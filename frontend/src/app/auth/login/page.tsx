@@ -16,69 +16,50 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { apiUrl } from "../../../lib/api";
-
-type LoginResponse = {
-  success: boolean;
-  message: string;
-  data?: {
-    access_token: string;
-    refresh_token: string;
-    user: {
-      id: number;
-      email: string;
-      user_type: string;
-      is_email_verified: boolean;
-      is_active: boolean;
-    };
-  };
-};
+import { getApiErrorMessage } from "../../../lib/api-error";
+import { persistAuthSession } from "../../../lib/auth-storage";
+import { useAppDispatch } from "../../../store/hooks";
+import { setAuthSession } from "../../../store/slices/authSlice";
+import { useLoginMutation } from "../../../store/services/authApi";
 
 export default function LoginPage() {
   const router = useRouter();
+  const dispatch = useAppDispatch();
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [remember, setRemember] = React.useState(false);
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState("");
+  const [login, { isLoading }] = useLoginMutation();
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setIsSubmitting(true);
     setErrorMessage("");
 
     try {
-      const response = await fetch(apiUrl("/api/auth/login"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      const result = await login({
           email: email.trim().toLowerCase(),
           password,
+      }).unwrap();
+
+      dispatch(
+        setAuthSession({
+          accessToken: result.data.access_token,
+          refreshToken: result.data.refresh_token,
+          user: result.data.user,
         }),
+      );
+      persistAuthSession({
+        accessToken: result.data.access_token,
+        refreshToken: result.data.refresh_token,
+        user: result.data.user,
+        remember,
       });
-
-      const result = (await response.json()) as LoginResponse;
-
-      if (!response.ok || !result.success || !result.data) {
-        throw new Error(result.message || "Login failed. Please check your credentials.");
-      }
-
-      const storage = remember ? window.localStorage : window.sessionStorage;
-      storage.setItem("mollure_access_token", result.data.access_token);
-      storage.setItem("mollure_refresh_token", result.data.refresh_token);
-      storage.setItem("mollure_user", JSON.stringify(result.data.user));
 
       router.push("/");
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Login failed. Please check your credentials.",
+        getApiErrorMessage(error, "Login failed. Please check your credentials."),
       );
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -236,7 +217,7 @@ export default function LoginPage() {
                     <Button
                       type="submit"
                       variant="contained"
-                      disabled={isSubmitting}
+                      disabled={isLoading}
                       sx={{
                         minHeight: 54,
                         borderRadius: 999,
@@ -247,7 +228,7 @@ export default function LoginPage() {
                         boxShadow: "0 18px 40px rgba(0, 169, 180, 0.24)",
                       }}
                     >
-                      {isSubmitting ? "Signing In..." : "Sign In"}
+                      {isLoading ? "Signing In..." : "Sign In"}
                     </Button>
 
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, fontSize: 12, color: "#94a3b8" }}>

@@ -14,13 +14,8 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { apiUrl } from "../../../../lib/api";
-
-type ResetPasswordResponse = {
-  success: boolean;
-  message: string;
-  data?: unknown;
-};
+import { getApiErrorMessage } from "../../../../lib/api-error";
+import { useResetPasswordMutation } from "../../../../store/services/authApi";
 
 export default function NewPasswordPage() {
   const router = useRouter();
@@ -28,8 +23,8 @@ export default function NewPasswordPage() {
   const [userId, setUserId] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState("");
+  const [resetPassword, { isLoading }] = useResetPasswordMutation();
 
   React.useEffect(() => {
     const savedEmail = window.sessionStorage.getItem("mollure_reset_email") || "";
@@ -52,35 +47,17 @@ export default function NewPasswordPage() {
       return;
     }
 
-    setIsSubmitting(true);
-
     try {
-      const response = await fetch(apiUrl("/api/auth/reset-password"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          user_id: Number(userId),
-          new_password: password,
-          confirm_password: confirmPassword,
-        }),
-      });
-
-      const result = (await response.json()) as ResetPasswordResponse;
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || "Unable to reset password.");
-      }
+      await resetPassword({
+        user_id: Number(userId),
+        new_password: password,
+        confirm_password: confirmPassword,
+      }).unwrap();
 
       window.sessionStorage.removeItem("mollure_reset_user_id");
       router.push("/auth/reset-password/success");
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Unable to reset password.",
-      );
-    } finally {
-      setIsSubmitting(false);
+      setErrorMessage(getApiErrorMessage(error, "Unable to reset password."));
     }
   };
 
@@ -143,8 +120,8 @@ export default function NewPasswordPage() {
 
                     {errorMessage ? <Alert severity="error">{errorMessage}</Alert> : null}
 
-                    <Button type="submit" variant="contained" disabled={isSubmitting} sx={{ minHeight: 54, borderRadius: 999, textTransform: "none", fontSize: "1rem", fontWeight: 800, background: "linear-gradient(135deg, #10233f 0%, #00a9b4 100%)", boxShadow: "0 18px 40px rgba(0, 169, 180, 0.24)" }}>
-                      {isSubmitting ? "Resetting..." : "Reset Password"}
+                    <Button type="submit" variant="contained" disabled={isLoading} sx={{ minHeight: 54, borderRadius: 999, textTransform: "none", fontSize: "1rem", fontWeight: 800, background: "linear-gradient(135deg, #10233f 0%, #00a9b4 100%)", boxShadow: "0 18px 40px rgba(0, 169, 180, 0.24)" }}>
+                      {isLoading ? "Resetting..." : "Reset Password"}
                     </Button>
 
                     <Typography variant="body2" textAlign="center" color="text.secondary">

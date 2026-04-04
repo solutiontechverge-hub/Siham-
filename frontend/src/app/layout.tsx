@@ -1,5 +1,6 @@
 import "./globals.css";
 import ThemeRegistry from "../theme/ThemeRegistry";
+import StoreProvider from "../store/provider";
 
 export const metadata = {
   title: "Mollure Frontend",
@@ -14,7 +15,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <ThemeRegistry>{children}</ThemeRegistry>
+        <StoreProvider>
+          <ThemeRegistry>{children}</ThemeRegistry>
+        </StoreProvider>
       </body>
     </html>
   );

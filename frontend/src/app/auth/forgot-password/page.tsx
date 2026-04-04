@@ -15,42 +15,24 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { apiUrl } from "../../../lib/api";
-
-type ForgotPasswordResponse = {
-  success: boolean;
-  message: string;
-  data: null;
-};
+import { getApiErrorMessage } from "../../../lib/api-error";
+import { useForgotPasswordMutation } from "../../../store/services/authApi";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
   const [email, setEmail] = React.useState("");
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [successMessage, setSuccessMessage] = React.useState("");
   const [errorMessage, setErrorMessage] = React.useState("");
+  const [forgotPassword, { isLoading }] = useForgotPasswordMutation();
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    setIsSubmitting(true);
     setSuccessMessage("");
     setErrorMessage("");
 
     try {
-      const response = await fetch(apiUrl("/api/auth/forgot-password"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      const result = (await response.json()) as ForgotPasswordResponse;
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || "Unable to send OTP right now.");
-      }
+      const result = await forgotPassword({ email }).unwrap();
 
       setSuccessMessage(
         result.message || "OTP sent to your email if it exists in our system.",
@@ -61,12 +43,8 @@ export default function ForgotPasswordPage() {
       }, 700);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Something went wrong while sending the OTP.",
+        getApiErrorMessage(error, "Something went wrong while sending the OTP."),
       );
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -226,7 +204,7 @@ export default function ForgotPasswordPage() {
                     <Button
                       type="submit"
                       variant="contained"
-                      disabled={isSubmitting}
+                      disabled={isLoading}
                       sx={{
                         minHeight: 54,
                         borderRadius: 999,
@@ -238,7 +216,7 @@ export default function ForgotPasswordPage() {
                         boxShadow: "0 18px 40px rgba(0, 169, 180, 0.24)",
                       }}
                     >
-                      {isSubmitting ? (
+                      {isLoading ? (
                         <Stack direction="row" spacing={1.25} alignItems="center">
                           <CircularProgress size={18} sx={{ color: "#fff" }} />
                           <span>Sending...</span>

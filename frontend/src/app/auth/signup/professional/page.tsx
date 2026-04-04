@@ -18,13 +18,8 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { apiUrl } from "../../../../lib/api";
-
-type RegisterResponse = {
-  success: boolean;
-  message: string;
-  data: unknown;
-};
+import { getApiErrorMessage } from "../../../../lib/api-error";
+import { useRegisterMutation } from "../../../../store/services/authApi";
 
 type FormState = {
   legalName: string;
@@ -70,9 +65,9 @@ const initialForm: FormState = {
 
 export default function ProfessionalSignupPage() {
   const [form, setForm] = React.useState<FormState>(initialForm);
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [successMessage, setSuccessMessage] = React.useState("");
   const [errorMessage, setErrorMessage] = React.useState("");
+  const [register, { isLoading }] = useRegisterMutation();
 
   const handleChange = (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -100,15 +95,8 @@ export default function ProfessionalSignupPage() {
       return;
     }
 
-    setIsSubmitting(true);
-
     try {
-      const response = await fetch(apiUrl("/api/auth/register"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      const result = await register({
           user_type: "professional",
           email: form.contactEmail.trim().toLowerCase(),
           password: form.password,
@@ -127,14 +115,7 @@ export default function ProfessionalSignupPage() {
           other_link: form.otherLink.trim() || undefined,
           contact_first_name: form.contactFirstName.trim(),
           contact_last_name: form.contactLastName.trim(),
-        }),
-      });
-
-      const result = (await response.json()) as RegisterResponse;
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || "Registration failed.");
-      }
+      }).unwrap();
 
       setSuccessMessage(
         result.message ||
@@ -143,12 +124,8 @@ export default function ProfessionalSignupPage() {
       setForm(initialForm);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Registration failed. Please check the details.",
+        getApiErrorMessage(error, "Registration failed. Please check the details."),
       );
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
@@ -378,7 +355,7 @@ export default function ProfessionalSignupPage() {
                       <Button
                         type="submit"
                         variant="contained"
-                        disabled={isSubmitting}
+                        disabled={isLoading}
                         sx={{
                           minWidth: 220,
                           minHeight: 54,
@@ -391,7 +368,7 @@ export default function ProfessionalSignupPage() {
                           boxShadow: "0 18px 40px rgba(0, 169, 180, 0.24)",
                         }}
                       >
-                        {isSubmitting ? (
+                        {isLoading ? (
                           <Stack direction="row" spacing={1.25} alignItems="center">
                             <CircularProgress size={18} sx={{ color: "#fff" }} />
                             <span>Registering...</span>

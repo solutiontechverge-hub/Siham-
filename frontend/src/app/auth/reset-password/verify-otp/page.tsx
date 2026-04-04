@@ -14,24 +14,20 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { apiUrl } from "../../../../lib/api";
-
-type VerifyOtpResponse = {
-  success: boolean;
-  message: string;
-  data?: {
-    user_id: number;
-  };
-};
+import { getApiErrorMessage } from "../../../../lib/api-error";
+import {
+  useForgotPasswordMutation,
+  useVerifyOtpMutation,
+} from "../../../../store/services/authApi";
 
 export default function VerifyOtpPage() {
   const router = useRouter();
   const [email, setEmail] = React.useState("");
   const [digits, setDigits] = React.useState(["", "", "", "", "", ""]);
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [isResending, setIsResending] = React.useState(false);
   const [successMessage, setSuccessMessage] = React.useState("");
   const [errorMessage, setErrorMessage] = React.useState("");
+  const [verifyOtp, { isLoading: isVerifying }] = useVerifyOtpMutation();
+  const [forgotPassword, { isLoading: isResending }] = useForgotPasswordMutation();
 
   React.useEffect(() => {
     const savedEmail = window.sessionStorage.getItem("mollure_reset_email") || "";
@@ -61,25 +57,11 @@ export default function VerifyOtpPage() {
       return;
     }
 
-    setIsSubmitting(true);
-
     try {
-      const response = await fetch(apiUrl("/api/auth/verify-otp"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: email.trim().toLowerCase(),
-          otp,
-        }),
-      });
-
-      const result = (await response.json()) as VerifyOtpResponse;
-
-      if (!response.ok || !result.success || !result.data?.user_id) {
-        throw new Error(result.message || "OTP verification failed.");
-      }
+      const result = await verifyOtp({
+        email: email.trim().toLowerCase(),
+        otp,
+      }).unwrap();
 
       window.sessionStorage.setItem("mollure_reset_email", email.trim().toLowerCase());
       window.sessionStorage.setItem("mollure_reset_user_id", String(result.data.user_id));
@@ -89,11 +71,7 @@ export default function VerifyOtpPage() {
         router.push("/auth/reset-password/new");
       }, 700);
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "OTP verification failed.",
-      );
-    } finally {
-      setIsSubmitting(false);
+      setErrorMessage(getApiErrorMessage(error, "OTP verification failed."));
     }
   };
 
@@ -103,35 +81,18 @@ export default function VerifyOtpPage() {
       return;
     }
 
-    setIsResending(true);
     setErrorMessage("");
     setSuccessMessage("");
 
     try {
-      const response = await fetch(apiUrl("/api/auth/forgot-password"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: email.trim().toLowerCase(),
-        }),
-      });
-
-      const result = (await response.json()) as { success: boolean; message: string };
-
-      if (!response.ok || !result.success) {
-        throw new Error(result.message || "Unable to resend OTP.");
-      }
+      const result = await forgotPassword({
+        email: email.trim().toLowerCase(),
+      }).unwrap();
 
       window.sessionStorage.setItem("mollure_reset_email", email.trim().toLowerCase());
       setSuccessMessage(result.message || "OTP sent again.");
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Unable to resend OTP.",
-      );
-    } finally {
-      setIsResending(false);
+      setErrorMessage(getApiErrorMessage(error, "Unable to resend OTP."));
     }
   };
 
@@ -191,8 +152,8 @@ export default function VerifyOtpPage() {
                     {successMessage ? <Alert severity="success">{successMessage}</Alert> : null}
                     {errorMessage ? <Alert severity="error">{errorMessage}</Alert> : null}
 
-                    <Button type="submit" variant="contained" disabled={isSubmitting} sx={{ minHeight: 54, borderRadius: 999, textTransform: "none", fontSize: "1rem", fontWeight: 800, background: "linear-gradient(135deg, #10233f 0%, #00a9b4 100%)", boxShadow: "0 18px 40px rgba(0, 169, 180, 0.24)" }}>
-                      {isSubmitting ? "Verifying..." : "Verify OTP"}
+                    <Button type="submit" variant="contained" disabled={isVerifying} sx={{ minHeight: 54, borderRadius: 999, textTransform: "none", fontSize: "1rem", fontWeight: 800, background: "linear-gradient(135deg, #10233f 0%, #00a9b4 100%)", boxShadow: "0 18px 40px rgba(0, 169, 180, 0.24)" }}>
+                      {isVerifying ? "Verifying..." : "Verify OTP"}
                     </Button>
 
                     <Typography variant="body2" textAlign="center" color="text.secondary">
