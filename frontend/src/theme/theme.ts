@@ -3,9 +3,6 @@
 import { createTheme } from "@mui/material/styles";
 
 const theme = createTheme({
-  typography: {
-    fontFamily: "var(--font-poppins), Poppins, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
-  },
   palette: {
     mode: "light",
     primary: {
@@ -24,8 +21,8 @@ const theme = createTheme({
     },
     mollure: {
       teal: "#21B8BF",
-      tealDark: "#1EA6AC",
-      navy: "#344054",
+      tealDark: "#149CA7",
+      navy: "#344A66",
       slate: "#71819A",
       surface: "#F7FBFD",
       footer: "#223648",
@@ -44,7 +41,7 @@ const theme = createTheme({
       inputBorderHover: "#B9CDD9",
       placeholder: "#9AA9B9",
       headerHint: "#90A0B1",
-      bodyText: "#667085",
+      bodyText: "#698096",
       avatarBg: "#EAF6FF",
       star: "#FFB547",
       logoPrimary: "#6AD6D4",

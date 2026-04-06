@@ -47,6 +47,10 @@ router.post(
       .optional({ values: "falsy" })
       .isURL()
       .withMessage("website must be a valid URL."),
+    body("other_link")
+      .optional({ values: "falsy" })
+      .isURL()
+      .withMessage("other_link must be a valid URL."),
     body("experience_years")
       .optional({ values: "falsy" })
       .isInt({ min: 0 })

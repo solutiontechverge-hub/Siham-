@@ -22,10 +22,6 @@ import { clientsPageData } from "./clients.data";
 import { getFeatureIcon, useClientsPageTokens } from "./clients.use";
 import Image from "next/image";
 import { Profile as AvatarImage, Logo } from "../../../images";
-import { Swiper, SwiperSlide } from "swiper/react";
-import "swiper/css";
-import "swiper/css/pagination";
-import { Autoplay, Pagination } from "swiper/modules";
 
 export default function ClientsPage() {
   const tokens = useClientsPageTokens();
@@ -62,7 +58,18 @@ export default function ClientsPage() {
                 sx={{ display: { xs: "none", md: "flex" } }}
               >
                 {header.navItems.map((item) => (
-                  <Typography key={item} sx={{ fontSize: 14, color: tokens.slate }}>
+                  <Typography
+                    key={item}
+                    component={item === "How It Works" ? Link : "span"}
+                    href={item === "How It Works" ? "/how-it-works" : undefined}
+                    sx={{
+                      fontSize: 14,
+                      color: tokens.slate,
+                      textDecoration: "none",
+                      cursor: item === "How It Works" ? "pointer" : "default",
+                      "&:hover": item === "How It Works" ? { color: tokens.navy } : undefined,
+                    }}
+                  >
                     {item}
                   </Typography>
                 ))}
@@ -425,21 +432,9 @@ export default function ClientsPage() {
           {testimonialsSection.title}
         </Typography>
 
-        <Swiper
-          spaceBetween={22}
-          slidesPerView={1}
-          breakpoints={{
-            640: { slidesPerView: 2 },
-            900: { slidesPerView: 3 },
-            1200: { slidesPerView: 4 },
-          }}
-          modules={[Autoplay, Pagination]}
-          autoplay={{ delay: 3000, disableOnInteraction: false }}
-          pagination={{ clickable: true }}
-          style={{ paddingBottom: 34 }}
-        >
+        <Grid container spacing={2.5}>
           {testimonialsSection.items.map((testimonial) => (
-            <SwiperSlide key={testimonial.id}>
+            <Grid item xs={12} sm={6} md={4} lg={3} key={testimonial.id}>
               <Card
                 sx={{
                   height: "100%",
@@ -451,7 +446,15 @@ export default function ClientsPage() {
                 }}
               >
                 <CardContent sx={{ p: 0 }}>
-                  <Box sx={{ bgcolor: tokens.surface, px: 2, pt: 2, pb: 3, position: "relative" }}>
+                  <Box
+                    sx={{
+                      bgcolor: "rgba(33, 184, 191, 0.10)",
+                      px: 2,
+                      pt: 2,
+                      pb: 3,
+                      position: "relative",
+                    }}
+                  >
                     <Stack direction="row" spacing={1.5} alignItems="center">
                       <Box
                         sx={{
@@ -520,9 +523,9 @@ export default function ClientsPage() {
                   </Box>
                 </CardContent>
               </Card>
-            </SwiperSlide>
+            </Grid>
           ))}
-        </Swiper>
+        </Grid>
       </Container>
 
       <Box sx={{ bgcolor: tokens.teal, py: { xs: 7, md: 8 } }}>
