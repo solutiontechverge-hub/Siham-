@@ -29,6 +29,10 @@ declare module "@mui/material/styles" {
     logoSecondary: string;
     logoAccent: string;
     logoText: string;
+    bgshadow: string;
+    cardbg: string;
+    textcolorgrey700: string;
+    warmwarning: string;
   }
 
   interface Palette {

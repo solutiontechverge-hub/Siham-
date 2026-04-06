@@ -1,6 +1,5 @@
 "use client";
 
-import LanguageRoundedIcon from "@mui/icons-material/LanguageRounded";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
 import {
   Avatar,
@@ -10,7 +9,6 @@ import {
   CardContent,
   Chip,
   Container,
-  Divider,
   Grid,
   MenuItem,
   Stack,
@@ -21,7 +19,8 @@ import Link from "next/link";
 import { clientsPageData } from "./clients.data";
 import { getFeatureIcon, useClientsPageTokens } from "./clients.use";
 import Image from "next/image";
-import { Profile as AvatarImage, Logo } from "../../../images";
+import { Profile as AvatarImage } from "../../../images";
+import { MarketingSiteFooter, MarketingSiteHeader } from "../../components/common";
 
 export default function ClientsPage() {
   const tokens = useClientsPageTokens();
@@ -30,97 +29,13 @@ export default function ClientsPage() {
 
   return (
     <Box sx={{ bgcolor: "background.default", color: tokens.navy }}>
-      <Box
-        component="header"
-        sx={{
-          position: "sticky",
-          top: 0,
-          zIndex: 10,
-          bgcolor: tokens.whiteOverlay,
-          backdropFilter: "blur(10px)",
-          borderBottom: `1px solid ${tokens.border}`,
-        }}
-      >
-        <Container maxWidth="lg" sx={{ py: 1.75 }}>
-          <Stack
-            direction="row"
-            alignItems="center"
-            justifyContent="space-between"
-            spacing={2}
-          >
-            <Stack direction="row" alignItems="center" spacing={4}>
-              <Box component={Link} href="/" sx={{ display: "inline-flex", alignItems: "center" }}>
-                <Image src={Logo} alt="Mollure" width={160} height={38} priority />
-              </Box>
-              <Stack
-                direction="row"
-                spacing={3}
-                sx={{ display: { xs: "none", md: "flex" } }}
-              >
-                {header.navItems.map((item) => (
-                  <Typography
-                    key={item}
-                    component={item === "How It Works" ? Link : "span"}
-                    href={item === "How It Works" ? "/how-it-works" : undefined}
-                    sx={{
-                      fontSize: 14,
-                      color: tokens.slate,
-                      textDecoration: "none",
-                      cursor: item === "How It Works" ? "pointer" : "default",
-                      "&:hover": item === "How It Works" ? { color: tokens.navy } : undefined,
-                    }}
-                  >
-                    {item}
-                  </Typography>
-                ))}
-              </Stack>
-            </Stack>
-
-            <Stack direction="row" alignItems="center" spacing={1.25}>
-              <Button
-                startIcon={<LanguageRoundedIcon sx={{ fontSize: 16 }} />}
-                sx={{
-                  minWidth: 0,
-                  px: 1.25,
-                  py: 0.6,
-                  borderRadius: 999,
-                  color: tokens.navy,
-                  border: `1px solid ${tokens.border}`,
-                  textTransform: "none",
-                  fontSize: 13,
-                }}
-              >
-                {header.localeLabel}
-              </Button>
-              <Button
-                variant="contained"
-                disableElevation
-                sx={{
-                  px: 2.25,
-                  py: 0.85,
-                  borderRadius: 999,
-                  textTransform: "none",
-                  color: "#fff",
-                  bgcolor: tokens.teal,
-                  // fontWeight: 700,
-                  "&:hover": { bgcolor: tokens.teal },
-                }}
-              >
-                {header.loginLabel}
-              </Button>
-              <Typography
-                sx={{
-                  display: { xs: "none", sm: "block" },
-                  fontSize: 13,
-                  color: tokens.headerHint,
-                }}
-              >
-                {header.professionalLinkLabel}
-              </Typography>
-            </Stack>
-          </Stack>
-        </Container>
-      </Box>
+      <MarketingSiteHeader
+        navItems={[...header.navItems]}
+        localeLabel={header.localeLabel}
+        loginLabel={header.loginLabel}
+        professionalLinkLabel={header.professionalLinkLabel}
+        professionalHref={header.professionalHref}
+      />
 
       <Box
         sx={{
@@ -575,30 +490,10 @@ export default function ClientsPage() {
         </Container>
       </Box>
 
-      <Box sx={{ bgcolor: tokens.footer, color: tokens.footerText, pt: 6, pb: 3 }}>
-        <Container maxWidth="lg">
-          <Grid container spacing={4}>
-            {footer.columns.map((column, index) => (
-              <Grid item xs={12} sm={6} md={index === 0 ? 4 : 2} key={column.title}>
-                <Typography sx={{ mb: 1.6, fontWeight: 800, color: "#fff" }}>
-                  {column.title}
-                </Typography>
-                <Stack spacing={1.15}>
-                  {column.items.map((item) => (
-                    <Typography key={item} sx={{ color: tokens.footerText, lineHeight: 1.8 }}>
-                      {item}
-                    </Typography>
-                  ))}
-                </Stack>
-              </Grid>
-            ))}
-          </Grid>
-          <Divider sx={{ my: 3.5, borderColor: "rgba(255,255,255,0.08)" }} />
-          <Typography sx={{ color: tokens.footerMuted, fontSize: 13 }}>
-            {footer.copyright}
-          </Typography>
-        </Container>
-      </Box>
+      <MarketingSiteFooter
+        columns={[...footer.columns]}
+        copyright={footer.copyright}
+      />
     </Box>
   );
 }

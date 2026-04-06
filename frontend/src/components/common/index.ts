@@ -10,3 +10,7 @@ export { default as AppTextField } from "./AppTextField";
 export { default as ContentCard } from "./ContentCard";
 export { default as FilterPanel } from "./FilterPanel";
 export { default as ImageCard } from "./ImageCard";
+export { default as MarketingSiteHeader } from "./MarketingSiteHeader";
+export { default as MarketingSiteFooter } from "./MarketingSiteFooter";
+export type { MarketingNavItem } from "./MarketingSiteHeader";
+export type { MarketingFooterColumn } from "./MarketingSiteFooter";

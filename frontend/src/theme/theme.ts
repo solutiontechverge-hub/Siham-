@@ -48,6 +48,10 @@ const theme = createTheme({
       logoSecondary: "#56C7D2",
       logoAccent: "#A7E9A8",
       logoText: "#62758A",
+      bgshadow: "#F9FAFB",
+      cardbg: "#F8FFFF",
+      textcolorgrey700:"#344054",
+      warmwarning:'#FFFCF5'
     },
     
   },

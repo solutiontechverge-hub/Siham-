@@ -1,3 +1,8 @@
+import {
+  marketingShellFooter,
+  marketingShellHeader,
+} from "../../data/marketingShell.data";
+
 export type ClientFeatureIconKey =
   | "location"
   | "booking"
@@ -38,12 +43,7 @@ export type ClientFilter = {
 };
 
 export const clientsPageData = {
-  header: {
-    navItems: ["How It Works", "About"],
-    localeLabel: "EN",
-    loginLabel: "Login",
-    professionalLinkLabel: "for professional",
-  },
+  header: marketingShellHeader,
   hero: {
     eyebrow: "Beauty & Grooming For Your Time",
     title: "Book Beauty And Grooming Professionals On Your Terms",
@@ -144,27 +144,5 @@ export const clientsPageData = {
     action: "Partner with Mollure",
     supportingText: "Credit card required - free for first 50 transactions",
   },
-  footer: {
-    columns: [
-      {
-        title: "Mollure",
-        items: [
-          "The all-in-one platform for salon and freelance appointment management.",
-        ],
-      },
-      {
-        title: "Product",
-        items: ["How It Works", "Browse Professionals", "Pricing"],
-      },
-      {
-        title: "Company",
-        items: ["About", "Careers", "Contact"],
-      },
-      {
-        title: "Legal",
-        items: ["Privacy", "Terms", "Security"],
-      },
-    ] satisfies ClientFooterColumn[],
-    copyright: "2026 Mollure. All rights reserved.",
-  },
+  footer: marketingShellFooter,
 } as const;
