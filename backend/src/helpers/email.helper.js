@@ -8,9 +8,34 @@ const requiredEmailEnv = [
   "SMTP_FROM",
 ];
 
+const placeholderValues = new Set([
+  "",
+  "smtp.example.com",
+  "example@example.com",
+  "your-email@example.com",
+  "change-me",
+]);
+
+const isPlaceholderValue = (value) => {
+  if (!value) {
+    return true;
+  }
+
+  const normalizedValue = String(value).trim().toLowerCase();
+
+  return (
+    placeholderValues.has(normalizedValue) ||
+    normalizedValue.includes("example.com")
+  );
+};
+
 const ensureEmailConfig = () => {
   const missing = requiredEmailEnv.filter((key) => !process.env[key]);
-  return missing.length === 0;
+  const hasPlaceholderConfig = requiredEmailEnv.some((key) =>
+    isPlaceholderValue(process.env[key]),
+  );
+
+  return missing.length === 0 && !hasPlaceholderConfig;
 };
 
 const getTransporter = () => {
@@ -20,27 +45,43 @@ const getTransporter = () => {
     });
   }
 
+  const port = Number(process.env.SMTP_PORT);
+  const secure =
+    process.env.SMTP_SECURE === "true" || port === 465;
+
   return nodemailer.createTransport({
     host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT),
-    secure: Number(process.env.SMTP_PORT) === 465,
+    port,
+    secure,
     auth: {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASS,
+    },
+    tls: {
+      rejectUnauthorized: false,
     },
   });
 };
 
 const sendMail = async ({ to, subject, html, text }) => {
   const transporter = getTransporter();
+  const isRealEmailConfig = ensureEmailConfig();
 
-  await transporter.sendMail({
-    from: process.env.SMTP_FROM,
+  const info = await transporter.sendMail({
+    from: process.env.SMTP_FROM || "no-reply@localhost",
     to,
     subject,
     html,
     text,
   });
+
+  if (!isRealEmailConfig) {
+    console.warn(
+      `[email] SMTP is not fully configured. Email was captured locally for ${to}: ${subject}`,
+    );
+  }
+
+  return info;
 };
 
 export const sendVerificationEmail = async ({ email, token }) => {
