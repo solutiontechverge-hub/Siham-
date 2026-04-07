@@ -1,8 +1,8 @@
 "use client";
 
+import * as React from "react";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
 import {
-  Avatar,
   Box,
   Button,
   Card,
@@ -15,17 +15,27 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import Link from "next/link";
 import { clientsPageData } from "./clients.data";
 import { getFeatureIcon, useClientsPageTokens } from "./clients.use";
 import Image from "next/image";
 import { Profile as AvatarImage } from "../../../images";
-import { MarketingSiteFooter, MarketingSiteHeader } from "../../components/common";
+import {
+  MarketingSectionHeading,
+  MarketingSiteFooter,
+  MarketingSiteHeader,
+} from "../../components/common";
 
 export default function ClientsPage() {
   const tokens = useClientsPageTokens();
   const { header, hero, whyChooseSection, stepsSection, testimonialsSection, professionalCta, footer } =
     clientsPageData;
+  const [filterValues, setFilterValues] = React.useState<Record<string, string>>(
+    () =>
+      Object.fromEntries(hero.filters.map((f) => [f.label, ""])) as Record<
+        string,
+        string
+      >
+  );
 
   return (
     <Box sx={{ bgcolor: "background.default", color: tokens.navy }}>
@@ -50,11 +60,12 @@ export default function ClientsPage() {
             inset: 0,
             opacity: 0.65,
             background: tokens.heroGlow,
+            pointerEvents: "none",
           }}
         />
         <Container
           maxWidth="lg"
-          sx={{ position: "relative", py: { xs: 7, md: 10 } }}
+          sx={{ position: "relative", zIndex: 1, py: { xs: 7, md: 10 } }}
         >
           <Stack alignItems="center" textAlign="center">
             <Chip
@@ -70,10 +81,10 @@ export default function ClientsPage() {
               component="h1"
               sx={{
                 maxWidth: 900,
-                fontSize: { xs: "2.2rem", md: "3.6rem" },
+                fontSize: { xs: "2.1rem", md: "3.2rem" },
                 lineHeight: 1.08,
-                fontWeight: 700,
-                color: tokens.navy,
+                fontWeight: 600,
+                color: tokens.textcolorgrey700,
                 letterSpacing: "-0.04em",
               }}
             >
@@ -86,6 +97,7 @@ export default function ClientsPage() {
                 fontSize: { xs: 15, md: 18 },
                 color: tokens.bodyText,
                 lineHeight: 1.75,
+                fontWeight: 400,
               }}
             >
               {hero.description}
@@ -98,8 +110,10 @@ export default function ClientsPage() {
                 px: 3.5,
                 py: 1.35,
                 textTransform: "none",
-                fontWeight: 700,
-                hover: { border: `2px solid ${tokens.teal}` },
+                fontWeight: 600,
+                borderColor: tokens.teal,
+                color: tokens.tealDark,
+                "&:hover": { borderColor: tokens.teal, bgcolor: "rgba(255,255,255,0.35)" },
               }}
             >
               {hero.primaryAction}
@@ -137,9 +151,28 @@ export default function ClientsPage() {
                     <TextField
                       select={!!filter.options?.length}
                       fullWidth
-                      placeholder={filter.placeholder}
                       size="small"
-                      defaultValue=""
+                      value={filterValues[filter.label] ?? ""}
+                      onChange={(e) =>
+                        setFilterValues((prev) => ({
+                          ...prev,
+                          [filter.label]: e.target.value,
+                        }))
+                      }
+                      placeholder={!filter.options?.length ? filter.placeholder : undefined}
+                      SelectProps={{
+                        displayEmpty: true,
+                        MenuProps: {
+                          PaperProps: {
+                            sx: {
+                              mt: 1,
+                              borderRadius: 2,
+                              border: `1px solid ${tokens.border}`,
+                              boxShadow: "0 18px 44px rgba(16, 24, 40, 0.14)",
+                            },
+                          },
+                        },
+                      }}
                       sx={{
                         "& .MuiOutlinedInput-root": {
                           height: 44,
@@ -154,6 +187,17 @@ export default function ClientsPage() {
                         "& input::placeholder": { color: tokens.placeholder, opacity: 1 },
                       }}
                     >
+                      {filter.options?.length ? (
+                        <MenuItem
+                          value=""
+                          sx={{
+                            color: tokens.placeholder,
+                            fontStyle: "italic",
+                          }}
+                        >
+                          {filter.placeholder}
+                        </MenuItem>
+                      ) : null}
                       {filter.options?.map((option) => (
                         <MenuItem key={option} value={option}>
                           {option}
@@ -189,19 +233,7 @@ export default function ClientsPage() {
 
       <Box sx={{ bgcolor: tokens.surface, py: { xs: 8, md: 10 } }}>
         <Container maxWidth="lg">
-          <Typography
-            align="center"
-            sx={{
-              mb: 5.5,
-              fontSize: { xs: "2rem", md: "2.6rem" },
-              lineHeight: 1.1,
-              fontWeight: 800,
-              color: tokens.navy,
-              letterSpacing: "-0.03em",
-            }}
-          >
-            {whyChooseSection.title}
-          </Typography>
+          <MarketingSectionHeading title={whyChooseSection.title} />
 
           <Grid container spacing={2.5}>
             {whyChooseSection.items.map((item) => (
@@ -235,9 +267,9 @@ export default function ClientsPage() {
                       sx={{
                         mb: 0.85,
                         fontSize: 16,
-                        fontWeight: 800,
+                        fontWeight: 600,
                         lineHeight: 1.25,
-                        color: tokens.navy,
+                        color: tokens.textcolorgrey700,
                       }}
                     >
                       {item.title}
@@ -264,6 +296,7 @@ export default function ClientsPage() {
                         color: tokens.slate,
                         lineHeight: 1.75,
                         fontSize: 13,
+                        fontWeight: 400,
                       }}
                     >
                       {item.description}
@@ -278,18 +311,7 @@ export default function ClientsPage() {
 
       {/* Steps */}
       <Container maxWidth="lg" sx={{ py: { xs: 8, md: 10 } }}>
-        <Typography
-          align="center"
-          sx={{
-            mb: 5,
-            fontSize: { xs: "2rem", md: "2.8rem" },
-            fontWeight: 800,
-            lineHeight: 1.1,
-            color: tokens.navy,
-          }}
-        >
-          {stepsSection.title}
-        </Typography>
+        <MarketingSectionHeading title={stepsSection.title} />
 
         <Grid container spacing={2.5}>
           {stepsSection.items.map((step) => (
@@ -316,8 +338,8 @@ export default function ClientsPage() {
                     mt: 2.2,
                     mb: 0.9,
                     fontSize: 21,
-                    fontWeight: 800,
-                    color: tokens.navy,
+                    fontWeight: 600,
+                    color: tokens.textcolorgrey700,
                   }}
                 >
                   {step.title}
@@ -333,19 +355,7 @@ export default function ClientsPage() {
 
       {/* Testimonials */}
       <Container maxWidth="lg" sx={{ py: { xs: 7, md: 9 } }}>
-        <Typography
-          align="center"
-          sx={{
-            mb: 4,
-            fontSize: { xs: "2.2rem", md: "3.1rem" },
-            fontWeight: 900,
-            lineHeight: 1.05,
-            color: tokens.navy,
-            letterSpacing: "-0.03em",
-          }}
-        >
-          {testimonialsSection.title}
-        </Typography>
+        <MarketingSectionHeading title={testimonialsSection.title} mb={4} />
 
         <Grid container spacing={2.5}>
           {testimonialsSection.items.map((testimonial) => (

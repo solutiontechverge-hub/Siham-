@@ -4,6 +4,7 @@ import * as React from "react";
 import Image from "next/image";
 import { Box, Container, Stack, Typography } from "@mui/material";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
+import { AboutUsImage } from "../../../images";
 
 type AboutSplitSectionProps = {
   imageSrc: string;
@@ -26,15 +27,16 @@ export default function AboutSplitSection({
       id="about-split"
       component="section"
       aria-labelledby="about-split-heading"
-      sx={{ py: { xs: 4, md: 6 }, bgcolor: "background.default" }}
+      sx={{ py: { xs: 4, md: 6 }, }}
     >
-      <Container maxWidth="lg" sx={{ px: { xs: 2, sm: 3 } }}>
+      <Container maxWidth="lg" sx={{ px: { xs: 2, sm: 3 } }} >
         <Box
           sx={{
             display: "grid",
             gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
             gap: `${GUTTER_PX}px`,
-            bgcolor: "#0a0a0a",
+            // This gap becomes the vertical separator on desktop.
+            bgcolor: "#ffffff",
             borderRadius: OUTER_RADIUS,
             overflow: "hidden",
             boxShadow: "0 16px 48px rgba(16, 35, 63, 0.08)",
@@ -51,7 +53,7 @@ export default function AboutSplitSection({
             }}
           >
             <Image
-              src={imageSrc}
+              src={AboutUsImage}
               alt={imageAlt}
               fill
               sizes="(max-width: 900px) 100vw, 50vw"
@@ -63,7 +65,7 @@ export default function AboutSplitSection({
           <Box
             sx={{
               bgcolor: "primary.main",
-              color: "common.white",
+              // color: "common.white",
               display: "flex",
               flexDirection: "column",
               minHeight: { md: "100%" },

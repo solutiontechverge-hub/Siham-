@@ -1,0 +1,2 @@
+export { HowItWorksSectionTitle } from "./HowItWorksSectionTitle";
+

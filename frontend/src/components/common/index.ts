@@ -12,5 +12,6 @@ export { default as FilterPanel } from "./FilterPanel";
 export { default as ImageCard } from "./ImageCard";
 export { default as MarketingSiteHeader } from "./MarketingSiteHeader";
 export { default as MarketingSiteFooter } from "./MarketingSiteFooter";
+export { default as MarketingSectionHeading } from "./MarketingSectionHeading";
 export type { MarketingNavItem } from "./MarketingSiteHeader";
 export type { MarketingFooterColumn } from "./MarketingSiteFooter";

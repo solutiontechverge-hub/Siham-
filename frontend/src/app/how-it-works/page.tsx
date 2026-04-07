@@ -18,18 +18,18 @@ import {
   MarketingSiteFooter,
   MarketingSiteHeader,
 } from "../../components/common";
+import { HowItWorksSectionTitle } from "../../components/howItWorks";
 import {
   marketingShellFooter,
   marketingShellHeader,
 } from "../../data/marketingShell.data";
+import { howItWorksData } from "./howItWorks.data";
 import {
   CheckCircleOutline,
   CheckOutlined,
   CheckCircle,
   PersonPinCircleOutlined,
   LocationOnOutlined,
-  TuneOutlined,
-  ErrorOutlineOutlined,
   BoltOutlined,
   EventSeatOutlined,
   ScheduleOutlined,
@@ -60,19 +60,6 @@ const cardTitleSx = {
   color: "mollure.textcolorgrey700",
 } as const;
 
-const SectionTitle = ({ title }: { title: string }) => (
-  <Typography
-    variant="h4"
-    sx={{
-      ...sectionHeadingSx,
-      textAlign: "center",
-      mb: 4,
-    }}
-  >
-    {title}
-  </Typography>
-);
-
 const InfoCard = ({ title, points }: any) => (
   <Card sx={{ height: "100%", borderRadius: 3, boxShadow: 2 }}>
     <CardContent>
@@ -87,116 +74,12 @@ const InfoCard = ({ title, points }: any) => (
     </CardContent>
   </Card>
 );
-const fixedLocation = [
-  {
-    title: "Guest policy",
-    sub: "Book for yourself and add up to one guest",
-  },
-  {
-    title: "Service Timing",
-    sub: "Services start at the same time by default",
-  },
-  {
-    title: "Combinable Services",
-    sub: "Select multiple services if offered",
-  },
-  {
-    title: "Team Selection",
-    sub: "Assign different team members per service",
-  },
-];
-const desiredLocationIndividual = [
-  {
-    title: "Multiple Guests",
-    sub: "Add as many guests as needed",
-  },
-  {
-    title: "Sequential Services",
-    sub: "Services scheduled one after another",
-  },
-  {
-    title: "Single Team Member",
-    sub: "All services under one professional",
-  },
-  {
-    title: "Minimum Time Block",
-    sub: "Some professionals may require minimum duration",
-  },
-];
-export const desiredLocationBusiness = [
-  {
-    title: "Multiple Models",
-    sub: "Add As Many Model As Needed",
-  },
-  {
-    title: "Sequential Services",
-    sub: "Services Scheduled One After Another",
-  },
-  {
-    title: "Single Team Member",
-    sub: "All Services Under One Professional",
-  },
-  {
-    title: "Minimum Time Block",
-    sub: "Some Professionals May Require Minimum Duration",
-  },
-  {
-    title: "Project Details & File Uploads",
-    sub: "Include Comprehensive Project Information",
-  },
-  {
-    title: "Planning Details",
-    sub: "Upload Files And Images For Reference",
-  },
-];
-
-const points = [
-  "Sign Up Via Social Login Or Personal Registration",
-  "Manage Profile",
-  "Control Over Profile Visibility",
-  "Book Services For Personal Needs",
-  "Receive Invoices For Online Payment",
-];
-const businessPoints = [
-  "Register with business details  ",
-  "Manage Profile",
-  "Project booking access",
-  "Book services for personal or Business needs",
-  "Receive tax-compliant invoices (online or offline)",
-];
 
 export default function HowItWorksPage() {
   const theme = useTheme();
   const bgshadow = theme.palette.mollure.bgshadow;
   const cardbg = theme.palette.mollure.cardbg;
   const textcolorgrey700 = theme.palette.mollure.textcolorgrey700;
-
-  const keyPrinciples = [
-    {
-      title: "Client-Created Bookings",
-      description:
-        "Fixed location bookings are confirmed instantly. Desired location bookings are always sent as a booking request when created by a client.",
-      Icon: LocationOnOutlined,
-    },
-    {
-      title: "Professional-Created Bookings",
-      description:
-        "Bookings created by professionals are always sent as a booking request, regardless of location.",
-      Icon: TuneOutlined,
-    },
-    {
-      title: "Changes Requiring Approval",
-      description:
-        "Major changes require approval, so nothing important changes without you knowing.",
-      Icon: ErrorOutlineOutlined,
-    },
-    {
-      title: "Changes Without Approval",
-      description:
-        "Some changes are applied directly and clearly marked. When relevant, you'll be notified that the booking has been edited.",
-      Icon: BoltOutlined,
-    },
-  ] as const;
 
   return (
     <Box sx={{ bgcolor: "#f7f9fb" }}>
@@ -223,7 +106,7 @@ export default function HowItWorksPage() {
             fontSize: { xs: "1.75rem", sm: "2.125rem" },
           }}
         >
-          How Booking Works On Mollure
+          {howItWorksData.hero.title}
         </Typography>
         <Typography
           mt={2}
@@ -233,9 +116,7 @@ export default function HowItWorksPage() {
           color="text.secondary"
           sx={{ fontWeight: 400, lineHeight: 1.7 }}
         >
-          Interactive booking that puts clarity and communication first. Book
-          with confidence, knowing nothing important happens without your
-          approval.
+          {howItWorksData.hero.subtitle}
         </Typography>
       </Box>
 
@@ -249,17 +130,7 @@ export default function HowItWorksPage() {
         />
 
         <Box bgcolor={bgshadow} p={4} borderRadius={3} boxShadow={2} mt={3}>
-          <Typography
-            variant="h4"
-            sx={{
-              ...sectionHeadingSx,
-              textAlign: "center",
-              mb: 4,
-              mt: 2,
-            }}
-          >
-            Getting Started
-          </Typography>
+          <HowItWorksSectionTitle title="Getting Started" mb={4} />
           <Grid container spacing={4}>
             <Grid item xs={12} md={6}>
               <ContentCard>
@@ -286,7 +157,8 @@ export default function HowItWorksPage() {
 
                   {/* LIST */}
                   <Stack spacing={1.2}>
-                    {points.map((item, index) => (
+                    {howItWorksData.gettingStarted.individualPoints.map(
+                      (item, index) => (
                       <Stack
                         key={index}
                         direction="row"
@@ -331,7 +203,8 @@ export default function HowItWorksPage() {
 
                   {/* LIST */}
                   <Stack spacing={1.2}>
-                    {businessPoints.map((item, index) => (
+                    {howItWorksData.gettingStarted.businessPoints.map(
+                      (item, index) => (
                       <Stack
                         key={index}
                         direction="row"
@@ -352,29 +225,16 @@ export default function HowItWorksPage() {
             </Grid>
           </Grid>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-            Client profile information is controlled by the client. Professional
-            can view relevant details once a booking is confirmed and the client
-            has been added to the client list of the professional, but
-            professional cannot edit client user information.
+            {howItWorksData.gettingStarted.note}
           </Typography>
         </Box>
 
         {/* KEY PRINCIPLES */}
         <Box mt={10}>
-          <Typography
-            variant="h4"
-            sx={{
-              ...sectionHeadingSx,
-              textAlign: "center",
-              mb: 4,
-              mt: 2,
-            }}
-          >
-            Key Principles of Mollure
-          </Typography>
+          <HowItWorksSectionTitle title="Key Principles of Mollure" mb={4} />
 
           <Grid container spacing={3}>
-            {keyPrinciples.map(({ title, description, Icon }) => (
+            {howItWorksData.keyPrinciples.map(({ title, description, Icon }) => (
               <Grid item xs={12} sm={6} md={3} key={title}>
                 <ContentCard
                   sx={{
@@ -426,16 +286,7 @@ export default function HowItWorksPage() {
               borderRadius: "28px",
             }}
           >
-            <Typography
-              variant="h4"
-              sx={{
-                ...sectionHeadingSx,
-                textAlign: "center",
-                mb: 4,
-              }}
-            >
-              Booking Types and Setup
-            </Typography>
+            <HowItWorksSectionTitle title="Booking Types and Setup" mb={4} />
 
             <Stack spacing={4}>
               {/* Fixed Location */}
@@ -487,7 +338,7 @@ export default function HowItWorksPage() {
                   </Box>
 
                   <Grid container spacing={2.5}>
-                    {fixedLocation.map((f) => (
+                    {howItWorksData.bookingTypes.fixedLocation.map((f) => (
                       <Grid item xs={12} sm={6} key={f.title}>
                         <Stack
                           direction="row"
@@ -612,7 +463,8 @@ export default function HowItWorksPage() {
                       </Box>
                     </Box>
                     <Grid container spacing={2.5}>
-                      {desiredLocationIndividual.map((f) => (
+                      {howItWorksData.bookingTypes.desiredLocationStandard.map(
+                        (f) => (
                         <Grid item xs={12} sm={6} key={f.title}>
                           <Stack
                             direction="row"
@@ -682,7 +534,8 @@ export default function HowItWorksPage() {
                       </Box>
                     </Box>
                     <Grid container spacing={2.5}>
-                      {desiredLocationBusiness.map((f) => (
+                      {howItWorksData.bookingTypes.desiredLocationProject.map(
+                        (f) => (
                         <Grid item xs={12} sm={6} key={f.title}>
                           <Stack
                             direction="row"
@@ -749,7 +602,7 @@ export default function HowItWorksPage() {
         </Box>
         {/* REQUEST TYPES */}
         <Box mt={10} bgcolor={theme.palette.mollure.warmwarning}>
-          <SectionTitle title="Types of Requests" />
+          <HowItWorksSectionTitle title="Types of Requests" />
 
           <Stack spacing={3}>
             {/* Booking Request */}
@@ -1105,7 +958,7 @@ export default function HowItWorksPage() {
         {/* CHANGES */}
 
         <Box mt={10}>
-          <SectionTitle title="Changes Without Approval" />
+          <HowItWorksSectionTitle title="Changes Without Approval" />
 
           <Box
             sx={(t) => ({
