@@ -51,7 +51,8 @@ const theme = createTheme({
       bgshadow: "#F9FAFB",
       cardbg: "#F8FFFF",
       textcolorgrey700:"#344054",
-      warmwarning:'#FFFCF5'
+      warmwarning:'#FFFCF5',
+      white:'#FFFFFF',
     },
     
   },

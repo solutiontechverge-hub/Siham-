@@ -6,6 +6,7 @@ export const marketingShellHeader = {
   navItems: [
     { label: "How It Works", href: "/how-it-works" },
     { label: "About", href: "/about", match: "exact" as const },
+    { label: "Contact Us", href: "/contact-us", match: "exact" as const },
   ] satisfies MarketingNavItem[],
   localeLabel: "EN",
   loginLabel: "Login",

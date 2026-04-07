@@ -33,6 +33,7 @@ declare module "@mui/material/styles" {
     cardbg: string;
     textcolorgrey700: string;
     warmwarning: string;
+    white: string;
   }
 
   interface Palette {
