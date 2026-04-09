@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   Alert,
   Box,
@@ -13,17 +14,20 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { alpha } from "@mui/material/styles";
+import { alpha, useTheme } from "@mui/material/styles";
 import { getApiErrorMessage } from "../../../../lib/api-error";
 import {
   useForgotPasswordMutation,
   useVerifyOtpMutation,
 } from "../../../../store/services/authApi";
+import { Logo } from "../../../../../images";
 
 export default function VerifyOtpPage() {
+  const theme = useTheme();
+  const m = theme.palette.mollure;
   const router = useRouter();
   const [email, setEmail] = React.useState("");
-  const [digits, setDigits] = React.useState(["", "", "", "", "", ""]);
+  const [digits, setDigits] = React.useState(["", "", "", ""]);
   const [successMessage, setSuccessMessage] = React.useState("");
   const [errorMessage, setErrorMessage] = React.useState("");
   const [verifyOtp, { isLoading: isVerifying }] = useVerifyOtpMutation();
@@ -52,8 +56,8 @@ export default function VerifyOtpPage() {
     setSuccessMessage("");
 
     const otp = digits.join("");
-    if (otp.length !== 6) {
-      setErrorMessage("Please enter the 6-digit verification code.");
+    if (otp.length !== 4) {
+      setErrorMessage("Please enter the 4-digit verification code.");
       return;
     }
 
@@ -97,83 +101,228 @@ export default function VerifyOtpPage() {
   };
 
   return (
-    <Box sx={{ minHeight: "100vh", background: "radial-gradient(circle at top left, #d8ffff 0%, #f6fffd 34%, #f5f7fb 100%)", py: { xs: 3, md: 5 } }}>
-      <Container maxWidth="lg">
-        <Stack spacing={{ xs: 5, md: 8 }}>
-          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, flexWrap: "wrap" }}>
-            <Stack direction="row" spacing={1.5} alignItems="center">
-              <Box sx={{ width: 46, height: 46, borderRadius: "16px", background: "linear-gradient(135deg, #00c2b8 0%, #1177ff 100%)", boxShadow: "0 12px 30px rgba(17, 119, 255, 0.22)" }} />
-              <Typography variant="h5" sx={{ fontWeight: 800, letterSpacing: "-0.04em", color: "#10233f" }}>
-                Mollure
-              </Typography>
-            </Stack>
+    <Box
+      sx={{
+        minHeight: "100vh",
+        bgcolor: "#fff",
+        position: "relative",
+        overflow: "hidden",
+        "&:before": {
+          content: '""',
+          position: "absolute",
+          inset: 0,
+          background:
+            "radial-gradient(circle at 88% 42%, rgba(33, 184, 191, 0.10), transparent 42%)",
+          pointerEvents: "none",
+        },
+        "&:after": {
+          content: '""',
+          position: "absolute",
+          left: -120,
+          bottom: -130,
+          width: 320,
+          height: 320,
+          borderRadius: "50%",
+          border: `14px solid ${alpha(m.teal, 0.10)}`,
+          pointerEvents: "none",
+        },
+      }}
+    >
+      <Container maxWidth="lg" sx={{ position: "relative", zIndex: 1 }}>
+        <Box
+          sx={{
+            pt: 2.5,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 2,
+            flexWrap: "wrap",
+          }}
+        >
+          <Box
+            sx={{
+              position: "relative",
+              width: { xs: 84, sm: 96 },
+              height: { xs: 20, sm: 24 },
+              flexShrink: 0,
+            }}
+          >
+            <Image
+              src={Logo}
+              alt="Mollure"
+              fill
+              priority
+              sizes="96px"
+              style={{ objectFit: "contain" }}
+            />
           </Box>
 
-          <Box sx={{ display: "flex", justifyContent: "center" }}>
-            <Paper elevation={0} sx={{ width: "100%", maxWidth: 620, borderRadius: "32px", px: { xs: 3, sm: 5 }, py: { xs: 4, sm: 5 }, backgroundColor: "rgba(255,255,255,0.88)", backdropFilter: "blur(12px)", border: "1px solid rgba(16, 35, 63, 0.08)", boxShadow: "0 24px 80px rgba(16, 35, 63, 0.10)" }}>
-              <Stack spacing={3}>
-                <Box textAlign="center">
-                  <Typography variant="h3" sx={{ fontWeight: 900, letterSpacing: "-0.05em", color: "#10233f", fontSize: { xs: "2rem", sm: "2.75rem" } }}>
-                    Reset Password
-                  </Typography>
-                  <Typography sx={{ mt: 1.5, color: alpha("#10233f", 0.72), fontSize: "1rem" }}>
-                    Enter the 6 digit verification code sent to your email to change your password.
-                  </Typography>
-                </Box>
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+            <Button
+              variant="outlined"
+              size="small"
+              sx={{
+                borderRadius: 999,
+                borderColor: alpha(m.navy, 0.14),
+                color: m.navy,
+                px: 1.25,
+                textTransform: "none",
+                fontWeight: 600,
+                minHeight: 30,
+              }}
+            >
+              EN
+            </Button>
+            <Button
+              component={Link}
+              href="/auth/login"
+              variant="contained"
+              size="small"
+              sx={{
+                borderRadius: 999,
+                px: 1.8,
+                textTransform: "none",
+                fontWeight: 600,
+                minHeight: 30,
+                bgcolor: m.teal,
+                "&:hover": { bgcolor: m.tealDark },
+              }}
+            >
+              login
+            </Button>
+            <Button
+              component={Link}
+              href="/auth/professional/login"
+              variant="outlined"
+              size="small"
+              sx={{
+                borderRadius: 999,
+                borderColor: alpha(m.navy, 0.14),
+                color: alpha(m.navy, 0.72),
+                px: 1.8,
+                textTransform: "none",
+                fontWeight: 600,
+                minHeight: 30,
+              }}
+            >
+              for professional
+            </Button>
+          </Stack>
+        </Box>
 
-                <Box component="form" onSubmit={handleSubmit}>
-                  <Stack spacing={2.5}>
-                    <TextField
-                      fullWidth
-                      type="email"
-                      label="Email Address"
-                      value={email}
-                      onChange={(event) => setEmail(event.target.value)}
-                      required
-                      InputLabelProps={{ shrink: true }}
-                    />
+        <Box
+          sx={{
+            minHeight: "calc(100vh - 72px)",
+            display: "grid",
+            placeItems: "center",
+            pb: 6,
+          }}
+        >
+          <Paper
+            elevation={0}
+            sx={{
+              width: "100%",
+              maxWidth: 620,
+              borderRadius: "6px",
+              border: `1px solid ${alpha(m.navy, 0.10)}`,
+              boxShadow: "0 10px 30px rgba(16, 35, 63, 0.06)",
+              px: { xs: 3, sm: 4.5 },
+              py: { xs: 3, sm: 3.5 },
+            }}
+          >
+            <Stack spacing={2.25}>
+              <Box textAlign="center">
+                <Typography sx={{ fontWeight: 700, color: m.navy, fontSize: 22, lineHeight: 1.2 }}>
+                  Reset Password
+                </Typography>
+                <Typography sx={{ mt: 0.75, color: alpha(m.navy, 0.55), fontSize: 12.5, lineHeight: 1.4 }}>
+                  Enter The 4 Digit Verification Code That Was Sent To Your Email To Change Your Password
+                </Typography>
+              </Box>
 
-                    <Stack direction="row" spacing={1.5} justifyContent="center">
-                      {digits.map((digit, index) => (
-                        <TextField
-                          key={index}
-                          value={digit}
-                          onChange={(event) => handleDigitChange(index, event.target.value)}
-                          inputProps={{
-                            maxLength: 1,
-                            inputMode: "numeric",
-                            style: { textAlign: "center", fontSize: "1.2rem", fontWeight: 700 },
-                          }}
-                          sx={{ width: 56 }}
-                        />
-                      ))}
-                    </Stack>
-
-                    {successMessage ? <Alert severity="success">{successMessage}</Alert> : null}
-                    {errorMessage ? <Alert severity="error">{errorMessage}</Alert> : null}
-
-                    <Button type="submit" variant="contained" disabled={isVerifying} sx={{ minHeight: 54, borderRadius: 999, textTransform: "none", fontSize: "1rem", fontWeight: 800, background: "linear-gradient(135deg, #10233f 0%, #00a9b4 100%)", boxShadow: "0 18px 40px rgba(0, 169, 180, 0.24)" }}>
-                      {isVerifying ? "Verifying..." : "Verify OTP"}
-                    </Button>
-
-                    <Typography variant="body2" textAlign="center" color="text.secondary">
-                      Didn&apos;t receive a code?{" "}
-                      <Button type="button" variant="text" onClick={handleResend} disabled={isResending} sx={{ textTransform: "none", p: 0, minWidth: 0, fontWeight: 700 }}>
-                        {isResending ? "Resending..." : "Resend"}
-                      </Button>
-                    </Typography>
-
-                    <Typography variant="body2" textAlign="center" color="text.secondary">
-                      <Link href="/auth/forgot-password" style={{ color: "#00a9b4", textDecoration: "none", fontWeight: 700 }}>
-                        Back to forgot password
-                      </Link>
-                    </Typography>
+              <Box component="form" onSubmit={handleSubmit}>
+                <Stack spacing={1.8}>
+                  <Stack direction="row" spacing={1.25} justifyContent="center">
+                    {digits.map((digit, index) => (
+                      <TextField
+                        key={index}
+                        value={digit}
+                        onChange={(event) => handleDigitChange(index, event.target.value)}
+                        inputProps={{
+                          maxLength: 1,
+                          inputMode: "numeric",
+                          style: {
+                            textAlign: "center",
+                            fontSize: "1.15rem",
+                            fontWeight: 700,
+                            color: m.navy,
+                          },
+                        }}
+                        size="small"
+                        sx={{
+                          width: 64,
+                          "& .MuiOutlinedInput-root": {
+                            borderRadius: "8px",
+                            bgcolor: alpha(m.navy, 0.02),
+                          },
+                        }}
+                      />
+                    ))}
                   </Stack>
-                </Box>
-              </Stack>
-            </Paper>
-          </Box>
-        </Stack>
+
+                  {successMessage ? <Alert severity="success">{successMessage}</Alert> : null}
+                  {errorMessage ? <Alert severity="error">{errorMessage}</Alert> : null}
+
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    disableElevation
+                    disabled={isVerifying}
+                    sx={{
+                      borderRadius: "4px",
+                      textTransform: "none",
+                      fontWeight: 600,
+                      bgcolor: m.teal,
+                      "&:hover": { bgcolor: m.tealDark },
+                      minHeight: 38,
+                    }}
+                  >
+                    {isVerifying ? "Verifying..." : "send OTP"}
+                  </Button>
+
+                  <Typography textAlign="center" sx={{ color: alpha(m.navy, 0.55), fontSize: 12 }}>
+                    Didn&apos;t receive a code?{" "}
+                    <Button
+                      type="button"
+                      variant="text"
+                      onClick={handleResend}
+                      disabled={isResending}
+                      sx={{
+                        textTransform: "none",
+                        p: 0,
+                        minWidth: 0,
+                        fontWeight: 700,
+                        color: m.navy,
+                        "&:hover": { bgcolor: "transparent" },
+                      }}
+                    >
+                      {isResending ? "Resending..." : "Resend"}
+                    </Button>
+                  </Typography>
+
+                  <Typography textAlign="center" sx={{ color: alpha(m.navy, 0.55), fontSize: 12 }}>
+                    <Link
+                      href="/auth/forgot-password"
+                      style={{ color: m.teal, textDecoration: "none", fontWeight: 700 }}
+                    >
+                      Back to forgot password
+                    </Link>
+                  </Typography>
+                </Stack>
+              </Box>
+            </Stack>
+          </Paper>
+        </Box>
       </Container>
     </Box>
   );

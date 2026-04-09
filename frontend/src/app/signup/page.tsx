@@ -1,311 +1,300 @@
 "use client";
 
-import LanguageIcon from "@mui/icons-material/Language";
-import Groups2OutlinedIcon from "@mui/icons-material/Groups2Outlined";
-import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
-import BusinessOutlinedIcon from "@mui/icons-material/BusinessOutlined";
+import * as React from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   Box,
   Button,
   Container,
+  Paper,
   Stack,
   Typography,
 } from "@mui/material";
+import { alpha, useTheme } from "@mui/material/styles";
+import PublicRoundedIcon from "@mui/icons-material/PublicRounded";
+import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
+import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
+import ApartmentRoundedIcon from "@mui/icons-material/ApartmentRounded";
+import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
+import { Logo } from "../../../images";
 
-const userTypes = [
+type UserTypeKey = "individual" | "company" | "professional";
+
+const USER_TYPES: Array<{
+  key: UserTypeKey;
+  title: string;
+  Icon: typeof PersonOutlineRoundedIcon;
+  href: string;
+}> = [
   {
-    label: "Individual Client (IC)",
-    icon: <PersonOutlineOutlinedIcon sx={{ fontSize: 32 }} />,
-    selected: true,
+    key: "individual",
+    title: "Individual Client (IC)",
+    Icon: PersonOutlineRoundedIcon,
+    href: "/auth/signup/individual",
   },
   {
-    label: "Company Client (CC)",
-    icon: <BusinessOutlinedIcon sx={{ fontSize: 30 }} />,
-    selected: false,
+    key: "company",
+    title: "Company Client (CC)",
+    Icon: ApartmentRoundedIcon,
+    href: "/auth/signup/company",
   },
   {
-    label: "Professional",
-    icon: <Groups2OutlinedIcon sx={{ fontSize: 30 }} />,
-    selected: false,
+    key: "professional",
+    title: "Professional",
+    Icon: GroupsRoundedIcon,
+    href: "/auth/signup/professional",
   },
 ];
 
-export default function SignupPage() {
+export default function SignupSelectUserTypePage() {
+  const router = useRouter();
+  const theme = useTheme();
+  const m = theme.palette.mollure;
+
+  const [selected, setSelected] = React.useState<UserTypeKey>("individual");
+
+  const selectedHref =
+    USER_TYPES.find((t) => t.key === selected)?.href ?? "/auth/signup/individual";
+
   return (
     <Box
       sx={{
         minHeight: "100vh",
-        bgcolor: "#ffffff",
+        bgcolor: "background.default",
         position: "relative",
         overflow: "hidden",
-      }}
-    >
-      <Box
-        sx={{
+        "&:before": {
+          content: '""',
           position: "absolute",
           inset: 0,
-          pointerEvents: "none",
           background:
-            "radial-gradient(circle at 16% 55%, rgba(64, 206, 214, 0.14), transparent 22%), radial-gradient(circle at 86% 53%, rgba(187, 243, 244, 0.18), transparent 16%)",
-        }}
-      />
-
-      <Box
-        sx={{
+            "radial-gradient(circle at 88% 42%, rgba(33, 184, 191, 0.10), transparent 42%)",
+          pointerEvents: "none",
+        },
+        "& .bgRingLeft": {
           position: "absolute",
-          left: -68,
-          bottom: -70,
-          width: 190,
-          height: 190,
+          left: { xs: -155, md: -180 },
+          bottom: { xs: -160, md: -185 },
+          width: { xs: 380, md: 430 },
+          height: { xs: 380, md: 430 },
           borderRadius: "50%",
-          border: "20px solid rgba(165, 225, 228, 0.30)",
-          "&::before, &::after": {
-            content: '""',
-            position: "absolute",
-            borderRadius: "50%",
-            inset: 16,
-            border: "16px solid rgba(165, 225, 228, 0.20)",
-          },
-          "&::after": {
-            inset: 40,
-            border: "12px solid rgba(165, 225, 228, 0.15)",
-          },
-        }}
-      />
-
-      <Box
-        sx={{
+          border: `18px solid ${alpha(m.teal, 0.10)}`,
+          pointerEvents: "none",
+        },
+        "& .bgRingRight": {
           position: "absolute",
-          right: -62,
-          bottom: -88,
-          width: 205,
-          height: 205,
+          right: { xs: -170, md: -200 },
+          bottom: { xs: -175, md: -205 },
+          width: { xs: 420, md: 470 },
+          height: { xs: 420, md: 470 },
           borderRadius: "50%",
-          border: "18px solid rgba(165, 225, 228, 0.30)",
-          "&::before, &::after": {
-            content: '""',
-            position: "absolute",
-            borderRadius: "50%",
-            inset: 22,
-            border: "16px solid rgba(165, 225, 228, 0.20)",
-          },
-          "&::after": {
-            inset: 48,
-            border: "12px solid rgba(165, 225, 228, 0.14)",
-          },
-        }}
-      />
+          border: `18px solid ${alpha(m.teal, 0.10)}`,
+          pointerEvents: "none",
+        },
+      }}
+    >
+      <Box className="bgRingLeft" />
+      <Box className="bgRingRight" />
 
-      <Box
-        sx={{
-          position: "relative",
-          zIndex: 1,
-          minHeight: "100vh",
-          border: "3px solid #1c95f3",
-        }}
-      >
+      <Container maxWidth="lg" sx={{ position: "relative", zIndex: 1 }}>
         <Box
-          component="header"
           sx={{
-            px: { xs: 2, md: 5.5 },
-            py: 2,
-            borderBottom: "3px solid #1c95f3",
+            pt: 2.5,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 2,
+            flexWrap: "wrap",
           }}
         >
-          <Stack
-            direction="row"
-            alignItems="center"
-            justifyContent="space-between"
-            spacing={2}
+          <Box
+            sx={{
+              position: "relative",
+              width: { xs: 84, sm: 96 },
+              height: { xs: 20, sm: 24 },
+              flexShrink: 0,
+            }}
           >
-            <Stack
-              direction="row"
-              alignItems="center"
-              spacing={1.5}
-              sx={{
-                px: 1.5,
-                py: 0.75,
-                border: "1px dashed #1c95f3",
-              }}
-            >
-              <Box
-                sx={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: "8px 8px 2px 8px",
-                  position: "relative",
-                  border: "2px solid #32c9d5",
-                  "&::before, &::after": {
-                    content: '""',
-                    position: "absolute",
-                    inset: 4,
-                    borderRadius: "50%",
-                    borderTop: "2px solid #32c9d5",
-                  },
-                  "&::after": {
-                    inset: 8,
-                    borderTopColor: "#8ecf53",
-                  },
-                }}
-              />
-              <Typography
-                sx={{
-                  fontSize: { xs: 22, md: 26 },
-                  lineHeight: 1,
-                  color: "#50607a",
-                  fontWeight: 500,
-                }}
-              >
-                Mollure
-              </Typography>
-            </Stack>
+            <Image
+              src={Logo}
+              alt="Mollure"
+              fill
+              priority
+              sizes="96px"
+              style={{ objectFit: "contain" }}
+            />
+          </Box>
 
-            <Stack
-              direction="row"
-              alignItems="center"
-              spacing={1.25}
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+            <Button
+              variant="outlined"
+              size="small"
               sx={{
-                px: 1.25,
-                py: 0.5,
-                border: "1px dashed #1c95f3",
-                borderRadius: 1,
+                borderRadius: 999,
+                borderColor: alpha(m.navy, 0.14),
+                color: m.navy,
+                px: 1.05,
+                textTransform: "none",
+                fontWeight: 600,
+                minHeight: 30,
               }}
             >
-              <Stack
-                direction="row"
-                alignItems="center"
-                spacing={0.5}
-                sx={{
-                  px: 0.75,
-                  py: 0.5,
-                  border: "1px solid #111111",
-                  borderRadius: 4,
-                }}
-              >
-                <LanguageIcon sx={{ fontSize: 14, color: "#111111" }} />
-                <Typography sx={{ fontSize: 11, color: "#111111" }}>EN</Typography>
+              <Stack direction="row" spacing={0.6} alignItems="center">
+                <PublicRoundedIcon sx={{ fontSize: 15 }} />
+                <span>EN</span>
+                <KeyboardArrowDownRoundedIcon sx={{ fontSize: 18, opacity: 0.7 }} />
               </Stack>
-              <Button
-                disableElevation
-                sx={{
-                  minWidth: 76,
-                  height: 31,
-                  px: 2.5,
-                  borderRadius: 999,
-                  textTransform: "lowercase",
-                  fontSize: 12,
-                  bgcolor: "#27c3cf",
-                  color: "#ffffff",
-                  "&:hover": {
-                    bgcolor: "#1fb5c1",
-                  },
-                }}
-              >
-                login
-              </Button>
-              <Typography sx={{ fontSize: 11, color: "#7e8697" }}>
-                for professional
-              </Typography>
-            </Stack>
+            </Button>
+            <Button
+              component={Link}
+              href="/auth/login"
+              variant="contained"
+              size="small"
+              sx={{
+                borderRadius: 999,
+                px: 1.8,
+                textTransform: "none",
+                fontWeight: 600,
+                minHeight: 30,
+                bgcolor: "primary.main",
+                "&:hover": { bgcolor: "mollure.tealDark" },
+              }}
+            >
+              login
+            </Button>
+            <Button
+              component={Link}
+              href="/auth/professional/login"
+              variant="outlined"
+              size="small"
+              sx={{
+                borderRadius: 999,
+                borderColor: alpha(m.navy, 0.14),
+                color: alpha(m.navy, 0.72),
+                px: 1.8,
+                textTransform: "none",
+                fontWeight: 600,
+                minHeight: 30,
+              }}
+            >
+              for professional
+            </Button>
           </Stack>
         </Box>
 
-        <Container maxWidth="lg" sx={{ px: { xs: 3, md: 8 } }}>
-          <Box
-            sx={{
-              pt: { xs: 8, md: 9.5 },
-              pb: { xs: 10, md: 14 },
-            }}
-          >
-            <Typography
-              sx={{
-                color: "#9aa5bd",
-                fontSize: { xs: 28, md: 34 },
-                mb: 1,
-                lineHeight: 1,
-              }}
-            >
+        <Box sx={{ height: 1, bgcolor: alpha(m.navy, 0.10), mt: 2 }} />
+
+        <Box
+          sx={{
+            minHeight: "calc(100vh - 72px)",
+            display: "grid",
+            alignItems: "center",
+            pb: 6,
+          }}
+        >
+          <Box sx={{ maxWidth: 980, width: "100%", mx: "auto", px: { xs: 1, sm: 2 } }}>
+            <Typography sx={{ color: alpha(m.navy, 0.55), fontSize: 16, mb: 0.5 }}>
               Hi,
             </Typography>
-
             <Typography
-              component="h1"
               sx={{
-                color: "#4b5870",
-                fontSize: { xs: 34, md: 50 },
-                fontWeight: 600,
-                lineHeight: 1.1,
-                mb: { xs: 5, md: 6 },
+                fontWeight: 700,
+                color: "mollure.textcolorgrey700",
+                fontSize: { xs: 28, md: 34 },
+                lineHeight: 1.15,
+                textDecoration: "underline",
+                textDecorationThickness: "3px",
+                textUnderlineOffset: "8px",
+                textDecorationColor: alpha(m.teal, 0.9),
               }}
             >
               Select User Type
             </Typography>
 
-            <Stack
-              direction={{ xs: "column", md: "row" }}
-              spacing={3}
-              sx={{ mb: { xs: 5, md: 8 } }}
-            >
-              {userTypes.map((type) => (
-                <Box
-                  key={type.label}
-                  sx={{
-                    flex: 1,
-                    minHeight: 135,
-                    borderRadius: "6px",
-                    border: type.selected
-                      ? "2px solid #4fcfe0"
-                      : "1px solid #e6e7eb",
-                    bgcolor: "#ffffff",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    boxShadow: type.selected
-                      ? "0 8px 22px rgba(79, 207, 224, 0.08)"
-                      : "none",
-                    transition: "all 0.2s ease",
-                  }}
-                >
-                  <Stack alignItems="center" spacing={1.5}>
-                    <Box sx={{ color: "#657088" }}>{type.icon}</Box>
-                    <Typography
-                      sx={{
-                        color: "#4d5870",
-                        fontSize: 24,
-                        fontWeight: 500,
-                        textAlign: "center",
-                      }}
-                    >
-                      {type.label}
-                    </Typography>
-                  </Stack>
-                </Box>
-              ))}
+            <Stack direction={{ xs: "column", md: "row" }} spacing={3} sx={{ mt: 4 }}>
+              {USER_TYPES.map(({ key, title, Icon }) => {
+                const active = selected === key;
+                return (
+                  <Paper
+                    key={key}
+                    elevation={0}
+                    onClick={() => setSelected(key)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") setSelected(key);
+                    }}
+                    sx={{
+                      flex: 1,
+                      cursor: "pointer",
+                      userSelect: "none",
+                      height: { xs: 116, md: 132 },
+                      display: "grid",
+                      placeItems: "center",
+                      textAlign: "center",
+                      px: 2.5,
+                      borderRadius: "4px",
+                      bgcolor: "#fff",
+                      border: `1px solid ${
+                        active ? theme.palette.primary.main : alpha(m.navy, 0.10)
+                      }`,
+                      boxShadow: active
+                        ? `0 10px 22px ${alpha(m.teal, 0.14)}`
+                        : "0 8px 18px rgba(16, 35, 63, 0.04)",
+                      transition: "border-color 140ms ease, box-shadow 140ms ease",
+                      "&:hover": {
+                        borderColor: active
+                          ? theme.palette.primary.main
+                          : alpha(m.teal, 0.35),
+                        boxShadow: active
+                          ? `0 10px 22px ${alpha(m.teal, 0.14)}`
+                          : `0 10px 22px ${alpha(m.teal, 0.10)}`,
+                      },
+                    }}
+                  >
+                    <Stack spacing={1.35} alignItems="center">
+                      <Icon sx={{ fontSize: 34, color: alpha(m.navy, 0.58) }} />
+                      <Typography
+                        sx={{
+                          fontWeight: 600,
+                          color: alpha(m.navy, 0.80),
+                          fontSize: 14,
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        {title}
+                      </Typography>
+                    </Stack>
+                  </Paper>
+                );
+              })}
             </Stack>
 
             <Button
               fullWidth
               disableElevation
+              variant="contained"
+              onClick={() => router.push(selectedHref)}
               sx={{
-                height: 38,
+                mt: 5.5,
                 borderRadius: "4px",
                 textTransform: "none",
-                fontSize: 14,
-                fontWeight: 500,
-                bgcolor: "#27c3cf",
-                color: "#ffffff",
-                boxShadow: "none",
-                "&:hover": {
-                  bgcolor: "#20b6c2",
-                  boxShadow: "none",
-                },
+                fontWeight: 600,
+                fontSize: 13,
+                minHeight: 38,
+                bgcolor: "primary.main",
+                color: "common.white",
+                "&:hover": { bgcolor: "mollure.tealDark" },
               }}
             >
               Continue
             </Button>
           </Box>
-        </Container>
-      </Box>
+        </Box>
+      </Container>
     </Box>
   );
 }
+
