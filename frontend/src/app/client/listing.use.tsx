@@ -23,13 +23,29 @@ export function useClientListingState(cards: ListingCardData[]) {
   const [filters, setFilters] = React.useState<ListingFilterValues>(initialFilters);
   const [sort, setSort] = React.useState<ListingSortValue>("recommended");
   const [page, setPage] = React.useState(1);
-  const [favorites, setFavorites] = React.useState<Record<string, boolean>>({});
+  const [favorites, setFavorites] = React.useState<Record<string, boolean>>(() => {
+    if (typeof window === "undefined") return {};
+    try {
+      const raw = window.localStorage.getItem("mollure:favorites");
+      return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
+    } catch {
+      return {};
+    }
+  });
 
   const pageSize = 6;
 
   const toggleFavorite = React.useCallback((id: string) => {
     setFavorites((prev) => ({ ...prev, [id]: !prev[id] }));
   }, []);
+
+  React.useEffect(() => {
+    try {
+      window.localStorage.setItem("mollure:favorites", JSON.stringify(favorites));
+    } catch {
+      // ignore (storage disabled)
+    }
+  }, [favorites]);
 
   const filtered = React.useMemo(() => {
     const keyword = filters.keyword.trim().toLowerCase();

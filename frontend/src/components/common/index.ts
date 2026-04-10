@@ -5,6 +5,7 @@ export { default as AppDropdown } from "./AppDropdown";
 export { default as AppFooter } from "./AppFooter";
 export { default as AppPagination } from "./AppPagination";
 export { default as AppSearchField } from "./AppSearchField";
+export { default as AppSegmentTabs } from "./AppSegmentTabs";
 export { default as AppSelect } from "./AppSelect";
 export { default as AppTextField } from "./AppTextField";
 export { default as ContentCard } from "./ContentCard";

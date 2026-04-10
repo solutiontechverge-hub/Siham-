@@ -69,9 +69,7 @@ export default function ProfessionalSignupPage() {
   const [errorMessage, setErrorMessage] = React.useState("");
   const [register, { isLoading }] = useRegisterMutation();
 
-  const handleChange = (
-    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-  ) => {
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type, checked } = event.target as HTMLInputElement;
 
     setForm((prev) => ({
@@ -97,35 +95,32 @@ export default function ProfessionalSignupPage() {
 
     try {
       const result = await register({
-          user_type: "professional",
-          email: form.contactEmail.trim().toLowerCase(),
-          password: form.password,
-          confirm_password: form.confirmPassword,
-          legal_name: form.legalName.trim(),
-          ccc_number: form.cccNumber.trim(),
-          vat_number: form.vatNumber.trim(),
-          street: form.street.trim() || undefined,
-          street_number: form.number.trim() || undefined,
-          postal_code: form.postalCode.trim() || undefined,
-          province: form.province.trim() || undefined,
-          municipality: form.municipality.trim() || undefined,
-          business_type: form.businessType || undefined,
-          website: form.website.trim() || undefined,
-          instagram: form.instagram.trim() || undefined,
-          other_link: form.otherLink.trim() || undefined,
-          contact_first_name: form.contactFirstName.trim(),
-          contact_last_name: form.contactLastName.trim(),
+        user_type: "professional",
+        email: form.contactEmail.trim().toLowerCase(),
+        password: form.password,
+        confirm_password: form.confirmPassword,
+        legal_name: form.legalName.trim(),
+        ccc_number: form.cccNumber.trim(),
+        vat_number: form.vatNumber.trim(),
+        street: form.street.trim() || undefined,
+        street_number: form.number.trim() || undefined,
+        postal_code: form.postalCode.trim() || undefined,
+        province: form.province.trim() || undefined,
+        municipality: form.municipality.trim() || undefined,
+        business_type: form.businessType || undefined,
+        website: form.website.trim() || undefined,
+        instagram: form.instagram.trim() || undefined,
+        other_link: form.otherLink.trim() || undefined,
+        contact_first_name: form.contactFirstName.trim(),
+        contact_last_name: form.contactLastName.trim(),
       }).unwrap();
 
       setSuccessMessage(
-        result.message ||
-          "Professional account created successfully. Please check your email.",
+        result.message || "Professional account created successfully. Please check your email.",
       );
       setForm(initialForm);
     } catch (error) {
-      setErrorMessage(
-        getApiErrorMessage(error, "Registration failed. Please check the details."),
-      );
+      setErrorMessage(getApiErrorMessage(error, "Registration failed. Please check the details."));
     }
   };
 
@@ -155,8 +150,7 @@ export default function ProfessionalSignupPage() {
                   width: 46,
                   height: 46,
                   borderRadius: "16px",
-                  background:
-                    "linear-gradient(135deg, #00c2b8 0%, #1177ff 100%)",
+                  background: "linear-gradient(135deg, #00c2b8 0%, #1177ff 100%)",
                   boxShadow: "0 12px 30px rgba(17, 119, 255, 0.22)",
                 }}
               />
@@ -268,29 +262,88 @@ export default function ProfessionalSignupPage() {
                       </Typography>
                       <Grid container spacing={2.5}>
                         <Grid item xs={12} md={6}>
-                          <TextField fullWidth label="Legal Name" name="legalName" value={form.legalName} onChange={handleChange} required InputLabelProps={{ shrink: true }} />
+                          <TextField
+                            fullWidth
+                            label="Legal Name"
+                            name="legalName"
+                            value={form.legalName}
+                            onChange={handleChange}
+                            required
+                            InputLabelProps={{ shrink: true }}
+                          />
                         </Grid>
                         <Grid item xs={12} md={6} />
                         <Grid item xs={12} md={6}>
-                          <TextField fullWidth label="CCC Number" name="cccNumber" value={form.cccNumber} onChange={handleChange} required InputLabelProps={{ shrink: true }} />
+                          <TextField
+                            fullWidth
+                            label="CCC Number"
+                            name="cccNumber"
+                            value={form.cccNumber}
+                            onChange={handleChange}
+                            required
+                            InputLabelProps={{ shrink: true }}
+                          />
                         </Grid>
                         <Grid item xs={12} md={6}>
-                          <TextField fullWidth label="VAT Number" name="vatNumber" value={form.vatNumber} onChange={handleChange} required InputLabelProps={{ shrink: true }} />
+                          <TextField
+                            fullWidth
+                            label="VAT Number"
+                            name="vatNumber"
+                            value={form.vatNumber}
+                            onChange={handleChange}
+                            required
+                            InputLabelProps={{ shrink: true }}
+                          />
                         </Grid>
                         <Grid item xs={12} sm={6} md={3}>
-                          <TextField fullWidth label="Business Address" name="street" value={form.street} onChange={handleChange} InputLabelProps={{ shrink: true }} />
+                          <TextField
+                            fullWidth
+                            label="Business Address"
+                            name="street"
+                            value={form.street}
+                            onChange={handleChange}
+                            InputLabelProps={{ shrink: true }}
+                          />
                         </Grid>
                         <Grid item xs={12} sm={6} md={3}>
-                          <TextField fullWidth label="Number" name="number" value={form.number} onChange={handleChange} InputLabelProps={{ shrink: true }} />
+                          <TextField
+                            fullWidth
+                            label="Number"
+                            name="number"
+                            value={form.number}
+                            onChange={handleChange}
+                            InputLabelProps={{ shrink: true }}
+                          />
                         </Grid>
                         <Grid item xs={12} sm={6} md={3}>
-                          <TextField fullWidth label="Postal Code" name="postalCode" value={form.postalCode} onChange={handleChange} InputLabelProps={{ shrink: true }} />
+                          <TextField
+                            fullWidth
+                            label="Postal Code"
+                            name="postalCode"
+                            value={form.postalCode}
+                            onChange={handleChange}
+                            InputLabelProps={{ shrink: true }}
+                          />
                         </Grid>
                         <Grid item xs={12} sm={6} md={3}>
-                          <TextField fullWidth label="Province" name="province" value={form.province} onChange={handleChange} InputLabelProps={{ shrink: true }} />
+                          <TextField
+                            fullWidth
+                            label="Province"
+                            name="province"
+                            value={form.province}
+                            onChange={handleChange}
+                            InputLabelProps={{ shrink: true }}
+                          />
                         </Grid>
                         <Grid item xs={12} md={6}>
-                          <TextField fullWidth label="Municipality" name="municipality" value={form.municipality} onChange={handleChange} InputLabelProps={{ shrink: true }} />
+                          <TextField
+                            fullWidth
+                            label="Municipality"
+                            name="municipality"
+                            value={form.municipality}
+                            onChange={handleChange}
+                            InputLabelProps={{ shrink: true }}
+                          />
                         </Grid>
                         <Grid item xs={12} md={6}>
                           <TextField
@@ -309,13 +362,34 @@ export default function ProfessionalSignupPage() {
                           </TextField>
                         </Grid>
                         <Grid item xs={12} md={4}>
-                          <TextField fullWidth label="Website" name="website" value={form.website} onChange={handleChange} InputLabelProps={{ shrink: true }} />
+                          <TextField
+                            fullWidth
+                            label="Website"
+                            name="website"
+                            value={form.website}
+                            onChange={handleChange}
+                            InputLabelProps={{ shrink: true }}
+                          />
                         </Grid>
                         <Grid item xs={12} md={4}>
-                          <TextField fullWidth label="Instagram" name="instagram" value={form.instagram} onChange={handleChange} InputLabelProps={{ shrink: true }} />
+                          <TextField
+                            fullWidth
+                            label="Instagram"
+                            name="instagram"
+                            value={form.instagram}
+                            onChange={handleChange}
+                            InputLabelProps={{ shrink: true }}
+                          />
                         </Grid>
                         <Grid item xs={12} md={4}>
-                          <TextField fullWidth label="Other" name="otherLink" value={form.otherLink} onChange={handleChange} InputLabelProps={{ shrink: true }} />
+                          <TextField
+                            fullWidth
+                            label="Other"
+                            name="otherLink"
+                            value={form.otherLink}
+                            onChange={handleChange}
+                            InputLabelProps={{ shrink: true }}
+                          />
                         </Grid>
                       </Grid>
                     </Box>
@@ -326,26 +400,78 @@ export default function ProfessionalSignupPage() {
                       </Typography>
                       <Grid container spacing={2.5}>
                         <Grid item xs={12} md={6}>
-                          <TextField fullWidth label="First Name" name="contactFirstName" value={form.contactFirstName} onChange={handleChange} required InputLabelProps={{ shrink: true }} />
+                          <TextField
+                            fullWidth
+                            label="First Name"
+                            name="contactFirstName"
+                            value={form.contactFirstName}
+                            onChange={handleChange}
+                            required
+                            InputLabelProps={{ shrink: true }}
+                          />
                         </Grid>
                         <Grid item xs={12} md={6}>
-                          <TextField fullWidth label="Last Name" name="contactLastName" value={form.contactLastName} onChange={handleChange} required InputLabelProps={{ shrink: true }} />
+                          <TextField
+                            fullWidth
+                            label="Last Name"
+                            name="contactLastName"
+                            value={form.contactLastName}
+                            onChange={handleChange}
+                            required
+                            InputLabelProps={{ shrink: true }}
+                          />
                         </Grid>
                         <Grid item xs={12} md={6}>
-                          <TextField fullWidth type="email" label="Email" name="contactEmail" value={form.contactEmail} onChange={handleChange} required autoComplete="email" InputLabelProps={{ shrink: true }} />
+                          <TextField
+                            fullWidth
+                            type="email"
+                            label="Email"
+                            name="contactEmail"
+                            value={form.contactEmail}
+                            onChange={handleChange}
+                            required
+                            autoComplete="email"
+                            InputLabelProps={{ shrink: true }}
+                          />
                         </Grid>
                         <Grid item xs={12} md={3}>
-                          <TextField fullWidth type="password" label="Password" name="password" value={form.password} onChange={handleChange} required autoComplete="new-password" InputLabelProps={{ shrink: true }} />
+                          <TextField
+                            fullWidth
+                            type="password"
+                            label="Password"
+                            name="password"
+                            value={form.password}
+                            onChange={handleChange}
+                            required
+                            autoComplete="new-password"
+                            InputLabelProps={{ shrink: true }}
+                          />
                         </Grid>
                         <Grid item xs={12} md={3}>
-                          <TextField fullWidth type="password" label="Repeat Password" name="confirmPassword" value={form.confirmPassword} onChange={handleChange} required autoComplete="new-password" InputLabelProps={{ shrink: true }} />
+                          <TextField
+                            fullWidth
+                            type="password"
+                            label="Repeat Password"
+                            name="confirmPassword"
+                            value={form.confirmPassword}
+                            onChange={handleChange}
+                            required
+                            autoComplete="new-password"
+                            InputLabelProps={{ shrink: true }}
+                          />
                         </Grid>
                       </Grid>
                     </Box>
 
                     <FormControlLabel
-                      control={<Checkbox checked={form.acceptTerms} onChange={handleChange} name="acceptTerms" />}
-                      label={<Typography variant="body2" color="text.secondary">Accept our Terms & Conditions</Typography>}
+                      control={
+                        <Checkbox checked={form.acceptTerms} onChange={handleChange} name="acceptTerms" />
+                      }
+                      label={
+                        <Typography variant="body2" color="text.secondary">
+                          Accept our Terms & Conditions
+                        </Typography>
+                      }
                     />
 
                     {successMessage ? <Alert severity="success">{successMessage}</Alert> : null}
@@ -363,8 +489,7 @@ export default function ProfessionalSignupPage() {
                           textTransform: "none",
                           fontSize: "1rem",
                           fontWeight: 800,
-                          background:
-                            "linear-gradient(135deg, #10233f 0%, #00a9b4 100%)",
+                          background: "linear-gradient(135deg, #10233f 0%, #00a9b4 100%)",
                           boxShadow: "0 18px 40px rgba(0, 169, 180, 0.24)",
                         }}
                       >
