@@ -77,11 +77,13 @@ function SectionShell({
           gap: 2,
         }}
       >
-        <Typography
-          sx={{ fontWeight: 800, color: alpha(m.navy, 0.85), fontSize: 14 }}
-        >
-          {title}
-        </Typography>
+        {typeof title === "string" ? (
+          <Typography sx={{ fontWeight: 800, color: alpha(m.navy, 0.85), fontSize: 14 }}>
+            {title}
+          </Typography>
+        ) : (
+          title
+        )}
         {action}
       </Box>
       <Divider />
@@ -355,6 +357,302 @@ export default function ProfessionalFixedLocationSetup({
     };
   }, []);
 
+  const professionalPhotoInputRef = React.useRef<HTMLInputElement | null>(null);
+  const onChooseProfessionalPhoto = React.useCallback(() => {
+    professionalPhotoInputRef.current?.click();
+  }, []);
+  const onProfessionalPhotoSelected = React.useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      addedBlobUrlsRef.current.push(url);
+      setField("professionalPhotoSrc", url);
+      e.target.value = "";
+    },
+    [setField],
+  );
+
+  const [professionalDrawerOpen, setProfessionalDrawerOpen] = React.useState(false);
+  const openProfessionalDrawer = React.useCallback(() => setProfessionalDrawerOpen(true), []);
+  const closeProfessionalDrawer = React.useCallback(() => setProfessionalDrawerOpen(false), []);
+
+  const professionalForm = (
+    <Stack spacing={2.1}>
+      <Stack direction="row" spacing={1.25} alignItems="center">
+        <Box
+          sx={{
+            width: 52,
+            height: 52,
+            borderRadius: "999px",
+            overflow: "hidden",
+            bgcolor: alpha(m.navy, 0.06),
+            border: `1px solid ${alpha(m.navy, 0.10)}`,
+            flex: "0 0 auto",
+          }}
+        >
+          <Image
+            src={values.professionalPhotoSrc}
+            alt="Profile"
+            width={52}
+            height={52}
+            unoptimized
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
+        </Box>
+        <Typography sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.78) }}>
+          Profile Picture
+        </Typography>
+        <Box sx={{ flex: 1 }} />
+        <Button
+          onClick={onChooseProfessionalPhoto}
+          variant="outlined"
+          sx={{
+            borderRadius: "8px",
+            textTransform: "none",
+            fontWeight: 800,
+            borderColor: alpha(m.navy, 0.14),
+            color: alpha(m.navy, 0.78),
+            bgcolor: "#fff",
+            height: 34,
+            px: 2,
+          }}
+        >
+          Upload
+        </Button>
+        <input
+          ref={professionalPhotoInputRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={onProfessionalPhotoSelected}
+        />
+      </Stack>
+
+      <Box>
+        <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.78), mb: 1 }}>
+          Company Information
+        </Typography>
+        <Divider sx={{ mb: 1.5 }} />
+        <Grid container spacing={1.5}>
+          <Grid item xs={12}>
+            <MollureFormField
+              label="Legal Name*"
+              placeholder="e.g Jane"
+              value={values.companyLegalName}
+              onChange={(e) => setField("companyLegalName", e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <MollureFormField
+              label="COC number*"
+              value={values.companyCocNumber}
+              onChange={(e) => setField("companyCocNumber", e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <MollureFormField
+              label="VAT number*"
+              value={values.companyVatNumber}
+              onChange={(e) => setField("companyVatNumber", e.target.value)}
+            />
+          </Grid>
+
+          <Grid item xs={12}>
+            <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
+              Business Address
+            </Typography>
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <MollureFormField
+              placeholder="Street"
+              value={values.companyStreet}
+              onChange={(e) => setField("companyStreet", e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <MollureFormField
+              placeholder="Number"
+              value={values.companyStreetNumber}
+              onChange={(e) => setField("companyStreetNumber", e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <MollureFormField
+              placeholder="Postal Code"
+              value={values.companyPostalCode}
+              onChange={(e) => setField("companyPostalCode", e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <MollureFormField
+              select
+              placeholder="Province"
+              value={values.companyProvince || "Province"}
+              onChange={(e) => setField("companyProvince", e.target.value)}
+            >
+              {["Province", "North Holland", "South Holland"].map((o) => (
+                <MenuItem key={o} value={o}>
+                  {o}
+                </MenuItem>
+              ))}
+            </MollureFormField>
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <MollureFormField
+              select
+              placeholder="Municipality"
+              value={values.companyMunicipality || "Municipality"}
+              onChange={(e) => setField("companyMunicipality", e.target.value)}
+            >
+              {["Municipality", "Amsterdam", "Rotterdam"].map((o) => (
+                <MenuItem key={o} value={o}>
+                  {o}
+                </MenuItem>
+              ))}
+            </MollureFormField>
+          </Grid>
+          <Grid item xs={12}>
+            <MollureFormField
+              select
+              placeholder="Select Business Type"
+              value={values.companyBusinessType || "Select Business Type"}
+              onChange={(e) => setField("companyBusinessType", e.target.value)}
+            >
+              {["Select Business Type", "Salon Owner", "Freelancer"].map((o) => (
+                <MenuItem key={o} value={o}>
+                  {o}
+                </MenuItem>
+              ))}
+            </MollureFormField>
+          </Grid>
+        </Grid>
+      </Box>
+
+      <Box>
+        <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.78), mb: 1 }}>
+          Portfolio links
+        </Typography>
+        <Divider sx={{ mb: 1.5 }} />
+        <Grid container spacing={1.5}>
+          <Grid item xs={12} md={4}>
+            <MollureFormField
+              placeholder="Website"
+              value={values.companyWebsite}
+              onChange={(e) => setField("companyWebsite", e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <MollureFormField
+              placeholder="Instagram"
+              value={values.socialInstagram}
+              onChange={(e) => setField("socialInstagram", e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12} md={4}>
+            <MollureFormField
+              placeholder="Other"
+              value={values.socialOther}
+              onChange={(e) => setField("socialOther", e.target.value)}
+            />
+          </Grid>
+        </Grid>
+      </Box>
+
+      <Box>
+        <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.78), mb: 1 }}>
+          Contact Person
+        </Typography>
+        <Divider sx={{ mb: 1.5 }} />
+        <Grid container spacing={1.5}>
+          <Grid item xs={12} md={6}>
+            <MollureFormField
+              label="First Name*"
+              placeholder="e.g Jane"
+              value={values.contactFirstName}
+              onChange={(e) => setField("contactFirstName", e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <MollureFormField
+              label="Last Name*"
+              placeholder="e.g Doe"
+              value={values.contactLastName}
+              onChange={(e) => setField("contactLastName", e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <MollureFormField
+              label="Email*"
+              placeholder="Your@gmail.com"
+              value={values.contactEmail}
+              onChange={(e) => setField("contactEmail", e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <MollureFormField
+              label="Phone number*"
+              value={values.contactPhone}
+              onChange={(e) => setField("contactPhone", e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <MollureFormField
+              label="Password*"
+              type="password"
+              placeholder="Enter Password"
+              value={values.contactPassword}
+              onChange={(e) => setField("contactPassword", e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <MollureFormField
+              label="Repeat password*"
+              type="password"
+              placeholder="Confirm Password"
+              value={values.contactRepeatPassword}
+              onChange={(e) => setField("contactRepeatPassword", e.target.value)}
+            />
+          </Grid>
+        </Grid>
+      </Box>
+    </Stack>
+  );
+
+  const professionalDrawer = (
+    <Drawer
+      anchor="right"
+      open={professionalDrawerOpen}
+      onClose={closeProfessionalDrawer}
+      PaperProps={{ sx: { width: { xs: "100%", sm: 520 }, p: 2.5 } }}
+    >
+      <Stack spacing={2} sx={{ height: "100%", overflowY: "auto" }}>
+        <Typography sx={{ fontWeight: 900, fontSize: 16, color: alpha(m.navy, 0.88) }}>
+          Professional
+        </Typography>
+        {professionalForm}
+        <Box sx={{ pb: 1 }}>
+          <Button
+            fullWidth
+            variant="contained"
+            disableElevation
+            onClick={closeProfessionalDrawer}
+            sx={{
+              borderRadius: "8px",
+              textTransform: "none",
+              fontWeight: 900,
+              bgcolor: "primary.main",
+              "&:hover": { bgcolor: "mollure.tealDark" },
+              minHeight: 44,
+            }}
+          >
+            Update
+          </Button>
+        </Box>
+      </Stack>
+    </Drawer>
+  );
+
   React.useEffect(() => {
     if (mediaIdx > mediaSlides.length - 1) setMediaIdx(Math.max(0, mediaSlides.length - 1));
   }, [mediaIdx, mediaSlides.length]);
@@ -422,34 +720,28 @@ export default function ProfessionalFixedLocationSetup({
   const userInfoContent = (
     <Stack spacing={2}>
       <SectionShell
-        title={data.userInfo.title}
+        title={
+          <Typography sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 16 }}>
+            Professional
+          </Typography>
+        }
         action={
-          <PrimaryMiniButton>{data.userInfo.saveLabel}</PrimaryMiniButton>
+          <IconButton
+            size="small"
+            onClick={openProfessionalDrawer}
+            sx={{
+              width: 30,
+              height: 30,
+              borderRadius: "999px",
+              bgcolor: alpha(m.navy, 0.05),
+              "&:hover": { bgcolor: alpha(m.navy, 0.10) },
+            }}
+          >
+            <EditRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
+          </IconButton>
         }
       >
-        <Grid container spacing={2}>
-          <Grid item xs={12} md={4}>
-            <MollureFormField
-              label={data.userInfo.languageLabel}
-              value={values.language}
-              onChange={(e) => setField("language", e.target.value)}
-            />
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <MollureFormField
-              label={data.userInfo.currencyLabel}
-              value={values.currency}
-              onChange={(e) => setField("currency", e.target.value)}
-            />
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <MollureFormField
-              label={data.userInfo.timezoneLabel}
-              value={values.timezone}
-              onChange={(e) => setField("timezone", e.target.value)}
-            />
-          </Grid>
-        </Grid>
+        {professionalForm}
       </SectionShell>
     </Stack>
   );
@@ -1836,6 +2128,7 @@ export default function ProfessionalFixedLocationSetup({
     <>
       {inner}
       {teamDrawer}
+      {professionalDrawer}
     </>
   );
 

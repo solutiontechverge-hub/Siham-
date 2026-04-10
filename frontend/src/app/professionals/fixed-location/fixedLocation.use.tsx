@@ -44,6 +44,27 @@ export type FixedLocationFormState = {
 
   notes: string;
 
+  // Professional (User Info)
+  professionalPhotoSrc: string;
+  companyLegalName: string;
+  companyCocNumber: string;
+  companyVatNumber: string;
+  companyStreet: string;
+  companyStreetNumber: string;
+  companyPostalCode: string;
+  companyProvince: string;
+  companyMunicipality: string;
+  companyBusinessType: string;
+  companyWebsite: string;
+  socialInstagram: string;
+  socialOther: string;
+  contactFirstName: string;
+  contactLastName: string;
+  contactEmail: string;
+  contactPhone: string;
+  contactPassword: string;
+  contactRepeatPassword: string;
+
   // Price
   priceRangeFrom: string;
   priceRangeTo: string;
@@ -91,6 +112,26 @@ const initialState: FixedLocationFormState = {
   timezone: "GMT+1",
 
   notes: "",
+
+  professionalPhotoSrc: "/professionals/hero.png",
+  companyLegalName: "",
+  companyCocNumber: "",
+  companyVatNumber: "",
+  companyStreet: "",
+  companyStreetNumber: "",
+  companyPostalCode: "",
+  companyProvince: "",
+  companyMunicipality: "",
+  companyBusinessType: "",
+  companyWebsite: "",
+  socialInstagram: "",
+  socialOther: "",
+  contactFirstName: "",
+  contactLastName: "",
+  contactEmail: "",
+  contactPhone: "",
+  contactPassword: "",
+  contactRepeatPassword: "",
 
   priceRangeFrom: "Low",
   priceRangeTo: "Low",
