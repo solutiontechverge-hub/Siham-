@@ -106,7 +106,7 @@ function MiniCard({
   );
 }
 
-function useTintBg(tint: ProfessionalFeaturesPageData["sections"][number]["tint"]) {
+function getTintBg(tint: ProfessionalFeaturesPageData["sections"][number]["tint"]) {
   switch (tint) {
     case "mint":
       return "#EAF9F4";
@@ -120,24 +120,26 @@ function useTintBg(tint: ProfessionalFeaturesPageData["sections"][number]["tint"
   }
 }
 
-function usePreviewToneColor(tone?: "teal" | "navy" | "slate") {
-  const theme = useTheme();
-  const m = theme.palette.mollure;
-  switch (tone) {
-    case "navy":
-      return m.navy;
-    case "slate":
-      return alpha(m.navy, 0.65);
-    case "teal":
-    default:
-      return m.teal;
-  }
-}
-
 export default function ProfessionalFeatures({ data }: ProfessionalFeaturesProps) {
   const theme = useTheme();
   const m = useProfessionalsTokens();
   const { header, title, subtitle, sections, footer } = data;
+
+  const previewToneColor = React.useCallback(
+    (tone?: "teal" | "navy" | "slate") => {
+      const mp = theme.palette.mollure;
+      switch (tone) {
+        case "navy":
+          return mp.navy;
+        case "slate":
+          return alpha(mp.navy, 0.65);
+        case "teal":
+        default:
+          return mp.teal;
+      }
+    },
+    [theme.palette.mollure],
+  );
 
   return (
     <Box sx={{ bgcolor: "background.default" }}>
@@ -201,7 +203,7 @@ export default function ProfessionalFeatures({ data }: ProfessionalFeaturesProps
       <Container maxWidth="lg" sx={{ py: { xs: 4, md: 6 } }}>
         <Stack spacing={{ xs: 2.5, md: 3.5 }}>
           {sections.map((section) => {
-            const tintBg = useTintBg(section.tint);
+            const tintBg = getTintBg(section.tint);
             return (
               <Box
                 key={section.title}

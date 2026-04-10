@@ -146,3 +146,5 @@ export const clientsPageData = {
   },
   footer: marketingShellFooter,
 } as const;
+
+export type ClientsLandingData = typeof clientsPageData;

@@ -18,7 +18,6 @@ import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownR
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
 import ApartmentRoundedIcon from "@mui/icons-material/ApartmentRounded";
 import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
-import { Logo } from "../../../images";
 
 type UserTypeKey = "individual" | "company" | "professional";
 
@@ -118,7 +117,7 @@ export default function SignupSelectUserTypePage() {
             }}
           >
             <Image
-              src={Logo}
+              src="/logo.svg"
               alt="Mollure"
               fill
               priority
