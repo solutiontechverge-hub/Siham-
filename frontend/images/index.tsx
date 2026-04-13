@@ -11,3 +11,5 @@ export const ListingImage3 = require("./Rectangle 106.svg");
 export const ListingImage4 = require("./Rectangle 107.svg");
 export const ListingImage5 = require("./Rectangle 108.svg");
 export const ListingImage6 = require("./Rectangle 109.svg");
+
+export const DD = require("./dd.svg");

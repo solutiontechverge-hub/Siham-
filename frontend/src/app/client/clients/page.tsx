@@ -21,7 +21,7 @@ import Link from "next/link";
 import { clientsPageData } from "./clients.data";
 import { getFeatureIcon, useClientsPageTokens } from "./clients.use";
 import Image from "next/image";
-import { Profile as AvatarImage, Logo } from "../../../images";
+import { Profile as AvatarImage, Logo } from "../../../../images";
 
 export default function ClientsPage() {
   const tokens = useClientsPageTokens();
