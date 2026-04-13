@@ -1,10 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { Box, Card, CardContent, Typography } from "@mui/material";
+import { Box, Card, CardContent } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import type { MarketingFeatureCardIconKey } from "./MarketingFeatureCard";
 import { getMarketingFeatureIcon } from "./MarketingFeatureCard";
+import { BodyText, CardTitle } from "../ui/typography";
 
 export type MarketingResultCardProps = {
   iconKey: MarketingFeatureCardIconKey;
@@ -47,17 +48,15 @@ export default function MarketingResultCard({
         >
           {icon}
         </Box>
-        <Typography
+        <CardTitle
           sx={{
-            fontWeight: 700,
-            color: m.textcolorgrey700,
             fontSize: 13.5,
             lineHeight: 1.25,
           }}
         >
           {title}
-        </Typography>
-        <Typography
+        </CardTitle>
+        <BodyText
           sx={{
             mt: 1,
             color: alpha(m.navy, 0.55),
@@ -66,7 +65,7 @@ export default function MarketingResultCard({
           }}
         >
           {description}
-        </Typography>
+        </BodyText>
       </CardContent>
     </Card>
   );

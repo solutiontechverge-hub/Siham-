@@ -5,14 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
-  Alert,
   Box,
   Button,
   Container,
   Paper,
   Stack,
   TextField,
-  Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { getApiErrorMessage } from "../../../../lib/api-error";
@@ -21,15 +19,16 @@ import {
   useVerifyOtpMutation,
 } from "../../../../store/services/authApi";
 import { Logo } from "../../../../../images";
+import { BodyText, SubHeading } from "../../../../components/ui/typography";
+import { useSnackbar } from "../../../../components/common/AppSnackbar";
 
 export default function VerifyOtpPage() {
   const theme = useTheme();
   const m = theme.palette.mollure;
   const router = useRouter();
+  const { showSnackbar } = useSnackbar();
   const [email, setEmail] = React.useState("");
   const [digits, setDigits] = React.useState(["", "", "", ""]);
-  const [successMessage, setSuccessMessage] = React.useState("");
-  const [errorMessage, setErrorMessage] = React.useState("");
   const [verifyOtp, { isLoading: isVerifying }] = useVerifyOtpMutation();
   const [forgotPassword, { isLoading: isResending }] = useForgotPasswordMutation();
 
@@ -52,12 +51,10 @@ export default function VerifyOtpPage() {
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setErrorMessage("");
-    setSuccessMessage("");
 
     const otp = digits.join("");
     if (otp.length !== 4) {
-      setErrorMessage("Please enter the 4-digit verification code.");
+      showSnackbar({ severity: "error", message: "Please enter the 4-digit verification code." });
       return;
     }
 
@@ -69,24 +66,21 @@ export default function VerifyOtpPage() {
 
       window.sessionStorage.setItem("mollure_reset_email", email.trim().toLowerCase());
       window.sessionStorage.setItem("mollure_reset_user_id", String(result.data.user_id));
-      setSuccessMessage("OTP verified. You can now set a new password.");
+      showSnackbar({ severity: "success", message: "OTP verified. You can now set a new password." });
 
       window.setTimeout(() => {
         router.push("/auth/reset-password/new");
       }, 700);
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, "OTP verification failed."));
+      showSnackbar({ severity: "error", message: getApiErrorMessage(error, "OTP verification failed.") });
     }
   };
 
   const handleResend = async () => {
     if (!email.trim()) {
-      setErrorMessage("Enter your email address first.");
+      showSnackbar({ severity: "error", message: "Enter your email address first." });
       return;
     }
-
-    setErrorMessage("");
-    setSuccessMessage("");
 
     try {
       const result = await forgotPassword({
@@ -94,9 +88,9 @@ export default function VerifyOtpPage() {
       }).unwrap();
 
       window.sessionStorage.setItem("mollure_reset_email", email.trim().toLowerCase());
-      setSuccessMessage(result.message || "OTP sent again.");
+      showSnackbar({ severity: "success", message: result.message || "OTP sent again." });
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, "Unable to resend OTP."));
+      showSnackbar({ severity: "error", message: getApiErrorMessage(error, "Unable to resend OTP.") });
     }
   };
 
@@ -232,12 +226,10 @@ export default function VerifyOtpPage() {
           >
             <Stack spacing={2.25}>
               <Box textAlign="center">
-                <Typography sx={{ fontWeight: 700, color: m.navy, fontSize: 22, lineHeight: 1.2 }}>
-                  Reset Password
-                </Typography>
-                <Typography sx={{ mt: 0.75, color: alpha(m.navy, 0.55), fontSize: 12.5, lineHeight: 1.4 }}>
+                <SubHeading sx={{ fontSize: 22, color: m.navy, lineHeight: 1.2 }}>Reset Password</SubHeading>
+                <BodyText sx={{ mt: 0.75, color: alpha(m.navy, 0.55), fontSize: 12.5, lineHeight: 1.4 }}>
                   Enter The 4 Digit Verification Code That Was Sent To Your Email To Change Your Password
-                </Typography>
+                </BodyText>
               </Box>
 
               <Box component="form" onSubmit={handleSubmit}>
@@ -270,9 +262,6 @@ export default function VerifyOtpPage() {
                     ))}
                   </Stack>
 
-                  {successMessage ? <Alert severity="success">{successMessage}</Alert> : null}
-                  {errorMessage ? <Alert severity="error">{errorMessage}</Alert> : null}
-
                   <Button
                     type="submit"
                     variant="contained"
@@ -290,7 +279,7 @@ export default function VerifyOtpPage() {
                     {isVerifying ? "Verifying..." : "send OTP"}
                   </Button>
 
-                  <Typography textAlign="center" sx={{ color: alpha(m.navy, 0.55), fontSize: 12 }}>
+                  <BodyText textAlign="center" sx={{ color: alpha(m.navy, 0.55), fontSize: 12 }}>
                     Didn&apos;t receive a code?{" "}
                     <Button
                       type="button"
@@ -308,16 +297,16 @@ export default function VerifyOtpPage() {
                     >
                       {isResending ? "Resending..." : "Resend"}
                     </Button>
-                  </Typography>
+                  </BodyText>
 
-                  <Typography textAlign="center" sx={{ color: alpha(m.navy, 0.55), fontSize: 12 }}>
+                  <BodyText textAlign="center" sx={{ color: alpha(m.navy, 0.55), fontSize: 12 }}>
                     <Link
                       href="/auth/forgot-password"
                       style={{ color: m.teal, textDecoration: "none", fontWeight: 700 }}
                     >
                       Back to forgot password
                     </Link>
-                  </Typography>
+                  </BodyText>
                 </Stack>
               </Box>
             </Stack>

@@ -2,8 +2,9 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Paper, Stack, Typography } from "@mui/material";
+import { Paper, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import { BodyText } from "../ui/typography";
 
 export type FixedLocationTopTab = {
   label: string;
@@ -72,7 +73,7 @@ export default function FixedLocationTopTabs({
           const active = t.label === activeLabel;
 
           return (
-            <Typography
+            <BodyText
               key={t.href}
               component={Link}
               href={t.href}
@@ -81,7 +82,6 @@ export default function FixedLocationTopTabs({
                 whiteSpace: "nowrap",
                 flex: "1 1 0",
                 textAlign: "center",
-                fontWeight: active ? 500 : 400,
                 letterSpacing: "-0.01em",
                 color: active
                   ? theme.palette.text.primary
@@ -107,7 +107,7 @@ export default function FixedLocationTopTabs({
               }}
             >
               {t.label}
-            </Typography>
+            </BodyText>
           );
         })}
       </Stack>

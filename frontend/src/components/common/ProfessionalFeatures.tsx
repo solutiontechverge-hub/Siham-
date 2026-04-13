@@ -8,7 +8,6 @@ import {
   Container,
   Grid,
   Stack,
-  Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
@@ -20,6 +19,7 @@ import MarketingSiteFooter from "./MarketingSiteFooter";
 import MarketingSiteHeader from "./MarketingSiteHeader";
 import type { ProfessionalFeaturesPageData } from "../../app/professionals/professionalFeatures.data";
 import { useProfessionalsTokens } from "../../app/professionals/professionals.use";
+import { BodyText as Typography } from "../ui/typography";
 
 export type ProfessionalFeaturesProps = {
   data: ProfessionalFeaturesPageData;

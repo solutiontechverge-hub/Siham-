@@ -9,9 +9,9 @@ import {
   Container,
   Divider,
   Stack,
-  Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import { BodyText, CardTitle } from "../ui/typography";
 
 export type AuthAwareHeaderProps = {
   signupLabel?: string;
@@ -45,9 +45,9 @@ export default function AuthAwareHeader({
     <Box sx={{ bgcolor: alpha(m.teal, 0.10) }}>
       <Container maxWidth="lg" sx={{ py: 1.25 }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <Typography sx={{ fontWeight: 800, color: m.navy, letterSpacing: "-0.02em" }}>
+          <CardTitle sx={{ color: m.navy, letterSpacing: "-0.02em" }}>
             Mollure
-          </Typography>
+          </CardTitle>
 
           <Stack direction="row" spacing={1.25} alignItems="center">
             <Box
@@ -59,9 +59,7 @@ export default function AuthAwareHeader({
                 border: `1px solid ${alpha(m.navy, 0.08)}`,
               }}
             >
-              <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.7) }}>
-                EN
-              </Typography>
+              <BodyText sx={{ fontSize: 12, color: alpha(m.navy, 0.7) }}>EN</BodyText>
             </Box>
 
             {isAuthed ? (

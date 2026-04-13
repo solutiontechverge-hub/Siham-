@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Box, Container, Divider, Grid, Stack, Typography } from "@mui/material";
+import { Box, Container, Divider, Grid, Stack } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
+import { BodyText, CardTitle } from "../ui/typography";
 
 export type MarketingFooterColumn = {
   title: string;
@@ -36,26 +37,26 @@ export default function MarketingSiteFooter({
               md={index === 0 ? 4 : 2}
               key={column.title}
             >
-              <Typography sx={{ mb: 1.6, fontWeight: 800, color: "#fff" }}>
+              <CardTitle sx={{ mb: 1.6, color: "#fff" }}>
                 {column.title}
-              </Typography>
+              </CardTitle>
               <Stack spacing={1.15}>
                 {column.items.map((item) => (
-                  <Typography
+                  <BodyText
                     key={item}
                     sx={{ color: m.footerText, lineHeight: 1.8 }}
                   >
                     {item}
-                  </Typography>
+                  </BodyText>
                 ))}
               </Stack>
             </Grid>
           ))}
         </Grid>
         <Divider sx={{ my: 3.5, borderColor: "rgba(255,255,255,0.08)" }} />
-        <Typography sx={{ color: m.footerMuted, fontSize: 13 }}>
+        <BodyText sx={{ color: m.footerMuted, fontSize: 13 }}>
           {copyright}
-        </Typography>
+        </BodyText>
       </Container>
     </Box>
   );

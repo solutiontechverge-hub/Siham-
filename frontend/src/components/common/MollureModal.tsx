@@ -2,8 +2,9 @@
 
 import * as React from "react";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
-import { Box, Dialog, Divider, IconButton, Stack, Typography, type DialogProps } from "@mui/material";
+import { Box, Dialog, Divider, IconButton, Stack, type DialogProps } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import { SubHeading } from "../ui/typography";
 
 type MollureModalProps = Omit<DialogProps, "children"> & {
   title: React.ReactNode;
@@ -40,7 +41,7 @@ export default function MollureModal({
     >
       <Stack sx={{ minHeight: contentMinHeight ?? 0 }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 2.5, py: 2 }}>
-          <Typography sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 16 }}>{title}</Typography>
+          <SubHeading sx={{ fontSize: 16, color: alpha(m.navy, 0.88) }}>{title}</SubHeading>
           <IconButton
             size="small"
             onClick={() => onClose?.({}, "backdropClick")}

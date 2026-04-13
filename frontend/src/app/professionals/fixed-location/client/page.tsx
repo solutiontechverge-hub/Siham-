@@ -19,7 +19,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
@@ -36,6 +35,7 @@ import MollureModal from "../../../../components/common/MollureModal";
 import MollureDrawer from "../../../../components/common/MollureDrawer";
 import MollureListToolbar from "../../../../components/common/MollureListToolbar";
 import { useFixedLocationClientPage } from "./useFixedLocationClientPage";
+import { Typography } from "../../../../components/ui/typography";
 
 export default function FixedLocationClientPage() {
   const theme = useTheme();

@@ -3,7 +3,6 @@
 import {
   Box,
   Container,
-  Typography,
   Grid,
   Card,
   CardContent,
@@ -24,6 +23,7 @@ import {
   marketingShellHeader,
 } from "../../data/marketingShell.data";
 import { howItWorksData } from "./howItWorks.data";
+import { Typography } from "../../components/ui/typography";
 import {
   CheckCircleOutline,
   CheckOutlined,

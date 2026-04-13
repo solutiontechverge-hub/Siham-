@@ -3,8 +3,9 @@
 import Link from "next/link";
 import Image from "next/image";
 import { alpha, useTheme } from "@mui/material/styles";
-import { Box, Button, Container, Paper, Stack, Typography } from "@mui/material";
+import { Box, Button, Container, Paper, Stack } from "@mui/material";
 import { Logo } from "../../../../../images";
+import { BodyText, SubHeading } from "../../../../components/ui/typography";
 
 export default function PasswordResetSuccessPage() {
   const theme = useTheme();
@@ -142,12 +143,10 @@ export default function PasswordResetSuccessPage() {
             }}
           >
             <Stack spacing={1.5} alignItems="center">
-              <Typography sx={{ fontWeight: 700, color: m.navy, fontSize: 22, lineHeight: 1.2 }}>
-                Password Reset
-              </Typography>
-              <Typography sx={{ color: alpha(m.navy, 0.55), fontSize: 12.5, lineHeight: 1.4 }}>
+              <SubHeading sx={{ fontSize: 22, color: m.navy, lineHeight: 1.2 }}>Password Reset</SubHeading>
+              <BodyText sx={{ color: alpha(m.navy, 0.55), fontSize: 12.5, lineHeight: 1.4 }}>
                 Your Password Has Been Successfully Reset
-              </Typography>
+              </BodyText>
               <Button
                 component={Link}
                 href="/auth/login"

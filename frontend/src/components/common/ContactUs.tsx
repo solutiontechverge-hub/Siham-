@@ -15,13 +15,13 @@ import {
   Select,
   Stack,
   TextField,
-  Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
 import { contactUsData } from "../../app/contact-us/contactus.data";
 import { useContactUsForm } from "../../app/contact-us/contactus.use";
 import { ContactUsImage } from "../../../images";
+import { BodyText, SubHeading } from "../ui/typography";
 
 export type ContactUsProps = {
   illustrationSrc: string;
@@ -63,19 +63,18 @@ export default function ContactUs({ illustrationSrc }: ContactUsProps) {
               }}
             >
               <Stack spacing={1.25} alignItems="center" textAlign="center">
-                <Typography
+                <SubHeading
                   sx={{
-                    fontWeight: 800,
                     color: m.navy,
                     letterSpacing: "-0.04em",
                     fontSize: { xs: "1.6rem", sm: "2rem" },
                   }}
                 >
                   {contactUsData.headerTitle}
-                </Typography>
-                <Typography sx={{ color: alpha(m.navy, 0.55), fontSize: 13 }}>
+                </SubHeading>
+                <BodyText sx={{ color: alpha(m.navy, 0.55), fontSize: 13 }}>
                   {contactUsData.headerSubtitle}
-                </Typography>
+                </BodyText>
               </Stack>
 
               <Box
@@ -269,16 +268,14 @@ export default function ContactUs({ illustrationSrc }: ContactUsProps) {
                       onBlur={() => touch("consent")}
                       sx={{ width: 16, height: 16 }}
                     />
-                    <Typography
-                      sx={{ fontSize: 11, color: alpha(m.navy, 0.55) }}
-                    >
+                    <BodyText sx={{ fontSize: 11, color: alpha(m.navy, 0.55) }}>
                       {contactUsData.fields.consent.label}
-                    </Typography>
+                    </BodyText>
                   </Stack>
                   {touched.consent && errors.consent ? (
-                    <Typography sx={{ fontSize: 11, color: "error.main" }}>
+                    <BodyText sx={{ fontSize: 11, color: "error.main" }}>
                       {errors.consent}
-                    </Typography>
+                    </BodyText>
                   ) : null}
                 </Stack>
 

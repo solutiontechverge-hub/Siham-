@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
-  Alert,
   Box,
   Button,
   CircularProgress,
@@ -13,34 +12,32 @@ import {
   Paper,
   Stack,
   TextField,
-  Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { getApiErrorMessage } from "../../../lib/api-error";
 import { useForgotPasswordMutation } from "../../../store/services/authApi";
 import { Logo } from "../../../../images";
+import { BodyText, SubHeading } from "../../../components/ui/typography";
+import { useSnackbar } from "../../../components/common/AppSnackbar";
 
 export default function ForgotPasswordPage() {
   const theme = useTheme();
   const m = theme.palette.mollure;
   const router = useRouter();
+  const { showSnackbar } = useSnackbar();
   const [email, setEmail] = React.useState("");
-  const [successMessage, setSuccessMessage] = React.useState("");
-  const [errorMessage, setErrorMessage] = React.useState("");
   const [forgotPassword, { isLoading }] = useForgotPasswordMutation();
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    setSuccessMessage("");
-    setErrorMessage("");
-
     try {
       const result = await forgotPassword({ email }).unwrap();
 
-      setSuccessMessage(
-        result.message || "OTP sent to your email if it exists in our system.",
-      );
+      showSnackbar({
+        severity: "success",
+        message: result.message || "OTP sent to your email if it exists in our system.",
+      });
       window.sessionStorage.setItem(
         "mollure_reset_email",
         email.trim().toLowerCase(),
@@ -49,12 +46,10 @@ export default function ForgotPasswordPage() {
         router.push("/auth/reset-password/verify-otp");
       }, 700);
     } catch (error) {
-      setErrorMessage(
-        getApiErrorMessage(
-          error,
-          "Something went wrong while sending the OTP.",
-        ),
-      );
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Something went wrong while sending the OTP."),
+      });
     }
   };
 
@@ -195,26 +190,10 @@ export default function ForgotPasswordPage() {
           >
             <Stack spacing={2.25}>
               <Box textAlign="center">
-                <Typography
-                  sx={{
-                    fontWeight: 700,
-                    color: m.navy,
-                    fontSize: 22,
-                    lineHeight: 1.2,
-                  }}
-                >
-                  Forget Password
-                </Typography>
-                <Typography
-                  sx={{
-                    mt: 0.75,
-                    color: alpha(m.navy, 0.55),
-                    fontSize: 12.5,
-                    lineHeight: 1.4,
-                  }}
-                >
+                <SubHeading sx={{ fontSize: 22, color: m.navy, lineHeight: 1.2 }}>Forget Password</SubHeading>
+                <BodyText sx={{ mt: 0.75, color: alpha(m.navy, 0.55), fontSize: 12.5, lineHeight: 1.4 }}>
                   No Worries, We&apos;ll Send You Reset Instructions
-                </Typography>
+                </BodyText>
               </Box>
 
               <Box component="form" onSubmit={handleSubmit}>
@@ -231,13 +210,6 @@ export default function ForgotPasswordPage() {
                     size="small"
                     InputLabelProps={{ shrink: true }}
                   />
-
-                  {successMessage ? (
-                    <Alert severity="success">{successMessage}</Alert>
-                  ) : null}
-                  {errorMessage ? (
-                    <Alert severity="error">{errorMessage}</Alert>
-                  ) : null}
 
                   <Button
                     type="submit"
@@ -263,11 +235,7 @@ export default function ForgotPasswordPage() {
                     )}
                   </Button>
 
-                  <Typography
-                    variant="body2"
-                    textAlign="center"
-                    sx={{ color: alpha(m.navy, 0.55), fontSize: 12 }}
-                  >
+                  <BodyText textAlign="center" sx={{ color: alpha(m.navy, 0.55), fontSize: 12 }}>
                     Remember your password?{" "}
                     <Link
                       href="/auth/login"
@@ -279,7 +247,7 @@ export default function ForgotPasswordPage() {
                     >
                       Back to login
                     </Link>
-                  </Typography>
+                  </BodyText>
                 </Stack>
               </Box>
             </Stack>

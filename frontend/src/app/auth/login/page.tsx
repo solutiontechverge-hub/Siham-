@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
-  Alert,
   Box,
   Button,
   Checkbox,
@@ -14,7 +13,6 @@ import {
   Paper,
   Stack,
   TextField,
-  Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { getApiErrorMessage } from "../../../lib/api-error";
@@ -23,21 +21,22 @@ import { useAppDispatch } from "../../../store/hooks";
 import { setAuthSession } from "../../../store/slices/authSlice";
 import { useLoginMutation } from "../../../store/services/authApi";
 import { Logo } from "../../../../images";
+import { BodyText, SubHeading } from "../../../components/ui/typography";
+import { useSnackbar } from "../../../components/common/AppSnackbar";
 
 export default function LoginPage() {
   const theme = useTheme();
   const m = theme.palette.mollure;
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const { showSnackbar } = useSnackbar();
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [remember, setRemember] = React.useState(false);
-  const [errorMessage, setErrorMessage] = React.useState("");
   const [login, { isLoading }] = useLoginMutation();
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setErrorMessage("");
 
     try {
       const result = await login({
@@ -60,10 +59,12 @@ export default function LoginPage() {
       });
 
       router.push("/");
+      showSnackbar({ severity: "success", message: "Signed in successfully." });
     } catch (error) {
-      setErrorMessage(
-        getApiErrorMessage(error, "Login failed. Please check your credentials."),
-      );
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Login failed. Please check your credentials."),
+      });
     }
   };
 
@@ -199,12 +200,10 @@ export default function LoginPage() {
           >
             <Stack spacing={2.25}>
               <Box textAlign="center">
-                <Typography sx={{ fontWeight: 700, color: m.navy, fontSize: 22, lineHeight: 1.2 }}>
-                  Sign In
-                </Typography>
-                <Typography sx={{ mt: 0.75, color: alpha(m.navy, 0.55), fontSize: 12.5, lineHeight: 1.4 }}>
+                <SubHeading sx={{ fontSize: 22, color: m.navy, lineHeight: 1.2 }}>Sign In</SubHeading>
+                <BodyText sx={{ mt: 0.75, color: alpha(m.navy, 0.55), fontSize: 12.5, lineHeight: 1.4 }}>
                   Welcome Back! Login To Access Your Account
-                </Typography>
+                </BodyText>
               </Box>
 
               <Box component="form" onSubmit={handleSubmit}>
@@ -252,9 +251,7 @@ export default function LoginPage() {
                         />
                       }
                       label={
-                        <Typography sx={{ fontSize: 12, color: alpha(m.navy, 0.55) }}>
-                          Remember Me
-                        </Typography>
+                        <BodyText sx={{ fontSize: 12, color: alpha(m.navy, 0.55) }}>Remember Me</BodyText>
                       }
                     />
 
@@ -269,8 +266,6 @@ export default function LoginPage() {
                       Forget Password?
                     </Link>
                   </Box>
-
-                  {errorMessage ? <Alert severity="error">{errorMessage}</Alert> : null}
 
                   <Button
                     type="submit"
@@ -328,7 +323,7 @@ export default function LoginPage() {
                     </Button>
                   </Stack>
 
-                  <Typography textAlign="center" sx={{ fontSize: 12, color: alpha(m.navy, 0.55) }}>
+                  <BodyText textAlign="center" sx={{ fontSize: 12, color: alpha(m.navy, 0.55) }}>
                     Don&apos;t have account?{" "}
                     <Link
                       href="/auth/signup/individual"
@@ -336,7 +331,7 @@ export default function LoginPage() {
                     >
                       Create account
                     </Link>
-                  </Typography>
+                  </BodyText>
                 </Stack>
               </Box>
             </Stack>

@@ -1,9 +1,10 @@
 "use client";
 
 import FixedLocationPageScaffold from "../../../../components/common/FixedLocationPageScaffold";
-import { Paper, Typography } from "@mui/material";
+import { Paper } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { fixedLocationTopTabs } from "../fixedLocationTopTabs";
+import { Typography } from "../../../../components/ui/typography";
 
 export default function FixedLocationAnalyticsPage() {
   const theme = useTheme();

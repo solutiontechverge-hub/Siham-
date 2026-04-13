@@ -2,9 +2,10 @@
 
 import * as React from "react";
 import Image from "next/image";
-import { Box, Container, Stack, Typography } from "@mui/material";
+import { Box, Container, Stack } from "@mui/material";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import { AboutUsImage } from "../../../images";
+import { BodyText, SubHeading } from "../ui/typography";
 
 type AboutSplitSectionProps = {
   imageSrc: string;
@@ -80,25 +81,17 @@ export default function AboutSplitSection({
                 boxSizing: "border-box",
               }}
             >
-              <Stack
-                direction="row"
-                alignItems="center"
-                justifyContent="flex-end"
-                spacing={1}
-                sx={{ width: "100%" }}
-              >
-                <Typography
+              <Stack direction="row" alignItems="center" justifyContent="flex-end" spacing={1} sx={{ width: "100%" }}>
+                <SubHeading
                   id="about-split-heading"
-                  component="h2"
                   sx={{
-                    fontWeight: 600,
                     fontSize: { xs: "1.65rem", md: "2rem" },
                     color: "common.white",
                     lineHeight: 1.2,
                   }}
                 >
                   {panelTitle}
-                </Typography>
+                </SubHeading>
                 <AutoAwesomeIcon
                   sx={{
                     fontSize: { xs: 22, md: 26 },
@@ -111,11 +104,9 @@ export default function AboutSplitSection({
 
               <Stack spacing={2.25} sx={{ flex: 1 }}>
                 {paragraphs.map((p) => (
-                  <Typography
+                  <BodyText
                     key={p.slice(0, 40)}
-                    variant="body1"
                     sx={{
-                      fontWeight: 400,
                       lineHeight: 1.75,
                       color: "rgba(255,255,255,0.95)",
                       textAlign: "left",
@@ -123,7 +114,7 @@ export default function AboutSplitSection({
                     }}
                   >
                     {p}
-                  </Typography>
+                  </BodyText>
                 ))}
               </Stack>
             </Stack>

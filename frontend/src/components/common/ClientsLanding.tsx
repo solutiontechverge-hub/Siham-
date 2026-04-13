@@ -14,7 +14,6 @@ import {
   MenuItem,
   Stack,
   TextField,
-  Typography,
 } from "@mui/material";
 import { Profile as AvatarImage } from "../../../images";
 import type { ClientsLandingData } from "../../app/clients/clients.data";
@@ -22,6 +21,7 @@ import { getFeatureIcon, useClientsPageTokens } from "../../app/clients/clients.
 import MarketingSectionHeading from "./MarketingSectionHeading";
 import MarketingSiteFooter from "./MarketingSiteFooter";
 import MarketingSiteHeader from "./MarketingSiteHeader";
+import { BodyText as Typography } from "../ui/typography";
 
 export type ClientsLandingOverrides = {
   header?: Partial<ClientsLandingData["header"]>;

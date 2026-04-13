@@ -1,12 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { Box, Card, CardContent, Typography } from "@mui/material";
+import { Box, Card, CardContent } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import BusinessRoundedIcon from "@mui/icons-material/BusinessRounded";
 import ChatBubbleRoundedIcon from "@mui/icons-material/ChatBubbleRounded";
 import PlaceRoundedIcon from "@mui/icons-material/PlaceRounded";
 import SyncAltRoundedIcon from "@mui/icons-material/SyncAltRounded";
+import { BodyText, CardTitle } from "../ui/typography";
 
 export type MarketingFeatureCardIconKey =
   | "locations"
@@ -83,17 +84,15 @@ export default function MarketingFeatureCard({
           </Box>
 
           <Box sx={{ minWidth: 0 }}>
-            <Typography
+            <CardTitle
               sx={{
-                fontWeight: 700,
-                color: m.textcolorgrey700,
                 fontSize: { xs: 14.5, md: 15.5 },
                 lineHeight: 1.22,
               }}
             >
               {title}
-            </Typography>
-            <Typography
+            </CardTitle>
+            <BodyText
               sx={{
                 mt: 0.65,
                 color: alpha(m.navy, 0.55),
@@ -102,7 +101,7 @@ export default function MarketingFeatureCard({
               }}
             >
               {description}
-            </Typography>
+            </BodyText>
           </Box>
         </Box>
       </CardContent>

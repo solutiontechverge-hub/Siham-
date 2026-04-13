@@ -1,9 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { Box, Stack, Typography, type PaperProps } from "@mui/material";
+import { Box, Stack, type PaperProps } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import AppCard from "./AppCard";
+import { BodyText, SubHeading } from "../ui/typography";
 
 type ContentCardProps = Omit<PaperProps, "title"> & {
   title?: React.ReactNode;
@@ -58,22 +59,15 @@ export default function ContentCard({
           }}
         >
           {title && (
-            <Typography
-              variant="h6"
-              sx={{ fontWeight: 600, color: "mollure.textcolorgrey700" }}
-            >
+            <SubHeading sx={{ fontSize: "18px", color: "mollure.textcolorgrey700" }}>
               {title}
-            </Typography>
+            </SubHeading>
           )}
 
           {description && (
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{ fontWeight: 400, lineHeight: 1.65 }}
-            >
+            <BodyText sx={{ lineHeight: 1.65 }} color="text.secondary">
               {description}
-            </Typography>
+            </BodyText>
           )}
 
           {children}

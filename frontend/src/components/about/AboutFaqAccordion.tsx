@@ -8,10 +8,10 @@ import {
   Box,
   Container,
   Stack,
-  Typography,
 } from "@mui/material";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import { BodyText, CardTitle, SubHeading } from "../ui/typography";
 
 export type AboutFaqItem = {
   id: string;
@@ -37,10 +37,8 @@ export default function AboutFaqAccordion({
       }}
     >
       <Container maxWidth="md">
-        <Typography
-          variant="h4"
+        <SubHeading
           sx={{
-            fontWeight: 600,
             textAlign: "center",
             color: "mollure.textcolorgrey700",
             mb: 4,
@@ -48,7 +46,7 @@ export default function AboutFaqAccordion({
           }}
         >
           {title}
-        </Typography>
+        </SubHeading>
 
         <Stack spacing={1.5}>
           {items.map((item) => (
@@ -88,7 +86,7 @@ export default function AboutFaqAccordion({
                     flexShrink: 0,
                   }}
                 />
-                <Typography
+                <CardTitle
                   sx={{
                     fontWeight: 600,
                     color: "mollure.textcolorgrey700",
@@ -96,20 +94,18 @@ export default function AboutFaqAccordion({
                   }}
                 >
                   {item.question}
-                </Typography>
+                </CardTitle>
               </AccordionSummary>
               <AccordionDetails sx={{ px: 2, pb: 2.5, pt: 0, pl: 2 }}>
-                <Typography
-                  variant="body2"
+                <BodyText
                   sx={{
                     pl: 4,
-                    fontWeight: 400,
                     color: "text.secondary",
                     lineHeight: 1.75,
                   }}
                 >
                   {item.answer}
-                </Typography>
+                </BodyText>
               </AccordionDetails>
             </Accordion>
           ))}

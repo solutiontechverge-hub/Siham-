@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Typography } from "@mui/material";
+import { SubHeading } from "../ui/typography";
 
 const sectionHeadingSx = {
   fontWeight: 600,
@@ -17,8 +17,7 @@ export function HowItWorksSectionTitle({
   mb?: number;
 }) {
   return (
-    <Typography
-      variant="h4"
+    <SubHeading
       sx={{
         ...sectionHeadingSx,
         textAlign: "center",
@@ -26,7 +25,7 @@ export function HowItWorksSectionTitle({
       }}
     >
       {title}
-    </Typography>
+    </SubHeading>
   );
 }
 

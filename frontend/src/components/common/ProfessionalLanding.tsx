@@ -13,7 +13,6 @@ import {
   Grid,
   Paper,
   Stack,
-  Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
@@ -26,6 +25,7 @@ import MarketingResultCard from "./MarketingResultCard";
 import type { professionalsPageData } from "../../app/professionals/professionals.data";
 import { useProfessionalsTokens } from "../../app/professionals/professionals.use";
 import { ProfessionalsHeroImage } from "../../../images";
+import { BodyText as Typography } from "../ui/typography";
 
 type ProfessionalsLandingData = typeof professionalsPageData;
 

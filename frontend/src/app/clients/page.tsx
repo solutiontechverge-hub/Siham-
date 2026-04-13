@@ -13,7 +13,6 @@ import {
   MenuItem,
   Stack,
   TextField,
-  Typography,
 } from "@mui/material";
 import { clientsPageData } from "./clients.data";
 import { getFeatureIcon, useClientsPageTokens } from "./clients.use";
@@ -24,6 +23,7 @@ import {
   MarketingSiteFooter,
   MarketingSiteHeader,
 } from "../../components/common";
+import { BodyText as Typography } from "../../components/ui/typography";
 
 export default function ClientsPage() {
   const tokens = useClientsPageTokens();

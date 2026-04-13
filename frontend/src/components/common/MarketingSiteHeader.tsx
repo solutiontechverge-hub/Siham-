@@ -5,9 +5,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import LanguageRoundedIcon from "@mui/icons-material/LanguageRounded";
-import { Avatar, Box, Button, Container, Divider, Stack, Typography } from "@mui/material";
+import { Avatar, Box, Button, Container, Divider, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { Logo } from "../../../images";
+import { BodyText } from "../ui/typography";
 
 export type MarketingNavItem = {
   label: string;
@@ -112,13 +113,12 @@ export default function MarketingSiteHeader({
                   {navItems.map((item) => {
                     const active = isNavActive(pathForActive, item);
                     return (
-                      <Typography
+                      <BodyText
                         key={item.href + item.label}
                         component={Link}
                         href={item.href}
                         sx={{
                           fontSize: 14,
-                          fontWeight: active ? 600 : 400,
                           color: active ? m.navy : m.slate,
                           textDecoration: "none",
                           cursor: "pointer",
@@ -129,7 +129,7 @@ export default function MarketingSiteHeader({
                         }}
                       >
                         {item.label}
-                      </Typography>
+                      </BodyText>
                     );
                   })}
                 </Stack>
@@ -213,7 +213,7 @@ export default function MarketingSiteHeader({
                       {professionalLinkLabel}
                     </Button>
                   ) : (
-                    <Typography
+                    <BodyText
                       sx={{
                         display: { xs: "none", sm: "block" },
                         fontSize: 13,
@@ -221,7 +221,7 @@ export default function MarketingSiteHeader({
                       }}
                     >
                       {professionalLinkLabel}
-                    </Typography>
+                    </BodyText>
                   )
                 ) : null}
               </Stack>

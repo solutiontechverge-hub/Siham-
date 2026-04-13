@@ -1,8 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Stack, Typography } from "@mui/material";
+import { Stack } from "@mui/material";
 import type { ResponsiveStyleValue } from "@mui/system";
+import { Description, MainHeading } from "../ui/typography";
 
 type MarketingSectionHeadingProps = {
   title: React.ReactNode;
@@ -27,23 +28,19 @@ export default function MarketingSectionHeading({
           align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start",
       }}
     >
-      <Typography
-        component="h2"
+      <MainHeading
         sx={{
-          fontWeight: 600,
-          color: "mollure.textcolorgrey700",
           fontSize: { xs: "2rem", md: "2.6rem" },
           lineHeight: 1.12,
           letterSpacing: "-0.02em",
+          textAlign: align,
         }}
       >
         {title}
-      </Typography>
+      </MainHeading>
       {subtitle ? (
-        <Typography
+        <Description
           sx={{
-            fontWeight: 400,
-            color: "mollure.bodyText",
             fontSize: { xs: "0.95rem", md: "1.05rem" },
             lineHeight: 1.7,
             textAlign: align,
@@ -52,7 +49,7 @@ export default function MarketingSectionHeading({
           }}
         >
           {subtitle}
-        </Typography>
+        </Description>
       ) : null}
     </Stack>
   );

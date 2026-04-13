@@ -21,7 +21,6 @@ import {
   Rating,
   Stack,
   Switch,
-  Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
@@ -39,6 +38,7 @@ import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import type { FixedLocationPageData } from "../../app/professionals/fixed-location/fixedLocation.data";
 import { useFixedLocationForm } from "../../app/professionals/fixed-location/fixedLocation.use";
 import MollureFormField from "./MollureFormField";
+import { Typography } from "../ui/typography";
 
 export type ProfessionalFixedLocationSetupProps = {
   data: FixedLocationPageData;

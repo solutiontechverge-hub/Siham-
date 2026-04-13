@@ -10,7 +10,6 @@ import {
   Container,
   Paper,
   Stack,
-  Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import PublicRoundedIcon from "@mui/icons-material/PublicRounded";
@@ -18,6 +17,7 @@ import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownR
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
 import ApartmentRoundedIcon from "@mui/icons-material/ApartmentRounded";
 import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
+import { BodyText, MainHeading } from "../../components/ui/typography";
 
 type UserTypeKey = "individual" | "company" | "professional";
 
@@ -194,12 +194,9 @@ export default function SignupSelectUserTypePage() {
           }}
         >
           <Box sx={{ maxWidth: 980, width: "100%", mx: "auto", px: { xs: 1, sm: 2 } }}>
-            <Typography sx={{ color: alpha(m.navy, 0.55), fontSize: 16, mb: 0.5 }}>
-              Hi,
-            </Typography>
-            <Typography
+            <BodyText sx={{ color: alpha(m.navy, 0.55), fontSize: 16, mb: 0.5 }}>Hi,</BodyText>
+            <MainHeading
               sx={{
-                fontWeight: 700,
                 color: "mollure.textcolorgrey700",
                 fontSize: { xs: 28, md: 34 },
                 lineHeight: 1.15,
@@ -210,7 +207,7 @@ export default function SignupSelectUserTypePage() {
               }}
             >
               Select User Type
-            </Typography>
+            </MainHeading>
 
             <Stack direction={{ xs: "column", md: "row" }} spacing={3} sx={{ mt: 4 }}>
               {USER_TYPES.map(({ key, title, Icon }) => {
@@ -255,16 +252,15 @@ export default function SignupSelectUserTypePage() {
                   >
                     <Stack spacing={1.35} alignItems="center">
                       <Icon sx={{ fontSize: 34, color: alpha(m.navy, 0.58) }} />
-                      <Typography
+                      <BodyText
                         sx={{
-                          fontWeight: 600,
                           color: alpha(m.navy, 0.80),
                           fontSize: 14,
                           lineHeight: 1.2,
                         }}
                       >
                         {title}
-                      </Typography>
+                      </BodyText>
                     </Stack>
                   </Paper>
                 );
