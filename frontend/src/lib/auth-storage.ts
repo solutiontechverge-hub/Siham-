@@ -37,3 +37,20 @@ export const clearPersistedAuthSession = () => {
   window.sessionStorage.removeItem(REFRESH_TOKEN_KEY);
   window.sessionStorage.removeItem(USER_KEY);
 };
+
+export const getPersistedAuthSession = () => {
+  const readFrom = (storage: Storage) => {
+    const accessToken = storage.getItem(ACCESS_TOKEN_KEY);
+    const refreshToken = storage.getItem(REFRESH_TOKEN_KEY);
+    const userRaw = storage.getItem(USER_KEY);
+    if (!accessToken || !refreshToken || !userRaw) return null;
+    try {
+      const user = JSON.parse(userRaw) as AuthUser;
+      return { accessToken, refreshToken, user };
+    } catch {
+      return null;
+    }
+  };
+
+  return readFrom(window.localStorage) ?? readFrom(window.sessionStorage);
+};

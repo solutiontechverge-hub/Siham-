@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Pagination, Stack, Typography, type PaginationProps } from "@mui/material";
+import { Pagination, Stack, type PaginationProps } from "@mui/material";
+import { BodyText } from "../ui/typography";
 
 type AppPaginationProps = PaginationProps & {
   summary?: React.ReactNode;
@@ -18,9 +19,7 @@ export default function AppPagination({
       alignItems={{ xs: "stretch", sm: "center" }}
       justifyContent="space-between"
     >
-      <Typography variant="body2" color="text.secondary">
-        {summary || "Browse more results"}
-      </Typography>
+      <BodyText color="text.secondary">{summary || "Browse more results"}</BodyText>
       <Pagination color="primary" shape="rounded" {...props} />
     </Stack>
   );

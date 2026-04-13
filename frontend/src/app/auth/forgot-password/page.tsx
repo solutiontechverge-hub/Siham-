@@ -3,8 +3,8 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import {
-  Alert,
   Box,
   Button,
   CircularProgress,
@@ -12,39 +12,44 @@ import {
   Paper,
   Stack,
   TextField,
-  Typography,
 } from "@mui/material";
-import { alpha } from "@mui/material/styles";
+import { alpha, useTheme } from "@mui/material/styles";
 import { getApiErrorMessage } from "../../../lib/api-error";
 import { useForgotPasswordMutation } from "../../../store/services/authApi";
+import { Logo } from "../../../../images";
+import { BodyText, SubHeading } from "../../../components/ui/typography";
+import { useSnackbar } from "../../../components/common/AppSnackbar";
 
 export default function ForgotPasswordPage() {
+  const theme = useTheme();
+  const m = theme.palette.mollure;
   const router = useRouter();
+  const { showSnackbar } = useSnackbar();
   const [email, setEmail] = React.useState("");
-  const [successMessage, setSuccessMessage] = React.useState("");
-  const [errorMessage, setErrorMessage] = React.useState("");
   const [forgotPassword, { isLoading }] = useForgotPasswordMutation();
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    setSuccessMessage("");
-    setErrorMessage("");
-
     try {
       const result = await forgotPassword({ email }).unwrap();
 
-      setSuccessMessage(
-        result.message || "OTP sent to your email if it exists in our system.",
+      showSnackbar({
+        severity: "success",
+        message: result.message || "OTP sent to your email if it exists in our system.",
+      });
+      window.sessionStorage.setItem(
+        "mollure_reset_email",
+        email.trim().toLowerCase(),
       );
-      window.sessionStorage.setItem("mollure_reset_email", email.trim().toLowerCase());
       window.setTimeout(() => {
         router.push("/auth/reset-password/verify-otp");
       }, 700);
     } catch (error) {
-      setErrorMessage(
-        getApiErrorMessage(error, "Something went wrong while sending the OTP."),
-      );
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Something went wrong while sending the OTP."),
+      });
     }
   };
 
@@ -52,185 +57,202 @@ export default function ForgotPasswordPage() {
     <Box
       sx={{
         minHeight: "100vh",
-        background:
-          "radial-gradient(circle at top left, #d8ffff 0%, #f6fffd 34%, #f5f7fb 100%)",
-        py: { xs: 3, md: 5 },
+        bgcolor: "#fff",
+        position: "relative",
+        overflow: "hidden",
+        "&:before": {
+          content: '""',
+          position: "absolute",
+          inset: 0,
+          background:
+            "radial-gradient(circle at 88% 42%, rgba(33, 184, 191, 0.10), transparent 42%)",
+          pointerEvents: "none",
+        },
+        "&:after": {
+          content: '""',
+          position: "absolute",
+          left: -120,
+          bottom: -130,
+          width: 320,
+          height: 320,
+          borderRadius: "50%",
+          border: `14px solid ${alpha(m.teal, 0.1)}`,
+          pointerEvents: "none",
+        },
       }}
     >
-      <Container maxWidth="lg">
-        <Stack spacing={{ xs: 5, md: 8 }}>
+      <Container maxWidth="lg" sx={{ position: "relative", zIndex: 1 }}>
+        <Box
+          sx={{
+            pt: 2.5,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 2,
+            flexWrap: "wrap",
+          }}
+        >
           <Box
             sx={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 2,
-              flexWrap: "wrap",
+              position: "relative",
+              width: { xs: 84, sm: 96 },
+              height: { xs: 20, sm: 24 },
+              flexShrink: 0,
             }}
           >
-            <Stack direction="row" spacing={1.5} alignItems="center">
-              <Box
-                sx={{
-                  width: 46,
-                  height: 46,
-                  borderRadius: "16px",
-                  background:
-                    "linear-gradient(135deg, #00c2b8 0%, #1177ff 100%)",
-                  boxShadow: "0 12px 30px rgba(17, 119, 255, 0.22)",
-                }}
-              />
-              <Typography
-                variant="h5"
-                sx={{
-                  fontWeight: 800,
-                  letterSpacing: "-0.04em",
-                  color: "#10233f",
-                }}
-              >
-                Mollure
-              </Typography>
-            </Stack>
-
-            <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
-              <Button
-                variant="outlined"
-                sx={{
-                  borderRadius: 999,
-                  borderColor: alpha("#10233f", 0.14),
-                  color: "#10233f",
-                  px: 2,
-                  textTransform: "none",
-                  fontWeight: 700,
-                }}
-              >
-                EN
-              </Button>
-              <Button
-                component={Link}
-                href="/auth/login"
-                variant="contained"
-                sx={{
-                  borderRadius: 999,
-                  px: 2.5,
-                  textTransform: "none",
-                  fontWeight: 700,
-                  backgroundColor: "#00b3b3",
-                  "&:hover": {
-                    backgroundColor: "#009c9c",
-                  },
-                }}
-              >
-                Login
-              </Button>
-              <Button
-                component={Link}
-                href="/auth/professional/login"
-                variant="outlined"
-                sx={{
-                  borderRadius: 999,
-                  borderColor: alpha("#10233f", 0.14),
-                  color: "#10233f",
-                  px: 2,
-                  textTransform: "none",
-                  fontWeight: 700,
-                }}
-              >
-                For professional
-              </Button>
-            </Stack>
+            <Image
+              src={Logo}
+              alt="Mollure"
+              fill
+              priority
+              sizes="96px"
+              style={{ objectFit: "contain" }}
+            />
           </Box>
 
-          <Box sx={{ display: "flex", justifyContent: "center" }}>
-            <Paper
-              elevation={0}
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            flexWrap="wrap"
+          >
+            <Button
+              variant="outlined"
+              size="small"
               sx={{
-                width: "100%",
-                maxWidth: 620,
-                borderRadius: "32px",
-                px: { xs: 3, sm: 5 },
-                py: { xs: 4, sm: 5 },
-                backgroundColor: "rgba(255,255,255,0.88)",
-                backdropFilter: "blur(12px)",
-                border: "1px solid rgba(16, 35, 63, 0.08)",
-                boxShadow: "0 24px 80px rgba(16, 35, 63, 0.10)",
+                borderRadius: 999,
+                borderColor: alpha(m.navy, 0.14),
+                color: m.navy,
+                px: 1.25,
+                textTransform: "none",
+                fontWeight: 600,
+                minHeight: 30,
               }}
             >
-              <Stack spacing={3}>
-                <Box textAlign="center">
-                  <Typography
-                    variant="h3"
+              EN
+            </Button>
+            <Button
+              component={Link}
+              href="/auth/login"
+              variant="contained"
+              size="small"
+              sx={{
+                borderRadius: 999,
+                px: 1.8,
+                textTransform: "none",
+                fontWeight: 600,
+                minHeight: 30,
+                bgcolor: m.teal,
+                "&:hover": { bgcolor: m.tealDark },
+              }}
+            >
+              login
+            </Button>
+            <Button
+              component={Link}
+              href="/auth/professional/login"
+              variant="outlined"
+              size="small"
+              sx={{
+                borderRadius: 999,
+                borderColor: alpha(m.navy, 0.14),
+                color: alpha(m.navy, 0.72),
+                px: 1.8,
+                textTransform: "none",
+                fontWeight: 600,
+                minHeight: 30,
+              }}
+            >
+              for professional
+            </Button>
+          </Stack>
+        </Box>
+
+        <Box
+          sx={{
+            minHeight: "calc(100vh - 72px)",
+            display: "grid",
+            placeItems: "center",
+            pb: 6,
+          }}
+        >
+          <Paper
+            elevation={0}
+            sx={{
+              width: "100%",
+              maxWidth: 520,
+              borderRadius: "6px",
+              border: `1px solid ${alpha(m.navy, 0.1)}`,
+              boxShadow: "0 10px 30px rgba(16, 35, 63, 0.06)",
+              px: { xs: 3, sm: 4.5 },
+              py: { xs: 3, sm: 3.5 },
+            }}
+          >
+            <Stack spacing={2.25}>
+              <Box textAlign="center">
+                <SubHeading sx={{ fontSize: 22, color: m.navy, lineHeight: 1.2 }}>Forget Password</SubHeading>
+                <BodyText sx={{ mt: 0.75, color: alpha(m.navy, 0.55), fontSize: 12.5, lineHeight: 1.4 }}>
+                  No Worries, We&apos;ll Send You Reset Instructions
+                </BodyText>
+              </Box>
+
+              <Box component="form" onSubmit={handleSubmit}>
+                <Stack spacing={2}>
+                  <TextField
+                    fullWidth
+                    type="email"
+                    label="Email Address"
+                    placeholder="e.g Jane"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    required
+                    autoComplete="email"
+                    size="small"
+                    InputLabelProps={{ shrink: true }}
+                  />
+
+                  <Button
+                    type="submit"
+                    variant="contained"
+                    disableElevation
+                    disabled={isLoading}
                     sx={{
-                      fontWeight: 900,
-                      letterSpacing: "-0.05em",
-                      color: "#10233f",
-                      fontSize: { xs: "2rem", sm: "2.75rem" },
+                      borderRadius: "4px",
+                      textTransform: "none",
+                      fontWeight: 600,
+                      bgcolor: m.teal,
+                      "&:hover": { bgcolor: m.tealDark },
+                      minHeight: 38,
                     }}
                   >
-                    Forget Password
-                  </Typography>
-                  <Typography
-                    sx={{
-                      mt: 1.5,
-                      color: alpha("#10233f", 0.72),
-                      fontSize: "1rem",
-                    }}
-                  >
-                    No worries, we&apos;ll send you reset instructions.
-                  </Typography>
-                </Box>
+                    {isLoading ? (
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <CircularProgress size={16} sx={{ color: "#fff" }} />
+                        <span>Sending...</span>
+                      </Stack>
+                    ) : (
+                      "Send OTP"
+                    )}
+                  </Button>
 
-                <Box component="form" onSubmit={handleSubmit}>
-                  <Stack spacing={2.5}>
-                    <TextField
-                      type="email"
-                      label="Email Address"
-                      placeholder="e.g. jane@example.com"
-                      value={email}
-                      onChange={(event) => setEmail(event.target.value)}
-                      required
-                      fullWidth
-                      autoComplete="email"
-                      InputLabelProps={{ shrink: true }}
-                    />
-
-                    {successMessage ? (
-                  <Alert severity="success">{successMessage}</Alert>
-                    ) : null}
-
-                    {errorMessage ? (
-                      <Alert severity="error">{errorMessage}</Alert>
-                    ) : null}
-
-                    <Button
-                      type="submit"
-                      variant="contained"
-                      disabled={isLoading}
-                      sx={{
-                        minHeight: 54,
-                        borderRadius: 999,
-                        textTransform: "none",
-                        fontSize: "1rem",
-                        fontWeight: 800,
-                        background:
-                          "linear-gradient(135deg, #10233f 0%, #00a9b4 100%)",
-                        boxShadow: "0 18px 40px rgba(0, 169, 180, 0.24)",
+                  <BodyText textAlign="center" sx={{ color: alpha(m.navy, 0.55), fontSize: 12 }}>
+                    Remember your password?{" "}
+                    <Link
+                      href="/auth/login"
+                      style={{
+                        color: m.teal,
+                        textDecoration: "none",
+                        fontWeight: 700,
                       }}
                     >
-                      {isLoading ? (
-                        <Stack direction="row" spacing={1.25} alignItems="center">
-                          <CircularProgress size={18} sx={{ color: "#fff" }} />
-                          <span>Sending...</span>
-                        </Stack>
-                      ) : (
-                        "Send OTP"
-                      )}
-                    </Button>
-                  </Stack>
-                </Box>
-              </Stack>
-            </Paper>
-          </Box>
-        </Stack>
+                      Back to login
+                    </Link>
+                  </BodyText>
+                </Stack>
+              </Box>
+            </Stack>
+          </Paper>
+        </Box>
       </Container>
     </Box>
   );

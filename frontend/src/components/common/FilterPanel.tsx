@@ -2,8 +2,9 @@
 
 import * as React from "react";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
-import { Box, Chip, Stack, Typography, type PaperProps } from "@mui/material";
+import { Box, Chip, Stack, type PaperProps } from "@mui/material";
 import ContentCard from "./ContentCard";
+import { BodyText } from "../ui/typography";
 
 type FilterItem = {
   key: string;
@@ -42,9 +43,7 @@ export default function FilterPanel({
             ))}
           </Box>
         ) : (
-          <Typography variant="body2" color="text.secondary">
-            No active filters yet.
-          </Typography>
+          <BodyText color="text.secondary">No active filters yet.</BodyText>
         )}
         {children}
         {footer}
