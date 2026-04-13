@@ -478,7 +478,7 @@ export default function FixedLocationClientPage() {
       >
         <Box sx={{ px: 2.5, py: 3, textAlign: "center" }}>
           <Typography sx={{ fontWeight: 900, color: alpha(m.navy, 0.80), fontSize: 15, lineHeight: 1.25 }}>
-            Blocked Clients can't book
+            Blocked Clients can&apos;t book
             <br />
             appointment or message you
           </Typography>

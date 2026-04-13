@@ -113,7 +113,7 @@ export function useContactUsForm() {
     // TODO: wire to backend when contact endpoint is defined.
     await new Promise((r) => setTimeout(r, 500));
     setSubmitState("success");
-  }, [isSignedIn]);
+  }, [isSignedIn, values]);
 
   const closeGate = React.useCallback(() => setShowSignInGate(false), []);
 
