@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useTheme } from "@mui/material/styles";
-import { listingPageData } from "../listing.data";
+import { listingPageData } from "../listing/listing.data";
 import { favouritesPageData } from "./data-favourites";
 
 export function useFavouritesTokens() {

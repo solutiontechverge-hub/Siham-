@@ -1,4 +1,4 @@
-import { marketingShellFooter, marketingShellHeader } from "../../data/marketingShell.data";
+import { professionalsMarketingFooter, professionalsMarketingHeader } from "../../data/marketingShell.data";
 
 export type ProfessionalFeaturesPreviewItem = {
   label: string;
@@ -49,15 +49,15 @@ export type ProfessionalFeaturesSection = {
 };
 
 export type ProfessionalFeaturesPageData = {
-  header: typeof marketingShellHeader;
+  header: typeof professionalsMarketingHeader;
   title: string;
   subtitle: string;
   sections: readonly ProfessionalFeaturesSection[];
-  footer: typeof marketingShellFooter;
+  footer: typeof professionalsMarketingFooter;
 };
 
 export const professionalFeaturesPageData = {
-  header: marketingShellHeader,
+  header: professionalsMarketingHeader,
   title: "Features",
   subtitle:
     "Interactive Booking That Puts Clarity And Communication First. Book With Confidence, Knowing Nothing Important Happens Without Your Approval.",
@@ -222,6 +222,6 @@ export const professionalFeaturesPageData = {
       ],
     },
   ] satisfies readonly ProfessionalFeaturesSection[],
-  footer: marketingShellFooter,
+  footer: professionalsMarketingFooter,
 } satisfies ProfessionalFeaturesPageData;
 

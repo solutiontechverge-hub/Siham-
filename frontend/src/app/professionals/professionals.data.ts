@@ -1,4 +1,4 @@
-import { marketingShellFooter, marketingShellHeader } from "../../data/marketingShell.data";
+import { professionalsMarketingFooter, professionalsMarketingHeader } from "../../data/marketingShell.data";
 
 export type ProfessionalFeatureIconKey =
   | "locations"
@@ -25,7 +25,7 @@ export type ProfessionalStep = {
 };
 
 export const professionalsPageData = {
-  header: marketingShellHeader,
+  header: professionalsMarketingHeader,
   hero: {
     eyebrow: "For Salons & Freelancers",
     title: "Let Mollure Work\nFor You",
@@ -137,6 +137,6 @@ export const professionalsPageData = {
       "Join thousands of salon owners and freelancers who are saving time and growing revenue with Mollure.",
     action: "Continue Now",
   },
-  footer: marketingShellFooter,
+  footer: professionalsMarketingFooter,
 } as const;
 

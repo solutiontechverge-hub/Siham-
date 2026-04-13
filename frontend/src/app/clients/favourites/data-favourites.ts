@@ -1,4 +1,4 @@
-import { listingPageData } from "../listing.data";
+import { listingPageData } from "../listing/listing.data";
 
 export const favouritesPageData = {
   header: listingPageData.header,

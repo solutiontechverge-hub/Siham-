@@ -1,4 +1,4 @@
-import type { ListingFilterOption } from "../../components/common";
+import type { ListingFilterOption } from "../../../components/common";
 import {
   ListingImage1,
   ListingImage2,
@@ -6,7 +6,7 @@ import {
   ListingImage4,
   ListingImage5,
   ListingImage6,
-} from "../../../images";
+} from "../../../../images";
 
 export type ListingCardService = {
   name: string;

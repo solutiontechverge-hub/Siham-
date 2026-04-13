@@ -1,14 +1,17 @@
 "use client";
 
 import * as React from "react";
-import LanguageRoundedIcon from "@mui/icons-material/LanguageRounded";
-import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
-import { Box, Button, Container, Divider, Grid, Stack, Typography } from "@mui/material";
+import { Box, Container, Divider, Grid, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import Image from "next/image";
 import Link from "next/link";
-import { Logo } from "../../../images";
+import { MollureMarketingHeader, MarketingSiteFooter } from "../../../components/common";
+import {
+  professionalsMarketingFooter,
+  professionalsMarketingHeader,
+} from "../../../data/marketingShell.data";
+
+const MARKETING_CARD_SHADOW = "0 10px 28px rgba(16, 35, 63, 0.10)";
 
 export default function PricingPage() {
   const tokens = useTheme().palette.mollure;
@@ -24,117 +27,17 @@ export default function PricingPage() {
 
   return (
     <Box sx={{ bgcolor: tokens.surface, color: tokens.navy, minHeight: "100vh" }}>
-      <Box
-        component="header"
-        sx={{
-          position: "sticky",
-          top: 0,
-          zIndex: 10,
-          bgcolor: "#fff",
-          borderBottom: `1px solid ${tokens.border}`,
-        }}
-      >
-        <Container maxWidth="xl" sx={{ py: 1.4 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
-            <Box component={Link} href="/" sx={{ display: "inline-flex", alignItems: "center", minWidth: 240 }}>
-              <Image src={Logo} alt="Mollure" width={160} height={38} priority />
-            </Box>
-
-            <Stack
-              direction="row"
-              spacing={3}
-              alignItems="center"
-              sx={{ display: { xs: "none", md: "flex" } }}
-            >
-              {[
-                { label: "Features", href: "/features" },
-                { label: "How It Works", href: "/how-it-works" },
-                { label: "Pricing", href: "/pricing" },
-                { label: "About", href: "/about" },
-              ].map((item) => {
-                const active = item.href === "/pricing";
-                return (
-                  <Typography
-                    key={item.href}
-                    component={Link}
-                    href={item.href}
-                    sx={{
-                      fontSize: 13.5,
-                      fontWeight: active ? 700 : 500,
-                      color: active ? alpha(tokens.navy, 0.88) : alpha(tokens.navy, 0.6),
-                      textDecoration: "none",
-                      lineHeight: 1,
-                      "&:hover": { color: tokens.navy },
-                    }}
-                  >
-                    {item.label}
-                  </Typography>
-                );
-              })}
-            </Stack>
-
-            <Stack direction="row" alignItems="center" spacing={1.2} sx={{ minWidth: 320, justifyContent: "flex-end" }}>
-              <Button
-                variant="outlined"
-                startIcon={<LanguageRoundedIcon sx={{ fontSize: 18 }} />}
-                endIcon={<ExpandMoreRoundedIcon sx={{ fontSize: 18 }} />}
-                sx={{
-                  borderRadius: 999,
-                  borderColor: alpha(tokens.navy, 0.18),
-                  color: tokens.navy,
-                  px: 1.5,
-                  textTransform: "none",
-                  fontWeight: 800,
-                  fontSize: 13,
-                  bgcolor: "#fff",
-                  height: 34,
-                  minWidth: 92,
-                  "& .MuiButton-startIcon": { mr: 0.7 },
-                  "& .MuiButton-endIcon": { ml: 0.5 },
-                }}
-              >
-                EN
-              </Button>
-              <Button
-                component={Link}
-                href="/auth/login"
-                variant="contained"
-                disableElevation
-                sx={{
-                  borderRadius: 999,
-                  px: 2.2,
-                  textTransform: "none",
-                  fontWeight: 900,
-                  bgcolor: tokens.teal,
-                  "&:hover": { bgcolor: tokens.tealDark },
-                  height: 34,
-                }}
-              >
-                login
-              </Button>
-              <Button
-                variant="outlined"
-                sx={{
-                  borderRadius: 999,
-                  borderColor: alpha(tokens.navy, 0.18),
-                  color: alpha(tokens.navy, 0.62),
-                  px: 2.0,
-                  textTransform: "none",
-                  fontWeight: 600,
-                  fontSize: 13,
-                  bgcolor: "#fff",
-                  height: 34,
-                }}
-              >
-                for client
-              </Button>
-            </Stack>
-          </Stack>
-        </Container>
-      </Box>
+      <MollureMarketingHeader
+        navItems={[...professionalsMarketingHeader.navItems]}
+        localeLabel={professionalsMarketingHeader.localeLabel}
+        loginLabel={professionalsMarketingHeader.loginLabel}
+        professionalLinkLabel={professionalsMarketingHeader.professionalLinkLabel}
+        professionalHref={professionalsMarketingHeader.professionalHref}
+        homeHref="/professionals"
+      />
 
       <Box sx={{ bgcolor: alpha(tokens.teal, 0.16), borderBottom: `1px solid ${tokens.border}` }}>
-        <Container maxWidth="xl" sx={{ py: { xs: 5.25, md: 6.25 } }}>
+        <Container maxWidth="lg" sx={{ py: { xs: 5.25, md: 6.25 } }}>
           <Stack alignItems="center" textAlign="center">
             <Typography
               component="h1"
@@ -162,14 +65,14 @@ export default function PricingPage() {
         </Container>
       </Box>
 
-      <Container maxWidth="xl" sx={{ py: { xs: 3.25, md: 4 } }}>
+      <Container maxWidth="lg" sx={{ py: { xs: 3.25, md: 4 } }}>
         <Stack spacing={2.25}>
           <Box
             sx={{
               bgcolor: "#fff",
               borderRadius: 2.5,
               border: `1px solid ${tokens.border}`,
-              boxShadow: "0 16px 40px rgba(16, 24, 40, 0.10)",
+              boxShadow: MARKETING_CARD_SHADOW,
               p: { xs: 2.5, md: 3.25 },
             }}
           >
@@ -212,7 +115,7 @@ export default function PricingPage() {
               bgcolor: alpha(tokens.teal, 0.04),
               borderRadius: 2.5,
               border: `1px solid ${tokens.border}`,
-              boxShadow: "0 16px 40px rgba(16, 24, 40, 0.10)",
+              boxShadow: MARKETING_CARD_SHADOW,
               p: { xs: 2.5, md: 3.25 },
             }}
           >
@@ -285,7 +188,7 @@ export default function PricingPage() {
               bgcolor: alpha(tokens.star, 0.08),
               borderRadius: 2.5,
               border: `1px solid ${tokens.border}`,
-              boxShadow: "0 16px 40px rgba(16, 24, 40, 0.10)",
+              boxShadow: MARKETING_CARD_SHADOW,
               p: { xs: 2.5, md: 3.25 },
             }}
           >
@@ -358,7 +261,7 @@ export default function PricingPage() {
               bgcolor: "#fff",
               borderRadius: 2.5,
               border: `1px solid ${tokens.border}`,
-              boxShadow: "0 16px 40px rgba(16, 24, 40, 0.10)",
+              boxShadow: MARKETING_CARD_SHADOW,
               p: { xs: 2.5, md: 3.25 },
             }}
           >
@@ -421,7 +324,7 @@ export default function PricingPage() {
               bgcolor: alpha(tokens.teal, 0.04),
               borderRadius: 2.5,
               border: `1px solid ${tokens.border}`,
-              boxShadow: "0 16px 40px rgba(16, 24, 40, 0.10)",
+              boxShadow: MARKETING_CARD_SHADOW,
               p: { xs: 2.5, md: 3.25 },
             }}
           >
@@ -508,85 +411,14 @@ export default function PricingPage() {
         </Stack>
       </Container>
 
-      <Box
-        sx={{
-          bgcolor: tokens.footer,
-          color: tokens.footerText,
-          pt: 5.5,
-          pb: 3,
-          mt: 2,
-        }}
-      >
-        <Container maxWidth="xl">
-          <Grid container spacing={5}>
-            <Grid item xs={12} md={5}>
-              <Typography sx={{ mb: 1.25, fontWeight: 900, color: "#fff", fontSize: 22 }}>
-                Mollure
-              </Typography>
-              <Typography sx={{ color: tokens.footerText, lineHeight: 1.7, maxWidth: 360, fontSize: 13 }}>
-                The All-In-One Platform For Salon And Freelancer Appointment Management
-              </Typography>
-            </Grid>
-
-            <Grid item xs={12} sm={6} md={2.33}>
-              <Typography sx={{ mb: 1.25, fontWeight: 900, color: "#fff", fontSize: 14 }}>
-                Product
-              </Typography>
-              <Stack spacing={0.9}>
-                <Typography
-                  component={Link}
-                  href="/features"
-                  sx={{ color: tokens.footerText, textDecoration: "none", fontSize: 12.5 }}
-                >
-                  Features
-                </Typography>
-                <Typography
-                  component={Link}
-                  href="/pricing"
-                  sx={{ color: tokens.footerText, textDecoration: "none", fontSize: 12.5 }}
-                >
-                  Pricing
-                </Typography>
-                <Typography sx={{ color: tokens.footerText, fontSize: 12.5 }}>Integrations</Typography>
-                <Typography sx={{ color: tokens.footerText, fontSize: 12.5 }}>API</Typography>
-              </Stack>
-            </Grid>
-
-            <Grid item xs={12} sm={6} md={2.33}>
-              <Typography sx={{ mb: 1.25, fontWeight: 900, color: "#fff", fontSize: 14 }}>
-                Company
-              </Typography>
-              <Stack spacing={0.9}>
-                <Typography
-                  component={Link}
-                  href="/about"
-                  sx={{ color: tokens.footerText, textDecoration: "none", fontSize: 12.5 }}
-                >
-                  About
-                </Typography>
-                <Typography sx={{ color: tokens.footerText, fontSize: 12.5 }}>FAQ</Typography>
-                <Typography sx={{ color: tokens.footerText, fontSize: 12.5 }}>Contact</Typography>
-              </Stack>
-            </Grid>
-
-            <Grid item xs={12} sm={6} md={2.33}>
-              <Typography sx={{ mb: 1.25, fontWeight: 900, color: "#fff", fontSize: 14 }}>
-                Legal
-              </Typography>
-              <Stack spacing={0.9}>
-                <Typography sx={{ color: tokens.footerText, fontSize: 12.5 }}>Privacy</Typography>
-                <Typography sx={{ color: tokens.footerText, fontSize: 12.5 }}>Terms</Typography>
-                <Typography sx={{ color: tokens.footerText, fontSize: 12.5 }}>Security</Typography>
-              </Stack>
-            </Grid>
-          </Grid>
-
-          <Divider sx={{ my: 3.5, borderColor: alpha("#fff", 0.12) }} />
-          <Typography sx={{ color: tokens.footerMuted, fontSize: 12.5 }}>
-            2024 Mollure. All Rights Reserved.
-          </Typography>
-        </Container>
-      </Box>
+      <MarketingSiteFooter
+        columns={professionalsMarketingFooter.columns.map((col) => ({
+          title: col.title,
+          items: [...col.items],
+        }))}
+        copyright={professionalsMarketingFooter.copyright}
+        sx={{ mt: 2 }}
+      />
     </Box>
   );
 }

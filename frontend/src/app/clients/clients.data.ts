@@ -1,7 +1,4 @@
-import {
-  marketingShellFooter,
-  marketingShellHeader,
-} from "../../data/marketingShell.data";
+import { clientsShellHeader, marketingShellFooter } from "../../data/marketingShell.data";
 
 export type ClientFeatureIconKey =
   | "location"
@@ -43,7 +40,7 @@ export type ClientFilter = {
 };
 
 export const clientsPageData = {
-  header: marketingShellHeader,
+  header: clientsShellHeader,
   hero: {
     eyebrow: "Beauty & Grooming For Your Time",
     title: "Book Beauty And Grooming Professionals On Your Terms",

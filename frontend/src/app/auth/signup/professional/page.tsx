@@ -1,7 +1,10 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import Link from "next/link";
+import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import {
   Box,
   Button,
@@ -10,16 +13,22 @@ import {
   Container,
   FormControlLabel,
   Grid,
+  IconButton,
+  InputAdornment,
   MenuItem,
   Paper,
   Stack,
   TextField,
+  Typography,
 } from "@mui/material";
-import { alpha } from "@mui/material/styles";
+import { alpha, useTheme } from "@mui/material/styles";
 import { getApiErrorMessage } from "../../../../lib/api-error";
 import { useRegisterMutation } from "../../../../store/services/authApi";
-import { BodyText, CardTitle, MainHeading, SubHeading } from "../../../../components/ui/typography";
+import { MarketingSiteHeader } from "../../../../components/common";
+import { authSignupHeaderProfessional } from "../../../../data/marketingShell.data";
+import { BodyText } from "../../../../components/ui/typography";
 import { useSnackbar } from "../../../../components/common/AppSnackbar";
+import { SignupBg, SignupLs, SignupRs } from "../../../../../images";
 
 type FormState = {
   legalName: string;
@@ -63,10 +72,99 @@ const initialForm: FormState = {
   acceptTerms: false,
 };
 
+const PROVINCE_OPTIONS = [
+  "Drenthe",
+  "Flevoland",
+  "Friesland",
+  "Gelderland",
+  "Groningen",
+  "Limburg",
+  "North Brabant",
+  "North Holland",
+  "Overijssel",
+  "South Holland",
+  "Utrecht",
+  "Zeeland",
+  "Antwerp",
+  "East Flanders",
+  "Flemish Brabant",
+  "Hainaut",
+  "Liège",
+  "Limburg (BE)",
+  "Luxembourg (BE)",
+  "Namur",
+  "Walloon Brabant",
+  "West Flanders",
+  "Brussels-Capital Region",
+] as const;
+
+const MUNICIPALITY_OPTIONS = [
+  "Amsterdam",
+  "Rotterdam",
+  "The Hague",
+  "Utrecht",
+  "Eindhoven",
+  "Groningen",
+  "Tilburg",
+  "Almere",
+  "Breda",
+  "Nijmegen",
+  "Antwerp",
+  "Ghent",
+  "Charleroi",
+  "Brussels",
+  "Liège",
+  "Schaerbeek",
+  "Anderlecht",
+  "Bruges",
+  "Namur",
+  "Leuven",
+] as const;
+
+const BUSINESS_TYPE_OPTIONS = [
+  { value: "salonOwner", label: "Salon Owner" },
+  { value: "freelancer", label: "Freelancer" },
+  { value: "other", label: "Other" },
+] as const;
+
 export default function ProfessionalSignupPage() {
+  const theme = useTheme();
+  const m = theme.palette.mollure;
   const [form, setForm] = React.useState<FormState>(initialForm);
+  const [showPassword, setShowPassword] = React.useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
   const { showSnackbar } = useSnackbar();
   const [register, { isLoading }] = useRegisterMutation();
+
+  const cardBorder = m.cardBorder ?? alpha(m.navy, 0.12);
+
+  const textFieldSx = {
+    "& .MuiOutlinedInput-root": {
+      borderRadius: "8px",
+      bgcolor: m.white ?? "#fff",
+      "& fieldset": {
+        borderColor: m.inputBorder,
+      },
+      "&:hover fieldset": {
+        borderColor: m.inputBorderHover,
+      },
+      "&.Mui-focused fieldset": {
+        borderColor: m.teal,
+      },
+    },
+    "& .MuiInputLabel-root": {
+      fontWeight: 600,
+      fontSize: "0.8125rem",
+      color: alpha(m.navy, 0.88),
+    },
+    "& .MuiInputLabel-root.Mui-focused": {
+      color: alpha(m.navy, 0.88),
+    },
+    "& .MuiOutlinedInput-input::placeholder": {
+      color: m.placeholder,
+      opacity: 1,
+    },
+  } as const;
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value, type, checked } = event.target as HTMLInputElement;
@@ -115,8 +213,7 @@ export default function ProfessionalSignupPage() {
       showSnackbar({
         severity: "success",
         message:
-          result.message ||
-          "Professional account created successfully. Please check your email.",
+          result.message || "Professional account created successfully. Please check your email.",
       });
       setForm(initialForm);
     } catch (error) {
@@ -131,275 +228,414 @@ export default function ProfessionalSignupPage() {
     <Box
       sx={{
         minHeight: "100vh",
-        background:
-          "radial-gradient(circle at top left, #d8ffff 0%, #f6fffd 34%, #f5f7fb 100%)",
-        py: { xs: 3, md: 5 },
+        bgcolor: m.white ?? "#fff",
+        position: "relative",
+        overflow: "hidden",
       }}
     >
-      <Container maxWidth="lg">
-        <Stack spacing={{ xs: 5, md: 8 }}>
+      <Box
+        aria-hidden
+        sx={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 0,
+          pointerEvents: "none",
+        }}
+      >
+        <Box
+          sx={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            lineHeight: 0,
+          }}
+        >
+          <Image
+            src={SignupBg}
+            alt=""
+            width={1440}
+            height={553}
+            priority
+            sizes="100vw"
+            style={{
+              width: "100%",
+              height: "auto",
+              display: "block",
+            }}
+          />
+        </Box>
+
+        <Box
+          sx={{
+            position: "absolute",
+            left: { xs: -12, sm: -4, md: 0 },
+            bottom: { xs: -28, sm: -12, md: 0 },
+            width: { xs: "min(52vw, 240px)", sm: 280, md: 323 },
+            lineHeight: 0,
+          }}
+        >
+          <Image
+            src={SignupLs}
+            alt=""
+            width={323}
+            height={469}
+            sizes="(max-width: 600px) 52vw, 323px"
+            style={{ width: "100%", height: "auto", display: "block" }}
+          />
+        </Box>
+
+        <Box
+          sx={{
+            position: "absolute",
+            right: { xs: -12, sm: -4, md: 0 },
+            bottom: { xs: -28, sm: -12, md: 0 },
+            width: { xs: "min(56vw, 260px)", sm: 300, md: 364 },
+            lineHeight: 0,
+          }}
+        >
+          <Image
+            src={SignupRs}
+            alt=""
+            width={364}
+            height={413}
+            sizes="(max-width: 600px) 56vw, 364px"
+            style={{ width: "100%", height: "auto", display: "block" }}
+          />
+        </Box>
+      </Box>
+
+      <Box sx={{ position: "relative", zIndex: 1 }}>
+        <MarketingSiteHeader
+          navItems={[...authSignupHeaderProfessional.navItems]}
+          localeLabel={authSignupHeaderProfessional.localeLabel}
+          loginLabel={authSignupHeaderProfessional.loginLabel}
+          loginHref={authSignupHeaderProfessional.loginHref}
+          professionalLinkLabel={authSignupHeaderProfessional.professionalLinkLabel}
+          professionalHref={authSignupHeaderProfessional.professionalHref}
+          homeHref="/"
+        />
+
+        <Container maxWidth="lg">
           <Box
             sx={{
               display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 2,
-              flexWrap: "wrap",
+              justifyContent: "center",
+              py: { xs: 3, sm: 4 },
+              pb: { xs: 5, sm: 6 },
             }}
           >
-            <Stack direction="row" spacing={1.5} alignItems="center">
-              <Box
-                sx={{
-                  width: 46,
-                  height: 46,
-                  borderRadius: "16px",
-                  background: "linear-gradient(135deg, #00c2b8 0%, #1177ff 100%)",
-                  boxShadow: "0 12px 30px rgba(17, 119, 255, 0.22)",
-                }}
-              />
-              <CardTitle sx={{ fontSize: "1.25rem", letterSpacing: "-0.04em", color: "#10233f" }}>Mollure</CardTitle>
-            </Stack>
-
-            <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
-              <Button
-                variant="outlined"
-                sx={{
-                  borderRadius: 999,
-                  borderColor: alpha("#10233f", 0.14),
-                  color: "#10233f",
-                  px: 2,
-                  textTransform: "none",
-                  fontWeight: 700,
-                }}
-              >
-                EN
-              </Button>
-              <Button
-                component={Link}
-                href="/auth/login"
-                variant="contained"
-                sx={{
-                  borderRadius: 999,
-                  px: 2.5,
-                  textTransform: "none",
-                  fontWeight: 700,
-                  backgroundColor: "#00b3b3",
-                  "&:hover": {
-                    backgroundColor: "#009c9c",
-                  },
-                }}
-              >
-                Login
-              </Button>
-              <Button
-                component={Link}
-                href="/auth/professional/login"
-                variant="outlined"
-                sx={{
-                  borderRadius: 999,
-                  borderColor: alpha("#10233f", 0.14),
-                  color: "#10233f",
-                  px: 2,
-                  textTransform: "none",
-                  fontWeight: 700,
-                }}
-              >
-                For professional
-              </Button>
-            </Stack>
-          </Box>
-
-          <Box sx={{ display: "flex", justifyContent: "center" }}>
             <Paper
               elevation={0}
               sx={{
                 width: "100%",
-                maxWidth: 980,
-                borderRadius: "32px",
-                px: { xs: 3, sm: 5 },
-                py: { xs: 4, sm: 5 },
-                backgroundColor: "rgba(255,255,255,0.88)",
-                backdropFilter: "blur(12px)",
-                border: "1px solid rgba(16, 35, 63, 0.08)",
-                boxShadow: "0 24px 80px rgba(16, 35, 63, 0.10)",
+                maxWidth: 720,
+                borderRadius: "14px",
+                border: `1px solid ${cardBorder}`,
+                boxShadow: `0 18px 48px ${alpha(m.navy, 0.08)}, 0 4px 14px ${alpha(m.navy, 0.04)}`,
+                bgcolor: m.white ?? "#fff",
+                px: { xs: 3, sm: 4.5 },
+                py: { xs: 3.5, sm: 4.25 },
               }}
             >
-              <Stack spacing={4}>
+              <Stack spacing={3}>
                 <Box textAlign="center">
-                  <MainHeading sx={{ letterSpacing: "-0.05em", color: "#10233f", fontSize: { xs: "2rem", sm: "2.75rem" } }}>
+                  <Typography
+                    component="h1"
+                    sx={{
+                      fontWeight: 700,
+                      fontSize: { xs: "1.5rem", sm: "1.75rem" },
+                      lineHeight: 1.2,
+                      color: m.navy,
+                    }}
+                  >
                     Create An Account
-                  </MainHeading>
-                  <BodyText sx={{ mt: 1.5, color: alpha("#10233f", 0.72), fontSize: "1rem" }}>
-                    Join us and start your journey today.
+                  </Typography>
+                  <BodyText
+                    sx={{
+                      mt: 1,
+                      color: alpha(m.navy, 0.52),
+                      fontSize: "0.875rem",
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    Join Us And Start Your Journey Today.
                   </BodyText>
                 </Box>
 
                 <Box component="form" onSubmit={handleSubmit}>
-                  <Stack spacing={4}>
+                  <Stack spacing={3}>
                     <Box>
-                      <SubHeading sx={{ mb: 2, fontSize: "1.125rem", color: "#10233f" }}>Company Information</SubHeading>
-                      <Grid container spacing={2.5}>
-                        <Grid item xs={12} md={6}>
+                      <Typography
+                        sx={{
+                          fontWeight: 700,
+                          fontSize: "0.9375rem",
+                          color: m.navy,
+                          mb: 1.5,
+                        }}
+                      >
+                        Company Information
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={12}>
                           <TextField
                             fullWidth
+                            size="small"
                             label="Legal Name"
                             name="legalName"
                             value={form.legalName}
                             onChange={handleChange}
                             required
+                            placeholder="e.g Jane"
                             InputLabelProps={{ shrink: true }}
+                            sx={textFieldSx}
                           />
                         </Grid>
-                        <Grid item xs={12} md={6} />
-                        <Grid item xs={12} md={6}>
+                        <Grid item xs={12} sm={6}>
                           <TextField
                             fullWidth
-                            label="CCC Number"
+                            size="small"
+                            label="COC number"
                             name="cccNumber"
                             value={form.cccNumber}
                             onChange={handleChange}
                             required
+                            placeholder="676537"
                             InputLabelProps={{ shrink: true }}
+                            sx={textFieldSx}
                           />
                         </Grid>
-                        <Grid item xs={12} md={6}>
+                        <Grid item xs={12} sm={6}>
                           <TextField
                             fullWidth
-                            label="VAT Number"
+                            size="small"
+                            label="VAT number"
                             name="vatNumber"
                             value={form.vatNumber}
                             onChange={handleChange}
                             required
+                            placeholder="27354323456789"
                             InputLabelProps={{ shrink: true }}
+                            sx={textFieldSx}
                           />
                         </Grid>
-                        <Grid item xs={12} sm={6} md={3}>
+
+                        <Grid item xs={12}>
+                          <Typography
+                            sx={{
+                              fontWeight: 600,
+                              fontSize: "0.8125rem",
+                              color: alpha(m.navy, 0.72),
+                              mb: 0.5,
+                              mt: 0.5,
+                            }}
+                          >
+                            Business Address
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={12} sm={8}>
                           <TextField
                             fullWidth
-                            label="Business Address"
+                            size="small"
+                            label="Street"
                             name="street"
                             value={form.street}
                             onChange={handleChange}
                             InputLabelProps={{ shrink: true }}
+                            sx={textFieldSx}
                           />
                         </Grid>
-                        <Grid item xs={12} sm={6} md={3}>
+                        <Grid item xs={12} sm={4}>
                           <TextField
                             fullWidth
+                            size="small"
                             label="Number"
                             name="number"
                             value={form.number}
                             onChange={handleChange}
                             InputLabelProps={{ shrink: true }}
+                            sx={textFieldSx}
                           />
                         </Grid>
-                        <Grid item xs={12} sm={6} md={3}>
+                        <Grid item xs={12} sm={6}>
                           <TextField
                             fullWidth
+                            size="small"
                             label="Postal Code"
                             name="postalCode"
                             value={form.postalCode}
                             onChange={handleChange}
                             InputLabelProps={{ shrink: true }}
+                            sx={textFieldSx}
                           />
                         </Grid>
-                        <Grid item xs={12} sm={6} md={3}>
+                        <Grid item xs={12} sm={6}>
                           <TextField
                             fullWidth
+                            size="small"
+                            select
                             label="Province"
                             name="province"
                             value={form.province}
                             onChange={handleChange}
                             InputLabelProps={{ shrink: true }}
-                          />
+                            sx={textFieldSx}
+                            SelectProps={{ displayEmpty: true }}
+                          >
+                            <MenuItem value="">
+                              <em>Select Province</em>
+                            </MenuItem>
+                            {PROVINCE_OPTIONS.map((p) => (
+                              <MenuItem key={p} value={p}>
+                                {p}
+                              </MenuItem>
+                            ))}
+                          </TextField>
                         </Grid>
-                        <Grid item xs={12} md={6}>
+                        <Grid item xs={12}>
                           <TextField
                             fullWidth
+                            size="small"
+                            select
                             label="Municipality"
                             name="municipality"
                             value={form.municipality}
                             onChange={handleChange}
                             InputLabelProps={{ shrink: true }}
-                          />
+                            sx={textFieldSx}
+                            SelectProps={{ displayEmpty: true }}
+                          >
+                            <MenuItem value="">
+                              <em>Select Municipality</em>
+                            </MenuItem>
+                            {MUNICIPALITY_OPTIONS.map((c) => (
+                              <MenuItem key={c} value={c}>
+                                {c}
+                              </MenuItem>
+                            ))}
+                          </TextField>
                         </Grid>
-                        <Grid item xs={12} md={6}>
+
+                        <Grid item xs={12}>
                           <TextField
                             fullWidth
+                            size="small"
                             select
                             label="Select Business Type"
                             name="businessType"
                             value={form.businessType}
                             onChange={handleChange}
                             InputLabelProps={{ shrink: true }}
+                            sx={textFieldSx}
+                            SelectProps={{ displayEmpty: true }}
                           >
-                            <MenuItem value="">Select</MenuItem>
-                            <MenuItem value="salonOwner">Salon Owner</MenuItem>
-                            <MenuItem value="freelancer">Freelancer</MenuItem>
-                            <MenuItem value="other">Other</MenuItem>
+                            <MenuItem value="">
+                              <em>Select Business Type</em>
+                            </MenuItem>
+                            {BUSINESS_TYPE_OPTIONS.map((opt) => (
+                              <MenuItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </MenuItem>
+                            ))}
                           </TextField>
+                        </Grid>
+
+                        <Grid item xs={12}>
+                          <Typography
+                            sx={{
+                              fontWeight: 600,
+                              fontSize: "0.8125rem",
+                              color: alpha(m.navy, 0.72),
+                              mb: 0.5,
+                              mt: 0.5,
+                            }}
+                          >
+                            Portfolio links
+                          </Typography>
                         </Grid>
                         <Grid item xs={12} md={4}>
                           <TextField
                             fullWidth
+                            size="small"
                             label="Website"
                             name="website"
                             value={form.website}
                             onChange={handleChange}
                             InputLabelProps={{ shrink: true }}
+                            sx={textFieldSx}
                           />
                         </Grid>
                         <Grid item xs={12} md={4}>
                           <TextField
                             fullWidth
+                            size="small"
                             label="Instagram"
                             name="instagram"
                             value={form.instagram}
                             onChange={handleChange}
                             InputLabelProps={{ shrink: true }}
+                            sx={textFieldSx}
                           />
                         </Grid>
                         <Grid item xs={12} md={4}>
                           <TextField
                             fullWidth
+                            size="small"
                             label="Other"
                             name="otherLink"
                             value={form.otherLink}
                             onChange={handleChange}
                             InputLabelProps={{ shrink: true }}
+                            sx={textFieldSx}
                           />
                         </Grid>
                       </Grid>
                     </Box>
 
                     <Box>
-                      <SubHeading sx={{ mb: 2, fontSize: "1.125rem", color: "#10233f" }}>Contact Person</SubHeading>
-                      <Grid container spacing={2.5}>
-                        <Grid item xs={12} md={6}>
+                      <Typography
+                        sx={{
+                          fontWeight: 700,
+                          fontSize: "0.9375rem",
+                          color: m.navy,
+                          mb: 1.5,
+                        }}
+                      >
+                        Contact Person
+                      </Typography>
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} sm={6}>
                           <TextField
                             fullWidth
+                            size="small"
                             label="First Name"
                             name="contactFirstName"
                             value={form.contactFirstName}
                             onChange={handleChange}
                             required
+                            placeholder="e.g Jane"
                             InputLabelProps={{ shrink: true }}
+                            sx={textFieldSx}
                           />
                         </Grid>
-                        <Grid item xs={12} md={6}>
+                        <Grid item xs={12} sm={6}>
                           <TextField
                             fullWidth
+                            size="small"
                             label="Last Name"
                             name="contactLastName"
                             value={form.contactLastName}
                             onChange={handleChange}
                             required
+                            placeholder="e.g Doe"
                             InputLabelProps={{ shrink: true }}
+                            sx={textFieldSx}
                           />
                         </Grid>
-                        <Grid item xs={12} md={6}>
+                        <Grid item xs={12}>
                           <TextField
                             fullWidth
+                            size="small"
                             type="email"
                             label="Email"
                             name="contactEmail"
@@ -407,76 +643,153 @@ export default function ProfessionalSignupPage() {
                             onChange={handleChange}
                             required
                             autoComplete="email"
+                            placeholder="You@gmail.com"
                             InputLabelProps={{ shrink: true }}
+                            sx={textFieldSx}
                           />
                         </Grid>
-                        <Grid item xs={12} md={3}>
+                        <Grid item xs={12} sm={6}>
                           <TextField
                             fullWidth
-                            type="password"
+                            size="small"
+                            type={showPassword ? "text" : "password"}
                             label="Password"
                             name="password"
                             value={form.password}
                             onChange={handleChange}
                             required
                             autoComplete="new-password"
+                            placeholder="Enter Password"
                             InputLabelProps={{ shrink: true }}
+                            sx={textFieldSx}
+                            InputProps={{
+                              endAdornment: (
+                                <InputAdornment position="end">
+                                  <IconButton
+                                    type="button"
+                                    edge="end"
+                                    aria-label={showPassword ? "Hide password" : "Show password"}
+                                    onClick={() => setShowPassword((v) => !v)}
+                                    size="small"
+                                    sx={{ color: alpha(m.navy, 0.45) }}
+                                  >
+                                    {showPassword ? (
+                                      <VisibilityOutlinedIcon fontSize="small" />
+                                    ) : (
+                                      <VisibilityOffOutlinedIcon fontSize="small" />
+                                    )}
+                                  </IconButton>
+                                </InputAdornment>
+                              ),
+                            }}
                           />
                         </Grid>
-                        <Grid item xs={12} md={3}>
+                        <Grid item xs={12} sm={6}>
                           <TextField
                             fullWidth
-                            type="password"
-                            label="Repeat Password"
+                            size="small"
+                            type={showConfirmPassword ? "text" : "password"}
+                            label="Repeat password"
                             name="confirmPassword"
                             value={form.confirmPassword}
                             onChange={handleChange}
                             required
                             autoComplete="new-password"
+                            placeholder="Confirm Password"
                             InputLabelProps={{ shrink: true }}
+                            sx={textFieldSx}
+                            InputProps={{
+                              endAdornment: (
+                                <InputAdornment position="end">
+                                  <IconButton
+                                    type="button"
+                                    edge="end"
+                                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                                    onClick={() => setShowConfirmPassword((v) => !v)}
+                                    size="small"
+                                    sx={{ color: alpha(m.navy, 0.45) }}
+                                  >
+                                    {showConfirmPassword ? (
+                                      <VisibilityOutlinedIcon fontSize="small" />
+                                    ) : (
+                                      <VisibilityOffOutlinedIcon fontSize="small" />
+                                    )}
+                                  </IconButton>
+                                </InputAdornment>
+                              ),
+                            }}
                           />
                         </Grid>
                       </Grid>
                     </Box>
 
                     <FormControlLabel
-                      control={<Checkbox checked={form.acceptTerms} onChange={handleChange} name="acceptTerms" />}
-                      label={<BodyText color="text.secondary">Accept our Terms & Conditions</BodyText>}
+                      control={
+                        <Checkbox
+                          size="small"
+                          checked={form.acceptTerms}
+                          onChange={handleChange}
+                          name="acceptTerms"
+                          sx={{
+                            color: alpha(m.navy, 0.35),
+                            "&.Mui-checked": { color: m.teal },
+                          }}
+                        />
+                      }
+                      label={
+                        <BodyText component="span" sx={{ fontSize: "0.875rem", color: alpha(m.navy, 0.55) }}>
+                          Accept our{" "}
+                          <Link
+                            href="/terms"
+                            style={{
+                              color: m.teal,
+                              fontWeight: 600,
+                              textDecoration: "underline",
+                            }}
+                          >
+                            Terms & Conditions
+                          </Link>
+                          <Typography component="span" sx={{ color: "error.main", fontWeight: 600 }}>
+                            *
+                          </Typography>
+                        </BodyText>
+                      }
                     />
 
-                    <Box sx={{ display: "flex", justifyContent: "center" }}>
-                      <Button
-                        type="submit"
-                        variant="contained"
-                        disabled={isLoading}
-                        sx={{
-                          minWidth: 220,
-                          minHeight: 54,
-                          borderRadius: 999,
-                          textTransform: "none",
-                          fontSize: "1rem",
-                          fontWeight: 800,
-                          background: "linear-gradient(135deg, #10233f 0%, #00a9b4 100%)",
-                          boxShadow: "0 18px 40px rgba(0, 169, 180, 0.24)",
-                        }}
-                      >
-                        {isLoading ? (
-                          <Stack direction="row" spacing={1.25} alignItems="center">
-                            <CircularProgress size={18} sx={{ color: "#fff" }} />
-                            <span>Registering...</span>
-                          </Stack>
-                        ) : (
-                          "Register"
-                        )}
-                      </Button>
-                    </Box>
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      disableElevation
+                      fullWidth
+                      disabled={isLoading}
+                      sx={{
+                        borderRadius: "10px",
+                        textTransform: "none",
+                        fontWeight: 700,
+                        fontSize: "1rem",
+                        py: 1.2,
+                        minHeight: 44,
+                        bgcolor: m.teal,
+                        color: m.white,
+                        "&:hover": { bgcolor: m.tealDark },
+                      }}
+                    >
+                      {isLoading ? (
+                        <Stack direction="row" spacing={1.25} alignItems="center" justifyContent="center">
+                          <CircularProgress size={20} sx={{ color: m.white }} />
+                          <span>Registering...</span>
+                        </Stack>
+                      ) : (
+                        "Register"
+                      )}
+                    </Button>
                   </Stack>
                 </Box>
               </Stack>
             </Paper>
           </Box>
-        </Stack>
-      </Container>
+        </Container>
+      </Box>
     </Box>
   );
 }

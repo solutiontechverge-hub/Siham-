@@ -3,33 +3,71 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
+import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
+import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import {
   Box,
   Button,
   Container,
+  IconButton,
+  InputAdornment,
   Paper,
   Stack,
   TextField,
 } from "@mui/material";
-import { alpha } from "@mui/material/styles";
+import { alpha, useTheme } from "@mui/material/styles";
 import { getApiErrorMessage } from "../../../../lib/api-error";
 import { useResetPasswordMutation } from "../../../../store/services/authApi";
-import { BodyText, CardTitle, MainHeading } from "../../../../components/ui/typography";
+import { MarketingSiteHeader } from "../../../../components/common";
+import { authLoginHeaderClient } from "../../../../data/marketingShell.data";
+import { BodyText, SubHeading } from "../../../../components/ui/typography";
 import { useSnackbar } from "../../../../components/common/AppSnackbar";
+import { SignupBg, SignupLs, SignupRs } from "../../../../../images";
 
 export default function NewPasswordPage() {
+  const m = useTheme().palette.mollure;
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
-  const [email, setEmail] = React.useState("");
   const [userId, setUserId] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
+  const [showPassword, setShowPassword] = React.useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
   const [resetPassword, { isLoading }] = useResetPasswordMutation();
 
+  const cardBorder = m.cardBorder ?? alpha(m.navy, 0.12);
+
+  const textFieldSx = {
+    "& .MuiOutlinedInput-root": {
+      borderRadius: "8px",
+      bgcolor: m.white ?? "#fff",
+      "& fieldset": {
+        borderColor: m.inputBorder,
+      },
+      "&:hover fieldset": {
+        borderColor: m.inputBorderHover,
+      },
+      "&.Mui-focused fieldset": {
+        borderColor: m.teal,
+      },
+    },
+    "& .MuiInputLabel-root": {
+      fontWeight: 600,
+      fontSize: "0.8125rem",
+      color: alpha(m.navy, 0.88),
+    },
+    "& .MuiInputLabel-root.Mui-focused": {
+      color: alpha(m.navy, 0.88),
+    },
+    "& .MuiOutlinedInput-input::placeholder": {
+      color: m.placeholder,
+      opacity: 1,
+    },
+  } as const;
+
   React.useEffect(() => {
-    const savedEmail = window.sessionStorage.getItem("mollure_reset_email") || "";
     const savedUserId = window.sessionStorage.getItem("mollure_reset_user_id") || "";
-    setEmail(savedEmail);
     setUserId(savedUserId);
   }, []);
 
@@ -62,66 +100,240 @@ export default function NewPasswordPage() {
   };
 
   return (
-    <Box sx={{ minHeight: "100vh", background: "radial-gradient(circle at top left, #d8ffff 0%, #f6fffd 34%, #f5f7fb 100%)", py: { xs: 3, md: 5 } }}>
-      <Container maxWidth="lg">
-        <Stack spacing={{ xs: 5, md: 8 }}>
-          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, flexWrap: "wrap" }}>
-            <Stack direction="row" spacing={1.5} alignItems="center">
-              <Box sx={{ width: 46, height: 46, borderRadius: "16px", background: "linear-gradient(135deg, #00c2b8 0%, #1177ff 100%)", boxShadow: "0 12px 30px rgba(17, 119, 255, 0.22)" }} />
-              <CardTitle sx={{ fontSize: "1.25rem", letterSpacing: "-0.04em", color: "#10233f" }}>Mollure</CardTitle>
-            </Stack>
-          </Box>
+    <Box
+      sx={{
+        minHeight: "100vh",
+        bgcolor: m.white ?? "#fff",
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      <Box
+        aria-hidden
+        sx={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 0,
+          pointerEvents: "none",
+        }}
+      >
+        <Box
+          sx={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            lineHeight: 0,
+          }}
+        >
+          <Image
+            src={SignupBg}
+            alt=""
+            width={1440}
+            height={553}
+            priority
+            sizes="100vw"
+            style={{
+              width: "100%",
+              height: "auto",
+              display: "block",
+            }}
+          />
+        </Box>
 
-          <Box sx={{ display: "flex", justifyContent: "center" }}>
-            <Paper elevation={0} sx={{ width: "100%", maxWidth: 620, borderRadius: "32px", px: { xs: 3, sm: 5 }, py: { xs: 4, sm: 5 }, backgroundColor: "rgba(255,255,255,0.88)", backdropFilter: "blur(12px)", border: "1px solid rgba(16, 35, 63, 0.08)", boxShadow: "0 24px 80px rgba(16, 35, 63, 0.10)" }}>
-              <Stack spacing={3}>
+        <Box
+          sx={{
+            position: "absolute",
+            left: { xs: -12, sm: -4, md: 0 },
+            bottom: { xs: -28, sm: -12, md: 0 },
+            width: { xs: "min(52vw, 240px)", sm: 280, md: 323 },
+            lineHeight: 0,
+          }}
+        >
+          <Image
+            src={SignupLs}
+            alt=""
+            width={323}
+            height={469}
+            sizes="(max-width: 600px) 52vw, 323px"
+            style={{ width: "100%", height: "auto", display: "block" }}
+          />
+        </Box>
+
+        <Box
+          sx={{
+            position: "absolute",
+            right: { xs: -12, sm: -4, md: 0 },
+            bottom: { xs: -28, sm: -12, md: 0 },
+            width: { xs: "min(56vw, 260px)", sm: 300, md: 364 },
+            lineHeight: 0,
+          }}
+        >
+          <Image
+            src={SignupRs}
+            alt=""
+            width={364}
+            height={413}
+            sizes="(max-width: 600px) 56vw, 364px"
+            style={{ width: "100%", height: "auto", display: "block" }}
+          />
+        </Box>
+      </Box>
+
+      <Box sx={{ position: "relative", zIndex: 1 }}>
+        <MarketingSiteHeader
+          navItems={[...authLoginHeaderClient.navItems]}
+          localeLabel={authLoginHeaderClient.localeLabel}
+          loginLabel={authLoginHeaderClient.loginLabel}
+          loginHref={authLoginHeaderClient.loginHref}
+          professionalLinkLabel={authLoginHeaderClient.professionalLinkLabel}
+          professionalHref={authLoginHeaderClient.professionalHref}
+          homeHref="/"
+        />
+
+        <Container maxWidth="lg">
+          <Box
+            sx={{
+              minHeight: "calc(100vh - 120px)",
+              display: "grid",
+              placeItems: "center",
+              py: 4,
+              pb: 6,
+            }}
+          >
+            <Paper
+              elevation={0}
+              sx={{
+                width: "100%",
+                maxWidth: 620,
+                borderRadius: "14px",
+                border: `1px solid ${cardBorder}`,
+                boxShadow: `0 18px 48px ${alpha(m.navy, 0.08)}, 0 4px 14px ${alpha(m.navy, 0.04)}`,
+                bgcolor: m.white ?? "#fff",
+                px: { xs: 3, sm: 4.75 },
+                py: { xs: 3.5, sm: 4.25 },
+              }}
+            >
+              <Stack spacing={2.75}>
                 <Box textAlign="center">
-                  <MainHeading sx={{ letterSpacing: "-0.05em", color: "#10233f", fontSize: { xs: "2rem", sm: "2.75rem" } }}>
+                  <SubHeading
+                    sx={{
+                      fontSize: { xs: "1.5rem", sm: "1.625rem" },
+                      fontWeight: 700,
+                      color: m.navy,
+                      lineHeight: 1.2,
+                    }}
+                  >
                     Set New Password?
-                  </MainHeading>
-                  <BodyText sx={{ mt: 1.5, color: alpha("#10233f", 0.72), fontSize: "1rem" }}>
-                    Your new password must be different from the previous one.
+                  </SubHeading>
+                  <BodyText
+                    sx={{
+                      mt: 1,
+                      color: alpha(m.navy, 0.52),
+                      fontSize: "0.875rem",
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    Your New Password Must Be Different From Your Previously Used Password
                   </BodyText>
                 </Box>
 
                 <Box component="form" onSubmit={handleSubmit}>
-                  <Stack spacing={2.5}>
+                  <Stack spacing={2}>
                     <TextField
                       fullWidth
-                      type="email"
-                      label="Email Address"
-                      value={email}
-                      onChange={(event) => setEmail(event.target.value)}
-                      disabled={Boolean(email)}
-                      InputLabelProps={{ shrink: true }}
-                    />
-                    <TextField
-                      fullWidth
-                      type="password"
+                      type={showPassword ? "text" : "password"}
                       label="Password"
+                      placeholder="Enter Password Here"
                       value={password}
                       onChange={(event) => setPassword(event.target.value)}
                       required
                       autoComplete="new-password"
+                      size="small"
                       InputLabelProps={{ shrink: true }}
+                      sx={textFieldSx}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton
+                              type="button"
+                              edge="end"
+                              aria-label={showPassword ? "Hide password" : "Show password"}
+                              onClick={() => setShowPassword((v) => !v)}
+                              size="small"
+                              sx={{ color: alpha(m.navy, 0.45) }}
+                            >
+                              {showPassword ? (
+                                <VisibilityOutlinedIcon fontSize="small" />
+                              ) : (
+                                <VisibilityOffOutlinedIcon fontSize="small" />
+                              )}
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      }}
                     />
+
                     <TextField
                       fullWidth
-                      type="password"
+                      type={showConfirmPassword ? "text" : "password"}
                       label="Confirm Password"
+                      placeholder="Enter Password Here"
                       value={confirmPassword}
                       onChange={(event) => setConfirmPassword(event.target.value)}
                       required
                       autoComplete="new-password"
+                      size="small"
                       InputLabelProps={{ shrink: true }}
+                      sx={textFieldSx}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton
+                              type="button"
+                              edge="end"
+                              aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                              onClick={() => setShowConfirmPassword((v) => !v)}
+                              size="small"
+                              sx={{ color: alpha(m.navy, 0.45) }}
+                            >
+                              {showConfirmPassword ? (
+                                <VisibilityOutlinedIcon fontSize="small" />
+                              ) : (
+                                <VisibilityOffOutlinedIcon fontSize="small" />
+                              )}
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      }}
                     />
 
-                    <Button type="submit" variant="contained" disabled={isLoading} sx={{ minHeight: 54, borderRadius: 999, textTransform: "none", fontSize: "1rem", fontWeight: 800, background: "linear-gradient(135deg, #10233f 0%, #00a9b4 100%)", boxShadow: "0 18px 40px rgba(0, 169, 180, 0.24)" }}>
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      disableElevation
+                      fullWidth
+                      disabled={isLoading}
+                      sx={{
+                        borderRadius: "10px",
+                        textTransform: "none",
+                        fontWeight: 700,
+                        fontSize: "1rem",
+                        py: 1.2,
+                        minHeight: 44,
+                        bgcolor: m.teal,
+                        color: m.white,
+                        "&:hover": { bgcolor: m.tealDark },
+                      }}
+                    >
                       {isLoading ? "Resetting..." : "Reset Password"}
                     </Button>
 
-                    <BodyText textAlign="center" color="text.secondary">
-                      <Link href="/auth/reset-password/verify-otp" style={{ color: "#00a9b4", textDecoration: "none", fontWeight: 700 }}>
+                    <BodyText textAlign="center" sx={{ color: alpha(m.navy, 0.48), fontSize: "0.8125rem" }}>
+                      <Link
+                        href="/auth/reset-password/verify-otp"
+                        style={{ color: m.teal, textDecoration: "none", fontWeight: 600 }}
+                      >
                         Back to OTP verification
                       </Link>
                     </BodyText>
@@ -130,8 +342,8 @@ export default function NewPasswordPage() {
               </Stack>
             </Paper>
           </Box>
-        </Stack>
-      </Container>
+        </Container>
+      </Box>
     </Box>
   );
 }

@@ -19,7 +19,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import MarketingSectionHeading from "./MarketingSectionHeading";
 import MarketingSiteFooter from "./MarketingSiteFooter";
-import MarketingSiteHeader from "./MarketingSiteHeader";
+import MollureMarketingHeader from "./MollureMarketingHeader";
 import MarketingFeatureCard from "./MarketingFeatureCard";
 import MarketingResultCard from "./MarketingResultCard";
 import type { professionalsPageData } from "../../app/professionals/professionals.data";
@@ -43,12 +43,13 @@ export default function ProfessionalLanding({
 
   return (
     <Box sx={{ bgcolor: "background.default" }}>
-      <MarketingSiteHeader
+      <MollureMarketingHeader
         navItems={[...header.navItems]}
         localeLabel={header.localeLabel}
         loginLabel={header.loginLabel}
         professionalLinkLabel={header.professionalLinkLabel}
         professionalHref={header.professionalHref}
+        homeHref="/professionals"
       />
 
       {/* Hero */}

@@ -22,10 +22,10 @@ import {
 import { alpha } from "@mui/material/styles";
 import Image from "next/image";
 import Link from "next/link";
-import { ListingFilterBox, AppPagination, AppCard } from "../../components/common";
+import { ListingFilterBox, AppPagination, AppCard } from "../../../components/common";
 import { listingPageData, type ListingCardData } from "./listing.data";
 import { useClientListingState, useListingTokens, type ListingSortValue } from "./listing.use";
-import { Logo, ListingBG, FixedLocationIcon, DesiredLocationIcon } from "../../../images";
+import { Logo, ListingBG, FixedLocationIcon, DesiredLocationIcon } from "../../../../images";
 
 function toSrc(img: any) {
   if (!img) return "";

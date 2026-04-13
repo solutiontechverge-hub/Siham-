@@ -17,10 +17,11 @@ import {
 } from "@mui/material";
 import { Profile as AvatarImage } from "../../../images";
 import type { ClientsLandingData } from "../../app/clients/clients.data";
+import { clientsShellHeader, type ClientsShellHeaderConfig } from "../../data/marketingShell.data";
 import { getFeatureIcon, useClientsPageTokens } from "../../app/clients/clients.use";
 import MarketingSectionHeading from "./MarketingSectionHeading";
 import MarketingSiteFooter from "./MarketingSiteFooter";
-import MarketingSiteHeader from "./MarketingSiteHeader";
+import MollureMarketingHeader from "./MollureMarketingHeader";
 import { BodyText as Typography } from "../ui/typography";
 
 export type ClientsLandingOverrides = {
@@ -36,7 +37,11 @@ export type ClientsLandingProps = {
 export default function ClientsLanding({ data, overrides }: ClientsLandingProps) {
   const tokens = useClientsPageTokens();
 
-  const header = { ...data.header, ...(overrides?.header ?? {}) };
+  const header: ClientsShellHeaderConfig = {
+    ...clientsShellHeader,
+    ...data.header,
+    ...(overrides?.header ?? {}),
+  } as ClientsShellHeaderConfig;
   const hero = { ...data.hero, ...(overrides?.hero ?? {}) };
   const { whyChooseSection, stepsSection, testimonialsSection, professionalCta, footer } = data;
 
@@ -50,10 +55,11 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
 
   return (
     <Box sx={{ bgcolor: "background.default", color: tokens.navy }}>
-      <MarketingSiteHeader
+      <MollureMarketingHeader
         navItems={[...header.navItems]}
         localeLabel={header.localeLabel}
         loginLabel={header.loginLabel}
+        homeHref="/clients"
         professionalLinkLabel={header.professionalLinkLabel}
         professionalHref={header.professionalHref}
       />

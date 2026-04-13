@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useTheme } from "@mui/material/styles";
-import type { ListingFilterValues } from "../../components/common";
+import type { ListingFilterValues } from "../../../components/common";
 import type { ListingCardData } from "./listing.data";
 
 export type ListingSortValue = "recommended" | "rating" | "price_asc" | "price_desc";

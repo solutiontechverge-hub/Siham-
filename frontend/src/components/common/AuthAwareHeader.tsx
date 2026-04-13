@@ -31,7 +31,7 @@ function getInitials(emailOrName?: string) {
 
 export default function AuthAwareHeader({
   signupLabel = "signup",
-  signupHref = "/signup",
+  signupHref = "/auth/signup",
   withDivider,
 }: AuthAwareHeaderProps) {
   const theme = useTheme();
