@@ -440,19 +440,8 @@ export default function ProfessionalSignupPage() {
                     </Box>
 
                     <FormControlLabel
-<<<<<<< HEAD
-                      control={
-                        <Checkbox checked={form.acceptTerms} onChange={handleChange} name="acceptTerms" />
-                      }
-                      label={
-                        <Typography variant="body2" color="text.secondary">
-                          Accept our Terms & Conditions
-                        </Typography>
-                      }
-=======
                       control={<Checkbox checked={form.acceptTerms} onChange={handleChange} name="acceptTerms" />}
                       label={<BodyText color="text.secondary">Accept our Terms & Conditions</BodyText>}
->>>>>>> c38b50808cd81ff610958e2358bee1683599bf26
                     />
 
                     <Box sx={{ display: "flex", justifyContent: "center" }}>
