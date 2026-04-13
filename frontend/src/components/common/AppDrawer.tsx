@@ -7,9 +7,9 @@ import {
   Drawer,
   IconButton,
   Stack,
-  Typography,
   type DrawerProps,
 } from "@mui/material";
+import { BodyText, SubHeading } from "../ui/typography";
 
 type AppDrawerProps = DrawerProps & {
   title?: React.ReactNode;
@@ -30,14 +30,12 @@ export default function AppDrawer({
           <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
             <Box>
               {title ? (
-                <Typography variant="h6" sx={{ fontWeight: 800, color: "#10233f" }}>
-                  {title}
-                </Typography>
+                <SubHeading sx={{ fontSize: "20px", color: "#10233f" }}>{title}</SubHeading>
               ) : null}
               {subtitle ? (
-                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                <BodyText color="text.secondary" sx={{ mt: 0.5 }}>
                   {subtitle}
-                </Typography>
+                </BodyText>
               ) : null}
             </Box>
             <IconButton aria-label="Close drawer" onClick={() => onClose?.({}, "backdropClick")}>

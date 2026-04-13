@@ -13,3 +13,7 @@ export const ListingImage5 = require("./Rectangle 108.svg");
 export const ListingImage6 = require("./Rectangle 109.svg");
 
 export const DD = require("./dd.svg");
+export const AboutHeroImage = require("./about/about-header.svg");
+export const AboutUsImage = require("./about/about-us.svg");
+export const ContactUsImage = require("././contact-us.svg"); 
+export const ProfessionalsHeroImage = require("./profesional-landing.svg");

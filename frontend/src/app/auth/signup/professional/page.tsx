@@ -3,7 +3,6 @@
 import * as React from "react";
 import Link from "next/link";
 import {
-  Alert,
   Box,
   Button,
   Checkbox,
@@ -15,11 +14,12 @@ import {
   Paper,
   Stack,
   TextField,
-  Typography,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { getApiErrorMessage } from "../../../../lib/api-error";
 import { useRegisterMutation } from "../../../../store/services/authApi";
+import { BodyText, CardTitle, MainHeading, SubHeading } from "../../../../components/ui/typography";
+import { useSnackbar } from "../../../../components/common/AppSnackbar";
 
 type FormState = {
   legalName: string;
@@ -65,8 +65,7 @@ const initialForm: FormState = {
 
 export default function ProfessionalSignupPage() {
   const [form, setForm] = React.useState<FormState>(initialForm);
-  const [successMessage, setSuccessMessage] = React.useState("");
-  const [errorMessage, setErrorMessage] = React.useState("");
+  const { showSnackbar } = useSnackbar();
   const [register, { isLoading }] = useRegisterMutation();
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -80,16 +79,14 @@ export default function ProfessionalSignupPage() {
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setSuccessMessage("");
-    setErrorMessage("");
 
     if (form.password !== form.confirmPassword) {
-      setErrorMessage("Password and repeat password must match.");
+      showSnackbar({ severity: "error", message: "Password and repeat password must match." });
       return;
     }
 
     if (!form.acceptTerms) {
-      setErrorMessage("Please accept the terms and conditions.");
+      showSnackbar({ severity: "error", message: "Please accept the terms and conditions." });
       return;
     }
 
@@ -115,12 +112,18 @@ export default function ProfessionalSignupPage() {
         contact_last_name: form.contactLastName.trim(),
       }).unwrap();
 
-      setSuccessMessage(
-        result.message || "Professional account created successfully. Please check your email.",
-      );
+      showSnackbar({
+        severity: "success",
+        message:
+          result.message ||
+          "Professional account created successfully. Please check your email.",
+      });
       setForm(initialForm);
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, "Registration failed. Please check the details."));
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Registration failed. Please check the details."),
+      });
     }
   };
 
@@ -154,16 +157,7 @@ export default function ProfessionalSignupPage() {
                   boxShadow: "0 12px 30px rgba(17, 119, 255, 0.22)",
                 }}
               />
-              <Typography
-                variant="h5"
-                sx={{
-                  fontWeight: 800,
-                  letterSpacing: "-0.04em",
-                  color: "#10233f",
-                }}
-              >
-                Mollure
-              </Typography>
+              <CardTitle sx={{ fontSize: "1.25rem", letterSpacing: "-0.04em", color: "#10233f" }}>Mollure</CardTitle>
             </Stack>
 
             <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
@@ -232,34 +226,18 @@ export default function ProfessionalSignupPage() {
             >
               <Stack spacing={4}>
                 <Box textAlign="center">
-                  <Typography
-                    variant="h3"
-                    sx={{
-                      fontWeight: 900,
-                      letterSpacing: "-0.05em",
-                      color: "#10233f",
-                      fontSize: { xs: "2rem", sm: "2.75rem" },
-                    }}
-                  >
+                  <MainHeading sx={{ letterSpacing: "-0.05em", color: "#10233f", fontSize: { xs: "2rem", sm: "2.75rem" } }}>
                     Create An Account
-                  </Typography>
-                  <Typography
-                    sx={{
-                      mt: 1.5,
-                      color: alpha("#10233f", 0.72),
-                      fontSize: "1rem",
-                    }}
-                  >
+                  </MainHeading>
+                  <BodyText sx={{ mt: 1.5, color: alpha("#10233f", 0.72), fontSize: "1rem" }}>
                     Join us and start your journey today.
-                  </Typography>
+                  </BodyText>
                 </Box>
 
                 <Box component="form" onSubmit={handleSubmit}>
                   <Stack spacing={4}>
                     <Box>
-                      <Typography sx={{ mb: 2, fontWeight: 800, color: "#10233f" }}>
-                        Company Information
-                      </Typography>
+                      <SubHeading sx={{ mb: 2, fontSize: "1.125rem", color: "#10233f" }}>Company Information</SubHeading>
                       <Grid container spacing={2.5}>
                         <Grid item xs={12} md={6}>
                           <TextField
@@ -395,9 +373,7 @@ export default function ProfessionalSignupPage() {
                     </Box>
 
                     <Box>
-                      <Typography sx={{ mb: 2, fontWeight: 800, color: "#10233f" }}>
-                        Contact Person
-                      </Typography>
+                      <SubHeading sx={{ mb: 2, fontSize: "1.125rem", color: "#10233f" }}>Contact Person</SubHeading>
                       <Grid container spacing={2.5}>
                         <Grid item xs={12} md={6}>
                           <TextField
@@ -464,6 +440,7 @@ export default function ProfessionalSignupPage() {
                     </Box>
 
                     <FormControlLabel
+<<<<<<< HEAD
                       control={
                         <Checkbox checked={form.acceptTerms} onChange={handleChange} name="acceptTerms" />
                       }
@@ -472,10 +449,11 @@ export default function ProfessionalSignupPage() {
                           Accept our Terms & Conditions
                         </Typography>
                       }
+=======
+                      control={<Checkbox checked={form.acceptTerms} onChange={handleChange} name="acceptTerms" />}
+                      label={<BodyText color="text.secondary">Accept our Terms & Conditions</BodyText>}
+>>>>>>> c38b50808cd81ff610958e2358bee1683599bf26
                     />
-
-                    {successMessage ? <Alert severity="success">{successMessage}</Alert> : null}
-                    {errorMessage ? <Alert severity="error">{errorMessage}</Alert> : null}
 
                     <Box sx={{ display: "flex", justifyContent: "center" }}>
                       <Button

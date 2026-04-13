@@ -2,8 +2,9 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Box, Button, Container, Paper, Stack, Typography } from "@mui/material";
+import { Box, Button, Container, Paper, Stack } from "@mui/material";
 import { apiUrl } from "../lib/api";
+import { BodyText, SubHeading } from "../components/ui/typography";
 
 export default function HomePage() {
   const [apiStatus, setApiStatus] = React.useState("Check backend status");
@@ -22,12 +23,10 @@ export default function HomePage() {
     <Container maxWidth="md" sx={{ py: 8 }}>
       <Paper elevation={2} sx={{ p: 4 }}>
         <Stack spacing={2}>
-          <Typography variant="h4" fontWeight={700}>
-            Next.js + MUI Frontend Ready
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
+          <SubHeading sx={{ fontSize: "1.75rem" }}>Next.js + MUI Frontend Ready</SubHeading>
+          <BodyText color="text.secondary">
             Yeh frontend MUI ke sath configured hai aur backend health API ko hit kar sakta hai.
-          </Typography>
+          </BodyText>
           <Box>
             <Button variant="contained" onClick={checkBackend}>
               Check Backend API
@@ -63,7 +62,7 @@ export default function HomePage() {
               Open Verify OTP Page
             </Button>
           </Box>
-          <Typography variant="body2">{apiStatus}</Typography>
+          <BodyText>{apiStatus}</BodyText>
         </Stack>
       </Paper>
     </Container>
