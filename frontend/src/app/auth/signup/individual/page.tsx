@@ -13,18 +13,20 @@ import {
   Container,
   FormControlLabel,
   Grid,
-  IconButton,
-  InputAdornment,
   MenuItem,
   Paper,
   Stack,
-  TextField,
   Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { getApiErrorMessage } from "../../../../lib/api-error";
 import { useRegisterMutation } from "../../../../store/services/authApi";
-import { MarketingSiteHeader } from "../../../../components/common";
+import {
+  MarketingSiteHeader,
+  MollureAuthLabeledField,
+  MollureAuthLabeledPasswordField,
+  MollureAuthTextField,
+} from "../../../../components/common";
 import { authSignupHeaderClient } from "../../../../data/marketingShell.data";
 import { BodyText } from "../../../../components/ui/typography";
 import { useSnackbar } from "../../../../components/common/AppSnackbar";
@@ -64,40 +66,10 @@ export default function IndividualSignupPage() {
   const theme = useTheme();
   const m = theme.palette.mollure;
   const [form, setForm] = React.useState<FormState>(initialForm);
-  const [showPassword, setShowPassword] = React.useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
   const { showSnackbar } = useSnackbar();
   const [register, { isLoading }] = useRegisterMutation();
 
   const cardBorder = m.cardBorder ?? alpha(m.navy, 0.12);
-
-  const textFieldSx = {
-    "& .MuiOutlinedInput-root": {
-      borderRadius: "8px",
-      bgcolor: m.white ?? "#fff",
-      "& fieldset": {
-        borderColor: m.inputBorder,
-      },
-      "&:hover fieldset": {
-        borderColor: m.inputBorderHover,
-      },
-      "&.Mui-focused fieldset": {
-        borderColor: m.teal,
-      },
-    },
-    "& .MuiInputLabel-root": {
-      fontWeight: 600,
-      fontSize: "0.8125rem",
-      color: alpha(m.navy, 0.88),
-    },
-    "& .MuiInputLabel-root.Mui-focused": {
-      color: alpha(m.navy, 0.88),
-    },
-    "& .MuiOutlinedInput-input::placeholder": {
-      color: m.placeholder,
-      opacity: 1,
-    },
-  } as const;
 
   const displayNameOptions = React.useMemo(() => {
     const full = `${form.firstName} ${form.lastName}`.trim();
@@ -316,44 +288,32 @@ export default function IndividualSignupPage() {
                       </Typography>
                       <Grid container spacing={2}>
                         <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            size="small"
-                            label="First Name"
+                          <MollureAuthLabeledField
+                            fieldLabel="First Name"
                             name="firstName"
                             value={form.firstName}
                             onChange={handleChange}
                             required
-                            InputLabelProps={{ shrink: true }}
-                            sx={textFieldSx}
                           />
                         </Grid>
                         <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            size="small"
-                            label="Last Name"
+                          <MollureAuthLabeledField
+                            fieldLabel="Last Name"
                             name="lastName"
                             value={form.lastName}
                             onChange={handleChange}
                             required
-                            InputLabelProps={{ shrink: true }}
-                            sx={textFieldSx}
                           />
                         </Grid>
                         <Grid item xs={12}>
-                          <TextField
-                            fullWidth
-                            size="small"
+                          <MollureAuthLabeledField
+                            fieldLabel="Select name for rating/review"
                             select
-                            label="Select name for rating/review"
                             name="displayName"
                             value={form.displayName}
                             onChange={handleChange}
                             disabled={displayNameOptions.length === 0}
                             SelectProps={{ displayEmpty: true }}
-                            InputLabelProps={{ shrink: true }}
-                            sx={textFieldSx}
                           >
                             <MenuItem value="">
                               <em>Select name for rating/review</em>
@@ -363,32 +323,24 @@ export default function IndividualSignupPage() {
                                 {opt.label}
                               </MenuItem>
                             ))}
-                          </TextField>
+                          </MollureAuthLabeledField>
                         </Grid>
                         <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            size="small"
+                          <MollureAuthLabeledField
                             type="date"
-                            label="Birth date"
+                            fieldLabel="Birth date"
                             name="birthDate"
                             value={form.birthDate}
                             onChange={handleChange}
-                            InputLabelProps={{ shrink: true }}
-                            sx={textFieldSx}
                           />
                         </Grid>
                         <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            size="small"
+                          <MollureAuthLabeledField
+                            fieldLabel="Select Gender"
                             select
-                            label="Select Gender"
                             name="gender"
                             value={form.gender}
                             onChange={handleChange}
-                            InputLabelProps={{ shrink: true }}
-                            sx={textFieldSx}
                           >
                             <MenuItem value="">
                               <em>Select Gender</em>
@@ -396,7 +348,7 @@ export default function IndividualSignupPage() {
                             <MenuItem value="female">Female</MenuItem>
                             <MenuItem value="male">Male</MenuItem>
                             <MenuItem value="other">Other</MenuItem>
-                          </TextField>
+                          </MollureAuthLabeledField>
                         </Grid>
                       </Grid>
                     </Box>
@@ -414,16 +366,12 @@ export default function IndividualSignupPage() {
                       </Typography>
                       <Grid container spacing={2}>
                         <Grid item xs={12} sm={4}>
-                          <TextField
-                            fullWidth
-                            size="small"
+                          <MollureAuthLabeledField
+                            fieldLabel="Country Code"
                             select
-                            label="Country Code"
                             name="countryCode"
                             value={form.countryCode}
                             onChange={handleChange}
-                            InputLabelProps={{ shrink: true }}
-                            sx={textFieldSx}
                             SelectProps={{ displayEmpty: true }}
                           >
                             <MenuItem value="">
@@ -434,104 +382,46 @@ export default function IndividualSignupPage() {
                                 {code}
                               </MenuItem>
                             ))}
-                          </TextField>
+                          </MollureAuthLabeledField>
                         </Grid>
                         <Grid item xs={12} sm={8}>
-                          <TextField
-                            fullWidth
-                            size="small"
-                            label="Contact Number"
+                          <MollureAuthLabeledField
+                            fieldLabel="Contact Number"
                             name="phone"
                             value={form.phone}
                             onChange={handleChange}
                             placeholder="Enter phone number"
-                            InputLabelProps={{ shrink: true }}
-                            sx={textFieldSx}
                           />
                         </Grid>
                         <Grid item xs={12}>
-                          <TextField
-                            fullWidth
-                            size="small"
+                          <MollureAuthLabeledField
                             type="email"
-                            label="Email"
+                            fieldLabel="Email"
                             name="email"
                             value={form.email}
                             onChange={handleChange}
                             required
                             autoComplete="email"
-                            InputLabelProps={{ shrink: true }}
-                            sx={textFieldSx}
                           />
                         </Grid>
                         <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            size="small"
-                            type={showPassword ? "text" : "password"}
-                            label="Password"
+                          <MollureAuthLabeledPasswordField
+                            fieldLabel="Password"
                             name="password"
                             value={form.password}
                             onChange={handleChange}
                             required
                             autoComplete="new-password"
-                            InputLabelProps={{ shrink: true }}
-                            sx={textFieldSx}
-                            InputProps={{
-                              endAdornment: (
-                                <InputAdornment position="end">
-                                  <IconButton
-                                    type="button"
-                                    edge="end"
-                                    aria-label={showPassword ? "Hide password" : "Show password"}
-                                    onClick={() => setShowPassword((v) => !v)}
-                                    size="small"
-                                    sx={{ color: alpha(m.navy, 0.45) }}
-                                  >
-                                    {showPassword ? (
-                                      <VisibilityOutlinedIcon fontSize="small" />
-                                    ) : (
-                                      <VisibilityOffOutlinedIcon fontSize="small" />
-                                    )}
-                                  </IconButton>
-                                </InputAdornment>
-                              ),
-                            }}
                           />
                         </Grid>
                         <Grid item xs={12} sm={6}>
-                          <TextField
-                            fullWidth
-                            size="small"
-                            type={showConfirmPassword ? "text" : "password"}
-                            label="Repeat password"
+                          <MollureAuthLabeledPasswordField
+                            fieldLabel="Repeat password"
                             name="confirmPassword"
                             value={form.confirmPassword}
                             onChange={handleChange}
                             required
                             autoComplete="new-password"
-                            InputLabelProps={{ shrink: true }}
-                            sx={textFieldSx}
-                            InputProps={{
-                              endAdornment: (
-                                <InputAdornment position="end">
-                                  <IconButton
-                                    type="button"
-                                    edge="end"
-                                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
-                                    onClick={() => setShowConfirmPassword((v) => !v)}
-                                    size="small"
-                                    sx={{ color: alpha(m.navy, 0.45) }}
-                                  >
-                                    {showConfirmPassword ? (
-                                      <VisibilityOutlinedIcon fontSize="small" />
-                                    ) : (
-                                      <VisibilityOffOutlinedIcon fontSize="small" />
-                                    )}
-                                  </IconButton>
-                                </InputAdornment>
-                              ),
-                            }}
                           />
                         </Grid>
                       </Grid>

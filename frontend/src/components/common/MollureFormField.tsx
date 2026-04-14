@@ -1,50 +1,33 @@
 "use client";
 
 import * as React from "react";
-import { TextField, type TextFieldProps } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
+import type { TextFieldProps } from "@mui/material";
+import { MollureLabeledField, MollureTextField } from ".";
 
 export default function MollureFormField(props: TextFieldProps) {
-  const theme = useTheme();
-  const m = theme.palette.mollure;
+  // Many existing professional pages pass labels like "Legal Name*".
+  // To keep behavior but match the new design (label above field),
+  // infer required from a trailing asterisk and strip it from the label.
+  const label =
+    typeof props.label === "string" ? props.label.trim() : props.label;
 
-  const baseSx = React.useMemo(
-    () => ({
-      "& .MuiInputLabel-root": {
-        fontSize: 11.5,
-        fontWeight: 700,
-        color: alpha(m.navy, 0.68),
-      },
-      "& .MuiOutlinedInput-root": {
-        borderRadius: "10px",
-        bgcolor: alpha(m.navy, 0.018),
-        "& fieldset": { borderColor: alpha(m.navy, 0.14) },
-        "&:hover fieldset": { borderColor: alpha(m.navy, 0.22) },
-        "&.Mui-focused fieldset": {
-          borderColor: alpha(m.teal, 0.55),
-          borderWidth: 1,
-        },
-      },
-      "& .MuiOutlinedInput-input": {
-        fontSize: 12,
-        color: alpha(m.navy, 0.86),
-        paddingTop: "11px",
-        paddingBottom: "11px",
-      },
-      "& textarea": { fontSize: 12, color: alpha(m.navy, 0.86) },
-      "& input::placeholder": { color: alpha(m.navy, 0.45), opacity: 1 },
-    }),
-    [m.navy, m.teal],
-  );
+  const hasInlineAsterisk =
+    typeof label === "string" ? /\*\s*$/.test(label) : false;
 
-  return (
-    <TextField
-      fullWidth
-      size="small"
-      InputLabelProps={{ shrink: true, ...props.InputLabelProps }}
-      {...props}
-      sx={[baseSx, props.sx] as any}
-    />
-  );
+  if (props.label) {
+    const cleanLabel =
+      typeof label === "string" ? label.replace(/\*\s*$/, "").trim() : label;
+
+    const { label: _ignoredLabel, required, ...rest } = props;
+    return (
+      <MollureLabeledField
+        fieldLabel={cleanLabel as any}
+        required={required ?? hasInlineAsterisk}
+        {...rest}
+      />
+    );
+  }
+
+  return <MollureTextField {...props} />;
 }
 

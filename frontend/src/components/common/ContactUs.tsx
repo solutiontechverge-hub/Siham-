@@ -6,15 +6,10 @@ import {
   Box,
   Button,
   Container,
-  FormControl,
-  FormHelperText,
   Grid,
-  InputLabel,
   MenuItem,
   Paper,
-  Select,
   Stack,
-  TextField,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
@@ -22,6 +17,7 @@ import { contactUsData } from "../../app/contact-us/contactus.data";
 import { useContactUsForm } from "../../app/contact-us/contactus.use";
 import { ContactUsImage } from "../../../images";
 import { BodyText, SubHeading } from "../ui/typography";
+import { MollureLabeledField, MollureLabeledSelect } from ".";
 
 export type ContactUsProps = {
   illustrationSrc: string;
@@ -103,106 +99,76 @@ export default function ContactUs({ illustrationSrc }: ContactUsProps) {
               }}
             >
               <Stack spacing={2.25}>
-                <FormControl
-                  fullWidth
-                  error={Boolean(touched.persona && errors.persona)}
+                <MollureLabeledSelect
+                  fieldLabel={contactUsData.whoAreYou.label}
+                  value={values.persona}
+                  onChange={(e) => setField("persona", String(e.target.value))}
+                  onBlur={() => touch("persona")}
+                  errorText={touched.persona ? errors.persona : undefined}
                 >
-                  <InputLabel shrink>
-                    {contactUsData.whoAreYou.label}
-                  </InputLabel>
-                  <Select
-                    value={values.persona}
-                    label={contactUsData.whoAreYou.label}
-                    onChange={(e) =>
-                      setField("persona", String(e.target.value))
-                    }
-                    onBlur={() => touch("persona")}
-                    displayEmpty
-                    notched
-                  >
-                    {contactUsData.whoAreYou.options.map((opt) => (
-                      <MenuItem key={opt} value={opt}>
-                        {opt}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                  {touched.persona && errors.persona ? (
-                    <FormHelperText>{errors.persona}</FormHelperText>
-                  ) : null}
-                </FormControl>
+                  <MenuItem value="">
+                    <em>{contactUsData.whoAreYou.label}</em>
+                  </MenuItem>
+                  {contactUsData.whoAreYou.options.map((opt) => (
+                    <MenuItem key={opt} value={opt}>
+                      {opt}
+                    </MenuItem>
+                  ))}
+                </MollureLabeledSelect>
 
                 <Grid container spacing={0.2}>
                   <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label={contactUsData.fields.name.label}
+                    <MollureLabeledField
+                      fieldLabel={contactUsData.fields.name.label}
                       placeholder={contactUsData.fields.name.placeholder}
                       value={values.name}
                       onChange={(e) => setField("name", e.target.value)}
                       onBlur={() => touch("name")}
-                      InputLabelProps={{ shrink: true }}
                       error={Boolean(touched.name && errors.name)}
                       helperText={touched.name ? errors.name : undefined}
                     />
                   </Grid>
                   <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label={contactUsData.fields.email.label}
+                    <MollureLabeledField
+                      fieldLabel={contactUsData.fields.email.label}
                       placeholder={contactUsData.fields.email.placeholder}
                       value={values.email}
                       onChange={(e) => setField("email", e.target.value)}
                       onBlur={() => touch("email")}
-                      InputLabelProps={{ shrink: true }}
                       error={Boolean(touched.email && errors.email)}
                       helperText={touched.email ? errors.email : undefined}
                     />
                   </Grid>
                 </Grid>
 
-                <FormControl
-                  fullWidth
-                  error={Boolean(touched.subject && errors.subject)}
+                <MollureLabeledSelect
+                  fieldLabel={contactUsData.fields.subject.label}
+                  value={values.subject}
+                  onChange={(e) => setField("subject", String(e.target.value))}
+                  onBlur={() => touch("subject")}
+                  errorText={touched.subject ? errors.subject : undefined}
+                  renderValue={(val) =>
+                    val ? String(val) : contactUsData.fields.subject.placeholder
+                  }
                 >
-                  <InputLabel shrink>
-                    {contactUsData.fields.subject.label}
-                  </InputLabel>
-                  <Select
-                    value={values.subject}
-                    label={contactUsData.fields.subject.label}
-                    onChange={(e) =>
-                      setField("subject", String(e.target.value))
-                    }
-                    onBlur={() => touch("subject")}
-                    displayEmpty
-                    notched
-                    renderValue={(val) =>
-                      val
-                        ? String(val)
-                        : contactUsData.fields.subject.placeholder
-                    }
-                  >
-                    {contactUsData.fields.subject.options.map((opt) => (
-                      <MenuItem key={opt} value={opt}>
-                        {opt}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                  {touched.subject && errors.subject ? (
-                    <FormHelperText>{errors.subject}</FormHelperText>
-                  ) : null}
-                </FormControl>
+                  <MenuItem value="">
+                    <em>{contactUsData.fields.subject.placeholder}</em>
+                  </MenuItem>
+                  {contactUsData.fields.subject.options.map((opt) => (
+                    <MenuItem key={opt} value={opt}>
+                      {opt}
+                    </MenuItem>
+                  ))}
+                </MollureLabeledSelect>
 
-                <TextField
-                  fullWidth
+                <MollureLabeledField
+                  fieldLabel={contactUsData.fields.message.label}
                   multiline
                   minRows={4}
-                  label={contactUsData.fields.message.label}
                   placeholder={contactUsData.fields.message.placeholder}
                   value={values.message}
                   onChange={(e) => setField("message", e.target.value)}
                   onBlur={() => touch("message")}
-                  InputLabelProps={{ shrink: true }}
                   error={Boolean(touched.message && errors.message)}
                   helperText={touched.message ? errors.message : undefined}
                 />

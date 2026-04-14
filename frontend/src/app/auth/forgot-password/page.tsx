@@ -4,11 +4,11 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Box, Button, Container, Paper, Stack, TextField } from "@mui/material";
+import { Box, Button, Container, Paper, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { getApiErrorMessage } from "../../../lib/api-error";
 import { useForgotPasswordMutation } from "../../../store/services/authApi";
-import { MarketingSiteHeader } from "../../../components/common";
+import { MarketingSiteHeader, MollureLabeledField } from "../../../components/common";
 import { authLoginHeaderClient } from "../../../data/marketingShell.data";
 import { BodyText, SubHeading } from "../../../components/ui/typography";
 import { useSnackbar } from "../../../components/common/AppSnackbar";
@@ -22,34 +22,6 @@ export default function ForgotPasswordPage() {
   const [forgotPassword, { isLoading }] = useForgotPasswordMutation();
 
   const cardBorder = m.cardBorder ?? alpha(m.navy, 0.12);
-
-  const textFieldSx = {
-    "& .MuiOutlinedInput-root": {
-      borderRadius: "8px",
-      bgcolor: m.white ?? "#fff",
-      "& fieldset": {
-        borderColor: m.inputBorder,
-      },
-      "&:hover fieldset": {
-        borderColor: m.inputBorderHover,
-      },
-      "&.Mui-focused fieldset": {
-        borderColor: m.teal,
-      },
-    },
-    "& .MuiInputLabel-root": {
-      fontWeight: 600,
-      fontSize: "0.8125rem",
-      color: alpha(m.navy, 0.88),
-    },
-    "& .MuiInputLabel-root.Mui-focused": {
-      color: alpha(m.navy, 0.88),
-    },
-    "& .MuiOutlinedInput-input::placeholder": {
-      color: m.placeholder,
-      opacity: 1,
-    },
-  } as const;
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -214,18 +186,14 @@ export default function ForgotPasswordPage() {
 
                 <Box component="form" onSubmit={handleSubmit}>
                   <Stack spacing={2.25}>
-                    <TextField
-                      fullWidth
+                    <MollureLabeledField
                       type="email"
-                      label="Email Address"
+                      fieldLabel="Email Address"
                       placeholder="e.g Jane"
                       value={email}
                       onChange={(event) => setEmail(event.target.value)}
                       required
                       autoComplete="email"
-                      size="small"
-                      InputLabelProps={{ shrink: true }}
-                      sx={textFieldSx}
                     />
 
                     <Button

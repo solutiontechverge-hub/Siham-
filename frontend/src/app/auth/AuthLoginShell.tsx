@@ -5,20 +5,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import AppleIcon from "@mui/icons-material/Apple";
-import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
-import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import {
   Box,
   Button,
   Checkbox,
   Container,
   FormControlLabel,
-  IconButton,
-  InputAdornment,
   Paper,
   Stack,
   SvgIcon,
-  TextField,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { getApiErrorMessage } from "../../lib/api-error";
@@ -27,7 +22,7 @@ import { useAppDispatch } from "../../store/hooks";
 import { setAuthSession } from "../../store/slices/authSlice";
 import { useLoginMutation } from "../../store/services/authApi";
 import { SignupBg, SignupLs, SignupRs } from "../../../images";
-import { MarketingSiteHeader } from "../../components/common";
+import { MarketingSiteHeader, MollureAuthLabeledField, MollureAuthLabeledPasswordField } from "../../components/common";
 import type { AuthStripHeaderConfig } from "../../data/marketingShell.data";
 import { BodyText, SubHeading } from "../../components/ui/typography";
 import { useSnackbar } from "../../components/common/AppSnackbar";
@@ -70,38 +65,9 @@ export default function AuthLoginShell({ header, signupHref }: AuthLoginShellPro
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [remember, setRemember] = React.useState(false);
-  const [showPassword, setShowPassword] = React.useState(false);
   const [login, { isLoading }] = useLoginMutation();
 
   const cardBorder = m.cardBorder ?? alpha(m.navy, 0.12);
-
-  const textFieldSx = {
-    "& .MuiOutlinedInput-root": {
-      borderRadius: "8px",
-      bgcolor: m.white ?? "#fff",
-      "& fieldset": {
-        borderColor: m.inputBorder,
-      },
-      "&:hover fieldset": {
-        borderColor: m.inputBorderHover,
-      },
-      "&.Mui-focused fieldset": {
-        borderColor: m.teal,
-      },
-    },
-    "& .MuiInputLabel-root": {
-      fontWeight: 600,
-      fontSize: "0.8125rem",
-      color: alpha(m.navy, 0.88),
-    },
-    "& .MuiInputLabel-root.Mui-focused": {
-      color: alpha(m.navy, 0.88),
-    },
-    "& .MuiOutlinedInput-input::placeholder": {
-      color: m.placeholder,
-      opacity: 1,
-    },
-  } as const;
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -277,52 +243,24 @@ export default function AuthLoginShell({ header, signupHref }: AuthLoginShellPro
 
                 <Box component="form" onSubmit={handleSubmit}>
                   <Stack spacing={2}>
-                    <TextField
-                      fullWidth
+                    <MollureAuthLabeledField
                       type="email"
-                      label="Email Address"
+                      fieldLabel="Email Address"
                       placeholder="e.g Jane"
                       value={email}
                       onChange={(event) => setEmail(event.target.value)}
                       required
                       autoComplete="email"
-                      size="small"
-                      InputLabelProps={{ shrink: true }}
-                      sx={textFieldSx}
                     />
 
-                    <TextField
-                      fullWidth
-                      type={showPassword ? "text" : "password"}
-                      label="Password"
+                    <MollureAuthLabeledPasswordField
+                      typeWhenHidden="password"
+                      fieldLabel="Password"
                       placeholder="Enter Password Here"
                       value={password}
                       onChange={(event) => setPassword(event.target.value)}
                       required
                       autoComplete="current-password"
-                      size="small"
-                      InputLabelProps={{ shrink: true }}
-                      sx={textFieldSx}
-                      InputProps={{
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <IconButton
-                              type="button"
-                              edge="end"
-                              aria-label={showPassword ? "Hide password" : "Show password"}
-                              onClick={() => setShowPassword((v) => !v)}
-                              size="small"
-                              sx={{ color: alpha(m.navy, 0.45) }}
-                            >
-                              {showPassword ? (
-                                <VisibilityOutlinedIcon fontSize="small" />
-                              ) : (
-                                <VisibilityOffOutlinedIcon fontSize="small" />
-                              )}
-                            </IconButton>
-                          </InputAdornment>
-                        ),
-                      }}
                     />
 
                     <Box

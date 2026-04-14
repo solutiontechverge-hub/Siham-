@@ -9,6 +9,19 @@ export { default as AppSegmentTabs } from "./AppSegmentTabs";
 export { default as AppSelect } from "./AppSelect";
 export { default as AppTextField } from "./AppTextField";
 export { default as MollureFormField } from "./MollureFormField";
+export {
+  MollureLabeledField,
+  MollureLabeledPasswordField,
+  MollureLabeledSelect,
+  MollurePasswordField,
+  MollureTextField,
+} from "./MollureLabeledFields";
+export {
+  MollureAuthLabeledField,
+  MollureAuthLabeledPasswordField,
+  MollureAuthPasswordField,
+  MollureAuthTextField,
+} from "./MollureAuthFields";
 export { default as ContentCard } from "./ContentCard";
 export { default as FilterPanel } from "./FilterPanel";
 export { default as ImageCard } from "./ImageCard";
@@ -31,6 +44,7 @@ export {
 } from "../marketing";
 export { default as AuthAwareHeader } from "./AuthAwareHeader";
 export { default as ProfessionalFixedLocationSetup } from "./ProfessionalFixedLocationSetup";
+export { default as ProfessionalDesiredLocationSetup } from "./ProfessionalDesiredLocationSetup";
 export type { MarketingNavItem, MollureMarketingHeaderProps } from "./MollureMarketingHeader";
 export type { MarketingSiteHeaderProps } from "./MarketingSiteHeader";
 export type { MarketingFooterColumn, MarketingFooterItem } from "./MarketingSiteFooter";

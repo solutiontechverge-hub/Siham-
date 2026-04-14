@@ -11,7 +11,6 @@ import {
   MenuItem,
   Paper,
   Stack,
-  TextField,
   Typography,
   type PaperProps,
 } from "@mui/material";
@@ -19,6 +18,7 @@ import { useTheme } from "@mui/material/styles";
 import CalendarPopover, { type CalendarPopoverValue } from "./CalendarPopover";
 import Image from "next/image";
 import { ListingBG, DesiredLocationIcon, FixedLocationIcon } from "../../../../images";
+import { MollureTextField } from "..";
 
 function assetUrl(asset: any) {
   if (!asset) return "";
@@ -79,19 +79,6 @@ export default function ListingFilterBox({
         minute: "2-digit",
       })
     : "";
-
-  const standardFieldSx = {
-    "& .MuiInput-root": {
-      fontSize: 14,
-      color: tokens.navy,
-      pb: 0.6,
-      "&:before": { borderBottomColor: tokens.border },
-      "&:hover:not(.Mui-disabled):before": { borderBottomColor: tokens.inputBorderHover },
-      "&.Mui-focused:after": { borderBottomColor: tokens.teal },
-    },
-    "& input::placeholder": { color: tokens.placeholder, opacity: 1 },
-    "& .MuiSelect-select": { py: 0.3 },
-  } as const;
 
   const LocationPill = ({
     icon,
@@ -160,10 +147,8 @@ export default function ListingFilterBox({
       <Grid container spacing={2.75} alignItems="flex-end">
         <Grid item xs={12} sm={6}>
           <Typography sx={labelSx}>Select Date and Time</Typography>
-          <TextField
-            fullWidth
+          <MollureTextField
             placeholder="Pick date & time"
-            variant="standard"
             value={dateTimeDisplay}
             onClick={(e) => setCalendarAnchor(e.currentTarget)}
             InputProps={{
@@ -172,7 +157,10 @@ export default function ListingFilterBox({
                 <CalendarMonthRoundedIcon sx={{ color: tokens.placeholder, fontSize: 20 }} />
               ),
             }}
-            sx={standardFieldSx}
+            sx={{
+              cursor: "pointer",
+              "& .MuiOutlinedInput-root": { bgcolor: "#fff" },
+            }}
           />
           <CalendarPopover
             anchorEl={calendarAnchor}
@@ -185,17 +173,14 @@ export default function ListingFilterBox({
 
         <Grid item xs={12} sm={6}>
           <Typography sx={labelSx}>Select Category</Typography>
-          <TextField
+          <MollureTextField
             select
-            fullWidth
-            variant="standard"
             value={values.category}
             onChange={(e) => set({ category: e.target.value })}
             placeholder="Select category"
             InputProps={{
               endAdornment: <ArrowDropDownRoundedIcon sx={{ color: tokens.placeholder }} />,
             }}
-            sx={standardFieldSx}
           >
             <MenuItem value="">
               <Typography sx={{ color: tokens.placeholder, fontSize: 13 }}>
@@ -207,7 +192,7 @@ export default function ListingFilterBox({
                 {opt.label}
               </MenuItem>
             ))}
-          </TextField>
+          </MollureTextField>
         </Grid>
 
         <Grid item xs={12}>
@@ -233,17 +218,14 @@ export default function ListingFilterBox({
 
         <Grid item xs={12}>
           <Typography sx={labelSx}>Select Municipality</Typography>
-          <TextField
+          <MollureTextField
             select
-            fullWidth
-            variant="standard"
             value={values.municipality}
             onChange={(e) => set({ municipality: e.target.value })}
             placeholder="Select municipality"
             InputProps={{
               endAdornment: <ArrowDropDownRoundedIcon sx={{ color: tokens.placeholder }} />,
             }}
-            sx={standardFieldSx}
           >
             <MenuItem value="">
               <Typography sx={{ color: tokens.placeholder, fontSize: 13 }}>
@@ -255,18 +237,15 @@ export default function ListingFilterBox({
                 {opt.label}
               </MenuItem>
             ))}
-          </TextField>
+          </MollureTextField>
         </Grid>
 
         <Grid item xs={12}>
           <Typography sx={labelSx}>Search Keyword</Typography>
-          <TextField
-            fullWidth
-            variant="standard"
+          <MollureTextField
             value={values.keyword}
             onChange={(e) => set({ keyword: e.target.value })}
             placeholder="Search keyword"
-            sx={standardFieldSx}
           />
         </Grid>
 

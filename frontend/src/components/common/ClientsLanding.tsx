@@ -13,7 +13,6 @@ import {
   Grid,
   MenuItem,
   Stack,
-  TextField,
 } from "@mui/material";
 import { Profile as AvatarImage } from "../../../images";
 import type { ClientsLandingData } from "../../app/clients/clients.data";
@@ -23,6 +22,7 @@ import MarketingSectionHeading from "./MarketingSectionHeading";
 import MarketingSiteFooter from "./MarketingSiteFooter";
 import MollureMarketingHeader from "./MollureMarketingHeader";
 import { BodyText as Typography } from "../ui/typography";
+import { MollureTextField } from ".";
 
 export type ClientsLandingOverrides = {
   header?: Partial<ClientsLandingData["header"]>;
@@ -162,7 +162,7 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
                     >
                       {filter.label}
                     </Typography>
-                    <TextField
+                    <MollureTextField
                       select={!!filter.options?.length}
                       fullWidth
                       size="small"
@@ -191,7 +191,7 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
                         "& .MuiOutlinedInput-root": {
                           height: 44,
                           bgcolor: "#fff",
-                          borderRadius: 2,
+                          borderRadius: "6px",
                           fontSize: 13,
                           color: tokens.navy,
                           "& fieldset": { borderColor: tokens.inputBorder },
@@ -211,7 +211,7 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
                           {option}
                         </MenuItem>
                       ))}
-                    </TextField>
+                    </MollureTextField>
                   </Grid>
                 ))}
 

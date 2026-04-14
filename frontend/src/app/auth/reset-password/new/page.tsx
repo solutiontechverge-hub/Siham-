@@ -4,22 +4,17 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
-import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import {
   Box,
   Button,
   Container,
-  IconButton,
-  InputAdornment,
   Paper,
   Stack,
-  TextField,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { getApiErrorMessage } from "../../../../lib/api-error";
 import { useResetPasswordMutation } from "../../../../store/services/authApi";
-import { MarketingSiteHeader } from "../../../../components/common";
+import { MarketingSiteHeader, MollureLabeledPasswordField } from "../../../../components/common";
 import { authLoginHeaderClient } from "../../../../data/marketingShell.data";
 import { BodyText, SubHeading } from "../../../../components/ui/typography";
 import { useSnackbar } from "../../../../components/common/AppSnackbar";
@@ -32,39 +27,9 @@ export default function NewPasswordPage() {
   const [userId, setUserId] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [confirmPassword, setConfirmPassword] = React.useState("");
-  const [showPassword, setShowPassword] = React.useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = React.useState(false);
   const [resetPassword, { isLoading }] = useResetPasswordMutation();
 
   const cardBorder = m.cardBorder ?? alpha(m.navy, 0.12);
-
-  const textFieldSx = {
-    "& .MuiOutlinedInput-root": {
-      borderRadius: "8px",
-      bgcolor: m.white ?? "#fff",
-      "& fieldset": {
-        borderColor: m.inputBorder,
-      },
-      "&:hover fieldset": {
-        borderColor: m.inputBorderHover,
-      },
-      "&.Mui-focused fieldset": {
-        borderColor: m.teal,
-      },
-    },
-    "& .MuiInputLabel-root": {
-      fontWeight: 600,
-      fontSize: "0.8125rem",
-      color: alpha(m.navy, 0.88),
-    },
-    "& .MuiInputLabel-root.Mui-focused": {
-      color: alpha(m.navy, 0.88),
-    },
-    "& .MuiOutlinedInput-input::placeholder": {
-      color: m.placeholder,
-      opacity: 1,
-    },
-  } as const;
 
   React.useEffect(() => {
     const savedUserId = window.sessionStorage.getItem("mollure_reset_user_id") || "";
@@ -240,72 +205,22 @@ export default function NewPasswordPage() {
 
                 <Box component="form" onSubmit={handleSubmit}>
                   <Stack spacing={2}>
-                    <TextField
-                      fullWidth
-                      type={showPassword ? "text" : "password"}
-                      label="Password"
+                    <MollureLabeledPasswordField
+                      fieldLabel="Password"
                       placeholder="Enter Password Here"
                       value={password}
                       onChange={(event) => setPassword(event.target.value)}
                       required
                       autoComplete="new-password"
-                      size="small"
-                      InputLabelProps={{ shrink: true }}
-                      sx={textFieldSx}
-                      InputProps={{
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <IconButton
-                              type="button"
-                              edge="end"
-                              aria-label={showPassword ? "Hide password" : "Show password"}
-                              onClick={() => setShowPassword((v) => !v)}
-                              size="small"
-                              sx={{ color: alpha(m.navy, 0.45) }}
-                            >
-                              {showPassword ? (
-                                <VisibilityOutlinedIcon fontSize="small" />
-                              ) : (
-                                <VisibilityOffOutlinedIcon fontSize="small" />
-                              )}
-                            </IconButton>
-                          </InputAdornment>
-                        ),
-                      }}
                     />
 
-                    <TextField
-                      fullWidth
-                      type={showConfirmPassword ? "text" : "password"}
-                      label="Confirm Password"
+                    <MollureLabeledPasswordField
+                      fieldLabel="Confirm Password"
                       placeholder="Enter Password Here"
                       value={confirmPassword}
                       onChange={(event) => setConfirmPassword(event.target.value)}
                       required
                       autoComplete="new-password"
-                      size="small"
-                      InputLabelProps={{ shrink: true }}
-                      sx={textFieldSx}
-                      InputProps={{
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <IconButton
-                              type="button"
-                              edge="end"
-                              aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
-                              onClick={() => setShowConfirmPassword((v) => !v)}
-                              size="small"
-                              sx={{ color: alpha(m.navy, 0.45) }}
-                            >
-                              {showConfirmPassword ? (
-                                <VisibilityOutlinedIcon fontSize="small" />
-                              ) : (
-                                <VisibilityOffOutlinedIcon fontSize="small" />
-                              )}
-                            </IconButton>
-                          </InputAdornment>
-                        ),
-                      }}
                     />
 
                     <Button

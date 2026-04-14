@@ -16,13 +16,12 @@ import {
   IconButton,
   MenuItem,
   Stack,
-  TextField,
   Typography,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import Image from "next/image";
 import Link from "next/link";
-import { ListingFilterBox, AppPagination, AppCard } from "../../../components/common";
+import { ListingFilterBox, AppPagination, AppCard, MollureTextField } from "../../../components/common";
 import { listingPageData, type ListingCardData } from "./listing.data";
 import { useClientListingState, useListingTokens, type ListingSortValue } from "./listing.use";
 import { Logo, ListingBG, FixedLocationIcon, DesiredLocationIcon } from "../../../../images";
@@ -333,7 +332,7 @@ export default function ClientListingPage() {
             {toolbar.filterLabel}
           </Button>
 
-          <TextField
+          <MollureTextField
             select
             size="small"
             value={state.sort}
@@ -343,7 +342,7 @@ export default function ClientListingPage() {
               "& .MuiOutlinedInput-root": {
                 height: 40,
                 bgcolor: "#fff",
-                borderRadius: 2,
+                borderRadius: "6px",
                 fontSize: 13,
                 color: tokens.navy,
                 "& fieldset": { borderColor: tokens.inputBorder },
@@ -360,7 +359,7 @@ export default function ClientListingPage() {
                 {opt.label}
               </MenuItem>
             ))}
-          </TextField>
+          </MollureTextField>
         </Stack>
 
         <Grid container spacing={2.5}>

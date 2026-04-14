@@ -6,20 +6,17 @@ import { Paper, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../ui/typography";
 
-export type FixedLocationTopTab = {
+export type DesiredLocationTopTab = {
   label: string;
   href: string;
 };
 
-export type FixedLocationTopTabsProps = {
-  tabs: readonly FixedLocationTopTab[];
+export type DesiredLocationTopTabsProps = {
+  tabs: readonly DesiredLocationTopTab[];
   activeLabel: string;
 };
 
-export default function FixedLocationTopTabs({
-  tabs,
-  activeLabel,
-}: FixedLocationTopTabsProps) {
+export default function DesiredLocationTopTabs({ tabs, activeLabel }: DesiredLocationTopTabsProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
 
@@ -53,18 +50,9 @@ export default function FixedLocationTopTabs({
           backgroundImage: "none",
           width: "100%",
           justifyContent: "space-between",
-
-          // ✅ Hide scrollbar (Chrome, Safari, Edge)
-          "&::-webkit-scrollbar": {
-            display: "none",
-          },
-
-          // ✅ Hide scrollbar (Firefox)
+          "&::-webkit-scrollbar": { display: "none" },
           scrollbarWidth: "none",
-
-          // ✅ Hide scrollbar (IE/Edge legacy)
           msOverflowStyle: "none",
-
           "&:after": {
             content: '""',
             position: "absolute",
@@ -78,7 +66,6 @@ export default function FixedLocationTopTabs({
       >
         {tabs.map((t) => {
           const active = t.label === activeLabel;
-
           return (
             <BodyText
               key={t.href}
@@ -90,16 +77,13 @@ export default function FixedLocationTopTabs({
                 flex: "1 1 0",
                 textAlign: "center",
                 letterSpacing: "-0.01em",
-                color: active
-                  ? theme.palette.text.primary
-                  : alpha(theme.palette.text.secondary, 0.75),
+                color: active ? theme.palette.text.primary : alpha(theme.palette.text.secondary, 0.75),
                 fontSize: 14,
                 pt: 1.2,
                 pb: 1.15,
                 fontWeight: active ? 600 : 400,
                 position: "relative",
                 zIndex: 1,
-
                 "&:after": {
                   content: '""',
                   position: "absolute",
@@ -107,9 +91,7 @@ export default function FixedLocationTopTabs({
                   right: 0,
                   bottom: 0,
                   height: 2,
-                  bgcolor: active
-                    ? theme.palette.primary.main
-                    : "transparent",
+                  bgcolor: active ? theme.palette.primary.main : "transparent",
                   borderRadius: 0,
                 },
               }}
@@ -122,3 +104,4 @@ export default function FixedLocationTopTabs({
     </Paper>
   );
 }
+
