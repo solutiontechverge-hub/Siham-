@@ -91,12 +91,12 @@ export default function MollureMarketingHeader({
     color: alpha(m.navy, 0.62),
     textTransform: "lowercase" as const,
     fontWeight: 600,
-    fontSize: { xs: "0.8125rem", sm: "0.875rem", md: "0.9375rem" },
+    fontSize: { xs: "0.75rem", sm: "0.8125rem", md: "0.875rem" },
     bgcolor: "#fff",
-    minHeight: { xs: 36, md: 38 },
-    px: { xs: 1.5, sm: 1.75, md: 2 },
+    minHeight: { xs: 34, md: 36 },
+    px: { xs: 1.25, sm: 1.5, md: 1.75 },
     py: 0.5,
-    maxWidth: { xs: 132, sm: 168, md: 196 },
+    maxWidth: { xs: 124, sm: 156, md: 180 },
     minWidth: 0,
     flexShrink: 0,
     lineHeight: 1.2,
@@ -125,7 +125,7 @@ export default function MollureMarketingHeader({
           maxWidth={maxWidth}
           sx={{
             py: 1.5,
-            px: { xs: 3, sm: 4, md: 6, lg: 8, xl: 10 },
+            px: { xs: 3, sm: 4, md: 5, lg: 6, xl: 8 },
           }}
         >
           {/* md+: true center nav between logo and actions; xs: compact row */}
@@ -163,7 +163,7 @@ export default function MollureMarketingHeader({
                 direction="row"
                 alignItems="center"
                 justifyContent="center"
-                spacing={{ md: 4, lg: 5 }}
+                spacing={{ md: 2.5, lg: 3.5, xl: 4 }}
                 useFlexGap
                 sx={{
                   display: { xs: "none", md: "flex" },
@@ -179,7 +179,7 @@ export default function MollureMarketingHeader({
                       component={Link}
                       href={item.href}
                       sx={{
-                        fontSize: { md: "1rem", lg: "1.0625rem" },
+                        fontSize: { md: "0.9375rem", lg: "1rem" },
                         lineHeight: 1.25,
                         fontWeight: active ? 600 : 500,
                         letterSpacing: "0.01em",
@@ -213,7 +213,7 @@ export default function MollureMarketingHeader({
               <Stack
                 direction="row"
                 alignItems="center"
-                spacing={{ xs: 1, sm: 1.5, md: 1.75 }}
+                spacing={{ xs: 0.75, sm: 1, md: 1.25 }}
                 sx={{
                   flexShrink: 0,
                   justifyContent: "flex-end",
@@ -229,19 +229,19 @@ export default function MollureMarketingHeader({
               >
                 <Button
                   variant="outlined"
-                  startIcon={<LanguageRoundedIcon sx={{ fontSize: 20, color: m.navy }} />}
-                  endIcon={<ExpandMoreRoundedIcon sx={{ fontSize: 20, color: m.navy }} />}
+                  startIcon={<LanguageRoundedIcon sx={{ fontSize: 18, color: m.navy }} />}
+                  endIcon={<ExpandMoreRoundedIcon sx={{ fontSize: 18, color: m.navy }} />}
                   sx={{
                     borderRadius: 999,
                     borderColor: alpha(m.navy, 0.18),
                     color: m.navy,
-                    px: 1.75,
+                    px: { xs: 1.25, md: 1.5 },
                     textTransform: "none",
                     fontWeight: 800,
-                    fontSize: { xs: "0.875rem", md: "0.9375rem" },
+                    fontSize: { xs: "0.8125rem", md: "0.875rem" },
                     bgcolor: "#fff",
-                    height: { xs: 36, md: 38 },
-                    minWidth: 100,
+                    height: { xs: 34, md: 36 },
+                    minWidth: 84,
                     "& .MuiButton-startIcon": { mr: 0.75 },
                     "& .MuiButton-endIcon": { ml: 0.5 },
                   }}
@@ -252,8 +252,8 @@ export default function MollureMarketingHeader({
                 {isAuthed ? (
                   <Avatar
                     sx={{
-                      width: { xs: 36, md: 38 },
-                      height: { xs: 36, md: 38 },
+                      width: { xs: 34, md: 36 },
+                      height: { xs: 34, md: 36 },
                       bgcolor: alpha(m.navy, 0.08),
                       color: alpha(m.navy, 0.85),
                       fontWeight: 800,
@@ -270,13 +270,13 @@ export default function MollureMarketingHeader({
                     disableElevation
                     sx={{
                       borderRadius: 999,
-                      px: 2.5,
+                      px: { xs: 2, md: 2.25 },
                       textTransform: "lowercase",
                       fontWeight: 900,
                       bgcolor: m.teal,
                       "&:hover": { bgcolor: m.tealDark },
-                      height: { xs: 36, md: 38 },
-                      fontSize: { xs: "0.875rem", md: "0.9375rem" },
+                      height: { xs: 34, md: 36 },
+                      fontSize: { xs: "0.8125rem", md: "0.875rem" },
                     }}
                   >
                     {resolvedLoginLabel}
@@ -294,7 +294,7 @@ export default function MollureMarketingHeader({
                         display: "inline-flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        height: { xs: 36, md: 38 },
+                        height: { xs: 34, md: 36 },
                       }}
                     >
                       {professionalLinkLabel}
