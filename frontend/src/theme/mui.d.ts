@@ -7,6 +7,7 @@ declare module "@mui/material/styles" {
     description: React.CSSProperties;
     cardTitle: React.CSSProperties;
     bodyText: React.CSSProperties;
+    headerNav: React.CSSProperties;
   }
 
   interface TypographyVariantsOptions {
@@ -15,6 +16,7 @@ declare module "@mui/material/styles" {
     description?: React.CSSProperties;
     cardTitle?: React.CSSProperties;
     bodyText?: React.CSSProperties;
+    headerNav?: React.CSSProperties;
   }
 
   interface MollurePalette {
@@ -70,6 +72,7 @@ declare module "@mui/material/Typography" {
     description: true;
     cardTitle: true;
     bodyText: true;
+    headerNav: true;
   }
 }
 

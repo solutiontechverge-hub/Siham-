@@ -14,6 +14,7 @@ import {
   MenuItem,
   Stack,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import { Profile as AvatarImage } from "../../../images";
 import type { ClientsLandingData } from "../../app/clients/clients.data";
 import { clientsShellHeader, type ClientsShellHeaderConfig } from "../../data/marketingShell.data";
@@ -137,27 +138,27 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
           <Card
             sx={{
               mt: { xs: 5, md: 6.5 },
-              borderRadius: 3.5,
-              boxShadow: "0 20px 45px rgba(40, 92, 112, 0.10)",
+              borderRadius: 2.5,
+              boxShadow: "0 18px 40px rgba(16, 24, 40, 0.10)",
               border: `1px solid ${tokens.border}`,
+              bgcolor: "#fff",
               overflow: "hidden",
             }}
           >
-            <CardContent sx={{ p: { xs: 2, md: 2.5 } }}>
-              <Grid container spacing={1.75} alignItems="flex-end">
+            <CardContent sx={{ p: { xs: 2, md: 2.75 } }}>
+              <Grid container spacing={{ xs: 1.75, md: 2.25 }} alignItems="flex-end">
                 {hero.filters.map((filter) => (
                   <Grid item xs={12} sm={6} md={3} key={filter.label}>
                     <Typography
-                      display={"flex"}
-                      alignItems={"center"}
-                      justifyContent={"center"}
+                      display="flex"
+                      alignItems="center"
+                      justifyContent="flex-start"
                       sx={{
                         mb: 0.75,
-                        fontSize: 11,
-                        fontWeight: 700,
-                        color: tokens.slate,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.08em",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: alpha(tokens.navy, 0.6),
+                        letterSpacing: "0.01em",
                       }}
                     >
                       {filter.label}
@@ -177,6 +178,14 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
                       SelectProps={{
                         displayEmpty: true,
                         MenuProps: {
+                          MenuListProps: {
+                            sx: {
+                              py: 0,
+                              "& .MuiMenuItem-root:not(:last-child)": {
+                                borderBottom: `1px solid ${tokens.border}`,
+                              },
+                            },
+                          },
                           PaperProps: {
                             sx: {
                               mt: 1,
@@ -191,7 +200,7 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
                         "& .MuiOutlinedInput-root": {
                           height: 44,
                           bgcolor: "#fff",
-                          borderRadius: "6px",
+                          borderRadius: "8px",
                           fontSize: 13,
                           color: tokens.navy,
                           "& fieldset": { borderColor: tokens.inputBorder },
@@ -222,10 +231,11 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
                     disableElevation
                     sx={{
                       height: 44,
-                      borderRadius: 2,
+                      borderRadius: "10px",
                       textTransform: "none",
                       fontWeight: 700,
                       bgcolor: tokens.teal,
+                      color: "#fff",
                       "&:hover": { bgcolor: tokens.tealDark },
                     }}
                   >

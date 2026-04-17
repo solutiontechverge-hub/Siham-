@@ -5,7 +5,7 @@ import { MarketingShellLayout } from "../../../components/marketing";
 
 export default function ProfessionalsContactUsPage() {
   return (
-    <MarketingShellLayout audience="professionals">
+    <MarketingShellLayout audience="professionals" hideFooter>
       <ContactUs illustrationSrc="/about/about-gears-photo.png" />
     </MarketingShellLayout>
   );

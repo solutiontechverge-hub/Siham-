@@ -3,16 +3,13 @@
 import * as React from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import BusinessOutlinedIcon from "@mui/icons-material/BusinessOutlined";
-import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
-import PersonOutlinedIcon from "@mui/icons-material/PersonOutlined";
 import { Box, Button, Container, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 
 import { MarketingSiteHeader } from "../../../components/common";
 import { authSignupHeaderClient } from "../../../data/marketingShell.data";
 import { BodyText } from "../../../components/ui/typography";
-import { SignupBg, SignupLs, SignupRs } from "../../../../images";
+import { CC, IC, Professional, SignupBg, SignupLs, SignupRs } from "../../../../images";
 
 type SignupAudience = "individual" | "company" | "professional";
 
@@ -49,24 +46,22 @@ function UserTypeCard({ selected, onSelect, icon, label }: UserTypeCardProps) {
         flex: 1,
         minWidth: { xs: "100%", sm: 168 },
         cursor: "pointer",
-        borderRadius: "12px",
-        px: { xs: 2, sm: 2.25 },
-        py: { xs: 2.75, sm: 3 },
-        minHeight: { sm: 148 },
+        borderRadius: "10px",
+        px: { xs: 2.25, sm: 2.5 },
+        py: { xs: 2.25, sm: 2.4 },
+        minHeight: { xs: 92, sm: 104 },
         textAlign: "center",
         bgcolor: m.white ?? "#fff",
         border: selected ? `2px solid ${m.teal}` : `1px solid ${cardBorderIdle}`,
-        boxShadow: selected
-          ? `0 10px 28px ${alpha(m.navy, 0.08)}, 0 4px 14px ${alpha(m.teal, 0.18)}`
-          : `0 1px 4px ${alpha(m.navy, 0.05)}`,
+        boxShadow: selected ? `0 6px 18px ${alpha(m.navy, 0.08)}` : "none",
         transition: theme.transitions.create(["border-color", "box-shadow", "background-color"], {
           duration: theme.transitions.duration.shorter,
         }),
         "&:hover": {
           borderColor: selected ? m.teal : alpha(m.navy, 0.16),
           boxShadow: selected
-            ? `0 12px 32px ${alpha(m.navy, 0.09)}, 0 4px 16px ${alpha(m.teal, 0.2)}`
-            : `0 2px 8px ${alpha(m.navy, 0.07)}`,
+            ? `0 8px 22px ${alpha(m.navy, 0.1)}`
+            : `0 2px 10px ${alpha(m.navy, 0.06)}`,
         },
       }}
     >
@@ -75,20 +70,19 @@ function UserTypeCard({ selected, onSelect, icon, label }: UserTypeCardProps) {
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
-          mb: 1.5,
-          color: selected ? m.teal : alpha(m.navy, 0.42),
-          "& svg": { fontSize: 44 },
+          mb: 1.2,
+          opacity: selected ? 1 : 0.9,
         }}
       >
         {icon}
       </Box>
       <Typography
         sx={{
-          fontWeight: selected ? 700 : 400,
-          fontSize: "0.9375rem",
+          fontWeight: selected ? 600 : 500,
+          fontSize: "0.9rem",
           lineHeight: 1.4,
           letterSpacing: "0.01em",
-          color: selected ? m.navy : alpha(m.navy, 0.52),
+          color: selected ? alpha(m.navy, 0.92) : alpha(m.navy, 0.64),
         }}
       >
         {label}
@@ -260,19 +254,43 @@ export default function SignupSelectUserTypePage() {
               <UserTypeCard
                 selected={audience === "individual"}
                 onSelect={() => setAudience("individual")}
-                icon={<PersonOutlinedIcon />}
+                icon={
+                  <Image
+                    src={IC}
+                    alt="Individual Client"
+                    width={34}
+                    height={30}
+                    style={{ display: "block" }}
+                  />
+                }
                 label="Individual Client (IC)"
               />
               <UserTypeCard
                 selected={audience === "company"}
                 onSelect={() => setAudience("company")}
-                icon={<BusinessOutlinedIcon />}
+                icon={
+                  <Image
+                    src={CC}
+                    alt="Company Client"
+                    width={28}
+                    height={36}
+                    style={{ display: "block" }}
+                  />
+                }
                 label="Company Client (CC)"
               />
               <UserTypeCard
                 selected={audience === "professional"}
                 onSelect={() => setAudience("professional")}
-                icon={<GroupsOutlinedIcon />}
+                icon={
+                  <Image
+                    src={Professional}
+                    alt="Professional"
+                    width={34}
+                    height={28}
+                    style={{ display: "block" }}
+                  />
+                }
                 label="Professional"
               />
             </Stack>

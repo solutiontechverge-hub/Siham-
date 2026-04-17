@@ -9,7 +9,7 @@ import LanguageRoundedIcon from "@mui/icons-material/LanguageRounded";
 import { Avatar, Box, Button, Container, Divider, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { Logo } from "../../../images";
-import { BodyText } from "../ui/typography";
+import { HeaderNavText } from "../ui/typography";
 
 export type MarketingNavItem = {
   label: string;
@@ -82,32 +82,51 @@ export default function MollureMarketingHeader({
   const m = theme.palette.mollure;
   const pathname = usePathname() ?? "";
   const pathForActive = activePath ?? pathname;
+  const isProfessionalsRoute = pathForActive === "/professionals" || pathForActive.startsWith("/professionals/");
   const resolvedLoginLabel = primaryActionLabel ?? loginLabel ?? "login";
   const resolvedLoginHref = primaryActionHref ?? loginHref ?? "/auth/login";
 
-  const audienceSwitchSx = {
+  const pillBaseSx = {
     borderRadius: 999,
-    borderColor: alpha(m.navy, 0.18),
-    color: alpha(m.navy, 0.62),
+    height: { xs: 34, sm: 34, md: 36 },
+    minHeight: { xs: 34, sm: 34, md: 36 },
+    px: { xs: 1.1, sm: 1.1, md: 1.35 },
+    fontSize: { xs: "0.8125rem", sm: "0.8125rem", md: "0.875rem" },
+    lineHeight: 1,
+    letterSpacing: "0.01em",
     textTransform: "lowercase" as const,
-    fontWeight: 600,
-    fontSize: { xs: "0.75rem", sm: "0.8125rem", md: "0.875rem" },
+    whiteSpace: "nowrap" as const,
+  };
+
+  const pillOutlineSx = {
+    ...pillBaseSx,
     bgcolor: "#fff",
-    minHeight: { xs: 34, md: 36 },
-    px: { xs: 1.25, sm: 1.5, md: 1.75 },
-    py: 0.5,
-    maxWidth: { xs: 124, sm: 156, md: 180 },
+    borderColor: alpha(m.navy, 0.22),
+    color: alpha(m.navy, 0.86),
+    fontWeight: 500,
+    "&:hover": {
+      borderColor: alpha(m.navy, 0.32),
+      bgcolor: alpha(m.navy, 0.03),
+    },
+  };
+
+  const pillPrimarySx = {
+    ...pillBaseSx,
+    bgcolor: m.teal,
+    color: "#fff",
+    fontWeight: 500,
+    boxShadow: "none",
+    "&:hover": { bgcolor: m.tealDark, boxShadow: "none" },
+  };
+
+  const audienceSwitchSx = {
+    ...pillOutlineSx,
+    maxWidth: { xs: 170, sm: 200, md: 240 },
     minWidth: 0,
     flexShrink: 0,
-    lineHeight: 1.2,
-    whiteSpace: "nowrap" as const,
     overflow: "hidden",
     textOverflow: "ellipsis",
     textAlign: "center" as const,
-    "&:hover": {
-      borderColor: alpha(m.navy, 0.28),
-      bgcolor: alpha(m.navy, 0.03),
-    },
   };
 
   return (
@@ -135,8 +154,8 @@ export default function MollureMarketingHeader({
               flexDirection: { xs: "row" },
               alignItems: "center",
               justifyContent: { xs: "space-between", md: "stretch" },
-              gridTemplateColumns: { md: "minmax(0, 1fr) auto minmax(0, 1fr)" },
-              columnGap: { md: 3 },
+              gridTemplateColumns: { md: "auto minmax(0, 1fr) auto" },
+              columnGap: { md: 2 },
               rowGap: 1,
             }}
           >
@@ -163,7 +182,7 @@ export default function MollureMarketingHeader({
                 direction="row"
                 alignItems="center"
                 justifyContent="center"
-                spacing={{ md: 2.5, lg: 3.5, xl: 4 }}
+                spacing={{ md: 2.25, lg: 3.25, xl: 3.75 }}
                 useFlexGap
                 sx={{
                   display: { xs: "none", md: "flex" },
@@ -174,15 +193,13 @@ export default function MollureMarketingHeader({
                 {navItems.map((item) => {
                   const active = isNavActive(pathForActive, item);
                   return (
-                    <BodyText
+                    <HeaderNavText
                       key={item.href + item.label}
                       component={Link}
                       href={item.href}
                       sx={{
-                        fontSize: { md: "0.9375rem", lg: "1rem" },
                         lineHeight: 1.25,
                         fontWeight: active ? 600 : 500,
-                        letterSpacing: "0.01em",
                         color: active ? alpha(m.navy, 0.92) : alpha(m.navy, 0.58),
                         textDecoration: "none",
                         whiteSpace: "nowrap",
@@ -190,7 +207,7 @@ export default function MollureMarketingHeader({
                       }}
                     >
                       {item.label}
-                    </BodyText>
+                    </HeaderNavText>
                   );
                 })}
               </Stack>
@@ -213,7 +230,7 @@ export default function MollureMarketingHeader({
               <Stack
                 direction="row"
                 alignItems="center"
-                spacing={{ xs: 0.75, sm: 1, md: 1.25 }}
+                spacing={{ xs: 1.1, sm: 1.4, md: 1.6 }}
                 sx={{
                   flexShrink: 0,
                   justifyContent: "flex-end",
@@ -229,21 +246,15 @@ export default function MollureMarketingHeader({
               >
                 <Button
                   variant="outlined"
-                  startIcon={<LanguageRoundedIcon sx={{ fontSize: 18, color: m.navy }} />}
-                  endIcon={<ExpandMoreRoundedIcon sx={{ fontSize: 18, color: m.navy }} />}
+                  startIcon={<LanguageRoundedIcon sx={{ fontSize: 20, color: alpha(m.navy, 0.9) }} />}
+                  endIcon={<ExpandMoreRoundedIcon sx={{ fontSize: 20, color: alpha(m.navy, 0.55) }} />}
                   sx={{
-                    borderRadius: 999,
-                    borderColor: alpha(m.navy, 0.18),
-                    color: m.navy,
-                    px: { xs: 1.25, md: 1.5 },
-                    textTransform: "none",
-                    fontWeight: 800,
-                    fontSize: { xs: "0.8125rem", md: "0.875rem" },
-                    bgcolor: "#fff",
-                    height: { xs: 34, md: 36 },
-                    minWidth: 84,
-                    "& .MuiButton-startIcon": { mr: 0.75 },
-                    "& .MuiButton-endIcon": { ml: 0.5 },
+                    ...pillOutlineSx,
+                    minWidth: { xs: 84, sm: 84, md: 92 },
+                    justifyContent: "space-between",
+                    gap: 1.1,
+                    "& .MuiButton-startIcon": { mr: 0 },
+                    "& .MuiButton-endIcon": { ml: 0 },
                   }}
                 >
                   {localeLabel}
@@ -269,14 +280,8 @@ export default function MollureMarketingHeader({
                     variant="contained"
                     disableElevation
                     sx={{
-                      borderRadius: 999,
-                      px: { xs: 2, md: 2.25 },
-                      textTransform: "lowercase",
-                      fontWeight: 900,
-                      bgcolor: m.teal,
-                      "&:hover": { bgcolor: m.tealDark },
-                      height: { xs: 34, md: 36 },
-                      fontSize: { xs: "0.8125rem", md: "0.875rem" },
+                      ...pillPrimarySx,
+                      minWidth: { xs: 92, sm: 100, md: 108 },
                     }}
                   >
                     {resolvedLoginLabel}
@@ -294,7 +299,7 @@ export default function MollureMarketingHeader({
                         display: "inline-flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        height: { xs: 34, md: 36 },
+                        minWidth: { xs: 112, sm: 120, md: 128 },
                       }}
                     >
                       {professionalLinkLabel}

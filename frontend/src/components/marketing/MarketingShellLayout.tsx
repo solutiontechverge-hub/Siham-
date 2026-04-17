@@ -18,9 +18,16 @@ type MarketingShellLayoutProps = {
   children: React.ReactNode;
   /** Override default shell background (e.g. how-it-works uses its own inner bg) */
   contentSx?: object;
+  /** Hide the marketing footer for special pages (e.g. contact-us). */
+  hideFooter?: boolean;
 };
 
-export function MarketingShellLayout({ audience, children, contentSx }: MarketingShellLayoutProps) {
+export function MarketingShellLayout({
+  audience,
+  children,
+  contentSx,
+  hideFooter,
+}: MarketingShellLayoutProps) {
   const footerData = audience === "clients" ? marketingShellFooter : professionalsMarketingFooter;
   const footer = (
     <MarketingSiteFooter
@@ -45,7 +52,7 @@ export function MarketingShellLayout({ audience, children, contentSx }: Marketin
           professionalHref={h.professionalHref}
         />
         {children}
-        {footer}
+        {hideFooter ? null : footer}
       </Box>
     );
   }
@@ -62,7 +69,7 @@ export function MarketingShellLayout({ audience, children, contentSx }: Marketin
         homeHref="/professionals"
       />
       {children}
-      {footer}
+      {hideFooter ? null : footer}
     </Box>
   );
 }

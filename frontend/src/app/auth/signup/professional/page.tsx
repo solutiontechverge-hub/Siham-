@@ -17,8 +17,6 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import { alpha } from "@mui/material/styles";
-import { PasswordStrengthBar } from "../../../../components/common";
 import { getApiErrorMessage } from "../../../../lib/api-error";
 import { getPasswordStrength } from "../../../../lib/passwordStrength";
 import { useRegisterMutation } from "../../../../store/services/authApi";
@@ -157,7 +155,7 @@ export default function ProfessionalSignupPage() {
     }
 
     if (!passwordStrength.isStrong) {
-      setErrorMessage("Please choose a strong password to continue.");
+      showSnackbar({ severity: "error", message: "Please choose a strong password to continue." });
       return;
     }
 
@@ -576,11 +574,6 @@ export default function ProfessionalSignupPage() {
                             autoComplete="new-password"
                             placeholder="Enter Password"
                           />
-                        <Grid item xs={12} md={3}>
-                          <Box>
-                            <TextField fullWidth type="password" label="Password" name="password" value={form.password} onChange={handleChange} required autoComplete="new-password" InputLabelProps={{ shrink: true }} />
-                            <PasswordStrengthBar password={form.password} />
-                          </Box>
                         </Grid>
                         <Grid item xs={12} sm={6}>
                           <MollureAuthLabeledPasswordField

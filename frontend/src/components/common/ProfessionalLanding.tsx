@@ -25,7 +25,15 @@ import MarketingResultCard from "./MarketingResultCard";
 import type { professionalsPageData } from "../../app/professionals/professionals.data";
 import { useProfessionalsTokens } from "../../app/professionals/professionals.use";
 import { ProfessionalsHeroImage } from "../../../images";
-import { BodyText as Typography } from "../ui/typography";
+import {
+  MarketingHeroDescription,
+  MarketingHeroTitle,
+  MarketingKpiSubtitle,
+  MarketingKpiTitle,
+  MarketingSectionSubtitle,
+  MarketingSectionTitle,
+  Typography,
+} from "../ui/typography";
 
 type ProfessionalsLandingData = typeof professionalsPageData;
 
@@ -156,30 +164,12 @@ export default function ProfessionalLanding({
                     px: 0.95,
                   }}
                 />
-                <Typography
-                  component="h1"
-                  sx={{
-                    whiteSpace: "pre-line",
-                    fontSize: { xs: "2.55rem", sm: "3.35rem", md: "4.05rem" },
-                    lineHeight: { xs: 1.08, md: 1.03 },
-                    fontWeight: 700,
-                    letterSpacing: "-0.04em",
-                    color: "text.primary",
-                  }}
-                >
+                <MarketingHeroTitle>
                   {hero.title}
-                </Typography>
-                <Typography
-                  sx={{
-                    whiteSpace: "pre-line",
-                    fontSize: { xs: "1rem", md: "1.0625rem" },
-                    lineHeight: 1.5,
-                    color: alpha(theme.palette.mollure.navy, 0.55),
-                    maxWidth: 500,
-                  }}
-                >
+                </MarketingHeroTitle>
+                <MarketingHeroDescription>
                   {hero.description}
-                </Typography>
+                </MarketingHeroDescription>
                 <Button
                   variant="contained"
                   disableElevation
@@ -262,9 +252,9 @@ export default function ProfessionalLanding({
             elevation={0}
             sx={{
               mt: { xs: 1, md: -8.5 },
-              ml: { xs: 0, md: 0 },
+              mx: "auto",
               width: "100%",
-              maxWidth: 900,
+              maxWidth: 1120,
               position: "relative",
               zIndex: 2,
               borderRadius: "10px",
@@ -302,25 +292,12 @@ export default function ProfessionalLanding({
                       },
                     }}
                   >
-                    <Typography
-                      sx={{
-                        fontWeight: 700,
-                        color: "mollure.textcolorgrey700",
-                        fontSize: { xs: 16, md: 21 },
-                        lineHeight: 1.1,
-                      }}
-                    >
+                    <MarketingKpiTitle>
                       {c.title}
-                    </Typography>
-                    <Typography
-                      sx={{
-                        color: "text.secondary",
-                        fontSize: { xs: "0.71875rem", md: "0.875rem" },
-                        mt: 0.45,
-                      }}
-                    >
+                    </MarketingKpiTitle>
+                    <MarketingKpiSubtitle>
                       {c.subtitle}
-                    </Typography>
+                    </MarketingKpiSubtitle>
                   </Box>
                 </Grid>
               ))}
@@ -348,33 +325,12 @@ export default function ProfessionalLanding({
       {/* Results */}
       <Box sx={{ bgcolor: "background.default", py: { xs: 6, md: 8 } }}>
         <Container maxWidth="lg">
-          <Typography
-            component="h2"
-            sx={{
-              fontWeight: 600,
-              color: "mollure.textcolorgrey700",
-              textAlign: "center",
-              fontSize: { xs: "1.75rem", md: "2.15rem" },
-              lineHeight: 1.15,
-              letterSpacing: "-0.01em",
-            }}
-          >
+          <MarketingSectionTitle>
             {results.title}
-          </Typography>
-          <Typography
-            sx={{
-              mt: 0.65,
-              fontWeight: 400,
-              color: alpha(theme.palette.mollure.navy, 0.55),
-              textAlign: "center",
-              fontSize: { xs: "0.85rem", md: "0.95rem" },
-              lineHeight: 1.55,
-              maxWidth: 620,
-              mx: "auto",
-            }}
-          >
+          </MarketingSectionTitle>
+          <MarketingSectionSubtitle sx={{ mt: 0.65 }}>
             {results.subtitle}
-          </Typography>
+          </MarketingSectionSubtitle>
 
           <Grid
             container
@@ -408,7 +364,7 @@ export default function ProfessionalLanding({
       {/* Pricing */}
       <Box sx={{ bgcolor: "background.default", py: { xs: 6, md: 8 } }}>
         <Container maxWidth="lg">
-          <Typography
+          <MarketingSectionTitle
             sx={{
               textAlign: "center",
               fontWeight: 800,
@@ -418,7 +374,7 @@ export default function ProfessionalLanding({
             }}
           >
             {pricing.title}
-          </Typography>
+          </MarketingSectionTitle>
 
           <Box
             sx={{

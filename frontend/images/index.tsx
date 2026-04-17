@@ -21,3 +21,7 @@ export const ProfessionalsHeroImage = require("./profesional-landing.svg");
 export const SignupBg = require("./signup-bg.svg");
 export const SignupLs = require("./signup-ls.svg");
 export const SignupRs = require("./signup-rs.svg");
+
+export const IC = require("./IC.svg");
+export const CC = require("./CC.svg");
+export const Professional = require("./Professional.svg");

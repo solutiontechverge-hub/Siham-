@@ -48,9 +48,9 @@ export const clientsPageData = {
       "Find verified professionals for salon or on-location services. Review, confirm, and manage bookings in one place for personal or business needs.",
     primaryAction: "Browse Professionals",
     filters: [
-      { label: "Select Category", placeholder: "Hair stylist", options: ['helo','hehjhe']},
-      { label: "Location", placeholder: "Select city", options: ['helo','hehjhe'] },
-      { label: "Select Municipality", placeholder: "Select municipality", options: ['helo','hehjhe'] },
+      { label: "Select Category", placeholder: "Hair stylist", options: ['Fixed Location','Desired Location']},
+      { label: "Location", placeholder: "Select city", options: ['Fixed','Desired Location'] },
+      { label: "Select Municipality", placeholder: "Select municipality", options: ['Fixed Location','Desired Location'] },
     ] satisfies ClientFilter[],
     searchAction: "Search",
   },

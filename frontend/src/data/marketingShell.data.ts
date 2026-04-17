@@ -115,7 +115,7 @@ export const marketingShellFooter = {
       title: "Company",
       items: [
         { label: "About", href: "/about" },
-        "Careers",
+        "FAQ",
         { label: "Contact", href: "/contact-us" },
       ],
     },
