@@ -3,48 +3,45 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  Alert,
-  Box,
-  Button,
-  CircularProgress,
-  Container,
-  Paper,
-  Stack,
-  TextField,
-  Typography,
-} from "@mui/material";
-import { alpha } from "@mui/material/styles";
+import Image from "next/image";
+import { Box, Button, Container, Paper, Stack } from "@mui/material";
+import { alpha, useTheme } from "@mui/material/styles";
 import { getApiErrorMessage } from "../../../lib/api-error";
 import { useForgotPasswordMutation } from "../../../store/services/authApi";
+import { MarketingSiteHeader, MollureLabeledField } from "../../../components/common";
+import { authLoginHeaderClient } from "../../../data/marketingShell.data";
+import { BodyText, SubHeading } from "../../../components/ui/typography";
+import { useSnackbar } from "../../../components/common/AppSnackbar";
+import { SignupBg, SignupLs, SignupRs } from "../../../../images";
 
 export default function ForgotPasswordPage() {
+  const m = useTheme().palette.mollure;
   const router = useRouter();
+  const { showSnackbar } = useSnackbar();
   const [email, setEmail] = React.useState("");
-  const [successMessage, setSuccessMessage] = React.useState("");
-  const [errorMessage, setErrorMessage] = React.useState("");
   const [forgotPassword, { isLoading }] = useForgotPasswordMutation();
+
+  const cardBorder = m.cardBorder ?? alpha(m.navy, 0.12);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    setSuccessMessage("");
-    setErrorMessage("");
-
     try {
-      const result = await forgotPassword({ email }).unwrap();
+      const result = await forgotPassword({ email: email.trim().toLowerCase() }).unwrap();
 
-      setSuccessMessage(
-        result.message || "OTP sent to your email if it exists in our system.",
-      );
+      showSnackbar({
+        severity: "success",
+        message: result.message || "OTP sent to your email if it exists in our system.",
+      });
       window.sessionStorage.setItem("mollure_reset_email", email.trim().toLowerCase());
       window.setTimeout(() => {
         router.push("/auth/reset-password/verify-otp");
       }, 700);
     } catch (error) {
-      setErrorMessage(
-        getApiErrorMessage(error, "Something went wrong while sending the OTP."),
-      );
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Something went wrong while sending the OTP."),
+      });
     }
   };
 
@@ -52,186 +49,188 @@ export default function ForgotPasswordPage() {
     <Box
       sx={{
         minHeight: "100vh",
-        background:
-          "radial-gradient(circle at top left, #d8ffff 0%, #f6fffd 34%, #f5f7fb 100%)",
-        py: { xs: 3, md: 5 },
+        bgcolor: m.white ?? "#fff",
+        position: "relative",
+        overflow: "hidden",
       }}
     >
-      <Container maxWidth="lg">
-        <Stack spacing={{ xs: 5, md: 8 }}>
+      <Box
+        aria-hidden
+        sx={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 0,
+          pointerEvents: "none",
+        }}
+      >
+        <Box
+          sx={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            lineHeight: 0,
+          }}
+        >
+          <Image
+            src={SignupBg}
+            alt=""
+            width={1440}
+            height={553}
+            priority
+            sizes="100vw"
+            style={{
+              width: "100%",
+              height: "auto",
+              display: "block",
+            }}
+          />
+        </Box>
+
+        <Box
+          sx={{
+            position: "absolute",
+            left: { xs: -12, sm: -4, md: 0 },
+            bottom: { xs: -28, sm: -12, md: 0 },
+            width: { xs: "min(52vw, 240px)", sm: 280, md: 323 },
+            lineHeight: 0,
+          }}
+        >
+          <Image
+            src={SignupLs}
+            alt=""
+            width={323}
+            height={469}
+            sizes="(max-width: 600px) 52vw, 323px"
+            style={{ width: "100%", height: "auto", display: "block" }}
+          />
+        </Box>
+
+        <Box
+          sx={{
+            position: "absolute",
+            right: { xs: -12, sm: -4, md: 0 },
+            bottom: { xs: -28, sm: -12, md: 0 },
+            width: { xs: "min(56vw, 260px)", sm: 300, md: 364 },
+            lineHeight: 0,
+          }}
+        >
+          <Image
+            src={SignupRs}
+            alt=""
+            width={364}
+            height={413}
+            sizes="(max-width: 600px) 56vw, 364px"
+            style={{ width: "100%", height: "auto", display: "block" }}
+          />
+        </Box>
+      </Box>
+
+      <Box sx={{ position: "relative", zIndex: 1 }}>
+        <MarketingSiteHeader
+          navItems={[...authLoginHeaderClient.navItems]}
+          localeLabel={authLoginHeaderClient.localeLabel}
+          loginLabel={authLoginHeaderClient.loginLabel}
+          loginHref={authLoginHeaderClient.loginHref}
+          professionalLinkLabel={authLoginHeaderClient.professionalLinkLabel}
+          professionalHref={authLoginHeaderClient.professionalHref}
+          homeHref="/"
+        />
+
+        <Container maxWidth="lg">
           <Box
             sx={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 2,
-              flexWrap: "wrap",
+              minHeight: "calc(100vh - 120px)",
+              display: "grid",
+              placeItems: "center",
+              py: 4,
+              pb: 6,
             }}
           >
-            <Stack direction="row" spacing={1.5} alignItems="center">
-              <Box
-                sx={{
-                  width: 46,
-                  height: 46,
-                  borderRadius: "16px",
-                  background:
-                    "linear-gradient(135deg, #00c2b8 0%, #1177ff 100%)",
-                  boxShadow: "0 12px 30px rgba(17, 119, 255, 0.22)",
-                }}
-              />
-              <Typography
-                variant="h5"
-                sx={{
-                  fontWeight: 800,
-                  letterSpacing: "-0.04em",
-                  color: "#10233f",
-                }}
-              >
-                Mollure
-              </Typography>
-            </Stack>
-
-            <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
-              <Button
-                variant="outlined"
-                sx={{
-                  borderRadius: 999,
-                  borderColor: alpha("#10233f", 0.14),
-                  color: "#10233f",
-                  px: 2,
-                  textTransform: "none",
-                  fontWeight: 700,
-                }}
-              >
-                EN
-              </Button>
-              <Button
-                component={Link}
-                href="/auth/login"
-                variant="contained"
-                sx={{
-                  borderRadius: 999,
-                  px: 2.5,
-                  textTransform: "none",
-                  fontWeight: 700,
-                  backgroundColor: "#00b3b3",
-                  "&:hover": {
-                    backgroundColor: "#009c9c",
-                  },
-                }}
-              >
-                Login
-              </Button>
-              <Button
-                component={Link}
-                href="/auth/professional/login"
-                variant="outlined"
-                sx={{
-                  borderRadius: 999,
-                  borderColor: alpha("#10233f", 0.14),
-                  color: "#10233f",
-                  px: 2,
-                  textTransform: "none",
-                  fontWeight: 700,
-                }}
-              >
-                For professional
-              </Button>
-            </Stack>
-          </Box>
-
-          <Box sx={{ display: "flex", justifyContent: "center" }}>
             <Paper
               elevation={0}
               sx={{
                 width: "100%",
                 maxWidth: 620,
-                borderRadius: "32px",
-                px: { xs: 3, sm: 5 },
-                py: { xs: 4, sm: 5 },
-                backgroundColor: "rgba(255,255,255,0.88)",
-                backdropFilter: "blur(12px)",
-                border: "1px solid rgba(16, 35, 63, 0.08)",
-                boxShadow: "0 24px 80px rgba(16, 35, 63, 0.10)",
+                borderRadius: "14px",
+                border: `1px solid ${cardBorder}`,
+                boxShadow: `0 18px 48px ${alpha(m.navy, 0.08)}, 0 4px 14px ${alpha(m.navy, 0.04)}`,
+                bgcolor: m.white ?? "#fff",
+                px: { xs: 3, sm: 4.75 },
+                py: { xs: 3.5, sm: 4.25 },
               }}
             >
-              <Stack spacing={3}>
+              <Stack spacing={2.75}>
                 <Box textAlign="center">
-                  <Typography
-                    variant="h3"
+                  <SubHeading
                     sx={{
-                      fontWeight: 900,
-                      letterSpacing: "-0.05em",
-                      color: "#10233f",
-                      fontSize: { xs: "2rem", sm: "2.75rem" },
+                      fontSize: { xs: "1.5rem", sm: "1.625rem" },
+                      fontWeight: 700,
+                      color: m.navy,
+                      lineHeight: 1.2,
                     }}
                   >
                     Forget Password
-                  </Typography>
-                  <Typography
+                  </SubHeading>
+                  <BodyText
                     sx={{
-                      mt: 1.5,
-                      color: alpha("#10233f", 0.72),
-                      fontSize: "1rem",
+                      mt: 1,
+                      color: alpha(m.navy, 0.52),
+                      fontSize: "0.875rem",
+                      lineHeight: 1.45,
                     }}
                   >
-                    No worries, we&apos;ll send you reset instructions.
-                  </Typography>
+                    No Worries, We&apos;ll Send You Reset Instructions
+                  </BodyText>
                 </Box>
 
                 <Box component="form" onSubmit={handleSubmit}>
-                  <Stack spacing={2.5}>
-                    <TextField
+                  <Stack spacing={2.25}>
+                    <MollureLabeledField
                       type="email"
-                      label="Email Address"
-                      placeholder="e.g. jane@example.com"
+                      fieldLabel="Email Address"
+                      placeholder="e.g Jane"
                       value={email}
                       onChange={(event) => setEmail(event.target.value)}
                       required
-                      fullWidth
                       autoComplete="email"
-                      InputLabelProps={{ shrink: true }}
                     />
-
-                    {successMessage ? (
-                  <Alert severity="success">{successMessage}</Alert>
-                    ) : null}
-
-                    {errorMessage ? (
-                      <Alert severity="error">{errorMessage}</Alert>
-                    ) : null}
 
                     <Button
                       type="submit"
                       variant="contained"
+                      disableElevation
+                      fullWidth
                       disabled={isLoading}
                       sx={{
-                        minHeight: 54,
-                        borderRadius: 999,
-                        textTransform: "none",
-                        fontSize: "1rem",
-                        fontWeight: 800,
-                        background:
-                          "linear-gradient(135deg, #10233f 0%, #00a9b4 100%)",
-                        boxShadow: "0 18px 40px rgba(0, 169, 180, 0.24)",
+                        borderRadius: "10px",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.04em",
+                        fontWeight: 700,
+                        fontSize: "0.9375rem",
+                        py: 1.2,
+                        minHeight: 44,
+                        bgcolor: m.teal,
+                        color: m.white,
+                        "&:hover": { bgcolor: m.tealDark },
                       }}
                     >
-                      {isLoading ? (
-                        <Stack direction="row" spacing={1.25} alignItems="center">
-                          <CircularProgress size={18} sx={{ color: "#fff" }} />
-                          <span>Sending...</span>
-                        </Stack>
-                      ) : (
-                        "Send OTP"
-                      )}
+                      {isLoading ? "Sending..." : "Send OTP"}
                     </Button>
+
+                    <BodyText textAlign="center" sx={{ color: alpha(m.navy, 0.48), fontSize: "0.8125rem" }}>
+                      Remember your password?{" "}
+                      <Link href="/auth/login" style={{ color: m.teal, textDecoration: "none", fontWeight: 700 }}>
+                        Back to login
+                      </Link>
+                    </BodyText>
                   </Stack>
                 </Box>
               </Stack>
             </Paper>
           </Box>
-        </Stack>
-      </Container>
+        </Container>
+      </Box>
     </Box>
   );
 }

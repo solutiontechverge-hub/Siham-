@@ -1,3 +1,5 @@
+import { clientsShellHeader, marketingShellFooter } from "../../data/marketingShell.data";
+
 export type ClientFeatureIconKey =
   | "location"
   | "booking"
@@ -38,12 +40,7 @@ export type ClientFilter = {
 };
 
 export const clientsPageData = {
-  header: {
-    navItems: ["How It Works", "About"],
-    localeLabel: "EN",
-    loginLabel: "Login",
-    professionalLinkLabel: "for professional",
-  },
+  header: clientsShellHeader,
   hero: {
     eyebrow: "Beauty & Grooming For Your Time",
     title: "Book Beauty And Grooming Professionals On Your Terms",
@@ -51,9 +48,9 @@ export const clientsPageData = {
       "Find verified professionals for salon or on-location services. Review, confirm, and manage bookings in one place for personal or business needs.",
     primaryAction: "Browse Professionals",
     filters: [
-      { label: "Select Category", placeholder: "Hair stylist", options: ['helo','hehjhe']},
-      { label: "Location", placeholder: "Select city", options: ['helo','hehjhe'] },
-      { label: "Select Municipality", placeholder: "Select municipality", options: ['helo','hehjhe'] },
+      { label: "Select Category", placeholder: "Hair stylist", options: ['Fixed Location','Desired Location']},
+      { label: "Location", placeholder: "Select city", options: ['Fixed','Desired Location'] },
+      { label: "Select Municipality", placeholder: "Select municipality", options: ['Fixed Location','Desired Location'] },
     ] satisfies ClientFilter[],
     searchAction: "Search",
   },
@@ -144,27 +141,7 @@ export const clientsPageData = {
     action: "Partner with Mollure",
     supportingText: "Credit card required - free for first 50 transactions",
   },
-  footer: {
-    columns: [
-      {
-        title: "Mollure",
-        items: [
-          "The all-in-one platform for salon and freelance appointment management.",
-        ],
-      },
-      {
-        title: "Product",
-        items: ["How It Works", "Browse Professionals", "Pricing"],
-      },
-      {
-        title: "Company",
-        items: ["About", "Careers", "Contact"],
-      },
-      {
-        title: "Legal",
-        items: ["Privacy", "Terms", "Security"],
-      },
-    ] satisfies ClientFooterColumn[],
-    copyright: "2026 Mollure. All rights reserved.",
-  },
+  footer: marketingShellFooter,
 } as const;
+
+export type ClientsLandingData = typeof clientsPageData;

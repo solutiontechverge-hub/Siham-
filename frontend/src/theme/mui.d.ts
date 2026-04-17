@@ -1,6 +1,24 @@
 import "@mui/material/styles";
 
 declare module "@mui/material/styles" {
+  interface TypographyVariants {
+    mainHeading: React.CSSProperties;
+    subHeading: React.CSSProperties;
+    description: React.CSSProperties;
+    cardTitle: React.CSSProperties;
+    bodyText: React.CSSProperties;
+    headerNav: React.CSSProperties;
+  }
+
+  interface TypographyVariantsOptions {
+    mainHeading?: React.CSSProperties;
+    subHeading?: React.CSSProperties;
+    description?: React.CSSProperties;
+    cardTitle?: React.CSSProperties;
+    bodyText?: React.CSSProperties;
+    headerNav?: React.CSSProperties;
+  }
+
   interface MollurePalette {
     teal: string;
     tealDark: string;
@@ -29,6 +47,13 @@ declare module "@mui/material/styles" {
     logoSecondary: string;
     logoAccent: string;
     logoText: string;
+    bgshadow: string;
+    cardbg: string;
+    textcolorgrey700: string;
+    headingText: string;
+    descriptionText: string;
+    warmwarning: string;
+    white: string;
   }
 
   interface Palette {
@@ -37,6 +62,17 @@ declare module "@mui/material/styles" {
 
   interface PaletteOptions {
     mollure?: Partial<MollurePalette>;
+  }
+}
+
+declare module "@mui/material/Typography" {
+  interface TypographyPropsVariantOverrides {
+    mainHeading: true;
+    subHeading: true;
+    description: true;
+    cardTitle: true;
+    bodyText: true;
+    headerNav: true;
   }
 }
 

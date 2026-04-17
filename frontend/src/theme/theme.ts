@@ -48,10 +48,78 @@ const theme = createTheme({
       logoSecondary: "#56C7D2",
       logoAccent: "#A7E9A8",
       logoText: "#62758A",
+      bgshadow: "#F9FAFB",
+      cardbg: "#F8FFFF",
+      textcolorgrey700: "#344054",
+      headingText: "#333333",
+      descriptionText: "#5A5A5A",
+      warmwarning: "#FFFCF5",
+      white: "#FFFFFF",
     },
     
   },
 
+  typography: {
+    fontFamily:
+      "var(--font-poppins), Poppins, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
+    mainHeading: {
+      fontFamily: "inherit",
+      fontWeight: 600,
+      fontSize: "30px",
+      lineHeight: "16px",
+      color: "#344054",
+    },
+    subHeading: {
+      fontFamily: "inherit",
+      fontWeight: 500,
+      fontSize: "24px",
+      lineHeight: "normal",
+      color: "#333333",
+    },
+    description: {
+      fontFamily: "inherit",
+      fontWeight: 400,
+      fontSize: "14px",
+      lineHeight: "normal",
+      color: "#5A5A5A",
+    },
+    cardTitle: {
+      fontFamily: "inherit",
+      fontWeight: 500,
+      fontSize: "14px",
+      lineHeight: "20px",
+      color: "#344054",
+    },
+    bodyText: {
+      fontFamily: "inherit",
+      fontWeight: 400,
+      fontSize: "14px",
+      lineHeight: "normal",
+      color: "#5A5A5A",
+    },
+    headerNav: {
+      fontFamily: "inherit",
+      fontWeight: 500,
+      fontSize: "18px",
+      lineHeight: "22px",
+      letterSpacing: "0.01em",
+    },
+  },
+
+  components: {
+    MuiTypography: {
+      defaultProps: {
+        variantMapping: {
+          mainHeading: "h1",
+          subHeading: "h2",
+          description: "p",
+          cardTitle: "h3",
+          bodyText: "p",
+          headerNav: "span",
+        },
+      },
+    },
+  },
 
   shape: {
     borderRadius: 12,
