@@ -16,7 +16,9 @@ import {
   TextField,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
+import { PasswordStrengthBar } from "../../../../components/common";
 import { getApiErrorMessage } from "../../../../lib/api-error";
+import { getPasswordStrength } from "../../../../lib/passwordStrength";
 import { useRegisterMutation } from "../../../../store/services/authApi";
 import { BodyText, CardTitle, MainHeading, SubHeading } from "../../../../components/ui/typography";
 import { useSnackbar } from "../../../../components/common/AppSnackbar";
@@ -67,6 +69,7 @@ export default function ProfessionalSignupPage() {
   const [form, setForm] = React.useState<FormState>(initialForm);
   const { showSnackbar } = useSnackbar();
   const [register, { isLoading }] = useRegisterMutation();
+  const passwordStrength = getPasswordStrength(form.password);
 
   const handleChange = (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -84,6 +87,11 @@ export default function ProfessionalSignupPage() {
 
     if (form.password !== form.confirmPassword) {
       showSnackbar({ severity: "error", message: "Password and repeat password must match." });
+      return;
+    }
+
+    if (!passwordStrength.isStrong) {
+      setErrorMessage("Please choose a strong password to continue.");
       return;
     }
 
@@ -308,7 +316,10 @@ export default function ProfessionalSignupPage() {
                           <TextField fullWidth type="email" label="Email" name="contactEmail" value={form.contactEmail} onChange={handleChange} required autoComplete="email" InputLabelProps={{ shrink: true }} />
                         </Grid>
                         <Grid item xs={12} md={3}>
-                          <TextField fullWidth type="password" label="Password" name="password" value={form.password} onChange={handleChange} required autoComplete="new-password" InputLabelProps={{ shrink: true }} />
+                          <Box>
+                            <TextField fullWidth type="password" label="Password" name="password" value={form.password} onChange={handleChange} required autoComplete="new-password" InputLabelProps={{ shrink: true }} />
+                            <PasswordStrengthBar password={form.password} />
+                          </Box>
                         </Grid>
                         <Grid item xs={12} md={3}>
                           <TextField fullWidth type="password" label="Repeat Password" name="confirmPassword" value={form.confirmPassword} onChange={handleChange} required autoComplete="new-password" InputLabelProps={{ shrink: true }} />

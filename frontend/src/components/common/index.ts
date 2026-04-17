@@ -27,3 +27,4 @@ export { default as ProfessionalFixedLocationAnalytics } from "./ProfessionalFix
 export { default as ProfessionalFixedLocationCalendar } from "./ProfessionalFixedLocationCalendar";
 export type { MarketingNavItem } from "./MarketingSiteHeader";
 export type { MarketingFooterColumn } from "./MarketingSiteFooter";
+export { default as PasswordStrengthBar } from "./PasswordStrengthBar";
