@@ -6,15 +6,10 @@ import {
   Box,
   Button,
   Container,
-  FormControl,
-  FormHelperText,
   Grid,
-  InputLabel,
   MenuItem,
   Paper,
-  Select,
   Stack,
-  TextField,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
@@ -22,6 +17,8 @@ import { contactUsData } from "../../app/contact-us/contactus.data";
 import { useContactUsForm } from "../../app/contact-us/contactus.use";
 import { ContactUsImage } from "../../../images";
 import { BodyText, SubHeading } from "../ui/typography";
+import { MollureLabeledField, MollureLabeledSelect } from ".";
+import { SignupBg, SignupLs, SignupRs } from "../../../images";
 
 export type ContactUsProps = {
   illustrationSrc: string;
@@ -47,22 +44,78 @@ export default function ContactUs({ illustrationSrc }: ContactUsProps) {
   const fileInputId = React.useId();
 
   return (
-    <Box sx={{ py: { xs: 4, md: 6 } }}>
-      <Container maxWidth="lg">
-        <Grid container spacing={{ xs: 3, md: 4 }}>
-          <Grid item xs={12} md={6}>
-            <Paper
-              elevation={0}
-              sx={{
-                p: { xs: 3, sm: 4 },
-                borderRadius: "20px",
-                border: `1px solid ${alpha(m.navy, 0.08)}`,
-                boxShadow: "0 18px 50px rgba(16, 35, 63, 0.08)",
-                bgcolor: "rgba(255,255,255,0.9)",
-                backdropFilter: "blur(10px)",
-              }}
-            >
-              <Stack spacing={1.25} alignItems="center" textAlign="center">
+    <Box
+      sx={{
+        minHeight: "100vh",
+        bgcolor: m.white ?? "#fff",
+        position: "relative",
+        overflow: "hidden",
+        py: { xs: 4, md: 6 },
+      }}
+    >
+      <Box
+        aria-hidden
+        sx={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 0,
+          pointerEvents: "none",
+        }}
+      >
+        <Box sx={{ position: "absolute", top: 0, left: 0, right: 0, lineHeight: 0 }}>
+          <Image
+            src={SignupBg}
+            alt=""
+            width={1440}
+            height={553}
+            priority
+            sizes="100vw"
+            style={{ width: "100%", height: "auto", display: "block" }}
+          />
+        </Box>
+        <Box
+          sx={{
+            position: "absolute",
+            left: { xs: -12, sm: -4, md: 0 },
+            bottom: { xs: -28, sm: -12, md: 0 },
+            width: { xs: "min(52vw, 240px)", sm: 280, md: 323 },
+            lineHeight: 0,
+          }}
+        >
+          <Image
+            src={SignupLs}
+            alt=""
+            width={323}
+            height={469}
+            sizes="(max-width: 600px) 52vw, 323px"
+            style={{ width: "100%", height: "auto", display: "block" }}
+          />
+        </Box>
+        <Box
+          sx={{
+            position: "absolute",
+            right: { xs: -12, sm: -4, md: 0 },
+            bottom: { xs: -28, sm: -12, md: 0 },
+            width: { xs: "min(56vw, 260px)", sm: 300, md: 364 },
+            lineHeight: 0,
+          }}
+        >
+          <Image
+            src={SignupRs}
+            alt=""
+            width={364}
+            height={413}
+            sizes="(max-width: 600px) 56vw, 364px"
+            style={{ width: "100%", height: "auto", display: "block" }}
+          />
+        </Box>
+      </Box>
+
+      <Box sx={{ position: "relative", zIndex: 1 }}>
+        <Container maxWidth="lg">
+          <Grid container spacing={{ xs: 3, md: 4 }} alignItems="flex-start">
+            <Grid item xs={12} md={6}>
+              <Stack spacing={1.25} alignItems="flex-start" sx={{ pt: { xs: 1, md: 3 } }}>
                 <SubHeading
                   sx={{
                     color: m.navy,
@@ -72,25 +125,22 @@ export default function ContactUs({ illustrationSrc }: ContactUsProps) {
                 >
                   {contactUsData.headerTitle}
                 </SubHeading>
-                <BodyText sx={{ color: alpha(m.navy, 0.55), fontSize: 13 }}>
+                <BodyText sx={{ color: alpha(m.navy, 0.55), fontSize: 13, maxWidth: 360 }}>
                   {contactUsData.headerSubtitle}
                 </BodyText>
+
+                <Box sx={{ mt: 2.5, position: "relative", width: "100%", maxWidth: 440, height: 320 }}>
+                  <Image
+                    src={ContactUsImage}
+                    alt="Contact illustration"
+                    fill
+                    style={{ objectFit: "contain", objectPosition: "left top" }}
+                  />
+                </Box>
               </Stack>
+            </Grid>
 
-              <Box
-                sx={{ mt: 3, position: "relative", width: "100%", height: 340 }}
-              >
-                <Image
-                  src={ContactUsImage}
-                  alt="Contact illustration"
-                  fill
-                  style={{ objectFit: "contain" }}
-                />
-              </Box>
-            </Paper>
-          </Grid>
-
-          <Grid item xs={12} md={6}>
+            <Grid item xs={12} md={6}>
             <Paper
               elevation={0}
               sx={{
@@ -103,106 +153,76 @@ export default function ContactUs({ illustrationSrc }: ContactUsProps) {
               }}
             >
               <Stack spacing={2.25}>
-                <FormControl
-                  fullWidth
-                  error={Boolean(touched.persona && errors.persona)}
+                <MollureLabeledSelect
+                  fieldLabel={contactUsData.whoAreYou.label}
+                  value={values.persona}
+                  onChange={(e) => setField("persona", String(e.target.value))}
+                  onBlur={() => touch("persona")}
+                  errorText={touched.persona ? errors.persona : undefined}
                 >
-                  <InputLabel shrink>
-                    {contactUsData.whoAreYou.label}
-                  </InputLabel>
-                  <Select
-                    value={values.persona}
-                    label={contactUsData.whoAreYou.label}
-                    onChange={(e) =>
-                      setField("persona", String(e.target.value))
-                    }
-                    onBlur={() => touch("persona")}
-                    displayEmpty
-                    notched
-                  >
-                    {contactUsData.whoAreYou.options.map((opt) => (
-                      <MenuItem key={opt} value={opt}>
-                        {opt}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                  {touched.persona && errors.persona ? (
-                    <FormHelperText>{errors.persona}</FormHelperText>
-                  ) : null}
-                </FormControl>
+                  <MenuItem value="">
+                    <em>{contactUsData.whoAreYou.label}</em>
+                  </MenuItem>
+                  {contactUsData.whoAreYou.options.map((opt) => (
+                    <MenuItem key={opt} value={opt}>
+                      {opt}
+                    </MenuItem>
+                  ))}
+                </MollureLabeledSelect>
 
                 <Grid container spacing={0.2}>
                   <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label={contactUsData.fields.name.label}
+                    <MollureLabeledField
+                      fieldLabel={contactUsData.fields.name.label}
                       placeholder={contactUsData.fields.name.placeholder}
                       value={values.name}
                       onChange={(e) => setField("name", e.target.value)}
                       onBlur={() => touch("name")}
-                      InputLabelProps={{ shrink: true }}
                       error={Boolean(touched.name && errors.name)}
                       helperText={touched.name ? errors.name : undefined}
                     />
                   </Grid>
                   <Grid item xs={12} sm={6}>
-                    <TextField
-                      fullWidth
-                      label={contactUsData.fields.email.label}
+                    <MollureLabeledField
+                      fieldLabel={contactUsData.fields.email.label}
                       placeholder={contactUsData.fields.email.placeholder}
                       value={values.email}
                       onChange={(e) => setField("email", e.target.value)}
                       onBlur={() => touch("email")}
-                      InputLabelProps={{ shrink: true }}
                       error={Boolean(touched.email && errors.email)}
                       helperText={touched.email ? errors.email : undefined}
                     />
                   </Grid>
                 </Grid>
 
-                <FormControl
-                  fullWidth
-                  error={Boolean(touched.subject && errors.subject)}
+                <MollureLabeledSelect
+                  fieldLabel={contactUsData.fields.subject.label}
+                  value={values.subject}
+                  onChange={(e) => setField("subject", String(e.target.value))}
+                  onBlur={() => touch("subject")}
+                  errorText={touched.subject ? errors.subject : undefined}
+                  renderValue={(val) =>
+                    val ? String(val) : contactUsData.fields.subject.placeholder
+                  }
                 >
-                  <InputLabel shrink>
-                    {contactUsData.fields.subject.label}
-                  </InputLabel>
-                  <Select
-                    value={values.subject}
-                    label={contactUsData.fields.subject.label}
-                    onChange={(e) =>
-                      setField("subject", String(e.target.value))
-                    }
-                    onBlur={() => touch("subject")}
-                    displayEmpty
-                    notched
-                    renderValue={(val) =>
-                      val
-                        ? String(val)
-                        : contactUsData.fields.subject.placeholder
-                    }
-                  >
-                    {contactUsData.fields.subject.options.map((opt) => (
-                      <MenuItem key={opt} value={opt}>
-                        {opt}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                  {touched.subject && errors.subject ? (
-                    <FormHelperText>{errors.subject}</FormHelperText>
-                  ) : null}
-                </FormControl>
+                  <MenuItem value="">
+                    <em>{contactUsData.fields.subject.placeholder}</em>
+                  </MenuItem>
+                  {contactUsData.fields.subject.options.map((opt) => (
+                    <MenuItem key={opt} value={opt}>
+                      {opt}
+                    </MenuItem>
+                  ))}
+                </MollureLabeledSelect>
 
-                <TextField
-                  fullWidth
+                <MollureLabeledField
+                  fieldLabel={contactUsData.fields.message.label}
                   multiline
                   minRows={4}
-                  label={contactUsData.fields.message.label}
                   placeholder={contactUsData.fields.message.placeholder}
                   value={values.message}
                   onChange={(e) => setField("message", e.target.value)}
                   onBlur={() => touch("message")}
-                  InputLabelProps={{ shrink: true }}
                   error={Boolean(touched.message && errors.message)}
                   helperText={touched.message ? errors.message : undefined}
                 />
@@ -290,6 +310,7 @@ export default function ContactUs({ illustrationSrc }: ContactUsProps) {
                     textTransform: "none",
                     fontWeight: 700,
                     bgcolor: m.teal,
+                    color: "#fff",
                     "&:hover": { bgcolor: m.teal },
                   }}
                 >
@@ -299,9 +320,10 @@ export default function ContactUs({ illustrationSrc }: ContactUsProps) {
                 </Button>
               </Stack>
             </Paper>
+            </Grid>
           </Grid>
-        </Grid>
-      </Container>
+        </Container>
+      </Box>
     </Box>
   );
 }

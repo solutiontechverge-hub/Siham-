@@ -97,6 +97,13 @@ const theme = createTheme({
       lineHeight: "normal",
       color: "#5A5A5A",
     },
+    headerNav: {
+      fontFamily: "inherit",
+      fontWeight: 500,
+      fontSize: "18px",
+      lineHeight: "22px",
+      letterSpacing: "0.01em",
+    },
   },
 
   components: {
@@ -108,6 +115,7 @@ const theme = createTheme({
           description: "p",
           cardTitle: "h3",
           bodyText: "p",
+          headerNav: "span",
         },
       },
     },

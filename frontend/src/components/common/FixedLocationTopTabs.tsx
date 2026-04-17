@@ -30,11 +30,16 @@ export default function FixedLocationTopTabs({
         width: "100%",
         ml: 0,
         mr: 0,
-        borderRadius: "10px",
-        bgcolor: "#fff",
-        border: `1px solid ${alpha(m.navy, 0.08)}`,
-        px: { xs: 1.75, md: 2.25 },
-        py: 0.6,
+        borderRadius: "8px",
+        bgcolor: "#FFFFFF",
+        backgroundColor: "#FFFFFF",
+        backgroundImage: "none",
+        opacity: 1,
+        filter: "none",
+        border: `1px solid ${alpha(m.navy, 0.10)}`,
+        boxShadow: "none",
+        px: 0,
+        py: 0,
       }}
     >
       <Stack
@@ -43,7 +48,9 @@ export default function FixedLocationTopTabs({
         sx={{
           overflowX: "hidden",
           position: "relative",
-          pt: 0.15,
+          bgcolor: "#FFFFFF",
+          backgroundColor: "#FFFFFF",
+          backgroundImage: "none",
           width: "100%",
           justifyContent: "space-between",
 
@@ -65,7 +72,7 @@ export default function FixedLocationTopTabs({
             right: 0,
             bottom: 0,
             height: 1,
-            bgcolor: m.border,
+            bgcolor: alpha(m.navy, 0.16),
           },
         }}
       >
@@ -87,22 +94,23 @@ export default function FixedLocationTopTabs({
                   ? theme.palette.text.primary
                   : alpha(theme.palette.text.secondary, 0.75),
                 fontSize: 14,
-                pt: 1.05,
-                pb: 1.1,
+                pt: 1.2,
+                pb: 1.15,
+                fontWeight: active ? 600 : 400,
                 position: "relative",
                 zIndex: 1,
 
                 "&:after": {
                   content: '""',
                   position: "absolute",
-                  left: "10%",
-                  right: "10%",
-                  bottom: -0.5,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
                   height: 2,
                   bgcolor: active
                     ? theme.palette.primary.main
                     : "transparent",
-                  borderRadius: 999,
+                  borderRadius: 0,
                 },
               }}
             >
