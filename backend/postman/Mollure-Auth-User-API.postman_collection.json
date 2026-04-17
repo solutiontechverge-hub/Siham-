@@ -1,0 +1,821 @@
+{
+  "info": {
+    "_postman_id": "4d3d9d8d-2a7d-4e96-9a6a-41e29f8d12f1",
+    "name": "Mollure Auth User API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000"
+    },
+    {
+      "key": "authToken",
+      "value": ""
+    },
+    {
+      "key": "email",
+      "value": "umerarshad111571@gmail.com"
+    },
+    {
+      "key": "password",
+      "value": "Password123!"
+    },
+    {
+      "key": "userId",
+      "value": "1"
+    },
+    {
+      "key": "verifyToken",
+      "value": ""
+    },
+    {
+      "key": "otp",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "health"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "POST Select User Type",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_type\": \"individual\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/select-user-type",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "select-user-type"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST Register Individual",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "user_type",
+                  "value": "individual",
+                  "type": "text"
+                },
+                {
+                  "key": "email",
+                  "value": "{{email}}",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "{{password}}",
+                  "type": "text"
+                },
+                {
+                  "key": "confirm_password",
+                  "value": "{{password}}",
+                  "type": "text"
+                },
+                {
+                  "key": "first_name",
+                  "value": "Umer",
+                  "type": "text"
+                },
+                {
+                  "key": "last_name",
+                  "value": "Arshad",
+                  "type": "text"
+                },
+                {
+                  "key": "display_name",
+                  "value": "Umer",
+                  "type": "text"
+                },
+                {
+                  "key": "date_of_birth",
+                  "value": "1998-01-15",
+                  "type": "text"
+                },
+                {
+                  "key": "gender",
+                  "value": "male",
+                  "type": "text"
+                },
+                {
+                  "key": "country_code",
+                  "value": "+92",
+                  "type": "text"
+                },
+                {
+                  "key": "phone",
+                  "value": "3001234567",
+                  "type": "text"
+                },
+                {
+                  "key": "profile_picture",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST Register Company",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "user_type",
+                  "value": "company",
+                  "type": "text"
+                },
+                {
+                  "key": "email",
+                  "value": "company@example.com",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "Password123!",
+                  "type": "text"
+                },
+                {
+                  "key": "confirm_password",
+                  "value": "Password123!",
+                  "type": "text"
+                },
+                {
+                  "key": "legal_name",
+                  "value": "Mollure Pvt Ltd",
+                  "type": "text"
+                },
+                {
+                  "key": "ccc_number",
+                  "value": "REG-2026-001",
+                  "type": "text"
+                },
+                {
+                  "key": "vat_number",
+                  "value": "VAT-2026-7788",
+                  "type": "text"
+                },
+                {
+                  "key": "street",
+                  "value": "Main Boulevard",
+                  "type": "text"
+                },
+                {
+                  "key": "street_number",
+                  "value": "12-B",
+                  "type": "text"
+                },
+                {
+                  "key": "postal_code",
+                  "value": "54000",
+                  "type": "text"
+                },
+                {
+                  "key": "province",
+                  "value": "Punjab",
+                  "type": "text"
+                },
+                {
+                  "key": "municipality",
+                  "value": "Lahore",
+                  "type": "text"
+                },
+                {
+                  "key": "contact_first_name",
+                  "value": "Umer",
+                  "type": "text"
+                },
+                {
+                  "key": "contact_last_name",
+                  "value": "Arshad",
+                  "type": "text"
+                },
+                {
+                  "key": "logo",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST Register Professional",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "user_type",
+                  "value": "professional",
+                  "type": "text"
+                },
+                {
+                  "key": "email",
+                  "value": "professional@example.com",
+                  "type": "text"
+                },
+                {
+                  "key": "password",
+                  "value": "Password123!",
+                  "type": "text"
+                },
+                {
+                  "key": "confirm_password",
+                  "value": "Password123!",
+                  "type": "text"
+                },
+                {
+                  "key": "legal_name",
+                  "value": "Glow Studio",
+                  "type": "text"
+                },
+                {
+                  "key": "ccc_number",
+                  "value": "PRO-2026-004",
+                  "type": "text"
+                },
+                {
+                  "key": "vat_number",
+                  "value": "VAT-PRO-4411",
+                  "type": "text"
+                },
+                {
+                  "key": "street",
+                  "value": "Mall Road",
+                  "type": "text"
+                },
+                {
+                  "key": "street_number",
+                  "value": "22-A",
+                  "type": "text"
+                },
+                {
+                  "key": "postal_code",
+                  "value": "54000",
+                  "type": "text"
+                },
+                {
+                  "key": "province",
+                  "value": "Punjab",
+                  "type": "text"
+                },
+                {
+                  "key": "municipality",
+                  "value": "Lahore",
+                  "type": "text"
+                },
+                {
+                  "key": "business_type",
+                  "value": "salonOwner",
+                  "type": "text"
+                },
+                {
+                  "key": "website",
+                  "value": "https://glowstudio.com",
+                  "type": "text"
+                },
+                {
+                  "key": "instagram",
+                  "value": "https://instagram.com/glowstudio",
+                  "type": "text"
+                },
+                {
+                  "key": "other_link",
+                  "value": "https://linktr.ee/glowstudio",
+                  "type": "text"
+                },
+                {
+                  "key": "contact_first_name",
+                  "value": "Ali",
+                  "type": "text"
+                },
+                {
+                  "key": "contact_last_name",
+                  "value": "Raza",
+                  "type": "text"
+                },
+                {
+                  "key": "profile_picture",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST Verify Email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{verifyToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/verify-email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "verify-email"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET Verify Email",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/verify-email?token={{verifyToken}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "verify-email"
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "{{verifyToken}}"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const jsonData = pm.response.json();",
+                  "if (jsonData.success && jsonData.data && jsonData.data.access_token) {",
+                  "  pm.collectionVariables.set('authToken', jsonData.data.access_token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST Forgot Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/forgot-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "forgot-password"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST Verify OTP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const jsonData = pm.response.json();",
+                  "if (jsonData.success && jsonData.data && jsonData.data.user_id) {",
+                  "  pm.collectionVariables.set('userId', String(jsonData.data.user_id));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"otp\": \"{{otp}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/verify-otp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "verify-otp"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": {{userId}},\n  \"new_password\": \"NewPassword123!\",\n  \"confirm_password\": \"NewPassword123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/reset-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "reset-password"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "User",
+      "item": [
+        {
+          "name": "GET Profile",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/user/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "profile"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT Profile Individual",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "first_name",
+                  "value": "Updated Umer",
+                  "type": "text"
+                },
+                {
+                  "key": "last_name",
+                  "value": "Updated Arshad",
+                  "type": "text"
+                },
+                {
+                  "key": "display_name",
+                  "value": "Umer A.",
+                  "type": "text"
+                },
+                {
+                  "key": "gender",
+                  "value": "male",
+                  "type": "text"
+                },
+                {
+                  "key": "country_code",
+                  "value": "+92",
+                  "type": "text"
+                },
+                {
+                  "key": "phone",
+                  "value": "3007654321",
+                  "type": "text"
+                },
+                {
+                  "key": "profile_picture",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/user/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "profile"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT Profile Company",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "legal_name",
+                  "value": "Updated Mollure Pvt Ltd",
+                  "type": "text"
+                },
+                {
+                  "key": "ccc_number",
+                  "value": "REG-2026-999",
+                  "type": "text"
+                },
+                {
+                  "key": "vat_number",
+                  "value": "VAT-UPDATED-9000",
+                  "type": "text"
+                },
+                {
+                  "key": "province",
+                  "value": "Sindh",
+                  "type": "text"
+                },
+                {
+                  "key": "municipality",
+                  "value": "Karachi",
+                  "type": "text"
+                },
+                {
+                  "key": "contact_first_name",
+                  "value": "Ali",
+                  "type": "text"
+                },
+                {
+                  "key": "contact_last_name",
+                  "value": "Raza",
+                  "type": "text"
+                },
+                {
+                  "key": "logo",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/user/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "profile"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT Profile Professional",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "legal_name",
+                  "value": "Updated Glow Studio",
+                  "type": "text"
+                },
+                {
+                  "key": "business_type",
+                  "value": "freelancer",
+                  "type": "text"
+                },
+                {
+                  "key": "website",
+                  "value": "https://updated-glowstudio.com",
+                  "type": "text"
+                },
+                {
+                  "key": "instagram",
+                  "value": "https://instagram.com/updatedglowstudio",
+                  "type": "text"
+                },
+                {
+                  "key": "other_link",
+                  "value": "https://linktr.ee/updatedglowstudio",
+                  "type": "text"
+                },
+                {
+                  "key": "contact_first_name",
+                  "value": "Updated Ali",
+                  "type": "text"
+                },
+                {
+                  "key": "contact_last_name",
+                  "value": "Updated Raza",
+                  "type": "text"
+                },
+                {
+                  "key": "profile_picture",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/user/profile",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "user",
+                "profile"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
