@@ -47,8 +47,8 @@ export { default as ProfessionalFixedLocationSetup } from "./ProfessionalFixedLo
 export { default as MollureCardHeader } from "./MollureCardHeader";
 export { default as ProfessionalFixedLocationAnalytics } from "./ProfessionalFixedLocationAnalytics";
 export { default as ProfessionalFixedLocationCalendar } from "./ProfessionalFixedLocationCalendar";
-export type { MarketingNavItem } from "./MarketingSiteHeader";
-export type { MarketingFooterColumn } from "./MarketingSiteFooter";
+// export type { MarketingNavItem } from "./MarketingSiteHeader";
+// export type { MarketingFooterColumn } from "./MarketingSiteFooter";
 export { default as ProfessionalDesiredLocationSetup } from "./ProfessionalDesiredLocationSetup";
 export type { MarketingNavItem, MollureMarketingHeaderProps } from "./MollureMarketingHeader";
 export type { MarketingSiteHeaderProps } from "./MarketingSiteHeader";
