@@ -48,3 +48,4 @@ export { default as ProfessionalDesiredLocationSetup } from "./ProfessionalDesir
 export type { MarketingNavItem, MollureMarketingHeaderProps } from "./MollureMarketingHeader";
 export type { MarketingSiteHeaderProps } from "./MarketingSiteHeader";
 export type { MarketingFooterColumn, MarketingFooterItem } from "./MarketingSiteFooter";
+export { default as PasswordStrengthBar } from "./PasswordStrengthBar";

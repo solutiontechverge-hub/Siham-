@@ -19,7 +19,10 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import { alpha } from "@mui/material/styles";
+import { PasswordStrengthBar } from "../../../../components/common";
 import { getApiErrorMessage } from "../../../../lib/api-error";
+import { getPasswordStrength } from "../../../../lib/passwordStrength";
 import { useRegisterMutation } from "../../../../store/services/authApi";
 import {
   MarketingSiteHeader,
@@ -68,6 +71,7 @@ export default function IndividualSignupPage() {
   const [form, setForm] = React.useState<FormState>(initialForm);
   const { showSnackbar } = useSnackbar();
   const [register, { isLoading }] = useRegisterMutation();
+  const passwordStrength = getPasswordStrength(form.password);
 
   const cardBorder = m.cardBorder ?? alpha(m.navy, 0.12);
 
@@ -98,6 +102,11 @@ export default function IndividualSignupPage() {
 
     if (form.password !== form.confirmPassword) {
       showSnackbar({ severity: "error", message: "Password and repeat password must match." });
+      return;
+    }
+
+    if (!passwordStrength.isStrong) {
+      setErrorMessage("Please choose a strong password to continue.");
       return;
     }
 
@@ -404,6 +413,7 @@ export default function IndividualSignupPage() {
                             autoComplete="email"
                           />
                         </Grid>
+<<<<<<< HEAD
                         <Grid item xs={12} sm={6}>
                           <MollureAuthLabeledPasswordField
                             fieldLabel="Password"
@@ -413,6 +423,23 @@ export default function IndividualSignupPage() {
                             required
                             autoComplete="new-password"
                           />
+=======
+                        <Grid item xs={12} md={3}>
+                          <Box>
+                            <TextField
+                              fullWidth
+                              type="password"
+                              label="Password"
+                              name="password"
+                              value={form.password}
+                              onChange={handleChange}
+                              required
+                              autoComplete="new-password"
+                              InputLabelProps={{ shrink: true }}
+                            />
+                            <PasswordStrengthBar password={form.password} />
+                          </Box>
+>>>>>>> 2f5c98f675daf40dbc6dee9215ffa560bb354ad3
                         </Grid>
                         <Grid item xs={12} sm={6}>
                           <MollureAuthLabeledPasswordField
