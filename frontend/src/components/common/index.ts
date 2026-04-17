@@ -22,5 +22,8 @@ export { default as ProfessionalFeatures } from "./ProfessionalFeatures";
 export { default as ClientsLanding } from "./ClientsLanding";
 export { default as AuthAwareHeader } from "./AuthAwareHeader";
 export { default as ProfessionalFixedLocationSetup } from "./ProfessionalFixedLocationSetup";
+export { default as MollureCardHeader } from "./MollureCardHeader";
+export { default as ProfessionalFixedLocationAnalytics } from "./ProfessionalFixedLocationAnalytics";
+export { default as ProfessionalFixedLocationCalendar } from "./ProfessionalFixedLocationCalendar";
 export type { MarketingNavItem } from "./MarketingSiteHeader";
 export type { MarketingFooterColumn } from "./MarketingSiteFooter";
