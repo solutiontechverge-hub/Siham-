@@ -7,6 +7,17 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const sqlDir = path.resolve(__dirname, "../../sql");
 
+const getMigrationPriority = (filename) => {
+  const normalized = filename.toLowerCase();
+
+  // Base schema/bootstrap migrations must run before incremental ALTER scripts.
+  if (normalized.includes("bootstrap") || normalized.includes("initial")) {
+    return 0;
+  }
+
+  return 1;
+};
+
 const ensureMigrationsTable = async (client) => {
   await client.query(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -23,7 +34,14 @@ const getSqlFiles = async () => {
   return entries
     .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".sql"))
     .map((entry) => entry.name)
-    .sort((a, b) => a.localeCompare(b));
+    .sort((a, b) => {
+      const priorityDiff = getMigrationPriority(a) - getMigrationPriority(b);
+      if (priorityDiff !== 0) {
+        return priorityDiff;
+      }
+
+      return a.localeCompare(b);
+    });
 };
 
 export const runMigrations = async () => {
@@ -65,3 +83,5 @@ export const runMigrations = async () => {
     client.release();
   }
 };
+
+ 
