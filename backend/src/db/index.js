@@ -17,8 +17,14 @@ if (!connectionString) {
   throw new Error("DB_URL is required.");
 }
 
+const shouldUseSsl =
+  process.env.DB_SSL === "true" ||
+  process.env.PGSSLMODE === "require" ||
+  connectionString.includes("supabase.co");
+
 export const pool = new Pool({
   connectionString,
+  ssl: shouldUseSsl ? { rejectUnauthorized: false } : undefined,
 });
 
 export const query = (text, params) => pool.query(text, params);
