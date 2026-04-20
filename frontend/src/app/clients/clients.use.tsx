@@ -9,9 +9,9 @@ import FmdGoodOutlinedIcon from "@mui/icons-material/FmdGoodOutlined";
 import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
 import Box from "@mui/material/Box";
 import TextField from "@mui/material/TextField";
-import Typography from "@mui/material/Typography";
 import { useTheme } from "@mui/material/styles";
 import type { ClientFeatureIconKey } from "./clients.data";
+import { BodyText, CardTitle } from "../../components/ui/typography";
 
 export function useClientsPageTokens() {
   return useTheme().palette.mollure;
@@ -57,16 +57,15 @@ export function LogoMark() {
         <span />
         <span />
       </Box>
-      <Typography
+      <CardTitle
         sx={{
           fontSize: 22,
-          fontWeight: 700,
           color: tokens.logoText,
           letterSpacing: "-0.02em",
         }}
       >
         Mollure
-      </Typography>
+      </CardTitle>
     </Box>
   );
 }
@@ -82,18 +81,17 @@ export function FilterField({
 
   return (
     <Box sx={{ minWidth: 0 }}>
-      <Typography
+      <BodyText
         sx={{
           mb: 0.75,
           fontSize: 11,
-          fontWeight: 700,
           color: tokens.slate,
           textTransform: "uppercase",
           letterSpacing: "0.08em",
         }}
       >
         {label}
-      </Typography>
+      </BodyText>
       <TextField
         fullWidth
         placeholder={placeholder}
