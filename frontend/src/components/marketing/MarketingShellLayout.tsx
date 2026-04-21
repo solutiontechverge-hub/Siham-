@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Box } from "@mui/material";
+import type { SxProps, Theme } from "@mui/material/styles";
 import MarketingSiteFooter from "../common/MarketingSiteFooter";
 import MollureMarketingHeader from "../common/MollureMarketingHeader";
 import {
@@ -17,9 +18,11 @@ type MarketingShellLayoutProps = {
   audience: MarketingAudience;
   children: React.ReactNode;
   /** Override default shell background (e.g. how-it-works uses its own inner bg) */
-  contentSx?: object;
+  contentSx?: SxProps<Theme>;
   /** Hide the marketing footer for special pages (e.g. contact-us). */
   hideFooter?: boolean;
+  /** Pass additional styles to the marketing footer wrapper. */
+  footerSx?: SxProps<Theme>;
 };
 
 export function MarketingShellLayout({
@@ -27,7 +30,13 @@ export function MarketingShellLayout({
   children,
   contentSx,
   hideFooter,
+  footerSx,
 }: MarketingShellLayoutProps) {
+  const baseShellSx: SxProps<Theme> = { bgcolor: "background.default", minHeight: "100vh" };
+  const shellSx: SxProps<Theme> = contentSx
+    ? [baseShellSx, ...(Array.isArray(contentSx) ? contentSx : [contentSx])]
+    : baseShellSx;
+
   const footerData = audience === "clients" ? marketingShellFooter : professionalsMarketingFooter;
   const footer = (
     <MarketingSiteFooter
@@ -36,13 +45,14 @@ export function MarketingShellLayout({
         items: [...col.items],
       }))}
       copyright={footerData.copyright}
+      sx={footerSx}
     />
   );
 
   if (audience === "clients") {
     const h = clientsShellHeader;
     return (
-      <Box sx={{ bgcolor: "background.default", minHeight: "100vh", ...(contentSx ?? {}) }}>
+      <Box sx={shellSx}>
         <MollureMarketingHeader
           navItems={[...h.navItems]}
           localeLabel={h.localeLabel}
@@ -59,7 +69,7 @@ export function MarketingShellLayout({
 
   const h = professionalsMarketingHeader;
   return (
-    <Box sx={{ bgcolor: "background.default", minHeight: "100vh", ...(contentSx ?? {}) }}>
+    <Box sx={shellSx}>
       <MollureMarketingHeader
         navItems={[...h.navItems]}
         localeLabel={h.localeLabel}
