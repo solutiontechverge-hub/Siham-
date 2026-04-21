@@ -1,13 +1,17 @@
 "use client";
 
 import * as React from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
-import { Box, Button, InputAdornment, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from "@mui/material";
+import { Box, Button, ButtonBase, InputAdornment, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { jsPDF } from "jspdf";
 import { BodyText } from "../ui/typography";
 import MollureCardHeader from "./MollureCardHeader";
 import MollureFormField from "./MollureFormField";
+import ProfessionalFixedLocationSalesVolumeAnalytics from "./ProfessionalFixedLocationSalesVolumeAnalytics";
+import ProfessionalFixedLocationPerformanceAnalytics from "./ProfessionalFixedLocationPerformanceAnalytics";
+import ProfessionalFixedLocationRatingReviewAnalytics from "./ProfessionalFixedLocationRatingReviewAnalytics";
 import type {
   AttendanceNoShowRow,
   BookingByServiceCategoryRow,
@@ -55,52 +59,55 @@ function AnalyticsSubTabs({
           bottom: 0,
           height: 1,
           bgcolor: alpha(m.navy, 0.08),
+          pointerEvents: "none",
         },
       }}
     >
       {tabs.map((t) => {
         const isActive = t === active;
         return (
-          <BodyText
+          <ButtonBase
             key={t}
-            component="button"
-            type="button"
             onClick={() => onChange(t)}
             sx={{
-              appearance: "none",
-              border: 0,
-              bgcolor: "transparent",
-              cursor: "pointer",
-              whiteSpace: "nowrap",
               flex: "1 1 0",
-              textAlign: "center",
-              px: 1.25,
-              pt: 1.05,
-              pb: 1.1,
-              fontSize: 13,
-              fontWeight: isActive ? 800 : 600,
-              letterSpacing: "-0.01em",
-              color: isActive ? m.teal : alpha(m.navy, 0.55),
+              minWidth: 0,
+              width: 0,
+              display: "block",
               position: "relative",
-              "&:after": {
-                content: '""',
-                position: "absolute",
-                left: "12%",
-                right: "12%",
-                bottom: -0.5,
-                height: 2,
-                bgcolor: isActive ? m.teal : "transparent",
-                borderRadius: 999,
-              },
-              "&:focus-visible": {
-                outline: "none",
-                boxShadow: `0 0 0 3px ${alpha(m.teal, 0.25)}`,
-                borderRadius: "8px",
-              },
+              zIndex: 1,
             }}
           >
-            {t}
-          </BodyText>
+            <BodyText
+              component="span"
+              sx={{
+                whiteSpace: "nowrap",
+                width: "100%",
+                textAlign: "center",
+                px: 1.25,
+                pt: 1.05,
+                pb: 1.1,
+                fontSize: 13,
+                fontWeight: isActive ? 800 : 600,
+                letterSpacing: "-0.01em",
+                color: isActive ? m.teal : alpha(m.navy, 0.55),
+                position: "relative",
+                display: "block",
+                "&:after": {
+                  content: '""',
+                  position: "absolute",
+                  left: "12%",
+                  right: "12%",
+                  bottom: -0.5,
+                  height: 2,
+                  bgcolor: isActive ? m.teal : "transparent",
+                  borderRadius: 999,
+                },
+              }}
+            >
+              {t}
+            </BodyText>
+          </ButtonBase>
         );
       })}
     </Stack>
@@ -567,8 +574,24 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
   const [fromDate, setFromDate] = React.useState("");
   const [toDate, setToDate] = React.useState("");
 
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  React.useEffect(() => {
+    const nextTab = searchParams.get("tab");
+    if (!nextTab) return;
+    if ((data.subTabs as readonly string[]).includes(nextTab)) {
+      setActiveSubTab(nextTab as ProfessionalAnalyticsSubTab);
+    }
+  }, [data.subTabs, searchParams]);
+
   const todayIso = React.useMemo(() => new Date().toISOString().slice(0, 10), []);
 
+  const isBookingAndOperational = activeSubTab === "Booking and Operational Analytics";
+  const isSalesVolume = activeSubTab === "Sales Volume Analytics";
+  const isPerformance = activeSubTab === "Performance Analytics";
+  const isRatingReview = activeSubTab === "Rating and Review Analytics";
   const section11 = data.sections.bookingOriginAndType;
   const section12 = data.sections.bookingStatusSummary;
   const section13 = data.sections.attendanceNoShowAnalytics;
@@ -577,6 +600,14 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
   const section16 = data.sections.bookingByServiceCategory;
 
   const exportPdf = React.useCallback(() => {
+    if (!isBookingAndOperational) {
+      showSnackbar({
+        severity: "info",
+        message: `Export for "${activeSubTab}" is not implemented yet.`,
+      });
+      return;
+    }
+
     const hasFrom = Boolean(fromDate);
     const hasTo = Boolean(toDate);
 
@@ -918,6 +949,7 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
     data.header.subtitle,
     data.header.title,
     fromDate,
+    isBookingAndOperational,
     section11.rows,
     section11.title,
     section12.rows,
@@ -1052,191 +1084,219 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
         </Paper>
       </Box>
 
-      <AnalyticsSubTabs tabs={data.subTabs} active={activeSubTab} onChange={setActiveSubTab} />
+      <AnalyticsSubTabs
+        tabs={data.subTabs}
+        active={activeSubTab}
+        onChange={(next) => {
+          setActiveSubTab(next);
+          const params = new URLSearchParams(searchParams.toString());
+          params.set("tab", next);
+          router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+        }}
+      />
 
-      {/* Content (only first section implemented to match screenshot) */}
-      <Box sx={{ px: 2.25, py: 1.6 }}>
-        <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}>
-          {section11.title}
-        </BodyText>
-      </Box>
+      {isBookingAndOperational ? (
+        <>
+          <Box sx={{ px: 2.25, py: 1.6 }}>
+            <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}>
+              {section11.title}
+            </BodyText>
+          </Box>
 
-      <Box sx={{ px: 2.25, pb: 2.25 }}>
-        <BookingOriginAndTypeTable rows={section11.rows} />
+          <Box sx={{ px: 2.25, pb: 2.25 }}>
+            <BookingOriginAndTypeTable rows={section11.rows} />
 
-        <BodyText
-          component="button"
-          type="button"
-          onClick={() => {
-            // placeholder for explanation dialog/drawer
-            void 0;
-          }}
-          sx={{
-            mt: 1.75,
-            p: 0,
-            border: 0,
-            bgcolor: "transparent",
-            cursor: "pointer",
-            color: m.teal,
-            fontSize: 12.5,
-            fontWeight: 800,
-            textDecoration: "underline",
-            "&:hover": { color: m.tealDark },
-          }}
-        >
-          {section11.explanationLabel}
-        </BodyText>
-      </Box>
+            <BodyText
+              component="button"
+              type="button"
+              onClick={() => {
+                // placeholder for explanation dialog/drawer
+                void 0;
+              }}
+              sx={{
+                mt: 1.75,
+                p: 0,
+                border: 0,
+                bgcolor: "transparent",
+                cursor: "pointer",
+                color: m.teal,
+                fontSize: 12.5,
+                fontWeight: 800,
+                textDecoration: "underline",
+                "&:hover": { color: m.tealDark },
+              }}
+            >
+              {section11.explanationLabel}
+            </BodyText>
+          </Box>
 
-      <Box sx={{ px: 2.25, pb: 2.25 }}>
-        <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88), mb: 1.6 }}>
-          {section12.title}
-        </BodyText>
+          <Box sx={{ px: 2.25, pb: 2.25 }}>
+            <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88), mb: 1.6 }}>
+              {section12.title}
+            </BodyText>
 
-        <BookingStatusSummaryTable rows={section12.rows} />
+            <BookingStatusSummaryTable rows={section12.rows} />
 
-        <BodyText
-          component="button"
-          type="button"
-          onClick={() => {
-            void 0;
-          }}
-          sx={{
-            mt: 1.75,
-            p: 0,
-            border: 0,
-            bgcolor: "transparent",
-            cursor: "pointer",
-            color: m.teal,
-            fontSize: 12.5,
-            fontWeight: 800,
-            textDecoration: "underline",
-            "&:hover": { color: m.tealDark },
-          }}
-        >
-          {section12.explanationLabel}
-        </BodyText>
-      </Box>
+            <BodyText
+              component="button"
+              type="button"
+              onClick={() => {
+                void 0;
+              }}
+              sx={{
+                mt: 1.75,
+                p: 0,
+                border: 0,
+                bgcolor: "transparent",
+                cursor: "pointer",
+                color: m.teal,
+                fontSize: 12.5,
+                fontWeight: 800,
+                textDecoration: "underline",
+                "&:hover": { color: m.tealDark },
+              }}
+            >
+              {section12.explanationLabel}
+            </BodyText>
+          </Box>
 
-      <Box sx={{ px: 2.25, pb: 2.25 }}>
-        <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88), mb: 1.6 }}>
-          {section13.title}
-        </BodyText>
+          <Box sx={{ px: 2.25, pb: 2.25 }}>
+            <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88), mb: 1.6 }}>
+              {section13.title}
+            </BodyText>
 
-        <AttendanceNoShowAnalyticsTable rows={section13.rows} />
+            <AttendanceNoShowAnalyticsTable rows={section13.rows} />
 
-        <BodyText
-          component="button"
-          type="button"
-          onClick={() => {
-            void 0;
-          }}
-          sx={{
-            mt: 1.75,
-            p: 0,
-            border: 0,
-            bgcolor: "transparent",
-            cursor: "pointer",
-            color: m.teal,
-            fontSize: 12.5,
-            fontWeight: 800,
-            textDecoration: "underline",
-            "&:hover": { color: m.tealDark },
-          }}
-        >
-          {section13.explanationLabel}
-        </BodyText>
-      </Box>
+            <BodyText
+              component="button"
+              type="button"
+              onClick={() => {
+                void 0;
+              }}
+              sx={{
+                mt: 1.75,
+                p: 0,
+                border: 0,
+                bgcolor: "transparent",
+                cursor: "pointer",
+                color: m.teal,
+                fontSize: 12.5,
+                fontWeight: 800,
+                textDecoration: "underline",
+                "&:hover": { color: m.tealDark },
+              }}
+            >
+              {section13.explanationLabel}
+            </BodyText>
+          </Box>
 
-      <Box sx={{ px: 2.25, pb: 2.25 }}>
-        <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88), mb: 1.6 }}>
-          {section14.title}
-        </BodyText>
+          <Box sx={{ px: 2.25, pb: 2.25 }}>
+            <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88), mb: 1.6 }}>
+              {section14.title}
+            </BodyText>
 
-        <ReschedulingSummaryTable rows={section14.rows} />
+            <ReschedulingSummaryTable rows={section14.rows} />
 
-        <BodyText
-          component="button"
-          type="button"
-          onClick={() => {
-            void 0;
-          }}
-          sx={{
-            mt: 1.75,
-            p: 0,
-            border: 0,
-            bgcolor: "transparent",
-            cursor: "pointer",
-            color: m.teal,
-            fontSize: 12.5,
-            fontWeight: 800,
-            textDecoration: "underline",
-            "&:hover": { color: m.tealDark },
-          }}
-        >
-          {section14.explanationLabel}
-        </BodyText>
-      </Box>
+            <BodyText
+              component="button"
+              type="button"
+              onClick={() => {
+                void 0;
+              }}
+              sx={{
+                mt: 1.75,
+                p: 0,
+                border: 0,
+                bgcolor: "transparent",
+                cursor: "pointer",
+                color: m.teal,
+                fontSize: 12.5,
+                fontWeight: 800,
+                textDecoration: "underline",
+                "&:hover": { color: m.tealDark },
+              }}
+            >
+              {section14.explanationLabel}
+            </BodyText>
+          </Box>
 
-      <Box sx={{ px: 2.25, pb: 2.25 }}>
-        <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88), mb: 1.6 }}>
-          {section15.title}
-        </BodyText>
+          <Box sx={{ px: 2.25, pb: 2.25 }}>
+            <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88), mb: 1.6 }}>
+              {section15.title}
+            </BodyText>
 
-        <BookingByClientTypeTable rows={section15.rows} />
+            <BookingByClientTypeTable rows={section15.rows} />
 
-        <BodyText
-          component="button"
-          type="button"
-          onClick={() => {
-            void 0;
-          }}
-          sx={{
-            mt: 1.75,
-            p: 0,
-            border: 0,
-            bgcolor: "transparent",
-            cursor: "pointer",
-            color: m.teal,
-            fontSize: 12.5,
-            fontWeight: 800,
-            textDecoration: "underline",
-            "&:hover": { color: m.tealDark },
-          }}
-        >
-          {section15.explanationLabel}
-        </BodyText>
-      </Box>
+            <BodyText
+              component="button"
+              type="button"
+              onClick={() => {
+                void 0;
+              }}
+              sx={{
+                mt: 1.75,
+                p: 0,
+                border: 0,
+                bgcolor: "transparent",
+                cursor: "pointer",
+                color: m.teal,
+                fontSize: 12.5,
+                fontWeight: 800,
+                textDecoration: "underline",
+                "&:hover": { color: m.tealDark },
+              }}
+            >
+              {section15.explanationLabel}
+            </BodyText>
+          </Box>
 
-      <Box sx={{ px: 2.25, pb: 2.25 }}>
-        <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88), mb: 1.6 }}>
-          {section16.title}
-        </BodyText>
+          <Box sx={{ px: 2.25, pb: 2.25 }}>
+            <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88), mb: 1.6 }}>
+              {section16.title}
+            </BodyText>
 
-        <BookingByServiceCategoryTable rows={section16.rows} />
+            <BookingByServiceCategoryTable rows={section16.rows} />
 
-        <BodyText
-          component="button"
-          type="button"
-          onClick={() => {
-            void 0;
-          }}
-          sx={{
-            mt: 1.75,
-            p: 0,
-            border: 0,
-            bgcolor: "transparent",
-            cursor: "pointer",
-            color: m.teal,
-            fontSize: 12.5,
-            fontWeight: 800,
-            textDecoration: "underline",
-            "&:hover": { color: m.tealDark },
-          }}
-        >
-          {section16.explanationLabel}
-        </BodyText>
-      </Box>
+            <BodyText
+              component="button"
+              type="button"
+              onClick={() => {
+                void 0;
+              }}
+              sx={{
+                mt: 1.75,
+                p: 0,
+                border: 0,
+                bgcolor: "transparent",
+                cursor: "pointer",
+                color: m.teal,
+                fontSize: 12.5,
+                fontWeight: 800,
+                textDecoration: "underline",
+                "&:hover": { color: m.tealDark },
+              }}
+            >
+              {section16.explanationLabel}
+            </BodyText>
+          </Box>
+        </>
+      ) : isSalesVolume ? (
+        <ProfessionalFixedLocationSalesVolumeAnalytics data={data.salesVolume} />
+      ) : isPerformance ? (
+        <ProfessionalFixedLocationPerformanceAnalytics data={data.performance} />
+      ) : isRatingReview ? (
+        <ProfessionalFixedLocationRatingReviewAnalytics data={data.ratingReview} />
+      ) : (
+        <Box sx={{ px: 2.25, py: 5 }}>
+          <BodyText sx={{ fontSize: 14, fontWeight: 800, color: alpha(m.navy, 0.65), textAlign: "center" }}>
+            No data is wired for{" "}
+            <BodyText component="span" sx={{ fontWeight: 900, color: alpha(m.navy, 0.8) }}>
+              {activeSubTab}
+            </BodyText>{" "}
+            yet.
+          </BodyText>
+        </Box>
+      )}
     </Paper>
   );
 }
