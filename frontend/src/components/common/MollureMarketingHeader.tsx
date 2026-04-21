@@ -6,10 +6,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import LanguageRoundedIcon from "@mui/icons-material/LanguageRounded";
-import { Avatar, Box, Button, Container, Divider, Stack, Typography } from "@mui/material";
+import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneRounded";
+import { Avatar, Box, Button, Container, Divider, IconButton, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { Logo } from "../../../images";
 import { HeaderNavText } from "../ui/typography";
+import ClientProfileMenuPopover from "./ClientProfileMenuPopover";
 
 export type MarketingNavItem = {
   label: string;
@@ -31,6 +33,8 @@ export type MollureMarketingHeaderProps = {
   withDivider?: boolean;
   isAuthed?: boolean;
   userLabel?: string;
+  userName?: string;
+  userAvatarSrc?: string;
   rightSlot?: React.ReactNode;
   /** Outer content width; default `xl` matches wide marketing layouts */
   maxWidth?: "xs" | "sm" | "md" | "lg" | "xl" | false;
@@ -56,6 +60,21 @@ function getInitials(emailOrName?: string) {
   return `${a}${b}`.slice(0, 2);
 }
 
+function toDisplayName(userName?: string, userLabel?: string) {
+  const preferred = (userName ?? "").trim();
+  if (preferred) return preferred;
+  const email = (userLabel ?? "").trim();
+  const local = (email.split("@")[0] ?? "").trim();
+  if (!local) return "User";
+  const parts = local.split(/[._\s-]+/).filter(Boolean);
+  const titled = parts
+    .slice(0, 2)
+    .map((p) => (p ? p[0]!.toUpperCase() + p.slice(1) : ""))
+    .join(" ")
+    .trim();
+  return titled || "User";
+}
+
 /**
  * Marketing strip header: white bar, teal bottom rule, logo + nav + locale / login / secondary pill.
  * Pass `navItems` (and optional `homeHref`, CTAs) for each screen.
@@ -74,6 +93,8 @@ export default function MollureMarketingHeader({
   withDivider,
   isAuthed = false,
   userLabel = "user@example.com",
+  userName,
+  userAvatarSrc,
   rightSlot,
   maxWidth = "xl",
   bottomBorder = true,
@@ -85,6 +106,15 @@ export default function MollureMarketingHeader({
   const isProfessionalsRoute = pathForActive === "/professionals" || pathForActive.startsWith("/professionals/");
   const resolvedLoginLabel = primaryActionLabel ?? loginLabel ?? "login";
   const resolvedLoginHref = primaryActionHref ?? loginHref ?? "/auth/login";
+  const resolvedUserName = toDisplayName(userName, userLabel);
+  const [mounted, setMounted] = React.useState(false);
+  const [profileAnchor, setProfileAnchor] = React.useState<HTMLElement | null>(null);
+  const openProfileMenu = (anchor: HTMLElement) => setProfileAnchor(anchor);
+  const closeProfileMenu = () => setProfileAnchor(null);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const pillBaseSx = {
     borderRadius: 999,
@@ -261,18 +291,59 @@ export default function MollureMarketingHeader({
                 </Button>
 
                 {isAuthed ? (
-                  <Avatar
-                    sx={{
-                      width: { xs: 34, md: 36 },
-                      height: { xs: 34, md: 36 },
-                      bgcolor: alpha(m.navy, 0.08),
-                      color: alpha(m.navy, 0.85),
-                      fontWeight: 800,
-                      fontSize: 13,
-                    }}
-                  >
-                    {getInitials(userLabel)}
-                  </Avatar>
+                  <>
+                    <IconButton
+                      aria-label="Notifications"
+                      sx={{
+                        width: { xs: 34, md: 36 },
+                        height: { xs: 34, md: 36 },
+                        borderRadius: 999,
+                        color: alpha(m.navy, 0.82),
+                      }}
+                    >
+                      <NotificationsNoneRoundedIcon sx={{ fontSize: 22 }} />
+                    </IconButton>
+
+                    <Stack
+                      direction="row"
+                      alignItems="center"
+                      spacing={1}
+                      sx={{ cursor: "pointer", userSelect: "none" }}
+                      role="button"
+                      aria-label="Open profile menu"
+                      onClick={(e) => openProfileMenu(e.currentTarget)}
+                    >
+                      <Avatar
+                        src={userAvatarSrc}
+                        sx={{
+                          width: { xs: 34, md: 36 },
+                          height: { xs: 34, md: 36 },
+                          bgcolor: alpha(m.navy, 0.08),
+                          color: alpha(m.navy, 0.85),
+                          fontWeight: 800,
+                          fontSize: 13,
+                        }}
+                      >
+                        {userAvatarSrc ? null : mounted ? getInitials(userLabel) : "U"}
+                      </Avatar>
+                      <Typography
+                        sx={{
+                          display: { xs: "none", sm: "block" },
+                          fontWeight: 700,
+                          fontSize: 18,
+                          lineHeight: 1.2,
+                          color: alpha(m.navy, 0.78),
+                          whiteSpace: "nowrap",
+                          maxWidth: 240,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        {mounted ? resolvedUserName : ""}
+                      </Typography>
+                      <ExpandMoreRoundedIcon sx={{ fontSize: 22, color: alpha(m.navy, 0.55) }} />
+                    </Stack>
+                  </>
                 ) : (
                   <Button
                     component={Link}
@@ -322,6 +393,17 @@ export default function MollureMarketingHeader({
         </Container>
       </Box>
       {withDivider ? <Divider /> : null}
+
+      {isAuthed ? (
+        <ClientProfileMenuPopover
+          anchorEl={profileAnchor}
+          open={Boolean(profileAnchor)}
+          onClose={closeProfileMenu}
+          name={resolvedUserName}
+          email={userLabel}
+          avatarSrc={userAvatarSrc}
+        />
+      ) : null}
     </Box>
   );
 }

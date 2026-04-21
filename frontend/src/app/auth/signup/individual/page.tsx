@@ -128,6 +128,26 @@ export default function IndividualSignupPage() {
         phone: form.phone.trim() || undefined,
       }).unwrap();
 
+      // Persist client details for pre-filling the client profile page.
+      try {
+        window.localStorage.setItem(
+          "mollure:client_profile",
+          JSON.stringify({
+            first_name: form.firstName.trim(),
+            last_name: form.lastName.trim(),
+            display_name: form.displayName.trim() || undefined,
+            date_of_birth: form.birthDate || undefined,
+            gender: form.gender || undefined,
+            country_code: form.countryCode.trim() || undefined,
+            phone: form.phone.trim() || undefined,
+            email: form.email.trim().toLowerCase(),
+            avatar_url: null,
+          }),
+        );
+      } catch {
+        // ignore storage failures
+      }
+
       showSnackbar({
         severity: "success",
         message: result.message || "Account created successfully. Please check your email.",

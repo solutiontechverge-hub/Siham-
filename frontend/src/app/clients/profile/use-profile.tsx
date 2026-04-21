@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useTheme } from "@mui/material/styles";
 import { profilePageData } from "./data-profile";
+import { getPersistedAuthSession } from "../../../lib/auth-storage";
 
 export function useProfileTokens() {
   return useTheme().palette.mollure;
@@ -34,6 +35,38 @@ function computedDisplayName(form: ProfileFormState): string {
   }
 }
 
+type PersistedClientProfile = {
+  first_name?: string;
+  last_name?: string;
+  display_name?: string;
+  date_of_birth?: string;
+  gender?: string;
+  country_code?: string;
+  phone?: string;
+  email?: string;
+  avatar_url?: string | null;
+};
+
+function readPersistedClientProfile(): PersistedClientProfile | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem("mollure:client_profile");
+    if (!raw) return null;
+    const data = JSON.parse(raw) as PersistedClientProfile;
+    return data && typeof data === "object" ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+function writePersistedClientProfile(next: PersistedClientProfile) {
+  try {
+    window.localStorage.setItem("mollure:client_profile", JSON.stringify(next));
+  } catch {
+    // ignore storage failures
+  }
+}
+
 export function useClientProfilePage() {
   const tokens = useProfileTokens();
   const [isSaving, setIsSaving] = React.useState(false);
@@ -53,22 +86,21 @@ export function useClientProfilePage() {
     return initial;
   });
 
-  // Preview-only state. Replace with backend GET/PATCH when ready.
-  const [profile, setProfile] = React.useState({
-    first_name: "Sara",
-    last_name: "Johnson",
-    display_name: "Sara",
-    date_of_birth: "1998-06-12",
-    gender: "female",
-    country_code: "+44",
-    phone: "+442xxxxxxxxxxx",
-    email: "You@gmail.com",
+  // Start with stable empty values to avoid SSR/CSR hydration mismatches,
+  // then hydrate from storage after mount.
+  const [profile, setProfile] = React.useState(() => ({
+    first_name: "",
+    last_name: "",
+    display_name: "",
+    date_of_birth: "",
+    gender: "",
+    country_code: "",
+    phone: "",
+    email: "",
     avatar_url: null as string | null,
-  });
+  }));
 
   const [isEditing, setIsEditing] = React.useState(false);
-  const [showPassword, setShowPassword] = React.useState(false);
-  const [showRepeatPassword, setShowRepeatPassword] = React.useState(false);
   const [form, setForm] = React.useState<ProfileFormState>({
     firstName: profile.first_name,
     lastName: profile.last_name,
@@ -89,6 +121,38 @@ export function useClientProfilePage() {
       ? `${profile.first_name ?? ""} ${profile.last_name ?? ""}`.trim() ||
         profilePageData.header.userDisplayNameFallback
       : profilePageData.header.userDisplayNameFallback;
+
+  React.useEffect(() => {
+    const authedEmail = getPersistedAuthSession()?.user?.email?.trim().toLowerCase();
+    const persisted = readPersistedClientProfile();
+    const persistedEmail = persisted?.email?.trim().toLowerCase();
+    const canUsePersisted = Boolean(persisted && persistedEmail && authedEmail && persistedEmail === authedEmail);
+
+    const nextProfile = {
+      first_name: canUsePersisted ? persisted?.first_name ?? "" : "",
+      last_name: canUsePersisted ? persisted?.last_name ?? "" : "",
+      display_name: canUsePersisted ? persisted?.display_name ?? "" : "",
+      date_of_birth: canUsePersisted ? persisted?.date_of_birth ?? "" : "",
+      gender: canUsePersisted ? persisted?.gender ?? "" : "",
+      country_code: canUsePersisted ? persisted?.country_code ?? "" : "",
+      phone: canUsePersisted ? persisted?.phone ?? "" : "",
+      email: authedEmail ?? (canUsePersisted ? persisted?.email ?? "" : ""),
+      avatar_url: (canUsePersisted ? persisted?.avatar_url : null) as string | null,
+    };
+
+    setProfile(nextProfile);
+    // Keep form in sync with profile on first hydrate (do not stomp user edits).
+    setForm((prev) => ({
+      ...prev,
+      firstName: nextProfile.first_name,
+      lastName: nextProfile.last_name,
+      birthDate: nextProfile.date_of_birth,
+      gender: nextProfile.gender,
+      countryCode: nextProfile.country_code,
+      phone: nextProfile.phone,
+      email: nextProfile.email,
+    }));
+  }, []);
 
   const handleChange = (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -115,19 +179,25 @@ export function useClientProfilePage() {
 
     try {
       setIsSaving(true);
-      setProfile((prev) => ({
-        ...prev,
+      const nextProfile = {
+        ...profile,
         first_name: form.firstName.trim(),
         last_name: form.lastName.trim(),
         display_name: computedDisplayName(form),
         date_of_birth: form.birthDate,
         country_code: form.countryCode.trim(),
         phone: form.phone.trim(),
+        email: form.email,
+        avatar_url: profile.avatar_url,
+      };
+
+      setProfile((prev) => ({
+        ...prev,
+        ...nextProfile,
       }));
+      writePersistedClientProfile(nextProfile);
       setSuccessMessage("Profile updated.");
       setIsEditing(false);
-      setShowPassword(false);
-      setShowRepeatPassword(false);
       setForm((prev) => ({ ...prev, password: "", confirmPassword: "" }));
     } catch (_err) {
       setErrorMessage("Could not update profile.");
@@ -135,6 +205,14 @@ export function useClientProfilePage() {
       setIsSaving(false);
     }
   };
+
+  const setAvatarUrl = React.useCallback((nextUrl: string | null) => {
+    setProfile((prev) => {
+      const nextProfile = { ...prev, avatar_url: nextUrl };
+      writePersistedClientProfile(nextProfile);
+      return nextProfile;
+    });
+  }, []);
 
   const fieldsDisabled = !isEditing;
 
@@ -163,16 +241,13 @@ export function useClientProfilePage() {
     tokens,
     pageBg: profilePageData.pageBg,
     profile,
+    setAvatarUrl,
     form,
     isLoading: false,
     loadError: null as unknown,
     isSaving,
     isEditing,
     setIsEditing,
-    showPassword,
-    setShowPassword,
-    showRepeatPassword,
-    setShowRepeatPassword,
     successMessage,
     errorMessage,
     displayName,

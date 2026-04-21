@@ -6,17 +6,17 @@ import { Paper, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../ui/typography";
 
-export type DesiredLocationTopTab = {
+export type ClientTopTab = {
   label: string;
   href: string;
 };
 
-export type DesiredLocationTopTabsProps = {
-  tabs: readonly DesiredLocationTopTab[];
+export type ClientTopTabsProps = {
+  tabs: readonly ClientTopTab[];
   activeLabel: string;
 };
 
-export default function DesiredLocationTopTabs({ tabs, activeLabel }: DesiredLocationTopTabsProps) {
+export default function ClientTopTabs({ tabs, activeLabel }: ClientTopTabsProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
 
@@ -25,14 +25,9 @@ export default function DesiredLocationTopTabs({ tabs, activeLabel }: DesiredLoc
       elevation={0}
       sx={{
         width: "100%",
-        ml: 0,
-        mr: 0,
         borderRadius: "8px",
-        bgcolor: "transparent",
-        backgroundColor: "transparent",
+        bgcolor: "#FFFFFF",
         backgroundImage: "none",
-        opacity: 1,
-        filter: "none",
         border: "none",
         boxShadow: "none",
         px: 0,
@@ -45,9 +40,7 @@ export default function DesiredLocationTopTabs({ tabs, activeLabel }: DesiredLoc
         sx={{
           overflowX: "hidden",
           position: "relative",
-          bgcolor: "transparent",
-          backgroundColor: "transparent",
-          backgroundImage: "none",
+          bgcolor: "#FFFFFF",
           width: "100%",
           justifyContent: "space-between",
           "&::-webkit-scrollbar": { display: "none" },

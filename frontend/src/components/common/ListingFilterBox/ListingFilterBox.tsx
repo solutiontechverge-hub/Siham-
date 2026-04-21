@@ -1,8 +1,6 @@
 "use client";
 
 import * as React from "react";
-import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
-import ArrowDropDownRoundedIcon from "@mui/icons-material/ArrowDropDownRounded";
 import {
   Box,
   Button,
@@ -11,14 +9,14 @@ import {
   MenuItem,
   Paper,
   Stack,
-  Typography,
   type PaperProps,
 } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
+import { alpha, useTheme } from "@mui/material/styles";
 import CalendarPopover, { type CalendarPopoverValue } from "./CalendarPopover";
 import Image from "next/image";
-import { ListingBG, DesiredLocationIcon, FixedLocationIcon } from "../../../../images";
+import { ArrowDown, ListingBG, DesiredLocationIcon, FixedLocationIcon } from "../../../../images";
 import { MollureTextField } from "..";
+import { BodyText } from "../../ui/typography";
 
 function assetUrl(asset: any) {
   if (!asset) return "";
@@ -61,11 +59,37 @@ export default function ListingFilterBox({
   const tokens = useTheme().palette.mollure;
   const [calendarAnchor, setCalendarAnchor] = React.useState<HTMLElement | null>(null);
 
-  const labelSx = {
-    mb: 0.6,
-    fontSize: 14,
-    fontWeight: 500,
-    color: tokens.slate,
+  const lineFieldSx = {
+    "& .MuiOutlinedInput-root": {
+      borderRadius: 0,
+      bgcolor: "transparent",
+      "& fieldset": { border: "none" },
+      "&:hover fieldset": { border: "none" },
+      "&.Mui-focused fieldset": { border: "none" },
+      borderBottom: `1px solid ${alpha(tokens.navy, 0.14)}`,
+      "&:hover": { borderBottomColor: alpha(tokens.navy, 0.22) },
+      "&.Mui-focused": { borderBottom: `2px solid ${tokens.teal}` },
+    },
+    "& .MuiOutlinedInput-input": {
+      px: 0,
+      py: 1.15,
+      fontSize: "0.95rem",
+      fontWeight: 500,
+      color: alpha(tokens.navy, 0.9),
+    },
+    "& input::placeholder": {
+      color: alpha(tokens.navy, 0.55),
+      opacity: 1,
+      fontWeight: 500,
+      fontSize: "1.05rem",
+    },
+    "& .MuiSelect-select": {
+      px: 0,
+      py: 1.15,
+      fontSize: "0.95rem",
+      fontWeight: 500,
+      color: alpha(tokens.navy, 0.9),
+    },
   } as const;
 
   const set = (patch: Partial<ListingFilterValues>) => onChange({ ...values, ...patch });
@@ -99,21 +123,20 @@ export default function ListingFilterBox({
         justifyContent: "space-between",
         textTransform: "none",
         px: 1.5,
-        py: 1.15,
-        borderRadius: 2,
-        bgcolor: "rgba(52, 74, 102, 0.04)",
-        border: `1px solid ${tokens.border}`,
+        py: 1.05,
+        borderRadius: "12px",
+        bgcolor: alpha(tokens.navy, 0.03),
         color: tokens.navy,
         fontWeight: 600,
-        "&:hover": { bgcolor: "rgba(33, 184, 191, 0.08)" },
+        "&:hover": { bgcolor: alpha(tokens.teal, 0.06) },
       }}
       fullWidth
     >
       <Stack direction="row" spacing={1.1} alignItems="center">
         <Image src={icon} alt={label} width={18} height={18} />
-        <Typography sx={{ fontSize: 14, fontWeight: 600, color: tokens.navy }}>
+        <BodyText sx={{ fontSize: 14, fontWeight: 500, color: tokens.navy }}>
           {label}
-        </Typography>
+        </BodyText>
       </Stack>
       <Checkbox
         checked={checked}
@@ -132,13 +155,12 @@ export default function ListingFilterBox({
     <Paper
       elevation={0}
       sx={{
-        borderRadius: 3.5,
+        borderRadius: 2.25,
         position: "relative",
-        bgcolor: tokens.whiteOverlay,
-        backdropFilter: "blur(12px)",
-        border: `1px solid ${tokens.border}`,
-        boxShadow: "0 20px 45px rgba(40, 92, 112, 0.10)",
-        p: { xs: 2.5, md: 3 },
+        bgcolor: tokens.white,
+        border: `2px solid ${alpha(tokens.teal, 0.25)}`,
+        boxShadow: "0 18px 42px rgba(16, 24, 40, 0.08)",
+        p: { xs: 2.25, md: 3 },
         "& > *": { position: "relative" },
         ...sx,
       }}
@@ -146,20 +168,21 @@ export default function ListingFilterBox({
     >
       <Grid container spacing={2.75} alignItems="flex-end">
         <Grid item xs={12} sm={6}>
-          <Typography sx={labelSx}>Select Date and Time</Typography>
           <MollureTextField
-            placeholder="Pick date & time"
+            placeholder="Select Date and Time"
             value={dateTimeDisplay}
             onClick={(e) => setCalendarAnchor(e.currentTarget)}
             InputProps={{
               readOnly: true,
               endAdornment: (
-                <CalendarMonthRoundedIcon sx={{ color: tokens.placeholder, fontSize: 20 }} />
+                <Box sx={{ display: "flex", alignItems: "center", pr: 0.25 }}>
+                  <Image src={ArrowDown} alt="" width={16} height={16} />
+                </Box>
               ),
             }}
             sx={{
               cursor: "pointer",
-              "& .MuiOutlinedInput-root": { bgcolor: "#fff" },
+              ...lineFieldSx,
             }}
           />
           <CalendarPopover
@@ -172,20 +195,33 @@ export default function ListingFilterBox({
         </Grid>
 
         <Grid item xs={12} sm={6}>
-          <Typography sx={labelSx}>Select Category</Typography>
           <MollureTextField
             select
             value={values.category}
             onChange={(e) => set({ category: e.target.value })}
-            placeholder="Select category"
             InputProps={{
-              endAdornment: <ArrowDropDownRoundedIcon sx={{ color: tokens.placeholder }} />,
+              endAdornment: (
+                <Box sx={{ display: "flex", alignItems: "center", pr: 0.25 }}>
+                  <Image src={ArrowDown} alt="" width={16} height={16} />
+                </Box>
+              ),
+            }}
+            sx={lineFieldSx}
+            SelectProps={{
+              displayEmpty: true,
+              IconComponent: () => null,
+              renderValue: (selected) =>
+                selected ? (
+                  selected as any
+                ) : (
+                  <BodyText sx={{ color: alpha(tokens.navy, 0.55), fontSize: "1.05rem", fontWeight: 500 }}>
+                    Select Category
+                  </BodyText>
+                ),
             }}
           >
             <MenuItem value="">
-              <Typography sx={{ color: tokens.placeholder, fontSize: 13 }}>
-                Select category
-              </Typography>
+              <BodyText sx={{ color: tokens.placeholder, fontSize: 13 }}>Select Category</BodyText>
             </MenuItem>
             {categoryOptions.map((opt) => (
               <MenuItem key={opt.value} value={opt.value}>
@@ -217,20 +253,33 @@ export default function ListingFilterBox({
         </Grid>
 
         <Grid item xs={12}>
-          <Typography sx={labelSx}>Select Municipality</Typography>
           <MollureTextField
             select
             value={values.municipality}
             onChange={(e) => set({ municipality: e.target.value })}
-            placeholder="Select municipality"
             InputProps={{
-              endAdornment: <ArrowDropDownRoundedIcon sx={{ color: tokens.placeholder }} />,
+              endAdornment: (
+                <Box sx={{ display: "flex", alignItems: "center", pr: 0.25 }}>
+                  <Image src={ArrowDown} alt="" width={16} height={16} />
+                </Box>
+              ),
+            }}
+            sx={lineFieldSx}
+            SelectProps={{
+              displayEmpty: true,
+              IconComponent: () => null,
+              renderValue: (selected) =>
+                selected ? (
+                  selected as any
+                ) : (
+                  <BodyText sx={{ color: alpha(tokens.navy, 0.55), fontSize: "1.05rem", fontWeight: 500 }}>
+                    Select Municipality
+                  </BodyText>
+                ),
             }}
           >
             <MenuItem value="">
-              <Typography sx={{ color: tokens.placeholder, fontSize: 13 }}>
-                Select municipality
-              </Typography>
+              <BodyText sx={{ color: tokens.placeholder, fontSize: 13 }}>Select Municipality</BodyText>
             </MenuItem>
             {municipalityOptions.map((opt) => (
               <MenuItem key={opt.value} value={opt.value}>
@@ -241,28 +290,29 @@ export default function ListingFilterBox({
         </Grid>
 
         <Grid item xs={12}>
-          <Typography sx={labelSx}>Search Keyword</Typography>
           <MollureTextField
             value={values.keyword}
             onChange={(e) => set({ keyword: e.target.value })}
-            placeholder="Search keyword"
+            placeholder="Search Keyword"
+            sx={lineFieldSx}
           />
         </Grid>
 
         <Grid item xs={12}>
-          <Box sx={{ display: "flex", justifyContent: "center", pt: 0.25 }}>
+          <Box sx={{ pt: 0.25 }}>
             <Button
               fullWidth
               onClick={onApply}
               variant="contained"
               disableElevation
               sx={{
-                maxWidth: 700,
                 height: 52,
-                borderRadius: 2.2,
+                borderRadius: "12px",
                 textTransform: "none",
-                fontWeight: 800,
+                fontWeight: 600,
+                fontSize: "1.05rem",
                 bgcolor: tokens.teal,
+                color: tokens.white,
                 "&:hover": { bgcolor: tokens.tealDark },
               }}
             >

@@ -6,6 +6,8 @@ import FavoriteBorderRoundedIcon from "@mui/icons-material/FavoriteBorderRounded
 import SortRoundedIcon from "@mui/icons-material/SortRounded";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
+import SwapVertRoundedIcon from "@mui/icons-material/SwapVertRounded";
+import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import {
   Box,
   Button,
@@ -21,10 +23,12 @@ import {
 import { alpha } from "@mui/material/styles";
 import Image from "next/image";
 import Link from "next/link";
-import { ListingFilterBox, AppPagination, AppCard, MollureTextField } from "../../../components/common";
+import { ListingFilterBox, AppPagination, AppCard, MarketingSiteFooter, MollureMarketingHeader, MollureTextField } from "../../../components/common";
 import { listingPageData, type ListingCardData } from "./listing.data";
 import { useClientListingState, useListingTokens, type ListingSortValue } from "./listing.use";
-import { Logo, ListingBG, FixedLocationIcon, DesiredLocationIcon } from "../../../../images";
+import { ListingBG, FixedLocationIcon, DesiredLocationIcon } from "../../../../images";
+import { useAppSelector } from "../../../store/hooks";
+import { marketingShellFooter } from "../../../data/marketingShell.data";
 
 function toSrc(img: any) {
   if (!img) return "";
@@ -91,36 +95,71 @@ function ListingCard({
             <FavoriteBorderRoundedIcon sx={{ color: alpha(tokens.navy, 0.55), fontSize: 18 }} />
           )}
         </IconButton>
+
+        {/* Carousel dots (visual only) */}
+        <Box
+          sx={{
+            position: "absolute",
+            left: 0,
+            right: 0,
+            bottom: 10,
+            display: "flex",
+            justifyContent: "center",
+            gap: 0.75,
+            pointerEvents: "none",
+          }}
+        >
+          {[0, 1, 2, 3].map((i) => (
+            <Box
+              key={i}
+              sx={{
+                width: 8,
+                height: 8,
+                borderRadius: 999,
+                bgcolor: i === 1 ? "#fff" : "rgba(255,255,255,0.55)",
+                border: i === 1 ? "1px solid rgba(0,0,0,0.12)" : "1px solid rgba(0,0,0,0.08)",
+              }}
+            />
+          ))}
+        </Box>
       </Box>
 
       <CardContent sx={{ p: 2.25 }}>
-        <Stack spacing={1.25}>
-          <Box>
-            <Typography sx={{ fontWeight: 900, color: tokens.navy, fontSize: 13, lineHeight: 1.25 }}>
-              {item.title}
-            </Typography>
-            <Typography sx={{ fontWeight: 800, color: tokens.navy, fontSize: 12, opacity: 0.9 }}>
-              {item.subtitle}
-            </Typography>
+        <Stack spacing={1.4} sx={{ textAlign: "center" }}>
+          <Box sx={{ color: alpha(tokens.navy, 0.5), fontSize: 13, lineHeight: 1.2 }}>
+            Lorem Ipsum | Lorem | Lorem Ipsum
+          </Box>
+          <Box sx={{ color: alpha(tokens.navy, 0.5), fontSize: 13, lineHeight: 1.2 }}>
+            Lorem Ipsum | Lorem | Lorem Ipsum
           </Box>
 
-          <Stack direction="row" alignItems="center" spacing={1} sx={{ color: tokens.slate }}>
-            <Typography sx={{ fontSize: 12 }}>{item.municipalityLabel}</Typography>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.25, ml: "auto" }}>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <StarRoundedIcon key={i} sx={{ fontSize: 14, color: tokens.star }} />
-              ))}
-              <Typography sx={{ fontSize: 11, color: tokens.slate, ml: 0.5 }}>
-                {item.reviewsCount} Reviews
-              </Typography>
-            </Box>
+          <Typography sx={{ fontWeight: 400, color: alpha(tokens.navy, 0.78), fontSize: 18, lineHeight: 1.35 }}>
+            {item.title} {item.subtitle}
+          </Typography>
+
+          <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.75}>
+            <LocationOnOutlinedIcon sx={{ fontSize: 16, color: alpha(tokens.navy, 0.55) }} />
+            <Typography sx={{ fontSize: 13, color: alpha(tokens.navy, 0.55) }}>
+              {item.municipalityLabel}
+            </Typography>
           </Stack>
+
+          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.4 }}>
+              {Array.from({ length: 5 }).map((_, i) => (
+                <StarRoundedIcon key={i} sx={{ fontSize: 22, color: tokens.star }} />
+              ))}
+            </Box>
+            <Typography sx={{ fontSize: 12, color: alpha(tokens.navy, 0.55) }}>
+              {item.reviewsCount} Reviews
+            </Typography>
+          </Box>
 
           <Box
             sx={{
               display: "flex",
-              border: `1px solid ${tokens.border}`,
-              borderRadius: 999,
+              border: `1px solid ${alpha(tokens.navy, 0.12)}`,
+              borderRadius: "8px",
               overflow: "hidden",
               bgcolor: "#fff",
             }}
@@ -129,57 +168,39 @@ function ListingCard({
               onClick={() => setMode("fixed")}
               sx={{
                 flex: 1,
-                py: 0.6,
+                py: 1.0,
                 textTransform: "none",
-                fontWeight: 900,
-                fontSize: 12,
+                fontWeight: 700,
+                fontSize: 14,
                 borderRadius: 0,
-                color: mode === "fixed" ? "#fff" : tokens.teal,
+                color: mode === "fixed" ? "#fff" : tokens.slate,
                 bgcolor: mode === "fixed" ? tokens.teal : "transparent",
                 "&:hover": { bgcolor: mode === "fixed" ? tokens.tealDark : "rgba(33, 184, 191, 0.08)" },
               }}
-              startIcon={
-                <Image
-                  src={FixedLocationIcon}
-                  alt="Fixed location"
-                  width={14}
-                  height={14}
-                  style={{ filter: mode === "fixed" ? "brightness(0) invert(1)" : "none" }}
-                />
-              }
             >
               Fixed Location
             </Button>
-            <Divider orientation="vertical" flexItem sx={{ borderColor: tokens.border }} />
+            <Divider orientation="vertical" flexItem sx={{ borderColor: alpha(tokens.navy, 0.12) }} />
             <Button
               onClick={() => setMode("desired")}
               sx={{
                 flex: 1,
-                py: 0.6,
+                py: 1.0,
                 textTransform: "none",
-                fontWeight: 900,
-                fontSize: 12,
+                fontWeight: 700,
+                fontSize: 14,
                 borderRadius: 0,
-                color: mode === "desired" ? "#fff" : tokens.teal,
+                color: mode === "desired" ? "#fff" : tokens.slate,
                 bgcolor: mode === "desired" ? tokens.teal : "transparent",
                 "&:hover": { bgcolor: mode === "desired" ? tokens.tealDark : "rgba(33, 184, 191, 0.08)" },
               }}
-              startIcon={
-                <Image
-                  src={DesiredLocationIcon}
-                  alt="Desired location"
-                  width={14}
-                  height={14}
-                  style={{ filter: mode === "desired" ? "brightness(0) invert(1)" : "none" }}
-                />
-              }
             >
               Desired Location
             </Button>
           </Box>
 
-          <Box sx={{ pt: 0.5 }}>
-            <Stack spacing={0.85}>
+          <Box sx={{ pt: 0.75, textAlign: "left" }}>
+            <Stack spacing={1}>
               {item.services.map((svc, idx) => (
                 <Stack
                   key={`${svc.name}-${idx}`}
@@ -189,16 +210,16 @@ function ListingCard({
                   spacing={1}
                 >
                   <Box sx={{ minWidth: 0 }}>
-                    <Typography sx={{ fontSize: 12, fontWeight: 900, color: tokens.navy }}>
+                    <Typography sx={{ fontSize: 13, fontWeight: 800, color: alpha(tokens.navy, 0.9) }}>
                       {svc.name}
                     </Typography>
                     {svc.durationLabel ? (
-                      <Typography sx={{ fontSize: 11, color: tokens.slate }}>
+                      <Typography sx={{ fontSize: 12, color: alpha(tokens.navy, 0.55) }}>
                         {svc.durationLabel}
                       </Typography>
                     ) : null}
                   </Box>
-                  <Typography sx={{ fontSize: 11, color: tokens.slate, whiteSpace: "nowrap" }}>
+                  <Typography sx={{ fontSize: 12, color: alpha(tokens.navy, 0.65), whiteSpace: "nowrap" }}>
                     {svc.priceLabel}
                   </Typography>
                 </Stack>
@@ -215,64 +236,37 @@ export default function ClientListingPage() {
   const tokens = useListingTokens();
   const { header, filters: filterData, toolbar, cards } = listingPageData;
   const state = useClientListingState(cards);
+  const user = useAppSelector((s) => s.auth.user);
+  const displayName =
+    ((user as any)?.display_name as string | undefined) ||
+    `${(user as any)?.first_name ?? ""} ${(user as any)?.last_name ?? ""}`.trim();
+  const [avatarUrl, setAvatarUrl] = React.useState<string | undefined>(undefined);
+
+  React.useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem("mollure:client_profile");
+      if (!raw) return;
+      const data = JSON.parse(raw) as { avatar_url?: string | null; email?: string };
+      const authedEmail = user?.email?.trim().toLowerCase();
+      const persistedEmail = data?.email?.trim().toLowerCase();
+      if (authedEmail && persistedEmail && authedEmail === persistedEmail) {
+        if (typeof data.avatar_url === "string" && data.avatar_url) setAvatarUrl(data.avatar_url);
+      }
+    } catch {
+      // ignore
+    }
+  }, [user?.email]);
 
   return (
     <Box sx={{ bgcolor: "background.default", minHeight: "100vh" }}>
-      {/* Header */}
-      <Box
-        component="header"
-        sx={{
-          position: "sticky",
-          top: 0,
-          zIndex: 10,
-          bgcolor: tokens.whiteOverlay,
-          backdropFilter: "blur(10px)",
-          borderBottom: `1px solid ${tokens.border}`,
-        }}
-      >
-        <Container maxWidth="lg" sx={{ py: 1.5 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
-            <Box component={Link} href="/" sx={{ display: "inline-flex", alignItems: "center" }}>
-              <Image src={Logo} alt="Mollure" width={160} height={38} priority />
-            </Box>
-
-            <Stack direction="row" spacing={1.25} alignItems="center">
-              <Button
-                variant="outlined"
-                sx={{
-                  borderRadius: 999,
-                  borderColor: tokens.border,
-                  color: tokens.navy,
-                  px: 2,
-                  textTransform: "none",
-                  fontWeight: 800,
-                  height: 36,
-                }}
-              >
-                {header.localeLabel}
-              </Button>
-              <Button
-                variant="contained"
-                disableElevation
-                sx={{
-                  borderRadius: 999,
-                  px: 2.5,
-                  textTransform: "none",
-                  fontWeight: 800,
-                  bgcolor: tokens.teal,
-                  height: 36,
-                  "&:hover": { bgcolor: tokens.tealDark },
-                }}
-              >
-                {header.loginLabel}
-              </Button>
-              <Typography sx={{ color: tokens.headerHint, fontSize: 13 }}>
-                {header.professionalLinkLabel}
-              </Typography>
-            </Stack>
-          </Stack>
-        </Container>
-      </Box>
+      <MollureMarketingHeader
+        navItems={[]}
+        isAuthed
+        userLabel={user?.email ?? ""}
+        userName={displayName}
+        userAvatarSrc={avatarUrl}
+        homeHref="/clients/listing"
+      />
 
       {/* Hero with BG + Filter Box */}
       <Box
@@ -319,14 +313,28 @@ export default function ClientListingPage() {
       {/* Results */}
       <Container maxWidth="lg" sx={{ py: { xs: 4, md: 5 } }}>
         <Stack direction="row" alignItems="center" justifyContent="flex-end" spacing={1.25} sx={{ mb: 2 }}>
+          {/*
+            Toolbar controls must match the compact design:
+            same height/shape/typography for Filters + Sort.
+          */}
+          {/** shared sizing tokens */}
           <Button
-            variant="text"
-            startIcon={<TuneRoundedIcon />}
+            variant="outlined"
+            endIcon={<TuneRoundedIcon />}
             sx={{
+              height: 40,
+              minWidth: 104,
+              px: 1.5,
+              borderRadius: "6px",
               textTransform: "none",
-              fontWeight: 800,
-              color: tokens.slate,
-              "&:hover": { bgcolor: "rgba(33, 184, 191, 0.08)", color: tokens.navy },
+              fontWeight: 500,
+              fontSize: 13,
+              lineHeight: 1,
+              color: alpha(tokens.navy, 0.85),
+              bgcolor: "#fff",
+              borderColor: alpha(tokens.navy, 0.18),
+              "&:hover": { bgcolor: "#fff", borderColor: alpha(tokens.navy, 0.28) },
+              "& .MuiButton-endIcon": { ml: 1, color: alpha(tokens.navy, 0.85) },
             }}
           >
             {toolbar.filterLabel}
@@ -338,20 +346,33 @@ export default function ClientListingPage() {
             value={state.sort}
             onChange={(e) => state.setSort(e.target.value as ListingSortValue)}
             sx={{
-              width: 170,
+              width: 104,
               "& .MuiOutlinedInput-root": {
                 height: 40,
                 bgcolor: "#fff",
                 borderRadius: "6px",
                 fontSize: 13,
-                color: tokens.navy,
-                "& fieldset": { borderColor: tokens.inputBorder },
-                "&:hover fieldset": { borderColor: tokens.inputBorderHover },
-                "&.Mui-focused fieldset": { borderColor: tokens.teal, borderWidth: 1 },
+                fontWeight: 500,
+                color: alpha(tokens.navy, 0.85),
+                "& fieldset": { borderColor: alpha(tokens.navy, 0.18) },
+                "&:hover fieldset": { borderColor: alpha(tokens.navy, 0.28) },
+                "&.Mui-focused fieldset": { borderColor: alpha(tokens.navy, 0.28), borderWidth: 1 },
+              },
+              "& .MuiSelect-select": {
+                fontSize: 13,
+                fontWeight: 500,
+                display: "flex",
+                alignItems: "center",
               },
             }}
             InputProps={{
-              startAdornment: <SortRoundedIcon sx={{ color: tokens.placeholder, mr: 0.75 }} />,
+              startAdornment: null,
+              endAdornment: <SwapVertRoundedIcon sx={{ color: alpha(tokens.navy, 0.8), mr: 0.25 }} />,
+            }}
+            SelectProps={{
+              displayEmpty: true,
+              renderValue: () => "Sort By",
+              IconComponent: () => null,
             }}
           >
             {toolbar.sortOptions.map((opt) => (
@@ -383,6 +404,12 @@ export default function ClientListingPage() {
           />
         </Box>
       </Container>
+
+      <MarketingSiteFooter
+        columns={marketingShellFooter.columns.map((col) => ({ title: col.title, items: [...col.items] }))}
+        copyright={marketingShellFooter.copyright}
+        sx={{ mt: 2 }}
+      />
     </Box>
   );
 }
