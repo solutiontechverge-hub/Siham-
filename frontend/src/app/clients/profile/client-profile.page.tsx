@@ -25,6 +25,7 @@ import {
   MenuItem,
   Popover,
   Paper,
+  Snackbar,
   Stack,
   Typography,
 } from "@mui/material";
@@ -73,6 +74,7 @@ export default function ClientProfilePage() {
     setIsEditing,
     successMessage,
     errorMessage,
+    clearMessages,
     displayName,
     handleChange,
     setReviewNameMode,
@@ -85,9 +87,6 @@ export default function ClientProfilePage() {
     isManageSharingOpen,
     openManageSharing,
     closeManageSharing,
-    isNotificationsOpen,
-    openNotifications,
-    closeNotifications,
     sharingVisibility,
     toggleSharingField,
     handleLogout,
@@ -234,90 +233,6 @@ export default function ClientProfilePage() {
           </Button>
         </Stack>
       </Popover>
-
-      <Dialog
-        open={isNotificationsOpen}
-        onClose={closeNotifications}
-        fullWidth
-        maxWidth="sm"
-        PaperProps={{
-          sx: {
-            borderRadius: 4,
-            overflow: "hidden",
-            boxShadow: "0 22px 70px rgba(16, 24, 40, 0.22)",
-          },
-        }}
-      >
-        <DialogContent sx={{ p: 0 }}>
-          <Box sx={{ p: 3, bgcolor: "#fff" }}>
-            <Stack direction="row" alignItems="center" justifyContent="space-between">
-              <Typography sx={{ fontWeight: 900, color: tokens.navy, fontSize: 20 }}>
-                {profilePageData.popovers.notifications.title}
-              </Typography>
-              <IconButton
-                onClick={closeNotifications}
-                sx={{
-                  width: 42,
-                  height: 42,
-                  bgcolor: "rgba(52, 74, 102, 0.06)",
-                  color: tokens.slate,
-                  "&:hover": { bgcolor: "rgba(33, 184, 191, 0.12)", color: tokens.teal },
-                }}
-                aria-label="Close notifications"
-              >
-                <CloseRoundedIcon />
-              </IconButton>
-            </Stack>
-          </Box>
-          <Divider sx={{ borderColor: tokens.border }} />
-
-          <Box sx={{ bgcolor: "#fff", p: 0 }}>
-            {profilePageData.popovers.notifications.items.map((n, idx) => {
-              const statusIcon =
-                n.statusType === "accepted" ? (
-                  <CheckCircleRoundedIcon sx={{ fontSize: 16, color: tokens.teal }} />
-                ) : n.statusType === "rejected" ? (
-                  <CancelRoundedIcon sx={{ fontSize: 16, color: "#EE4B4B" }} />
-                ) : n.statusType === "updated" ? (
-                  <AutorenewRoundedIcon sx={{ fontSize: 16, color: tokens.slate }} />
-                ) : (
-                  <AutorenewRoundedIcon sx={{ fontSize: 16, color: tokens.slate }} />
-                );
-
-              return (
-                <Box key={n.id}>
-                  <Box sx={{ px: 3, py: 2.25 }}>
-                    <Typography sx={{ fontWeight: 800, color: tokens.navy, fontSize: 14 }}>
-                      {n.professionalName}
-                    </Typography>
-
-                    <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 0.5 }}>
-                      <Typography sx={{ color: tokens.slate, fontSize: 13 }}>
-                        {n.statusLabel}
-                      </Typography>
-                      {statusIcon}
-                    </Stack>
-
-                    <Typography sx={{ color: tokens.slate, fontSize: 13, mt: 0.5 }}>
-                      {n.bookingIdLabel}
-                    </Typography>
-
-                    <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 0.75 }}>
-                      <AccessTimeRoundedIcon sx={{ fontSize: 16, color: alpha(tokens.slate, 0.65) }} />
-                      <Typography sx={{ color: alpha(tokens.slate, 0.8), fontSize: 12.5 }}>
-                        {n.timeLabel}
-                      </Typography>
-                    </Stack>
-                  </Box>
-                  {idx < profilePageData.popovers.notifications.items.length - 1 ? (
-                    <Divider sx={{ borderColor: alpha(tokens.border, 0.8) }} />
-                  ) : null}
-                </Box>
-              );
-            })}
-          </Box>
-        </DialogContent>
-      </Dialog>
 
       <Dialog
         open={isManageSharingOpen}
@@ -504,8 +419,17 @@ export default function ClientProfilePage() {
             </Stack>
 
             <Box component="form" onSubmit={handleSubmit}>
-            {successMessage ? <Alert severity="success" sx={{ mb: 2 }}>{successMessage}</Alert> : null}
             {errorMessage ? <Alert severity="error" sx={{ mb: 2 }}>{errorMessage}</Alert> : null}
+            <Snackbar
+              open={Boolean(successMessage)}
+              autoHideDuration={3000}
+              onClose={clearMessages}
+              anchorOrigin={{ vertical: "top", horizontal: "center" }}
+            >
+              <Alert onClose={clearMessages} severity="success" variant="filled" sx={{ fontWeight: 700 }}>
+                {successMessage || "Profile Updated"}
+              </Alert>
+            </Snackbar>
 
             <Typography sx={{ fontWeight: 800, color: tokens.navy, mb: 1 }}>
               {profilePageData.sections.personal}
@@ -673,8 +597,9 @@ export default function ClientProfilePage() {
                 py: 1.35,
                 borderRadius: "12px",
                 textTransform: "none",
-                fontWeight: 800,
+                fontWeight: 600,
                 fontSize: 16,
+                color: "#fff",
                 bgcolor: tokens.teal,
                 "&:hover": { bgcolor: tokens.tealDark },
               }}

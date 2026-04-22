@@ -27,6 +27,8 @@ export { default as FilterPanel } from "./FilterPanel";
 export { default as ImageCard } from "./ImageCard";
 export * from "./ListingFilterBox";
 export { default as ClientProfileMenuPopover } from "./ClientProfileMenuPopover";
+export { default as ClientListingCard } from "./ClientListingCard";
+export { default as ClientNotificationsDrawer } from "./ClientNotificationsDrawer";
 export { default as ClientTopTabs } from "./ClientTopTabs";
 export { default as MarketingSiteHeader } from "./MarketingSiteHeader";
 export { default as MollureMarketingHeader } from "./MollureMarketingHeader";

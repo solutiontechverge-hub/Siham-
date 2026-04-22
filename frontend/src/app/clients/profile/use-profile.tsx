@@ -74,7 +74,6 @@ export function useClientProfilePage() {
     null,
   );
   const [isManageSharingOpen, setIsManageSharingOpen] = React.useState(false);
-  const [isNotificationsOpen, setIsNotificationsOpen] = React.useState(false);
 
   const [sharingVisibility, setSharingVisibility] = React.useState<
     Record<string, boolean>
@@ -115,6 +114,10 @@ export function useClientProfilePage() {
   });
   const [successMessage, setSuccessMessage] = React.useState("");
   const [errorMessage, setErrorMessage] = React.useState("");
+  const clearMessages = React.useCallback(() => {
+    setSuccessMessage("");
+    setErrorMessage("");
+  }, []);
 
   const displayName =
     profile
@@ -167,8 +170,7 @@ export function useClientProfilePage() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    setSuccessMessage("");
-    setErrorMessage("");
+    clearMessages();
 
     if (form.password || form.confirmPassword) {
       if (form.password !== form.confirmPassword) {
@@ -225,9 +227,6 @@ export function useClientProfilePage() {
   };
   const closeManageSharing = () => setIsManageSharingOpen(false);
 
-  const openNotifications = () => setIsNotificationsOpen(true);
-  const closeNotifications = () => setIsNotificationsOpen(false);
-
   const toggleSharingField = (key: string) => {
     setSharingVisibility((prev) => ({ ...prev, [key]: !prev[key] }));
   };
@@ -250,6 +249,7 @@ export function useClientProfilePage() {
     setIsEditing,
     successMessage,
     errorMessage,
+    clearMessages,
     displayName,
     handleChange,
     setReviewNameMode,
@@ -263,9 +263,6 @@ export function useClientProfilePage() {
     isManageSharingOpen,
     openManageSharing,
     closeManageSharing,
-    isNotificationsOpen,
-    openNotifications,
-    closeNotifications,
     sharingVisibility,
     toggleSharingField,
     handleLogout,

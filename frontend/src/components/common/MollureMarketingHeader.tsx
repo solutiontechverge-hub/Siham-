@@ -12,6 +12,8 @@ import { alpha, useTheme } from "@mui/material/styles";
 import { Logo } from "../../../images";
 import { HeaderNavText } from "../ui/typography";
 import ClientProfileMenuPopover from "./ClientProfileMenuPopover";
+import ClientNotificationsDrawer from "./ClientNotificationsDrawer";
+import { clientNotificationsData } from "../../data/clientNotifications.data";
 
 export type MarketingNavItem = {
   label: string;
@@ -111,6 +113,9 @@ export default function MollureMarketingHeader({
   const [profileAnchor, setProfileAnchor] = React.useState<HTMLElement | null>(null);
   const openProfileMenu = (anchor: HTMLElement) => setProfileAnchor(anchor);
   const closeProfileMenu = () => setProfileAnchor(null);
+  const [notificationsOpen, setNotificationsOpen] = React.useState(false);
+  const openNotifications = () => setNotificationsOpen(true);
+  const closeNotifications = () => setNotificationsOpen(false);
 
   React.useEffect(() => {
     setMounted(true);
@@ -294,6 +299,7 @@ export default function MollureMarketingHeader({
                   <>
                     <IconButton
                       aria-label="Notifications"
+                      onClick={openNotifications}
                       sx={{
                         width: { xs: 34, md: 36 },
                         height: { xs: 34, md: 36 },
@@ -402,6 +408,15 @@ export default function MollureMarketingHeader({
           name={resolvedUserName}
           email={userLabel}
           avatarSrc={userAvatarSrc}
+        />
+      ) : null}
+
+      {isAuthed ? (
+        <ClientNotificationsDrawer
+          open={notificationsOpen}
+          onClose={closeNotifications}
+          title={clientNotificationsData.title}
+          items={clientNotificationsData.items}
         />
       ) : null}
     </Box>
