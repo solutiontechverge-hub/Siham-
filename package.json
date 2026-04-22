@@ -1,0 +1,26 @@
+{
+  "name": "mollure-monorepo",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev:frontend": "npm --workspace frontend run dev",
+    "dev:backend": "npm --workspace backend run dev",
+    "dev": "npm run dev:frontend",
+    "build:frontend": "npm --workspace frontend run build",
+    "build:backend": "npm --workspace backend run build",
+    "build": "npm run build:backend && npm run build:frontend",
+    "start:frontend": "npm --workspace frontend run start",
+    "start:backend": "npm --workspace backend run start",
+    "start": "npm run start:frontend",
+    "lint:frontend": "npm --workspace frontend run lint",
+    "lint": "npm run lint:frontend"
+  },
+  "engines": {
+    "node": "^18.18.0 || ^20.0.0 || ^22.0.0",
+    "npm": ">=9"
+  }
+}
+

@@ -14,7 +14,7 @@ const { Pool } = pg;
 const connectionString = process.env.DB_URL || process.env.DATABASE_URL;
 
 if (!connectionString) {
-  throw new Error("DB_URL is required.");
+  throw new Error("DB_URL or DATABASE_URL is required.");
 }
 
 const shouldUseSsl =

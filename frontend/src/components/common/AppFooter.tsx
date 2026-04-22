@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Box, Container, Stack, Typography } from "@mui/material";
+import { Box, Container, Stack } from "@mui/material";
+import { BodyText, CardTitle } from "../ui/typography";
 
 type FooterLink = {
   label: string;
@@ -38,27 +39,26 @@ export default function AppFooter({
           alignItems={{ xs: "flex-start", md: "center" }}
         >
           <Box>
-            <Typography sx={{ fontWeight: 900, color: "#10233f", letterSpacing: "-0.03em" }}>
+            <CardTitle sx={{ color: "#10233f", letterSpacing: "-0.03em" }}>
               {brand}
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.75 }}>
+            </CardTitle>
+            <BodyText color="text.secondary" sx={{ mt: 0.75 }}>
               {caption}
-            </Typography>
+            </BodyText>
           </Box>
           <Stack direction="row" spacing={2} flexWrap="wrap">
             {links.map((link) => (
-              <Typography
+              <BodyText
                 key={link.href}
                 component={Link}
                 href={link.href}
                 sx={{
                   color: "#10233f",
                   textDecoration: "none",
-                  fontWeight: 600,
                 }}
               >
                 {link.label}
-              </Typography>
+              </BodyText>
             ))}
           </Stack>
         </Stack>

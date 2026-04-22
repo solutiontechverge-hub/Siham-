@@ -6,10 +6,10 @@ import {
   CardContent,
   CardMedia,
   Stack,
-  Typography,
   type PaperProps,
 } from "@mui/material";
 import AppCard from "./AppCard";
+import { BodyText, SubHeading } from "../ui/typography";
 
 type ImageCardProps = Omit<PaperProps, "title"> & {
   image: string;
@@ -34,13 +34,9 @@ export default function ImageCard({
       <CardMedia component="img" height={imageHeight} image={image} alt={imageAlt} />
       <CardContent sx={{ p: 3 }}>
         <Stack spacing={1.5}>
-          <Typography variant="h6" sx={{ fontWeight: 800, color: "#10233f" }}>
-            {title}
-          </Typography>
+          <SubHeading sx={{ fontSize: "20px", color: "#10233f" }}>{title}</SubHeading>
           {description ? (
-            <Typography variant="body2" color="text.secondary">
-              {description}
-            </Typography>
+            <BodyText color="text.secondary">{description}</BodyText>
           ) : null}
           {actions ? <Box>{actions}</Box> : null}
         </Stack>
