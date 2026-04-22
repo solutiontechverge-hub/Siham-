@@ -2,6 +2,7 @@
 
 import FixedLocationPageScaffold from "../../../../components/common/FixedLocationPageScaffold";
 import {
+  Alert,
   Avatar,
   Box,
   Button,
@@ -12,6 +13,7 @@ import {
   MenuItem,
   Paper,
   Grid,
+  Snackbar,
   Stack,
   Table,
   TableBody,
@@ -132,13 +134,30 @@ export default function FixedLocationClientPage() {
     deleteClient,
     openClientDetailsEdit,
     mollureResults,
+    addMollureClient,
+    addNonMollureClient,
+    snackbar,
+    closeSnackbar,
     openNonMollureAddDrawer,
     closeClientDetailsDrawer,
     confirmDeleteClient,
+    confirmBlockClient,
+    saveClientEdits,
   } = useFixedLocationClientPage();
 
   return (
     <FixedLocationPageScaffold activeTopTab="Client" topTabs={fixedLocationTopTabs}>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={2500}
+        onClose={closeSnackbar}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert onClose={closeSnackbar} severity={snackbar.severity} variant="filled" sx={{ fontWeight: 700 }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+
       <Paper
         elevation={0}
         sx={{
@@ -456,15 +475,13 @@ export default function FixedLocationClientPage() {
             <Button
               variant="contained"
               disableElevation
-              onClick={() => {
-                // Hook your API here. For now: close modal only.
-                setBlockClientId(null);
-              }}
+              onClick={confirmBlockClient}
               sx={{
                 borderRadius: "8px",
                 textTransform: "none",
                 fontWeight: 900,
                 bgcolor: "primary.main",
+                color: "#fff",
                 "&:hover": { bgcolor: "mollure.tealDark" },
                 height: 34,
                 px: 3,
@@ -594,6 +611,23 @@ export default function FixedLocationClientPage() {
                 }}
               >
                 Cancel
+              </Button>
+              <Button
+                variant="contained"
+                disableElevation
+                onClick={saveClientEdits}
+                sx={{
+                  borderRadius: "8px",
+                  textTransform: "none",
+                  fontWeight: 900,
+                  bgcolor: "primary.main",
+                  color: "#fff",
+                  "&:hover": { bgcolor: "mollure.tealDark" },
+                  height: 36,
+                  px: 3,
+                }}
+              >
+                Update
               </Button>
             </Stack>
           ) : null
@@ -1241,7 +1275,7 @@ export default function FixedLocationClientPage() {
               variant="contained"
               disableElevation
               disabled={!selectedMollureId}
-              onClick={() => setAddMollureOpen(false)}
+              onClick={addMollureClient}
               sx={{
                 borderRadius: "8px",
                 textTransform: "none",
@@ -1401,13 +1435,11 @@ export default function FixedLocationClientPage() {
                   return;
                 }
                 if (nonMollureStep === "individual") {
-                  if (!validateIndividual()) return;
-                  setAddNonMollureOpen(false);
+                  addNonMollureClient();
                   return;
                 }
                 if (nonMollureStep === "company") {
-                  if (!validateCompany()) return;
-                  setAddNonMollureOpen(false);
+                  addNonMollureClient();
                 }
               }}
               sx={{

@@ -111,6 +111,17 @@ export function useFixedLocationClientPage() {
   const [coEmail, setCoEmail] = React.useState("");
   const [compErrors, setCompErrors] = React.useState<Partial<Record<string, string>>>({});
 
+  const [snackbar, setSnackbar] = React.useState<{
+    open: boolean;
+    message: string;
+    severity: "success" | "info" | "error";
+  }>({ open: false, message: "", severity: "success" });
+
+  const closeSnackbar = React.useCallback((_e?: unknown, reason?: string) => {
+    if (reason === "clickaway") return;
+    setSnackbar((p) => ({ ...p, open: false }));
+  }, []);
+
   const validateCompany = React.useCallback(() => {
     const next: Partial<Record<string, string>> = {};
     if (!coLegalName.trim()) next.legalName = "Legal name is required";
@@ -320,6 +331,151 @@ export function useFixedLocationClientPage() {
     setCompErrors({});
   }, []);
 
+  const formatAddedOn = React.useCallback(() => {
+    // Matches the existing mock style like "March 2, 2024"
+    return new Date().toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
+  }, []);
+
+  const addMollureClient = React.useCallback(() => {
+    const id = String(selectedMollureId || "").trim();
+    if (!id) return false;
+    const row = mockMollureDirectory.find((r) => r.id === id);
+    if (!row) return false;
+
+    setClients((prev) => {
+      // Avoid duplicates by email (common in this flow).
+      if (prev.some((c) => c.email.trim().toLowerCase() === row.email.trim().toLowerCase())) return prev;
+
+      const nextId = `c_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+      const next: ClientRecord = {
+        id: nextId,
+        name: row.name,
+        email: row.email,
+        phone: "—",
+        totalSales: "€0",
+        lastBooking: "—",
+        tags: ["Mollure"],
+        kind: "individual",
+        addedOn: formatAddedOn(),
+        bookingsCompleted: 0,
+        averageBookingValue: "€0",
+        recentServices: [],
+        bookingHistory: [],
+      };
+      return [next, ...prev];
+    });
+
+    setSelectedMollureId("");
+    setMollureSearch("");
+    setAddMollureOpen(false);
+    setSnackbar({ open: true, message: "Client Added", severity: "success" });
+    return true;
+  }, [formatAddedOn, selectedMollureId]);
+
+  const addNonMollureClient = React.useCallback(() => {
+    if (nonMollureStep === "individual") {
+      if (!validateIndividual()) return false;
+      const fullName = `${indFirstName.trim()} ${indLastName.trim()}`.trim();
+      const email = indEmail.trim().toLowerCase();
+
+      setClients((prev) => {
+        if (prev.some((c) => c.email.trim().toLowerCase() === email)) return prev;
+        const nextId = `c_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+        const next: ClientRecord = {
+          id: nextId,
+          name: fullName,
+          email,
+          phone: `${indCountryCode} ${indPhone}`.trim(),
+          totalSales: "€0",
+          lastBooking: "—",
+          tags: [],
+          kind: "individual",
+          addedOn: formatAddedOn(),
+          gender: indGender || undefined,
+          dateOfBirth: indDob || undefined,
+          residentialAddress: undefined,
+          bookingsCompleted: 0,
+          averageBookingValue: "€0",
+          recentServices: [],
+          bookingHistory: [],
+        };
+        return [next, ...prev];
+      });
+
+      setAddNonMollureOpen(false);
+      resetNonMollureAddForm();
+      setSnackbar({ open: true, message: "Client Added", severity: "success" });
+      return true;
+    }
+
+    if (nonMollureStep === "company") {
+      if (!validateCompany()) return false;
+      const email = coEmail.trim().toLowerCase();
+      const contactName = `${coContactFirst.trim()} ${coContactLast.trim()}`.trim();
+
+      setClients((prev) => {
+        if (prev.some((c) => c.email.trim().toLowerCase() === email)) return prev;
+        const nextId = `c_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+        const next: ClientRecord = {
+          id: nextId,
+          name: coLegalName.trim(),
+          email,
+          phone: `${coCountryCode} ${coPhone}`.trim(),
+          totalSales: "€0",
+          lastBooking: "—",
+          tags: [],
+          kind: "company",
+          addedOn: formatAddedOn(),
+          legalName: coLegalName.trim(),
+          coc: coCoc.trim(),
+          vat: coVat.trim(),
+          contactPersonName: contactName || undefined,
+          gender: coGender || undefined,
+          businessAddress: `${coStreet.trim()} ${coStreetNumber.trim()}, ${coMunicipality.trim()} ${coPostal.trim()}`.trim(),
+          detailEmail: email,
+          bookingsCompleted: 0,
+          averageBookingValue: "€0",
+          recentServices: [],
+          bookingHistory: [],
+        };
+        return [next, ...prev];
+      });
+
+      setAddNonMollureOpen(false);
+      resetNonMollureAddForm();
+      setSnackbar({ open: true, message: "Client Added", severity: "success" });
+      return true;
+    }
+
+    return false;
+  }, [
+    coCoc,
+    coContactFirst,
+    coContactLast,
+    coCountryCode,
+    coEmail,
+    coGender,
+    coLegalName,
+    coMunicipality,
+    coPhone,
+    coPostal,
+    coStreet,
+    coStreetNumber,
+    coVat,
+    formatAddedOn,
+    indCountryCode,
+    indDob,
+    indEmail,
+    indFirstName,
+    indGender,
+    indLastName,
+    indPhone,
+    nonMollureStep,
+    resetNonMollureAddForm,
+    validateCompany,
+    validateIndividual,
+  ]);
+
   const openNonMollureAddDrawer = React.useCallback(() => {
     resetNonMollureAddForm();
     setAddNonMollureOpen(true);
@@ -340,7 +496,77 @@ export function useFixedLocationClientPage() {
       setClientDetailsMode("view");
     }
     if (blockClientId === id) setBlockClientId(null);
+    setSnackbar({ open: true, message: "Client Deleted", severity: "info" });
   }, [blockClientId, deleteClientId, viewClientId]);
+
+  const confirmBlockClient = React.useCallback(() => {
+    if (!blockClientId) return;
+    const id = blockClientId;
+    setClients((prev) => prev.filter((c) => c.id !== id));
+    setBlockClientId(null);
+    if (viewClientId === id) {
+      setViewClientId(null);
+      setClientDetailsMode("view");
+    }
+    if (deleteClientId === id) setDeleteClientId(null);
+    setSnackbar({ open: true, message: "Client Blocked", severity: "info" });
+  }, [blockClientId, deleteClientId, viewClientId]);
+
+  const saveClientEdits = React.useCallback(() => {
+    if (!viewClientId) return false;
+
+    setClients((prev) =>
+      prev.map((c) => {
+        if (c.id !== viewClientId) return c;
+
+        if (c.kind === "company") {
+          const email = editCompanyForm.email.trim().toLowerCase();
+          const contactPersonName = `${editCompanyForm.contactFirst.trim()} ${editCompanyForm.contactLast.trim()}`.trim();
+          const businessAddress = [
+            editCompanyForm.street.trim(),
+            editCompanyForm.streetNumber.trim(),
+            editCompanyForm.municipality.trim(),
+            editCompanyForm.postal.trim(),
+            editCompanyForm.province.trim(),
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .trim();
+
+          return {
+            ...c,
+            name: editCompanyForm.legalName.trim() || c.name,
+            legalName: editCompanyForm.legalName.trim() || undefined,
+            coc: editCompanyForm.coc.trim() || undefined,
+            vat: editCompanyForm.vat.trim() || undefined,
+            contactPersonName: contactPersonName || undefined,
+            gender: editCompanyForm.gender || undefined,
+            phone: `${editCompanyForm.countryCode} ${editCompanyForm.phone}`.trim(),
+            email: email || c.email,
+            detailEmail: email || c.detailEmail,
+            businessAddress: businessAddress || undefined,
+          };
+        }
+
+        // individual
+        const email = editIndividualForm.email.trim().toLowerCase();
+        const fullName = `${editIndividualForm.firstName.trim()} ${editIndividualForm.lastName.trim()}`.trim();
+        return {
+          ...c,
+          name: fullName || c.name,
+          gender: editIndividualForm.gender || undefined,
+          dateOfBirth: editIndividualForm.dob.trim() || undefined,
+          phone: `${editIndividualForm.countryCode} ${editIndividualForm.phone}`.trim(),
+          email: email || c.email,
+          residentialAddress: editIndividualForm.residentialAddress.trim() || undefined,
+        };
+      }),
+    );
+
+    setClientDetailsMode("view");
+    setSnackbar({ open: true, message: "Client Updated", severity: "success" });
+    return true;
+  }, [editCompanyForm, editIndividualForm, viewClientId]);
 
   return {
     clients,
@@ -437,9 +663,15 @@ export function useFixedLocationClientPage() {
     deleteClient,
     openClientDetailsEdit,
     mollureResults,
+    addMollureClient,
+    addNonMollureClient,
+    snackbar,
+    closeSnackbar,
     resetNonMollureAddForm,
     openNonMollureAddDrawer,
     closeClientDetailsDrawer,
     confirmDeleteClient,
+    confirmBlockClient,
+    saveClientEdits,
   };
 }

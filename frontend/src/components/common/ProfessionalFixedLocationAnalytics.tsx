@@ -8,6 +8,7 @@ import { alpha, useTheme } from "@mui/material/styles";
 import { jsPDF } from "jspdf";
 import { BodyText } from "../ui/typography";
 import MollureCardHeader from "./MollureCardHeader";
+import ExportMenuPopover from "./ExportMenuPopover";
 import MollureFormField from "./MollureFormField";
 import ProfessionalFixedLocationSalesVolumeAnalytics from "./ProfessionalFixedLocationSalesVolumeAnalytics";
 import ProfessionalFixedLocationPerformanceAnalytics from "./ProfessionalFixedLocationPerformanceAnalytics";
@@ -573,6 +574,8 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
   const [activeSubTab, setActiveSubTab] = React.useState<ProfessionalAnalyticsSubTab>(data.initialSubTab);
   const [fromDate, setFromDate] = React.useState("");
   const [toDate, setToDate] = React.useState("");
+  const [exportAnchor, setExportAnchor] = React.useState<HTMLElement | null>(null);
+  const exportMenuOpen = Boolean(exportAnchor);
 
   const router = useRouter();
   const pathname = usePathname();
@@ -599,11 +602,13 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
   const section15 = data.sections.bookingByClientType;
   const section16 = data.sections.bookingByServiceCategory;
 
-  const exportPdf = React.useCallback(() => {
-    if (!isBookingAndOperational) {
+  const exportPdf = React.useCallback((exportTab: ProfessionalAnalyticsSubTab) => {
+    const exportIsBookingAndOperational = exportTab === "Booking and Operational Analytics";
+
+    if (!exportIsBookingAndOperational) {
       showSnackbar({
         severity: "info",
-        message: `Export for "${activeSubTab}" is not implemented yet.`,
+        message: `Export for "${exportTab}" is not implemented yet.`,
       });
       return;
     }
@@ -662,7 +667,7 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
     doc.setTextColor(40);
-    doc.text(String(activeSubTab), 40, 114, { maxWidth: pageW - 80 });
+    doc.text(String(exportTab), 40, 114, { maxWidth: pageW - 80 });
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(11);
@@ -939,17 +944,15 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
 
     const filename =
       fromDate && toDate
-        ? `professional-analytics_${activeSubTab.replaceAll(" ", "-").toLowerCase()}_${fromDate}_to_${toDate}.pdf`
-        : `professional-analytics_${activeSubTab.replaceAll(" ", "-").toLowerCase()}.pdf`;
+        ? `professional-analytics_${exportTab.replaceAll(" ", "-").toLowerCase()}_${fromDate}_to_${toDate}.pdf`
+        : `professional-analytics_${exportTab.replaceAll(" ", "-").toLowerCase()}.pdf`;
 
     doc.save(filename);
     showSnackbar({ severity: "success", message: "Export started. Your PDF should download shortly." });
   }, [
-    activeSubTab,
     data.header.subtitle,
     data.header.title,
     fromDate,
-    isBookingAndOperational,
     section11.rows,
     section11.title,
     section12.rows,
@@ -966,6 +969,17 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
     toDate,
     todayIso,
   ]);
+
+  const exportOptions = React.useMemo(
+    () => [
+      { id: "all", label: "All" },
+      { id: "Booking and Operational Analytics", label: "Booking and Operational Analytics" },
+      { id: "Sales Volume Analytics", label: "Sales Volume Analytics" },
+      { id: "Performance Analytics", label: "Performance Analytics" },
+      { id: "Rating and Review Analytics", label: "Rating and Review Analytics" },
+    ] as const,
+    [],
+  );
 
   return (
     <Paper
@@ -1065,7 +1079,7 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
             <Button
               variant="contained"
               disableElevation
-              onClick={exportPdf}
+              onClick={(e) => setExportAnchor(e.currentTarget)}
               sx={{
                 height: 28,
                 borderRadius: "6px",
@@ -1073,6 +1087,7 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
                 fontWeight: 800,
                 fontSize: 12,
                 bgcolor: m.teal,
+                color: "#fff",
                 "&:hover": { bgcolor: m.tealDark },
                 px: 2,
                 minWidth: 84,
@@ -1080,6 +1095,24 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
             >
               Export
             </Button>
+
+            <ExportMenuPopover
+              anchorEl={exportAnchor}
+              open={exportMenuOpen}
+              onClose={() => setExportAnchor(null)}
+              options={exportOptions}
+              onSelect={(opt) => {
+                setExportAnchor(null);
+                if (opt.id === "all") {
+                  showSnackbar({
+                    severity: "info",
+                    message: 'Export for "All" is not implemented yet. Please select a specific analytics section.',
+                  });
+                } else {
+                  exportPdf(opt.id as ProfessionalAnalyticsSubTab);
+                }
+              }}
+            />
           </Stack>
         </Paper>
       </Box>

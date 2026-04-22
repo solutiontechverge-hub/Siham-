@@ -72,6 +72,14 @@ export default function IndividualSignupPage() {
   const passwordStrength = getPasswordStrength(form.password);
 
   const cardBorder = m.cardBorder ?? alpha(m.navy, 0.12);
+  const maxDob = React.useMemo(() => {
+    // Use local date (not UTC) to avoid off-by-one in some timezones.
+    const d = new Date();
+    const yyyy = String(d.getFullYear());
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }, []);
 
   const displayNameOptions = React.useMemo(() => {
     const full = `${form.firstName} ${form.lastName}`.trim();
@@ -127,6 +135,26 @@ export default function IndividualSignupPage() {
         country_code: form.countryCode.trim() || undefined,
         phone: form.phone.trim() || undefined,
       }).unwrap();
+
+      // Persist client details for pre-filling the client profile page.
+      try {
+        window.localStorage.setItem(
+          "mollure:client_profile",
+          JSON.stringify({
+            first_name: form.firstName.trim(),
+            last_name: form.lastName.trim(),
+            display_name: form.displayName.trim() || undefined,
+            date_of_birth: form.birthDate || undefined,
+            gender: form.gender || undefined,
+            country_code: form.countryCode.trim() || undefined,
+            phone: form.phone.trim() || undefined,
+            email: form.email.trim().toLowerCase(),
+            avatar_url: null,
+          }),
+        );
+      } catch {
+        // ignore storage failures
+      }
 
       showSnackbar({
         severity: "success",
@@ -339,6 +367,7 @@ export default function IndividualSignupPage() {
                             name="birthDate"
                             value={form.birthDate}
                             onChange={handleChange}
+                            inputProps={{ max: maxDob }}
                           />
                         </Grid>
                         <Grid item xs={12} sm={6}>
