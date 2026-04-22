@@ -32,6 +32,22 @@
     {
       "key": "otp",
       "value": ""
+    },
+    {
+      "key": "categoryId",
+      "value": ""
+    },
+    {
+      "key": "subcategoryId",
+      "value": ""
+    },
+    {
+      "key": "businessSetupId",
+      "value": ""
+    },
+    {
+      "key": "calendarCode",
+      "value": "CAL-001"
     }
   ],
   "item": [
@@ -810,6 +826,379 @@
                 "api",
                 "user",
                 "profile"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Business",
+      "item": [
+        {
+          "name": "GET Categories",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/business/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "business",
+                "categories"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST Create Category",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const jsonData = pm.response.json();",
+                  "if (jsonData.success && jsonData.data && jsonData.data.id) {",
+                  "  pm.collectionVariables.set('categoryId', String(jsonData.data.id));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Beauty Services\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/business/categories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "business",
+                "categories"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST Create Subcategory",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const jsonData = pm.response.json();",
+                  "if (jsonData.success && jsonData.data && jsonData.data.id) {",
+                  "  pm.collectionVariables.set('subcategoryId', String(jsonData.data.id));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"category_id\": {{categoryId}},\n  \"title\": \"Bridal Makeup\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/business/subcategories",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "business",
+                "subcategories"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET Business Setup",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const jsonData = pm.response.json();",
+                  "if (jsonData.success && jsonData.data && jsonData.data.id) {",
+                  "  pm.collectionVariables.set('businessSetupId', String(jsonData.data.id));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/business/setup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "business",
+                "setup"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "PUT Upsert Business Setup",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const jsonData = pm.response.json();",
+                  "if (jsonData.success && jsonData.data && jsonData.data.id) {",
+                  "  pm.collectionVariables.set('businessSetupId', String(jsonData.data.id));",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"location_mode\": \"both\",\n  \"business_name\": \"Glow Studio Pro\",\n  \"business_about\": \"Luxury beauty and makeup services.\",\n  \"business_keywords\": [\"makeup\", \"bridal\", \"beauty\"],\n  \"business_media\": [\"img-1.jpg\", \"img-2.jpg\", \"img-3.jpg\", \"img-4.jpg\"],\n  \"fixed_location_address\": \"Mall Road\",\n  \"fixed_location_street_number\": \"22-A\",\n  \"fixed_location_postal_code\": \"54000\",\n  \"fixed_location_province\": \"Punjab\",\n  \"fixed_location_municipality\": \"Lahore\",\n  \"service_categories\": [\"Beauty Services\"],\n  \"project\": \"Signature bridal shoots\",\n  \"book_service_notes\": \"Book at least 24 hours earlier.\",\n  \"team_member_ids\": [1],\n  \"additional_notes\": \"Bring inspiration references.\",\n  \"price_range\": \"100-500\",\n  \"prepayment_percentage\": 20,\n  \"prepayment_instruction\": \"Pay online before confirmation.\",\n  \"kilometer_allowance\": 15,\n  \"kilometer_allowance_instruction\": \"After 15km extra charges apply.\",\n  \"response_time_hours\": 2,\n  \"response_time_minutes\": 30,\n  \"policy_custom_instruction\": \"Respect studio timings.\",\n  \"appointment_before_hours\": 24,\n  \"appointment_before_minutes\": 0,\n  \"late_reschedule_fee_percentage\": 10,\n  \"late_reschedule_policy_instruction\": \"Changes within 12 hours incur charges.\",\n  \"cancellation_before_hours\": 12,\n  \"cancellation_before_minutes\": 0,\n  \"late_cancellation_fee_percentage\": 15,\n  \"cancellation_policy_instruction\": \"Late cancellations are partially charged.\",\n  \"no_show_fee_percentage\": 25,\n  \"desired_location_area\": \"DHA\",\n  \"desired_location_province\": \"Punjab\",\n  \"desired_location_services\": [\"Bridal Makeup\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/business/setup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "business",
+                "setup"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET Business Service Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/business/service-details",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "business",
+                "service-details"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST Upsert Business Service Detail",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"service_id\": {{subcategoryId}},\n  \"price\": 250\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/business/service-details",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "business",
+                "service-details"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET Calendar Entries",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/business/calendar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "business",
+                "calendar"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST Create Calendar Entry",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"confirmed\",\n  \"title\": \"Bridal Booking Slot\",\n  \"unique_code\": \"{{calendarCode}}\",\n  \"start_time\": \"2026-05-01T10:00:00.000Z\",\n  \"end_time\": \"2026-05-01T12:00:00.000Z\",\n  \"start_date\": \"2026-05-01\",\n  \"end_date\": \"2026-05-01\",\n  \"location_type\": \"fixed\",\n  \"service_ids\": [{{subcategoryId}}]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/business/calendar",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "business",
+                "calendar"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "GET Bookings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/business/bookings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "business",
+                "bookings"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "POST Create Booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"booking_date\": \"2026-05-01\",\n  \"business_setup_id\": {{businessSetupId}},\n  \"service_id\": {{subcategoryId}},\n  \"team_member_id\": 1,\n  \"start_time\": \"2026-05-01T10:00:00.000Z\",\n  \"end_time\": \"2026-05-01T12:00:00.000Z\",\n  \"location_type\": \"fixed\",\n  \"location_details\": {\n    \"address\": \"Mall Road\",\n    \"province\": \"Punjab\"\n  },\n  \"notes\": \"Need bridal makeup package.\",\n  \"prepayment_status\": \"pending\",\n  \"status\": \"requested\",\n  \"total_price\": 250,\n  \"images\": [\"ref-1.jpg\"],\n  \"contact_number\": \"+923001234567\",\n  \"documents\": [\"brief.pdf\"],\n  \"province\": \"Punjab\",\n  \"municipality\": \"Lahore\",\n  \"street_address\": \"Mall Road\",\n  \"street_number\": \"22-A\",\n  \"postal_code\": \"54000\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/business/bookings",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "business",
+                "bookings"
               ]
             }
           },
