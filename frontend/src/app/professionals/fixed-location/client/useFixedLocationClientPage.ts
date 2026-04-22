@@ -499,6 +499,19 @@ export function useFixedLocationClientPage() {
     setSnackbar({ open: true, message: "Client Deleted", severity: "info" });
   }, [blockClientId, deleteClientId, viewClientId]);
 
+  const confirmBlockClient = React.useCallback(() => {
+    if (!blockClientId) return;
+    const id = blockClientId;
+    setClients((prev) => prev.filter((c) => c.id !== id));
+    setBlockClientId(null);
+    if (viewClientId === id) {
+      setViewClientId(null);
+      setClientDetailsMode("view");
+    }
+    if (deleteClientId === id) setDeleteClientId(null);
+    setSnackbar({ open: true, message: "Client Blocked", severity: "info" });
+  }, [blockClientId, deleteClientId, viewClientId]);
+
   const saveClientEdits = React.useCallback(() => {
     if (!viewClientId) return false;
 
@@ -658,6 +671,7 @@ export function useFixedLocationClientPage() {
     openNonMollureAddDrawer,
     closeClientDetailsDrawer,
     confirmDeleteClient,
+    confirmBlockClient,
     saveClientEdits,
   };
 }

@@ -141,6 +141,7 @@ export default function FixedLocationClientPage() {
     openNonMollureAddDrawer,
     closeClientDetailsDrawer,
     confirmDeleteClient,
+    confirmBlockClient,
     saveClientEdits,
   } = useFixedLocationClientPage();
 
@@ -474,15 +475,13 @@ export default function FixedLocationClientPage() {
             <Button
               variant="contained"
               disableElevation
-              onClick={() => {
-                // Hook your API here. For now: close modal only.
-                setBlockClientId(null);
-              }}
+              onClick={confirmBlockClient}
               sx={{
                 borderRadius: "8px",
                 textTransform: "none",
                 fontWeight: 900,
                 bgcolor: "primary.main",
+                color: "#fff",
                 "&:hover": { bgcolor: "mollure.tealDark" },
                 height: 34,
                 px: 3,
