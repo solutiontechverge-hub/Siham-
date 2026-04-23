@@ -2,7 +2,7 @@ export type PasswordStrengthLevel = "weak" | "medium" | "strong";
 
 export type PasswordStrengthResult = {
   level: PasswordStrengthLevel;
-  label: "Low" | "Normal" | "Strong";
+  label: "Weak" | "Medium" | "Strong";
   score: number;
   isStrong: boolean;
 };
@@ -42,16 +42,16 @@ export const getPasswordStrength = (password: string): PasswordStrengthResult =>
   if (score >= 3) {
     return {
       level: "medium",
-      label: "Normal",
+      label: "Medium",
       score,
       isStrong: false,
     };
   }
 
-  return {
-    level: "weak",
-    label: "Low",
-    score,
-    isStrong: false,
-  };
+    return {
+      level: "weak",
+      label: "Weak",
+      score,
+      isStrong: false,
+    };
 };

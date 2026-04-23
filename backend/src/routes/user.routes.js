@@ -17,6 +17,20 @@ router.put(
     { name: "logo", maxCount: 1 },
   ]),
   [
+    body("email")
+      .optional({ values: "falsy" })
+      .trim()
+      .isEmail()
+      .withMessage("email must be a valid email address.")
+      .normalizeEmail(),
+    body("password")
+      .optional({ values: "falsy" })
+      .isLength({ min: 8 })
+      .withMessage("password must be at least 8 characters long."),
+    body("confirm_password")
+      .optional({ values: "falsy" })
+      .custom((value, { req }) => !req.body.password || value === req.body.password)
+      .withMessage("confirm_password must match password."),
     body("website")
       .optional({ values: "falsy" })
       .isURL()

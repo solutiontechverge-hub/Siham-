@@ -110,7 +110,7 @@ export default function AuthLoginShell({ header, signupHref }: AuthLoginShellPro
           ? "/clients/listing"
           : result.data.user.user_type === "professional"
             ? "/professionals/fixed-location/profile"
-            : "/",
+            : "/clients/profile",
       );
       showSnackbar({ severity: "success", message: "Signed in successfully." });
     } catch (error) {
