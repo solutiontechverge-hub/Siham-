@@ -6,6 +6,7 @@ import {
   Avatar,
   Box,
   Button,
+  CircularProgress,
   Drawer,
   Fade,
   Checkbox,
@@ -37,6 +38,7 @@ import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import type { FixedLocationPageData } from "../../app/professionals/fixed-location/fixedLocation.data";
 import { useFixedLocationForm } from "../../app/professionals/fixed-location/fixedLocation.use";
+import type { ProfessionalProfile, ProfileResponse } from "../../store/services/profileApi";
 import MollureFormField from "./MollureFormField";
 import { Typography } from "../ui/typography";
 
@@ -51,6 +53,28 @@ type ServiceDetailUiItem = {
 export type ProfessionalFixedLocationSetupProps = {
   data: FixedLocationPageData;
   chrome?: boolean;
+  profileData?: ProfileResponse | null;
+  isProfileSaving?: boolean;
+  onSaveProfessionalProfile?: (payload: {
+    email: string;
+    password?: string;
+    confirm_password?: string;
+    legal_name: string;
+    ccc_number: string;
+    vat_number: string;
+    street: string;
+    street_number: string;
+    postal_code: string;
+    province: string;
+    municipality: string;
+    business_type: string;
+    website: string;
+    instagram: string;
+    other_link: string;
+    contact_first_name: string;
+    contact_last_name: string;
+    phone: string;
+  }) => Promise<void>;
 };
 
 function SectionShell({
@@ -131,6 +155,9 @@ function PrimaryMiniButton({
 export default function ProfessionalFixedLocationSetup({
   data,
   chrome = true,
+  profileData = null,
+  isProfileSaving = false,
+  onSaveProfessionalProfile,
 }: ProfessionalFixedLocationSetupProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -383,6 +410,39 @@ export default function ProfessionalFixedLocationSetup({
 
   const [isProfessionalEditing, setIsProfessionalEditing] = React.useState(false);
   const professionalFieldsDisabled = !isProfessionalEditing;
+  const hydratedProfileRef = React.useRef<string | null>(null);
+
+  React.useEffect(() => {
+    if (!profileData || profileData.user_type !== "professional") {
+      return;
+    }
+
+    const hydrationKey = `${profileData.id}:${profileData.updated_at}`;
+    if (hydratedProfileRef.current === hydrationKey) {
+      return;
+    }
+
+    const professionalProfile = profileData.profile as ProfessionalProfile | null;
+
+    setField("professionalPhotoSrc", professionalProfile?.profile_picture || "/professionals/hero.png");
+    setField("companyLegalName", professionalProfile?.legal_name || "");
+    setField("companyCocNumber", professionalProfile?.ccc_number || "");
+    setField("companyVatNumber", professionalProfile?.vat_number || "");
+    setField("companyStreet", professionalProfile?.street || "");
+    setField("companyStreetNumber", professionalProfile?.street_number || "");
+    setField("companyPostalCode", professionalProfile?.postal_code || "");
+    setField("companyProvince", professionalProfile?.province || "");
+    setField("companyMunicipality", professionalProfile?.municipality || "");
+    setField("companyBusinessType", professionalProfile?.business_type || "");
+    setField("companyWebsite", professionalProfile?.website || "");
+    setField("socialInstagram", professionalProfile?.instagram || "");
+    setField("socialOther", professionalProfile?.other_link || "");
+    setField("contactFirstName", professionalProfile?.contact_first_name || "");
+    setField("contactLastName", professionalProfile?.contact_last_name || "");
+    setField("contactEmail", profileData.email || "");
+    setField("contactPhone", professionalProfile?.phone || "");
+    hydratedProfileRef.current = hydrationKey;
+  }, [profileData, setField]);
   const businessEditKeys = React.useMemo(
     () =>
       [
@@ -1021,8 +1081,37 @@ export default function ProfessionalFixedLocationSetup({
           fullWidth
           variant="contained"
           disableElevation
-          onClick={() => setIsProfessionalEditing(false)}
-          disabled={!isProfessionalEditing}
+          onClick={async () => {
+            if (!onSaveProfessionalProfile) {
+              setIsProfessionalEditing(false);
+              return;
+            }
+
+            await onSaveProfessionalProfile({
+              email: values.contactEmail,
+              password: values.contactPassword || undefined,
+              confirm_password: values.contactRepeatPassword || undefined,
+              legal_name: values.companyLegalName,
+              ccc_number: values.companyCocNumber,
+              vat_number: values.companyVatNumber,
+              street: values.companyStreet,
+              street_number: values.companyStreetNumber,
+              postal_code: values.companyPostalCode,
+              province: values.companyProvince,
+              municipality: values.companyMunicipality,
+              business_type: values.companyBusinessType,
+              website: values.companyWebsite,
+              instagram: values.socialInstagram,
+              other_link: values.socialOther,
+              contact_first_name: values.contactFirstName,
+              contact_last_name: values.contactLastName,
+              phone: values.contactPhone,
+            });
+            setField("contactPassword", "");
+            setField("contactRepeatPassword", "");
+            setIsProfessionalEditing(false);
+          }}
+          disabled={!isProfessionalEditing || isProfileSaving}
           sx={{
             borderRadius: "6px",
             textTransform: "none",
@@ -1034,7 +1123,7 @@ export default function ProfessionalFixedLocationSetup({
             mt: 0.5,
           }}
         >
-          Update
+          {isProfileSaving ? <CircularProgress size={20} color="inherit" /> : "Update"}
         </Button>
       </Stack>
     </Box>

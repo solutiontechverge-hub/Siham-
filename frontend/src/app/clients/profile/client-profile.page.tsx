@@ -39,7 +39,11 @@ import { useClientProfilePage } from "./use-profile";
 import { ClientTopTabs, MollureMarketingHeader } from "../../../components/common";
 import { MarketingSiteFooter } from "../../../components/common";
 import { marketingShellFooter } from "../../../data/marketingShell.data";
-import { MollureLabeledField, MollureLabeledPasswordField } from "../../../components/common";
+import {
+  MollureLabeledField,
+  MollureLabeledPasswordField,
+  PasswordStrengthBar,
+} from "../../../components/common";
 
 const clientTopTabs = [
   { label: "Booking", href: "/clients/booking" },
@@ -65,6 +69,8 @@ export default function ClientProfilePage() {
     tokens,
     pageBg,
     profile,
+    isCompanyProfile,
+    avatarUrl,
     setAvatarUrl,
     form,
     isLoading,
@@ -118,7 +124,7 @@ export default function ClientProfilePage() {
       <Box sx={{ minHeight: "100vh", bgcolor: pageBg, py: 8 }}>
         <Container maxWidth="sm">
           <Alert severity="error" sx={{ mb: 2 }}>
-            Could not load profile. Ensure <code>GET /api/users/me</code> returns the same fields as individual signup.
+            Could not load profile. Ensure <code>GET /api/user/profile</code> is reachable and the auth token is valid.
           </Alert>
           <Button variant="contained" onClick={() => refetch()} sx={{ bgcolor: tokens.teal }}>
             Retry
@@ -135,7 +141,7 @@ export default function ClientProfilePage() {
         isAuthed
         userLabel={profile?.email || form.email}
         userName={displayName}
-        userAvatarSrc={profile?.avatar_url || undefined}
+        userAvatarSrc={avatarUrl || undefined}
         homeHref="/clients/listing"
       />
 
@@ -168,7 +174,7 @@ export default function ClientProfilePage() {
         <Stack spacing={2}>
           <Stack direction="row" spacing={1.5} alignItems="center">
             <Avatar
-              src={profile?.avatar_url || imgSrc(AvatarPlaceholder)}
+              src={avatarUrl || imgSrc(AvatarPlaceholder)}
               sx={{ width: 54, height: 54, bgcolor: tokens.avatarBg }}
             />
             <Box sx={{ minWidth: 0 }}>
@@ -284,7 +290,7 @@ export default function ClientProfilePage() {
           >
             <Stack direction="row" spacing={1.5} alignItems="center">
               <Avatar
-                src={profile?.avatar_url || imgSrc(AvatarPlaceholder)}
+                src={avatarUrl || imgSrc(AvatarPlaceholder)}
                 sx={{ width: 44, height: 44, bgcolor: tokens.avatarBg }}
               />
               <Typography sx={{ fontWeight: 900, color: tokens.navy, fontSize: 16 }}>
@@ -409,7 +415,7 @@ export default function ClientProfilePage() {
               <Box component="label" sx={{ cursor: "pointer", display: "inline-flex" }}>
                 <input type="file" accept="image/*" hidden onChange={handleAvatarPick} />
                 <Avatar
-                  src={profile?.avatar_url || imgSrc(AvatarPlaceholder)}
+                  src={avatarUrl || imgSrc(AvatarPlaceholder)}
                   sx={{ width: 72, height: 72, bgcolor: tokens.avatarBg }}
                 />
               </Box>
@@ -432,115 +438,234 @@ export default function ClientProfilePage() {
             </Snackbar>
 
             <Typography sx={{ fontWeight: 800, color: tokens.navy, mb: 1 }}>
-              {profilePageData.sections.personal}
+              {isCompanyProfile ? "Company Information" : profilePageData.sections.personal}
             </Typography>
             <Divider sx={{ mb: 2.5, borderColor: tokens.border }} />
 
-            <Grid container spacing={2.25}>
-              <Grid item xs={12} sm={6}>
-                <MollureLabeledField
-                  name="firstName"
-                  fieldLabel={profilePageData.fields.firstName.label}
-                  placeholder={profilePageData.fields.firstName.placeholder}
-                  value={form.firstName}
-                  onChange={handleChange}
-                  disabled={fieldsDisabled}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <MollureLabeledField
-                  name="lastName"
-                  fieldLabel={profilePageData.fields.lastName.label}
-                  placeholder={profilePageData.fields.lastName.placeholder}
-                  value={form.lastName}
-                  onChange={handleChange}
-                  disabled={fieldsDisabled}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <MollureLabeledField
-                  select
-                  fieldLabel={profilePageData.fields.reviewName.label}
-                  value={form.reviewNameMode}
-                  onChange={(e) => setReviewNameMode(e.target.value as typeof form.reviewNameMode)}
-                  disabled={fieldsDisabled}
-                >
-                  {profilePageData.reviewNameOptions.map((opt) => (
-                    <MenuItem key={opt.value} value={opt.value}>
-                      {opt.label}
+            {!isCompanyProfile ? (
+              <Grid container spacing={2.25}>
+                <Grid item xs={12} sm={6}>
+                  <MollureLabeledField
+                    name="firstName"
+                    fieldLabel={profilePageData.fields.firstName.label}
+                    placeholder={profilePageData.fields.firstName.placeholder}
+                    value={form.firstName}
+                    onChange={handleChange}
+                    disabled={fieldsDisabled}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <MollureLabeledField
+                    name="lastName"
+                    fieldLabel={profilePageData.fields.lastName.label}
+                    placeholder={profilePageData.fields.lastName.placeholder}
+                    value={form.lastName}
+                    onChange={handleChange}
+                    disabled={fieldsDisabled}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <MollureLabeledField
+                    select
+                    fieldLabel={profilePageData.fields.reviewName.label}
+                    value={form.reviewNameMode}
+                    onChange={(e) => setReviewNameMode(e.target.value as typeof form.reviewNameMode)}
+                    disabled={fieldsDisabled}
+                  >
+                    {profilePageData.reviewNameOptions.map((opt) => (
+                      <MenuItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </MenuItem>
+                    ))}
+                  </MollureLabeledField>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <MollureLabeledField
+                    name="birthDate"
+                    type="date"
+                    fieldLabel={profilePageData.fields.birthDate.label}
+                    value={form.birthDate}
+                    onChange={handleChange}
+                    disabled={fieldsDisabled}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <MollureLabeledField
+                    select
+                    fieldLabel={profilePageData.fields.gender.label}
+                    name="gender"
+                    value={form.gender}
+                    onChange={handleChange}
+                    disabled={fieldsDisabled}
+                  >
+                    <MenuItem value="">
+                      <em>Select</em>
                     </MenuItem>
-                  ))}
-                </MollureLabeledField>
+                    {profilePageData.genderOptions.map((opt) => (
+                      <MenuItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </MenuItem>
+                    ))}
+                  </MollureLabeledField>
+                </Grid>
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <MollureLabeledField
-                  name="birthDate"
-                  type="date"
-                  fieldLabel={profilePageData.fields.birthDate.label}
-                  value={form.birthDate}
-                  onChange={handleChange}
-                  disabled={fieldsDisabled}
-                />
+            ) : (
+              <Grid container spacing={2.25}>
+                <Grid item xs={12}>
+                  <MollureLabeledField
+                    name="legalName"
+                    fieldLabel="Legal Name"
+                    placeholder="Enter legal name"
+                    value={form.legalName}
+                    onChange={handleChange}
+                    disabled={fieldsDisabled}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <MollureLabeledField
+                    name="cccNumber"
+                    fieldLabel="COC Number"
+                    placeholder="Enter COC number"
+                    value={form.cccNumber}
+                    onChange={handleChange}
+                    disabled={fieldsDisabled}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <MollureLabeledField
+                    name="vatNumber"
+                    fieldLabel="VAT Number"
+                    placeholder="Enter VAT number"
+                    value={form.vatNumber}
+                    onChange={handleChange}
+                    disabled={fieldsDisabled}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={8}>
+                  <MollureLabeledField
+                    name="street"
+                    fieldLabel="Street"
+                    placeholder="Enter street"
+                    value={form.street}
+                    onChange={handleChange}
+                    disabled={fieldsDisabled}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <MollureLabeledField
+                    name="streetNumber"
+                    fieldLabel="Street Number"
+                    placeholder="Enter number"
+                    value={form.streetNumber}
+                    onChange={handleChange}
+                    disabled={fieldsDisabled}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <MollureLabeledField
+                    name="postalCode"
+                    fieldLabel="Postal Code"
+                    placeholder="Enter postal code"
+                    value={form.postalCode}
+                    onChange={handleChange}
+                    disabled={fieldsDisabled}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <MollureLabeledField
+                    name="province"
+                    fieldLabel="Province"
+                    placeholder="Enter province"
+                    value={form.province}
+                    onChange={handleChange}
+                    disabled={fieldsDisabled}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <MollureLabeledField
+                    name="municipality"
+                    fieldLabel="Municipality"
+                    placeholder="Enter municipality"
+                    value={form.municipality}
+                    onChange={handleChange}
+                    disabled={fieldsDisabled}
+                  />
+                </Grid>
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <MollureLabeledField
-                  select
-                  fieldLabel={profilePageData.fields.gender.label}
-                  name="gender"
-                  value={form.gender}
-                  onChange={handleChange}
-                  disabled
-                  sx={{
-                    "& .MuiSelect-select": { color: tokens.placeholder },
-                  }}
-                >
-                  <MenuItem value="">
-                    <em>Select</em>
-                  </MenuItem>
-                  {profilePageData.genderOptions.map((opt) => (
-                    <MenuItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </MenuItem>
-                  ))}
-                </MollureLabeledField>
-              </Grid>
-            </Grid>
+            )}
 
             <Typography sx={{ fontWeight: 800, color: tokens.navy, mb: 1, mt: 3.5 }}>
-              {profilePageData.sections.contact}
+              {isCompanyProfile ? "Contact Person" : profilePageData.sections.contact}
             </Typography>
             <Divider sx={{ mb: 2.5, borderColor: tokens.border }} />
 
             <Grid container spacing={2.25}>
-              <Grid item xs={12} sm={4}>
-                <MollureLabeledField
-                  select
-                  name="countryCode"
-                  fieldLabel={profilePageData.fields.countryCode.label}
-                  value={form.countryCode || ""}
-                  onChange={handleChange}
-                  disabled={fieldsDisabled}
-                >
-                  <MenuItem value="">
-                    <em>Code</em>
-                  </MenuItem>
-                  {profilePageData.countryCodeOptions.map((opt) => (
-                    <MenuItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </MenuItem>
-                  ))}
-                </MollureLabeledField>
-              </Grid>
-              <Grid item xs={12} sm={8}>
-                <MollureLabeledField
-                  name="phone"
-                  fieldLabel={profilePageData.fields.phone.label}
-                  placeholder={profilePageData.fields.phone.placeholder}
-                  value={form.phone}
-                  onChange={handleChange}
-                  disabled={fieldsDisabled}
-                />
-              </Grid>
+              {!isCompanyProfile ? (
+                <>
+                  <Grid item xs={12} sm={4}>
+                    <MollureLabeledField
+                      select
+                      name="countryCode"
+                      fieldLabel={profilePageData.fields.countryCode.label}
+                      value={form.countryCode || ""}
+                      onChange={handleChange}
+                      disabled={fieldsDisabled}
+                    >
+                      <MenuItem value="">
+                        <em>Code</em>
+                      </MenuItem>
+                      {profilePageData.countryCodeOptions.map((opt) => (
+                        <MenuItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </MenuItem>
+                      ))}
+                    </MollureLabeledField>
+                  </Grid>
+                  <Grid item xs={12} sm={8}>
+                    <MollureLabeledField
+                      name="phone"
+                      fieldLabel={profilePageData.fields.phone.label}
+                      placeholder={profilePageData.fields.phone.placeholder}
+                      value={form.phone}
+                      onChange={handleChange}
+                      disabled={fieldsDisabled}
+                    />
+                  </Grid>
+                </>
+              ) : (
+                <>
+                  <Grid item xs={12} sm={6}>
+                    <MollureLabeledField
+                      name="contactFirstName"
+                      fieldLabel="First Name"
+                      placeholder="Enter first name"
+                      value={form.contactFirstName}
+                      onChange={handleChange}
+                      disabled={fieldsDisabled}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <MollureLabeledField
+                      name="contactLastName"
+                      fieldLabel="Last Name"
+                      placeholder="Enter last name"
+                      value={form.contactLastName}
+                      onChange={handleChange}
+                      disabled={fieldsDisabled}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <MollureLabeledField
+                      name="phone"
+                      fieldLabel="Phone"
+                      placeholder="Enter phone number"
+                      value={form.phone}
+                      onChange={handleChange}
+                      disabled={fieldsDisabled}
+                    />
+                  </Grid>
+                </>
+              )}
               <Grid item xs={12}>
                 <MollureLabeledField
                   name="email"
@@ -573,6 +698,9 @@ export default function ClientProfilePage() {
                   onChange={handleChange}
                   disabled={fieldsDisabled}
                 />
+              </Grid>
+              <Grid item xs={12}>
+                <PasswordStrengthBar password={form.password} />
               </Grid>
             </Grid>
 

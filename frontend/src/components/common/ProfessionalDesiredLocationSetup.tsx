@@ -2,11 +2,15 @@
 
 import * as React from "react";
 import type { DesiredLocationPageData } from "../../app/professionals/desired-location/desiredLocation.data";
-import ProfessionalFixedLocationSetup from "./ProfessionalFixedLocationSetup";
+import ProfessionalFixedLocationSetup, {
+  type ProfessionalFixedLocationSetupProps,
+} from "./ProfessionalFixedLocationSetup";
 
-export type ProfessionalDesiredLocationSetupProps = {
+export type ProfessionalDesiredLocationSetupProps = Omit<
+  ProfessionalFixedLocationSetupProps,
+  "data"
+> & {
   data: DesiredLocationPageData;
-  chrome?: boolean;
 };
 
 export default function ProfessionalDesiredLocationSetup({ data, chrome = true }: ProfessionalDesiredLocationSetupProps) {

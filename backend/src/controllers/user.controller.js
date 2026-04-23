@@ -1,4 +1,7 @@
+import bcrypt from "bcrypt";
 import { query } from "../db/index.js";
+
+const SALT_ROUNDS = 12;
 
 const profileConfig = {
   individual: {
@@ -27,6 +30,7 @@ const profileConfig = {
       "municipality",
       "contact_first_name",
       "contact_last_name",
+      "phone",
       "logo",
     ],
   },
@@ -47,6 +51,7 @@ const profileConfig = {
       "other_link",
       "contact_first_name",
       "contact_last_name",
+      "phone",
       "profile_picture",
     ],
   },
@@ -103,6 +108,7 @@ export const updateProfile = async (req, res) => {
   try {
     const config = profileConfig[req.user.user_type];
     const updates = {};
+    const userUpdates = {};
 
     for (const field of config.fields) {
       if (req.body[field] !== undefined) {
@@ -118,9 +124,18 @@ export const updateProfile = async (req, res) => {
       updates.logo = req.files.logo[0].filename;
     }
 
-    const updateEntries = Object.entries(updates);
+    if (req.body.email !== undefined) {
+      userUpdates.email = req.body.email.trim().toLowerCase();
+    }
 
-    if (updateEntries.length === 0) {
+    if (req.body.password) {
+      userUpdates.password_hash = await bcrypt.hash(req.body.password, SALT_ROUNDS);
+    }
+
+    const updateEntries = Object.entries(updates);
+    const userUpdateEntries = Object.entries(userUpdates);
+
+    if (updateEntries.length === 0 && userUpdateEntries.length === 0) {
       return res.status(400).json({
         success: false,
         message: "No profile fields provided for update.",
@@ -133,28 +148,45 @@ export const updateProfile = async (req, res) => {
       .join(", ");
     const values = updateEntries.map(([, value]) => value);
 
-    const updateResult = await query(
-      `UPDATE ${config.table}
-       SET ${setClause}
-       WHERE user_id = $${values.length + 1}
-       RETURNING *`,
-      [...values, req.user.id],
-    );
+    if (updateEntries.length > 0) {
+      const updateResult = await query(
+        `UPDATE ${config.table}
+         SET ${setClause}
+         WHERE user_id = $${values.length + 1}
+         RETURNING *`,
+        [...values, req.user.id],
+      );
 
-    if (updateResult.rowCount === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "Profile not found.",
-        data: null,
-      });
+      if (updateResult.rowCount === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Profile not found.",
+          data: null,
+        });
+      }
     }
 
-    await query(
-      `UPDATE users
-       SET updated_at = NOW()
-       WHERE id = $1`,
-      [req.user.id],
-    );
+    if (userUpdateEntries.length > 0) {
+      const userSetClause = userUpdateEntries
+        .map(([field], index) => `${field} = $${index + 1}`)
+        .concat(`updated_at = NOW()`)
+        .join(", ");
+      const userValues = userUpdateEntries.map(([, value]) => value);
+
+      await query(
+        `UPDATE users
+         SET ${userSetClause}
+         WHERE id = $${userValues.length + 1}`,
+        [...userValues, req.user.id],
+      );
+    } else {
+      await query(
+        `UPDATE users
+         SET updated_at = NOW()
+         WHERE id = $1`,
+        [req.user.id],
+      );
+    }
 
     const profileResult = await query(getProfileQuery(req.user.user_type), [req.user.id]);
 
@@ -164,6 +196,14 @@ export const updateProfile = async (req, res) => {
       data: profileResult.rows[0],
     });
   } catch (error) {
+    if (error.code === "23505") {
+      return res.status(409).json({
+        success: false,
+        message: "Email is already in use.",
+        data: null,
+      });
+    }
+
     return res.status(500).json({
       success: false,
       message: "Failed to update profile.",

@@ -41,6 +41,7 @@ const profileConfig = {
       "municipality",
       "contact_first_name",
       "contact_last_name",
+      "phone",
       "logo",
     ],
     requiredFields: [
@@ -68,6 +69,7 @@ const profileConfig = {
       "other_link",
       "contact_first_name",
       "contact_last_name",
+      "phone",
       "profile_picture",
     ],
     requiredFields: [

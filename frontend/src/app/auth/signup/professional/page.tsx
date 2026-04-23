@@ -24,6 +24,7 @@ import {
   MarketingSiteHeader,
   MollureAuthLabeledField,
   MollureAuthLabeledPasswordField,
+  PasswordStrengthBar,
 } from "../../../../components/common";
 import { authSignupHeaderProfessional } from "../../../../data/marketingShell.data";
 import { BodyText } from "../../../../components/ui/typography";
@@ -586,6 +587,9 @@ export default function ProfessionalSignupPage() {
                             placeholder="Confirm Password"
                           />
                         </Grid>
+                        <Grid item xs={12}>
+                          <PasswordStrengthBar password={form.password} />
+                        </Grid>
                       </Grid>
                     </Box>
 
@@ -627,7 +631,7 @@ export default function ProfessionalSignupPage() {
                       variant="contained"
                       disableElevation
                       fullWidth
-                      disabled={isLoading}
+                      disabled={isLoading || !passwordStrength.isStrong}
                       sx={{
                         borderRadius: "10px",
                         textTransform: "none",
