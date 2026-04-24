@@ -72,6 +72,27 @@ export type FixedLocationFormState = {
   prepaymentInstructions: string;
   kilometerAllowance: string;
   kilometerAllowanceInstructions: string;
+
+  // Policy
+  policyResponseHours: string;
+  policyResponseMinutes: string;
+  policyInstructions: string;
+
+  // Rescheduling Policy
+  rescheduleMinimumHours: string;
+  rescheduleMinimumMinutes: string;
+  rescheduleLateFeePercent: string;
+  rescheduleInstructions: string;
+
+  // Cancellation Policy
+  cancelMinimumHours: string;
+  cancelMinimumMinutes: string;
+  cancelLateFeePercent: string;
+  cancelInstructions: string;
+
+  // No Show Policy
+  noShowFeePercent: string;
+  noShowInstructions: string;
 };
 
 const initialState: FixedLocationFormState = {
@@ -139,6 +160,23 @@ const initialState: FixedLocationFormState = {
   prepaymentInstructions: "",
   kilometerAllowance: "",
   kilometerAllowanceInstructions: "",
+
+  policyResponseHours: "",
+  policyResponseMinutes: "",
+  policyInstructions: "",
+
+  rescheduleMinimumHours: "",
+  rescheduleMinimumMinutes: "",
+  rescheduleLateFeePercent: "",
+  rescheduleInstructions: "",
+
+  cancelMinimumHours: "",
+  cancelMinimumMinutes: "",
+  cancelLateFeePercent: "",
+  cancelInstructions: "",
+
+  noShowFeePercent: "",
+  noShowInstructions: "",
 };
 
 export function useFixedLocationForm() {

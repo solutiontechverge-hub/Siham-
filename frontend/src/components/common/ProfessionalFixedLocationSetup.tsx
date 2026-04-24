@@ -2720,6 +2720,295 @@ export default function ProfessionalFixedLocationSetup({
       </SectionShell>
 
       <SectionShell
+        title="Policy Section"
+        action={
+          <IconButton
+            size="small"
+            onClick={() => enableBusinessEditing("price")}
+            sx={{
+              width: 30,
+              height: 30,
+              borderRadius: "999px",
+              bgcolor: alpha(m.navy, 0.05),
+              "&:hover": { bgcolor: alpha(m.navy, 0.10) },
+            }}
+            aria-label="Edit policy"
+          >
+            <EditRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
+          </IconButton>
+        }
+      >
+        <Box sx={businessEditing.price ? undefined : { pointerEvents: "none" }}>
+          <Stack spacing={1.6}>
+            <Box>
+              <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
+                Prepayment/Response Time
+              </Typography>
+              <Grid container spacing={1.5}>
+                <Grid item xs={12} md={6}>
+                  <MollureFormField
+                    placeholder="Hour"
+                    value={values.policyResponseHours}
+                    onChange={(e) => setField("policyResponseHours", e.target.value)}
+                    disabled={!businessEditing.price}
+                    sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                    InputProps={{
+                      endAdornment: <InputAdornment position="end">H</InputAdornment>,
+                      inputMode: "numeric",
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <MollureFormField
+                    placeholder="Minutes"
+                    value={values.policyResponseMinutes}
+                    onChange={(e) => setField("policyResponseMinutes", e.target.value)}
+                    disabled={!businessEditing.price}
+                    sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                    InputProps={{
+                      endAdornment: <InputAdornment position="end">Min</InputAdornment>,
+                      inputMode: "numeric",
+                    }}
+                  />
+                </Grid>
+              </Grid>
+            </Box>
+
+            <MollureFormField
+              placeholder="Custom instructions for Policy"
+              value={values.policyInstructions}
+              onChange={(e) => setField("policyInstructions", e.target.value)}
+              multiline
+              minRows={3}
+              disabled={!businessEditing.price}
+              sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+            />
+          </Stack>
+        </Box>
+      </SectionShell>
+
+      <SectionShell
+        title="Rescheduling Policy"
+        action={
+          <IconButton
+            size="small"
+            onClick={() => enableBusinessEditing("price")}
+            sx={{
+              width: 30,
+              height: 30,
+              borderRadius: "999px",
+              bgcolor: alpha(m.navy, 0.05),
+              "&:hover": { bgcolor: alpha(m.navy, 0.10) },
+            }}
+            aria-label="Edit rescheduling policy"
+          >
+            <EditRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
+          </IconButton>
+        }
+      >
+        <Box sx={businessEditing.price ? undefined : { pointerEvents: "none" }}>
+          <Stack spacing={1.6}>
+            <Box>
+              <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
+                Minimum Time Before Appointment
+              </Typography>
+              <Grid container spacing={1.5}>
+                <Grid item xs={12} md={6}>
+                  <MollureFormField
+                    placeholder="Hour"
+                    value={values.rescheduleMinimumHours}
+                    onChange={(e) => setField("rescheduleMinimumHours", e.target.value)}
+                    disabled={!businessEditing.price}
+                    sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                    InputProps={{
+                      endAdornment: <InputAdornment position="end">H</InputAdornment>,
+                      inputMode: "numeric",
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <MollureFormField
+                    placeholder="Minutes"
+                    value={values.rescheduleMinimumMinutes}
+                    onChange={(e) => setField("rescheduleMinimumMinutes", e.target.value)}
+                    disabled={!businessEditing.price}
+                    sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                    InputProps={{
+                      endAdornment: <InputAdornment position="end">Min</InputAdornment>,
+                      inputMode: "numeric",
+                    }}
+                  />
+                </Grid>
+              </Grid>
+            </Box>
+
+            <Box>
+              <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
+                Late Rescheduling Fee
+              </Typography>
+              <MollureFormField
+                placeholder="0"
+                value={values.rescheduleLateFeePercent}
+                onChange={(e) => setField("rescheduleLateFeePercent", e.target.value)}
+                disabled={!businessEditing.price}
+                sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                InputProps={{
+                  endAdornment: <InputAdornment position="end">%</InputAdornment>,
+                  inputMode: "numeric",
+                }}
+              />
+            </Box>
+
+            <MollureFormField
+              placeholder="Custom instructions for rescheduling Policy"
+              value={values.rescheduleInstructions}
+              onChange={(e) => setField("rescheduleInstructions", e.target.value)}
+              multiline
+              minRows={3}
+              disabled={!businessEditing.price}
+              sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+            />
+          </Stack>
+        </Box>
+      </SectionShell>
+
+      <SectionShell
+        title="Cancellation Policy"
+        action={
+          <IconButton
+            size="small"
+            onClick={() => enableBusinessEditing("price")}
+            sx={{
+              width: 30,
+              height: 30,
+              borderRadius: "999px",
+              bgcolor: alpha(m.navy, 0.05),
+              "&:hover": { bgcolor: alpha(m.navy, 0.10) },
+            }}
+            aria-label="Edit cancellation policy"
+          >
+            <EditRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
+          </IconButton>
+        }
+      >
+        <Box sx={businessEditing.price ? undefined : { pointerEvents: "none" }}>
+          <Stack spacing={1.6}>
+            <Box>
+              <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
+                Minimum Time Before Appointment
+              </Typography>
+              <Grid container spacing={1.5}>
+                <Grid item xs={12} md={6}>
+                  <MollureFormField
+                    placeholder="Hour"
+                    value={values.cancelMinimumHours}
+                    onChange={(e) => setField("cancelMinimumHours", e.target.value)}
+                    disabled={!businessEditing.price}
+                    sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                    InputProps={{
+                      endAdornment: <InputAdornment position="end">H</InputAdornment>,
+                      inputMode: "numeric",
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <MollureFormField
+                    placeholder="Minutes"
+                    value={values.cancelMinimumMinutes}
+                    onChange={(e) => setField("cancelMinimumMinutes", e.target.value)}
+                    disabled={!businessEditing.price}
+                    sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                    InputProps={{
+                      endAdornment: <InputAdornment position="end">Min</InputAdornment>,
+                      inputMode: "numeric",
+                    }}
+                  />
+                </Grid>
+              </Grid>
+            </Box>
+
+            <Box>
+              <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
+                Late Cancellation Fee
+              </Typography>
+              <MollureFormField
+                placeholder="0"
+                value={values.cancelLateFeePercent}
+                onChange={(e) => setField("cancelLateFeePercent", e.target.value)}
+                disabled={!businessEditing.price}
+                sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                InputProps={{
+                  endAdornment: <InputAdornment position="end">%</InputAdornment>,
+                  inputMode: "numeric",
+                }}
+              />
+            </Box>
+
+            <MollureFormField
+              placeholder="Custom instructions for cancellation Policy"
+              value={values.cancelInstructions}
+              onChange={(e) => setField("cancelInstructions", e.target.value)}
+              multiline
+              minRows={3}
+              disabled={!businessEditing.price}
+              sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+            />
+          </Stack>
+        </Box>
+      </SectionShell>
+
+      <SectionShell
+        title="No Show Policy"
+        action={
+          <IconButton
+            size="small"
+            onClick={() => enableBusinessEditing("price")}
+            sx={{
+              width: 30,
+              height: 30,
+              borderRadius: "999px",
+              bgcolor: alpha(m.navy, 0.05),
+              "&:hover": { bgcolor: alpha(m.navy, 0.10) },
+            }}
+            aria-label="Edit no show policy"
+          >
+            <EditRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
+          </IconButton>
+        }
+      >
+        <Box sx={businessEditing.price ? undefined : { pointerEvents: "none" }}>
+          <Stack spacing={1.6}>
+            <Box>
+              <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
+                No Show Fee
+              </Typography>
+              <MollureFormField
+                placeholder="0"
+                value={values.noShowFeePercent}
+                onChange={(e) => setField("noShowFeePercent", e.target.value)}
+                disabled={!businessEditing.price}
+                sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                InputProps={{
+                  endAdornment: <InputAdornment position="end">%</InputAdornment>,
+                  inputMode: "numeric",
+                }}
+              />
+            </Box>
+
+            <MollureFormField
+              placeholder="Custom instructions for no show Policy"
+              value={values.noShowInstructions}
+              onChange={(e) => setField("noShowInstructions", e.target.value)}
+              multiline
+              minRows={3}
+              disabled={!businessEditing.price}
+              sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+            />
+          </Stack>
+        </Box>
+      </SectionShell>
+
+      <SectionShell
         title="Portfolio"
         action={
           <Stack direction="row" spacing={1} alignItems="center">
