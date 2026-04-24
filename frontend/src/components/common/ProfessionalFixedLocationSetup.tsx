@@ -442,6 +442,7 @@ export default function ProfessionalFixedLocationSetup({
   const showFixedLocationSection = businessOfferingSelect === "Fixed Location" || businessOfferingSelect === "Both";
   const showDesiredLocationSection =
     businessOfferingSelect === "Desired Location" || businessOfferingSelect === "Both";
+  const showKilometerAllowance = businessOfferingSelect !== "Fixed Location";
 
   const locationSectionTitle = React.useMemo(() => {
     if (businessOfferingSelect === "Desired Location") return "Desired Location";
@@ -2684,34 +2685,36 @@ export default function ProfessionalFixedLocationSetup({
             </Box>
           </Box>
 
-          <Box>
-            <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
-              Kilometer Allowance (Optional)
-            </Typography>
-            <MollureFormField
-              value={values.kilometerAllowance}
-              onChange={(e) => setField("kilometerAllowance", e.target.value)}
-              placeholder="€ 0"
-              disabled={!businessEditing.price}
-              sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-              InputProps={{
-                startAdornment: <InputAdornment position="start">€</InputAdornment>,
-                endAdornment: <InputAdornment position="end">EUR/Kilometer</InputAdornment>,
-                inputMode: "decimal",
-              }}
-            />
-            <Box sx={{ mt: 1 }}>
+          {showKilometerAllowance ? (
+            <Box>
+              <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
+                Kilometer Allowance (Optional)
+              </Typography>
               <MollureFormField
-                placeholder="Custom instructions for Kilometer Allowance"
-                value={values.kilometerAllowanceInstructions}
-                onChange={(e) => setField("kilometerAllowanceInstructions", e.target.value)}
-                multiline
-                minRows={3}
+                value={values.kilometerAllowance}
+                onChange={(e) => setField("kilometerAllowance", e.target.value)}
+                placeholder="€ 0"
                 disabled={!businessEditing.price}
                 sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                InputProps={{
+                  startAdornment: <InputAdornment position="start">€</InputAdornment>,
+                  endAdornment: <InputAdornment position="end">EUR/Kilometer</InputAdornment>,
+                  inputMode: "decimal",
+                }}
               />
+              <Box sx={{ mt: 1 }}>
+                <MollureFormField
+                  placeholder="Custom instructions for Kilometer Allowance"
+                  value={values.kilometerAllowanceInstructions}
+                  onChange={(e) => setField("kilometerAllowanceInstructions", e.target.value)}
+                  multiline
+                  minRows={3}
+                  disabled={!businessEditing.price}
+                  sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                />
+              </Box>
             </Box>
-          </Box>
+          ) : null}
         </Stack>
         </Box>
       </SectionShell>
