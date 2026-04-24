@@ -423,11 +423,31 @@ export default function ProfessionalFixedLocationSetup({
       return next;
     });
   }, []);
-  const offeringOptions = React.useMemo(() => ["Fixed Location", "Desired Location"] as const, []);
-  type OfferingOption = (typeof offeringOptions)[number];
-  const [businessOffering, setBusinessOffering] = React.useState<OfferingOption[]>(["Fixed Location"]);
-  const [useSameBusinessInfo, setUseSameBusinessInfo] = React.useState(true);
+  const templateOptions = React.useMemo(() => ["Fixed Location", "Desired Location"] as const, []);
+  type OfferingOption = (typeof templateOptions)[number];
+  type OfferingSelectOption = OfferingOption | "Both";
+  const offeringSelectOptions = React.useMemo(
+    () => ["Fixed Location", "Desired Location", "Both"] as const,
+    [],
+  );
+  const [businessOfferingSelect, setBusinessOfferingSelect] =
+    React.useState<OfferingSelectOption>("Fixed Location");
+  const businessOffering = React.useMemo<OfferingOption[]>(
+    () => (businessOfferingSelect === "Both" ? ["Fixed Location", "Desired Location"] : [businessOfferingSelect]),
+    [businessOfferingSelect],
+  );
+  const useSameBusinessInfo = businessOfferingSelect === "Both";
   const [activeBusinessTemplate, setActiveBusinessTemplate] = React.useState<OfferingOption>("Fixed Location");
+
+  const showFixedLocationSection = businessOfferingSelect === "Fixed Location" || businessOfferingSelect === "Both";
+  const showDesiredLocationSection =
+    businessOfferingSelect === "Desired Location" || businessOfferingSelect === "Both";
+
+  const locationSectionTitle = React.useMemo(() => {
+    if (businessOfferingSelect === "Desired Location") return "Desired Location";
+    if (businessOfferingSelect === "Fixed Location") return "Fixed Location";
+    return data.location.title;
+  }, [businessOfferingSelect, data.location.title]);
 
   type BusinessTemplateState = Pick<
     typeof values,
@@ -507,6 +527,314 @@ export default function ProfessionalFixedLocationSetup({
 
   const biz = activeBusinessTemplate === "Fixed Location" ? getCurrentBusinessState() : desiredBusiness;
 
+  const fixedBiz = getCurrentBusinessState();
+  const setFixedBizField = React.useCallback(
+    <K extends keyof BusinessTemplateState>(key: K, value: BusinessTemplateState[K]) => {
+      setIsBusinessPublishEnabled(true);
+      setField(key as any, value as any);
+      if (useSameBusinessInfo) setDesiredBusiness((p) => ({ ...p, [key]: value }));
+    },
+    [setField, useSameBusinessInfo],
+  );
+
+  type DesiredAreaRow = { id: string; province: string; municipality: string };
+  const desiredProvinceOptions = React.useMemo(
+    () =>
+      [
+        "Drenthe",
+        "Flevoland",
+        "Friesland",
+        "Gelderland",
+        "Groningen",
+        "Limburg",
+        "Noord-Brabant",
+        "Noord-Holland",
+        "Overijssel",
+        "Utrecht",
+        "Zeeland",
+        "Zuid-Holland",
+      ] as const,
+    [],
+  );
+  const desiredMunicipalityByProvince = React.useMemo(() => {
+    const base = ["Municipality Name", "Amsterdam", "Rotterdam", "Utrecht", "Haarlem", "Groningen", "Eindhoven"];
+    return desiredProvinceOptions.reduce((acc, p) => {
+      acc[p] = base;
+      return acc;
+    }, {} as Record<(typeof desiredProvinceOptions)[number], string[]>);
+  }, [desiredProvinceOptions]);
+
+  const [desiredAreaMode, setDesiredAreaMode] = React.useState<"Specific areas only" | "All Netherlands">(
+    "Specific areas only",
+  );
+  const [desiredProvinceDraft, setDesiredProvinceDraft] = React.useState<(typeof desiredProvinceOptions)[number]>(
+    "Noord-Holland",
+  );
+  const [desiredMunicipalityDraft, setDesiredMunicipalityDraft] = React.useState<string>("Municipality Name");
+  const [desiredAreas, setDesiredAreas] = React.useState<DesiredAreaRow[]>([
+    { id: "dl-1", province: "Drenthe", municipality: "Drenthe(5)" },
+    { id: "dl-2", province: "Zuid-Holland", municipality: "Zuid-Holland(2)" },
+    { id: "dl-3", province: "Groningen", municipality: "Groningen(8)" },
+    { id: "dl-4", province: "Noord-Holland", municipality: "Noord-Holland" },
+  ]);
+
+  const addDesiredArea = React.useCallback(() => {
+    if (!desiredProvinceDraft || !desiredMunicipalityDraft || desiredMunicipalityDraft === "Municipality Name") return;
+    const exists = desiredAreas.some(
+      (r) => r.province === desiredProvinceDraft && r.municipality === desiredMunicipalityDraft,
+    );
+    if (exists) return;
+    setIsBusinessPublishEnabled(true);
+    setDesiredAreas((prev) => [
+      ...prev,
+      { id: `dl-${Date.now()}-${Math.random().toString(16).slice(2)}`, province: desiredProvinceDraft, municipality: desiredMunicipalityDraft },
+    ]);
+  }, [desiredAreas, desiredMunicipalityDraft, desiredProvinceDraft]);
+
+  const updateDesiredArea = React.useCallback(
+    (id: string, patch: Partial<Omit<DesiredAreaRow, "id">>) => {
+      setIsBusinessPublishEnabled(true);
+      setDesiredAreas((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+    },
+    [],
+  );
+
+  const removeDesiredArea = React.useCallback((id: string) => {
+    setIsBusinessPublishEnabled(true);
+    setDesiredAreas((prev) => prev.filter((r) => r.id !== id));
+  }, []);
+
+  const fixedLocationForm = (
+    <Grid container spacing={1.6}>
+      <Grid item xs={12}>
+        <MollureFormField
+          label="Salon Name"
+          placeholder="Makelush"
+          value={fixedBiz.salonName}
+          onChange={(e) => setFixedBizField("salonName", e.target.value)}
+          disabled={!businessEditing.location}
+        />
+      </Grid>
+      <Grid item xs={12}>
+        <Typography sx={{ fontWeight: 700, fontSize: 13, color: theme.palette.text.primary, mt: 0.5 }}>
+          Address
+        </Typography>
+      </Grid>
+      <Grid item xs={12} sm={6}>
+        <MollureFormField
+          label="Street Address"
+          placeholder="Street Address"
+          value={fixedBiz.streetAddress}
+          onChange={(e) => setFixedBizField("streetAddress", e.target.value)}
+          disabled={!businessEditing.location}
+        />
+      </Grid>
+      <Grid item xs={12} sm={6}>
+        <MollureFormField
+          label="Street Number"
+          placeholder="Street Number"
+          value={fixedBiz.streetNumber}
+          onChange={(e) => setFixedBizField("streetNumber", e.target.value)}
+          disabled={!businessEditing.location}
+        />
+      </Grid>
+      <Grid item xs={12} sm={4}>
+        <MollureFormField
+          label="Postal code"
+          placeholder="Postal code"
+          value={fixedBiz.postalCode}
+          onChange={(e) => setFixedBizField("postalCode", e.target.value)}
+          disabled={!businessEditing.location}
+        />
+      </Grid>
+      <Grid item xs={12} sm={4}>
+        <MollureFormField
+          select
+          label="Province"
+          value={fixedBiz.province}
+          onChange={(e) => setFixedBizField("province", e.target.value)}
+          disabled={!businessEditing.location}
+        >
+          <MenuItem value="">Province</MenuItem>
+          {desiredProvinceOptions.map((p) => (
+            <MenuItem key={p} value={p}>
+              {p}
+            </MenuItem>
+          ))}
+        </MollureFormField>
+      </Grid>
+      <Grid item xs={12} sm={4}>
+        <MollureFormField
+          select
+          label="Municipality"
+          value={fixedBiz.municipality}
+          onChange={(e) => setFixedBizField("municipality", e.target.value)}
+          disabled={!businessEditing.location}
+        >
+          <MenuItem value="">Municipality</MenuItem>
+          {(desiredMunicipalityByProvince[(fixedBiz.province as any) || "Noord-Holland"] ?? []).map((o) => (
+            <MenuItem key={o} value={o}>
+              {o}
+            </MenuItem>
+          ))}
+        </MollureFormField>
+      </Grid>
+    </Grid>
+  );
+
+  const desiredLocationForm = (
+    <Grid container spacing={1.6}>
+      <Grid item xs={12}>
+        <Typography sx={{ fontSize: 12.5, color: alpha(m.navy, 0.62), fontWeight: 500, mb: 0.6 }}>
+          We are offering services
+        </Typography>
+        <MollureFormField
+          select
+          value={desiredAreaMode}
+          onChange={(e) => setDesiredAreaMode(e.target.value as any)}
+          disabled={!businessEditing.location}
+          sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+        >
+          <MenuItem value="Specific areas only">Specific areas only</MenuItem>
+          <MenuItem value="All Netherlands">All Netherlands</MenuItem>
+        </MollureFormField>
+      </Grid>
+
+      <Grid item xs={12} sm={6}>
+        <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.6 }}>
+          Province
+        </Typography>
+        <MollureFormField
+          select
+          value={desiredProvinceDraft}
+          onChange={(e) => {
+            const p = e.target.value as any;
+            setDesiredProvinceDraft(p);
+            setDesiredMunicipalityDraft("Municipality Name");
+          }}
+          disabled={!businessEditing.location || desiredAreaMode !== "Specific areas only"}
+          sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+        >
+          {desiredProvinceOptions.map((p) => (
+            <MenuItem key={p} value={p}>
+              {p}
+            </MenuItem>
+          ))}
+        </MollureFormField>
+      </Grid>
+
+      <Grid item xs={12} sm={6}>
+        <Stack direction="row" spacing={1} alignItems="flex-end">
+          <Box sx={{ flex: 1 }}>
+            <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.6 }}>
+              Municipality
+            </Typography>
+            <MollureFormField
+              select
+              value={desiredMunicipalityDraft}
+              onChange={(e) => setDesiredMunicipalityDraft(e.target.value)}
+              disabled={!businessEditing.location || desiredAreaMode !== "Specific areas only"}
+              sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+            >
+              {(desiredMunicipalityByProvince[desiredProvinceDraft] ?? []).map((o) => (
+                <MenuItem key={o} value={o}>
+                  {o}
+                </MenuItem>
+              ))}
+            </MollureFormField>
+          </Box>
+          <IconButton
+            onClick={addDesiredArea}
+            disabled={!businessEditing.location || desiredAreaMode !== "Specific areas only"}
+            sx={{
+              width: 36,
+              height: 36,
+              borderRadius: "999px",
+              bgcolor: alpha(m.teal, 0.18),
+              color: m.tealDark,
+              border: `1px solid ${alpha(m.tealDark, 0.12)}`,
+              "&:hover": { bgcolor: alpha(m.teal, 0.26) },
+            }}
+            aria-label="Add desired area"
+          >
+            <AddRoundedIcon />
+          </IconButton>
+        </Stack>
+      </Grid>
+
+      {desiredAreaMode === "Specific areas only" ? (
+        <Grid item xs={12}>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "repeat(auto-fit, minmax(220px, 1fr))" },
+              gap: 1.1,
+              alignItems: "start",
+              width: "100%",
+            }}
+          >
+            {desiredAreas.map((r) => {
+              const options = desiredMunicipalityByProvince[(r.province as any) || "Noord-Holland"] ?? [];
+              const safeOptions = options.includes(r.municipality) ? options : [r.municipality, ...options];
+              return (
+                <Box
+                  key={r.id}
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 0.7,
+                    width: "100%",
+                    minWidth: 0,
+                  }}
+                >
+                  <MollureFormField
+                    select
+                    value={r.municipality}
+                    onChange={(e) => updateDesiredArea(r.id, { municipality: e.target.value })}
+                    disabled={!businessEditing.location}
+                    sx={{
+                      flex: "1 1 auto",
+                      minWidth: 0,
+                      "& .MuiOutlinedInput-root": {
+                        bgcolor: "#fff",
+                        borderRadius: "10px",
+                        minHeight: 36,
+                      },
+                      "& .MuiSvgIcon-root": {
+                        fontSize: 18,
+                        color: alpha(m.navy, 0.40),
+                      },
+                    }}
+                  >
+                    {safeOptions.map((o) => (
+                      <MenuItem key={o} value={o} sx={{ fontSize: 12 }}>
+                        {o}
+                      </MenuItem>
+                    ))}
+                  </MollureFormField>
+                  <IconButton
+                    onClick={() => removeDesiredArea(r.id)}
+                    disabled={!businessEditing.location}
+                    sx={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: "8px",
+                      bgcolor: alpha(m.navy, 0.04),
+                      "&:hover": { bgcolor: alpha(m.navy, 0.08) },
+                    }}
+                    aria-label="Remove desired area"
+                  >
+                    <DeleteOutlineRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.55) }} />
+                  </IconButton>
+                </Box>
+              );
+            })}
+          </Box>
+        </Grid>
+      ) : null}
+    </Grid>
+  );
+
   const setBizField = React.useCallback(
     <K extends keyof BusinessTemplateState>(key: K, value: BusinessTemplateState[K]) => {
       setIsBusinessPublishEnabled(true);
@@ -565,18 +893,6 @@ export default function ProfessionalFixedLocationSetup({
     setIsBusinessLocked(true);
     closeAllBusinessEditing();
   }, [closeAllBusinessEditing]);
-
-  const onToggleUseSameBusinessInfo = React.useCallback(
-    (checked: boolean) => {
-      if (isBusinessLocked) return;
-      setUseSameBusinessInfo(checked);
-      if (checked) {
-        // When re-enabling "same info", sync desired to fixed immediately.
-        setDesiredBusiness(getCurrentBusinessState());
-      }
-    },
-    [getCurrentBusinessState, isBusinessLocked],
-  );
 
   const onSwitchActiveBusinessTemplate = React.useCallback(
     (opt: OfferingOption) => {
@@ -1262,13 +1578,12 @@ export default function ProfessionalFixedLocationSetup({
           </Typography>
           <MollureFormField
             select
-            value={businessOffering}
+            value={businessOfferingSelect}
             onChange={(e) => {
-              const v = e.target.value;
-              const next = (Array.isArray(v) ? v : [v]).map(String).filter(Boolean) as OfferingOption[];
-              const normalized = (next.length ? next : ["Fixed Location"]) as OfferingOption[];
-              setBusinessOffering(normalized);
-              if (normalized.length === 1) onSwitchActiveBusinessTemplate(normalized[0]);
+              const v = String(e.target.value) as OfferingSelectOption;
+              setBusinessOfferingSelect(v);
+              if (v !== "Both") onSwitchActiveBusinessTemplate(v);
+              else onSwitchActiveBusinessTemplate("Fixed Location");
               setIsBusinessPublishEnabled(true);
             }}
             disabled={isBusinessLocked || !businessEditing.offering}
@@ -1278,15 +1593,12 @@ export default function ProfessionalFixedLocationSetup({
               },
             }}
             SelectProps={{
-              multiple: true,
               renderValue: (selected) => {
-                const items = (selected as unknown as string[]) ?? [];
-                if (items.length === 2) return "Fixed + Desired";
-                return items[0] ?? "";
+                return String(selected);
               },
             }}
           >
-            {offeringOptions.map((opt) => (
+            {offeringSelectOptions.map((opt) => (
               <MenuItem key={opt} value={opt}>
                 {opt}
               </MenuItem>
@@ -1325,7 +1637,7 @@ export default function ProfessionalFixedLocationSetup({
             gap: 0.4,
           }}
         >
-          {offeringOptions.map((opt) => {
+          {templateOptions.map((opt) => {
             const selected = businessOffering.includes(opt);
             const active = activeBusinessTemplate === opt;
             return (
@@ -1353,22 +1665,6 @@ export default function ProfessionalFixedLocationSetup({
             );
           })}
         </Box>
-        <FormControlLabel
-          sx={{ m: 0 }}
-          control={
-            <Checkbox
-              checked={useSameBusinessInfo}
-              onChange={(e) => onToggleUseSameBusinessInfo(e.target.checked)}
-              disabled={isBusinessLocked}
-              sx={{ color: alpha(m.navy, 0.28), "&.Mui-checked": { color: "primary.main" } }}
-            />
-          }
-          label={
-            <Typography sx={{ fontSize: 12, color: alpha(m.navy, 0.62), fontWeight: 600 }}>
-              Use same information for both templates
-            </Typography>
-          }
-        />
         <IconButton
           size="small"
           onClick={() => enableBusinessEditing("offering")}
@@ -1560,9 +1856,8 @@ export default function ProfessionalFixedLocationSetup({
         </Box>
       </SectionShell>
 
-      <SectionShell
-        title={data.location.title}
-        action={
+      {(() => {
+        const locationEditAction = (
           <IconButton
             size="small"
             onClick={() => enableBusinessEditing("location")}
@@ -1578,84 +1873,30 @@ export default function ProfessionalFixedLocationSetup({
           >
             <EditOutlinedIcon sx={{ fontSize: 18 }} />
           </IconButton>
+        );
+
+        if (businessOfferingSelect === "Both") {
+          return (
+            <Stack spacing={2}>
+              <SectionShell title="Fixed Location" action={locationEditAction}>
+                <Box sx={businessEditing.location ? undefined : { pointerEvents: "none" }}>{fixedLocationForm}</Box>
+              </SectionShell>
+              <SectionShell title="Desired Location" action={locationEditAction}>
+                <Box sx={businessEditing.location ? undefined : { pointerEvents: "none" }}>{desiredLocationForm}</Box>
+              </SectionShell>
+            </Stack>
+          );
         }
-      >
-        <Box sx={businessEditing.location ? undefined : { pointerEvents: "none" }}>
-          <Grid container spacing={2}>
-          <Grid item xs={12}>
-            <Grid container spacing={1.6}>
-              <Grid item xs={12}>
-                <MollureFormField
-                  label="Salon Name"
-                  placeholder="Makelush"
-                  value={biz.salonName}
-                  onChange={(e) => setBizField("salonName", e.target.value)}
-                  disabled={!businessEditing.location}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <Typography sx={{ fontWeight: 700, fontSize: 13, color: theme.palette.text.primary, mt: 0.5 }}>
-                  Address
-                </Typography>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <MollureFormField
-                  label="Stress Address"
-                  placeholder="Stress Address"
-                  value={biz.streetAddress}
-                  onChange={(e) => setBizField("streetAddress", e.target.value)}
-                  disabled={!businessEditing.location}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <MollureFormField
-                  label="Street Number"
-                  placeholder="Street Number"
-                  value={biz.streetNumber}
-                  onChange={(e) => setBizField("streetNumber", e.target.value)}
-                  disabled={!businessEditing.location}
-                />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <MollureFormField
-                  label="Postal code"
-                  placeholder="Postal code"
-                  value={biz.postalCode}
-                  onChange={(e) => setBizField("postalCode", e.target.value)}
-                  disabled={!businessEditing.location}
-                />
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <MollureFormField
-                  select
-                  label="Province"
-                  value={biz.province}
-                  onChange={(e) => setBizField("province", e.target.value)}
-                  disabled={!businessEditing.location}
-                >
-                  <MenuItem value="">Province</MenuItem>
-                  <MenuItem value="Province A">Province A</MenuItem>
-                  <MenuItem value="Province B">Province B</MenuItem>
-                </MollureFormField>
-              </Grid>
-              <Grid item xs={12} sm={4}>
-                <MollureFormField
-                  select
-                  label="Municipality"
-                  value={biz.municipality}
-                  onChange={(e) => setBizField("municipality", e.target.value)}
-                  disabled={!businessEditing.location}
-                >
-                  <MenuItem value="">Municipality</MenuItem>
-                  <MenuItem value="Municipality A">Municipality A</MenuItem>
-                  <MenuItem value="Municipality B">Municipality B</MenuItem>
-                </MollureFormField>
-              </Grid>
-            </Grid>
-          </Grid>
-          </Grid>
-        </Box>
-      </SectionShell>
+
+        return (
+          <SectionShell title={locationSectionTitle} action={locationEditAction}>
+            <Box sx={businessEditing.location ? undefined : { pointerEvents: "none" }}>
+              {showFixedLocationSection ? fixedLocationForm : null}
+              {showDesiredLocationSection ? desiredLocationForm : null}
+            </Box>
+          </SectionShell>
+        );
+      })()}
 
       <SectionShell
         title="Service For"

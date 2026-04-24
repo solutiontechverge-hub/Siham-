@@ -54,6 +54,15 @@ declare module "@mui/material/styles" {
     descriptionText: string;
     warmwarning: string;
     white: string;
+    fxLavenderTint: string;
+    fxMintTint: string;
+    fxGrayF2F4F7: string;
+    fxGrayF4F4F4: string;
+    fxGrayDCDFE3: string;
+    fxGrayF9FAFB: string;
+    fxSurface: string;
+    fxPillTrack: string;
+    fxPillBorder: string;
   }
 
   interface Palette {

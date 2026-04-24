@@ -55,6 +55,16 @@ const theme = createTheme({
       descriptionText: "#5A5A5A",
       warmwarning: "#FFFCF5",
       white: "#FFFFFF",
+      // Fixed-location schedule palette (from provided design)
+      fxLavenderTint: "#FAF6FFCF",
+      fxMintTint: "#EFFDF199",
+      fxGrayF2F4F7: "#F2F4F7",
+      fxGrayF4F4F4: "#F4F4F4",
+      fxGrayDCDFE3: "#DCDFE3",
+      fxGrayF9FAFB: "#F9FAFB",
+      fxSurface: "#FFFFFF",
+      fxPillTrack: "#EFFDF199",
+      fxPillBorder: "#DCDFE3",
     },
     
   },
