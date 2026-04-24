@@ -10,6 +10,8 @@ export type CalendarBookingStatus =
 
 export type CalendarBookingLocation = "FL" | "DL";
 
+export type CalendarBookingType = "Online" | "Offline" | "Project" | "Requests";
+
 export type CalendarResource = {
   id: string;
   name: string;
@@ -25,6 +27,7 @@ export type CalendarEvent = {
   title: string;
   status: CalendarBookingStatus;
   location: CalendarBookingLocation;
+  bookingType?: CalendarBookingType;
   showClientName?: string;
 };
 
@@ -109,6 +112,7 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
       title: "Hot stone full body massage",
       status: "Requested",
       location: "FL",
+      bookingType: "Requests",
       showClientName: "Lissa J",
     },
     {
@@ -120,6 +124,7 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
       title: "Hot stone full body massage",
       status: "Requested",
       location: "FL",
+      bookingType: "Requests",
       showClientName: "Lissa J",
     },
     {
@@ -131,6 +136,7 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
       title: "Hair Cut",
       status: "Cancelled",
       location: "FL",
+      bookingType: "Offline",
       showClientName: "Lissa J",
     },
     {
@@ -142,6 +148,7 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
       title: "Hair Cut",
       status: "Confirmed",
       location: "DL",
+      bookingType: "Online",
       showClientName: "Lissa J",
     },
     {
@@ -153,6 +160,7 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
       title: "Hair Cut",
       status: "Completed",
       location: "DL",
+      bookingType: "Project",
       showClientName: "Lissa J",
     },
     {
@@ -164,6 +172,7 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
       title: "Hair Cut",
       status: "No Show",
       location: "DL",
+      bookingType: "Offline",
       showClientName: "Lissa J",
     },
     {
@@ -175,6 +184,7 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
       title: "Make-up",
       status: "Confirmed",
       location: "FL",
+      bookingType: "Online",
       showClientName: "Ava K",
     },
     {
@@ -186,6 +196,7 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
       title: "Brows",
       status: "Requested",
       location: "DL",
+      bookingType: "Requests",
       showClientName: "Noah P",
     },
     {
@@ -197,6 +208,7 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
       title: "Lashes",
       status: "Completed",
       location: "FL",
+      bookingType: "Project",
       showClientName: "Emma S",
     },
     {
@@ -208,6 +220,7 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
       title: "Hair Wash",
       status: "Cancelled",
       location: "FL",
+      bookingType: "Offline",
       showClientName: "Liam R",
     },
   ],
