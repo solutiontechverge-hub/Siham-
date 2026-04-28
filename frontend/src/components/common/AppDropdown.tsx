@@ -27,6 +27,7 @@ export default function AppDropdown({
   value,
   multiple,
   renderValue,
+  placeholder,
   ...props
 }: AppDropdownProps) {
   return (
@@ -37,7 +38,17 @@ export default function AppDropdown({
       SelectProps={{
         IconComponent: ExpandMoreRoundedIcon,
         multiple: Boolean(multiple),
-        renderValue: renderValue as any,
+        displayEmpty: true,
+        renderValue:
+          (renderValue as any) ??
+          ((selected: any) => {
+            const isMulti = Array.isArray(selected);
+            const isEmpty = isMulti ? selected.length === 0 : selected === "" || selected == null;
+            if (isEmpty) return <span style={{ opacity: 0.6 }}>{placeholder ?? "Select"}</span>;
+            const v = isMulti ? selected[0] : selected;
+            const label = options.find((o) => o.value === v)?.label;
+            return label ?? String(v);
+          }),
       }}
       {...props}
     >

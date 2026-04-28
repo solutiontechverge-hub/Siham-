@@ -9,7 +9,7 @@ import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownR
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
-import { Avatar, Box, Button, Checkbox, Chip, Divider, Drawer, FormControlLabel, IconButton, Menu, MenuItem, Paper, Stack, Tooltip } from "@mui/material";
+import { Avatar, Box, Button, ButtonBase, Checkbox, Chip, Divider, FormControlLabel, IconButton, Menu, MenuItem, Paper, Stack, Tooltip } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../ui/typography";
 import MollureCardHeader from "./MollureCardHeader";
@@ -76,6 +76,18 @@ function parseIsoDate(iso: string) {
   // Use UTC to keep the label stable across timezones.
   const [y, m, d] = iso.split("-").map((v) => Number(v));
   return new Date(Date.UTC(y, m - 1, d));
+}
+
+function toIsoLocalDate(d: Date) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function startOfLocalDay(d: Date) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function isSameLocalDay(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
 function formatLongDateUtc(iso: string) {
@@ -157,6 +169,68 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
   const [activeDateIso, setActiveDateIso] = React.useState(data.initialDate);
   const [addAnchor, setAddAnchor] = React.useState<HTMLElement | null>(null);
   const [filtersOpen, setFiltersOpen] = React.useState(false);
+  const [slotDrawerTab, setSlotDrawerTab] = React.useState<"booking" | "sales" | "activity">("booking");
+  const [slotSelectedCalendar, setSlotSelectedCalendar] = React.useState<string>("");
+  const [slotCalendarDropdownOpen, setSlotCalendarDropdownOpen] = React.useState(true);
+  const [slotMiniScope, setSlotMiniScope] = React.useState<"fixed" | "desired">("fixed");
+  const [slotMiniMonth, setSlotMiniMonth] = React.useState<Date>(() => startOfLocalDay(new Date()));
+  const [slotMiniSelected, setSlotMiniSelected] = React.useState<Date | null>(null);
+  const [slotBookingScreen, setSlotBookingScreen] = React.useState<
+    "new-booking" | "non-mollure-type" | "non-mollure-individual" | "non-mollure-company" | "guest"
+  >("new-booking");
+  const [nonMollureClientType, setNonMollureClientType] = React.useState<"" | "individual" | "company">("");
+  const [guestDraft, setGuestDraft] = React.useState<{
+    firstName: string;
+    lastName: string;
+    email: string;
+    phoneCode: string;
+    phoneNumber: string;
+  }>(() => ({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phoneCode: "",
+    phoneNumber: "",
+  }));
+  const [nonMollureDraft, setNonMollureDraft] = React.useState<{
+    firstName: string;
+    lastName: string;
+    email: string;
+    gender: "" | "male" | "female" | "other";
+    dob: string;
+    phoneCode: string;
+    phoneNumber: string;
+    companyName: string;
+    legalName: string;
+    coc: string;
+    vat: string;
+    contactFirstName: string;
+    contactLastName: string;
+    street: string;
+    streetNumber: string;
+    postalCode: string;
+    province: string;
+    municipality: string;
+  }>(() => ({
+    firstName: "",
+    lastName: "",
+    email: "",
+    gender: "",
+    dob: "",
+    phoneCode: "",
+    phoneNumber: "",
+    companyName: "",
+    legalName: "",
+    coc: "",
+    vat: "",
+    contactFirstName: "",
+    contactLastName: "",
+    street: "",
+    streetNumber: "",
+    postalCode: "",
+    province: "",
+    municipality: "",
+  }));
 
   const bookingTypes: readonly CalendarBookingType[] = ["Online", "Offline", "Project", "Requests"];
   const locations: readonly CalendarBookingLocation[] = ["FL", "DL"];
@@ -193,6 +267,18 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
     freeStart: string;
     freeEnd: string;
   }>(null);
+
+  const slotTabs = React.useMemo(
+    () =>
+      [
+        { id: "booking" as const, label: "Booking" },
+        { id: "activity" as const, label: "Activity" },
+        { id: "sales" as const, label: "Sales" },
+      ] as const,
+    [],
+  );
+
+  const todayLocal = React.useMemo(() => startOfLocalDay(new Date()), []);
 
   const [blockDraft, setBlockDraft] = React.useState<{
     title: "Meeting" | "Training" | "Holiday" | "Custom";
@@ -369,9 +455,36 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
         freeEnd: fmtMinToTime(segment.endMin),
       };
       setSelectedSlot(payload);
+      // Init drawer "New Booking" date/month to today when opened
+      setSlotDrawerTab("booking");
+      setSlotBookingScreen("new-booking");
+      setNonMollureClientType("");
+      setNonMollureDraft({
+        firstName: "",
+        lastName: "",
+        email: "",
+        gender: "",
+        dob: "",
+        phoneCode: "",
+        phoneNumber: "",
+        companyName: "",
+        legalName: "",
+        coc: "",
+        vat: "",
+        contactFirstName: "",
+        contactLastName: "",
+        street: "",
+        streetNumber: "",
+        postalCode: "",
+        province: "",
+        municipality: "",
+      });
+      setSlotCalendarDropdownOpen(true);
+      setSlotMiniSelected(todayLocal);
+      setSlotMiniMonth(todayLocal);
       setSlotDrawerOpen(true);
     },
-    [getAvailabilityFor, getBusyFor, grid.stepMinutes, showSnackbar, startMin],
+    [getAvailabilityFor, getBusyFor, grid.stepMinutes, showSnackbar, startMin, todayLocal],
   );
 
   return (
@@ -1008,48 +1121,760 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
         </Box>
       </Paper>
 
-      <Drawer
+      <MollureDrawer
         anchor="right"
         open={slotDrawerOpen}
         onClose={() => setSlotDrawerOpen(false)}
-        PaperProps={{ sx: { width: { xs: "100%", sm: 420 } } }}
+        title="Free time"
+        width={{ xs: "100%", sm: 420 }}
+        footer={
+          selectedSlot && slotDrawerTab === "booking" ? (
+            <Box sx={{ px: 2.5, py: 2 }}>
+              <Stack direction="row" justifyContent="flex-end" spacing={1.25}>
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    if (slotBookingScreen === "non-mollure-individual" || slotBookingScreen === "non-mollure-company") {
+                      setSlotBookingScreen("non-mollure-type");
+                      return;
+                    }
+                    if (slotBookingScreen === "non-mollure-type") {
+                      setSlotBookingScreen("new-booking");
+                      return;
+                    }
+                    if (slotBookingScreen === "guest") {
+                      setSlotBookingScreen("new-booking");
+                      return;
+                    }
+                    setSlotDrawerOpen(false);
+                  }}
+                  sx={{
+                    borderRadius: "10px",
+                    textTransform: "none",
+                    fontWeight: 800,
+                    height: 38,
+                    borderColor: alpha(m.navy, 0.14),
+                    color: alpha(m.navy, 0.72),
+                    bgcolor: "#fff",
+                    minWidth: 110,
+                  }}
+                >
+                  Back
+                </Button>
+                <Button
+                  variant="contained"
+                  disableElevation
+                  onClick={() => {
+                    if (slotBookingScreen === "non-mollure-type") {
+                      if (!nonMollureClientType) {
+                        showSnackbar({ severity: "warning", message: "Please select Client Type." });
+                        return;
+                      }
+                      setSlotBookingScreen(nonMollureClientType === "individual" ? "non-mollure-individual" : "non-mollure-company");
+                      return;
+                    }
+                    if (slotBookingScreen === "non-mollure-individual" || slotBookingScreen === "non-mollure-company") {
+                      showSnackbar({ severity: "success", message: "Saved (mock)." });
+                      setSlotBookingScreen("new-booking");
+                      return;
+                    }
+                    if (slotBookingScreen === "guest") {
+                      const first = guestDraft.firstName.trim();
+                      const last = guestDraft.lastName.trim();
+                      if (!first || !last) {
+                        showSnackbar({ severity: "warning", message: "Guest first name and last name are required." });
+                        return;
+                      }
+                      showSnackbar({ severity: "success", message: "Guest added (mock)." });
+                      setSlotBookingScreen("new-booking");
+                      return;
+                    }
+                    showSnackbar({ severity: "success", message: "Saved (mock)." });
+                    setSlotDrawerOpen(false);
+                  }}
+                  sx={{
+                    borderRadius: "10px",
+                    textTransform: "none",
+                    fontWeight: 900,
+                    height: 38,
+                    bgcolor: m.teal,
+                    "&:hover": { bgcolor: m.tealDark },
+                    minWidth: 110,
+                  }}
+                >
+                  {slotBookingScreen === "new-booking" ? "Save" : "Save"}
+                </Button>
+              </Stack>
+            </Box>
+          ) : null
+        }
       >
-        <Box sx={{ p: 2.25 }}>
-          <BodyText sx={{ fontWeight: 900, fontSize: 16, color: alpha(m.navy, 0.85) }}>
-            Free time
-          </BodyText>
+        <Box sx={{ px: 2.5, pt: 2.25, pb: 2.5 }}>
           {selectedSlot ? (
             <>
-              <BodyText sx={{ mt: 0.75, color: alpha(m.navy, 0.6), fontSize: 12.5 }}>
-                Team member: <b>{data.resources.find((r) => r.id === selectedSlot.resourceId)?.name ?? selectedSlot.resourceId}</b>
-              </BodyText>
-              <BodyText sx={{ mt: 0.5, color: alpha(m.navy, 0.6), fontSize: 12.5 }}>
-                Date: <b>{formatLongDateUtc(selectedSlot.date)}</b>
-              </BodyText>
-              <BodyText sx={{ mt: 0.5, color: alpha(m.navy, 0.6), fontSize: 12.5 }}>
-                Clicked slot: <b>{selectedSlot.start}</b>
-              </BodyText>
-              <BodyText sx={{ mt: 0.5, color: alpha(m.navy, 0.6), fontSize: 12.5 }}>
-                Free window: <b>{selectedSlot.freeStart}</b> to <b>{selectedSlot.freeEnd}</b>
-              </BodyText>
-
-              <Paper
-                elevation={0}
+              {/* Top tabs (underline style) */}
+              <Box
                 sx={{
-                  mt: 2,
-                  borderRadius: "12px",
-                  border: `1px solid ${alpha(m.navy, 0.1)}`,
-                  bgcolor: alpha(m.navy, 0.02),
-                  p: 1.5,
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  borderBottom: `1px solid ${alpha(m.navy, 0.10)}`,
+                  mb: 1.75,
                 }}
               >
-                <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.75) }}>
-                  Drawer content placeholder
-                </BodyText>
-                <BodyText sx={{ mt: 0.5, color: alpha(m.navy, 0.55), fontSize: 12.5 }}>
-                  Tell me what fields/actions you want here, and I’ll build it.
-                </BodyText>
-              </Paper>
+                {slotTabs.map((t) => {
+                  const active = t.id === slotDrawerTab;
+                  return (
+                    <Box
+                      key={t.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setSlotDrawerTab(t.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") setSlotDrawerTab(t.id);
+                      }}
+                      sx={{
+                        textAlign: "center",
+                        py: 1.25,
+                        cursor: "pointer",
+                        position: "relative",
+                        userSelect: "none",
+                        color: active ? m.teal : alpha(m.navy, 0.55),
+                        fontWeight: 900,
+                        fontSize: 13.5,
+                        "&:after": {
+                          content: '""',
+                          position: "absolute",
+                          left: 0,
+                          right: 0,
+                          bottom: -1,
+                          height: 2,
+                          bgcolor: active ? m.teal : "transparent",
+                        },
+                      }}
+                    >
+                      {t.label}
+                    </Box>
+                  );
+                })}
+              </Box>
+
+              {slotDrawerTab === "booking" ? (
+                slotBookingScreen === "non-mollure-type" ? (
+                  <Stack spacing={1.6}>
+                    <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 22, letterSpacing: "-0.01em" }}>
+                      Add Non-Mollure Client
+                    </BodyText>
+
+                    <Box sx={{ pt: 0.5 }}>
+                      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
+                        Client Type
+                      </BodyText>
+                      <AppDropdown
+                        label=""
+                        value={nonMollureClientType}
+                        onChange={(val) => {
+                          const next = val as "" | "individual" | "company";
+                          setNonMollureClientType(next);
+                          if (next === "individual") setSlotBookingScreen("non-mollure-individual");
+                          if (next === "company") setSlotBookingScreen("non-mollure-company");
+                        }}
+                        options={[
+                          { label: "Individual Client", value: "individual" },
+                          { label: "Company Client", value: "company" },
+                        ]}
+                        fullWidth
+                        placeholder="Select Client Type"
+                      />
+                    </Box>
+
+                    <Box sx={{ flex: 1, minHeight: 360 }} />
+                  </Stack>
+                ) : slotBookingScreen === "non-mollure-individual" ? (
+                  <Stack spacing={1.6}>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 22, letterSpacing: "-0.01em" }}>
+                        Add Non-Mollure Client
+                      </BodyText>
+                      <Box
+                        sx={{
+                          px: 1,
+                          height: 22,
+                          borderRadius: "999px",
+                          bgcolor: alpha(m.teal, 0.12),
+                          color: m.teal,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          fontSize: 11,
+                          fontWeight: 900,
+                        }}
+                      >
+                        IC
+                      </Box>
+                    </Stack>
+
+                    <Box sx={{ pt: 0.25 }}>
+                      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
+                        Client Type
+                      </BodyText>
+                      <AppTextField value="Individual Client" fullWidth disabled />
+                    </Box>
+
+                    <AppTextField
+                      placeholder="First Name"
+                      value={nonMollureDraft.firstName}
+                      onChange={(e) => setNonMollureDraft((p) => ({ ...p, firstName: e.target.value }))}
+                      fullWidth
+                    />
+                    <AppTextField
+                      placeholder="Last Name"
+                      value={nonMollureDraft.lastName}
+                      onChange={(e) => setNonMollureDraft((p) => ({ ...p, lastName: e.target.value }))}
+                      fullWidth
+                    />
+
+                    <AppDropdown
+                      label=""
+                      value={nonMollureDraft.gender}
+                      onChange={(val) => setNonMollureDraft((p) => ({ ...p, gender: val as any }))}
+                      options={[
+                        { label: "Male", value: "male" },
+                        { label: "Female", value: "female" },
+                        { label: "Other", value: "other" },
+                      ]}
+                      fullWidth
+                      placeholder="Select Gender"
+                    />
+
+                    <Box>
+                      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
+                        Date of Birth
+                      </BodyText>
+                      <AppTextField
+                        type="text"
+                        value={nonMollureDraft.dob}
+                        onChange={(e) => setNonMollureDraft((p) => ({ ...p, dob: e.target.value }))}
+                        fullWidth
+                        placeholder="mm/dd/yyyy"
+                      />
+                    </Box>
+
+                    <Box>
+                      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
+                        Contact Number
+                      </BodyText>
+                      <Stack direction="row" spacing={1.25}>
+                        <AppDropdown
+                          label=""
+                          value={nonMollureDraft.phoneCode}
+                          onChange={(val) => setNonMollureDraft((p) => ({ ...p, phoneCode: val as string }))}
+                          options={[
+                            { label: "Select Country Code", value: "" },
+                            { label: "+1", value: "+1" },
+                            { label: "+44", value: "+44" },
+                            { label: "+92", value: "+92" },
+                          ]}
+                          fullWidth
+                          sx={{ maxWidth: 140 }}
+                          placeholder="Select Country Code"
+                        />
+                        <AppTextField
+                          placeholder="+442xxxxxxxxxx"
+                          value={nonMollureDraft.phoneNumber}
+                          onChange={(e) => setNonMollureDraft((p) => ({ ...p, phoneNumber: e.target.value }))}
+                          fullWidth
+                        />
+                      </Stack>
+                    </Box>
+
+                    <AppTextField
+                      placeholder="Email Address"
+                      value={nonMollureDraft.email}
+                      onChange={(e) => setNonMollureDraft((p) => ({ ...p, email: e.target.value }))}
+                      fullWidth
+                    />
+
+                    <Box sx={{ flex: 1, minHeight: 140 }} />
+                  </Stack>
+                ) : slotBookingScreen === "non-mollure-company" ? (
+                  <Stack spacing={1.6}>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 22, letterSpacing: "-0.01em" }}>
+                        Add Non-Mollure Client
+                      </BodyText>
+                      <Box
+                        sx={{
+                          px: 1,
+                          height: 22,
+                          borderRadius: "999px",
+                          bgcolor: alpha(m.teal, 0.12),
+                          color: m.teal,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          fontSize: 11,
+                          fontWeight: 900,
+                        }}
+                      >
+                        CC
+                      </Box>
+                    </Stack>
+
+                    <Box sx={{ pt: 0.25 }}>
+                      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
+                        Client Type
+                      </BodyText>
+                      <AppTextField value="Company Client" fullWidth disabled />
+                    </Box>
+
+                    <AppTextField
+                      placeholder="Legal Name"
+                      value={nonMollureDraft.legalName}
+                      onChange={(e) => setNonMollureDraft((p) => ({ ...p, legalName: e.target.value }))}
+                      fullWidth
+                    />
+                    <AppTextField
+                      placeholder="COC"
+                      value={nonMollureDraft.coc}
+                      onChange={(e) => setNonMollureDraft((p) => ({ ...p, coc: e.target.value }))}
+                      fullWidth
+                    />
+                    <AppTextField
+                      placeholder="VAT"
+                      value={nonMollureDraft.vat}
+                      onChange={(e) => setNonMollureDraft((p) => ({ ...p, vat: e.target.value }))}
+                      fullWidth
+                    />
+
+                    <AppTextField
+                      placeholder="Contact Person’s First Name"
+                      value={nonMollureDraft.contactFirstName}
+                      onChange={(e) => setNonMollureDraft((p) => ({ ...p, contactFirstName: e.target.value }))}
+                      fullWidth
+                    />
+                    <AppTextField
+                      placeholder="Contact Person’s Last Name"
+                      value={nonMollureDraft.contactLastName}
+                      onChange={(e) => setNonMollureDraft((p) => ({ ...p, contactLastName: e.target.value }))}
+                      fullWidth
+                    />
+
+                    <AppDropdown
+                      label=""
+                      value={nonMollureDraft.gender}
+                      onChange={(val) => setNonMollureDraft((p) => ({ ...p, gender: val as any }))}
+                      options={[
+                        { label: "Male", value: "male" },
+                        { label: "Female", value: "female" },
+                        { label: "Other", value: "other" },
+                      ]}
+                      fullWidth
+                      placeholder="Select Gender"
+                    />
+
+                    <Box sx={{ pt: 0.5 }}>
+                      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
+                        Business Address
+                      </BodyText>
+                      <Stack spacing={1.25}>
+                        <Stack direction="row" spacing={1.25}>
+                          <AppTextField
+                            placeholder="Street"
+                            value={nonMollureDraft.street}
+                            onChange={(e) => setNonMollureDraft((p) => ({ ...p, street: e.target.value }))}
+                            fullWidth
+                          />
+                          <AppTextField
+                            placeholder="Number"
+                            value={nonMollureDraft.streetNumber}
+                            onChange={(e) => setNonMollureDraft((p) => ({ ...p, streetNumber: e.target.value }))}
+                            fullWidth
+                          />
+                        </Stack>
+                        <Stack direction="row" spacing={1.25}>
+                          <AppTextField
+                            placeholder="Postal Code"
+                            value={nonMollureDraft.postalCode}
+                            onChange={(e) => setNonMollureDraft((p) => ({ ...p, postalCode: e.target.value }))}
+                            fullWidth
+                          />
+                          <AppDropdown
+                            label=""
+                            value={nonMollureDraft.province}
+                            onChange={(val) => setNonMollureDraft((p) => ({ ...p, province: val as string }))}
+                            options={[
+                              { label: "Province", value: "" },
+                              { label: "Province A", value: "province-a" },
+                              { label: "Province B", value: "province-b" },
+                            ]}
+                            fullWidth
+                            placeholder="Province"
+                          />
+                        </Stack>
+                        <AppDropdown
+                          label=""
+                          value={nonMollureDraft.municipality}
+                          onChange={(val) => setNonMollureDraft((p) => ({ ...p, municipality: val as string }))}
+                          options={[
+                            { label: "Municipality", value: "" },
+                            { label: "Municipality A", value: "municipality-a" },
+                            { label: "Municipality B", value: "municipality-b" },
+                          ]}
+                          fullWidth
+                          placeholder="Municipality"
+                        />
+                      </Stack>
+                    </Box>
+
+                    <Box>
+                      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
+                        Contact Number
+                      </BodyText>
+                      <Stack direction="row" spacing={1.25}>
+                        <AppDropdown
+                          label=""
+                          value={nonMollureDraft.phoneCode}
+                          onChange={(val) => setNonMollureDraft((p) => ({ ...p, phoneCode: val as string }))}
+                          options={[
+                            { label: "Country Code", value: "" },
+                            { label: "+1", value: "+1" },
+                            { label: "+44", value: "+44" },
+                            { label: "+92", value: "+92" },
+                          ]}
+                          fullWidth
+                          sx={{ maxWidth: 140 }}
+                          placeholder="Country Code"
+                        />
+                        <AppTextField
+                          placeholder="+442xxxxxxxxxx"
+                          value={nonMollureDraft.phoneNumber}
+                          onChange={(e) => setNonMollureDraft((p) => ({ ...p, phoneNumber: e.target.value }))}
+                          fullWidth
+                        />
+                      </Stack>
+                    </Box>
+
+                    <AppTextField
+                      placeholder="Email Address"
+                      value={nonMollureDraft.email}
+                      onChange={(e) => setNonMollureDraft((p) => ({ ...p, email: e.target.value }))}
+                      fullWidth
+                    />
+
+                    <Box sx={{ flex: 1, minHeight: 140 }} />
+                  </Stack>
+                ) : slotBookingScreen === "guest" ? (
+                  <Stack spacing={1.6}>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 22, letterSpacing: "-0.01em" }}>
+                        Add Guest
+                      </BodyText>
+                      <Box
+                        sx={{
+                          px: 1,
+                          height: 22,
+                          borderRadius: "999px",
+                          bgcolor: alpha(m.navy, 0.06),
+                          color: alpha(m.navy, 0.72),
+                          display: "inline-flex",
+                          alignItems: "center",
+                          fontSize: 11,
+                          fontWeight: 900,
+                        }}
+                      >
+                        Guest
+                      </Box>
+                    </Stack>
+
+                    <Stack direction="row" spacing={1.25}>
+                      <AppTextField
+                        placeholder="First Name*"
+                        value={guestDraft.firstName}
+                        onChange={(e) => setGuestDraft((p) => ({ ...p, firstName: e.target.value }))}
+                        fullWidth
+                      />
+                      <AppTextField
+                        placeholder="Last Name*"
+                        value={guestDraft.lastName}
+                        onChange={(e) => setGuestDraft((p) => ({ ...p, lastName: e.target.value }))}
+                        fullWidth
+                      />
+                    </Stack>
+
+                    <AppTextField
+                      placeholder="Email (optional)"
+                      value={guestDraft.email}
+                      onChange={(e) => setGuestDraft((p) => ({ ...p, email: e.target.value }))}
+                      fullWidth
+                    />
+
+                    <Box>
+                      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
+                        Contact Number (optional)
+                      </BodyText>
+                      <Stack direction="row" spacing={1.25}>
+                        <AppDropdown
+                          label=""
+                          value={guestDraft.phoneCode}
+                          onChange={(val) => setGuestDraft((p) => ({ ...p, phoneCode: val as string }))}
+                          options={[
+                            { label: "Country Code", value: "" },
+                            { label: "+1", value: "+1" },
+                            { label: "+44", value: "+44" },
+                            { label: "+92", value: "+92" },
+                          ]}
+                          fullWidth
+                          sx={{ maxWidth: 140 }}
+                          placeholder="Country Code"
+                        />
+                        <AppTextField
+                          placeholder="Phone number"
+                          value={guestDraft.phoneNumber}
+                          onChange={(e) => setGuestDraft((p) => ({ ...p, phoneNumber: e.target.value }))}
+                          fullWidth
+                        />
+                      </Stack>
+                    </Box>
+
+                    <Box sx={{ flex: 1, minHeight: 200 }} />
+                  </Stack>
+                ) : (
+                  <Stack spacing={1.6}>
+                    <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 15 }}>
+                      New Booking
+                    </BodyText>
+
+                    <Box>
+                      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
+                        Calendar
+                      </BodyText>
+                      <Box
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setSlotCalendarDropdownOpen((p) => !p)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") setSlotCalendarDropdownOpen((p) => !p);
+                        }}
+                        sx={{
+                          border: `1px solid ${alpha(m.navy, 0.14)}`,
+                          borderRadius: "10px",
+                          height: 42,
+                          display: "flex",
+                          alignItems: "center",
+                          px: 1.25,
+                          cursor: "pointer",
+                          bgcolor: "#fff",
+                          "&:hover": { bgcolor: alpha(m.navy, 0.02) },
+                        }}
+                      >
+                        <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: slotSelectedCalendar ? alpha(m.navy, 0.78) : alpha(m.navy, 0.45) }}>
+                          {slotSelectedCalendar
+                            ? data.resources.find((r) => r.id === slotSelectedCalendar)?.name ?? slotSelectedCalendar
+                            : "Select calender"}
+                        </BodyText>
+                        <Box sx={{ flex: 1 }} />
+                        <KeyboardArrowDownRoundedIcon sx={{ fontSize: 20, color: alpha(m.navy, 0.45), transform: slotCalendarDropdownOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 140ms ease" }} />
+                      </Box>
+                    </Box>
+
+                    {/* Embedded mini calendar */}
+                    {slotCalendarDropdownOpen ? (
+                      <Box
+                        sx={{
+                          border: `1px solid ${alpha(m.navy, 0.10)}`,
+                          borderRadius: "12px",
+                          bgcolor: "#fff",
+                          p: 1.5,
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            width: "fit-content",
+                            mx: "auto",
+                            mb: 1.25,
+                            borderRadius: "999px",
+                            border: `1px solid ${alpha(m.navy, 0.10)}`,
+                            bgcolor: "#fff",
+                            overflow: "hidden",
+                            display: "flex",
+                          }}
+                        >
+                          {[
+                            { id: "fixed" as const, label: "Fixed Location" },
+                            { id: "desired" as const, label: "Desired Location" },
+                          ].map((t) => {
+                            const active = t.id === slotMiniScope;
+                            return (
+                              <Box
+                                key={t.id}
+                                role="button"
+                                tabIndex={0}
+                                onClick={() => setSlotMiniScope(t.id)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") setSlotMiniScope(t.id);
+                                }}
+                                sx={{
+                                  px: 1.5,
+                                  py: 0.75,
+                                  fontSize: 12,
+                                  fontWeight: 900,
+                                  cursor: "pointer",
+                                  color: active ? "#fff" : alpha(m.navy, 0.55),
+                                  bgcolor: active ? m.teal : "transparent",
+                                  userSelect: "none",
+                                }}
+                              >
+                                {t.label}
+                              </Box>
+                            );
+                          })}
+                        </Box>
+
+                        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+                          <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.85) }}>
+                            {slotMiniMonth.toLocaleString("en-US", { month: "long", year: "numeric" })}
+                          </BodyText>
+                          <Stack direction="row" spacing={0.5}>
+                            <IconButton
+                              size="small"
+                              onClick={() => setSlotMiniMonth(new Date(slotMiniMonth.getFullYear(), slotMiniMonth.getMonth() - 1, 1))}
+                            >
+                              <ChevronLeftRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.6) }} />
+                            </IconButton>
+                            <IconButton
+                              size="small"
+                              onClick={() => setSlotMiniMonth(new Date(slotMiniMonth.getFullYear(), slotMiniMonth.getMonth() + 1, 1))}
+                            >
+                              <ChevronRightRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.6) }} />
+                            </IconButton>
+                          </Stack>
+                        </Stack>
+
+                        <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
+                          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+                            <BodyText key={d} sx={{ width: 36, textAlign: "center", fontSize: 11, fontWeight: 900, color: alpha(m.navy, 0.55) }}>
+                              {d}
+                            </BodyText>
+                          ))}
+                        </Stack>
+
+                        {(() => {
+                          const monthStart = new Date(slotMiniMonth.getFullYear(), slotMiniMonth.getMonth(), 1);
+                          const monthEnd = new Date(slotMiniMonth.getFullYear(), slotMiniMonth.getMonth() + 1, 0);
+                          const daysInMonth = monthEnd.getDate();
+                          const firstWeekdayMon0 = (monthStart.getDay() + 6) % 7;
+                          const cells: Array<Date | null> = [];
+                          for (let i = 0; i < firstWeekdayMon0; i++) cells.push(null);
+                          for (let day = 1; day <= daysInMonth; day++) cells.push(new Date(slotMiniMonth.getFullYear(), slotMiniMonth.getMonth(), day));
+                          while (cells.length % 7 !== 0) cells.push(null);
+
+                          return (
+                            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0.75 }}>
+                              {cells.map((cell, idx) => {
+                                const isSelected = cell && slotMiniSelected ? isSameLocalDay(cell, slotMiniSelected) : false;
+                                const isDisabled = !cell || cell < todayLocal;
+                                return (
+                                  <ButtonBase
+                                    key={idx}
+                                    disabled={isDisabled}
+                                    onClick={() => {
+                                      if (!cell) return;
+                                      setSlotMiniSelected(cell);
+                                    }}
+                                    sx={{
+                                      width: 36,
+                                      height: 34,
+                                      borderRadius: "10px",
+                                      fontSize: 12,
+                                      fontWeight: 900,
+                                      color: isDisabled ? alpha(m.navy, 0.25) : isSelected ? "#fff" : alpha(m.navy, 0.78),
+                                      bgcolor: isSelected ? m.teal : "transparent",
+                                      border: `1px solid ${isSelected ? m.teal : "transparent"}`,
+                                      "&:hover": !isDisabled ? { bgcolor: isSelected ? m.tealDark : alpha(m.teal, 0.10) } : undefined,
+                                    }}
+                                  >
+                                    {cell ? cell.getDate() : ""}
+                                  </ButtonBase>
+                                );
+                              })}
+                            </Box>
+                          );
+                        })()}
+                      </Box>
+                    ) : null}
+
+                    <Box>
+                      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
+                        Client
+                      </BodyText>
+                      <Stack spacing={1.25}>
+                        {[
+                          { label: "Add Non-Mollure Client", key: "non-mollure" },
+                          { label: "Add Guest", key: "guest" },
+                        ].map((item) => (
+                          <Box
+                            key={item.key}
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => {
+                              if (item.key === "non-mollure") {
+                                setSlotBookingScreen("non-mollure-type");
+                                return;
+                              }
+                              setSlotBookingScreen("guest");
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key !== "Enter" && e.key !== " ") return;
+                              if (item.key === "non-mollure") {
+                                setSlotBookingScreen("non-mollure-type");
+                                return;
+                              }
+                              setSlotBookingScreen("guest");
+                            }}
+                            sx={{
+                              border: `1px solid ${alpha(m.navy, 0.14)}`,
+                              borderRadius: "10px",
+                              height: 46,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1.25,
+                              px: 1.5,
+                              cursor: "pointer",
+                              bgcolor: "#fff",
+                              boxShadow: "0 4px 14px rgba(16, 35, 63, 0.06)",
+                              "&:hover": { bgcolor: alpha(m.navy, 0.02) },
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                width: 26,
+                                height: 26,
+                                borderRadius: "999px",
+                                bgcolor: alpha(m.teal, 0.12),
+                                color: m.teal,
+                                display: "grid",
+                                placeItems: "center",
+                                fontWeight: 900,
+                                flexShrink: 0,
+                                border: `1px solid ${alpha(m.teal, 0.22)}`,
+                              }}
+                            >
+                              +
+                            </Box>
+                            <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.72) }}>
+                              {item.label}
+                            </BodyText>
+                          </Box>
+                        ))}
+                      </Stack>
+                    </Box>
+                  </Stack>
+                )
+              ) : (
+                <Box sx={{ pt: 1 }}>
+                  <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.6) }}>
+                    {slotDrawerTab === "sales" ? "Sales tab (mock)." : "Activity tab (mock)."}
+                  </BodyText>
+                </Box>
+              )}
             </>
           ) : (
             <BodyText sx={{ mt: 1, color: alpha(m.navy, 0.6), fontSize: 12.5 }}>
@@ -1057,7 +1882,7 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
             </BodyText>
           )}
         </Box>
-      </Drawer>
+      </MollureDrawer>
 
       <MollureDrawer
         anchor="right"
