@@ -14,10 +14,27 @@ ALTER TABLE professional_profiles
   ADD COLUMN IF NOT EXISTS contact_first_name TEXT,
   ADD COLUMN IF NOT EXISTS contact_last_name TEXT;
 
-UPDATE professional_profiles
-SET
-  contact_first_name = COALESCE(contact_first_name, first_name),
-  contact_last_name = COALESCE(contact_last_name, last_name)
-WHERE
-  contact_first_name IS NULL
-  OR contact_last_name IS NULL;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = 'professional_profiles'
+      AND column_name = 'first_name'
+  ) THEN
+    UPDATE professional_profiles
+    SET contact_first_name = COALESCE(contact_first_name, first_name)
+    WHERE contact_first_name IS NULL;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = 'professional_profiles'
+      AND column_name = 'last_name'
+  ) THEN
+    UPDATE professional_profiles
+    SET contact_last_name = COALESCE(contact_last_name, last_name)
+    WHERE contact_last_name IS NULL;
+  END IF;
+END $$;

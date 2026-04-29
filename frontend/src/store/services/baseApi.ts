@@ -4,6 +4,7 @@ import type { RootState } from "../index";
 
 export const baseApi = createApi({
   reducerPath: "baseApi",
+  tagTypes: ["Profile"],
   baseQuery: fetchBaseQuery({
     baseUrl: apiBaseUrl,
     prepareHeaders: (headers, { getState }) => {

@@ -4,6 +4,8 @@ import * as React from "react";
 import { Box, Container, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import FixedLocationTopTabs, { type FixedLocationTopTab } from "./FixedLocationTopTabs";
+import MarketingSiteFooter from "./MarketingSiteFooter";
+import { professionalsMarketingFooter } from "../../data/marketingShell.data";
 
 export type FixedLocationPageScaffoldProps = {
   activeTopTab: string;
@@ -23,6 +25,12 @@ export default function FixedLocationPageScaffold({ activeTopTab, topTabs, child
           {children}
         </Stack>
       </Container>
+
+      <MarketingSiteFooter
+        columns={professionalsMarketingFooter.columns.map((col) => ({ title: col.title, items: [...col.items] }))}
+        copyright={professionalsMarketingFooter.copyright}
+        sx={{ mt: 2 }}
+      />
     </Box>
   );
 }

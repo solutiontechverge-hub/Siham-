@@ -2,9 +2,6 @@
 
 import * as React from "react";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
-import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
-import LanguageRoundedIcon from "@mui/icons-material/LanguageRounded";
-import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneRounded";
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
@@ -12,8 +9,6 @@ import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import CancelRoundedIcon from "@mui/icons-material/CancelRounded";
 import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
-import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
-import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import {
   Alert,
   Avatar,
@@ -26,14 +21,12 @@ import {
   Dialog,
   DialogContent,
   IconButton,
-  FormControl,
   Grid,
-  InputAdornment,
   MenuItem,
   Popover,
   Paper,
+  Snackbar,
   Stack,
-  TextField,
   Typography,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
@@ -43,6 +36,20 @@ import { usePathname } from "next/navigation";
 import { Logo, Profile as AvatarPlaceholder } from "../../../../images";
 import { profilePageData } from "./data-profile";
 import { useClientProfilePage } from "./use-profile";
+import { ClientTopTabs, MollureMarketingHeader } from "../../../components/common";
+import { MarketingSiteFooter } from "../../../components/common";
+import { marketingShellFooter } from "../../../data/marketingShell.data";
+import {
+  MollureLabeledField,
+  MollureLabeledPasswordField,
+  PasswordStrengthBar,
+} from "../../../components/common";
+
+const clientTopTabs = [
+  { label: "Booking", href: "/clients/booking" },
+  { label: "Favorites", href: "/clients/favourites" },
+  { label: "Profile", href: "/clients/profile" },
+] as const;
 
 function imgSrc(img: unknown): string {
   if (!img) return "";
@@ -62,52 +69,47 @@ export default function ClientProfilePage() {
     tokens,
     pageBg,
     profile,
+    isCompanyProfile,
+    avatarUrl,
+    setAvatarUrl,
     form,
     isLoading,
     loadError,
     isSaving,
     isEditing,
     setIsEditing,
-    showPassword,
-    setShowPassword,
-    showRepeatPassword,
-    setShowRepeatPassword,
     successMessage,
     errorMessage,
+    clearMessages,
     displayName,
     handleChange,
     setReviewNameMode,
     handleSubmit,
     fieldsDisabled,
     refetch,
-
     profileMenuAnchor,
     openProfileMenu,
     closeProfileMenu,
     isManageSharingOpen,
     openManageSharing,
     closeManageSharing,
-    isNotificationsOpen,
-    openNotifications,
-    closeNotifications,
     sharingVisibility,
     toggleSharingField,
     handleLogout,
   } = useClientProfilePage();
 
-  const fieldSx = {
-    "& .MuiOutlinedInput-root": {
-      bgcolor: "#fff",
-      borderRadius: 2,
-      fontSize: 14,
-      color: tokens.navy,
-      "& fieldset": { borderColor: tokens.inputBorder },
-      "&:hover fieldset": { borderColor: tokens.inputBorderHover },
-      "&.Mui-focused fieldset": { borderColor: tokens.teal, borderWidth: 1 },
-    },
-    "& .MuiInputLabel-root": { color: tokens.slate, fontSize: 13 },
-    "& input::placeholder": { color: tokens.placeholder, opacity: 1 },
-  } as const;
+  const handleAvatarPick = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : null;
+      if (result) setAvatarUrl(result);
+    };
+    reader.readAsDataURL(file);
+    // allow picking same file again
+    event.target.value = "";
+  };
 
   if (isLoading || !form) {
     return (
@@ -122,7 +124,7 @@ export default function ClientProfilePage() {
       <Box sx={{ minHeight: "100vh", bgcolor: pageBg, py: 8 }}>
         <Container maxWidth="sm">
           <Alert severity="error" sx={{ mb: 2 }}>
-            Could not load profile. Ensure <code>GET /api/users/me</code> returns the same fields as individual signup.
+            Could not load profile. Ensure <code>GET /api/user/profile</code> is reachable and the auth token is valid.
           </Alert>
           <Button variant="contained" onClick={() => refetch()} sx={{ bgcolor: tokens.teal }}>
             Retry
@@ -134,60 +136,21 @@ export default function ClientProfilePage() {
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: pageBg }}>
-      <Box
-        component="header"
-        sx={{
-          bgcolor: "#fff",
-          borderBottom: `1px solid ${tokens.border}`,
-        }}
-      >
-        <Container maxWidth="lg" sx={{ py: 1.5 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
-            <Box component={Link} href="/client" sx={{ display: "inline-flex" }}>
-              <Image src={Logo} alt="Mollure" width={150} height={36} priority />
-            </Box>
-            <Stack direction="row" spacing={1.5} alignItems="center">
-              <Button
-                endIcon={<ExpandMoreRoundedIcon sx={{ fontSize: 18 }} />}
-                startIcon={<LanguageRoundedIcon sx={{ fontSize: 18 }} />}
-                sx={{
-                  borderRadius: 999,
-                  border: `1px solid ${tokens.border}`,
-                  color: tokens.navy,
-                  textTransform: "none",
-                  fontWeight: 700,
-                  px: 1.5,
-                  minWidth: 0,
-                }}
-              >
-                EN
-              </Button>
-              <IconButton
-                sx={{ color: tokens.navy }}
-                aria-label="Notifications"
-                onClick={openNotifications}
-              >
-                <NotificationsNoneRoundedIcon />
-              </IconButton>
-              <Stack
-                direction="row"
-                spacing={1}
-                alignItems="center"
-                sx={{ ml: 0.5, cursor: "pointer", userSelect: "none" }}
-                onClick={(e) => openProfileMenu(e.currentTarget)}
-                role="button"
-                aria-label="Open profile menu"
-              >
-                <Avatar
-                  src={profile?.avatar_url || imgSrc(AvatarPlaceholder)}
-                  sx={{ width: 40, height: 40, bgcolor: tokens.avatarBg }}
-                />
-                <Typography sx={{ fontWeight: 700, color: tokens.navy, fontSize: 14, display: { xs: "none", sm: "block" } }}>
-                  {displayName}
-                </Typography>
-              </Stack>
-            </Stack>
-          </Stack>
+      <MollureMarketingHeader
+        navItems={[]}
+        isAuthed
+        userLabel={profile?.email || form.email}
+        userName={displayName}
+        userAvatarSrc={avatarUrl || undefined}
+        homeHref="/clients/listing"
+      />
+
+      <Box sx={{ mt: 2, bgcolor: "transparent" }}>
+        <Container maxWidth="lg" sx={{ px: { xs: 2, sm: 3, md: 4 }, py: 1.5 }}>
+          <ClientTopTabs
+            tabs={clientTopTabs}
+            activeLabel={pathname?.includes("/clients/booking") ? "Booking" : pathname?.includes("/clients/favourites") ? "Favorites" : "Profile"}
+          />
         </Container>
       </Box>
 
@@ -211,7 +174,7 @@ export default function ClientProfilePage() {
         <Stack spacing={2}>
           <Stack direction="row" spacing={1.5} alignItems="center">
             <Avatar
-              src={profile?.avatar_url || imgSrc(AvatarPlaceholder)}
+              src={avatarUrl || imgSrc(AvatarPlaceholder)}
               sx={{ width: 54, height: 54, bgcolor: tokens.avatarBg }}
             />
             <Box sx={{ minWidth: 0 }}>
@@ -278,90 +241,6 @@ export default function ClientProfilePage() {
       </Popover>
 
       <Dialog
-        open={isNotificationsOpen}
-        onClose={closeNotifications}
-        fullWidth
-        maxWidth="sm"
-        PaperProps={{
-          sx: {
-            borderRadius: 4,
-            overflow: "hidden",
-            boxShadow: "0 22px 70px rgba(16, 24, 40, 0.22)",
-          },
-        }}
-      >
-        <DialogContent sx={{ p: 0 }}>
-          <Box sx={{ p: 3, bgcolor: "#fff" }}>
-            <Stack direction="row" alignItems="center" justifyContent="space-between">
-              <Typography sx={{ fontWeight: 900, color: tokens.navy, fontSize: 20 }}>
-                {profilePageData.popovers.notifications.title}
-              </Typography>
-              <IconButton
-                onClick={closeNotifications}
-                sx={{
-                  width: 42,
-                  height: 42,
-                  bgcolor: "rgba(52, 74, 102, 0.06)",
-                  color: tokens.slate,
-                  "&:hover": { bgcolor: "rgba(33, 184, 191, 0.12)", color: tokens.teal },
-                }}
-                aria-label="Close notifications"
-              >
-                <CloseRoundedIcon />
-              </IconButton>
-            </Stack>
-          </Box>
-          <Divider sx={{ borderColor: tokens.border }} />
-
-          <Box sx={{ bgcolor: "#fff", p: 0 }}>
-            {profilePageData.popovers.notifications.items.map((n, idx) => {
-              const statusIcon =
-                n.statusType === "accepted" ? (
-                  <CheckCircleRoundedIcon sx={{ fontSize: 16, color: tokens.teal }} />
-                ) : n.statusType === "rejected" ? (
-                  <CancelRoundedIcon sx={{ fontSize: 16, color: "#EE4B4B" }} />
-                ) : n.statusType === "updated" ? (
-                  <AutorenewRoundedIcon sx={{ fontSize: 16, color: tokens.slate }} />
-                ) : (
-                  <AutorenewRoundedIcon sx={{ fontSize: 16, color: tokens.slate }} />
-                );
-
-              return (
-                <Box key={n.id}>
-                  <Box sx={{ px: 3, py: 2.25 }}>
-                    <Typography sx={{ fontWeight: 800, color: tokens.navy, fontSize: 14 }}>
-                      {n.professionalName}
-                    </Typography>
-
-                    <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 0.5 }}>
-                      <Typography sx={{ color: tokens.slate, fontSize: 13 }}>
-                        {n.statusLabel}
-                      </Typography>
-                      {statusIcon}
-                    </Stack>
-
-                    <Typography sx={{ color: tokens.slate, fontSize: 13, mt: 0.5 }}>
-                      {n.bookingIdLabel}
-                    </Typography>
-
-                    <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 0.75 }}>
-                      <AccessTimeRoundedIcon sx={{ fontSize: 16, color: alpha(tokens.slate, 0.65) }} />
-                      <Typography sx={{ color: alpha(tokens.slate, 0.8), fontSize: 12.5 }}>
-                        {n.timeLabel}
-                      </Typography>
-                    </Stack>
-                  </Box>
-                  {idx < profilePageData.popovers.notifications.items.length - 1 ? (
-                    <Divider sx={{ borderColor: alpha(tokens.border, 0.8) }} />
-                  ) : null}
-                </Box>
-              );
-            })}
-          </Box>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
         open={isManageSharingOpen}
         onClose={closeManageSharing}
         fullWidth
@@ -411,7 +290,7 @@ export default function ClientProfilePage() {
           >
             <Stack direction="row" spacing={1.5} alignItems="center">
               <Avatar
-                src={profile?.avatar_url || imgSrc(AvatarPlaceholder)}
+                src={avatarUrl || imgSrc(AvatarPlaceholder)}
                 sx={{ width: 44, height: 44, bgcolor: tokens.avatarBg }}
               />
               <Typography sx={{ fontWeight: 900, color: tokens.navy, fontSize: 16 }}>
@@ -488,277 +367,340 @@ export default function ClientProfilePage() {
         </DialogContent>
       </Dialog>
 
-      <Box sx={{ bgcolor: "#fff", borderBottom: `1px solid ${tokens.border}` }}>
-        <Container maxWidth="lg">
-          <Stack direction="row" justifyContent="center" spacing={{ xs: 4, sm: 8 }} sx={{ py: 0 }}>
-            {profilePageData.tabs.map((tab) => {
-              const active = pathname === tab.href;
-              return (
-                <Box
-                  key={tab.id}
-                  component={Link}
-                  href={tab.href}
-                  sx={{
-                    py: 1.75,
-                    textDecoration: "none",
-                    color: active ? "#000" : tokens.slate,
-                    fontWeight: active ? 700 : 600,
-                    fontSize: 15,
-                    borderBottom: active ? `3px solid ${tokens.teal}` : "3px solid transparent",
-                    mb: "-1px",
-                  }}
-                >
-                  {tab.label}
-                </Box>
-              );
-            })}
-          </Stack>
-        </Container>
-      </Box>
-
       <Container maxWidth="md" sx={{ py: { xs: 3, md: 4 } }}>
         <Paper
           elevation={0}
           sx={{
-            borderRadius: 3,
+            borderRadius: "10px",
             bgcolor: "#fff",
             border: `1px solid ${tokens.border}`,
             boxShadow: "0 16px 40px rgba(40, 92, 112, 0.08)",
-            p: { xs: 2.5, sm: 3.5 },
+            overflow: "hidden",
           }}
         >
-          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2.5 }}>
+          {/* Card header strip */}
+          <Box
+            sx={{
+              px: { xs: 2.5, sm: 3.5 },
+              py: 2,
+              borderBottom: `1px solid ${tokens.border}`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              bgcolor: "#fff",
+            }}
+          >
             <Typography sx={{ fontWeight: 800, fontSize: 18, color: tokens.navy }}>
               {profilePageData.card.title}
             </Typography>
             <IconButton
               onClick={() => setIsEditing((v) => !v)}
               sx={{
-                bgcolor: "rgba(52, 74, 102, 0.06)",
+                width: 32,
+                height: 32,
+                borderRadius: 2,
+                border: `1px solid ${tokens.border}`,
+                bgcolor: "#fff",
                 color: tokens.slate,
-                "&:hover": { bgcolor: "rgba(33, 184, 191, 0.12)", color: tokens.teal },
+                "&:hover": { bgcolor: "rgba(52, 74, 102, 0.03)", color: tokens.teal },
               }}
               aria-label="Edit profile"
             >
-              <EditRoundedIcon fontSize="small" />
+              <EditRoundedIcon sx={{ fontSize: 18 }} />
             </IconButton>
-          </Stack>
+          </Box>
 
-          <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 3 }}>
-            <Avatar
-              src={profile?.avatar_url || imgSrc(AvatarPlaceholder)}
-              sx={{ width: 72, height: 72, bgcolor: tokens.avatarBg }}
-            />
-            <Typography sx={{ fontWeight: 600, color: tokens.navy, fontSize: 15 }}>
-              {profilePageData.card.profilePictureLabel}
-            </Typography>
-          </Stack>
+          <Box sx={{ px: { xs: 2.5, sm: 3.5 }, pt: 3, pb: { xs: 2.5, sm: 3.5 } }}>
+            <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 3 }}>
+              <Box component="label" sx={{ cursor: "pointer", display: "inline-flex" }}>
+                <input type="file" accept="image/*" hidden onChange={handleAvatarPick} />
+                <Avatar
+                  src={avatarUrl || imgSrc(AvatarPlaceholder)}
+                  sx={{ width: 72, height: 72, bgcolor: tokens.avatarBg }}
+                />
+              </Box>
+              <Typography sx={{ fontWeight: 700, color: tokens.navy, fontSize: 16 }}>
+                {profilePageData.card.profilePictureLabel}
+              </Typography>
+            </Stack>
 
-          <Box component="form" onSubmit={handleSubmit}>
-            {successMessage ? <Alert severity="success" sx={{ mb: 2 }}>{successMessage}</Alert> : null}
+            <Box component="form" onSubmit={handleSubmit}>
             {errorMessage ? <Alert severity="error" sx={{ mb: 2 }}>{errorMessage}</Alert> : null}
+            <Snackbar
+              open={Boolean(successMessage)}
+              autoHideDuration={3000}
+              onClose={clearMessages}
+              anchorOrigin={{ vertical: "top", horizontal: "center" }}
+            >
+              <Alert onClose={clearMessages} severity="success" variant="filled" sx={{ fontWeight: 700 }}>
+                {successMessage || "Profile Updated"}
+              </Alert>
+            </Snackbar>
 
             <Typography sx={{ fontWeight: 800, color: tokens.navy, mb: 1 }}>
-              {profilePageData.sections.personal}
+              {isCompanyProfile ? "Company Information" : profilePageData.sections.personal}
             </Typography>
             <Divider sx={{ mb: 2.5, borderColor: tokens.border }} />
 
-            <Grid container spacing={2.25}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  name="firstName"
-                  label={profilePageData.fields.firstName.label}
-                  placeholder={profilePageData.fields.firstName.placeholder}
-                  value={form.firstName}
-                  onChange={handleChange}
-                  disabled={fieldsDisabled}
-                  InputLabelProps={{ shrink: true }}
-                  sx={fieldSx}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  name="lastName"
-                  label={profilePageData.fields.lastName.label}
-                  placeholder={profilePageData.fields.lastName.placeholder}
-                  value={form.lastName}
-                  onChange={handleChange}
-                  disabled={fieldsDisabled}
-                  InputLabelProps={{ shrink: true }}
-                  sx={fieldSx}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  select
-                  label={profilePageData.fields.reviewName.label}
-                  value={form.reviewNameMode}
-                  onChange={(e) => setReviewNameMode(e.target.value as typeof form.reviewNameMode)}
-                  disabled={fieldsDisabled}
-                  InputLabelProps={{ shrink: true }}
-                  sx={fieldSx}
-                >
-                  {profilePageData.reviewNameOptions.map((opt) => (
-                    <MenuItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  name="birthDate"
-                  type="date"
-                  label={profilePageData.fields.birthDate.label}
-                  value={form.birthDate}
-                  onChange={handleChange}
-                  disabled={fieldsDisabled}
-                  InputLabelProps={{ shrink: true }}
-                  sx={fieldSx}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  select
-                  label={profilePageData.fields.gender.label}
-                  name="gender"
-                  value={form.gender}
-                  onChange={handleChange}
-                  disabled
-                  InputLabelProps={{ shrink: true }}
-                  sx={{
-                    ...fieldSx,
-                    "& .MuiSelect-select": { color: tokens.placeholder },
-                  }}
-                >
-                  <MenuItem value="">
-                    <em>Select</em>
-                  </MenuItem>
-                  {profilePageData.genderOptions.map((opt) => (
-                    <MenuItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
-            </Grid>
-
-            <Typography sx={{ fontWeight: 800, color: tokens.navy, mb: 1, mt: 3.5 }}>
-              {profilePageData.sections.contact}
-            </Typography>
-            <Divider sx={{ mb: 2.5, borderColor: tokens.border }} />
-
-            <Grid container spacing={2.25}>
-              <Grid item xs={12} sm={4}>
-                <FormControl fullWidth>
-                  <TextField
-                    select
-                    name="countryCode"
-                    label={profilePageData.fields.countryCode.label}
-                    value={form.countryCode || ""}
+            {!isCompanyProfile ? (
+              <Grid container spacing={2.25}>
+                <Grid item xs={12} sm={6}>
+                  <MollureLabeledField
+                    name="firstName"
+                    fieldLabel={profilePageData.fields.firstName.label}
+                    placeholder={profilePageData.fields.firstName.placeholder}
+                    value={form.firstName}
                     onChange={handleChange}
                     disabled={fieldsDisabled}
-                    InputLabelProps={{ shrink: true }}
-                    sx={fieldSx}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <MollureLabeledField
+                    name="lastName"
+                    fieldLabel={profilePageData.fields.lastName.label}
+                    placeholder={profilePageData.fields.lastName.placeholder}
+                    value={form.lastName}
+                    onChange={handleChange}
+                    disabled={fieldsDisabled}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <MollureLabeledField
+                    select
+                    fieldLabel={profilePageData.fields.reviewName.label}
+                    value={form.reviewNameMode}
+                    onChange={(e) => setReviewNameMode(e.target.value as typeof form.reviewNameMode)}
+                    disabled={fieldsDisabled}
                   >
-                    <MenuItem value="">
-                      <em>Code</em>
-                    </MenuItem>
-                    {profilePageData.countryCodeOptions.map((opt) => (
+                    {profilePageData.reviewNameOptions.map((opt) => (
                       <MenuItem key={opt.value} value={opt.value}>
                         {opt.label}
                       </MenuItem>
                     ))}
-                  </TextField>
-                </FormControl>
+                  </MollureLabeledField>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <MollureLabeledField
+                    name="birthDate"
+                    type="date"
+                    fieldLabel={profilePageData.fields.birthDate.label}
+                    value={form.birthDate}
+                    onChange={handleChange}
+                    disabled={fieldsDisabled}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <MollureLabeledField
+                    select
+                    fieldLabel={profilePageData.fields.gender.label}
+                    name="gender"
+                    value={form.gender}
+                    onChange={handleChange}
+                    disabled={fieldsDisabled}
+                  >
+                    <MenuItem value="">
+                      <em>Select</em>
+                    </MenuItem>
+                    {profilePageData.genderOptions.map((opt) => (
+                      <MenuItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </MenuItem>
+                    ))}
+                  </MollureLabeledField>
+                </Grid>
               </Grid>
-              <Grid item xs={12} sm={8}>
-                <TextField
-                  fullWidth
-                  name="phone"
-                  label={profilePageData.fields.phone.label}
-                  placeholder={profilePageData.fields.phone.placeholder}
-                  value={form.phone}
-                  onChange={handleChange}
-                  disabled={fieldsDisabled}
-                  InputLabelProps={{ shrink: true }}
-                  sx={fieldSx}
-                />
+            ) : (
+              <Grid container spacing={2.25}>
+                <Grid item xs={12}>
+                  <MollureLabeledField
+                    name="legalName"
+                    fieldLabel="Legal Name"
+                    placeholder="Enter legal name"
+                    value={form.legalName}
+                    onChange={handleChange}
+                    disabled={fieldsDisabled}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <MollureLabeledField
+                    name="cccNumber"
+                    fieldLabel="COC Number"
+                    placeholder="Enter COC number"
+                    value={form.cccNumber}
+                    onChange={handleChange}
+                    disabled={fieldsDisabled}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <MollureLabeledField
+                    name="vatNumber"
+                    fieldLabel="VAT Number"
+                    placeholder="Enter VAT number"
+                    value={form.vatNumber}
+                    onChange={handleChange}
+                    disabled={fieldsDisabled}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={8}>
+                  <MollureLabeledField
+                    name="street"
+                    fieldLabel="Street"
+                    placeholder="Enter street"
+                    value={form.street}
+                    onChange={handleChange}
+                    disabled={fieldsDisabled}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <MollureLabeledField
+                    name="streetNumber"
+                    fieldLabel="Street Number"
+                    placeholder="Enter number"
+                    value={form.streetNumber}
+                    onChange={handleChange}
+                    disabled={fieldsDisabled}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <MollureLabeledField
+                    name="postalCode"
+                    fieldLabel="Postal Code"
+                    placeholder="Enter postal code"
+                    value={form.postalCode}
+                    onChange={handleChange}
+                    disabled={fieldsDisabled}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <MollureLabeledField
+                    name="province"
+                    fieldLabel="Province"
+                    placeholder="Enter province"
+                    value={form.province}
+                    onChange={handleChange}
+                    disabled={fieldsDisabled}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <MollureLabeledField
+                    name="municipality"
+                    fieldLabel="Municipality"
+                    placeholder="Enter municipality"
+                    value={form.municipality}
+                    onChange={handleChange}
+                    disabled={fieldsDisabled}
+                  />
+                </Grid>
               </Grid>
+            )}
+
+            <Typography sx={{ fontWeight: 800, color: tokens.navy, mb: 1, mt: 3.5 }}>
+              {isCompanyProfile ? "Contact Person" : profilePageData.sections.contact}
+            </Typography>
+            <Divider sx={{ mb: 2.5, borderColor: tokens.border }} />
+
+            <Grid container spacing={2.25}>
+              {!isCompanyProfile ? (
+                <>
+                  <Grid item xs={12} sm={4}>
+                    <MollureLabeledField
+                      select
+                      name="countryCode"
+                      fieldLabel={profilePageData.fields.countryCode.label}
+                      value={form.countryCode || ""}
+                      onChange={handleChange}
+                      disabled={fieldsDisabled}
+                    >
+                      <MenuItem value="">
+                        <em>Code</em>
+                      </MenuItem>
+                      {profilePageData.countryCodeOptions.map((opt) => (
+                        <MenuItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </MenuItem>
+                      ))}
+                    </MollureLabeledField>
+                  </Grid>
+                  <Grid item xs={12} sm={8}>
+                    <MollureLabeledField
+                      name="phone"
+                      fieldLabel={profilePageData.fields.phone.label}
+                      placeholder={profilePageData.fields.phone.placeholder}
+                      value={form.phone}
+                      onChange={handleChange}
+                      disabled={fieldsDisabled}
+                    />
+                  </Grid>
+                </>
+              ) : (
+                <>
+                  <Grid item xs={12} sm={6}>
+                    <MollureLabeledField
+                      name="contactFirstName"
+                      fieldLabel="First Name"
+                      placeholder="Enter first name"
+                      value={form.contactFirstName}
+                      onChange={handleChange}
+                      disabled={fieldsDisabled}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <MollureLabeledField
+                      name="contactLastName"
+                      fieldLabel="Last Name"
+                      placeholder="Enter last name"
+                      value={form.contactLastName}
+                      onChange={handleChange}
+                      disabled={fieldsDisabled}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <MollureLabeledField
+                      name="phone"
+                      fieldLabel="Phone"
+                      placeholder="Enter phone number"
+                      value={form.phone}
+                      onChange={handleChange}
+                      disabled={fieldsDisabled}
+                    />
+                  </Grid>
+                </>
+              )}
               <Grid item xs={12}>
-                <TextField
-                  fullWidth
+                <MollureLabeledField
                   name="email"
                   type="email"
-                  label={profilePageData.fields.email.label}
+                  fieldLabel={profilePageData.fields.email.label}
                   placeholder={profilePageData.fields.email.placeholder}
                   value={form.email}
                   disabled
-                  InputLabelProps={{ shrink: true }}
                   sx={{
-                    ...fieldSx,
                     "& .MuiOutlinedInput-root": { bgcolor: "rgba(52, 74, 102, 0.03)" },
                   }}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
+                <MollureLabeledPasswordField
                   name="password"
-                  type={showPassword ? "text" : "password"}
-                  label={profilePageData.fields.password.label}
+                  fieldLabel={profilePageData.fields.password.label}
                   placeholder={profilePageData.fields.password.placeholder}
                   value={form.password}
                   onChange={handleChange}
                   disabled={fieldsDisabled}
-                  InputLabelProps={{ shrink: true }}
-                  sx={fieldSx}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton
-                          edge="end"
-                          onClick={() => setShowPassword((v) => !v)}
-                          aria-label="Toggle password visibility"
-                        >
-                          {showPassword ? <VisibilityOffOutlinedIcon /> : <VisibilityOutlinedIcon />}
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                  }}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
+                <MollureLabeledPasswordField
                   name="confirmPassword"
-                  type={showRepeatPassword ? "text" : "password"}
-                  label={profilePageData.fields.repeatPassword.label}
+                  fieldLabel={profilePageData.fields.repeatPassword.label}
                   placeholder={profilePageData.fields.repeatPassword.placeholder}
                   value={form.confirmPassword}
                   onChange={handleChange}
                   disabled={fieldsDisabled}
-                  InputLabelProps={{ shrink: true }}
-                  sx={fieldSx}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton
-                          edge="end"
-                          onClick={() => setShowRepeatPassword((v) => !v)}
-                          aria-label="Toggle repeat password visibility"
-                        >
-                          {showRepeatPassword ? <VisibilityOffOutlinedIcon /> : <VisibilityOutlinedIcon />}
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                  }}
                 />
+              </Grid>
+              <Grid item xs={12}>
+                <PasswordStrengthBar password={form.password} />
               </Grid>
             </Grid>
 
@@ -781,19 +723,27 @@ export default function ClientProfilePage() {
               sx={{
                 mt: 3,
                 py: 1.35,
-                borderRadius: 2,
+                borderRadius: "12px",
                 textTransform: "none",
-                fontWeight: 800,
+                fontWeight: 600,
                 fontSize: 16,
+                color: "#fff",
                 bgcolor: tokens.teal,
                 "&:hover": { bgcolor: tokens.tealDark },
               }}
             >
               {isSaving ? <CircularProgress size={22} color="inherit" /> : profilePageData.actions.update}
             </Button>
+            </Box>
           </Box>
         </Paper>
       </Container>
+
+      <MarketingSiteFooter
+        columns={marketingShellFooter.columns.map((col) => ({ title: col.title, items: [...col.items] }))}
+        copyright={marketingShellFooter.copyright}
+        sx={{ mt: 2 }}
+      />
     </Box>
   );
 }

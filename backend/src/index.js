@@ -17,8 +17,7 @@ const port = process.env.PORT || 5000;
 const startServer = async () => {
   try {
     await pool.query("SELECT 1");
-        await runMigrations();
-
+    await runMigrations();
 
     app.listen(port, () => {
       console.log(`Backend running on http://localhost:${port}`);

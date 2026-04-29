@@ -513,6 +513,9 @@ export default function CompanySignupPage() {
                             placeholder="Confirm Password"
                           />
                         </Grid>
+                        <Grid item xs={12}>
+                          <PasswordStrengthBar password={form.password} />
+                        </Grid>
                       </Grid>
                     </Box>
 
@@ -554,7 +557,7 @@ export default function CompanySignupPage() {
                       variant="contained"
                       disableElevation
                       fullWidth
-                      disabled={isLoading}
+                      disabled={isLoading || !passwordStrength.isStrong}
                       sx={{
                         borderRadius: "10px",
                         textTransform: "none",

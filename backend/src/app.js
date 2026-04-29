@@ -5,6 +5,7 @@ import dotenv from "dotenv";
 import express from "express";
 import { fileURLToPath } from "url";
 import authRoutes from "./routes/auth.routes.js";
+import businessRoutes from "./routes/business.routes.js";
 import userRoutes from "./routes/user.routes.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -32,6 +33,7 @@ app.get("/api/health", (_req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
+app.use("/api/business", businessRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
