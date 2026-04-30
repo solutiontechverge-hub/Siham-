@@ -19,6 +19,8 @@ const signupPathByAudience: Record<SignupAudience, string> = {
   professional: "/auth/signup/professional",
 };
 
+const SIGNUP_AUDIENCE_STORAGE_KEY = "mollure:signup_audience";
+
 type UserTypeCardProps = {
   selected: boolean;
   onSelect: () => void;
@@ -97,7 +99,23 @@ export default function SignupSelectUserTypePage() {
   const router = useRouter();
   const [audience, setAudience] = React.useState<SignupAudience>("individual");
 
+  React.useEffect(() => {
+    try {
+      const stored = window.sessionStorage.getItem(SIGNUP_AUDIENCE_STORAGE_KEY);
+      if (stored === "individual" || stored === "company" || stored === "professional") {
+        setAudience(stored);
+      }
+    } catch {
+      // ignore storage access failures
+    }
+  }, []);
+
   const handleContinue = () => {
+    try {
+      window.sessionStorage.setItem(SIGNUP_AUDIENCE_STORAGE_KEY, audience);
+    } catch {
+      // ignore storage access failures
+    }
     router.push(signupPathByAudience[audience]);
   };
 
@@ -253,7 +271,14 @@ export default function SignupSelectUserTypePage() {
             >
               <UserTypeCard
                 selected={audience === "individual"}
-                onSelect={() => setAudience("individual")}
+                onSelect={() => {
+                  setAudience("individual");
+                  try {
+                    window.sessionStorage.setItem(SIGNUP_AUDIENCE_STORAGE_KEY, "individual");
+                  } catch {
+                    // ignore storage access failures
+                  }
+                }}
                 icon={
                   <Image
                     src={IC}
@@ -267,7 +292,14 @@ export default function SignupSelectUserTypePage() {
               />
               <UserTypeCard
                 selected={audience === "company"}
-                onSelect={() => setAudience("company")}
+                onSelect={() => {
+                  setAudience("company");
+                  try {
+                    window.sessionStorage.setItem(SIGNUP_AUDIENCE_STORAGE_KEY, "company");
+                  } catch {
+                    // ignore storage access failures
+                  }
+                }}
                 icon={
                   <Image
                     src={CC}
@@ -281,7 +313,14 @@ export default function SignupSelectUserTypePage() {
               />
               <UserTypeCard
                 selected={audience === "professional"}
-                onSelect={() => setAudience("professional")}
+                onSelect={() => {
+                  setAudience("professional");
+                  try {
+                    window.sessionStorage.setItem(SIGNUP_AUDIENCE_STORAGE_KEY, "professional");
+                  } catch {
+                    // ignore storage access failures
+                  }
+                }}
                 icon={
                   <Image
                     src={Professional}

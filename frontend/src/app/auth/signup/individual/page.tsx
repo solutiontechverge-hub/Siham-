@@ -3,6 +3,7 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined";
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import {
@@ -66,7 +67,9 @@ const COUNTRY_CODES = ["+1", "+44", "+61", "+92", "+971", "+33", "+49", "+81", "
 export default function IndividualSignupPage() {
   const theme = useTheme();
   const m = theme.palette.mollure;
+  const router = useRouter();
   const [form, setForm] = React.useState<FormState>(initialForm);
+  const [errors, setErrors] = React.useState<Partial<Record<keyof FormState, string>>>({});
   const { showSnackbar } = useSnackbar();
   const [register, { isLoading }] = useRegisterMutation();
   const passwordStrength = getPasswordStrength(form.password);
@@ -101,22 +104,55 @@ export default function IndividualSignupPage() {
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
+    setErrors((prev) => (prev[name as keyof FormState] ? { ...prev, [name]: undefined } : prev));
   };
+
+  const isValidEmail = React.useCallback((email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()), []);
+  const isValidName = React.useCallback((name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return false;
+    return /^[A-Za-zÀ-ÖØ-öø-ÿ' -]+$/.test(trimmed);
+  }, []);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
+    const nextErrors: Partial<Record<keyof FormState, string>> = {};
+    if (!form.email.trim()) nextErrors.email = "Email is required.";
+    else if (!isValidEmail(form.email)) nextErrors.email = "Enter a valid email address.";
+
+    if (!form.firstName.trim()) nextErrors.firstName = "First name is required.";
+    else if (!isValidName(form.firstName)) nextErrors.firstName = "Enter a valid first name.";
+
+    if (!form.lastName.trim()) nextErrors.lastName = "Last name is required.";
+    else if (!isValidName(form.lastName)) nextErrors.lastName = "Enter a valid last name.";
+
+    if (!form.password) nextErrors.password = "Password is required.";
+    if (!form.confirmPassword) nextErrors.confirmPassword = "Repeat password is required.";
+
+    if (!form.acceptTerms) nextErrors.acceptTerms = "Please accept the terms and conditions.";
+
+    if (Object.keys(nextErrors).length) {
+      setErrors(nextErrors);
+      const firstMessage = Object.values(nextErrors).find(Boolean);
+      if (firstMessage) showSnackbar({ severity: "error", message: firstMessage });
+      return;
+    }
+
     if (form.password !== form.confirmPassword) {
+      setErrors((prev) => ({ ...prev, confirmPassword: "Password and repeat password must match." }));
       showSnackbar({ severity: "error", message: "Password and repeat password must match." });
       return;
     }
 
     if (!passwordStrength.isStrong) {
+      setErrors((prev) => ({ ...prev, password: "Please choose a strong password to continue." }));
       showSnackbar({ severity: "error", message: "Please choose a strong password to continue." });
       return;
     }
 
     if (!form.acceptTerms) {
+      setErrors((prev) => ({ ...prev, acceptTerms: "Please accept the terms and conditions." }));
       showSnackbar({ severity: "error", message: "Please accept the terms and conditions." });
       return;
     }
@@ -161,6 +197,7 @@ export default function IndividualSignupPage() {
         message: result.message || "Account created successfully. Please check your email.",
       });
       setForm(initialForm);
+      router.push("/auth/login");
     } catch (error) {
       showSnackbar({
         severity: "error",
@@ -328,6 +365,8 @@ export default function IndividualSignupPage() {
                             name="firstName"
                             value={form.firstName}
                             onChange={handleChange}
+                            error={Boolean(errors.firstName)}
+                            helperText={errors.firstName}
                             required
                           />
                         </Grid>
@@ -337,6 +376,8 @@ export default function IndividualSignupPage() {
                             name="lastName"
                             value={form.lastName}
                             onChange={handleChange}
+                            error={Boolean(errors.lastName)}
+                            helperText={errors.lastName}
                             required
                           />
                         </Grid>
@@ -436,6 +477,8 @@ export default function IndividualSignupPage() {
                             name="email"
                             value={form.email}
                             onChange={handleChange}
+                            error={Boolean(errors.email)}
+                            helperText={errors.email}
                             required
                             autoComplete="email"
                           />
@@ -446,6 +489,8 @@ export default function IndividualSignupPage() {
                             name="password"
                             value={form.password}
                             onChange={handleChange}
+                            error={Boolean(errors.password)}
+                            helperText={errors.password}
                             required
                             autoComplete="new-password"
                           />
@@ -456,6 +501,8 @@ export default function IndividualSignupPage() {
                             name="confirmPassword"
                             value={form.confirmPassword}
                             onChange={handleChange}
+                            error={Boolean(errors.confirmPassword)}
+                            helperText={errors.confirmPassword}
                             required
                             autoComplete="new-password"
                           />

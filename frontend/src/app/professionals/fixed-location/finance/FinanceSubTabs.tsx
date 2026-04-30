@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import AppPillTabs from "../../../components/common/AppPillTabs";
+import AppPillTabs from "../../../../components/common/AppPillTabs";
 
 const OVERVIEW_HREF = "/professionals/fixed-location/finance/overview";
 const SETTING_HREF = "/professionals/fixed-location/finance/setting";
