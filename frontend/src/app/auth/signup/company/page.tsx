@@ -3,6 +3,7 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Box,
   Button,
@@ -117,7 +118,9 @@ const MUNICIPALITY_OPTIONS = [
 export default function CompanySignupPage() {
   const theme = useTheme();
   const m = theme.palette.mollure;
+  const router = useRouter();
   const [form, setForm] = React.useState<FormState>(initialForm);
+  const [errors, setErrors] = React.useState<Partial<Record<keyof FormState, string>>>({});
   const { showSnackbar } = useSnackbar();
   const [register, { isLoading }] = useRegisterMutation();
   const passwordStrength = getPasswordStrength(form.password);
@@ -133,22 +136,58 @@ export default function CompanySignupPage() {
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
+    setErrors((prev) => (prev[name as keyof FormState] ? { ...prev, [name]: undefined } : prev));
   };
+
+  const isValidEmail = React.useCallback((email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()), []);
+  const isValidName = React.useCallback((name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return false;
+    return /^[A-Za-zÀ-ÖØ-öø-ÿ' -]+$/.test(trimmed);
+  }, []);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
+    const nextErrors: Partial<Record<keyof FormState, string>> = {};
+    if (!form.contactEmail.trim()) nextErrors.contactEmail = "Email is required.";
+    else if (!isValidEmail(form.contactEmail)) nextErrors.contactEmail = "Enter a valid email address.";
+
+    if (!form.legalName.trim()) nextErrors.legalName = "Legal name is required.";
+    else if (!isValidName(form.legalName)) nextErrors.legalName = "Enter a valid legal name.";
+
+    if (!form.contactFirstName.trim()) nextErrors.contactFirstName = "First name is required.";
+    else if (!isValidName(form.contactFirstName)) nextErrors.contactFirstName = "Enter a valid first name.";
+
+    if (!form.contactLastName.trim()) nextErrors.contactLastName = "Last name is required.";
+    else if (!isValidName(form.contactLastName)) nextErrors.contactLastName = "Enter a valid last name.";
+
+    if (!form.password) nextErrors.password = "Password is required.";
+    if (!form.confirmPassword) nextErrors.confirmPassword = "Repeat password is required.";
+
+    if (!form.acceptTerms) nextErrors.acceptTerms = "Please accept the terms and conditions.";
+
+    if (Object.keys(nextErrors).length) {
+      setErrors(nextErrors);
+      const firstMessage = Object.values(nextErrors).find(Boolean);
+      if (firstMessage) showSnackbar({ severity: "error", message: firstMessage });
+      return;
+    }
+
     if (form.password !== form.confirmPassword) {
+      setErrors((prev) => ({ ...prev, confirmPassword: "Password and repeat password must match." }));
       showSnackbar({ severity: "error", message: "Password and repeat password must match." });
       return;
     }
 
     if (!passwordStrength.isStrong) {
+      setErrors((prev) => ({ ...prev, password: "Please choose a strong password to continue." }));
       showSnackbar({ severity: "error", message: "Please choose a strong password to continue." });
       return;
     }
 
     if (!form.acceptTerms) {
+      setErrors((prev) => ({ ...prev, acceptTerms: "Please accept the terms and conditions." }));
       showSnackbar({ severity: "error", message: "Please accept the terms and conditions." });
       return;
     }
@@ -177,6 +216,7 @@ export default function CompanySignupPage() {
           result.message || "Company account created successfully. Please check your email.",
       });
       setForm(initialForm);
+      router.push("/auth/professional/login");
     } catch (error) {
       showSnackbar({
         severity: "error",
@@ -344,6 +384,8 @@ export default function CompanySignupPage() {
                             name="legalName"
                             value={form.legalName}
                             onChange={handleChange}
+                            error={Boolean(errors.legalName)}
+                            helperText={errors.legalName}
                             required
                             placeholder="e.g Jane"
                           />
@@ -465,6 +507,8 @@ export default function CompanySignupPage() {
                             name="contactFirstName"
                             value={form.contactFirstName}
                             onChange={handleChange}
+                            error={Boolean(errors.contactFirstName)}
+                            helperText={errors.contactFirstName}
                             required
                             placeholder="e.g Jane"
                           />
@@ -475,6 +519,8 @@ export default function CompanySignupPage() {
                             name="contactLastName"
                             value={form.contactLastName}
                             onChange={handleChange}
+                            error={Boolean(errors.contactLastName)}
+                            helperText={errors.contactLastName}
                             required
                             placeholder="e.g Doe"
                           />
@@ -486,6 +532,8 @@ export default function CompanySignupPage() {
                             name="contactEmail"
                             value={form.contactEmail}
                             onChange={handleChange}
+                            error={Boolean(errors.contactEmail)}
+                            helperText={errors.contactEmail}
                             required
                             autoComplete="email"
                             placeholder="You@gmail.com"
@@ -497,6 +545,8 @@ export default function CompanySignupPage() {
                             name="password"
                             value={form.password}
                             onChange={handleChange}
+                            error={Boolean(errors.password)}
+                            helperText={errors.password}
                             required
                             autoComplete="new-password"
                             placeholder="Enter Password"
@@ -508,6 +558,8 @@ export default function CompanySignupPage() {
                             name="confirmPassword"
                             value={form.confirmPassword}
                             onChange={handleChange}
+                            error={Boolean(errors.confirmPassword)}
+                            helperText={errors.confirmPassword}
                             required
                             autoComplete="new-password"
                             placeholder="Confirm Password"
