@@ -625,6 +625,15 @@ export default function ProfessionalFixedLocationSetup({
     }, {} as Record<(typeof desiredProvinceOptions)[number], string[]>);
   }, [desiredProvinceOptions]);
 
+  type ProvinceKey = (typeof desiredProvinceOptions)[number];
+  const toProvinceKey = React.useCallback(
+    (province: string | null | undefined): ProvinceKey => {
+      const p = String(province ?? "").trim();
+      return (desiredProvinceOptions as readonly string[]).includes(p) ? (p as ProvinceKey) : "Noord-Holland";
+    },
+    [desiredProvinceOptions],
+  );
+
   const [desiredAreaMode, setDesiredAreaMode] = React.useState<"Specific areas only" | "All Netherlands">(
     "Specific areas only",
   );
@@ -733,7 +742,7 @@ export default function ProfessionalFixedLocationSetup({
           disabled={!businessEditing.location}
         >
           <MenuItem value="">Municipality</MenuItem>
-          {(desiredMunicipalityByProvince[(fixedBiz.province as any) || "Noord-Holland"] ?? []).map((o) => (
+          {(desiredMunicipalityByProvince[toProvinceKey(fixedBiz.province)] ?? []).map((o) => (
             <MenuItem key={o} value={o}>
               {o}
             </MenuItem>
@@ -835,7 +844,7 @@ export default function ProfessionalFixedLocationSetup({
             }}
           >
             {desiredAreas.map((r) => {
-              const options = desiredMunicipalityByProvince[(r.province as any) || "Noord-Holland"] ?? [];
+              const options = desiredMunicipalityByProvince[toProvinceKey(r.province)] ?? [];
               const safeOptions = options.includes(r.municipality) ? options : [r.municipality, ...options];
               return (
                 <Box

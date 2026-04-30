@@ -84,6 +84,7 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
   const [slotLocation, setSlotLocation] = React.useState<CalendarBookingLocation>("FL");
   const [slotCalendarMonth, setSlotCalendarMonth] = React.useState(() => toMonthIso(defaultDateIso));
   const [slotClientAdded, setSlotClientAdded] = React.useState(false);
+  const [bookingMoreAnchor, setBookingMoreAnchor] = React.useState<HTMLElement | null>(null);
   const [slotBookingScreen, setSlotBookingScreen] = React.useState<
     "new-booking" | "add-client-choice" | "non-mollure-type" | "non-mollure-individual" | "non-mollure-company" | "guest"
   >("new-booking");
@@ -1260,6 +1261,7 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                 {slotBookingScreen === "new-booking" && slotClientAdded ? (
                   <IconButton
                     size="small"
+                    onClick={(e) => setBookingMoreAnchor(e.currentTarget)}
                     sx={{
                       width: 36,
                       height: 36,
@@ -1272,6 +1274,56 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                     <MoreVertRoundedIcon sx={{ fontSize: 18 }} />
                   </IconButton>
                 ) : null}
+                <Popover
+                  open={Boolean(bookingMoreAnchor)}
+                  anchorEl={bookingMoreAnchor}
+                  onClose={() => setBookingMoreAnchor(null)}
+                  anchorOrigin={{ vertical: "top", horizontal: "left" }}
+                  transformOrigin={{ vertical: "bottom", horizontal: "left" }}
+                  PaperProps={{
+                    sx: {
+                      borderRadius: "10px",
+                      border: `1px solid ${alpha(m.navy, 0.10)}`,
+                      boxShadow: "0 10px 24px rgba(16, 35, 63, 0.14)",
+                      overflow: "hidden",
+                      minWidth: 240,
+                    },
+                  }}
+                >
+                  <Stack sx={{ py: 0.5 }}>
+                    {[
+                      "Add Prepayment",
+                      "Add Kilometer Allowance",
+                      "Add Discount to Total",
+                      "Add Late Cancellation",
+                      "Add Late Rescheduling",
+                      "Add Note",
+                    ].map((label) => (
+                      <Box
+                        key={label}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                          setBookingMoreAnchor(null);
+                          showSnackbar({ severity: "info", message: `${label} (mock).` });
+                        }}
+                        sx={{
+                          px: 1.5,
+                          py: 1,
+                          cursor: "pointer",
+                          fontSize: 12.5,
+                          fontWeight: 800,
+                          color: alpha(m.navy, 0.72),
+                          borderBottom: `1px solid ${alpha(m.navy, 0.06)}`,
+                          "&:hover": { bgcolor: alpha(m.navy, 0.04) },
+                          "&:last-of-type": { borderBottom: "none" },
+                        }}
+                      >
+                        {label}
+                      </Box>
+                    ))}
+                  </Stack>
+                </Popover>
                 <Box sx={{ flex: 1 }} />
                 <Button
                   variant="outlined"
@@ -1871,13 +1923,13 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                           alignItems: "center",
                           justifyContent: "space-between",
                           bgcolor: "#fff",
-                          color: slotClientAdded ? alpha(m.navy, 0.74) : alpha(m.navy, 0.45),
+                          color: alpha(m.navy, 0.74),
                           fontSize: 12.5,
                           fontWeight: 800,
                         }}
                       >
                         <Box component="span">
-                          {slotClientAdded ? `${slotLocation}: ${formatMdyDate(selectedSlot.date)}` : "Select calendar"}
+                          {selectedSlot ? `${slotLocation}: ${formatMdyDate(selectedSlot.date)}` : "Select calendar"}
                         </Box>
                         <KeyboardArrowDownRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.45) }} />
                       </Box>
