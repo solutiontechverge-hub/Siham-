@@ -19,6 +19,7 @@ import { BodyText } from "../ui/typography";
 import { useSnackbar } from "./AppSnackbar";
 import AppPillTabs from "./AppPillTabs";
 import MollureDrawer from "./MollureDrawer";
+import AppSearchField from "./AppSearchField";
 import AppTextField from "./AppTextField";
 import AppDropdown from "./AppDropdown";
 import CalendarAddMenu from "./calendar/CalendarAddMenu";
@@ -68,6 +69,26 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
   const m = theme.palette.mollure;
   const { showSnackbar } = useSnackbar();
 
+  const serviceCatalog = React.useMemo(
+    () =>
+      [
+        { id: "svc-haircut", name: "Haircut", price: 60 },
+        { id: "svc-color", name: "Hair Color", price: 95 },
+        { id: "svc-styling", name: "Hair Styling", price: 45 },
+        { id: "svc-facemask", name: "Face Mask", price: 35 },
+      ] as const,
+    [],
+  );
+  const productCatalog = React.useMemo(
+    () =>
+      [
+        { id: "prd-hair", name: "Hair Product", price: 25 },
+        { id: "prd-mask", name: "Face Mask", price: 18 },
+        { id: "prd-serum", name: "Hair Serum", price: 22 },
+      ] as const,
+    [],
+  );
+
   const defaultDateIso = React.useMemo(() => toIsoLocalDate(new Date()), []);
   const [activeSubTab, setActiveSubTab] = React.useState<CalendarSubTab>(data.initialSubTab);
   const [viewMode, setViewMode] = React.useState<CalendarViewMode>(data.initialView);
@@ -84,11 +105,53 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
   const [slotLocation, setSlotLocation] = React.useState<CalendarBookingLocation>("FL");
   const [slotCalendarMonth, setSlotCalendarMonth] = React.useState(() => toMonthIso(defaultDateIso));
   const [slotClientAdded, setSlotClientAdded] = React.useState(false);
+  const [slotClientSearch, setSlotClientSearch] = React.useState("");
+  const [slotAddMenuAnchor, setSlotAddMenuAnchor] = React.useState<HTMLElement | null>(null);
+  const [servicePickerOpen, setServicePickerOpen] = React.useState(false);
+  const [productPickerOpen, setProductPickerOpen] = React.useState(false);
+  const [selectedServiceId, setSelectedServiceId] = React.useState("");
+  const [selectedProductId, setSelectedProductId] = React.useState("");
+  const [selectedServices, setSelectedServices] = React.useState<Array<{ id: string; name: string; price: number }>>([]);
+  const [selectedProducts, setSelectedProducts] = React.useState<Array<{ id: string; name: string; price: number }>>([]);
+  const [desiredLocationDraft, setDesiredLocationDraft] = React.useState<{
+    street: string;
+    number: string;
+    postalCode: string;
+    province: string;
+    municipality: string;
+  }>(() => ({
+    street: "",
+    number: "",
+    postalCode: "",
+    province: "",
+    municipality: "",
+  }));
+  const [showPrepayment, setShowPrepayment] = React.useState(false);
+  const [prepaymentPercent, setPrepaymentPercent] = React.useState("");
+  const [paymentMethod, setPaymentMethod] = React.useState<"online" | "offline">("online");
+  const [showKilometerAllowance, setShowKilometerAllowance] = React.useState(false);
+  const [kilometerAllowanceDraft, setKilometerAllowanceDraft] = React.useState<{
+    eurPerKm: string;
+    totalKilometer: string;
+  }>(() => ({
+    eurPerKm: "",
+    totalKilometer: "",
+  }));
   const [bookingMoreAnchor, setBookingMoreAnchor] = React.useState<HTMLElement | null>(null);
   const [slotBookingScreen, setSlotBookingScreen] = React.useState<
     "new-booking" | "add-client-choice" | "non-mollure-type" | "non-mollure-individual" | "non-mollure-company" | "guest"
   >("new-booking");
   const [nonMollureClientType, setNonMollureClientType] = React.useState<"" | "individual" | "company">("");
+
+  const servicesTotal = React.useMemo(() => selectedServices.reduce((sum, s) => sum + s.price, 0), [selectedServices]);
+  const productsTotal = React.useMemo(() => selectedProducts.reduce((sum, p) => sum + p.price, 0), [selectedProducts]);
+  const totalPrice = servicesTotal + productsTotal;
+  const prepaymentAmount = React.useMemo(() => {
+    const pct = Number(prepaymentPercent);
+    if (!Number.isFinite(pct) || pct <= 0) return 0;
+    return Math.round((totalPrice * pct) / 100);
+  }, [prepaymentPercent, totalPrice]);
+  const remainingAfterPrepayment = Math.max(0, totalPrice - prepaymentAmount);
   const [guestDraft, setGuestDraft] = React.useState<{
     firstName: string;
     lastName: string;
@@ -1292,20 +1355,32 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                 >
                   <Stack sx={{ py: 0.5 }}>
                     {[
-                      "Add Prepayment",
-                      "Add Kilometer Allowance",
-                      "Add Discount to Total",
-                      "Add Late Cancellation",
-                      "Add Late Rescheduling",
-                      "Add Note",
-                    ].map((label) => (
+                      {
+                        label: "Add Prepayment",
+                        onClick: () => {
+                          setShowPrepayment(true);
+                          showSnackbar({ severity: "info", message: "Prepayment enabled." });
+                        },
+                      },
+                      {
+                        label: "Add Kilometer Allowance",
+                        onClick: () => {
+                          setShowKilometerAllowance(true);
+                          showSnackbar({ severity: "info", message: "Kilometer Allowance enabled." });
+                        },
+                      },
+                      { label: "Add Discount to Total", onClick: () => showSnackbar({ severity: "info", message: "Add Discount to Total (mock)." }) },
+                      { label: "Add Late Cancellation", onClick: () => showSnackbar({ severity: "info", message: "Add Late Cancellation (mock)." }) },
+                      { label: "Add Late Rescheduling", onClick: () => showSnackbar({ severity: "info", message: "Add Late Rescheduling (mock)." }) },
+                      { label: "Add Note", onClick: () => showSnackbar({ severity: "info", message: "Add Note (mock)." }) },
+                    ].map((item) => (
                       <Box
-                        key={label}
+                        key={item.label}
                         role="button"
                         tabIndex={0}
                         onClick={() => {
                           setBookingMoreAnchor(null);
-                          showSnackbar({ severity: "info", message: `${label} (mock).` });
+                          item.onClick();
                         }}
                         sx={{
                           px: 1.5,
@@ -1319,7 +1394,7 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                           "&:last-of-type": { borderBottom: "none" },
                         }}
                       >
-                        {label}
+                        {item.label}
                       </Box>
                     ))}
                   </Stack>
@@ -2085,26 +2160,43 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                             border: `1px solid ${alpha(m.navy, 0.12)}`,
                             borderRadius: "10px",
                             minHeight: 64,
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 1.25,
                             px: 1.5,
+                            py: 1.25,
                             bgcolor: "#fff",
                             boxShadow: `0 0 0 6px ${alpha(m.teal, 0.08)}`,
                           }}
                         >
-                          <Avatar src="/images/testimonial.webp" sx={{ width: 34, height: 34 }} />
-                          <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <BodyText sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78), lineHeight: 1.2 }}>
-                              Sara Johnson
-                            </BodyText>
-                            <BodyText sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.46), lineHeight: 1.2 }}>
-                              Sarajohnson@gmail.com
-                            </BodyText>
-                          </Box>
-                          <IconButton size="small" onClick={() => setSlotClientAdded(false)} sx={{ color: alpha(m.navy, 0.35) }}>
-                            <CloseRoundedIcon sx={{ fontSize: 17 }} />
-                          </IconButton>
+                          <AppSearchField
+                            value={slotClientSearch}
+                            onChange={(e) => setSlotClientSearch(e.target.value)}
+                            onClear={() => setSlotClientSearch("")}
+                            placeholder="Search client..."
+                            size="small"
+                            fullWidth
+                            sx={{ mb: 1 }}
+                          />
+
+                          <Stack direction="row" alignItems="center" spacing={1.25}>
+                            <Avatar src="/images/testimonial.webp" sx={{ width: 34, height: 34 }} />
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <BodyText sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78), lineHeight: 1.2 }}>
+                                Sara Johnson
+                              </BodyText>
+                              <BodyText sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.46), lineHeight: 1.2 }}>
+                                Sarajohnson@gmail.com
+                              </BodyText>
+                            </Box>
+                            <IconButton
+                              size="small"
+                              onClick={() => {
+                                setSlotClientAdded(false);
+                                setSlotClientSearch("");
+                              }}
+                              sx={{ color: alpha(m.navy, 0.35) }}
+                            >
+                              <CloseRoundedIcon sx={{ fontSize: 17 }} />
+                            </IconButton>
+                          </Stack>
                         </Box>
                       ) : (
                         <Box
@@ -2157,9 +2249,9 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                         <Box
                           role="button"
                           tabIndex={0}
-                          onClick={() => setSlotBookingScreen("add-client-choice")}
+                          onClick={(e) => setSlotAddMenuAnchor(e.currentTarget)}
                           onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") setSlotBookingScreen("add-client-choice");
+                            if (e.key === "Enter" || e.key === " ") setSlotAddMenuAnchor(e.currentTarget as HTMLElement);
                           }}
                           sx={{
                             border: `1px solid ${alpha(m.navy, 0.14)}`,
@@ -2183,18 +2275,358 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                           <KeyboardArrowDownRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.45) }} />
                         </Box>
 
+                        <Popover
+                          open={Boolean(slotAddMenuAnchor)}
+                          anchorEl={slotAddMenuAnchor}
+                          onClose={() => setSlotAddMenuAnchor(null)}
+                          anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+                          transformOrigin={{ vertical: "top", horizontal: "left" }}
+                          PaperProps={{
+                            sx: {
+                              mt: 0.8,
+                              borderRadius: "12px",
+                              border: `1px solid ${alpha(m.navy, 0.08)}`,
+                              boxShadow: "0 16px 44px rgba(16, 35, 63, 0.18)",
+                              overflow: "hidden",
+                              minWidth: 210,
+                            },
+                          }}
+                        >
+                          <Stack sx={{ p: 0.75 }}>
+                            {[
+                              { key: "service", label: "Add Service" },
+                              { key: "product", label: "Add Product" },
+                            ].map((item) => (
+                              <ButtonBase
+                                key={item.key}
+                                onClick={() => {
+                                  setSlotAddMenuAnchor(null);
+                                  if (item.key === "service") setServicePickerOpen(true);
+                                  if (item.key === "product") setProductPickerOpen(true);
+                                }}
+                                sx={{
+                                  width: "100%",
+                                  textAlign: "left",
+                                  borderRadius: "10px",
+                                  px: 1.25,
+                                  py: 1,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 1,
+                                  "&:hover": { bgcolor: alpha(m.navy, 0.035) },
+                                }}
+                              >
+                                <Box
+                                  sx={{
+                                    width: 30,
+                                    height: 30,
+                                    borderRadius: "999px",
+                                    bgcolor: alpha(m.teal, 0.12),
+                                    color: m.teal,
+                                    display: "grid",
+                                    placeItems: "center",
+                                    fontWeight: 900,
+                                    flexShrink: 0,
+                                    fontSize: 18,
+                                    border: `1px solid ${alpha(m.teal, 0.22)}`,
+                                  }}
+                                >
+                                  +
+                                </Box>
+                                <BodyText sx={{ fontSize: 12.5, fontWeight: 850, color: alpha(m.navy, 0.76) }}>
+                                  {item.label}
+                                </BodyText>
+                              </ButtonBase>
+                            ))}
+                          </Stack>
+                        </Popover>
+
+                        {servicePickerOpen ? (
+                          <Box
+                            sx={{
+                              borderRadius: "12px",
+                              bgcolor: "#fff",
+                              border: `1px solid ${alpha(m.navy, 0.08)}`,
+                              boxShadow: "0 10px 26px rgba(16, 35, 63, 0.08)",
+                              p: 1.5,
+                            }}
+                          >
+                            <Stack direction="row" alignItems="center" spacing={1}>
+                              <BodyText sx={{ flex: 1, fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
+                                Services
+                              </BodyText>
+                              <IconButton size="small" onClick={() => setServicePickerOpen(false)} sx={{ color: alpha(m.navy, 0.35) }}>
+                                <CloseRoundedIcon sx={{ fontSize: 17 }} />
+                              </IconButton>
+                            </Stack>
+
+                            <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                              <AppDropdown
+                                label=""
+                                value={selectedServiceId}
+                                onChange={(val) => setSelectedServiceId(val as string)}
+                                options={[
+                                  { label: "Select service", value: "" },
+                                  ...serviceCatalog.map((s) => ({ label: `${s.name} — €${s.price}`, value: s.id })),
+                                ]}
+                                fullWidth
+                                placeholder="Select service"
+                              />
+                              <Button
+                                variant="outlined"
+                                disabled={!selectedServiceId}
+                                onClick={() => {
+                                  const s = serviceCatalog.find((x) => x.id === selectedServiceId);
+                                  if (!s) return;
+                                  setSelectedServices((p) => (p.some((it) => it.id === s.id) ? p : [...p, { id: s.id, name: s.name, price: s.price }]));
+                                  setSelectedServiceId("");
+                                }}
+                                sx={{ borderRadius: "10px", textTransform: "none", fontWeight: 850, minWidth: 90 }}
+                              >
+                                Add
+                              </Button>
+                            </Stack>
+
+                            {selectedServices.length ? (
+                              <Stack spacing={0.75} sx={{ mt: 1.25 }}>
+                                {selectedServices.map((s) => (
+                                  <Box
+                                    key={s.id}
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "space-between",
+                                      borderRadius: "10px",
+                                      border: `1px solid ${alpha(m.navy, 0.08)}`,
+                                      px: 1.25,
+                                      py: 0.85,
+                                    }}
+                                  >
+                                    <BodyText sx={{ fontSize: 12.5, fontWeight: 850, color: alpha(m.navy, 0.72) }}>{s.name}</BodyText>
+                                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                                      <BodyText sx={{ fontSize: 12.5, fontWeight: 950, color: alpha(m.navy, 0.82) }}>€{s.price}</BodyText>
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => setSelectedServices((p) => p.filter((x) => x.id !== s.id))}
+                                        sx={{ color: alpha(m.navy, 0.3) }}
+                                        aria-label={`Remove ${s.name}`}
+                                      >
+                                        <CloseRoundedIcon sx={{ fontSize: 16 }} />
+                                      </IconButton>
+                                    </Stack>
+                                  </Box>
+                                ))}
+                              </Stack>
+                            ) : null}
+                          </Box>
+                        ) : null}
+
+                        {productPickerOpen ? (
+                          <Box
+                            sx={{
+                              borderRadius: "12px",
+                              bgcolor: "#fff",
+                              border: `1px solid ${alpha(m.navy, 0.08)}`,
+                              boxShadow: "0 10px 26px rgba(16, 35, 63, 0.08)",
+                              p: 1.5,
+                            }}
+                          >
+                            <Stack direction="row" alignItems="center" spacing={1}>
+                              <BodyText sx={{ flex: 1, fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
+                                Products
+                              </BodyText>
+                              <IconButton size="small" onClick={() => setProductPickerOpen(false)} sx={{ color: alpha(m.navy, 0.35) }}>
+                                <CloseRoundedIcon sx={{ fontSize: 17 }} />
+                              </IconButton>
+                            </Stack>
+
+                            <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                              <AppDropdown
+                                label=""
+                                value={selectedProductId}
+                                onChange={(val) => setSelectedProductId(val as string)}
+                                options={[
+                                  { label: "Select product", value: "" },
+                                  ...productCatalog.map((p) => ({ label: `${p.name} — €${p.price}`, value: p.id })),
+                                ]}
+                                fullWidth
+                                placeholder="Select product"
+                              />
+                              <Button
+                                variant="outlined"
+                                disabled={!selectedProductId}
+                                onClick={() => {
+                                  const p = productCatalog.find((x) => x.id === selectedProductId);
+                                  if (!p) return;
+                                  setSelectedProducts((prev) => (prev.some((it) => it.id === p.id) ? prev : [...prev, { id: p.id, name: p.name, price: p.price }]));
+                                  setSelectedProductId("");
+                                }}
+                                sx={{ borderRadius: "10px", textTransform: "none", fontWeight: 850, minWidth: 90 }}
+                              >
+                                Add
+                              </Button>
+                            </Stack>
+
+                            {selectedProducts.length ? (
+                              <Stack spacing={0.75} sx={{ mt: 1.25 }}>
+                                {selectedProducts.map((p) => (
+                                  <Box
+                                    key={p.id}
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "space-between",
+                                      borderRadius: "10px",
+                                      border: `1px solid ${alpha(m.navy, 0.08)}`,
+                                      px: 1.25,
+                                      py: 0.85,
+                                    }}
+                                  >
+                                    <BodyText sx={{ fontSize: 12.5, fontWeight: 850, color: alpha(m.navy, 0.72) }}>{p.name}</BodyText>
+                                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                                      <BodyText sx={{ fontSize: 12.5, fontWeight: 950, color: alpha(m.navy, 0.82) }}>€{p.price}</BodyText>
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => setSelectedProducts((prev) => prev.filter((x) => x.id !== p.id))}
+                                        sx={{ color: alpha(m.navy, 0.3) }}
+                                        aria-label={`Remove ${p.name}`}
+                                      >
+                                        <CloseRoundedIcon sx={{ fontSize: 16 }} />
+                                      </IconButton>
+                                    </Stack>
+                                  </Box>
+                                ))}
+                              </Stack>
+                            ) : null}
+                          </Box>
+                        ) : null}
+
                         <Box sx={{ borderRadius: "10px", bgcolor: alpha(m.navy, 0.025), p: 1.5 }}>
                           <BodyText sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.76), mb: 1 }}>
                             Location
                           </BodyText>
-                          <Stack direction="row" spacing={4}>
-                            <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.68) }}>
-                              {slotLocation === "FL" ? "Fixed Location" : "Desired Location"}
-                            </BodyText>
-                            <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.42) }}>
-                              St. Salon 123
-                            </BodyText>
-                          </Stack>
+                          {slotLocation === "FL" ? (
+                            <Stack direction="row" spacing={4}>
+                              <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.68) }}>
+                                Fixed Location
+                              </BodyText>
+                              <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.42) }}>
+                                St. Salon 123
+                              </BodyText>
+                            </Stack>
+                          ) : (
+                            <Box>
+                              {showKilometerAllowance ? (
+                                <Box
+                                  sx={{
+                                    borderRadius: "12px",
+                                    bgcolor: "#fff",
+                                    border: `1px solid ${alpha(m.navy, 0.08)}`,
+                                    boxShadow: "0 10px 26px rgba(16, 35, 63, 0.08)",
+                                    p: 1.5,
+                                    mb: 1.25,
+                                  }}
+                                >
+                                  <Stack direction="row" alignItems="center" spacing={1}>
+                                    <BodyText sx={{ flex: 1, fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
+                                      Kilometer Allowance
+                                    </BodyText>
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => setShowKilometerAllowance(false)}
+                                      sx={{ color: alpha(m.navy, 0.35) }}
+                                      aria-label="Remove kilometer allowance"
+                                    >
+                                      <CloseRoundedIcon sx={{ fontSize: 17 }} />
+                                    </IconButton>
+                                  </Stack>
+
+                                  <BodyText sx={{ fontSize: 12.25, fontWeight: 850, color: alpha(m.navy, 0.6), mt: 1, mb: 0.75 }}>
+                                    Amount/Per Kilometer
+                                  </BodyText>
+
+                                  <Stack direction="row" spacing={1}>
+                                    <AppTextField
+                                      placeholder="EUR/Km"
+                                      value={kilometerAllowanceDraft.eurPerKm}
+                                      onChange={(e) => setKilometerAllowanceDraft((p) => ({ ...p, eurPerKm: e.target.value }))}
+                                      fullWidth
+                                    />
+                                    <AppTextField
+                                      placeholder="Total Kilometer"
+                                      value={kilometerAllowanceDraft.totalKilometer}
+                                      onChange={(e) => setKilometerAllowanceDraft((p) => ({ ...p, totalKilometer: e.target.value }))}
+                                      fullWidth
+                                    />
+                                  </Stack>
+
+                                  <Box
+                                    sx={{
+                                      mt: 1.25,
+                                      pt: 1.25,
+                                      borderTop: `1px solid ${alpha(m.navy, 0.08)}`,
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "space-between",
+                                    }}
+                                  >
+                                    <BodyText sx={{ fontSize: 12.5, fontWeight: 850, color: alpha(m.navy, 0.62) }}>Total Price</BodyText>
+                                    <BodyText sx={{ fontSize: 18, fontWeight: 950, color: alpha(m.navy, 0.84) }}>20€</BodyText>
+                                  </Box>
+                                </Box>
+                              ) : null}
+
+                              <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.68), mb: 1 }}>
+                                Desired Location
+                              </BodyText>
+                              <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
+                                <AppTextField
+                                  placeholder="Street"
+                                  value={desiredLocationDraft.street}
+                                  onChange={(e) => setDesiredLocationDraft((p) => ({ ...p, street: e.target.value }))}
+                                  fullWidth
+                                />
+                                <AppTextField
+                                  placeholder="Number"
+                                  value={desiredLocationDraft.number}
+                                  onChange={(e) => setDesiredLocationDraft((p) => ({ ...p, number: e.target.value }))}
+                                  fullWidth
+                                />
+                              </Stack>
+                              <Stack direction="row" spacing={1}>
+                                <AppTextField
+                                  placeholder="Postal Code"
+                                  value={desiredLocationDraft.postalCode}
+                                  onChange={(e) => setDesiredLocationDraft((p) => ({ ...p, postalCode: e.target.value }))}
+                                  fullWidth
+                                />
+                                <AppDropdown
+                                  label=""
+                                  value={desiredLocationDraft.province}
+                                  onChange={(val) => setDesiredLocationDraft((p) => ({ ...p, province: val as string }))}
+                                  options={[
+                                    { label: "Province", value: "" },
+                                    { label: "Province 1", value: "Province 1" },
+                                    { label: "Province 2", value: "Province 2" },
+                                  ]}
+                                  fullWidth
+                                  placeholder="Province"
+                                />
+                                <AppDropdown
+                                  label=""
+                                  value={desiredLocationDraft.municipality}
+                                  onChange={(val) => setDesiredLocationDraft((p) => ({ ...p, municipality: val as string }))}
+                                  options={[
+                                    { label: "Municipality", value: "" },
+                                    { label: "Municipality 1", value: "Municipality 1" },
+                                    { label: "Municipality 2", value: "Municipality 2" },
+                                  ]}
+                                  fullWidth
+                                  placeholder="Municipality"
+                                />
+                              </Stack>
+                            </Box>
+                          )}
                         </Box>
 
                         <Box>
@@ -2214,6 +2646,125 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                             <AppTextField placeholder="+442xxxxxxxxxx" fullWidth />
                           </Stack>
                         </Box>
+
+                        <Box
+                          sx={{
+                            borderRadius: "10px",
+                            border: `1px solid ${alpha(m.navy, 0.16)}`,
+                            bgcolor: "#fff",
+                            px: 2,
+                            py: 1.6,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <BodyText sx={{ fontSize: 16, fontWeight: 950, color: alpha(m.navy, 0.78) }}>Total Price:</BodyText>
+                          <BodyText sx={{ fontSize: 18, fontWeight: 950, color: alpha(m.navy, 0.9) }}>€{totalPrice}</BodyText>
+                        </Box>
+
+                        {showPrepayment ? (
+                          <>
+                            <Box
+                              sx={{
+                                borderRadius: "12px",
+                                bgcolor: "#fff",
+                                border: `1px solid ${alpha(m.navy, 0.08)}`,
+                                boxShadow: "0 10px 26px rgba(16, 35, 63, 0.08)",
+                                p: 1.5,
+                              }}
+                            >
+                              <Stack direction="row" alignItems="center" spacing={1}>
+                                <BodyText sx={{ flex: 1, fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
+                                  Prepayment
+                                </BodyText>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => setShowPrepayment(false)}
+                                  sx={{ color: alpha(m.navy, 0.35) }}
+                                  aria-label="Remove prepayment"
+                                >
+                                  <CloseRoundedIcon sx={{ fontSize: 17 }} />
+                                </IconButton>
+                              </Stack>
+
+                              <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 1 }}>
+                                <BodyText sx={{ flex: 1, fontSize: 12.5, fontWeight: 850, color: alpha(m.navy, 0.62) }}>
+                                  Prepayment:
+                                </BodyText>
+                                <AppTextField
+                                  placeholder="%"
+                                  value={prepaymentPercent}
+                                  onChange={(e) => setPrepaymentPercent(e.target.value)}
+                                  sx={{ maxWidth: 86 }}
+                                />
+                                <BodyText sx={{ fontSize: 16, fontWeight: 950, color: alpha(m.navy, 0.85) }}>€{prepaymentAmount}</BodyText>
+                              </Stack>
+
+                              <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 1 }}>
+                                <BodyText sx={{ flex: 1, fontSize: 12.5, fontWeight: 850, color: alpha(m.navy, 0.55) }}>
+                                  Remaining after prepayment
+                                </BodyText>
+                                <BodyText sx={{ fontSize: 16, fontWeight: 950, color: alpha(m.navy, 0.85) }}>€{remainingAfterPrepayment}</BodyText>
+                              </Stack>
+
+                              <Box sx={{ mt: 1.25, pt: 1.25, borderTop: `1px solid ${alpha(m.navy, 0.08)}` }}>
+                                <BodyText sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78), mb: 0.75 }}>
+                                  Payment method
+                                </BodyText>
+
+                                {[
+                                  { key: "online" as const, label: "Online Direct" },
+                                  { key: "offline" as const, label: "Offline Direct" },
+                                ].map((pm) => {
+                                  const active = paymentMethod === pm.key;
+                                  return (
+                                    <ButtonBase
+                                      key={pm.key}
+                                      onClick={() => setPaymentMethod(pm.key)}
+                                      sx={{
+                                        width: "100%",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "space-between",
+                                        py: 0.65,
+                                        borderRadius: "10px",
+                                        "&:hover": { bgcolor: alpha(m.navy, 0.03) },
+                                      }}
+                                    >
+                                      <Stack direction="row" alignItems="center" spacing={1}>
+                                        <Box
+                                          sx={{
+                                            width: 18,
+                                            height: 12,
+                                            borderRadius: "3px",
+                                            border: `1px solid ${alpha(m.navy, 0.22)}`,
+                                            bgcolor: alpha(m.navy, 0.04),
+                                          }}
+                                        />
+                                        <BodyText sx={{ fontSize: 12.75, fontWeight: 850, color: alpha(m.navy, 0.74) }}>
+                                          {pm.label}
+                                        </BodyText>
+                                      </Stack>
+                                      <Box
+                                        sx={{
+                                          width: 18,
+                                          height: 18,
+                                          borderRadius: "999px",
+                                          border: `2px solid ${active ? m.teal : alpha(m.navy, 0.22)}`,
+                                          display: "grid",
+                                          placeItems: "center",
+                                        }}
+                                      >
+                                        {active ? <Box sx={{ width: 8, height: 8, borderRadius: "999px", bgcolor: m.teal }} /> : null}
+                                      </Box>
+                                    </ButtonBase>
+                                  );
+                                })}
+                              </Box>
+                            </Box>
+                          </>
+                        ) : null}
 
                         <Box sx={{ borderRadius: "10px", bgcolor: alpha(m.navy, 0.025), p: 1.5 }}>
                           <Button
