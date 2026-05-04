@@ -142,6 +142,11 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
     "new-booking" | "add-client-choice" | "non-mollure-type" | "non-mollure-individual" | "non-mollure-company" | "guest"
   >("new-booking");
   const [nonMollureClientType, setNonMollureClientType] = React.useState<"" | "individual" | "company">("");
+  const [slotSaveAttempted, setSlotSaveAttempted] = React.useState(false);
+
+  React.useEffect(() => {
+    setSlotSaveAttempted(false);
+  }, [slotBookingScreen]);
 
   const servicesTotal = React.useMemo(() => selectedServices.reduce((sum, s) => sum + s.price, 0), [selectedServices]);
   const productsTotal = React.useMemo(() => selectedProducts.reduce((sum, p) => sum + p.price, 0), [selectedProducts]);
@@ -347,14 +352,174 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
 
   const todayIso = defaultDateIso;
 
+  const slotValidation = React.useMemo(() => {
+    const isBlank = (v: string) => v.trim().length === 0;
+
+    const errors: Partial<
+      Record<
+        | "nonMollureClientType"
+        | "guestFirstName"
+        | "guestLastName"
+        | "nonMollureFirstName"
+        | "nonMollureLastName"
+        | "nonMollureGender"
+        | "nonMollureDob"
+        | "nonMollurePhoneCode"
+        | "nonMollurePhoneNumber"
+        | "nonMollureEmail"
+        | "nonMollureLegalName"
+        | "nonMollureCoc"
+        | "nonMollureVat"
+        | "nonMollureContactFirstName"
+        | "nonMollureContactLastName"
+        | "nonMollureStreet"
+        | "nonMollureStreetNumber"
+        | "nonMollurePostalCode"
+        | "nonMollureProvince"
+        | "nonMollureMunicipality"
+        | "bookingClient",
+        string
+      >
+    > = {};
+
+    let isValid = true;
+
+    if (slotDrawerTab !== "booking") {
+      return { isValid: true as const, errors };
+    }
+
+    if (slotBookingScreen === "add-client-choice") {
+      return { isValid: false as const, errors };
+    }
+
+    if (slotBookingScreen === "non-mollure-type") {
+      if (!nonMollureClientType) {
+        isValid = false;
+        errors.nonMollureClientType = "Select client type.";
+      }
+      return { isValid, errors };
+    }
+
+    if (slotBookingScreen === "guest") {
+      if (isBlank(guestDraft.firstName)) {
+        isValid = false;
+        errors.guestFirstName = "First name is required.";
+      }
+      if (isBlank(guestDraft.lastName)) {
+        isValid = false;
+        errors.guestLastName = "Last name is required.";
+      }
+      return { isValid, errors };
+    }
+
+    if (slotBookingScreen === "non-mollure-individual") {
+      if (isBlank(nonMollureDraft.firstName)) {
+        isValid = false;
+        errors.nonMollureFirstName = "First name is required.";
+      }
+      if (isBlank(nonMollureDraft.lastName)) {
+        isValid = false;
+        errors.nonMollureLastName = "Last name is required.";
+      }
+      if (!nonMollureDraft.gender) {
+        isValid = false;
+        errors.nonMollureGender = "Gender is required.";
+      }
+      if (isBlank(nonMollureDraft.dob)) {
+        isValid = false;
+        errors.nonMollureDob = "Date of birth is required.";
+      }
+      if (isBlank(nonMollureDraft.phoneCode)) {
+        isValid = false;
+        errors.nonMollurePhoneCode = "Country code is required.";
+      }
+      if (isBlank(nonMollureDraft.phoneNumber)) {
+        isValid = false;
+        errors.nonMollurePhoneNumber = "Phone number is required.";
+      }
+      if (isBlank(nonMollureDraft.email)) {
+        isValid = false;
+        errors.nonMollureEmail = "Email is required.";
+      }
+      return { isValid, errors };
+    }
+
+    if (slotBookingScreen === "non-mollure-company") {
+      if (isBlank(nonMollureDraft.legalName)) {
+        isValid = false;
+        errors.nonMollureLegalName = "Legal name is required.";
+      }
+      if (isBlank(nonMollureDraft.coc)) {
+        isValid = false;
+        errors.nonMollureCoc = "COC is required.";
+      }
+      if (isBlank(nonMollureDraft.vat)) {
+        isValid = false;
+        errors.nonMollureVat = "VAT is required.";
+      }
+      if (isBlank(nonMollureDraft.contactFirstName)) {
+        isValid = false;
+        errors.nonMollureContactFirstName = "Contact first name is required.";
+      }
+      if (isBlank(nonMollureDraft.contactLastName)) {
+        isValid = false;
+        errors.nonMollureContactLastName = "Contact last name is required.";
+      }
+      if (!nonMollureDraft.gender) {
+        isValid = false;
+        errors.nonMollureGender = "Gender is required.";
+      }
+      if (isBlank(nonMollureDraft.street)) {
+        isValid = false;
+        errors.nonMollureStreet = "Street is required.";
+      }
+      if (isBlank(nonMollureDraft.streetNumber)) {
+        isValid = false;
+        errors.nonMollureStreetNumber = "Number is required.";
+      }
+      if (isBlank(nonMollureDraft.postalCode)) {
+        isValid = false;
+        errors.nonMollurePostalCode = "Postal code is required.";
+      }
+      if (isBlank(nonMollureDraft.province)) {
+        isValid = false;
+        errors.nonMollureProvince = "Province is required.";
+      }
+      if (isBlank(nonMollureDraft.municipality)) {
+        isValid = false;
+        errors.nonMollureMunicipality = "Municipality is required.";
+      }
+      if (isBlank(nonMollureDraft.email)) {
+        isValid = false;
+        errors.nonMollureEmail = "Email is required.";
+      }
+      return { isValid, errors };
+    }
+
+    // new-booking
+    if (!slotClientAdded) {
+      isValid = false;
+      errors.bookingClient = "Client is required.";
+    }
+    return { isValid, errors };
+  }, [guestDraft.firstName, guestDraft.lastName, nonMollureClientType, nonMollureDraft, slotBookingScreen, slotClientAdded, slotDrawerTab]);
+
+  const slotErrors = React.useMemo(() => (slotSaveAttempted ? slotValidation.errors : {}), [slotSaveAttempted, slotValidation.errors]);
+
+  const prevCandidateIso = React.useMemo(() => {
+    if (viewMode === "week") return addDaysIso(activeDateIso, -7);
+    if (viewMode === "month") return addDaysIso(activeDateIso, -30);
+    return addDaysIso(activeDateIso, -1);
+  }, [activeDateIso, viewMode]);
+
+  const canGoPrev = prevCandidateIso >= todayIso;
+
   const onToday = () => {
     setActiveDateIso(todayIso);
   };
 
   const onPrev = () => {
-    if (viewMode === "week") setActiveDateIso(addDaysIso(activeDateIso, -7));
-    else if (viewMode === "month") setActiveDateIso(addDaysIso(activeDateIso, -30));
-    else setActiveDateIso(addDaysIso(activeDateIso, -1));
+    setActiveDateIso(canGoPrev ? prevCandidateIso : todayIso);
   };
 
   const onNext = () => {
@@ -501,6 +666,7 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
               <IconButton
                 size="small"
                 onClick={onPrev}
+                disabled={!canGoPrev}
                 sx={{
                   width: 26,
                   height: 26,
@@ -1437,33 +1603,29 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                 <Button
                   variant="contained"
                   disableElevation
+                  disabled={!slotValidation.isValid}
                   onClick={() => {
+                    setSlotSaveAttempted(true);
+                    if (!slotValidation.isValid) return;
                     if (slotBookingScreen === "non-mollure-type") {
-                      if (!nonMollureClientType) {
-                        showSnackbar({ severity: "warning", message: "Please select Client Type." });
-                        return;
-                      }
                       setSlotBookingScreen(nonMollureClientType === "individual" ? "non-mollure-individual" : "non-mollure-company");
                       return;
                     }
                     if (slotBookingScreen === "non-mollure-individual" || slotBookingScreen === "non-mollure-company") {
                       showSnackbar({ severity: "success", message: "Saved (mock)." });
                       setSlotBookingScreen("new-booking");
+                      setSlotSaveAttempted(false);
                       return;
                     }
                     if (slotBookingScreen === "guest") {
-                      const first = guestDraft.firstName.trim();
-                      const last = guestDraft.lastName.trim();
-                      if (!first || !last) {
-                        showSnackbar({ severity: "warning", message: "Guest first name and last name are required." });
-                        return;
-                      }
                       showSnackbar({ severity: "success", message: "Guest added (mock)." });
                       setSlotBookingScreen("new-booking");
+                      setSlotSaveAttempted(false);
                       return;
                     }
                     showSnackbar({ severity: "success", message: "Saved (mock)." });
                     setSlotDrawerOpen(false);
+                    setSlotSaveAttempted(false);
                   }}
                   sx={{
                     borderRadius: "10px",
@@ -1625,6 +1787,8 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                         ]}
                         fullWidth
                         placeholder="Select Client Type"
+                        error={Boolean(slotErrors.nonMollureClientType)}
+                        helperText={slotErrors.nonMollureClientType}
                       />
                     </Box>
 
@@ -1665,12 +1829,16 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                       value={nonMollureDraft.firstName}
                       onChange={(e) => setNonMollureDraft((p) => ({ ...p, firstName: e.target.value }))}
                       fullWidth
+                        error={Boolean(slotErrors.nonMollureFirstName)}
+                        helperText={slotErrors.nonMollureFirstName}
                     />
                     <AppTextField
                       placeholder="Last Name"
                       value={nonMollureDraft.lastName}
                       onChange={(e) => setNonMollureDraft((p) => ({ ...p, lastName: e.target.value }))}
                       fullWidth
+                        error={Boolean(slotErrors.nonMollureLastName)}
+                        helperText={slotErrors.nonMollureLastName}
                     />
 
                     <AppDropdown
@@ -1684,6 +1852,8 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                       ]}
                       fullWidth
                       placeholder="Select Gender"
+                      error={Boolean(slotErrors.nonMollureGender)}
+                      helperText={slotErrors.nonMollureGender}
                     />
 
                     <Box>
@@ -1696,6 +1866,8 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                         onChange={(e) => setNonMollureDraft((p) => ({ ...p, dob: e.target.value }))}
                         fullWidth
                         placeholder="mm/dd/yyyy"
+                        error={Boolean(slotErrors.nonMollureDob)}
+                        helperText={slotErrors.nonMollureDob}
                       />
                     </Box>
 
@@ -1717,12 +1889,16 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                           fullWidth
                           sx={{ maxWidth: 140 }}
                           placeholder="Select Country Code"
+                          error={Boolean(slotErrors.nonMollurePhoneCode)}
+                          helperText={slotErrors.nonMollurePhoneCode}
                         />
                         <AppTextField
                           placeholder="+442xxxxxxxxxx"
                           value={nonMollureDraft.phoneNumber}
                           onChange={(e) => setNonMollureDraft((p) => ({ ...p, phoneNumber: e.target.value }))}
                           fullWidth
+                          error={Boolean(slotErrors.nonMollurePhoneNumber)}
+                          helperText={slotErrors.nonMollurePhoneNumber}
                         />
                       </Stack>
                     </Box>
@@ -1732,6 +1908,8 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                       value={nonMollureDraft.email}
                       onChange={(e) => setNonMollureDraft((p) => ({ ...p, email: e.target.value }))}
                       fullWidth
+                      error={Boolean(slotErrors.nonMollureEmail)}
+                      helperText={slotErrors.nonMollureEmail}
                     />
 
                     <Box sx={{ flex: 1, minHeight: 140 }} />
@@ -1771,18 +1949,24 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                       value={nonMollureDraft.legalName}
                       onChange={(e) => setNonMollureDraft((p) => ({ ...p, legalName: e.target.value }))}
                       fullWidth
+                      error={Boolean(slotErrors.nonMollureLegalName)}
+                      helperText={slotErrors.nonMollureLegalName}
                     />
                     <AppTextField
                       placeholder="COC"
                       value={nonMollureDraft.coc}
                       onChange={(e) => setNonMollureDraft((p) => ({ ...p, coc: e.target.value }))}
                       fullWidth
+                      error={Boolean(slotErrors.nonMollureCoc)}
+                      helperText={slotErrors.nonMollureCoc}
                     />
                     <AppTextField
                       placeholder="VAT"
                       value={nonMollureDraft.vat}
                       onChange={(e) => setNonMollureDraft((p) => ({ ...p, vat: e.target.value }))}
                       fullWidth
+                      error={Boolean(slotErrors.nonMollureVat)}
+                      helperText={slotErrors.nonMollureVat}
                     />
 
                     <AppTextField
@@ -1790,12 +1974,16 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                       value={nonMollureDraft.contactFirstName}
                       onChange={(e) => setNonMollureDraft((p) => ({ ...p, contactFirstName: e.target.value }))}
                       fullWidth
+                      error={Boolean(slotErrors.nonMollureContactFirstName)}
+                      helperText={slotErrors.nonMollureContactFirstName}
                     />
                     <AppTextField
                       placeholder="Contact Person’s Last Name"
                       value={nonMollureDraft.contactLastName}
                       onChange={(e) => setNonMollureDraft((p) => ({ ...p, contactLastName: e.target.value }))}
                       fullWidth
+                      error={Boolean(slotErrors.nonMollureContactLastName)}
+                      helperText={slotErrors.nonMollureContactLastName}
                     />
 
                     <AppDropdown
@@ -1809,6 +1997,8 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                       ]}
                       fullWidth
                       placeholder="Select Gender"
+                      error={Boolean(slotErrors.nonMollureGender)}
+                      helperText={slotErrors.nonMollureGender}
                     />
 
                     <Box sx={{ pt: 0.5 }}>
@@ -1822,12 +2012,16 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                             value={nonMollureDraft.street}
                             onChange={(e) => setNonMollureDraft((p) => ({ ...p, street: e.target.value }))}
                             fullWidth
+                            error={Boolean(slotErrors.nonMollureStreet)}
+                            helperText={slotErrors.nonMollureStreet}
                           />
                           <AppTextField
                             placeholder="Number"
                             value={nonMollureDraft.streetNumber}
                             onChange={(e) => setNonMollureDraft((p) => ({ ...p, streetNumber: e.target.value }))}
                             fullWidth
+                            error={Boolean(slotErrors.nonMollureStreetNumber)}
+                            helperText={slotErrors.nonMollureStreetNumber}
                           />
                         </Stack>
                         <Stack direction="row" spacing={1.25}>
@@ -1836,6 +2030,8 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                             value={nonMollureDraft.postalCode}
                             onChange={(e) => setNonMollureDraft((p) => ({ ...p, postalCode: e.target.value }))}
                             fullWidth
+                            error={Boolean(slotErrors.nonMollurePostalCode)}
+                            helperText={slotErrors.nonMollurePostalCode}
                           />
                           <AppDropdown
                             label=""
@@ -1848,6 +2044,8 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                             ]}
                             fullWidth
                             placeholder="Province"
+                            error={Boolean(slotErrors.nonMollureProvince)}
+                            helperText={slotErrors.nonMollureProvince}
                           />
                         </Stack>
                         <AppDropdown
@@ -1861,6 +2059,8 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                           ]}
                           fullWidth
                           placeholder="Municipality"
+                          error={Boolean(slotErrors.nonMollureMunicipality)}
+                          helperText={slotErrors.nonMollureMunicipality}
                         />
                       </Stack>
                     </Box>
@@ -1898,6 +2098,8 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                       value={nonMollureDraft.email}
                       onChange={(e) => setNonMollureDraft((p) => ({ ...p, email: e.target.value }))}
                       fullWidth
+                      error={Boolean(slotErrors.nonMollureEmail)}
+                      helperText={slotErrors.nonMollureEmail}
                     />
 
                     <Box sx={{ flex: 1, minHeight: 140 }} />
@@ -1931,12 +2133,16 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                         value={guestDraft.firstName}
                         onChange={(e) => setGuestDraft((p) => ({ ...p, firstName: e.target.value }))}
                         fullWidth
+                        error={Boolean(slotErrors.guestFirstName)}
+                        helperText={slotErrors.guestFirstName}
                       />
                       <AppTextField
                         placeholder="Last Name*"
                         value={guestDraft.lastName}
                         onChange={(e) => setGuestDraft((p) => ({ ...p, lastName: e.target.value }))}
                         fullWidth
+                        error={Boolean(slotErrors.guestLastName)}
+                        helperText={slotErrors.guestLastName}
                       />
                     </Stack>
 
@@ -2242,6 +2448,11 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                           </BodyText>
                         </Box>
                       )}
+                      {slotErrors.bookingClient ? (
+                        <BodyText sx={{ mt: 0.6, fontSize: 11.5, fontWeight: 800, color: theme.palette.error.main }}>
+                          {slotErrors.bookingClient}
+                        </BodyText>
+                      ) : null}
                     </Box>
 
                     {slotClientAdded ? (
