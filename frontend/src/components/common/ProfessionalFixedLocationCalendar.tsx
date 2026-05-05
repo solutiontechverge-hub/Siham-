@@ -3,25 +3,55 @@
 import * as React from "react";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import KeyboardDoubleArrowLeftRoundedIcon from "@mui/icons-material/KeyboardDoubleArrowLeftRounded";
+import KeyboardDoubleArrowRightRoundedIcon from "@mui/icons-material/KeyboardDoubleArrowRightRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
-import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
+import LocationOnRoundedIcon from "@mui/icons-material/LocationOnRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
-import { Avatar, Box, Button, Checkbox, Chip, Divider, Drawer, FormControlLabel, IconButton, Menu, MenuItem, Paper, Stack, Tooltip } from "@mui/material";
+import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
+import StickyNote2OutlinedIcon from "@mui/icons-material/StickyNote2Outlined";
+import { Avatar, Box, Button, ButtonBase, Chip, IconButton, Paper, Popover, Stack, Tooltip } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../ui/typography";
-import MollureCardHeader from "./MollureCardHeader";
 import { useSnackbar } from "./AppSnackbar";
 import AppPillTabs from "./AppPillTabs";
 import MollureDrawer from "./MollureDrawer";
-import MollureModal from "./MollureModal";
-import AppSelect from "./AppSelect";
 import AppTextField from "./AppTextField";
 import AppDropdown from "./AppDropdown";
+import CalendarAddMenu from "./calendar/CalendarAddMenu";
+import CalendarBlockTimeModal from "./calendar/CalendarBlockTimeModal";
+import CalendarDesignModal, { type CalendarDesignDraft } from "./calendar/CalendarDesignModal";
+import CalendarPublicBusinessHoursModal, {
+  type PublicBusinessHoursDraft,
+} from "./calendar/CalendarPublicBusinessHoursModal";
+import CalendarFiltersDrawer from "./calendar/CalendarFiltersDrawer";
+import { useCalendarFilters } from "./calendar/useCalendarFilters";
+import {
+  addDaysIso,
+  addMonthsIso,
+  extractBookingId,
+  fmtMinToTime,
+  fmtTimeLabel,
+  formatLongDateUtc,
+  formatMdyDate,
+  formatMonthYearUtc,
+  type BlockTimeDraft,
+  type Interval,
+  mergeIntervals,
+  minutesSinceMidnight,
+  parseIsoDate,
+  type SelectedSlot,
+  startOfWeekIso,
+  statusChipSx,
+  subtractIntervals,
+  sumIntervalsMins,
+  toIsoLocalDate,
+  toMonthIso,
+} from "./calendar/calendar.utils";
 import type {
-  CalendarBookingStatus,
   CalendarBookingType,
   CalendarBookingLocation,
   CalendarSubTab,
@@ -33,178 +63,111 @@ export type ProfessionalFixedLocationCalendarProps = {
   data: ProfessionalFixedLocationCalendarData;
 };
 
-function statusChipSx(status: CalendarBookingStatus, m: { navy: string }) {
-  switch (status) {
-    case "Requested":
-      return { bgcolor: alpha("#F4A100", 0.12), color: "#C87800", borderColor: alpha("#F4A100", 0.5) };
-    case "Cancelled":
-      return { bgcolor: alpha("#D32F2F", 0.10), color: "#B71C1C", borderColor: alpha("#D32F2F", 0.4) };
-    case "Confirmed":
-      return { bgcolor: alpha("#2E7D32", 0.10), color: "#1B5E20", borderColor: alpha("#2E7D32", 0.4) };
-    case "Completed":
-      return { bgcolor: alpha(m.navy, 0.06), color: alpha(m.navy, 0.7), borderColor: alpha(m.navy, 0.2) };
-    case "No Show":
-    default:
-      return { bgcolor: alpha(m.navy, 0.06), color: alpha(m.navy, 0.7), borderColor: alpha(m.navy, 0.2) };
-  }
-}
-
-function extractBookingId(rawId: string) {
-  // "b-34009-a" → "34009"
-  const parts = rawId.split("-");
-  if (parts.length >= 3) return parts.slice(1, parts.length - 1).join("-");
-  if (parts.length === 2) return parts[1];
-  return rawId;
-}
-
-function minutesSinceMidnight(hhmm: string) {
-  const [h, m] = hhmm.split(":").map((v) => Number(v));
-  return h * 60 + m;
-}
-
-function pad2(n: number) {
-  return String(n).padStart(2, "0");
-}
-
-function fmtTimeLabel(minutes: number) {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return `${pad2(h)}:${pad2(m)}`;
-}
-
-function parseIsoDate(iso: string) {
-  // Use UTC to keep the label stable across timezones.
-  const [y, m, d] = iso.split("-").map((v) => Number(v));
-  return new Date(Date.UTC(y, m - 1, d));
-}
-
-function formatLongDateUtc(iso: string) {
-  const dt = parseIsoDate(iso);
-  // Force a stable locale to avoid Next.js hydration mismatches
-  // (server locale can differ from the user's browser locale).
-  return dt.toLocaleDateString("en-US", {
-    month: "short",
-    day: "2-digit",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-}
-
-function addDaysIso(iso: string, days: number) {
-  const dt = parseIsoDate(iso);
-  dt.setUTCDate(dt.getUTCDate() + days);
-  const y = dt.getUTCFullYear();
-  const m = String(dt.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(dt.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function startOfWeekIso(iso: string) {
-  const dt = parseIsoDate(iso);
-  const dow = dt.getUTCDay(); // 0..6
-  // start week on Monday
-  const diff = (dow + 6) % 7;
-  return addDaysIso(iso, -diff);
-}
-
-type Interval = { startMin: number; endMin: number };
-
-function mergeIntervals(intervals: readonly Interval[]) {
-  const sorted = [...intervals].sort((a, b) => a.startMin - b.startMin);
-  const out: Interval[] = [];
-  for (const it of sorted) {
-    const last = out[out.length - 1];
-    if (!last || it.startMin > last.endMin) out.push({ ...it });
-    else last.endMin = Math.max(last.endMin, it.endMin);
-  }
-  return out;
-}
-
-function subtractIntervals(base: readonly Interval[], busy: readonly Interval[]) {
-  const mergedBusy = mergeIntervals(busy);
-  const out: Interval[] = [];
-  for (const b of base) {
-    let cursor = b.startMin;
-    for (const u of mergedBusy) {
-      if (u.endMin <= cursor) continue;
-      if (u.startMin >= b.endMin) break;
-      if (u.startMin > cursor) out.push({ startMin: cursor, endMin: Math.min(u.startMin, b.endMin) });
-      cursor = Math.max(cursor, u.endMin);
-      if (cursor >= b.endMin) break;
-    }
-    if (cursor < b.endMin) out.push({ startMin: cursor, endMin: b.endMin });
-  }
-  return out;
-}
-
-function fmtMinToTime(min: number) {
-  const h = Math.floor(min / 60);
-  const m = min % 60;
-  return `${pad2(h)}:${pad2(m)}`;
-}
-
-function sumIntervalsMins(intervals: readonly Interval[]) {
-  return intervals.reduce((acc, it) => acc + Math.max(0, it.endMin - it.startMin), 0);
-}
-
 export default function ProfessionalFixedLocationCalendar({ data }: ProfessionalFixedLocationCalendarProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
   const { showSnackbar } = useSnackbar();
 
+  const defaultDateIso = React.useMemo(() => toIsoLocalDate(new Date()), []);
   const [activeSubTab, setActiveSubTab] = React.useState<CalendarSubTab>(data.initialSubTab);
   const [viewMode, setViewMode] = React.useState<CalendarViewMode>(data.initialView);
-  const [activeDateIso, setActiveDateIso] = React.useState(data.initialDate);
+  const [activeDateIso, setActiveDateIso] = React.useState(defaultDateIso);
+  const [selectedResourceId, setSelectedResourceId] = React.useState(data.resources[0]?.id ?? "");
+  const [datePickerAnchor, setDatePickerAnchor] = React.useState<HTMLElement | null>(null);
+  const [datePickerMonth, setDatePickerMonth] = React.useState(() => {
+    const base = parseIsoDate(defaultDateIso);
+    return new Date(base.getUTCFullYear(), base.getUTCMonth(), 1);
+  });
   const [addAnchor, setAddAnchor] = React.useState<HTMLElement | null>(null);
   const [filtersOpen, setFiltersOpen] = React.useState(false);
+  const [slotDrawerTab, setSlotDrawerTab] = React.useState<"booking" | "sales" | "activity">("booking");
+  const [slotLocation, setSlotLocation] = React.useState<CalendarBookingLocation>("FL");
+  const [slotCalendarMonth, setSlotCalendarMonth] = React.useState(() => toMonthIso(defaultDateIso));
+  const [slotClientAdded, setSlotClientAdded] = React.useState(false);
+  const [slotBookingScreen, setSlotBookingScreen] = React.useState<
+    "new-booking" | "add-client-choice" | "non-mollure-type" | "non-mollure-individual" | "non-mollure-company" | "guest"
+  >("new-booking");
+  const [nonMollureClientType, setNonMollureClientType] = React.useState<"" | "individual" | "company">("");
+  const [guestDraft, setGuestDraft] = React.useState<{
+    firstName: string;
+    lastName: string;
+    email: string;
+    phoneCode: string;
+    phoneNumber: string;
+  }>(() => ({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phoneCode: "",
+    phoneNumber: "",
+  }));
+  const [nonMollureDraft, setNonMollureDraft] = React.useState<{
+    firstName: string;
+    lastName: string;
+    email: string;
+    gender: "" | "male" | "female" | "other";
+    dob: string;
+    phoneCode: string;
+    phoneNumber: string;
+    companyName: string;
+    legalName: string;
+    coc: string;
+    vat: string;
+    contactFirstName: string;
+    contactLastName: string;
+    street: string;
+    streetNumber: string;
+    postalCode: string;
+    province: string;
+    municipality: string;
+  }>(() => ({
+    firstName: "",
+    lastName: "",
+    email: "",
+    gender: "",
+    dob: "",
+    phoneCode: "",
+    phoneNumber: "",
+    companyName: "",
+    legalName: "",
+    coc: "",
+    vat: "",
+    contactFirstName: "",
+    contactLastName: "",
+    street: "",
+    streetNumber: "",
+    postalCode: "",
+    province: "",
+    municipality: "",
+  }));
 
-  const bookingTypes: readonly CalendarBookingType[] = ["Online", "Offline", "Project", "Requests"];
-  const locations: readonly CalendarBookingLocation[] = ["FL", "DL"];
+  const {
+    appliedFilters,
+    bookingTypes,
+    draftFilters,
+    filteredResources,
+    initialFilters,
+    locations,
+    setAppliedFilters,
+    setDraftFilters,
+  } = useCalendarFilters(data.resources);
+  const [blockTimeOpen, setBlockTimeOpen] = React.useState(false);
+  const [publicBusinessHoursOpen, setPublicBusinessHoursOpen] = React.useState(false);
+  const [designOpen, setDesignOpen] = React.useState(false);
+  const [slotDrawerOpen, setSlotDrawerOpen] = React.useState(false);
+  const [selectedSlot, setSelectedSlot] = React.useState<null | SelectedSlot>(null);
 
-  const initialFilters = React.useMemo(
-    () => ({
-      teamAll: true,
-      teamIds: Object.fromEntries(data.resources.map((r) => [r.id, false])),
-      locationAll: true,
-      locations: { FL: false, DL: false },
-      bookingAll: true,
-      booking: { Online: false, Offline: false, Project: false, Requests: false },
-    }),
-    [data.resources],
+  const slotTabs = React.useMemo(
+    () =>
+      [
+        { id: "booking" as const, label: "Booking" },
+        { id: "activity" as const, label: "Activity" },
+        { id: "sales" as const, label: "Sales" },
+      ] as const,
+    [],
   );
 
-  const [draftFilters, setDraftFilters] = React.useState<{
-    teamAll: boolean;
-    teamIds: Record<string, boolean>;
-    locationAll: boolean;
-    locations: Record<CalendarBookingLocation, boolean>;
-    bookingAll: boolean;
-    booking: Record<CalendarBookingType, boolean>;
-  }>(() => initialFilters);
-
-  const [appliedFilters, setAppliedFilters] = React.useState(draftFilters);
-  const [blockTimeOpen, setBlockTimeOpen] = React.useState(false);
-  const [slotDrawerOpen, setSlotDrawerOpen] = React.useState(false);
-  const [selectedSlot, setSelectedSlot] = React.useState<null | {
-    resourceId: string;
-    date: string;
-    start: string;
-    end: string;
-    freeStart: string;
-    freeEnd: string;
-  }>(null);
-
-  const [blockDraft, setBlockDraft] = React.useState<{
-    title: "Meeting" | "Training" | "Holiday" | "Custom";
-    teamIds: string[];
-    locations: CalendarBookingLocation[];
-    dayFrom: "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday";
-    dayTo: "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday";
-    dateFrom: string;
-    dateTo: string;
-    startTime: string;
-    endTime: string;
-  }>(() => ({
+  const [blockDraft, setBlockDraft] = React.useState<BlockTimeDraft>(() => ({
     title: "Meeting",
     teamIds: data.resources.map((r) => r.id),
     locations: ["FL", "DL"],
@@ -215,6 +178,35 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
     startTime: "16:30",
     endTime: "17:30",
   }));
+
+  const [publicBusinessHoursDraft, setPublicBusinessHoursDraft] = React.useState<PublicBusinessHoursDraft>(() => ({
+    location: "",
+    schedule: "",
+    day: "",
+    startTime: "16:30",
+    endTime: "17:30",
+    notAvailable: false,
+    note: "",
+  }));
+
+  const [designDraft, setDesignDraft] = React.useState<CalendarDesignDraft>(() => ({
+    scope: "Categories",
+    colorsByCategory: {},
+  }));
+  const [appliedDesign, setAppliedDesign] = React.useState<CalendarDesignDraft>(() => ({
+    scope: "Categories",
+    colorsByCategory: {},
+  }));
+
+  const getServiceCategory = React.useCallback((title: string) => {
+    const t = String(title ?? "").toLowerCase();
+    // Heuristic mapping (mock): lets the Design modal color the grid right away.
+    if (/\b(nail|manicure|pedicure)\b/.test(t)) return "Nails";
+    if (/\b(facial|brow|lash|lashes|make-?up|makeup)\b/.test(t)) return "Face treatments";
+    if (/\b(massage|spa|body)\b/.test(t)) return "Body treatments";
+    if (/\b(hair|cut|wash|blow|color|colour|keratin|style|styling)\b/.test(t)) return "Hair";
+    return null;
+  }, []);
 
   const teamLabelById = React.useMemo(() => {
     const map = new Map<string, string>();
@@ -228,8 +220,8 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
   const startMin = grid.startHour * 60;
   const endMin = grid.endHour * 60;
   const rows = Math.floor((endMin - startMin) / grid.stepMinutes) + 1;
-  const rowPx = 44;
-  const laneHeaderPx = 42;
+  const rowPx = 48;
+  const laneHeaderPx = 44;
 
   const slotLines = React.useMemo(() => {
     const out: number[] = [];
@@ -247,14 +239,10 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
     return [activeDateIso];
   }, [activeDateIso, viewMode]);
 
-  const filteredResources = React.useMemo(() => {
-    if (appliedFilters.teamAll) return data.resources;
-    const selectedIds = Object.entries(appliedFilters.teamIds)
-      .filter(([, v]) => v)
-      .map(([id]) => id);
-    if (!selectedIds.length) return data.resources;
-    return data.resources.filter((r) => selectedIds.includes(r.id));
-  }, [appliedFilters.teamAll, appliedFilters.teamIds, data.resources]);
+  const activeResource = React.useMemo(
+    () => filteredResources.find((r) => r.id === selectedResourceId) ?? filteredResources[0],
+    [filteredResources, selectedResourceId],
+  );
 
   const eventsInRange = React.useMemo(
     () => {
@@ -273,7 +261,16 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
           });
       return byBooking;
     },
-    [data.events, visibleDates],
+    [
+      appliedFilters.booking,
+      appliedFilters.bookingAll,
+      appliedFilters.locationAll,
+      appliedFilters.locations,
+      appliedFilters.teamAll,
+      appliedFilters.teamIds,
+      data.events,
+      visibleDates,
+    ],
   );
   const blocksInRange = React.useMemo(
     () => {
@@ -281,13 +278,13 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
       if (appliedFilters.teamAll) return base;
       return base.filter((b) => appliedFilters.teamIds[b.resourceId]);
     },
-    [data.blocks, visibleDates],
+    [appliedFilters.teamAll, appliedFilters.teamIds, data.blocks, visibleDates],
   );
 
+  const todayIso = defaultDateIso;
+
   const onToday = () => {
-    const now = new Date();
-    const iso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-    setActiveDateIso(iso);
+    setActiveDateIso(todayIso);
   };
 
   const onPrev = () => {
@@ -341,6 +338,47 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
     [getAvailabilityFor, getBusyFor],
   );
 
+  const openBookingDrawer = React.useCallback(
+    (payload: SelectedSlot) => {
+      setSelectedSlot(payload);
+      setSlotDrawerTab("booking");
+      setSlotBookingScreen("new-booking");
+      setSlotLocation("FL");
+      setSlotCalendarMonth(toMonthIso(payload.date));
+      setSlotClientAdded(false);
+      setGuestDraft({
+        firstName: "",
+        lastName: "",
+        email: "",
+        phoneCode: "",
+        phoneNumber: "",
+      });
+      setNonMollureClientType("");
+      setNonMollureDraft({
+        firstName: "",
+        lastName: "",
+        email: "",
+        gender: "",
+        dob: "",
+        phoneCode: "",
+        phoneNumber: "",
+        companyName: "",
+        legalName: "",
+        coc: "",
+        vat: "",
+        contactFirstName: "",
+        contactLastName: "",
+        street: "",
+        streetNumber: "",
+        postalCode: "",
+        province: "",
+        municipality: "",
+      });
+      setSlotDrawerOpen(true);
+    },
+    [],
+  );
+
   const onEmptyClick = React.useCallback(
     (resourceId: string, iso: string, minutes: number) => {
       const availability = getAvailabilityFor(resourceId, iso);
@@ -359,19 +397,19 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
       const snap = Math.round((minutes - startMin) / grid.stepMinutes) * grid.stepMinutes + startMin;
       const start = Math.max(segment.startMin, snap);
       const end = segment.endMin;
+      const drawerDateIso = iso < todayIso ? todayIso : iso;
 
       const payload = {
         resourceId,
-        date: iso,
+        date: drawerDateIso,
         start: fmtMinToTime(start),
         end: fmtMinToTime(Math.min(end, start + grid.stepMinutes)),
         freeStart: fmtMinToTime(segment.startMin),
         freeEnd: fmtMinToTime(segment.endMin),
       };
-      setSelectedSlot(payload);
-      setSlotDrawerOpen(true);
+      openBookingDrawer(payload);
     },
-    [getAvailabilityFor, getBusyFor, grid.stepMinutes, showSnackbar, startMin],
+    [getAvailabilityFor, getBusyFor, grid.stepMinutes, openBookingDrawer, showSnackbar, startMin, todayIso],
   );
 
   return (
@@ -385,27 +423,24 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
       <Paper
         elevation={0}
         sx={{
-          borderRadius: "10px",
-          border: `1px solid ${alpha(m.navy, 0.08)}`,
-          boxShadow: "0 10px 22px rgba(16, 35, 63, 0.05)",
+          borderRadius: "4px",
+          border: 0,
+          boxShadow: "0 12px 28px rgba(16, 35, 63, 0.04)",
           bgcolor: theme.palette.background.paper,
           overflow: "hidden",
         }}
       >
-        <MollureCardHeader title="Calendar" subtitle="Manage your schedule and bookings." tone="default" />
-        <Divider />
-
         {/* Toolbar */}
-        <Box sx={{ px: 2, py: 1.25 }}>
+        <Box sx={{ px: 1.5, py: 1.1, bgcolor: "#fff" }}>
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
             <Stack direction="row" spacing={0.75} alignItems="center">
               <IconButton
                 size="small"
                 onClick={onPrev}
                 sx={{
-                  width: 30,
-                  height: 30,
-                  borderRadius: "8px",
+                  width: 26,
+                  height: 26,
+                  borderRadius: "6px",
                   border: `1px solid ${alpha(m.navy, 0.14)}`,
                   color: alpha(m.navy, 0.6),
                   bgcolor: "#fff",
@@ -417,7 +452,13 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
               <Button
                 variant="outlined"
                 startIcon={<CalendarMonthRoundedIcon sx={{ fontSize: 18 }} />}
-                onClick={() => showSnackbar({ severity: "info", message: "Date picker UI can be added next." })}
+                onClick={(e) => {
+                  setDatePickerMonth(() => {
+                    const base = parseIsoDate(activeDateIso);
+                    return new Date(base.getUTCFullYear(), base.getUTCMonth(), 1);
+                  });
+                  setDatePickerAnchor(e.currentTarget);
+                }}
                 sx={{
                   borderRadius: "8px",
                   textTransform: "none",
@@ -433,13 +474,138 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                 {formatLongDateUtc(activeDateIso)}
               </Button>
 
+              <Popover
+                open={Boolean(datePickerAnchor)}
+                anchorEl={datePickerAnchor}
+                onClose={() => setDatePickerAnchor(null)}
+                anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+                transformOrigin={{ vertical: "top", horizontal: "left" }}
+                PaperProps={{
+                  sx: {
+                    mt: 1,
+                    borderRadius: "12px",
+                    border: `1px solid ${alpha(m.navy, 0.10)}`,
+                    boxShadow: "0 14px 28px rgba(16, 35, 63, 0.12)",
+                    overflow: "hidden",
+                    width: 320,
+                    bgcolor: "#fff",
+                  },
+                }}
+              >
+                <Box sx={{ p: 1.5 }}>
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <IconButton
+                      size="small"
+                      onClick={() =>
+                        setDatePickerMonth((p) => new Date(p.getFullYear(), p.getMonth() - 1, 1))
+                      }
+                      sx={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: "8px",
+                        border: `1px solid ${alpha(m.navy, 0.12)}`,
+                        color: alpha(m.navy, 0.65),
+                        bgcolor: "#fff",
+                      }}
+                    >
+                      <ChevronLeftRoundedIcon sx={{ fontSize: 18 }} />
+                    </IconButton>
+                    <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.85), flex: 1, textAlign: "center" }}>
+                      {datePickerMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                    </BodyText>
+                    <IconButton
+                      size="small"
+                      onClick={() =>
+                        setDatePickerMonth((p) => new Date(p.getFullYear(), p.getMonth() + 1, 1))
+                      }
+                      sx={{
+                        width: 28,
+                        height: 28,
+                        borderRadius: "8px",
+                        border: `1px solid ${alpha(m.navy, 0.12)}`,
+                        color: alpha(m.navy, 0.65),
+                        bgcolor: "#fff",
+                      }}
+                    >
+                      <ChevronRightRoundedIcon sx={{ fontSize: 18 }} />
+                    </IconButton>
+                  </Stack>
+
+                  <Box
+                    sx={{
+                      mt: 1.25,
+                      display: "grid",
+                      gridTemplateColumns: "repeat(7, 1fr)",
+                      gap: 0.5,
+                    }}
+                  >
+                    {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+                      <BodyText
+                        key={d}
+                        sx={{
+                          fontSize: 11,
+                          fontWeight: 900,
+                          color: alpha(m.navy, 0.5),
+                          textAlign: "center",
+                          py: 0.5,
+                        }}
+                      >
+                        {d}
+                      </BodyText>
+                    ))}
+
+                    {(() => {
+                      const firstDowMon0 = (datePickerMonth.getDay() + 6) % 7; // 0=Mon..6=Sun
+                      const daysInMonth = new Date(datePickerMonth.getFullYear(), datePickerMonth.getMonth() + 1, 0).getDate();
+                      const cells: React.ReactNode[] = [];
+                      for (let i = 0; i < firstDowMon0; i++) cells.push(<Box key={`pad-${i}`} sx={{ height: 34 }} />);
+                      for (let day = 1; day <= daysInMonth; day++) {
+                        const dt = new Date(datePickerMonth.getFullYear(), datePickerMonth.getMonth(), day);
+                        const iso = toIsoLocalDate(dt);
+                        const isPast = iso < todayIso;
+                        const selected = iso === activeDateIso;
+                        cells.push(
+                          <ButtonBase
+                            key={iso}
+                            disabled={isPast}
+                            onClick={() => {
+                              setActiveDateIso(iso);
+                              setDatePickerAnchor(null);
+                            }}
+                            sx={{
+                              height: 34,
+                              borderRadius: "10px",
+                              display: "grid",
+                              placeItems: "center",
+                              fontSize: 12,
+                              fontWeight: 900,
+                              color: isPast ? alpha(m.navy, 0.24) : selected ? "#fff" : alpha(m.navy, 0.75),
+                              bgcolor: selected && !isPast ? m.teal : "transparent",
+                              cursor: isPast ? "not-allowed" : "pointer",
+                              "&.Mui-disabled": {
+                                color: alpha(m.navy, 0.24),
+                                pointerEvents: "auto",
+                              },
+                              "&:hover": { bgcolor: isPast ? "transparent" : selected ? m.tealDark : alpha(m.navy, 0.05) },
+                            }}
+                          >
+                            {day}
+                          </ButtonBase>
+                        );
+                      }
+                      return cells;
+                    })()}
+                  </Box>
+                </Box>
+              </Popover>
+
               <IconButton
                 size="small"
                 onClick={onNext}
                 sx={{
-                  width: 30,
-                  height: 30,
-                  borderRadius: "8px",
+                  width: 26,
+                  height: 26,
+                  borderRadius: "6px",
                   border: `1px solid ${alpha(m.navy, 0.14)}`,
                   color: alpha(m.navy, 0.6),
                   bgcolor: "#fff",
@@ -487,7 +653,7 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                     sx={{
                       borderRadius: 0,
                       minWidth: 44,
-                      height: 30,
+                      height: 28,
                       textTransform: "none",
                       fontWeight: 800,
                       fontSize: 12,
@@ -538,35 +704,37 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
             >
               Add
             </Button>
-            <Menu open={Boolean(addAnchor)} anchorEl={addAnchor} onClose={() => setAddAnchor(null)}>
-              {[
-                { label: "Booking", key: "booking" as const },
-                { label: "Blocked time", key: "blocked" as const },
-                { label: "Design", key: "design" as const },
-                { label: "Add Note", key: "note" as const },
-              ].map((item) => (
-                <MenuItem
-                  key={item.key}
-                  onClick={() => {
-                    setAddAnchor(null);
-                    if (item.key === "blocked") {
-                      setBlockTimeOpen(true);
-                      return;
-                    }
-                    showSnackbar({ severity: "info", message: `${item.label} (mock).` });
-                  }}
-                >
-                  {item.label}
-                </MenuItem>
-              ))}
-            </Menu>
+            <CalendarAddMenu
+              anchorEl={addAnchor}
+              onBlockedTime={() => setBlockTimeOpen(true)}
+              onBooking={() => {
+                const bookingDate = activeDateIso < todayIso ? todayIso : activeDateIso;
+                const resourceId = activeResource?.id ?? selectedResourceId ?? data.resources[0]?.id ?? "";
+                const availability = resourceId ? getAvailabilityFor(resourceId, bookingDate) : [];
+                const segment = availability[0] ?? { startMin, endMin: Math.min(endMin, startMin + grid.stepMinutes) };
+                const start = segment.startMin;
+                openBookingDrawer({
+                  resourceId,
+                  date: bookingDate,
+                  start: fmtMinToTime(start),
+                  end: fmtMinToTime(Math.min(segment.endMin, start + grid.stepMinutes)),
+                  freeStart: fmtMinToTime(segment.startMin),
+                  freeEnd: fmtMinToTime(segment.endMin),
+                });
+              }}
+              onPublicBusinessHours={() => setPublicBusinessHoursOpen(true)}
+              onDesign={() => {
+                setDesignDraft(appliedDesign);
+                setDesignOpen(true);
+              }}
+              onClose={() => setAddAnchor(null)}
+              onMockAction={(label) => showSnackbar({ severity: "info", message: `${label} (mock).` })}
+            />
           </Stack>
         </Box>
 
-        <Divider />
-
         {/* Timeline grid */}
-        <Box sx={{ px: 2, pb: 2 }}>
+        <Box sx={{ px: 1.5, pb: 1.5, bgcolor: "#fff" }}>
           {viewMode === "month" ? (
             <Paper
               elevation={0}
@@ -588,15 +756,16 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
           ) : (
             <Box
               sx={{
-                borderRadius: "10px",
-                border: `1px solid ${alpha(m.navy, 0.08)}`,
+                borderRadius: "2px",
+                border: `1px solid ${alpha(m.navy, 0.10)}`,
                 overflow: "hidden",
+                bgcolor: "#fff",
               }}
             >
-              <Box sx={{ display: "grid", gridTemplateColumns: "64px 1fr", bgcolor: m.fxSurface }}>
+              <Box sx={{ display: "grid", gridTemplateColumns: "58px 1fr", bgcolor: m.fxSurface }}>
                 {/* Time column */}
-                <Box sx={{ bgcolor: alpha(m.navy, 0.02) }}>
-                  <Box sx={{ height: laneHeaderPx, borderBottom: `1px solid ${alpha(m.navy, 0.06)}` }} />
+                <Box sx={{ bgcolor: "#fff" }}>
+                  <Box sx={{ height: laneHeaderPx, borderBottom: `1px solid ${alpha(m.navy, 0.08)}` }} />
                   {slotLines.map((t, idx) => (
                     <Box
                       key={t}
@@ -606,11 +775,11 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                         display: "flex",
                         alignItems: "flex-start",
                         justifyContent: "flex-end",
-                        pt: idx === 0 ? 1.1 : 0.9,
-                        borderBottom: `1px solid ${alpha(m.navy, 0.06)}`,
+                        pt: idx === 0 ? 1.15 : 1,
+                        borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
                       }}
                     >
-                      <BodyText sx={{ fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.55) }}>
+                      <BodyText sx={{ fontSize: 10, fontWeight: 800, color: alpha(m.navy, 0.5) }}>
                         {fmtTimeLabel(t)}
                       </BodyText>
                     </Box>
@@ -626,7 +795,7 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                     flexDirection: "column",
                   }}
                 >
-                  {filteredResources.map((res, laneIdx) => {
+                  {activeResource ? [activeResource].map((res, laneIdx) => {
                     const laneDates = viewMode === "week" ? visibleDates : [activeDateIso];
                     return (
                       <Box
@@ -639,49 +808,103 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                         <Box
                           sx={{
                             height: laneHeaderPx,
-                            px: 1.25,
+                            px: 1.1,
                             display: "flex",
                             alignItems: "center",
-                            gap: 1,
-                            bgcolor: m.fxSurface,
-                            borderBottom: `1px solid ${alpha(m.navy, 0.06)}`,
+                            gap: 0.8,
+                            bgcolor: "#fff",
+                            borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
                           }}
                         >
-                          <Avatar sx={{ width: 26, height: 26, bgcolor: alpha(m.teal, 0.14), color: m.teal, fontWeight: 900, fontSize: 12 }}>
-                            {res.avatarText}
-                          </Avatar>
-                          <Box sx={{ display: "flex", flexDirection: "column", minWidth: 140 }}>
-                            <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.85), lineHeight: 1.1 }}>
-                              {res.name}
-                            </BodyText>
-                            <Box
+                          <Stack direction="row" alignItems="center" spacing={2} sx={{ minWidth: 0, overflowX: "auto", py: 0.25 }}>
+                            {filteredResources.map((member) => {
+                              const isActiveMember = member.id === res.id;
+                              const ratio = Math.round(
+                                (viewMode === "week"
+                                  ? laneDates.reduce((acc, iso) => acc + getDailyBookingRatio(member.id, iso), 0) / Math.max(1, laneDates.length)
+                                  : getDailyBookingRatio(member.id, activeDateIso)) * 100,
+                              );
+
+                              return (
+                                <Box
+                                  key={member.id}
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={() => setSelectedResourceId(member.id)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" || e.key === " ") setSelectedResourceId(member.id);
+                                  }}
+                                  sx={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    gap: 0.8,
+                                    minWidth: 126,
+                                    cursor: "pointer",
+                                    borderRadius: "8px",
+                                    px: 0.4,
+                                    py: 0.35,
+                                    bgcolor: isActiveMember ? alpha(m.teal, 0.04) : "transparent",
+                                    "&:hover": { bgcolor: alpha(m.teal, 0.06) },
+                                  }}
+                                >
+                                  <Avatar
+                                    sx={{
+                                      width: 24,
+                                      height: 24,
+                                      bgcolor: alpha(m.teal, isActiveMember ? 0.2 : 0.12),
+                                      color: m.teal,
+                                      fontWeight: 900,
+                                      fontSize: 11,
+                                    }}
+                                  >
+                                    {member.avatarText}
+                                  </Avatar>
+                                  <Box sx={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                                    <BodyText
+                                      sx={{
+                                        fontWeight: 900,
+                                        color: isActiveMember ? alpha(m.navy, 0.82) : alpha(m.navy, 0.58),
+                                        lineHeight: 1.1,
+                                        fontSize: 12,
+                                        whiteSpace: "nowrap",
+                                      }}
+                                    >
+                                      {member.name}
+                                    </BodyText>
+                                    <Box
+                                      sx={{
+                                        mt: 0.45,
+                                        height: 3,
+                                        width: 72,
+                                        borderRadius: "999px",
+                                        bgcolor: m.fxGrayF2F4F7,
+                                        overflow: "hidden",
+                                      }}
+                                    >
+                                      <Box sx={{ height: "100%", width: `${ratio}%`, bgcolor: isActiveMember ? m.teal : alpha(m.navy, 0.24) }} />
+                                    </Box>
+                                  </Box>
+                                </Box>
+                              );
+                            })}
+                          </Stack>
+                          <Box sx={{ flex: 1 }} />
+                          <Tooltip title="Team notes" placement="left">
+                            <IconButton
+                              size="small"
+                              onClick={() => showSnackbar({ severity: "info", message: `Notes for ${res.name}` })}
                               sx={{
-                                mt: 0.45,
-                                height: 4,
-                                width: 84,
-                                borderRadius: "999px",
-                                bgcolor: m.fxGrayF2F4F7,
-                                overflow: "hidden",
+                                width: 24,
+                                height: 24,
+                                borderRadius: "6px",
+                                color: alpha(m.navy, 0.46),
+                                "&:hover": { bgcolor: alpha(m.navy, 0.06), color: alpha(m.navy, 0.72) },
                               }}
                             >
-                              <Box
-                                sx={{
-                                  height: "100%",
-                                  width: `${
-                                    Math.round(
-                                      (viewMode === "week"
-                                        ? laneDates.reduce((acc, iso) => acc + getDailyBookingRatio(res.id, iso), 0) /
-                                          Math.max(1, laneDates.length)
-                                        : getDailyBookingRatio(res.id, activeDateIso)) * 100,
-                                    )
-                                  }%`,
-                                  bgcolor: m.teal,
-                                }}
-                              />
-                            </Box>
-                          </Box>
-                          <Box sx={{ flex: 1 }} />
-                          <KeyboardArrowDownRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.5) }} />
+                              <StickyNote2OutlinedIcon sx={{ fontSize: 16 }} />
+                            </IconButton>
+                          </Tooltip>
+                          <KeyboardArrowDownRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.42) }} />
                         </Box>
 
                         {/* Lane body */}
@@ -690,7 +913,7 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                             position: "relative",
                             display: "grid",
                             gridTemplateColumns: viewMode === "week" ? "repeat(7, 1fr)" : "1fr",
-                            bgcolor: m.fxSurface,
+                            bgcolor: "#fff",
                           }}
                         >
                           {laneDates.map((iso, colIdx) => {
@@ -705,9 +928,10 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                                 key={`${res.id}-${iso}`}
                                 sx={{
                                   position: "relative",
-                                  borderLeft: viewMode === "week" && colIdx > 0 ? `1px solid ${alpha(m.navy, 0.06)}` : undefined,
+                                  borderLeft: viewMode === "week" && colIdx > 0 ? `1px solid ${alpha(m.navy, 0.08)}` : undefined,
                                   height: rows * rowPx,
-                                  bgcolor: m.fxSurface, // Free time = white
+                                  bgcolor: "#fff",
+                                  backgroundColor: "#fff",
                                 }}
                               >
                                 {/* Click layer */}
@@ -733,7 +957,8 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                                           right: 0,
                                           top: 0,
                                           height: ((Math.min(...availability.map((a) => a.startMin)) - startMin) / grid.stepMinutes) * rowPx,
-                                          bgcolor: m.fxGrayF9FAFB,
+                                          // Free slot background should stay white everywhere.
+                                          bgcolor: "#fff",
                                           pointerEvents: "none",
                                         }}
                                       />
@@ -747,14 +972,15 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                                           right: 0,
                                           top: ((Math.max(...availability.map((a) => a.endMin)) - startMin) / grid.stepMinutes) * rowPx,
                                           height: ((endMin - Math.max(...availability.map((a) => a.endMin))) / grid.stepMinutes) * rowPx,
-                                          bgcolor: m.fxGrayF9FAFB,
+                                          // Free slot background should stay white everywhere.
+                                          bgcolor: "#fff",
                                           pointerEvents: "none",
                                         }}
                                       />
                                     ) : null}
                                   </>
                                 ) : (
-                                  <Box sx={{ position: "absolute", inset: 0, bgcolor: m.fxGrayF9FAFB, pointerEvents: "none" }} />
+                                  <Box sx={{ position: "absolute", inset: 0, bgcolor: "#fff", pointerEvents: "none" }} />
                                 )}
 
                                 {/* Horizontal grid lines */}
@@ -767,7 +993,7 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                                       right: 0,
                                       top: ((t - startMin) / grid.stepMinutes) * rowPx,
                                       height: 1,
-                                      bgcolor: alpha(m.navy, 0.06),
+                                      bgcolor: alpha(m.navy, 0.08),
                                       pointerEvents: "none",
                                     }}
                                   />
@@ -784,21 +1010,24 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                                       elevation={0}
                                       sx={{
                                         position: "absolute",
-                                        left: 10,
-                                        right: 10,
+                                        left: 0,
+                                        right: 0,
                                         top,
                                         height,
-                                        borderRadius: "10px",
-                                        bgcolor: isUnavail ? alpha(m.navy, 0.04) : alpha(m.navy, 0.03),
-                                        border: `1px solid ${alpha(m.navy, 0.08)}`,
-                                        p: 1,
+                                        borderRadius: 0,
+                                        bgcolor: isUnavail ? alpha(m.navy, 0.035) : alpha(m.navy, 0.025),
+                                        border: 0,
+                                        borderTop: `1px solid ${alpha(m.navy, 0.04)}`,
+                                        borderBottom: `1px solid ${alpha(m.navy, 0.04)}`,
+                                        px: 1.2,
+                                        py: 0.75,
                                         pointerEvents: "none",
                                       }}
                                     >
-                                      <BodyText sx={{ fontWeight: 900, fontSize: 11.5, color: alpha(m.navy, 0.8) }}>
+                                      <BodyText sx={{ fontWeight: 900, fontSize: 10, color: alpha(m.navy, 0.6), lineHeight: 1.1 }}>
                                         {b.start} to {b.end}
                                       </BodyText>
-                                      <BodyText sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.55) }}>
+                                      <BodyText sx={{ fontSize: 10.5, fontWeight: 800, color: alpha(m.navy, 0.58), lineHeight: 1.1 }}>
                                         {b.title}
                                       </BodyText>
                                     </Paper>
@@ -807,24 +1036,40 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
 
                                 {/* Events */}
                                 {laneEvents.map((ev, idx) => {
-                                  const top = ((minutesSinceMidnight(ev.start) - startMin) / grid.stepMinutes) * rowPx + 4;
-                                  const height = ((minutesSinceMidnight(ev.end) - minutesSinceMidnight(ev.start)) / grid.stepMinutes) * rowPx - 8;
-                                  const split = idx % 2 === 0;
-                                  const left = split ? 4 : "50%";
-                                  const right = split ? "50%" : 4;
+                                  const evStart = minutesSinceMidnight(ev.start);
+                                  const evEnd = minutesSinceMidnight(ev.end);
+                                  const top = ((evStart - startMin) / grid.stepMinutes) * rowPx + 1;
+                                  const height = Math.max(44, ((evEnd - evStart) / grid.stepMinutes) * rowPx - 2);
+                                  const overlapping = laneEvents
+                                    .filter((other) => {
+                                      const otherStart = minutesSinceMidnight(other.start);
+                                      const otherEnd = minutesSinceMidnight(other.end);
+                                      return evStart < otherEnd && evEnd > otherStart;
+                                    })
+                                    .sort((a, b) => a.id.localeCompare(b.id));
+                                  const overlapIndex = Math.max(0, overlapping.findIndex((other) => other.id === ev.id));
+                                  const overlapCount = Math.max(1, overlapping.length);
+                                  const isSplit = overlapCount > 1;
+                                  const widthPct = 100 / overlapCount;
+                                  const left = isSplit ? `calc(${overlapIndex * widthPct}% + 4px)` : 4;
+                                  const right = isSplit ? `calc(${(overlapCount - overlapIndex - 1) * widthPct}% + 4px)` : 4;
 
                                   const statusTone =
                                     ev.status === "Requested"
-                                      ? { bar: "#F4A100", bg: m.fxLavenderTint }
+                                      ? { bar: "#FFA800", bg: "linear-gradient(90deg, rgba(255,168,0,0.11) 0%, rgba(255,168,0,0.035) 48%, rgba(33,184,191,0.045) 100%)" }
                                       : ev.status === "Cancelled"
-                                        ? { bar: "#D32F2F", bg: alpha("#D32F2F", 0.05) }
+                                        ? { bar: "#FF6B6B", bg: "#F0F2F5" }
                                         : ev.status === "Confirmed"
-                                          ? { bar: "#2E7D32", bg: m.fxMintTint }
+                                          ? { bar: "#2EAD73", bg: alpha(m.teal, 0.10) }
                                           : ev.status === "Completed"
-                                            ? { bar: m.teal, bg: alpha(m.teal, 0.05) }
-                                            : { bar: alpha(m.navy, 0.4), bg: m.fxGrayF9FAFB };
+                                            ? { bar: "#7C8AA0", bg: "#F0F2F5" }
+                                            : { bar: "#5D7FA5", bg: "#F0F2F5" };
 
-                                  const RAIL_W = 52;
+                                  const RAIL_W = 78;
+                                  const serviceCategory = getServiceCategory(ev.title);
+                                  const serviceColor = serviceCategory ? appliedDesign.colorsByCategory[serviceCategory] : undefined;
+                                  const serviceBg = serviceColor ? alpha(serviceColor, 0.14) : undefined;
+                                  const serviceBorder = serviceColor ? alpha(serviceColor, 0.35) : undefined;
 
                                   return (
                                     <Box
@@ -835,14 +1080,15 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                                         left,
                                         right,
                                         height,
-                                        borderRadius: "8px",
-                                        bgcolor: statusTone.bg,
-                                        border: `1px solid ${m.fxGrayDCDFE3}`,
+                                        borderRadius: "2px",
+                                        background: serviceBg ?? statusTone.bg,
+                                        border: `1px solid ${serviceBorder ?? alpha(m.navy, 0.08)}`,
                                         overflow: "hidden",
                                         display: "flex",
                                         flexDirection: "row",
                                         // left accent bar via box-shadow so we avoid pseudo-element clipping issues
-                                        boxShadow: `inset 3px 0 0 0 ${statusTone.bar}`,
+                                        boxShadow: `inset 4px 0 0 0 ${statusTone.bar}`,
+                                        zIndex: 4,
                                       }}
                                     >
                                       {/* ── LEFT content (non-interactive) ── */}
@@ -850,37 +1096,37 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                                         sx={{
                                           flex: 1,
                                           minWidth: 0,
-                                          pl: 1.5,
-                                          pr: 0.75,
-                                          py: 0.75,
+                                          pl: 1.3,
+                                          pr: 0.5,
+                                          py: 0.35,
                                           pointerEvents: "none",
                                           overflow: "hidden",
                                         }}
                                       >
-                                        <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.3 }}>
-                                          <BodyText sx={{ fontSize: 10.5, fontWeight: 800, color: alpha(m.navy, 0.65), lineHeight: 1 }}>
+                                        <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.35 }}>
+                                          <BodyText sx={{ fontSize: 10.5, fontWeight: 500, color: alpha(m.navy, 0.78), lineHeight: 1 }}>
                                             ID: {extractBookingId(ev.id)}
                                           </BodyText>
                                           <Chip
                                             size="small"
                                             label={ev.status}
                                             sx={{
-                                              height: 17,
-                                              borderRadius: "999px",
-                                              fontSize: 9,
-                                              fontWeight: 900,
+                                              height: 16,
+                                              borderRadius: "7px",
+                                              fontSize: 8.5,
+                                              fontWeight: 800,
                                               border: "1px solid",
-                                              "& .MuiChip-label": { px: 1 },
+                                              "& .MuiChip-label": { px: 0.9 },
                                               ...statusChipSx(ev.status, m),
                                             }}
                                           />
                                         </Stack>
                                         <BodyText
                                           sx={{
-                                            fontSize: 12,
-                                            fontWeight: 900,
-                                            color: alpha(m.navy, 0.88),
-                                            lineHeight: 1.2,
+                                            fontSize: 10.5,
+                                            fontWeight: 500,
+                                            color: alpha(m.navy, 0.82),
+                                            lineHeight: 1.1,
                                             overflow: "hidden",
                                             display: "-webkit-box",
                                             WebkitLineClamp: 2,
@@ -889,21 +1135,12 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                                         >
                                           {ev.title}
                                         </BodyText>
-                                        <BodyText sx={{ fontSize: 10.5, color: alpha(m.navy, 0.55), mt: 0.25, lineHeight: 1 }}>
+                                        <BodyText sx={{ fontSize: 10.5, color: alpha(m.navy, 0.74), mt: 0.15, lineHeight: 1.05 }}>
                                           ({ev.start} to {ev.end})
                                         </BodyText>
-                                        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.3 }}>
-                                          <Box
-                                            component="span"
-                                            sx={{
-                                              width: 7,
-                                              height: 7,
-                                              borderRadius: "50%",
-                                              bgcolor: ev.location === "FL" ? alpha("#E53935", 0.75) : alpha(m.teal, 0.75),
-                                              flexShrink: 0,
-                                            }}
-                                          />
-                                          <BodyText sx={{ fontSize: 10.5, fontWeight: 800, color: alpha(m.navy, 0.6), lineHeight: 1 }}>
+                                        <Stack direction="row" spacing={0.25} alignItems="center" sx={{ mt: 0.15 }}>
+                                          <LocationOnRoundedIcon sx={{ fontSize: 15, color: alpha(m.navy, 0.62), flexShrink: 0 }} />
+                                          <BodyText sx={{ fontSize: 10.5, fontWeight: 500, color: alpha(m.navy, 0.68), lineHeight: 1 }}>
                                             {ev.location}
                                           </BodyText>
                                         </Stack>
@@ -914,16 +1151,15 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                                         sx={{
                                           width: RAIL_W,
                                           flexShrink: 0,
-                                          bgcolor: m.fxSurface,
-                                          borderLeft: `1px solid ${m.fxGrayDCDFE3}`,
-                                          display: "flex",
-                                          flexDirection: "column",
+                                          bgcolor: "transparent",
+                                          borderLeft: `1px solid ${alpha(m.navy, 0.06)}`,
+                                          display: "grid",
+                                          gridTemplateRows: "15px 15px 1fr",
+                                          justifyItems: "center",
                                           alignItems: "center",
-                                          justifyContent: "space-around",
-                                          py: 0.5,
+                                          py: 0.2,
                                         }}
                                       >
-                                        {/* Calendar */}
                                         <Tooltip title="Open calendar" placement="left">
                                           <IconButton
                                             size="small"
@@ -931,9 +1167,26 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                                               e.stopPropagation();
                                               showSnackbar({ severity: "info", message: `Calendar for booking ${extractBookingId(ev.id)}` });
                                             }}
-                                            sx={{ p: 0.4, borderRadius: "6px", color: alpha(m.navy, 0.45), "&:hover": { bgcolor: alpha(m.navy, 0.06), color: m.navy } }}
+                                            sx={{ p: 0.1, borderRadius: "5px", color: alpha(m.navy, 0.58), "&:hover": { bgcolor: alpha(m.navy, 0.06), color: m.navy } }}
                                           >
-                                            <CalendarMonthRoundedIcon sx={{ fontSize: 17 }} />
+                                            <CalendarMonthRoundedIcon sx={{ fontSize: 14 }} />
+                                          </IconButton>
+                                        </Tooltip>
+                                        <Tooltip title="Open notes" placement="left">
+                                          <IconButton
+                                            size="small"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              showSnackbar({ severity: "info", message: `Notes for booking ${extractBookingId(ev.id)}` });
+                                            }}
+                                            sx={{
+                                              p: 0.1,
+                                              borderRadius: "5px",
+                                              color: alpha(m.navy, 0.58),
+                                              "&:hover": { bgcolor: alpha(m.navy, 0.06), color: m.navy },
+                                            }}
+                                          >
+                                            <StickyNote2OutlinedIcon sx={{ fontSize: 14 }} />
                                           </IconButton>
                                         </Tooltip>
 
@@ -952,18 +1205,18 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                                               flexDirection: "column",
                                               alignItems: "center",
                                               gap: 0.1,
-                                              px: 0.5,
-                                              py: 0.3,
-                                              borderRadius: "6px",
+                                              px: 0,
+                                              py: 0.2,
+                                              borderRadius: "5px",
                                               "&:hover": { bgcolor: alpha(m.navy, 0.06) },
                                             }}
                                           >
-                                            <PersonOutlineRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.45) }} />
+                                            <PersonOutlineRoundedIcon sx={{ fontSize: 13, color: alpha(m.navy, 0.58) }} />
                                             <BodyText
                                               sx={{
-                                                fontSize: 9,
+                                                fontSize: 8.5,
                                                 fontWeight: 700,
-                                                color: alpha(m.navy, 0.55),
+                                                color: alpha(m.navy, 0.62),
                                                 lineHeight: 1,
                                                 maxWidth: RAIL_W - 8,
                                                 textAlign: "center",
@@ -976,20 +1229,6 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                                             </BodyText>
                                           </Box>
                                         </Tooltip>
-
-                                        {/* Timer / notes */}
-                                        <Tooltip title="Open notes" placement="left">
-                                          <IconButton
-                                            size="small"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              showSnackbar({ severity: "info", message: `Notes for booking ${extractBookingId(ev.id)}` });
-                                            }}
-                                            sx={{ p: 0.4, borderRadius: "6px", color: "#E53935", "&:hover": { bgcolor: alpha("#E53935", 0.08) } }}
-                                          >
-                                            <AccessTimeRoundedIcon sx={{ fontSize: 17 }} />
-                                          </IconButton>
-                                        </Tooltip>
                                       </Box>
                                     </Box>
                                   );
@@ -1000,7 +1239,7 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                         </Box>
                       </Box>
                     );
-                  })}
+                  }) : null}
                 </Box>
               </Box>
             </Box>
@@ -1008,48 +1247,957 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
         </Box>
       </Paper>
 
-      <Drawer
+      <MollureDrawer
         anchor="right"
         open={slotDrawerOpen}
         onClose={() => setSlotDrawerOpen(false)}
-        PaperProps={{ sx: { width: { xs: "100%", sm: 420 } } }}
+        title="Free time"
+        width={{ xs: "100%", sm: 420 }}
+        footer={
+          selectedSlot && slotDrawerTab === "booking" ? (
+            <Box sx={{ px: 2.5, py: 2 }}>
+              <Stack direction="row" alignItems="center" spacing={1.25}>
+                {slotBookingScreen === "new-booking" && slotClientAdded ? (
+                  <IconButton
+                    size="small"
+                    sx={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: "8px",
+                      border: `1px solid ${alpha(m.navy, 0.14)}`,
+                      color: alpha(m.navy, 0.68),
+                      bgcolor: "#fff",
+                    }}
+                  >
+                    <MoreVertRoundedIcon sx={{ fontSize: 18 }} />
+                  </IconButton>
+                ) : null}
+                <Box sx={{ flex: 1 }} />
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    if (slotBookingScreen === "non-mollure-individual" || slotBookingScreen === "non-mollure-company") {
+                      setSlotBookingScreen("non-mollure-type");
+                      return;
+                    }
+                    if (slotBookingScreen === "non-mollure-type") {
+                      setSlotBookingScreen("add-client-choice");
+                      return;
+                    }
+                    if (slotBookingScreen === "guest") {
+                      setSlotBookingScreen("add-client-choice");
+                      return;
+                    }
+                    if (slotBookingScreen === "add-client-choice") {
+                      setSlotBookingScreen("new-booking");
+                      return;
+                    }
+                    setSlotDrawerOpen(false);
+                  }}
+                  sx={{
+                    borderRadius: "10px",
+                    textTransform: "none",
+                    fontWeight: 800,
+                    height: 38,
+                    borderColor: alpha(m.navy, 0.14),
+                    color: alpha(m.navy, 0.72),
+                    bgcolor: "#fff",
+                    minWidth: 110,
+                  }}
+                >
+                  {slotBookingScreen === "new-booking" ? "Cancel" : "Back"}
+                </Button>
+                <Button
+                  variant="contained"
+                  disableElevation
+                  onClick={() => {
+                    if (slotBookingScreen === "non-mollure-type") {
+                      if (!nonMollureClientType) {
+                        showSnackbar({ severity: "warning", message: "Please select Client Type." });
+                        return;
+                      }
+                      setSlotBookingScreen(nonMollureClientType === "individual" ? "non-mollure-individual" : "non-mollure-company");
+                      return;
+                    }
+                    if (slotBookingScreen === "non-mollure-individual" || slotBookingScreen === "non-mollure-company") {
+                      showSnackbar({ severity: "success", message: "Saved (mock)." });
+                      setSlotBookingScreen("new-booking");
+                      return;
+                    }
+                    if (slotBookingScreen === "guest") {
+                      const first = guestDraft.firstName.trim();
+                      const last = guestDraft.lastName.trim();
+                      if (!first || !last) {
+                        showSnackbar({ severity: "warning", message: "Guest first name and last name are required." });
+                        return;
+                      }
+                      showSnackbar({ severity: "success", message: "Guest added (mock)." });
+                      setSlotBookingScreen("new-booking");
+                      return;
+                    }
+                    showSnackbar({ severity: "success", message: "Saved (mock)." });
+                    setSlotDrawerOpen(false);
+                  }}
+                  sx={{
+                    borderRadius: "10px",
+                    textTransform: "none",
+                    fontWeight: 900,
+                    height: 38,
+                    bgcolor: m.teal,
+                    "&:hover": { bgcolor: m.tealDark },
+                    minWidth: 110,
+                  }}
+                >
+                  {slotBookingScreen === "new-booking" ? "Save" : "Save"}
+                </Button>
+              </Stack>
+            </Box>
+          ) : null
+        }
       >
-        <Box sx={{ p: 2.25 }}>
-          <BodyText sx={{ fontWeight: 900, fontSize: 16, color: alpha(m.navy, 0.85) }}>
-            Free time
-          </BodyText>
+        <Box sx={{ px: 2.5, pt: 2.25, pb: 2.5 }}>
           {selectedSlot ? (
             <>
-              <BodyText sx={{ mt: 0.75, color: alpha(m.navy, 0.6), fontSize: 12.5 }}>
-                Team member: <b>{data.resources.find((r) => r.id === selectedSlot.resourceId)?.name ?? selectedSlot.resourceId}</b>
-              </BodyText>
-              <BodyText sx={{ mt: 0.5, color: alpha(m.navy, 0.6), fontSize: 12.5 }}>
-                Date: <b>{formatLongDateUtc(selectedSlot.date)}</b>
-              </BodyText>
-              <BodyText sx={{ mt: 0.5, color: alpha(m.navy, 0.6), fontSize: 12.5 }}>
-                Clicked slot: <b>{selectedSlot.start}</b>
-              </BodyText>
-              <BodyText sx={{ mt: 0.5, color: alpha(m.navy, 0.6), fontSize: 12.5 }}>
-                Free window: <b>{selectedSlot.freeStart}</b> to <b>{selectedSlot.freeEnd}</b>
-              </BodyText>
-
-              <Paper
-                elevation={0}
+              {/* Top tabs (underline style) */}
+              <Box
                 sx={{
-                  mt: 2,
-                  borderRadius: "12px",
-                  border: `1px solid ${alpha(m.navy, 0.1)}`,
-                  bgcolor: alpha(m.navy, 0.02),
-                  p: 1.5,
+                  display: "grid",
+                  gridTemplateColumns: "repeat(3, 1fr)",
+                  borderBottom: `1px solid ${alpha(m.navy, 0.10)}`,
+                  mb: 1.75,
                 }}
               >
-                <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.75) }}>
-                  Drawer content placeholder
-                </BodyText>
-                <BodyText sx={{ mt: 0.5, color: alpha(m.navy, 0.55), fontSize: 12.5 }}>
-                  Tell me what fields/actions you want here, and I’ll build it.
-                </BodyText>
-              </Paper>
+                {slotTabs.map((t) => {
+                  const active = t.id === slotDrawerTab;
+                  return (
+                    <Box
+                      key={t.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setSlotDrawerTab(t.id)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") setSlotDrawerTab(t.id);
+                      }}
+                      sx={{
+                        textAlign: "center",
+                        py: 1.25,
+                        cursor: "pointer",
+                        position: "relative",
+                        userSelect: "none",
+                        color: active ? m.teal : alpha(m.navy, 0.55),
+                        fontWeight: 900,
+                        fontSize: 13.5,
+                        "&:after": {
+                          content: '""',
+                          position: "absolute",
+                          left: 0,
+                          right: 0,
+                          bottom: -1,
+                          height: 2,
+                          bgcolor: active ? m.teal : "transparent",
+                        },
+                      }}
+                    >
+                      {t.label}
+                    </Box>
+                  );
+                })}
+              </Box>
+
+              {slotDrawerTab === "booking" ? (
+                slotBookingScreen === "add-client-choice" ? (
+                  <Stack spacing={1.6}>
+                    <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 15 }}>
+                      Add Client
+                    </BodyText>
+                    <Stack spacing={1.25}>
+                      {[
+                        { label: "Add Non-Mollure Client", key: "non-mollure" },
+                        { label: "Add Guest", key: "guest" },
+                      ].map((item) => (
+                        <Box
+                          key={item.key}
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => {
+                            if (item.key === "non-mollure") setSlotBookingScreen("non-mollure-type");
+                            else {
+                              setSlotClientAdded(true);
+                              setSlotBookingScreen("new-booking");
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key !== "Enter" && e.key !== " ") return;
+                            if (item.key === "non-mollure") setSlotBookingScreen("non-mollure-type");
+                            else {
+                              setSlotClientAdded(true);
+                              setSlotBookingScreen("new-booking");
+                            }
+                          }}
+                          sx={{
+                            border: `1px solid ${alpha(m.navy, 0.14)}`,
+                            borderRadius: "10px",
+                            height: 46,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1.25,
+                            px: 1.5,
+                            cursor: "pointer",
+                            bgcolor: "#fff",
+                            boxShadow: "0 4px 14px rgba(16, 35, 63, 0.06)",
+                            "&:hover": { bgcolor: alpha(m.navy, 0.02) },
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              width: 26,
+                              height: 26,
+                              borderRadius: "999px",
+                              bgcolor: alpha(m.teal, 0.12),
+                              color: m.teal,
+                              display: "grid",
+                              placeItems: "center",
+                              fontWeight: 900,
+                              flexShrink: 0,
+                              fontSize: 18,
+                              border: `1px solid ${alpha(m.teal, 0.22)}`,
+                            }}
+                          >
+                            +
+                          </Box>
+                          <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.72) }}>
+                            {item.label}
+                          </BodyText>
+                        </Box>
+                      ))}
+                    </Stack>
+                    <Box sx={{ flex: 1, minHeight: 360 }} />
+                  </Stack>
+                ) : slotBookingScreen === "non-mollure-type" ? (
+                  <Stack spacing={1.6}>
+                    <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 22, letterSpacing: "-0.01em" }}>
+                      Add Non-Mollure Client
+                    </BodyText>
+
+                    <Box sx={{ pt: 0.5 }}>
+                      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
+                        Client Type
+                      </BodyText>
+                      <AppDropdown
+                        label=""
+                        value={nonMollureClientType}
+                        onChange={(val) => {
+                          const next = val as "" | "individual" | "company";
+                          setNonMollureClientType(next);
+                          if (next === "individual") setSlotBookingScreen("non-mollure-individual");
+                          if (next === "company") setSlotBookingScreen("non-mollure-company");
+                        }}
+                        options={[
+                          { label: "Individual Client", value: "individual" },
+                          { label: "Company Client", value: "company" },
+                        ]}
+                        fullWidth
+                        placeholder="Select Client Type"
+                      />
+                    </Box>
+
+                    <Box sx={{ flex: 1, minHeight: 360 }} />
+                  </Stack>
+                ) : slotBookingScreen === "non-mollure-individual" ? (
+                  <Stack spacing={1.6}>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 22, letterSpacing: "-0.01em" }}>
+                        Add Non-Mollure Client
+                      </BodyText>
+                      <Box
+                        sx={{
+                          px: 1,
+                          height: 22,
+                          borderRadius: "999px",
+                          bgcolor: alpha(m.teal, 0.12),
+                          color: m.teal,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          fontSize: 11,
+                          fontWeight: 900,
+                        }}
+                      >
+                        IC
+                      </Box>
+                    </Stack>
+
+                    <Box sx={{ pt: 0.25 }}>
+                      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
+                        Client Type
+                      </BodyText>
+                      <AppTextField value="Individual Client" fullWidth disabled />
+                    </Box>
+
+                    <AppTextField
+                      placeholder="First Name"
+                      value={nonMollureDraft.firstName}
+                      onChange={(e) => setNonMollureDraft((p) => ({ ...p, firstName: e.target.value }))}
+                      fullWidth
+                    />
+                    <AppTextField
+                      placeholder="Last Name"
+                      value={nonMollureDraft.lastName}
+                      onChange={(e) => setNonMollureDraft((p) => ({ ...p, lastName: e.target.value }))}
+                      fullWidth
+                    />
+
+                    <AppDropdown
+                      label=""
+                      value={nonMollureDraft.gender}
+                      onChange={(val) => setNonMollureDraft((p) => ({ ...p, gender: val as any }))}
+                      options={[
+                        { label: "Male", value: "male" },
+                        { label: "Female", value: "female" },
+                        { label: "Other", value: "other" },
+                      ]}
+                      fullWidth
+                      placeholder="Select Gender"
+                    />
+
+                    <Box>
+                      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
+                        Date of Birth
+                      </BodyText>
+                      <AppTextField
+                        type="text"
+                        value={nonMollureDraft.dob}
+                        onChange={(e) => setNonMollureDraft((p) => ({ ...p, dob: e.target.value }))}
+                        fullWidth
+                        placeholder="mm/dd/yyyy"
+                      />
+                    </Box>
+
+                    <Box>
+                      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
+                        Contact Number
+                      </BodyText>
+                      <Stack direction="row" spacing={1.25}>
+                        <AppDropdown
+                          label=""
+                          value={nonMollureDraft.phoneCode}
+                          onChange={(val) => setNonMollureDraft((p) => ({ ...p, phoneCode: val as string }))}
+                          options={[
+                            { label: "Select Country Code", value: "" },
+                            { label: "+1", value: "+1" },
+                            { label: "+44", value: "+44" },
+                            { label: "+92", value: "+92" },
+                          ]}
+                          fullWidth
+                          sx={{ maxWidth: 140 }}
+                          placeholder="Select Country Code"
+                        />
+                        <AppTextField
+                          placeholder="+442xxxxxxxxxx"
+                          value={nonMollureDraft.phoneNumber}
+                          onChange={(e) => setNonMollureDraft((p) => ({ ...p, phoneNumber: e.target.value }))}
+                          fullWidth
+                        />
+                      </Stack>
+                    </Box>
+
+                    <AppTextField
+                      placeholder="Email Address"
+                      value={nonMollureDraft.email}
+                      onChange={(e) => setNonMollureDraft((p) => ({ ...p, email: e.target.value }))}
+                      fullWidth
+                    />
+
+                    <Box sx={{ flex: 1, minHeight: 140 }} />
+                  </Stack>
+                ) : slotBookingScreen === "non-mollure-company" ? (
+                  <Stack spacing={1.6}>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 22, letterSpacing: "-0.01em" }}>
+                        Add Non-Mollure Client
+                      </BodyText>
+                      <Box
+                        sx={{
+                          px: 1,
+                          height: 22,
+                          borderRadius: "999px",
+                          bgcolor: alpha(m.teal, 0.12),
+                          color: m.teal,
+                          display: "inline-flex",
+                          alignItems: "center",
+                          fontSize: 11,
+                          fontWeight: 900,
+                        }}
+                      >
+                        CC
+                      </Box>
+                    </Stack>
+
+                    <Box sx={{ pt: 0.25 }}>
+                      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
+                        Client Type
+                      </BodyText>
+                      <AppTextField value="Company Client" fullWidth disabled />
+                    </Box>
+
+                    <AppTextField
+                      placeholder="Legal Name"
+                      value={nonMollureDraft.legalName}
+                      onChange={(e) => setNonMollureDraft((p) => ({ ...p, legalName: e.target.value }))}
+                      fullWidth
+                    />
+                    <AppTextField
+                      placeholder="COC"
+                      value={nonMollureDraft.coc}
+                      onChange={(e) => setNonMollureDraft((p) => ({ ...p, coc: e.target.value }))}
+                      fullWidth
+                    />
+                    <AppTextField
+                      placeholder="VAT"
+                      value={nonMollureDraft.vat}
+                      onChange={(e) => setNonMollureDraft((p) => ({ ...p, vat: e.target.value }))}
+                      fullWidth
+                    />
+
+                    <AppTextField
+                      placeholder="Contact Person’s First Name"
+                      value={nonMollureDraft.contactFirstName}
+                      onChange={(e) => setNonMollureDraft((p) => ({ ...p, contactFirstName: e.target.value }))}
+                      fullWidth
+                    />
+                    <AppTextField
+                      placeholder="Contact Person’s Last Name"
+                      value={nonMollureDraft.contactLastName}
+                      onChange={(e) => setNonMollureDraft((p) => ({ ...p, contactLastName: e.target.value }))}
+                      fullWidth
+                    />
+
+                    <AppDropdown
+                      label=""
+                      value={nonMollureDraft.gender}
+                      onChange={(val) => setNonMollureDraft((p) => ({ ...p, gender: val as any }))}
+                      options={[
+                        { label: "Male", value: "male" },
+                        { label: "Female", value: "female" },
+                        { label: "Other", value: "other" },
+                      ]}
+                      fullWidth
+                      placeholder="Select Gender"
+                    />
+
+                    <Box sx={{ pt: 0.5 }}>
+                      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
+                        Business Address
+                      </BodyText>
+                      <Stack spacing={1.25}>
+                        <Stack direction="row" spacing={1.25}>
+                          <AppTextField
+                            placeholder="Street"
+                            value={nonMollureDraft.street}
+                            onChange={(e) => setNonMollureDraft((p) => ({ ...p, street: e.target.value }))}
+                            fullWidth
+                          />
+                          <AppTextField
+                            placeholder="Number"
+                            value={nonMollureDraft.streetNumber}
+                            onChange={(e) => setNonMollureDraft((p) => ({ ...p, streetNumber: e.target.value }))}
+                            fullWidth
+                          />
+                        </Stack>
+                        <Stack direction="row" spacing={1.25}>
+                          <AppTextField
+                            placeholder="Postal Code"
+                            value={nonMollureDraft.postalCode}
+                            onChange={(e) => setNonMollureDraft((p) => ({ ...p, postalCode: e.target.value }))}
+                            fullWidth
+                          />
+                          <AppDropdown
+                            label=""
+                            value={nonMollureDraft.province}
+                            onChange={(val) => setNonMollureDraft((p) => ({ ...p, province: val as string }))}
+                            options={[
+                              { label: "Province", value: "" },
+                              { label: "Province A", value: "province-a" },
+                              { label: "Province B", value: "province-b" },
+                            ]}
+                            fullWidth
+                            placeholder="Province"
+                          />
+                        </Stack>
+                        <AppDropdown
+                          label=""
+                          value={nonMollureDraft.municipality}
+                          onChange={(val) => setNonMollureDraft((p) => ({ ...p, municipality: val as string }))}
+                          options={[
+                            { label: "Municipality", value: "" },
+                            { label: "Municipality A", value: "municipality-a" },
+                            { label: "Municipality B", value: "municipality-b" },
+                          ]}
+                          fullWidth
+                          placeholder="Municipality"
+                        />
+                      </Stack>
+                    </Box>
+
+                    <Box>
+                      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
+                        Contact Number
+                      </BodyText>
+                      <Stack direction="row" spacing={1.25}>
+                        <AppDropdown
+                          label=""
+                          value={nonMollureDraft.phoneCode}
+                          onChange={(val) => setNonMollureDraft((p) => ({ ...p, phoneCode: val as string }))}
+                          options={[
+                            { label: "Country Code", value: "" },
+                            { label: "+1", value: "+1" },
+                            { label: "+44", value: "+44" },
+                            { label: "+92", value: "+92" },
+                          ]}
+                          fullWidth
+                          sx={{ maxWidth: 140 }}
+                          placeholder="Country Code"
+                        />
+                        <AppTextField
+                          placeholder="+442xxxxxxxxxx"
+                          value={nonMollureDraft.phoneNumber}
+                          onChange={(e) => setNonMollureDraft((p) => ({ ...p, phoneNumber: e.target.value }))}
+                          fullWidth
+                        />
+                      </Stack>
+                    </Box>
+
+                    <AppTextField
+                      placeholder="Email Address"
+                      value={nonMollureDraft.email}
+                      onChange={(e) => setNonMollureDraft((p) => ({ ...p, email: e.target.value }))}
+                      fullWidth
+                    />
+
+                    <Box sx={{ flex: 1, minHeight: 140 }} />
+                  </Stack>
+                ) : slotBookingScreen === "guest" ? (
+                  <Stack spacing={1.6}>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 22, letterSpacing: "-0.01em" }}>
+                        Add Guest
+                      </BodyText>
+                      <Box
+                        sx={{
+                          px: 1,
+                          height: 22,
+                          borderRadius: "999px",
+                          bgcolor: alpha(m.navy, 0.06),
+                          color: alpha(m.navy, 0.72),
+                          display: "inline-flex",
+                          alignItems: "center",
+                          fontSize: 11,
+                          fontWeight: 900,
+                        }}
+                      >
+                        Guest
+                      </Box>
+                    </Stack>
+
+                    <Stack direction="row" spacing={1.25}>
+                      <AppTextField
+                        placeholder="First Name*"
+                        value={guestDraft.firstName}
+                        onChange={(e) => setGuestDraft((p) => ({ ...p, firstName: e.target.value }))}
+                        fullWidth
+                      />
+                      <AppTextField
+                        placeholder="Last Name*"
+                        value={guestDraft.lastName}
+                        onChange={(e) => setGuestDraft((p) => ({ ...p, lastName: e.target.value }))}
+                        fullWidth
+                      />
+                    </Stack>
+
+                    <AppTextField
+                      placeholder="Email (optional)"
+                      value={guestDraft.email}
+                      onChange={(e) => setGuestDraft((p) => ({ ...p, email: e.target.value }))}
+                      fullWidth
+                    />
+
+                    <Box>
+                      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
+                        Contact Number (optional)
+                      </BodyText>
+                      <Stack direction="row" spacing={1.25}>
+                        <AppDropdown
+                          label=""
+                          value={guestDraft.phoneCode}
+                          onChange={(val) => setGuestDraft((p) => ({ ...p, phoneCode: val as string }))}
+                          options={[
+                            { label: "Country Code", value: "" },
+                            { label: "+1", value: "+1" },
+                            { label: "+44", value: "+44" },
+                            { label: "+92", value: "+92" },
+                          ]}
+                          fullWidth
+                          sx={{ maxWidth: 140 }}
+                          placeholder="Country Code"
+                        />
+                        <AppTextField
+                          placeholder="Phone number"
+                          value={guestDraft.phoneNumber}
+                          onChange={(e) => setGuestDraft((p) => ({ ...p, phoneNumber: e.target.value }))}
+                          fullWidth
+                        />
+                      </Stack>
+                    </Box>
+
+                    <Box sx={{ flex: 1, minHeight: 200 }} />
+                  </Stack>
+                ) : (
+                  <Stack spacing={1.6}>
+                    <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 15 }}>
+                      New Booking
+                    </BodyText>
+
+                    {/* Calendar selector */}
+                    <Box>
+                      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
+                        Calendar
+                      </BodyText>
+                      <Box
+                        sx={{
+                          border: `1px solid ${alpha(m.navy, 0.14)}`,
+                          borderRadius: "10px",
+                          minHeight: 40,
+                          px: 1.5,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          bgcolor: "#fff",
+                          color: slotClientAdded ? alpha(m.navy, 0.74) : alpha(m.navy, 0.45),
+                          fontSize: 12.5,
+                          fontWeight: 800,
+                        }}
+                      >
+                        <Box component="span">
+                          {slotClientAdded ? `${slotLocation}: ${formatMdyDate(selectedSlot.date)}` : "Select calendar"}
+                        </Box>
+                        <KeyboardArrowDownRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.45) }} />
+                      </Box>
+
+                      {!slotClientAdded ? (
+                        <Paper
+                          elevation={0}
+                          sx={{
+                            mt: 1.5,
+                            mx: 0,
+                            width: "100%",
+                            borderRadius: "8px",
+                            border: `1px solid ${alpha(m.navy, 0.10)}`,
+                            boxShadow: "0 8px 18px rgba(16, 35, 63, 0.08)",
+                            overflow: "hidden",
+                            bgcolor: "#fff",
+                          }}
+                        >
+                          <Box sx={{ p: 1.5 }}>
+                            <Box
+                              sx={{
+                                display: "grid",
+                                gridTemplateColumns: "1fr 1fr",
+                                border: `1px solid ${alpha(m.navy, 0.08)}`,
+                                borderRadius: "7px",
+                                overflow: "hidden",
+                                mb: 1.2,
+                                maxWidth: 242,
+                                mx: "auto",
+                              }}
+                            >
+                              {(["FL", "DL"] as const).map((loc) => {
+                                const active = slotLocation === loc;
+                                return (
+                                  <ButtonBase
+                                    key={loc}
+                                    onClick={() => setSlotLocation(loc)}
+                                    sx={{
+                                      height: 28,
+                                      fontSize: 10,
+                                      fontWeight: 900,
+                                      bgcolor: active ? m.teal : "#fff",
+                                      color: active ? "#fff" : alpha(m.navy, 0.55),
+                                      borderRight: loc === "FL" ? `1px solid ${alpha(m.navy, 0.08)}` : undefined,
+                                    }}
+                                  >
+                                    {loc === "FL" ? "Fixed Location" : "Desired Location"}
+                                  </ButtonBase>
+                                );
+                              })}
+                            </Box>
+
+                            <Stack direction="row" alignItems="center" spacing={0.5} sx={{ px: 0.3 }}>
+                              <BodyText sx={{ flex: 1, fontSize: 15, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
+                                {formatMonthYearUtc(slotCalendarMonth)}
+                              </BodyText>
+                              <IconButton
+                                size="small"
+                                onClick={() => setSlotCalendarMonth((p) => addMonthsIso(p, -12))}
+                                sx={{ width: 22, height: 22, color: m.teal }}
+                                aria-label="Previous year"
+                              >
+                                <KeyboardDoubleArrowLeftRoundedIcon sx={{ fontSize: 16 }} />
+                              </IconButton>
+                              <IconButton
+                                size="small"
+                                onClick={() => setSlotCalendarMonth((p) => addMonthsIso(p, -1))}
+                                sx={{ width: 22, height: 22, color: m.teal }}
+                                aria-label="Previous month"
+                              >
+                                <ChevronLeftRoundedIcon sx={{ fontSize: 16 }} />
+                              </IconButton>
+                              <IconButton
+                                size="small"
+                                onClick={() => setSlotCalendarMonth((p) => addMonthsIso(p, 1))}
+                                sx={{ width: 22, height: 22, color: m.teal }}
+                                aria-label="Next month"
+                              >
+                                <ChevronRightRoundedIcon sx={{ fontSize: 16 }} />
+                              </IconButton>
+                              <IconButton
+                                size="small"
+                                onClick={() => setSlotCalendarMonth((p) => addMonthsIso(p, 12))}
+                                sx={{ width: 22, height: 22, color: m.teal }}
+                                aria-label="Next year"
+                              >
+                                <KeyboardDoubleArrowRightRoundedIcon sx={{ fontSize: 16 }} />
+                              </IconButton>
+                            </Stack>
+
+                            <Box sx={{ mt: 0.9, display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", columnGap: 0.5, rowGap: 0.55 }}>
+                              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+                                <BodyText key={d} sx={{ fontSize: 9, fontWeight: 800, color: alpha(m.navy, 0.42), textAlign: "center" }}>
+                                  {d}
+                                </BodyText>
+                              ))}
+                              {(() => {
+                                const monthDate = parseIsoDate(slotCalendarMonth);
+                                const year = monthDate.getUTCFullYear();
+                                const month = monthDate.getUTCMonth();
+                                const firstDowMon0 = (monthDate.getUTCDay() + 6) % 7;
+                                const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+                                const cells: React.ReactNode[] = [];
+                                for (let i = 0; i < firstDowMon0; i++) cells.push(<Box key={`slot-pad-${i}`} sx={{ height: 28 }} />);
+                                for (let day = 1; day <= daysInMonth; day++) {
+                                  const iso = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                                  const isPast = iso < todayIso;
+                                  const selected = iso === selectedSlot.date && !isPast;
+                                  cells.push(
+                                    <ButtonBase
+                                      key={iso}
+                                      disabled={isPast}
+                                      onClick={() => setSelectedSlot((p) => (p ? { ...p, date: iso } : p))}
+                                      sx={{
+                                        width: 28,
+                                        height: 28,
+                                        borderRadius: "999px",
+                                        display: "grid",
+                                        placeItems: "center",
+                                        justifySelf: "center",
+                                        fontSize: 11,
+                                        fontWeight: 800,
+                                        color: isPast ? alpha(m.navy, 0.24) : selected ? "#fff" : alpha(m.navy, 0.65),
+                                        bgcolor: isPast ? "transparent" : selected ? m.teal : alpha(m.navy, 0.04),
+                                        cursor: isPast ? "not-allowed" : "pointer",
+                                        "&.Mui-disabled": {
+                                          color: alpha(m.navy, 0.24),
+                                          pointerEvents: "auto",
+                                        },
+                                        "&:hover": { bgcolor: isPast ? "transparent" : selected ? m.tealDark : alpha(m.navy, 0.05) },
+                                      }}
+                                    >
+                                      {day}
+                                    </ButtonBase>,
+                                  );
+                                }
+                                return cells;
+                              })()}
+                            </Box>
+                          </Box>
+                        </Paper>
+                      ) : null}
+                    </Box>
+
+                    {/* Client */}
+                    <Box>
+                      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
+                        Client
+                      </BodyText>
+                      {slotClientAdded ? (
+                        <Box
+                          sx={{
+                            border: `1px solid ${alpha(m.navy, 0.12)}`,
+                            borderRadius: "10px",
+                            minHeight: 64,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1.25,
+                            px: 1.5,
+                            bgcolor: "#fff",
+                            boxShadow: `0 0 0 6px ${alpha(m.teal, 0.08)}`,
+                          }}
+                        >
+                          <Avatar src="/images/testimonial.webp" sx={{ width: 34, height: 34 }} />
+                          <Box sx={{ flex: 1, minWidth: 0 }}>
+                            <BodyText sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78), lineHeight: 1.2 }}>
+                              Sara Johnson
+                            </BodyText>
+                            <BodyText sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.46), lineHeight: 1.2 }}>
+                              Sarajohnson@gmail.com
+                            </BodyText>
+                          </Box>
+                          <IconButton size="small" onClick={() => setSlotClientAdded(false)} sx={{ color: alpha(m.navy, 0.35) }}>
+                            <CloseRoundedIcon sx={{ fontSize: 17 }} />
+                          </IconButton>
+                        </Box>
+                      ) : (
+                        <Box
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => setSlotBookingScreen("add-client-choice")}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") setSlotBookingScreen("add-client-choice");
+                          }}
+                          sx={{
+                            border: `1px solid ${alpha(m.navy, 0.14)}`,
+                            borderRadius: "10px",
+                            height: 46,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1.25,
+                            px: 1.5,
+                            cursor: "pointer",
+                            bgcolor: "#fff",
+                            boxShadow: "0 4px 14px rgba(16, 35, 63, 0.06)",
+                            "&:hover": { bgcolor: alpha(m.navy, 0.02) },
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              width: 26,
+                              height: 26,
+                              borderRadius: "999px",
+                              bgcolor: alpha(m.teal, 0.12),
+                              color: m.teal,
+                              display: "grid",
+                              placeItems: "center",
+                              fontWeight: 900,
+                              flexShrink: 0,
+                              fontSize: 18,
+                              border: `1px solid ${alpha(m.teal, 0.22)}`,
+                            }}
+                          >
+                            +
+                          </Box>
+                          <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.72) }}>
+                            Add Client
+                          </BodyText>
+                        </Box>
+                      )}
+                    </Box>
+
+                    {slotClientAdded ? (
+                      <>
+                        <Box
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => setSlotBookingScreen("add-client-choice")}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") setSlotBookingScreen("add-client-choice");
+                          }}
+                          sx={{
+                            border: `1px solid ${alpha(m.navy, 0.14)}`,
+                            borderRadius: "10px",
+                            height: 38,
+                            width: 132,
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 1,
+                            px: 1.25,
+                            cursor: "pointer",
+                            bgcolor: "#fff",
+                          }}
+                        >
+                          <Box sx={{ width: 22, height: 22, borderRadius: "999px", bgcolor: alpha(m.teal, 0.18), color: m.teal, display: "grid", placeItems: "center", fontSize: 17, fontWeight: 900 }}>
+                            +
+                          </Box>
+                          <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.62), flex: 1 }}>
+                            Add
+                          </BodyText>
+                          <KeyboardArrowDownRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.45) }} />
+                        </Box>
+
+                        <Box sx={{ borderRadius: "10px", bgcolor: alpha(m.navy, 0.025), p: 1.5 }}>
+                          <BodyText sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.76), mb: 1 }}>
+                            Location
+                          </BodyText>
+                          <Stack direction="row" spacing={4}>
+                            <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.68) }}>
+                              {slotLocation === "FL" ? "Fixed Location" : "Desired Location"}
+                            </BodyText>
+                            <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.42) }}>
+                              St. Salon 123
+                            </BodyText>
+                          </Stack>
+                        </Box>
+
+                        <Box>
+                          <BodyText sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.72), mb: 0.75 }}>
+                            Contact Number
+                          </BodyText>
+                          <Stack direction="row" spacing={1}>
+                            <AppDropdown
+                              label=""
+                              value=""
+                              onChange={() => undefined}
+                              options={[{ label: "Select Code", value: "" }, { label: "+44", value: "+44" }, { label: "+92", value: "+92" }]}
+                              fullWidth
+                              sx={{ maxWidth: 120 }}
+                              placeholder="Select Code"
+                            />
+                            <AppTextField placeholder="+442xxxxxxxxxx" fullWidth />
+                          </Stack>
+                        </Box>
+
+                        <Box sx={{ borderRadius: "10px", bgcolor: alpha(m.navy, 0.025), p: 1.5 }}>
+                          <Button
+                            variant="outlined"
+                            startIcon={
+                              <Box sx={{ width: 20, height: 20, borderRadius: "999px", bgcolor: alpha(m.navy, 0.06), color: alpha(m.navy, 0.45), display: "grid", placeItems: "center", fontWeight: 900 }}>
+                                +
+                              </Box>
+                            }
+                            sx={{
+                              borderRadius: "8px",
+                              textTransform: "none",
+                              fontWeight: 800,
+                              color: alpha(m.navy, 0.6),
+                              borderColor: alpha(m.navy, 0.14),
+                              bgcolor: "#fff",
+                              minWidth: 112,
+                            }}
+                          >
+                            Guest
+                          </Button>
+                        </Box>
+                        <Box sx={{ flex: 1, minHeight: 40 }} />
+                      </>
+                    ) : (
+                      <Box sx={{ flex: 1, minHeight: 360 }} />
+                    )}
+                  </Stack>
+                )
+              ) : (
+                <Box sx={{ pt: 1 }}>
+                  <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.6) }}>
+                    {slotDrawerTab === "sales" ? "Sales tab (mock)." : "Activity tab (mock)."}
+                  </BodyText>
+                </Box>
+              )}
             </>
           ) : (
             <BodyText sx={{ mt: 1, color: alpha(m.navy, 0.6), fontSize: 12.5 }}>
@@ -1057,357 +2205,55 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
             </BodyText>
           )}
         </Box>
-      </Drawer>
-
-      <MollureDrawer
-        anchor="right"
-        open={filtersOpen}
-        onClose={() => setFiltersOpen(false)}
-        title="Filters"
-        width={{ xs: "100%", sm: 320 }}
-        footer={
-          <Box sx={{ p: 2 }}>
-            <Stack direction="row" spacing={1}>
-              <Button
-                fullWidth
-                variant="outlined"
-                onClick={() => {
-                  setDraftFilters(appliedFilters);
-                  setFiltersOpen(false);
-                }}
-                sx={{ textTransform: "none", fontWeight: 800, borderRadius: "8px" }}
-              >
-                Cancel
-              </Button>
-              <Button
-                fullWidth
-                variant="outlined"
-                onClick={() => {
-                  setDraftFilters(initialFilters as any);
-                }}
-                sx={{ textTransform: "none", fontWeight: 800, borderRadius: "8px" }}
-              >
-                Reset
-              </Button>
-              <Button
-                fullWidth
-                variant="contained"
-                disableElevation
-                onClick={() => {
-                  setAppliedFilters(draftFilters);
-                  setFiltersOpen(false);
-                }}
-                sx={{ textTransform: "none", fontWeight: 800, borderRadius: "8px", bgcolor: m.teal, "&:hover": { bgcolor: m.tealDark } }}
-              >
-                Apply
-              </Button>
-            </Stack>
-          </Box>
-        }
-      >
-        <Box sx={{ px: 2, py: 1.5 }}>
-          <Stack spacing={2}>
-            <Box>
-              <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.7), mb: 0.75 }}>Team Member</BodyText>
-              <Stack spacing={0.5}>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      size="small"
-                      checked={draftFilters.teamAll}
-                      onChange={(e) =>
-                        setDraftFilters((p) => ({
-                          ...p,
-                          teamAll: e.target.checked,
-                          teamIds: Object.fromEntries(Object.keys(p.teamIds).map((id) => [id, false])),
-                        }))
-                      }
-                    />
-                  }
-                  label={<BodyText sx={{ fontSize: 12, color: alpha(m.navy, 0.72) }}>All</BodyText>}
-                  sx={{ m: 0, alignItems: "flex-start", "& .MuiFormControlLabel-label": { mt: "2px" } }}
-                />
-                {data.resources.map((r, i) => (
-                  <FormControlLabel
-                    key={r.id}
-                    control={
-                      <Checkbox
-                        size="small"
-                        checked={!draftFilters.teamAll && Boolean(draftFilters.teamIds[r.id])}
-                        onChange={(e) =>
-                          setDraftFilters((p) => ({
-                            ...p,
-                            teamAll: false,
-                            teamIds: { ...p.teamIds, [r.id]: e.target.checked },
-                          }))
-                        }
-                      />
-                    }
-                    label={<BodyText sx={{ fontSize: 12, color: alpha(m.navy, 0.72) }}>{`TM ${String.fromCharCode(65 + i)}`}</BodyText>}
-                    sx={{ m: 0, alignItems: "flex-start", "& .MuiFormControlLabel-label": { mt: "2px" } }}
-                  />
-                ))}
-              </Stack>
-              <Divider sx={{ mt: 1.5, borderColor: alpha(m.navy, 0.08) }} />
-            </Box>
-
-            <Box>
-              <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.7), mb: 0.75 }}>Location</BodyText>
-              <Stack spacing={0.5}>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      size="small"
-                      checked={draftFilters.locationAll}
-                      onChange={(e) =>
-                        setDraftFilters((p) => ({
-                          ...p,
-                          locationAll: e.target.checked,
-                          locations: { FL: false, DL: false },
-                        }))
-                      }
-                    />
-                  }
-                  label={<BodyText sx={{ fontSize: 12, color: alpha(m.navy, 0.72) }}>All</BodyText>}
-                  sx={{ m: 0, alignItems: "flex-start", "& .MuiFormControlLabel-label": { mt: "2px" } }}
-                />
-                {locations.map((loc) => (
-                  <FormControlLabel
-                    key={loc}
-                    control={
-                      <Checkbox
-                        size="small"
-                        checked={!draftFilters.locationAll && Boolean(draftFilters.locations[loc])}
-                        onChange={(e) =>
-                          setDraftFilters((p) => ({
-                            ...p,
-                            locationAll: false,
-                            locations: { ...p.locations, [loc]: e.target.checked },
-                          }))
-                        }
-                      />
-                    }
-                    label={<BodyText sx={{ fontSize: 12, color: alpha(m.navy, 0.72) }}>{loc}</BodyText>}
-                    sx={{ m: 0, alignItems: "flex-start", "& .MuiFormControlLabel-label": { mt: "2px" } }}
-                  />
-                ))}
-              </Stack>
-              <Divider sx={{ mt: 1.5, borderColor: alpha(m.navy, 0.08) }} />
-            </Box>
-
-            <Box>
-              <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.7), mb: 0.75 }}>Booking</BodyText>
-              <Stack spacing={0.5}>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      size="small"
-                      checked={draftFilters.bookingAll}
-                      onChange={(e) =>
-                        setDraftFilters((p) => ({
-                          ...p,
-                          bookingAll: e.target.checked,
-                          booking: { Online: false, Offline: false, Project: false, Requests: false },
-                        }))
-                      }
-                    />
-                  }
-                  label={<BodyText sx={{ fontSize: 12, color: alpha(m.navy, 0.72) }}>All</BodyText>}
-                  sx={{ m: 0, alignItems: "flex-start", "& .MuiFormControlLabel-label": { mt: "2px" } }}
-                />
-                {bookingTypes.map((bt) => (
-                  <FormControlLabel
-                    key={bt}
-                    control={
-                      <Checkbox
-                        size="small"
-                        checked={!draftFilters.bookingAll && Boolean(draftFilters.booking[bt])}
-                        onChange={(e) =>
-                          setDraftFilters((p) => ({
-                            ...p,
-                            bookingAll: false,
-                            booking: { ...p.booking, [bt]: e.target.checked },
-                          }))
-                        }
-                      />
-                    }
-                    label={<BodyText sx={{ fontSize: 12, color: alpha(m.navy, 0.72) }}>{bt}</BodyText>}
-                    sx={{ m: 0, alignItems: "flex-start", "& .MuiFormControlLabel-label": { mt: "2px" } }}
-                  />
-                ))}
-              </Stack>
-            </Box>
-          </Stack>
-        </Box>
       </MollureDrawer>
-
-      <MollureModal
-        open={blockTimeOpen}
+      <CalendarFiltersDrawer
+        appliedFilters={appliedFilters}
+        bookingTypes={bookingTypes}
+        draftFilters={draftFilters}
+        initialFilters={initialFilters}
+        locations={locations}
+        onApply={(nextFilters) => {
+          setAppliedFilters(nextFilters);
+          setFiltersOpen(false);
+        }}
+        onClose={() => setFiltersOpen(false)}
+        open={filtersOpen}
+        resources={data.resources}
+        setDraftFilters={setDraftFilters}
+      />
+      <CalendarBlockTimeModal
+        draft={blockDraft}
+        onApply={() => {
+          showSnackbar({ severity: "success", message: "Blocked time added (mock)." });
+          setBlockTimeOpen(false);
+        }}
         onClose={() => setBlockTimeOpen(false)}
-        title="Add Block Time"
-        maxWidth="sm"
-        fullWidth
-        footer={
-          <Box sx={{ px: 2.5, py: 2 }}>
-            <Stack direction="row" justifyContent="flex-end" spacing={1.25}>
-              <Button
-                variant="outlined"
-                onClick={() => setBlockTimeOpen(false)}
-                sx={{
-                  borderRadius: "10px",
-                  textTransform: "none",
-                  fontWeight: 800,
-                  height: 38,
-                  borderColor: alpha(m.navy, 0.14),
-                  color: alpha(m.navy, 0.72),
-                  bgcolor: "#fff",
-                  minWidth: 110,
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="contained"
-                disableElevation
-                onClick={() => {
-                  showSnackbar({ severity: "success", message: "Blocked time added (mock)." });
-                  setBlockTimeOpen(false);
-                }}
-                sx={{
-                  borderRadius: "10px",
-                  textTransform: "none",
-                  fontWeight: 800,
-                  height: 38,
-                  bgcolor: m.teal,
-                  "&:hover": { bgcolor: m.tealDark },
-                  minWidth: 110,
-                }}
-              >
-                Apply
-              </Button>
-            </Stack>
-          </Box>
-        }
-      >
-        <Box sx={{ px: 2.5, py: 2 }}>
-          <Stack spacing={1.75}>
-            <AppSelect
-              label="Title"
-              value={blockDraft.title}
-              onChange={(e) => setBlockDraft((p) => ({ ...p, title: e.target.value as any }))}
-              options={[
-                { label: "Meeting", value: "Meeting" },
-                { label: "Training", value: "Training" },
-                { label: "Holiday", value: "Holiday" },
-                { label: "Custom", value: "Custom" },
-              ]}
-              fullWidth
-            />
-
-            <AppDropdown
-              label="Team Member"
-              value={blockDraft.teamIds}
-              multiple
-              renderValue={(selected) => {
-                const ids = selected as readonly string[];
-                if (!ids.length) return "Select Team Member";
-                if (ids.length === data.resources.length) return "All";
-                return ids.map((id) => teamLabelById.get(id) ?? id).join(", ");
-              }}
-              onChange={(val) => setBlockDraft((p) => ({ ...p, teamIds: val as string[] }))}
-              options={data.resources.map((r) => ({ value: r.id, label: teamLabelById.get(r.id) ?? r.name }))}
-              fullWidth
-            />
-
-            <AppDropdown
-              label="Location"
-              value={blockDraft.locations}
-              multiple
-              renderValue={(selected) => {
-                const locs = selected as readonly string[];
-                if (!locs.length) return "Select Location";
-                if (locs.length === 2) return "All";
-                return locs.join(", ");
-              }}
-              onChange={(val) => setBlockDraft((p) => ({ ...p, locations: val as CalendarBookingLocation[] }))}
-              options={[
-                { label: "FL", value: "FL" },
-                { label: "DL", value: "DL" },
-              ]}
-              fullWidth
-            />
-
-            <Stack direction="row" spacing={1.25}>
-              <AppTextField
-                label="Date (from)"
-                type="date"
-                value={blockDraft.dateFrom}
-                onChange={(e) => setBlockDraft((p) => ({ ...p, dateFrom: e.target.value }))}
-                fullWidth
-                InputLabelProps={{ shrink: true }}
-              />
-              <AppTextField
-                label="Date (to)"
-                type="date"
-                value={blockDraft.dateTo}
-                onChange={(e) => setBlockDraft((p) => ({ ...p, dateTo: e.target.value }))}
-                fullWidth
-                InputLabelProps={{ shrink: true }}
-              />
-            </Stack>
-            <Stack direction="row" spacing={1.25}>
-              <AppSelect
-                label="Day (from)"
-                value={blockDraft.dayFrom}
-                onChange={(e) => setBlockDraft((p) => ({ ...p, dayFrom: e.target.value as any }))}
-                options={[
-                  { label: "Monday", value: "Monday" },
-                  { label: "Tuesday", value: "Tuesday" },
-                  { label: "Wednesday", value: "Wednesday" },
-                  { label: "Thursday", value: "Thursday" },
-                  { label: "Friday", value: "Friday" },
-                  { label: "Saturday", value: "Saturday" },
-                  { label: "Sunday", value: "Sunday" },
-                ]}
-                fullWidth
-              />
-              <AppSelect
-                label="Day (to)"
-                value={blockDraft.dayTo}
-                onChange={(e) => setBlockDraft((p) => ({ ...p, dayTo: e.target.value as any }))}
-                options={[
-                  { label: "Monday", value: "Monday" },
-                  { label: "Tuesday", value: "Tuesday" },
-                  { label: "Wednesday", value: "Wednesday" },
-                  { label: "Thursday", value: "Thursday" },
-                  { label: "Friday", value: "Friday" },
-                  { label: "Saturday", value: "Saturday" },
-                  { label: "Sunday", value: "Sunday" },
-                ]}
-                fullWidth
-              />
-            </Stack>
-            <Stack direction="row" spacing={1.25}>
-              <AppTextField
-                label="Start Time"
-                type="time"
-                value={blockDraft.startTime}
-                onChange={(e) => setBlockDraft((p) => ({ ...p, startTime: e.target.value }))}
-                fullWidth
-                InputLabelProps={{ shrink: true }}
-              />
-              <AppTextField
-                label="End Time"
-                type="time"
-                value={blockDraft.endTime}
-                onChange={(e) => setBlockDraft((p) => ({ ...p, endTime: e.target.value }))}
-                fullWidth
-                InputLabelProps={{ shrink: true }}
-              />
-            </Stack>
-          </Stack>
-        </Box>
-      </MollureModal>
+        open={blockTimeOpen}
+        resources={data.resources}
+        setDraft={setBlockDraft}
+        teamLabelById={teamLabelById}
+      />
+      <CalendarPublicBusinessHoursModal
+        open={publicBusinessHoursOpen}
+        onClose={() => setPublicBusinessHoursOpen(false)}
+        onApply={() => {
+          showSnackbar({ severity: "success", message: "Public business hours saved (mock)." });
+          setPublicBusinessHoursOpen(false);
+        }}
+        draft={publicBusinessHoursDraft}
+        setDraft={setPublicBusinessHoursDraft}
+      />
+      <CalendarDesignModal
+        open={designOpen}
+        onClose={() => setDesignOpen(false)}
+        onApply={() => {
+          setAppliedDesign(designDraft);
+          showSnackbar({ severity: "success", message: "Design saved (mock)." });
+          setDesignOpen(false);
+        }}
+        draft={designDraft}
+        setDraft={setDesignDraft}
+      />
     </Stack>
   );
 }

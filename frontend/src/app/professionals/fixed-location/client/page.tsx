@@ -36,6 +36,7 @@ import MollureFormField from "../../../../components/common/MollureFormField";
 import MollureModal from "../../../../components/common/MollureModal";
 import MollureDrawer from "../../../../components/common/MollureDrawer";
 import MollureListToolbar from "../../../../components/common/MollureListToolbar";
+import { ClientListDataCard, ClientListHeaderCard } from "../../../../components/common";
 import { useFixedLocationClientPage } from "./useFixedLocationClientPage";
 import { Typography } from "../../../../components/ui/typography";
 
@@ -168,16 +169,10 @@ export default function FixedLocationClientPage() {
           overflow: "hidden",
         }}
       >
-        {/* Header */}
+        {/* Header Card */}
         <Box sx={{ px: 2.25, py: 1.75 }}>
-          <Typography sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 18, lineHeight: 1.15 }}>
-            Client List
-          </Typography>
-          <Typography sx={{ mt: 0.4, color: alpha(m.navy, 0.55), fontSize: 12.5, fontWeight: 600 }}>
-            View Clients added to the list
-          </Typography>
+          <ClientListHeaderCard title="Client List" subtitle="View Clients added to the list" />
         </Box>
-        <Box sx={{ height: 1, bgcolor: alpha(m.navy, 0.06) }} />
 
         {/* Toolbar */}
         <MollureListToolbar
@@ -270,133 +265,165 @@ export default function FixedLocationClientPage() {
         </Menu>
 
         {/* Table */}
-        <Box sx={{ px: 2.25, pb: 2.25 }}>
-          <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.72), mb: 1 }}>
-            Clients ({clients.length})
-          </Typography>
+        <Box sx={{ px: 2.25, pb: 2.5 }}>
+          <ClientListDataCard>
+            <Typography
+              sx={{
+                fontSize: 13,
+                fontWeight: 800,
+                color: alpha(m.navy, 0.78),
+                mb: 1.25,
+              }}
+            >
+              Clients ({clients.length})
+            </Typography>
 
-          <TableContainer
-            component={Paper}
-            elevation={0}
-            sx={{
-              borderRadius: "10px",
-              border: `1px solid ${alpha(m.navy, 0.10)}`,
-              overflow: "hidden",
-            }}
-          >
-            <Table size="small">
-              <TableHead>
-                <TableRow sx={{ bgcolor: alpha(m.navy, 0.02) }}>
-                  {["Client Name", "Phone Number", "Total Sales", "Last Booking Date", ""].map((h) => (
-                    <TableCell
-                      key={h || "actions"}
-                      sx={{
-                        fontSize: 11.5,
-                        fontWeight: 800,
-                        color: alpha(m.navy, 0.62),
-                        py: 1.2,
-                        borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
-                      }}
-                      align={h === "" ? "right" : "left"}
-                    >
-                      {h}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {filtered.map((c) => (
-                  <TableRow key={c.id} hover sx={{ "& td": { borderBottom: `1px solid ${alpha(m.navy, 0.06)}` } }}>
-                    <TableCell sx={{ py: 1.25 }}>
-                      <Stack direction="row" spacing={1.1} alignItems="center">
-                        <Avatar
-                          src={c.photoSrc}
-                          sx={{
-                            width: 30,
-                            height: 30,
-                            bgcolor: alpha(m.navy, 0.08),
-                            color: alpha(m.navy, 0.78),
-                            fontWeight: 800,
-                            fontSize: 12,
-                          }}
-                        >
-                          {c.name
-                            .split(" ")
-                            .map((p) => p[0])
-                            .join("")
-                            .slice(0, 2)
-                            .toUpperCase()}
-                        </Avatar>
-                        <Box sx={{ minWidth: 0 }}>
-                          <Stack direction="row" spacing={0.75} alignItems="center">
-                            <Typography sx={{ fontWeight: 900, fontSize: 12.5, color: alpha(m.navy, 0.86) }}>
-                              {c.name}
-                            </Typography>
-                            {c.tags.includes("CC") && (
+            <TableContainer
+              component={Paper}
+              elevation={0}
+              sx={{
+                borderRadius: "12px",
+                border: `1px solid ${alpha(m.navy, 0.06)}`,
+                overflow: "hidden",
+              }}
+            >
+              <Table
+                size="small"
+                sx={{
+                  borderCollapse: "collapse",
+                  "& td": {
+                    borderBottom: `1px solid ${alpha(m.navy, 0.035)}`,
+                    borderRight: `1px solid ${alpha(m.navy, 0.04)}`,
+                  },
+                  "& tr > td:last-of-type": {
+                    borderRight: "none",
+                  },
+                  "& tbody tr:hover": {
+                    backgroundColor: alpha(m.navy, 0.025),
+                  },
+                }}
+              >
+                <TableHead>
+                  <TableRow sx={{ bgcolor: alpha(m.navy, 0.02) }}>
+                    {["Client Name", "Phone Number", "Total Sales", "Last Booking Date", ""].map((h, colIdx, arr) => (
+                      <TableCell
+                        key={h || "actions"}
+                        sx={{
+                          fontSize: 12,
+                          fontWeight: 800,
+                          color: alpha(m.navy, 0.7),
+                          py: 1.25,
+                          letterSpacing: "0.02em",
+                          borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
+                          borderRight: colIdx < arr.length - 1 ? `1px solid ${alpha(m.navy, 0.04)}` : "none",
+                        }}
+                        align={h === "" ? "right" : "left"}
+                      >
+                        {h}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filtered.map((c) => (
+                    <TableRow key={c.id} hover>
+                      <TableCell sx={{ py: 1.35 }}>
+                        <Stack direction="row" spacing={1.1} alignItems="center">
+                          <Avatar
+                            src={c.photoSrc}
+                            sx={{
+                              width: 32,
+                              height: 32,
+                              bgcolor: alpha(m.navy, 0.08),
+                              color: alpha(m.navy, 0.78),
+                              fontWeight: 800,
+                              fontSize: 13,
+                            }}
+                          >
+                            {c.name
+                              .split(" ")
+                              .map((p) => p[0])
+                              .join("")
+                              .slice(0, 2)
+                              .toUpperCase()}
+                          </Avatar>
+                          <Box sx={{ minWidth: 0 }}>
+                            <Stack direction="row" spacing={0.75} alignItems="center">
+                              <Typography
+                                sx={{
+                                  fontWeight: 900,
+                                  fontSize: 13,
+                                  color: alpha(m.navy, 0.88),
+                                }}
+                              >
+                                {c.name}
+                              </Typography>
+                              {c.tags.includes("CC") && (
+                                <Chip
+                                  label="CC Client"
+                                  size="small"
+                                  sx={{
+                                    height: 18,
+                                    borderRadius: "999px",
+                                    bgcolor: alpha(theme.palette.primary.main, 0.10),
+                                    color: theme.palette.primary.main,
+                                    fontSize: 10,
+                                    fontWeight: 800,
+                                    px: 0.5,
+                                  }}
+                                />
+                              )}
                               <Chip
-                                label="CC Client"
+                                label={c.tags.includes("Mollure") ? "Mollure" : "Non-Mollure"}
                                 size="small"
                                 sx={{
                                   height: 18,
                                   borderRadius: "999px",
-                                  bgcolor: alpha(theme.palette.primary.main, 0.10),
-                                  color: theme.palette.primary.main,
+                                  bgcolor: c.tags.includes("Mollure")
+                                    ? alpha(theme.palette.primary.main, 0.10)
+                                    : alpha(m.teal, 0.14),
+                                  color: c.tags.includes("Mollure") ? theme.palette.primary.main : alpha(m.teal, 0.95),
                                   fontSize: 10,
                                   fontWeight: 800,
                                   px: 0.5,
                                 }}
                               />
-                            )}
-                            <Chip
-                              label={c.tags.includes("Mollure") ? "Mollure" : "Non-Mollure"}
-                              size="small"
-                              sx={{
-                                height: 18,
-                                borderRadius: "999px",
-                                bgcolor: c.tags.includes("Mollure")
-                                  ? alpha(theme.palette.primary.main, 0.10)
-                                  : alpha(m.teal, 0.14),
-                                color: c.tags.includes("Mollure") ? theme.palette.primary.main : alpha(m.teal, 0.95),
-                                fontSize: 10,
-                                fontWeight: 800,
-                                px: 0.5,
-                              }}
-                            />
-                          </Stack>
-                          <Typography sx={{ fontSize: 11.5, fontWeight: 600, color: alpha(m.navy, 0.50) }}>
-                            {c.email}
-                          </Typography>
-                        </Box>
-                      </Stack>
-                    </TableCell>
-                    <TableCell sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.75) }}>
-                      {c.phone}
-                    </TableCell>
-                    <TableCell sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.78) }}>
-                      {c.totalSales}
-                    </TableCell>
-                    <TableCell sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.75) }}>
-                      {c.lastBooking}
-                    </TableCell>
-                    <TableCell align="right">
-                      <IconButton
-                        size="small"
-                        onClick={(e) => setRowMenu({ id: c.id, anchor: e.currentTarget })}
-                        sx={{
-                          width: 30,
-                          height: 30,
-                          borderRadius: "8px",
-                          color: alpha(m.navy, 0.55),
-                        }}
-                      >
-                        <MoreVertRoundedIcon sx={{ fontSize: 18 }} />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                            </Stack>
+                            <Typography sx={{ fontSize: 11.5, fontWeight: 600, color: alpha(m.navy, 0.50) }}>
+                              {c.email}
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      </TableCell>
+                      <TableCell sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.75) }}>
+                        {c.phone}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.78) }}>
+                        {c.totalSales}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.75) }}>
+                        {c.lastBooking}
+                      </TableCell>
+                      <TableCell align="right">
+                        <IconButton
+                          size="small"
+                          onClick={(e) => setRowMenu({ id: c.id, anchor: e.currentTarget })}
+                          sx={{
+                            width: 30,
+                            height: 30,
+                            borderRadius: "8px",
+                            color: alpha(m.navy, 0.55),
+                          }}
+                        >
+                          <MoreVertRoundedIcon sx={{ fontSize: 18 }} />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </ClientListDataCard>
         </Box>
 
         <Menu
@@ -1281,6 +1308,7 @@ export default function FixedLocationClientPage() {
                 textTransform: "none",
                 fontWeight: 900,
                 bgcolor: "primary.main",
+                color: "#fff",
                 "&:hover": { bgcolor: "mollure.tealDark" },
                 height: 36,
                 px: 2.25,
@@ -1447,6 +1475,7 @@ export default function FixedLocationClientPage() {
                 textTransform: "none",
                 fontWeight: 900,
                 bgcolor: "primary.main",
+                color: "#fff",
                 "&:hover": { bgcolor: "mollure.tealDark" },
                 height: 36,
                 px: 3,
@@ -1467,8 +1496,16 @@ export default function FixedLocationClientPage() {
                   select
                   value={nonMollureClientType || "Select Client Type"}
                   onChange={(e) => {
-                    setNonMollureClientType(e.target.value as "" | "Individual Client" | "Company Client");
+                    const nextType = e.target.value as "" | "Individual Client" | "Company Client";
+                    setNonMollureClientType(nextType);
                     setNonMollureTypeError("");
+                    setIndErrors({});
+                    setCompErrors({});
+                    if (nextType === "Company Client") {
+                      setNonMollureStep("company");
+                    } else if (nextType === "Individual Client") {
+                      setNonMollureStep("individual");
+                    }
                   }}
                   error={Boolean(nonMollureTypeError)}
                   helperText={nonMollureTypeError}
@@ -1529,11 +1566,14 @@ export default function FixedLocationClientPage() {
                     Date of Birth
                   </Typography>
                   <MollureFormField
-                    placeholder="MM/DD/YY"
+                    type="date"
                     value={indDob}
                     onChange={(e) => {
                       setIndDob(e.target.value);
                       setIndErrors((p) => ({ ...p, dob: undefined }));
+                    }}
+                    inputProps={{
+                      max: new Date().toISOString().slice(0, 10),
                     }}
                     error={Boolean(indErrors.dob)}
                     helperText={indErrors.dob}

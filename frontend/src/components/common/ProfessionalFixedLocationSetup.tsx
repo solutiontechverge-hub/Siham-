@@ -176,6 +176,23 @@ export default function ProfessionalFixedLocationSetup({
 }: ProfessionalFixedLocationSetupProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
+  type ProfileValidationField =
+    | "companyLegalName"
+    | "contactFirstName"
+    | "contactLastName"
+    | "contactEmail"
+    | "contactPassword"
+    | "contactRepeatPassword";
+  const [profileErrors, setProfileErrors] = React.useState<Partial<Record<ProfileValidationField, string>>>({});
+
+  const isValidEmail = React.useCallback((email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()), []);
+  const isValidName = React.useCallback((name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return false;
+    // letters (including accented), spaces, apostrophes, and hyphens — no digits
+    return /^[A-Za-zÀ-ÖØ-öø-ÿ' -]+$/.test(trimmed);
+  }, []);
+
   const {
     values,
     setField,
@@ -647,7 +664,6 @@ export default function ProfessionalFixedLocationSetup({
     [setField, useSameBusinessInfo],
   );
 
-  type DesiredAreaRow = { id: string; province: string; municipality: string };
   const desiredProvinceOptions = React.useMemo(
     () =>
       [
@@ -666,6 +682,8 @@ export default function ProfessionalFixedLocationSetup({
       ] as const,
     [],
   );
+  type DesiredProvince = (typeof desiredProvinceOptions)[number];
+  type DesiredAreaRow = { id: string; province: DesiredProvince; municipality: string };
   const desiredMunicipalityByProvince = React.useMemo(() => {
     const base = ["Municipality Name", "Amsterdam", "Rotterdam", "Utrecht", "Haarlem", "Groningen", "Eindhoven"];
     return desiredProvinceOptions.reduce((acc, p) => {
@@ -713,6 +731,13 @@ export default function ProfessionalFixedLocationSetup({
     setIsBusinessPublishEnabled(true);
     setDesiredAreas((prev) => prev.filter((r) => r.id !== id));
   }, []);
+
+  const fixedProvinceKey = React.useMemo<(typeof desiredProvinceOptions)[number]>(() => {
+    const province = fixedBiz.province;
+    return (desiredProvinceOptions as readonly string[]).includes(province)
+      ? (province as (typeof desiredProvinceOptions)[number])
+      : "Noord-Holland";
+  }, [fixedBiz.province, desiredProvinceOptions]);
 
   const fixedLocationForm = (
     <Grid container spacing={1.6}>
@@ -1429,8 +1454,13 @@ export default function ProfessionalFixedLocationSetup({
               label="Legal Name*"
               placeholder="e.g Jane"
               value={values.companyLegalName}
-              onChange={(e) => setField("companyLegalName", e.target.value)}
+              onChange={(e) => {
+                setField("companyLegalName", e.target.value);
+                setProfileErrors((prev) => (prev.companyLegalName ? { ...prev, companyLegalName: undefined } : prev));
+              }}
               disabled={professionalFieldsDisabled}
+              error={Boolean(profileErrors.companyLegalName)}
+              helperText={profileErrors.companyLegalName}
             />
           </Grid>
           <Grid item xs={12} md={6}>
@@ -1571,8 +1601,13 @@ export default function ProfessionalFixedLocationSetup({
               label="First Name*"
               placeholder="e.g Jane"
               value={values.contactFirstName}
-              onChange={(e) => setField("contactFirstName", e.target.value)}
+              onChange={(e) => {
+                setField("contactFirstName", e.target.value);
+                setProfileErrors((prev) => (prev.contactFirstName ? { ...prev, contactFirstName: undefined } : prev));
+              }}
               disabled={professionalFieldsDisabled}
+              error={Boolean(profileErrors.contactFirstName)}
+              helperText={profileErrors.contactFirstName}
             />
           </Grid>
           <Grid item xs={12} md={6}>
@@ -1580,8 +1615,13 @@ export default function ProfessionalFixedLocationSetup({
               label="Last Name*"
               placeholder="e.g Doe"
               value={values.contactLastName}
-              onChange={(e) => setField("contactLastName", e.target.value)}
+              onChange={(e) => {
+                setField("contactLastName", e.target.value);
+                setProfileErrors((prev) => (prev.contactLastName ? { ...prev, contactLastName: undefined } : prev));
+              }}
               disabled={professionalFieldsDisabled}
+              error={Boolean(profileErrors.contactLastName)}
+              helperText={profileErrors.contactLastName}
             />
           </Grid>
           <Grid item xs={12} md={6}>
@@ -1589,8 +1629,10 @@ export default function ProfessionalFixedLocationSetup({
               label="Email*"
               placeholder="Your@gmail.com"
               value={values.contactEmail}
-              onChange={(e) => setField("contactEmail", e.target.value)}
+              inputProps={{ readOnly: true }}
               disabled={professionalFieldsDisabled}
+              error={Boolean(profileErrors.contactEmail)}
+              helperText={profileErrors.contactEmail}
             />
           </Grid>
           <Grid item xs={12} md={6}>
@@ -1607,8 +1649,13 @@ export default function ProfessionalFixedLocationSetup({
               type="password"
               placeholder="Enter Password"
               value={values.contactPassword}
-              onChange={(e) => setField("contactPassword", e.target.value)}
+              onChange={(e) => {
+                setField("contactPassword", e.target.value);
+                setProfileErrors((prev) => (prev.contactPassword ? { ...prev, contactPassword: undefined } : prev));
+              }}
               disabled={professionalFieldsDisabled}
+              error={Boolean(profileErrors.contactPassword)}
+              helperText={profileErrors.contactPassword}
             />
           </Grid>
           <Grid item xs={12} md={6}>
@@ -1617,8 +1664,15 @@ export default function ProfessionalFixedLocationSetup({
               type="password"
               placeholder="Confirm Password"
               value={values.contactRepeatPassword}
-              onChange={(e) => setField("contactRepeatPassword", e.target.value)}
+              onChange={(e) => {
+                setField("contactRepeatPassword", e.target.value);
+                setProfileErrors((prev) =>
+                  prev.contactRepeatPassword ? { ...prev, contactRepeatPassword: undefined } : prev,
+                );
+              }}
               disabled={professionalFieldsDisabled}
+              error={Boolean(profileErrors.contactRepeatPassword)}
+              helperText={profileErrors.contactRepeatPassword}
             />
           </Grid>
         </Grid>
@@ -1751,6 +1805,27 @@ export default function ProfessionalFixedLocationSetup({
           onClick={async () => {
             if (!onSaveProfessionalProfile) {
               setIsProfessionalEditing(false);
+              return;
+            }
+
+            const nextErrors: Partial<Record<ProfileValidationField, string>> = {};
+            if (!isValidEmail(values.contactEmail)) nextErrors.contactEmail = "Enter a valid email address.";
+            if (!isValidName(values.companyLegalName)) nextErrors.companyLegalName = "Enter a valid legal name.";
+            if (!isValidName(values.contactFirstName)) nextErrors.contactFirstName = "Enter a valid first name.";
+            if (!isValidName(values.contactLastName)) nextErrors.contactLastName = "Enter a valid last name.";
+
+            const password = values.contactPassword.trim();
+            const repeatPassword = values.contactRepeatPassword.trim();
+            if (password || repeatPassword) {
+              if (!password) nextErrors.contactPassword = "Password is required.";
+              if (!repeatPassword) nextErrors.contactRepeatPassword = "Repeat password is required.";
+              if (password && repeatPassword && password !== repeatPassword) {
+                nextErrors.contactRepeatPassword = "Password and repeat password must match.";
+              }
+            }
+
+            if (Object.keys(nextErrors).length) {
+              setProfileErrors(nextErrors);
               return;
             }
 

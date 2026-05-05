@@ -1,8 +1,14 @@
 "use client";
 
-import AuthLoginShell from "../../AuthLoginShell";
-import { authLoginHeaderProfessional } from "../../../../data/marketingShell.data";
+import { useRouter } from "next/navigation";
+import * as React from "react";
 
 export default function ProfessionalLoginPage() {
-  return <AuthLoginShell header={authLoginHeaderProfessional} signupHref="/auth/signup/professional" />;
+  const router = useRouter();
+
+  React.useEffect(() => {
+    router.replace("/auth/login");
+  }, [router]);
+
+  return null;
 }

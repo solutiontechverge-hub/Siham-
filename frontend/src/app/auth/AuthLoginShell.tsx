@@ -78,19 +78,6 @@ export default function AuthLoginShell({ header, signupHref }: AuthLoginShellPro
         password,
       }).unwrap();
 
-      const isClientLogin = header.loginHref === "/auth/login";
-      const isProfessionalLogin = header.loginHref === "/auth/professional/login";
-
-      if (isClientLogin && result.data.user.user_type === "professional") {
-        showSnackbar({ severity: "error", message: "This email is registered with a professional" });
-        return;
-      }
-
-      if (isProfessionalLogin && result.data.user.user_type === "individual") {
-        showSnackbar({ severity: "error", message: "This email is registered as a client" });
-        return;
-      }
-
       dispatch(
         setAuthSession({
           accessToken: result.data.access_token,

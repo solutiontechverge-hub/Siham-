@@ -173,15 +173,21 @@ export function useFixedLocationClientPage() {
     const dob = indDob.trim();
     if (!dob) {
       next.dob = "Date of birth is required";
-    } else if (!/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(dob)) {
-      next.dob = "Use format MM/DD/YY or MM/DD/YYYY";
+    } else if (!/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(dob) && !/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
+      next.dob = "Use format MM/DD/YY, MM/DD/YYYY, or YYYY-MM-DD";
     } else {
-      const [mm, dd, yy] = dob.split("/").map((x) => Number(x));
-      const yFull = yy < 100 ? 2000 + yy : yy;
-      const d = new Date(yFull, mm - 1, dd);
-      if (d.getFullYear() !== yFull || d.getMonth() !== mm - 1 || d.getDate() !== dd) {
-        next.dob = "Enter a valid date";
-      }
+      const parseDob = (raw: string) => {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+          const [yyyy, mm, dd] = raw.split("-").map((x) => Number(x));
+          return { yyyy, mm, dd };
+        }
+        const [mm, dd, yy] = raw.split("/").map((x) => Number(x));
+        const yyyy = yy < 100 ? 2000 + yy : yy;
+        return { yyyy, mm, dd };
+      };
+      const { yyyy, mm, dd } = parseDob(dob);
+      const d = new Date(yyyy, mm - 1, dd);
+      if (d.getFullYear() !== yyyy || d.getMonth() !== mm - 1 || d.getDate() !== dd) next.dob = "Enter a valid date";
     }
     const digits = indPhone.replace(/\D/g, "");
     if (!digits) {
@@ -343,9 +349,9 @@ export function useFixedLocationClientPage() {
     if (!row) return false;
 
     setClients((prev) => {
-      // Avoid duplicates by email (common in this flow).
-      if (prev.some((c) => c.email.trim().toLowerCase() === row.email.trim().toLowerCase())) return prev;
-
+      // Add a new row for every selected Mollure member (even if the email
+      // already exists in the list), so the user can add all members and
+      // the total count increases.
       const nextId = `c_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
       const next: ClientRecord = {
         id: nextId,
@@ -368,7 +374,11 @@ export function useFixedLocationClientPage() {
     setSelectedMollureId("");
     setMollureSearch("");
     setAddMollureOpen(false);
-    setSnackbar({ open: true, message: "Client Added", severity: "success" });
+    setSnackbar({
+      open: true,
+      message: "Client Added",
+      severity: "success",
+    });
     return true;
   }, [formatAddedOn, selectedMollureId]);
 
@@ -377,6 +387,15 @@ export function useFixedLocationClientPage() {
       if (!validateIndividual()) return false;
       const fullName = `${indFirstName.trim()} ${indLastName.trim()}`.trim();
       const email = indEmail.trim().toLowerCase();
+      const normalizeDob = (raw: string) => {
+        const v = raw.trim();
+        if (!v) return "";
+        if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+          const [yyyy, mm, dd] = v.split("-");
+          return `${Number(mm)}/${Number(dd)}/${yyyy}`;
+        }
+        return v;
+      };
 
       setClients((prev) => {
         if (prev.some((c) => c.email.trim().toLowerCase() === email)) return prev;
@@ -392,7 +411,7 @@ export function useFixedLocationClientPage() {
           kind: "individual",
           addedOn: formatAddedOn(),
           gender: indGender || undefined,
-          dateOfBirth: indDob || undefined,
+          dateOfBirth: normalizeDob(indDob) || undefined,
           residentialAddress: undefined,
           bookingsCompleted: 0,
           averageBookingValue: "€0",
@@ -564,6 +583,7 @@ export function useFixedLocationClientPage() {
     );
 
     setClientDetailsMode("view");
+    setViewClientId(null);
     setSnackbar({ open: true, message: "Client Updated", severity: "success" });
     return true;
   }, [editCompanyForm, editIndividualForm, viewClientId]);
