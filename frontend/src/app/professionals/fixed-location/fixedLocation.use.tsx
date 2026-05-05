@@ -29,7 +29,7 @@ export type FixedLocationFormState = {
 
   bookCategory: string;
   bookService: string;
-  bookCombos: Array<{ id: string; a: string; b: string }>;
+  bookCombos: Array<{ id: string; categoryId: string; serviceId: string }>;
   bookComboInstructions: string;
 
   discountEnabled: boolean;
@@ -114,12 +114,9 @@ const initialState: FixedLocationFormState = {
   projectEnabled: true,
   projectInstructions: "",
 
-  bookCategory: "Lichaamsbehandeling",
-  bookService: "Neck massage",
-  bookCombos: [
-    { id: "combo-1", a: "Lichaamsbehandeling", b: "Lichaamsbehandeling" },
-    { id: "combo-2", a: "Lichaamsbehandeling", b: "Lichaamsbehandeling" },
-  ],
+  bookCategory: "",
+  bookService: "",
+  bookCombos: [],
   bookComboInstructions: "",
 
   discountEnabled: false,

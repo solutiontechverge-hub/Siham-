@@ -1,4 +1,4 @@
-import { query } from "../db/index.js";
+import { getClient, query } from "../db/index.js";
 
 const parseJsonValue = (value, fallback) => {
   if (value === undefined || value === null || value === "") {
@@ -48,6 +48,27 @@ const parseBigIntArray = (value) => {
     .filter((item) => Number.isInteger(item) && item > 0);
 };
 
+const parseJsonArray = (value) => {
+  if (value === undefined || value === null || value === "") {
+    return [];
+  }
+
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (typeof value !== "string") {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
 const parseOptionalNumber = (value) => {
   if (value === undefined || value === null || value === "") {
     return null;
@@ -64,6 +85,105 @@ const parseOptionalInteger = (value) => {
 
   const parsed = Number.parseInt(value, 10);
   return Number.isInteger(parsed) ? parsed : null;
+};
+
+const normalizeServiceCategories = (value) => {
+  return parseJsonArray(value)
+    .map((item) => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+
+      const categoryId = Number(item.category_id);
+      const serviceId = Number(item.service_id);
+      const amount = parseOptionalNumber(item.amount);
+
+      if (!Number.isInteger(categoryId) || categoryId <= 0) {
+        return null;
+      }
+
+      if (!Number.isInteger(serviceId) || serviceId <= 0) {
+        return null;
+      }
+
+      return {
+        category_id: categoryId,
+        service_id: serviceId,
+        amount: amount ?? 0,
+      };
+    })
+    .filter(Boolean);
+};
+
+const normalizeBookServiceCombinations = (value) => {
+  return parseJsonArray(value)
+    .map((item) => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+
+      const categoryId = Number(item.category_id);
+      const serviceId = Number(item.service_id);
+
+      if (!Number.isInteger(categoryId) || categoryId <= 0) {
+        return null;
+      }
+
+      if (!Number.isInteger(serviceId) || serviceId <= 0) {
+        return null;
+      }
+
+      return {
+        category_id: categoryId,
+        category_title: item.category_title ? String(item.category_title).trim() : null,
+        service_id: serviceId,
+        service_title: item.service_title ? String(item.service_title).trim() : null,
+      };
+    })
+    .filter(Boolean);
+};
+
+const normalizeTeamMembers = (value) => {
+  return parseJsonArray(value)
+    .map((item, index) => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+
+      const fullName = String(item.full_name ?? item.name ?? "").trim();
+      if (!fullName) {
+        return null;
+      }
+
+      const id = Number(item.id);
+      const normalizedAssignedServices = parseJsonArray(item.assigned_services)
+        .map((service) => {
+          if (!service || typeof service !== "object") {
+            return null;
+          }
+
+          const serviceId = Number(service.service_id);
+          if (!Number.isInteger(serviceId) || serviceId <= 0) {
+            return null;
+          }
+
+          return {
+            service_id: serviceId,
+            title: service.title ? String(service.title).trim() : null,
+          };
+        })
+        .filter(Boolean);
+
+      return {
+        id: Number.isInteger(id) && id > 0 ? id : null,
+        full_name: fullName,
+        role: String(item.role ?? "Team member").trim() || "Team member",
+        profile_photo: item.profile_photo ? String(item.profile_photo).trim() : null,
+        assigned_services: normalizedAssignedServices,
+        display_order: parseOptionalInteger(item.display_order) ?? index + 1,
+      };
+    })
+    .filter(Boolean);
 };
 
 const getProfessionalProfile = async (userId) => {
@@ -87,6 +207,80 @@ const getBusinessSetupByUserId = async (userId) => {
   );
 
   return result.rows[0] || null;
+};
+
+const getBusinessSetupDetailById = async (setupId, client = { query }) => {
+  const setupResult = await client.query(
+    `SELECT bs.*
+     FROM business_setups bs
+     WHERE bs.id = $1`,
+    [setupId],
+  );
+
+  const businessSetup = setupResult.rows[0];
+
+  if (!businessSetup) {
+    return null;
+  }
+
+  const [teamMembersResult, serviceDetailsResult] = await Promise.all([
+    client.query(
+      `SELECT
+         id,
+         business_setup_id,
+         full_name,
+         role,
+         profile_photo,
+         assigned_services,
+         display_order,
+         created_at,
+         updated_at
+       FROM business_team_members
+       WHERE business_setup_id = $1
+       ORDER BY display_order ASC, id ASC`,
+      [setupId],
+    ),
+    client.query(
+      `SELECT
+         bsd.id,
+         bsd.business_setup_id,
+         bsd.service_id,
+         bsd.price,
+         bsd.created_at,
+         s.title AS service_title,
+         s.category_id,
+         c.title AS category_title
+       FROM business_service_details bsd
+       INNER JOIN subcategories s ON s.id = bsd.service_id
+       INNER JOIN categories c ON c.id = s.category_id
+       WHERE bsd.business_setup_id = $1
+       ORDER BY c.title, s.title`,
+      [setupId],
+    ),
+  ]);
+
+  const teamMembers = teamMembersResult.rows.map((member) => ({
+    ...member,
+    assigned_services: parseJsonArray(member.assigned_services),
+  }));
+
+  return {
+    ...businessSetup,
+    service_categories: parseJsonArray(businessSetup.service_categories),
+    book_service_combinations: parseJsonArray(businessSetup.book_service_combinations),
+    team_members: teamMembers,
+    service_details: serviceDetailsResult.rows,
+  };
+};
+
+const getBusinessSetupDetailByUserId = async (userId, client = { query }) => {
+  const businessSetup = await getBusinessSetupByUserId(userId);
+
+  if (!businessSetup) {
+    return null;
+  }
+
+  return getBusinessSetupDetailById(businessSetup.id, client);
 };
 
 export const listCategories = async (_req, res) => {
@@ -200,7 +394,7 @@ export const getBusinessSetup = async (req, res) => {
       });
     }
 
-    const businessSetup = await getBusinessSetupByUserId(req.user.id);
+    const businessSetup = await getBusinessSetupDetailByUserId(req.user.id);
 
     return res.status(200).json({
       success: true,
@@ -238,21 +432,28 @@ export const upsertBusinessSetup = async (req, res) => {
       });
     }
 
+    const serviceCategories = normalizeServiceCategories(req.body.service_categories);
+    const bookServiceCombinations = normalizeBookServiceCombinations(req.body.book_service_combinations);
+    const teamMembers = normalizeTeamMembers(req.body.team_members);
+
     const payload = {
       location_mode: req.body.location_mode,
       business_name: req.body.business_name ?? null,
       business_about: req.body.business_about ?? null,
       business_keywords: parseTextArray(req.body.business_keywords),
       business_media: parseTextArray(req.body.business_media),
+      salon_name: req.body.salon_name ?? null,
       fixed_location_address: req.body.fixed_location_address ?? null,
       fixed_location_street_number: req.body.fixed_location_street_number ?? null,
       fixed_location_postal_code: req.body.fixed_location_postal_code ?? null,
       fixed_location_province: req.body.fixed_location_province ?? null,
       fixed_location_municipality: req.body.fixed_location_municipality ?? null,
-      service_categories: parseTextArray(req.body.service_categories),
+      service_for: parseTextArray(req.body.service_for),
+      service_categories: JSON.stringify(serviceCategories),
       project: req.body.project ?? null,
       book_service_notes: req.body.book_service_notes ?? null,
-      team_member_ids: parseBigIntArray(req.body.team_member_ids),
+      book_service_combinations: JSON.stringify(bookServiceCombinations),
+      team_member_ids: [],
       additional_notes: req.body.additional_notes ?? null,
       price_range: req.body.price_range ?? null,
       prepayment_percentage: parseOptionalNumber(req.body.prepayment_percentage),
@@ -271,6 +472,7 @@ export const upsertBusinessSetup = async (req, res) => {
       late_cancellation_fee_percentage: parseOptionalNumber(req.body.late_cancellation_fee_percentage),
       cancellation_policy_instruction: req.body.cancellation_policy_instruction ?? null,
       no_show_fee_percentage: parseOptionalNumber(req.body.no_show_fee_percentage),
+      no_show_fee_instruction: req.body.no_show_fee_instruction ?? null,
       desired_location_area: req.body.desired_location_area ?? null,
       desired_location_province: req.body.desired_location_province ?? null,
       desired_location_services: parseTextArray(req.body.desired_location_services),
@@ -279,31 +481,173 @@ export const upsertBusinessSetup = async (req, res) => {
     const fields = Object.keys(payload);
     const values = [professionalProfile.id, ...fields.map((field) => payload[field])];
     const updateAssignments = fields
-      .map((field, index) => `${field} = $${index + 2}`)
+      .map((field, index) => {
+        const castType = ["service_categories", "book_service_combinations"].includes(field) ? "::jsonb" : "";
+        return `${field} = $${index + 2}${castType}`;
+      })
       .concat("updated_at = NOW()")
       .join(", ");
 
-    const result = await query(
-      `INSERT INTO business_setups (
-         professional_profile_id,
-         ${fields.join(", ")}
-       )
-       VALUES (
-         $1,
-         ${fields.map((_, index) => `$${index + 2}`).join(", ")}
-       )
-       ON CONFLICT (professional_profile_id)
-       DO UPDATE SET
-         ${updateAssignments}
-       RETURNING *`,
-      values,
-    );
+    const client = await getClient();
 
-    return res.status(200).json({
-      success: true,
-      message: "Business setup saved successfully.",
-      data: result.rows[0],
-    });
+    try {
+      await client.query("BEGIN");
+
+      const insertValues = fields
+        .map((field, index) => {
+          const castType = ["service_categories", "book_service_combinations"].includes(field) ? "::jsonb" : "";
+          return `$${index + 2}${castType}`;
+        })
+        .join(", ");
+
+      const result = await client.query(
+        `INSERT INTO business_setups (
+           professional_profile_id,
+           ${fields.join(", ")}
+         )
+         VALUES (
+           $1,
+           ${insertValues}
+         )
+         ON CONFLICT (professional_profile_id)
+         DO UPDATE SET
+           ${updateAssignments}
+         RETURNING *`,
+        values,
+      );
+
+      const businessSetup = result.rows[0];
+
+      const syncedTeamMemberIds = [];
+
+      if (teamMembers.length > 0) {
+        const existingMembersResult = await client.query(
+          `SELECT id
+           FROM business_team_members
+           WHERE business_setup_id = $1`,
+          [businessSetup.id],
+        );
+
+        const existingMemberIds = new Set(existingMembersResult.rows.map((row) => row.id));
+
+        for (const member of teamMembers) {
+          if (member.id && existingMemberIds.has(member.id)) {
+            const updatedMemberResult = await client.query(
+              `UPDATE business_team_members
+               SET
+                 full_name = $2,
+                 role = $3,
+                 profile_photo = $4,
+                 assigned_services = $5::jsonb,
+                 display_order = $6,
+                 updated_at = NOW()
+               WHERE id = $1
+               RETURNING id`,
+              [
+                member.id,
+                member.full_name,
+                member.role,
+                member.profile_photo,
+                JSON.stringify(member.assigned_services),
+                member.display_order,
+              ],
+            );
+
+            if (updatedMemberResult.rows[0]?.id) {
+              syncedTeamMemberIds.push(updatedMemberResult.rows[0].id);
+            }
+          } else {
+            const insertedMemberResult = await client.query(
+              `INSERT INTO business_team_members (
+                 business_setup_id,
+                 full_name,
+                 role,
+                 profile_photo,
+                 assigned_services,
+                 display_order
+               )
+               VALUES ($1, $2, $3, $4, $5::jsonb, $6)
+               RETURNING id`,
+              [
+                businessSetup.id,
+                member.full_name,
+                member.role,
+                member.profile_photo,
+                JSON.stringify(member.assigned_services),
+                member.display_order,
+              ],
+            );
+
+            if (insertedMemberResult.rows[0]?.id) {
+              syncedTeamMemberIds.push(insertedMemberResult.rows[0].id);
+            }
+          }
+        }
+
+        await client.query(
+          `DELETE FROM business_team_members
+           WHERE business_setup_id = $1
+             AND NOT (id = ANY($2::bigint[]))`,
+          [businessSetup.id, syncedTeamMemberIds],
+        );
+      } else {
+        await client.query(
+          `DELETE FROM business_team_members
+           WHERE business_setup_id = $1`,
+          [businessSetup.id],
+        );
+      }
+      const serviceIds = serviceCategories.map((item) => item.service_id);
+
+      if (serviceCategories.length > 0) {
+        for (const item of serviceCategories) {
+          await client.query(
+            `INSERT INTO business_service_details (business_setup_id, service_id, price)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (business_setup_id, service_id)
+             DO UPDATE SET price = EXCLUDED.price`,
+            [businessSetup.id, item.service_id, item.amount],
+          );
+        }
+
+        await client.query(
+          `DELETE FROM business_service_details
+           WHERE business_setup_id = $1
+             AND NOT (service_id = ANY($2::bigint[]))`,
+          [businessSetup.id, serviceIds],
+        );
+      } else {
+        await client.query(
+          `DELETE FROM business_service_details
+           WHERE business_setup_id = $1`,
+          [businessSetup.id],
+        );
+      }
+
+      await client.query(
+        `UPDATE business_setups
+         SET
+           team_member_ids = $2::bigint[],
+           updated_at = NOW()
+         WHERE id = $1`,
+        [businessSetup.id, syncedTeamMemberIds],
+      );
+
+      const savedBusinessSetup = await getBusinessSetupDetailById(businessSetup.id, client);
+
+      await client.query("COMMIT");
+
+      return res.status(200).json({
+        success: true,
+        message: "Business setup saved successfully.",
+        data: savedBusinessSetup,
+      });
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -335,24 +679,30 @@ export const createBusinessServiceDetail = async (req, res) => {
       });
     }
 
-    const result = await query(
-      `INSERT INTO business_service_details (business_setup_id, service_id, price)
-       VALUES ($1, $2, $3)
-       ON CONFLICT (business_setup_id, service_id)
-       DO UPDATE SET price = EXCLUDED.price
-       RETURNING *`,
-      [businessSetup.id, req.body.service_id, req.body.price],
-    );
+    const services = req.body.services;
+    const insertedServices = [];
+
+    for (const service of services) {
+      const result = await query(
+        `INSERT INTO business_service_details (business_setup_id, service_id, price)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (business_setup_id, service_id)
+         DO UPDATE SET price = EXCLUDED.price
+         RETURNING *`,
+        [businessSetup.id, service.service_id, service.price],
+      );
+      insertedServices.push(result.rows[0]);
+    }
 
     return res.status(200).json({
       success: true,
-      message: "Business service detail saved successfully.",
-      data: result.rows[0],
+      message: "Business service details saved successfully.",
+      data: insertedServices,
     });
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: "Failed to save business service detail.",
+      message: "Failed to save business service details.",
       data: {
         error: error.message,
       },

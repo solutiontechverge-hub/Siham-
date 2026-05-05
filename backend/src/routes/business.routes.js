@@ -20,6 +20,23 @@ const router = express.Router();
 const locationModes = ["fixed", "desired", "both"];
 const locationTypes = ["fixed", "desired"];
 const calendarStatuses = ["requested", "cancelled", "completed", "confirmed", "blocked"];
+const percentageFields = [
+  "prepayment_percentage",
+  "late_reschedule_fee_percentage",
+  "late_cancellation_fee_percentage",
+  "no_show_fee_percentage",
+];
+const nonNegativeNumberFields = ["kilometer_allowance"];
+const nonNegativeIntegerFields = [
+  "response_time_hours",
+  "appointment_before_hours",
+  "cancellation_before_hours",
+];
+const minuteFields = [
+  "response_time_minutes",
+  "appointment_before_minutes",
+  "cancellation_before_minutes",
+];
 
 const parseArrayLike = (value) => {
   if (Array.isArray(value)) {
@@ -72,17 +89,55 @@ router.put(
       .isIn(locationModes)
       .withMessage("location_mode must be fixed, desired, or both."),
     body("business_keywords")
+      .optional({ values: "falsy" })
       .custom((value) => {
         const parsed = parseArrayLike(value);
-        return Array.isArray(parsed) && parsed.length >= 3;
+        return Array.isArray(parsed) && parsed.length <= 3;
       })
-      .withMessage("business_keywords must contain at least 3 items."),
+      .withMessage("business_keywords can contain up to 3 items."),
     body("business_media")
+      .optional({ values: "falsy" })
       .custom((value) => {
         const parsed = parseArrayLike(value);
-        return Array.isArray(parsed) && parsed.length >= 4;
+        return Array.isArray(parsed) && parsed.length <= 4;
       })
-      .withMessage("business_media must contain at least 4 items."),
+      .withMessage("business_media can contain up to 4 items."),
+    body("service_categories")
+      .optional({ values: "falsy" })
+      .custom((value) => Array.isArray(parseArrayLike(value)))
+      .withMessage("service_categories must be an array."),
+    body("book_service_combinations")
+      .optional({ values: "falsy" })
+      .custom((value) => Array.isArray(parseArrayLike(value)))
+      .withMessage("book_service_combinations must be an array."),
+    ...percentageFields.map((field) =>
+      body(field)
+        .optional({ values: "falsy" })
+        .isFloat({ min: 0, max: 100 })
+        .withMessage(`${field} must be a number between 0 and 100.`),
+    ),
+    ...nonNegativeNumberFields.map((field) =>
+      body(field)
+        .optional({ values: "falsy" })
+        .isFloat({ min: 0 })
+        .withMessage(`${field} must be a non-negative number.`),
+    ),
+    ...nonNegativeIntegerFields.map((field) =>
+      body(field)
+        .optional({ values: "falsy" })
+        .isInt({ min: 0 })
+        .withMessage(`${field} must be a non-negative integer.`),
+    ),
+    ...minuteFields.map((field) =>
+      body(field)
+        .optional({ values: "falsy" })
+        .isInt({ min: 0, max: 59 })
+        .withMessage(`${field} must be an integer between 0 and 59.`),
+    ),
+    body("team_members")
+      .optional({ values: "falsy" })
+      .custom((value) => Array.isArray(parseArrayLike(value)))
+      .withMessage("team_members must be an array."),
   ],
   validateRequest,
   upsertBusinessSetup,
@@ -93,8 +148,15 @@ router.get("/service-details", listBusinessServiceDetails);
 router.post(
   "/service-details",
   [
-    body("service_id").isInt({ min: 1 }).withMessage("service_id must be a valid integer."),
-    body("price").isFloat({ min: 0 }).withMessage("price must be a non-negative number."),
+    body("services")
+      .isArray({ min: 1 })
+      .withMessage("services must be an array with at least one item."),
+    body("services.*.service_id")
+      .isInt({ min: 1 })
+      .withMessage("Each service must have a valid service_id."),
+    body("services.*.price")
+      .isFloat({ min: 0 })
+      .withMessage("Each service must have a non-negative price."),
   ],
   validateRequest,
   createBusinessServiceDetail,
