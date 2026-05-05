@@ -39,14 +39,21 @@ import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import type { FixedLocationPageData } from "../../app/professionals/fixed-location/fixedLocation.data";
 import { useFixedLocationForm } from "../../app/professionals/fixed-location/fixedLocation.use";
 import type { ProfessionalProfile, ProfileResponse } from "../../store/services/profileApi";
+import type {
+  BusinessCategory,
+  BusinessSetup,
+  BusinessTeamMember,
+  UpsertBusinessSetupRequest,
+} from "../../store/services/businessApi";
 import MollureFormField from "./MollureFormField";
 import { Typography } from "../ui/typography";
 
 type ServiceDetailUiItem = {
   id: string;
-  categoryId: "hair" | "makeup" | "wimpers" | "wenbrauwen";
+  categoryId: string;
+  serviceId: number;
   name: string;
-  durationLabel: string;
+  durationLabel?: string;
   priceLabel: string;
 };
 
@@ -54,7 +61,10 @@ export type ProfessionalFixedLocationSetupProps = {
   data: FixedLocationPageData;
   chrome?: boolean;
   profileData?: ProfileResponse | null;
+  businessCategories?: BusinessCategory[];
+  businessSetupData?: BusinessSetup | null;
   isProfileSaving?: boolean;
+  isBusinessSetupSaving?: boolean;
   onSaveProfessionalProfile?: (payload: {
     email: string;
     password?: string;
@@ -75,6 +85,7 @@ export type ProfessionalFixedLocationSetupProps = {
     contact_last_name: string;
     phone: string;
   }) => Promise<void>;
+  onSaveBusinessSetup?: (payload: UpsertBusinessSetupRequest) => Promise<void>;
 };
 
 function SectionShell({
@@ -156,8 +167,12 @@ export default function ProfessionalFixedLocationSetup({
   data,
   chrome = true,
   profileData = null,
+  businessCategories = [],
+  businessSetupData = null,
   isProfileSaving = false,
+  isBusinessSetupSaving = false,
   onSaveProfessionalProfile,
+  onSaveBusinessSetup,
 }: ProfessionalFixedLocationSetupProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -172,9 +187,7 @@ export default function ProfessionalFixedLocationSetup({
   const [activeSubTab, setActiveSubTab] = React.useState<string>(
     data.subTabsActive,
   );
-  const [activeServiceCategory, setActiveServiceCategory] = React.useState<
-    "all" | "hair" | "makeup" | "wimpers" | "wenbrauwen"
-  >("all");
+  const [activeServiceCategory, setActiveServiceCategory] = React.useState<string>("all");
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const [mediaSlides, setMediaSlides] = React.useState<string[]>([
     "/professionals/hero.png",
@@ -236,13 +249,13 @@ export default function ProfessionalFixedLocationSetup({
 
   // ── Manage Team ──────────────────────────────────────────────────────────
   type TeamService = {
-    hair: string;
-    makeup: string;
-    wimpers: string;
-    wenbrauwen: string;
-    lich1: string;
-    lich2: string;
-    lich3: string;
+    slot1: string;
+    slot2: string;
+    slot3: string;
+    slot4: string;
+    slot5: string;
+    slot6: string;
+    slot7: string;
   };
   type TeamMemberUi = {
     id: string;
@@ -254,43 +267,48 @@ export default function ProfessionalFixedLocationSetup({
     services: TeamService;
   };
 
-  const teamOpts = React.useMemo(() => ({
-    hair:    ["Haar(5)",   "Haar(0)",   "Haar(2)"],
-    makeup:  ["Make-up(2)","Make-up(0)","Make-up(4)"],
-    wimpers: ["Wimpers(8)","Wimpers(0)","Wimpers(3)"],
-    wenbrauwen: ["Wenkbrauwen(4)","Wenkbrauwen(0)","Wenkbrauwen(1)"],
-    lich: ["Lichaamsbehandeling(1)","Lichaamsbehandeling(5)","Lichaamsbehandeling"],
-  }), []);
+  const allSubcategoryOptions = React.useMemo(
+    () =>
+      businessCategories.flatMap((category) =>
+        category.subcategories.map((subcategory) => ({
+          value: String(subcategory.id),
+          label: subcategory.title,
+        })),
+      ),
+    [businessCategories],
+  );
+
+  const blankTeamServices = React.useMemo<TeamService>(
+    () => ({
+      slot1: "",
+      slot2: "",
+      slot3: "",
+      slot4: "",
+      slot5: "",
+      slot6: "",
+      slot7: "",
+    }),
+    [],
+  );
 
   const defaultServices = React.useCallback(
-    (offset = 0): TeamService => ({
-      hair:    teamOpts.hair[0]!,
-      makeup:  teamOpts.makeup[0]!,
-      wimpers: teamOpts.wimpers[0]!,
-      wenbrauwen: teamOpts.wenbrauwen[0]!,
-      lich1: teamOpts.lich[offset % 3]!,
-      lich2: teamOpts.lich[(offset + 1) % 3]!,
-      lich3: teamOpts.lich[(offset + 2) % 3]!,
-    }),
-    [teamOpts],
+    (assignedServices: BusinessTeamMember["assigned_services"] = []): TeamService => {
+      const values = assignedServices.map((service) => String(service.service_id)).filter(Boolean);
+
+      return {
+        slot1: values[0] ?? "",
+        slot2: values[1] ?? "",
+        slot3: values[2] ?? "",
+        slot4: values[3] ?? "",
+        slot5: values[4] ?? "",
+        slot6: values[5] ?? "",
+        slot7: values[6] ?? "",
+      };
+    },
+    [],
   );
 
-  const [teamMembers, setTeamMembers] = React.useState<TeamMemberUi[]>(() =>
-    data.manageTeam.members.map((m, i) => ({
-      id: m.id, name: m.name, role: m.role,
-      photoSrc: "/professionals/hero.png",
-      rating: 4.5, reviewsLabel: "(134 Reviews)",
-      services: {
-        hair:      teamOpts.hair[0]!,
-        makeup:    teamOpts.makeup[0]!,
-        wimpers:   teamOpts.wimpers[0]!,
-        wenbrauwen:teamOpts.wenbrauwen[0]!,
-        lich1: teamOpts.lich[i % 3]!,
-        lich2: teamOpts.lich[(i + 1) % 3]!,
-        lich3: teamOpts.lich[(i + 2) % 3]!,
-      },
-    })),
-  );
+  const [teamMembers, setTeamMembers] = React.useState<TeamMemberUi[]>([]);
 
   const [featureTeamPublic, setFeatureTeamPublic] = React.useState(true);
   const [teamDrawerOpen, setTeamDrawerOpen] = React.useState(false);
@@ -299,24 +317,16 @@ export default function ProfessionalFixedLocationSetup({
   const [draftTeamRole, setDraftTeamRole] = React.useState("");
   const [draftPhotoSrc, setDraftPhotoSrc] = React.useState<string>("/professionals/hero.png");
   const teamPhotoInputRef = React.useRef<HTMLInputElement | null>(null);
-  const [draftServices, setDraftServices] = React.useState<TeamService>(() => ({
-    hair: teamOpts.hair[0]!,
-    makeup: teamOpts.makeup[0]!,
-    wimpers: teamOpts.wimpers[0]!,
-    wenbrauwen: teamOpts.wenbrauwen[0]!,
-    lich1: teamOpts.lich[0]!,
-    lich2: teamOpts.lich[1]!,
-    lich3: teamOpts.lich[2]!,
-  }));
+  const [draftServices, setDraftServices] = React.useState<TeamService>(() => ({ ...blankTeamServices }));
 
   const openAddDrawer = React.useCallback(() => {
     setEditingMemberId(null);
     setDraftTeamName("");
     setDraftTeamRole("");
     setDraftPhotoSrc("/professionals/hero.png");
-    setDraftServices(defaultServices(0));
+    setDraftServices({ ...blankTeamServices });
     setTeamDrawerOpen(true);
-  }, [defaultServices]);
+  }, [blankTeamServices]);
 
   const openEditDrawer = React.useCallback((mem: TeamMemberUi) => {
     setEditingMemberId(mem.id);
@@ -443,6 +453,45 @@ export default function ProfessionalFixedLocationSetup({
     setField("contactPhone", professionalProfile?.phone || "");
     hydratedProfileRef.current = hydrationKey;
   }, [profileData, setField]);
+
+  const toDisplayNumber = React.useCallback((value: string | number | null | undefined) => {
+    if (value === null || value === undefined || value === "") {
+      return "";
+    }
+
+    return String(value);
+  }, []);
+
+  const toTeamServicePayload = React.useCallback((services: TeamService) => {
+    const orderedValues = [
+      services.slot1,
+      services.slot2,
+      services.slot3,
+      services.slot4,
+      services.slot5,
+      services.slot6,
+      services.slot7,
+    ].filter(Boolean);
+
+    const seen = new Set<string>();
+
+    return orderedValues
+      .filter((value) => {
+        if (seen.has(value)) {
+          return false;
+        }
+
+        seen.add(value);
+        return true;
+      })
+      .map((value) => {
+        const matched = allSubcategoryOptions.find((option) => option.value === value);
+        return {
+          service_id: Number(value),
+          title: matched?.label ?? null,
+        };
+      });
+  }, [allSubcategoryOptions]);
   const businessEditKeys = React.useMemo(
     () =>
       [
@@ -733,7 +782,7 @@ export default function ProfessionalFixedLocationSetup({
           disabled={!businessEditing.location}
         >
           <MenuItem value="">Municipality</MenuItem>
-          {(desiredMunicipalityByProvince[(fixedBiz.province as any) || "Noord-Holland"] ?? []).map((o) => (
+          {((desiredMunicipalityByProvince as Record<string, string[]>)[fixedBiz.province || "Noord-Holland"] ?? []).map((o: string) => (
             <MenuItem key={o} value={o}>
               {o}
             </MenuItem>
@@ -835,7 +884,7 @@ export default function ProfessionalFixedLocationSetup({
             }}
           >
             {desiredAreas.map((r) => {
-              const options = desiredMunicipalityByProvince[(r.province as any) || "Noord-Holland"] ?? [];
+              const options = (desiredMunicipalityByProvince as Record<string, string[]>)[r.province || "Noord-Holland"] ?? [];
               const safeOptions = options.includes(r.municipality) ? options : [r.municipality, ...options];
               return (
                 <Box
@@ -867,7 +916,7 @@ export default function ProfessionalFixedLocationSetup({
                       },
                     }}
                   >
-                    {safeOptions.map((o) => (
+                    {safeOptions.map((o: string) => (
                       <MenuItem key={o} value={o} sx={{ fontSize: 12 }}>
                         {o}
                       </MenuItem>
@@ -946,14 +995,102 @@ export default function ProfessionalFixedLocationSetup({
     setIsBusinessPublishEnabled(true);
   }, []);
 
-  const onPublishBusinessSetup = React.useCallback(() => {
-    // This is where you'd call the real publish API.
-    // For now: treat "Publish" as the required save/apply action,
-    // then lock everything again.
+  const onPublishBusinessSetup = React.useCallback(async () => {
+    if (!onSaveBusinessSetup) {
+      setIsBusinessPublishEnabled(false);
+      setIsBusinessLocked(true);
+      closeAllBusinessEditing();
+      return;
+    }
+
+    const locationModeMap: Record<OfferingSelectOption, UpsertBusinessSetupRequest["location_mode"]> = {
+      "Fixed Location": "fixed",
+      "Desired Location": "desired",
+      Both: "both",
+    };
+    const sourceBiz = businessOfferingSelect === "Desired Location" ? desiredBusiness : fixedBiz;
+    const serviceItems = businessOfferingSelect === "Desired Location" ? servicesDesired : servicesFixed;
+    const desiredAreaText =
+      desiredAreaMode === "All Netherlands"
+        ? "All Netherlands"
+        : desiredAreas.map((area) => area.municipality).filter(Boolean).join(", ");
+    const desiredProvinceText =
+      desiredAreaMode === "All Netherlands"
+        ? "All Netherlands"
+        : Array.from(new Set(desiredAreas.map((area) => area.province).filter(Boolean))).join(", ");
+
+    await onSaveBusinessSetup({
+      location_mode: locationModeMap[businessOfferingSelect],
+      business_name: sourceBiz.profileName,
+      business_about: sourceBiz.about,
+      business_keywords: sourceBiz.keywords,
+      business_media: mediaSlides.filter((item) => item && !item.startsWith("blob:")).slice(0, 4),
+      salon_name: fixedBiz.salonName,
+      fixed_location_address: fixedBiz.streetAddress,
+      fixed_location_street_number: fixedBiz.streetNumber,
+      fixed_location_postal_code: fixedBiz.postalCode,
+      fixed_location_province: fixedBiz.province,
+      fixed_location_municipality: fixedBiz.municipality,
+      service_for: Object.entries(sourceBiz.serviceFor)
+        .filter(([, enabled]) => enabled)
+        .map(([key]) => key),
+      service_categories: serviceItems
+        .filter((item) => item.serviceId && item.categoryId)
+        .map((item) => ({
+          category_id: Number(item.categoryId),
+          service_id: item.serviceId,
+          amount: Number(String(item.priceLabel).replace(/[^0-9.]/g, "")) || 0,
+        })),
+      project: sourceBiz.projectEnabled ? sourceBiz.projectInstructions : "",
+      book_service_notes: values.bookComboInstructions,
+      additional_notes: values.notes,
+      price_range: [values.priceRangeFrom, values.priceRangeTo].filter(Boolean).join(" - "),
+      prepayment_percentage: Number(values.prepaymentPercent) || null,
+      prepayment_instruction: values.prepaymentInstructions,
+      kilometer_allowance: Number(values.kilometerAllowance) || null,
+      kilometer_allowance_instruction: values.kilometerAllowanceInstructions,
+      response_time_hours: Number(values.policyResponseHours) || null,
+      response_time_minutes: Number(values.policyResponseMinutes) || null,
+      policy_custom_instruction: values.policyInstructions,
+      appointment_before_hours: Number(values.rescheduleMinimumHours) || null,
+      appointment_before_minutes: Number(values.rescheduleMinimumMinutes) || null,
+      late_reschedule_fee_percentage: Number(values.rescheduleLateFeePercent) || null,
+      late_reschedule_policy_instruction: values.rescheduleInstructions,
+      cancellation_before_hours: Number(values.cancelMinimumHours) || null,
+      cancellation_before_minutes: Number(values.cancelMinimumMinutes) || null,
+      late_cancellation_fee_percentage: Number(values.cancelLateFeePercent) || null,
+      cancellation_policy_instruction: values.cancelInstructions,
+      no_show_fee_percentage: Number(values.noShowFeePercent) || null,
+      no_show_fee_instruction: values.noShowInstructions,
+      desired_location_area: desiredAreaText,
+      desired_location_province: desiredProvinceText,
+      desired_location_services: serviceItems.map((item) => item.name),
+      team_members: teamMembers.map((member, index) => ({
+        id: /^\d+$/.test(member.id) ? Number(member.id) : undefined,
+        full_name: member.name,
+        role: member.role,
+        profile_photo: member.photoSrc.startsWith("blob:") ? null : member.photoSrc,
+        assigned_services: toTeamServicePayload(member.services),
+        display_order: index + 1,
+      })),
+    });
+
     setIsBusinessPublishEnabled(false);
     setIsBusinessLocked(true);
     closeAllBusinessEditing();
-  }, [closeAllBusinessEditing]);
+  }, [
+    businessOfferingSelect,
+    closeAllBusinessEditing,
+    desiredAreaMode,
+    desiredAreas,
+    desiredBusiness,
+    fixedBiz,
+    mediaSlides,
+    onSaveBusinessSetup,
+    teamMembers,
+    toTeamServicePayload,
+    values,
+  ]);
 
   const onSwitchActiveBusinessTemplate = React.useCallback(
     (opt: OfferingOption) => {
@@ -965,8 +1102,8 @@ export default function ProfessionalFixedLocationSetup({
 
   // ── Services (template-aware) + drawer ────────────────────────────────────
   const initialServiceItems = React.useMemo(
-    () => (data.servicesDetails.items as unknown as ServiceDetailUiItem[]),
-    [data.servicesDetails.items],
+    () => [] as ServiceDetailUiItem[],
+    [],
   );
   const [servicesFixed, setServicesFixed] = React.useState<ServiceDetailUiItem[]>(() => initialServiceItems);
   const [servicesDesired, setServicesDesired] = React.useState<ServiceDetailUiItem[]>(() => initialServiceItems);
@@ -979,6 +1116,103 @@ export default function ProfessionalFixedLocationSetup({
     if (!useSameBusinessInfo) return;
     setServicesDesired(servicesFixed);
   }, [servicesFixed, useSameBusinessInfo]);
+
+  const hydratedBusinessRef = React.useRef<string | null>(null);
+
+  React.useEffect(() => {
+    if (!businessSetupData) {
+      return;
+    }
+
+    const hydrationKey = `${businessSetupData.id}:${businessSetupData.updated_at}`;
+    if (hydratedBusinessRef.current === hydrationKey) {
+      return;
+    }
+
+    const modeMap: Record<BusinessSetup["location_mode"], OfferingSelectOption> = {
+      fixed: "Fixed Location",
+      desired: "Desired Location",
+      both: "Both",
+    };
+
+    const nextOffering = modeMap[businessSetupData.location_mode];
+    setBusinessOfferingSelect(nextOffering);
+    setActiveBusinessTemplate(nextOffering === "Both" ? "Fixed Location" : nextOffering);
+
+    setField("profileName", businessSetupData.business_name || "");
+    setField("about", businessSetupData.business_about || "");
+    setField("keywordDraft", "");
+    setField("keywords", businessSetupData.business_keywords || []);
+    setField("salonName", businessSetupData.salon_name || "");
+    setField("streetAddress", businessSetupData.fixed_location_address || "");
+    setField("streetNumber", businessSetupData.fixed_location_street_number || "");
+    setField("postalCode", businessSetupData.fixed_location_postal_code || "");
+    setField("province", businessSetupData.fixed_location_province || "");
+    setField("municipality", businessSetupData.fixed_location_municipality || "");
+    setField("serviceFor", {
+      men: (businessSetupData.service_for || []).includes("men"),
+      women: (businessSetupData.service_for || []).includes("women"),
+      kids: (businessSetupData.service_for || []).includes("kids"),
+    });
+    setField("projectEnabled", Boolean(businessSetupData.project));
+    setField("projectInstructions", businessSetupData.project || "");
+    setField("bookComboInstructions", businessSetupData.book_service_notes || "");
+    setField("notes", businessSetupData.additional_notes || "");
+    setField("priceRangeFrom", businessSetupData.price_range ? businessSetupData.price_range.split("-")[0]?.trim() || "" : "");
+    setField("priceRangeTo", businessSetupData.price_range ? businessSetupData.price_range.split("-")[1]?.trim() || "" : "");
+    setField("prepaymentPercent", toDisplayNumber(businessSetupData.prepayment_percentage));
+    setField("prepaymentInstructions", businessSetupData.prepayment_instruction || "");
+    setField("kilometerAllowance", toDisplayNumber(businessSetupData.kilometer_allowance));
+    setField("kilometerAllowanceInstructions", businessSetupData.kilometer_allowance_instruction || "");
+    setField("policyResponseHours", toDisplayNumber(businessSetupData.response_time_hours));
+    setField("policyResponseMinutes", toDisplayNumber(businessSetupData.response_time_minutes));
+    setField("policyInstructions", businessSetupData.policy_custom_instruction || "");
+    setField("rescheduleMinimumHours", toDisplayNumber(businessSetupData.appointment_before_hours));
+    setField("rescheduleMinimumMinutes", toDisplayNumber(businessSetupData.appointment_before_minutes));
+    setField("rescheduleLateFeePercent", toDisplayNumber(businessSetupData.late_reschedule_fee_percentage));
+    setField("rescheduleInstructions", businessSetupData.late_reschedule_policy_instruction || "");
+    setField("cancelMinimumHours", toDisplayNumber(businessSetupData.cancellation_before_hours));
+    setField("cancelMinimumMinutes", toDisplayNumber(businessSetupData.cancellation_before_minutes));
+    setField("cancelLateFeePercent", toDisplayNumber(businessSetupData.late_cancellation_fee_percentage));
+    setField("cancelInstructions", businessSetupData.cancellation_policy_instruction || "");
+    setField("noShowFeePercent", toDisplayNumber(businessSetupData.no_show_fee_percentage));
+    setField("noShowInstructions", businessSetupData.no_show_fee_instruction || "");
+
+    const nextMediaSlides =
+      businessSetupData.business_media && businessSetupData.business_media.length > 0
+        ? businessSetupData.business_media
+        : ["/professionals/hero.png"];
+    setMediaSlides(nextMediaSlides);
+    setMediaIdx(0);
+
+    const savedServices = businessSetupData.service_details.map((item) => ({
+      id: String(item.service_id),
+      categoryId: String(item.category_id),
+      serviceId: item.service_id,
+      name: item.service_title,
+      priceLabel: toDisplayNumber(item.price),
+    }));
+    setServicesFixed(savedServices);
+    setServicesDesired(savedServices);
+
+    if (businessSetupData.team_members.length > 0) {
+      setTeamMembers(
+        businessSetupData.team_members.map((member) => ({
+          id: String(member.id ?? `tm-${member.display_order}`),
+          name: member.full_name,
+          role: member.role,
+          photoSrc: member.profile_photo || "/professionals/hero.png",
+          rating: 4.5,
+          reviewsLabel: "(0 Reviews)",
+          services: defaultServices(member.assigned_services),
+        })),
+      );
+    } else {
+      setTeamMembers([]);
+    }
+
+    hydratedBusinessRef.current = hydrationKey;
+  }, [businessSetupData, defaultServices, setField, toDisplayNumber]);
 
   const activeServices = activeBusinessTemplate === "Fixed Location" ? servicesFixed : servicesDesired;
   const setActiveServices = React.useCallback(
@@ -1000,26 +1234,28 @@ export default function ProfessionalFixedLocationSetup({
 
   const [serviceDrawerOpen, setServiceDrawerOpen] = React.useState(false);
   const [editingServiceId, setEditingServiceId] = React.useState<string | null>(null);
-  const [draftServiceCategory, setDraftServiceCategory] =
-    React.useState<ServiceDetailUiItem["categoryId"]>("hair");
+  const [draftServiceCategory, setDraftServiceCategory] = React.useState<string>("");
+  const [draftServiceId, setDraftServiceId] = React.useState<number | "">("");
   const [draftServiceName, setDraftServiceName] = React.useState("");
   const [draftServiceDuration, setDraftServiceDuration] = React.useState("");
   const [draftServicePrice, setDraftServicePrice] = React.useState("");
 
   const openAddServiceDrawer = React.useCallback(() => {
     setEditingServiceId(null);
-    setDraftServiceCategory("hair");
+    setDraftServiceCategory(businessCategories[0] ? String(businessCategories[0].id) : "");
+    setDraftServiceId("");
     setDraftServiceName("");
     setDraftServiceDuration("");
     setDraftServicePrice("");
     setServiceDrawerOpen(true);
-  }, []);
+  }, [businessCategories]);
 
   const openEditServiceDrawer = React.useCallback((it: ServiceDetailUiItem) => {
     setEditingServiceId(it.id);
     setDraftServiceCategory(it.categoryId);
+    setDraftServiceId(it.serviceId);
     setDraftServiceName(it.name);
-    setDraftServiceDuration(it.durationLabel);
+    setDraftServiceDuration(it.durationLabel || "");
     setDraftServicePrice(it.priceLabel);
     setServiceDrawerOpen(true);
   }, []);
@@ -1027,28 +1263,38 @@ export default function ProfessionalFixedLocationSetup({
   const closeServiceDrawer = React.useCallback(() => setServiceDrawerOpen(false), []);
 
   const saveService = React.useCallback(() => {
-    const name = draftServiceName.trim();
-    if (!name) return;
+    if (!draftServiceCategory || !draftServiceId) return;
+    const matchedCategory = businessCategories.find((category) => String(category.id) === draftServiceCategory);
+    const matchedService = matchedCategory?.subcategories.find((subcategory) => subcategory.id === Number(draftServiceId));
+    if (!matchedService) return;
 
-    const durationLabel = draftServiceDuration.trim() || "45 Min";
+    const name = matchedService.title;
+    const durationLabel = "";
+
     const priceLabel = draftServicePrice.trim() || "25 €";
     const categoryId = draftServiceCategory;
 
     if (editingServiceId) {
       setActiveServices((prev) =>
         prev.map((s) =>
-          s.id === editingServiceId ? { ...s, name, durationLabel, priceLabel, categoryId } : s,
+          s.id === editingServiceId
+            ? { ...s, name, durationLabel, priceLabel, categoryId, serviceId: matchedService.id }
+            : s,
         ),
       );
     } else {
-      const id = `svc-${Date.now()}`;
-      setActiveServices((prev) => [{ id, categoryId, name, durationLabel, priceLabel }, ...prev]);
+      const id = String(matchedService.id);
+      setActiveServices((prev) => [
+        { id, categoryId, serviceId: matchedService.id, name, durationLabel, priceLabel },
+        ...prev.filter((item) => item.serviceId !== matchedService.id),
+      ]);
     }
     setServiceDrawerOpen(false);
   }, [
+    businessCategories,
     draftServiceCategory,
     draftServiceDuration,
-    draftServiceName,
+    draftServiceId,
     draftServicePrice,
     editingServiceId,
     setActiveServices,
@@ -1347,21 +1593,42 @@ export default function ProfessionalFixedLocationSetup({
     e.target.value = "";
   }, []);
 
+  const serviceCategoryTabs = React.useMemo<
+    Array<{ id: string; label: string; iconKey: "all" | "hair" | "makeup" | "wimpers" | "wenbrauwen" }>
+  >(
+    () => [
+      { id: "all", label: "All", iconKey: "all" },
+      ...businessCategories.map((category) => ({
+        id: String(category.id),
+        label: category.title,
+        iconKey: "all" as const,
+      })),
+    ],
+    [businessCategories],
+  );
+
   const bookingCategoryOptions = React.useMemo(
-    () => ["Lichaamsbehandeling", "Hair", "Make-Up", "Wimpers", "Wenkbrauwen"] as const,
-    [],
+    () => businessCategories.map((category) => category.title),
+    [businessCategories],
   );
-  const bookingServiceOptions = React.useMemo(
-    () => ["Neck massage", "Buzz Cut", "Make-up Basic", "Lash Lift", "Brow Shape"] as const,
-    [],
-  );
+
+  const bookingServiceOptions = React.useMemo(() => {
+    const selectedCategory = businessCategories.find((category) => category.title === values.bookCategory);
+    if (selectedCategory) {
+      return selectedCategory.subcategories.map((subcategory) => subcategory.title);
+    }
+
+    return businessCategories.flatMap((category) =>
+      category.subcategories.map((subcategory) => subcategory.title),
+    );
+  }, [businessCategories, values.bookCategory]);
 
   const addBookingCombo = React.useCallback(() => {
     const id = `combo-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const a = values.bookCategory || bookingCategoryOptions[0] || "";
-    const b = values.bookCategory || bookingCategoryOptions[0] || "";
+    const b = values.bookService || bookingServiceOptions[0] || "";
     setField("bookCombos", [...values.bookCombos, { id, a, b }]);
-  }, [bookingCategoryOptions, setField, values.bookCategory, values.bookCombos]);
+  }, [bookingCategoryOptions, bookingServiceOptions, setField, values.bookCategory, values.bookCombos, values.bookService]);
 
   const updateBookingCombo = React.useCallback(
     (id: string, patch: Partial<{ a: string; b: string }>) => {
@@ -1523,14 +1790,14 @@ export default function ProfessionalFixedLocationSetup({
 
         <Grid container spacing={1.5}>
           {([
-            ["hair",       "Hair",         teamOpts.hair],
-            ["makeup",     "Make-up",       teamOpts.makeup],
-            ["wimpers",    "Wimpers",       teamOpts.wimpers],
-            ["wenbrauwen", "Wenkbrauwen",   teamOpts.wenbrauwen],
-            ["lich1",      "Lichaamsbehandeling 1", teamOpts.lich],
-            ["lich2",      "Lichaamsbehandeling 2", teamOpts.lich],
-            ["lich3",      "Lichaamsbehandeling 3", teamOpts.lich],
-          ] as const).map(([key, label, opts]) => (
+            ["slot1", "Assigned Service 1"],
+            ["slot2", "Assigned Service 2"],
+            ["slot3", "Assigned Service 3"],
+            ["slot4", "Assigned Service 4"],
+            ["slot5", "Assigned Service 5"],
+            ["slot6", "Assigned Service 6"],
+            ["slot7", "Assigned Service 7"],
+          ] as const).map(([key, label]) => (
             <Grid key={key} item xs={12} sm={6}>
               <MollureFormField
                 select label={label}
@@ -1539,7 +1806,12 @@ export default function ProfessionalFixedLocationSetup({
                   setDraftServices((p) => ({ ...p, [key]: e.target.value }))
                 }
               >
-                {opts.map((o) => <MenuItem key={o} value={o}>{o}</MenuItem>)}
+                <MenuItem value="">Select service</MenuItem>
+                {allSubcategoryOptions.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
               </MollureFormField>
             </Grid>
           ))}
@@ -1580,22 +1852,31 @@ export default function ProfessionalFixedLocationSetup({
             select
             label="Category"
             value={draftServiceCategory}
-            onChange={(e) => setDraftServiceCategory(e.target.value as any)}
+            onChange={(e) => {
+              setDraftServiceCategory(String(e.target.value));
+              setDraftServiceId("");
+            }}
           >
-            {data.servicesDetails.categories
-              .filter((c) => c.id !== "all")
-              .map((c) => (
-                <MenuItem key={c.id} value={c.id}>
-                  {c.label}
-                </MenuItem>
-              ))}
+            {businessCategories.map((category) => (
+              <MenuItem key={category.id} value={String(category.id)}>
+                {category.title}
+              </MenuItem>
+            ))}
           </MollureFormField>
           <MollureFormField
-            label="Service name"
-            placeholder="e.g Buzz Cut"
-            value={draftServiceName}
-            onChange={(e) => setDraftServiceName(e.target.value)}
-          />
+            select
+            label="Service"
+            value={draftServiceId}
+            onChange={(e) => setDraftServiceId(Number(e.target.value))}
+          >
+            {(businessCategories.find((category) => String(category.id) === draftServiceCategory)?.subcategories ?? []).map(
+              (subcategory) => (
+                <MenuItem key={subcategory.id} value={subcategory.id}>
+                  {subcategory.title}
+                </MenuItem>
+              ),
+            )}
+          </MollureFormField>
           <MollureFormField
             label="Duration"
             placeholder="e.g 45 Min"
@@ -1629,7 +1910,7 @@ export default function ProfessionalFixedLocationSetup({
             onClick={saveService}
             variant="contained"
             disableElevation
-            disabled={!draftServiceName.trim()}
+            disabled={!draftServiceCategory || !draftServiceId}
             sx={{
               borderRadius: "8px",
               textTransform: "none",
@@ -1699,7 +1980,7 @@ export default function ProfessionalFixedLocationSetup({
           variant="contained"
           disableElevation
           onClick={onPublishBusinessSetup}
-          disabled={!isBusinessPublishEnabled}
+          disabled={!isBusinessPublishEnabled || isBusinessSetupSaving}
           sx={{
             borderRadius: "6px",
             textTransform: "none",
@@ -1712,7 +1993,7 @@ export default function ProfessionalFixedLocationSetup({
             alignSelf: { xs: "flex-start", md: "flex-end" },
           }}
         >
-          {data.publishLabel}
+          {isBusinessSetupSaving ? "Saving..." : data.publishLabel}
         </Button>
       </Stack>
 
@@ -2110,7 +2391,7 @@ export default function ProfessionalFixedLocationSetup({
         <Box sx={businessEditing.servicesDetails ? undefined : { pointerEvents: "none" }}>
           <Stack spacing={1.5}>
           <Stack direction="row" spacing={1.25} sx={{ overflowX: "auto", pb: 0.25 }}>
-            {data.servicesDetails.categories.map((c) => {
+            {serviceCategoryTabs.map((c) => {
               const active = c.id === activeServiceCategory;
               const icon =
                 c.iconKey === "hair"
@@ -2168,7 +2449,7 @@ export default function ProfessionalFixedLocationSetup({
             <Typography sx={{ fontWeight: 800, fontSize: 13.5, color: alpha(m.navy, 0.82) }}>
               {activeServiceCategory === "all"
                 ? "All"
-                : data.servicesDetails.categories.find((x) => x.id === activeServiceCategory)?.label ?? "Services"}
+                : serviceCategoryTabs.find((x) => x.id === activeServiceCategory)?.label ?? "Services"}
             </Typography>
             <Box sx={{ flex: 1 }} />
             <IconButton
@@ -2209,7 +2490,7 @@ export default function ProfessionalFixedLocationSetup({
                       {it.name}
                     </Typography>
                     <Typography sx={{ fontSize: 11.5, color: theme.palette.primary.main, fontWeight: 600 }}>
-                      {it.durationLabel} View
+                      {it.durationLabel ? `${it.durationLabel} View` : "View"}
                     </Typography>
                   </Box>
                   <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.72) }}>
@@ -2419,7 +2700,7 @@ export default function ProfessionalFixedLocationSetup({
                             "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" },
                           }}
                         >
-                          {bookingCategoryOptions.map((opt) => (
+                          {bookingServiceOptions.map((opt) => (
                             <MenuItem key={opt} value={opt}>
                               {opt}
                             </MenuItem>
@@ -2568,12 +2849,7 @@ export default function ProfessionalFixedLocationSetup({
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   {/* Row 1 – 4 dropdowns */}
                   <Grid container spacing={1} sx={{ mb: 1 }}>
-                    {([
-                      ["hair",       teamOpts.hair],
-                      ["makeup",     teamOpts.makeup],
-                      ["wimpers",    teamOpts.wimpers],
-                      ["wenbrauwen", teamOpts.wenbrauwen],
-                    ] as const).map(([key, opts]) => (
+                    {(["slot1", "slot2", "slot3", "slot4"] as const).map((key) => (
                       <Grid key={key} item xs={3}>
                         <MollureFormField
                           select
@@ -2588,14 +2864,19 @@ export default function ProfessionalFixedLocationSetup({
                             "& .MuiSvgIcon-root": { fontSize: 18, color: alpha(m.navy, 0.40) },
                           }}
                         >
-                          {opts.map((o) => <MenuItem key={o} value={o} sx={{ fontSize: 12 }}>{o}</MenuItem>)}
+                          <MenuItem value="">Select</MenuItem>
+                          {allSubcategoryOptions.map((option) => (
+                            <MenuItem key={option.value} value={option.value} sx={{ fontSize: 12 }}>
+                              {option.label}
+                            </MenuItem>
+                          ))}
                         </MollureFormField>
                       </Grid>
                     ))}
                   </Grid>
                   {/* Row 2 – 3 dropdowns */}
                   <Grid container spacing={1}>
-                    {(["lich1", "lich2", "lich3"] as const).map((key) => (
+                    {(["slot5", "slot6", "slot7"] as const).map((key) => (
                       <Grid key={key} item xs={4}>
                         <MollureFormField
                           select
@@ -2610,7 +2891,12 @@ export default function ProfessionalFixedLocationSetup({
                             "& .MuiSvgIcon-root": { fontSize: 18, color: alpha(m.navy, 0.40) },
                           }}
                         >
-                          {teamOpts.lich.map((o) => <MenuItem key={o} value={o} sx={{ fontSize: 12 }}>{o}</MenuItem>)}
+                          <MenuItem value="">Select</MenuItem>
+                          {allSubcategoryOptions.map((option) => (
+                            <MenuItem key={option.value} value={option.value} sx={{ fontSize: 12 }}>
+                              {option.label}
+                            </MenuItem>
+                          ))}
                         </MollureFormField>
                       </Grid>
                     ))}

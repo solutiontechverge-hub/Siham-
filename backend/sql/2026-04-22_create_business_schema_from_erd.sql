@@ -26,12 +26,14 @@ CREATE TABLE IF NOT EXISTS business_setups (
   business_about TEXT,
   business_keywords TEXT[] NOT NULL DEFAULT '{}'::TEXT[],
   business_media TEXT[] NOT NULL DEFAULT '{}'::TEXT[],
+  salon_name TEXT,
   fixed_location_address TEXT,
   fixed_location_street_number TEXT,
   fixed_location_postal_code TEXT,
   fixed_location_province TEXT,
   fixed_location_municipality TEXT,
-  service_categories TEXT[] NOT NULL DEFAULT '{}'::TEXT[],
+  service_for TEXT[] NOT NULL DEFAULT '{}'::TEXT[],
+  service_categories JSONB NOT NULL DEFAULT '[]'::JSONB,
   project TEXT,
   book_service_notes TEXT,
   team_member_ids BIGINT[] NOT NULL DEFAULT '{}'::BIGINT[],
@@ -53,13 +55,14 @@ CREATE TABLE IF NOT EXISTS business_setups (
   late_cancellation_fee_percentage NUMERIC(5,2),
   cancellation_policy_instruction TEXT,
   no_show_fee_percentage NUMERIC(5,2),
+  no_show_fee_instruction TEXT,
   desired_location_area TEXT,
   desired_location_province TEXT,
   desired_location_services TEXT[] NOT NULL DEFAULT '{}'::TEXT[],
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  CHECK (cardinality(business_keywords) >= 3),
-  CHECK (cardinality(business_media) >= 4),
+  CHECK (cardinality(business_keywords) <= 3),
+  CHECK (cardinality(business_media) <= 4),
   CHECK (prepayment_percentage IS NULL OR (prepayment_percentage >= 0 AND prepayment_percentage <= 100)),
   CHECK (late_reschedule_fee_percentage IS NULL OR (late_reschedule_fee_percentage >= 0 AND late_reschedule_fee_percentage <= 100)),
   CHECK (late_cancellation_fee_percentage IS NULL OR (late_cancellation_fee_percentage >= 0 AND late_cancellation_fee_percentage <= 100)),
@@ -79,6 +82,18 @@ CREATE TABLE IF NOT EXISTS business_service_details (
   price NUMERIC(12,2) NOT NULL CHECK (price >= 0),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (business_setup_id, service_id)
+);
+
+CREATE TABLE IF NOT EXISTS business_team_members (
+  id BIGSERIAL PRIMARY KEY,
+  business_setup_id BIGINT NOT NULL REFERENCES business_setups(id) ON DELETE CASCADE,
+  full_name TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'Team member',
+  profile_photo TEXT,
+  assigned_services JSONB NOT NULL DEFAULT '{}'::JSONB,
+  display_order INTEGER NOT NULL DEFAULT 1,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS calendar_entries (
@@ -108,7 +123,7 @@ CREATE TABLE IF NOT EXISTS bookings (
   business_setup_id BIGINT NOT NULL REFERENCES business_setups(id) ON DELETE CASCADE,
   customer_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   service_id BIGINT REFERENCES subcategories(id) ON DELETE SET NULL,
-  team_member_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  team_member_id BIGINT REFERENCES business_team_members(id) ON DELETE SET NULL,
   start_time TIMESTAMPTZ,
   end_time TIMESTAMPTZ,
   location_type TEXT CHECK (location_type IN ('fixed', 'desired')),
@@ -141,6 +156,9 @@ CREATE INDEX IF NOT EXISTS idx_business_service_details_business_setup_id
 
 CREATE INDEX IF NOT EXISTS idx_business_service_details_service_id
   ON business_service_details(service_id);
+
+CREATE INDEX IF NOT EXISTS idx_business_team_members_business_setup_id
+  ON business_team_members(business_setup_id);
 
 CREATE INDEX IF NOT EXISTS idx_calendar_entries_professional_profile_id
   ON calendar_entries(professional_profile_id);
