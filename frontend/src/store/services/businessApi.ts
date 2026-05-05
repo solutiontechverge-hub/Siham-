@@ -47,6 +47,13 @@ export type BusinessTeamMember = {
   updated_at?: string;
 };
 
+export type BusinessBookServiceCombination = {
+  category_id: number;
+  category_title?: string | null;
+  service_id: number;
+  service_title?: string | null;
+};
+
 export type BusinessSetup = {
   id: number;
   professional_profile_id: number;
@@ -69,6 +76,7 @@ export type BusinessSetup = {
   }>;
   project: string | null;
   book_service_notes: string | null;
+  book_service_combinations: BusinessBookServiceCombination[];
   team_member_ids: number[];
   additional_notes: string | null;
   price_range: string | null;
@@ -118,6 +126,7 @@ export type UpsertBusinessSetupRequest = {
   }>;
   project?: string;
   book_service_notes?: string;
+  book_service_combinations?: BusinessBookServiceCombination[];
   additional_notes?: string;
   price_range?: string;
   prepayment_percentage?: number | null;

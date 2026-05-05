@@ -1042,13 +1042,47 @@ export default function ProfessionalFixedLocationSetup({
           amount: Number(String(item.priceLabel).replace(/[^0-9.]/g, "")) || 0,
         })),
       project: sourceBiz.projectEnabled ? sourceBiz.projectInstructions : "",
-      book_service_notes: values.bookComboInstructions,
-      additional_notes: values.notes,
-      price_range: [values.priceRangeFrom, values.priceRangeTo].filter(Boolean).join(" - "),
-      prepayment_percentage: Number(values.prepaymentPercent) || null,
-      prepayment_instruction: values.prepaymentInstructions,
-      kilometer_allowance: Number(values.kilometerAllowance) || null,
-      kilometer_allowance_instruction: values.kilometerAllowanceInstructions,
+      book_service_notes: sourceBiz.bookComboInstructions,
+      book_service_combinations: sourceBiz.projectEnabled
+        ? sourceBiz.bookCombos
+            .map((combo) => {
+              const category = businessCategories.find((item) => String(item.id) === combo.categoryId);
+              const service = category
+                ? category.subcategories.find((item) => String(item.id) === combo.serviceId)
+                : businessCategories
+                    .flatMap((item) => item.subcategories)
+                    .find((item) => String(item.id) === combo.serviceId);
+              const categoryId = Number(combo.categoryId);
+              const serviceId = Number(combo.serviceId);
+
+              if (!Number.isInteger(categoryId) || !Number.isInteger(serviceId)) {
+                return null;
+              }
+
+              return {
+                category_id: categoryId,
+                category_title: category?.title ?? null,
+                service_id: serviceId,
+                service_title: service?.title ?? null,
+              };
+            })
+            .filter(
+              (
+                combo,
+              ): combo is {
+                category_id: number;
+                category_title: string | null;
+                service_id: number;
+                service_title: string | null;
+              } => combo !== null,
+            )
+        : [],
+      additional_notes: sourceBiz.notes,
+      price_range: [sourceBiz.priceRangeFrom, sourceBiz.priceRangeTo].filter(Boolean).join(" - "),
+      prepayment_percentage: Number(sourceBiz.prepaymentPercent) || null,
+      prepayment_instruction: sourceBiz.prepaymentInstructions,
+      kilometer_allowance: Number(sourceBiz.kilometerAllowance) || null,
+      kilometer_allowance_instruction: sourceBiz.kilometerAllowanceInstructions,
       response_time_hours: Number(values.policyResponseHours) || null,
       response_time_minutes: Number(values.policyResponseMinutes) || null,
       policy_custom_instruction: values.policyInstructions,
@@ -1080,6 +1114,7 @@ export default function ProfessionalFixedLocationSetup({
     closeAllBusinessEditing();
   }, [
     businessOfferingSelect,
+    businessCategories,
     closeAllBusinessEditing,
     desiredAreaMode,
     desiredAreas,
@@ -1138,32 +1173,52 @@ export default function ProfessionalFixedLocationSetup({
     const nextOffering = modeMap[businessSetupData.location_mode];
     setBusinessOfferingSelect(nextOffering);
     setActiveBusinessTemplate(nextOffering === "Both" ? "Fixed Location" : nextOffering);
+    const savedBookCombos = (businessSetupData.book_service_combinations || []).map((combo, index) => ({
+      id: `combo-${combo.category_id}-${combo.service_id}-${index}`,
+      categoryId: String(combo.category_id),
+      serviceId: String(combo.service_id),
+    }));
+    const savedPriceRange = businessSetupData.price_range ? businessSetupData.price_range.split("-") : [];
+    const hydratedTemplateState: BusinessTemplateState = {
+      profileName: businessSetupData.business_name || "",
+      about: businessSetupData.business_about || "",
+      keywordDraft: "",
+      keywords: businessSetupData.business_keywords || [],
+      salonName: businessSetupData.salon_name || "",
+      streetAddress: businessSetupData.fixed_location_address || "",
+      streetNumber: businessSetupData.fixed_location_street_number || "",
+      postalCode: businessSetupData.fixed_location_postal_code || "",
+      province: businessSetupData.fixed_location_province || "",
+      municipality: businessSetupData.fixed_location_municipality || "",
+      serviceFor: {
+        men: (businessSetupData.service_for || []).includes("men"),
+        women: (businessSetupData.service_for || []).includes("women"),
+        kids: (businessSetupData.service_for || []).includes("kids"),
+      },
+      amenities: values.amenities,
+      projectEnabled: Boolean(businessSetupData.project),
+      projectInstructions: businessSetupData.project || "",
+      bookCategory: savedBookCombos[0]?.categoryId || "",
+      bookService: savedBookCombos[0]?.serviceId || "",
+      bookCombos: savedBookCombos,
+      bookComboInstructions: businessSetupData.book_service_notes || "",
+      discountEnabled: values.discountEnabled,
+      discountValue: values.discountValue,
+      depositEnabled: values.depositEnabled,
+      depositValue: values.depositValue,
+      notes: businessSetupData.additional_notes || "",
+      priceRangeFrom: savedPriceRange[0]?.trim() || "",
+      priceRangeTo: savedPriceRange[1]?.trim() || "",
+      prepaymentPercent: toDisplayNumber(businessSetupData.prepayment_percentage),
+      prepaymentInstructions: businessSetupData.prepayment_instruction || "",
+      kilometerAllowance: toDisplayNumber(businessSetupData.kilometer_allowance),
+      kilometerAllowanceInstructions: businessSetupData.kilometer_allowance_instruction || "",
+    };
 
-    setField("profileName", businessSetupData.business_name || "");
-    setField("about", businessSetupData.business_about || "");
-    setField("keywordDraft", "");
-    setField("keywords", businessSetupData.business_keywords || []);
-    setField("salonName", businessSetupData.salon_name || "");
-    setField("streetAddress", businessSetupData.fixed_location_address || "");
-    setField("streetNumber", businessSetupData.fixed_location_street_number || "");
-    setField("postalCode", businessSetupData.fixed_location_postal_code || "");
-    setField("province", businessSetupData.fixed_location_province || "");
-    setField("municipality", businessSetupData.fixed_location_municipality || "");
-    setField("serviceFor", {
-      men: (businessSetupData.service_for || []).includes("men"),
-      women: (businessSetupData.service_for || []).includes("women"),
-      kids: (businessSetupData.service_for || []).includes("kids"),
+    Object.entries(hydratedTemplateState).forEach(([key, value]) => {
+      setField(key as any, value as any);
     });
-    setField("projectEnabled", Boolean(businessSetupData.project));
-    setField("projectInstructions", businessSetupData.project || "");
-    setField("bookComboInstructions", businessSetupData.book_service_notes || "");
-    setField("notes", businessSetupData.additional_notes || "");
-    setField("priceRangeFrom", businessSetupData.price_range ? businessSetupData.price_range.split("-")[0]?.trim() || "" : "");
-    setField("priceRangeTo", businessSetupData.price_range ? businessSetupData.price_range.split("-")[1]?.trim() || "" : "");
-    setField("prepaymentPercent", toDisplayNumber(businessSetupData.prepayment_percentage));
-    setField("prepaymentInstructions", businessSetupData.prepayment_instruction || "");
-    setField("kilometerAllowance", toDisplayNumber(businessSetupData.kilometer_allowance));
-    setField("kilometerAllowanceInstructions", businessSetupData.kilometer_allowance_instruction || "");
+    setDesiredBusiness(hydratedTemplateState);
     setField("policyResponseHours", toDisplayNumber(businessSetupData.response_time_hours));
     setField("policyResponseMinutes", toDisplayNumber(businessSetupData.response_time_minutes));
     setField("policyInstructions", businessSetupData.policy_custom_instruction || "");
@@ -1212,7 +1267,7 @@ export default function ProfessionalFixedLocationSetup({
     }
 
     hydratedBusinessRef.current = hydrationKey;
-  }, [businessSetupData, defaultServices, setField, toDisplayNumber]);
+  }, [businessSetupData, defaultServices, setField, toDisplayNumber, values.amenities, values.depositEnabled, values.depositValue, values.discountEnabled, values.discountValue]);
 
   const activeServices = activeBusinessTemplate === "Fixed Location" ? servicesFixed : servicesDesired;
   const setActiveServices = React.useCallback(
@@ -1608,46 +1663,74 @@ export default function ProfessionalFixedLocationSetup({
   );
 
   const bookingCategoryOptions = React.useMemo(
-    () => businessCategories.map((category) => category.title),
+    () =>
+      businessCategories.map((category) => ({
+        value: String(category.id),
+        label: category.title,
+      })),
     [businessCategories],
   );
 
-  const bookingServiceOptions = React.useMemo(() => {
-    const selectedCategory = businessCategories.find((category) => category.title === values.bookCategory);
-    if (selectedCategory) {
-      return selectedCategory.subcategories.map((subcategory) => subcategory.title);
-    }
+  const getBookingServiceOptions = React.useCallback(
+    (categoryId: string) => {
+      const selectedCategory = businessCategories.find((category) => String(category.id) === categoryId);
+      const subcategories = selectedCategory
+        ? selectedCategory.subcategories
+        : businessCategories.flatMap((category) => category.subcategories);
 
-    return businessCategories.flatMap((category) =>
-      category.subcategories.map((subcategory) => subcategory.title),
-    );
-  }, [businessCategories, values.bookCategory]);
+      return subcategories.map((subcategory) => ({
+        value: String(subcategory.id),
+        label: subcategory.title,
+      }));
+    },
+    [businessCategories],
+  );
+
+  const bookingServiceOptions = React.useMemo(
+    () => getBookingServiceOptions(biz.bookCategory),
+    [biz.bookCategory, getBookingServiceOptions],
+  );
 
   const addBookingCombo = React.useCallback(() => {
+    const categoryId = biz.bookCategory || bookingCategoryOptions[0]?.value || "";
+    const serviceOptions = getBookingServiceOptions(categoryId);
+    const serviceId = biz.bookService || serviceOptions[0]?.value || "";
+    if (!categoryId || !serviceId) return;
+
     const id = `combo-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const a = values.bookCategory || bookingCategoryOptions[0] || "";
-    const b = values.bookService || bookingServiceOptions[0] || "";
-    setField("bookCombos", [...values.bookCombos, { id, a, b }]);
-  }, [bookingCategoryOptions, bookingServiceOptions, setField, values.bookCategory, values.bookCombos, values.bookService]);
+    setBizField("bookCombos", [...biz.bookCombos, { id, categoryId, serviceId }]);
+  }, [biz.bookCategory, biz.bookCombos, biz.bookService, bookingCategoryOptions, getBookingServiceOptions, setBizField]);
 
   const updateBookingCombo = React.useCallback(
-    (id: string, patch: Partial<{ a: string; b: string }>) => {
-      setField(
+    (id: string, patch: Partial<{ categoryId: string; serviceId: string }>) => {
+      setBizField(
         "bookCombos",
-        values.bookCombos.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+        biz.bookCombos.map((combo) => {
+          if (combo.id !== id) return combo;
+
+          const next = { ...combo, ...patch };
+          if (patch.categoryId) {
+            const serviceOptions = getBookingServiceOptions(patch.categoryId);
+            next.serviceId = serviceOptions.some((option) => option.value === next.serviceId)
+              ? next.serviceId
+              : serviceOptions[0]?.value || "";
+          }
+
+          return next;
+        }),
       );
     },
-    [setField, values.bookCombos],
+    [biz.bookCombos, getBookingServiceOptions, setBizField],
   );
 
   const deleteBookingCombo = React.useCallback(
     (id: string) => {
-      setField(
+      setBizField(
         "bookCombos",
-        values.bookCombos.filter((c) => c.id !== id),
+        biz.bookCombos.filter((c) => c.id !== id),
       );
     },
-    [setField, values.bookCombos],
+    [biz.bookCombos, setBizField],
   );
   const goPrevMedia = React.useCallback(() => {
     setMediaIdx((i) => (i - 1 + mediaSlides.length) % mediaSlides.length);
@@ -2538,8 +2621,8 @@ export default function ProfessionalFixedLocationSetup({
                 sx={{ m: 0 }}
                 control={
                   <Checkbox
-                    checked={values.projectEnabled}
-                    onChange={(e) => setField("projectEnabled", e.target.checked)}
+                    checked={biz.projectEnabled}
+                    onChange={(e) => setBizField("projectEnabled", e.target.checked)}
                     sx={{
                       color: alpha(m.navy, 0.28),
                       "&.Mui-checked": { color: "primary.main" },
@@ -2557,11 +2640,11 @@ export default function ProfessionalFixedLocationSetup({
               </Typography>
               <MollureFormField
                 placeholder="Custom instructions for Project"
-                value={values.projectInstructions}
-                onChange={(e) => setField("projectInstructions", e.target.value)}
+                value={biz.projectInstructions}
+                onChange={(e) => setBizField("projectInstructions", e.target.value)}
                 multiline
                 minRows={3}
-                disabled={!businessEditing.servicesDetails || !values.projectEnabled}
+                disabled={!businessEditing.servicesDetails || !biz.projectEnabled}
                 sx={{
                   "& .MuiOutlinedInput-root": {
                     bgcolor: "#fff",
@@ -2595,14 +2678,25 @@ export default function ProfessionalFixedLocationSetup({
                   </Typography>
                   <MollureFormField
                     select
-                    value={values.bookCategory}
-                    onChange={(e) => setField("bookCategory", e.target.value)}
+                    value={biz.bookCategory}
+                    onChange={(e) => {
+                      const categoryId = e.target.value;
+                      setBizField("bookCategory", categoryId);
+                      const nextServices = getBookingServiceOptions(categoryId);
+                      setBizField(
+                        "bookService",
+                        nextServices.some((option) => option.value === biz.bookService)
+                          ? biz.bookService
+                          : nextServices[0]?.value || "",
+                      );
+                    }}
                     sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                    disabled={!businessEditing.servicesDetails || !values.projectEnabled}
+                    disabled={!businessEditing.servicesDetails || !biz.projectEnabled}
                   >
+                    <MenuItem value="">Select category</MenuItem>
                     {bookingCategoryOptions.map((opt) => (
-                      <MenuItem key={opt} value={opt}>
-                        {opt}
+                      <MenuItem key={opt.value} value={opt.value}>
+                        {opt.label}
                       </MenuItem>
                     ))}
                   </MollureFormField>
@@ -2613,14 +2707,15 @@ export default function ProfessionalFixedLocationSetup({
                   </Typography>
                   <MollureFormField
                     select
-                    value={values.bookService}
-                    onChange={(e) => setField("bookService", e.target.value)}
+                    value={biz.bookService}
+                    onChange={(e) => setBizField("bookService", e.target.value)}
                     sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                    disabled={!businessEditing.servicesDetails || !values.projectEnabled}
+                    disabled={!businessEditing.servicesDetails || !biz.projectEnabled}
                   >
+                    <MenuItem value="">Select service</MenuItem>
                     {bookingServiceOptions.map((opt) => (
-                      <MenuItem key={opt} value={opt}>
-                        {opt}
+                      <MenuItem key={opt.value} value={opt.value}>
+                        {opt.label}
                       </MenuItem>
                     ))}
                   </MollureFormField>
@@ -2628,7 +2723,7 @@ export default function ProfessionalFixedLocationSetup({
                 <Grid item xs={12} md={2} sx={{ display: "flex", justifyContent: { md: "flex-end" } }}>
                   <IconButton
                     onClick={addBookingCombo}
-                    disabled={!businessEditing.servicesDetails || !values.projectEnabled}
+                    disabled={!businessEditing.servicesDetails || !biz.projectEnabled || !biz.bookCategory || !biz.bookService}
                     sx={{
                       width: 34,
                       height: 34,
@@ -2658,7 +2753,10 @@ export default function ProfessionalFixedLocationSetup({
                     Available Combinations
                   </Typography>
                   <Stack direction="row" spacing={1.25} sx={{ overflowX: "auto", pb: 0.25 }}>
-                    {values.bookCombos.map((c) => (
+                    {biz.bookCombos.map((c) => {
+                      const comboServiceOptions = getBookingServiceOptions(c.categoryId);
+
+                      return (
                       <Stack
                         key={c.id}
                         direction="row"
@@ -2675,60 +2773,61 @@ export default function ProfessionalFixedLocationSetup({
                       >
                         <MollureFormField
                           select
-                          value={c.a}
-                          onChange={(e) => updateBookingCombo(c.id, { a: e.target.value })}
-                          disabled={!values.projectEnabled}
+                          value={c.categoryId}
+                          onChange={(e) => updateBookingCombo(c.id, { categoryId: e.target.value })}
+                          disabled={!businessEditing.servicesDetails || !biz.projectEnabled}
                           sx={{
                             width: 170,
                             "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" },
                           }}
                         >
                           {bookingCategoryOptions.map((opt) => (
-                            <MenuItem key={opt} value={opt}>
-                              {opt}
+                            <MenuItem key={opt.value} value={opt.value}>
+                              {opt.label}
                             </MenuItem>
                           ))}
                         </MollureFormField>
                         <Typography sx={{ fontWeight: 800, color: alpha(m.navy, 0.45) }}>+</Typography>
                         <MollureFormField
                           select
-                          value={c.b}
-                          onChange={(e) => updateBookingCombo(c.id, { b: e.target.value })}
-                          disabled={!values.projectEnabled}
+                          value={c.serviceId}
+                          onChange={(e) => updateBookingCombo(c.id, { serviceId: e.target.value })}
+                          disabled={!businessEditing.servicesDetails || !biz.projectEnabled}
                           sx={{
                             width: 170,
                             "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" },
                           }}
                         >
-                          {bookingServiceOptions.map((opt) => (
-                            <MenuItem key={opt} value={opt}>
-                              {opt}
+                          {comboServiceOptions.map((opt) => (
+                            <MenuItem key={opt.value} value={opt.value}>
+                              {opt.label}
                             </MenuItem>
                           ))}
                         </MollureFormField>
                         <IconButton
                           size="small"
-                          disabled={!values.projectEnabled}
+                          disabled={!businessEditing.servicesDetails || !biz.projectEnabled}
                           onClick={() => deleteBookingCombo(c.id)}
                         >
                           <DeleteOutlineRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.55) }} />
                         </IconButton>
-                        <IconButton size="small" disabled={!values.projectEnabled}>
+                        <IconButton size="small" disabled={!businessEditing.servicesDetails || !biz.projectEnabled}>
                           <EditRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.55) }} />
                         </IconButton>
                       </Stack>
-                    ))}
+                    );
+                    })}
                   </Stack>
                 </Stack>
               </Paper>
 
               <MollureFormField
                 placeholder="Custom instructions for combo Service"
-                value={values.bookComboInstructions}
-                onChange={(e) => setField("bookComboInstructions", e.target.value)}
+                value={biz.bookComboInstructions}
+                onChange={(e) => setBizField("bookComboInstructions", e.target.value)}
                 multiline
                 minRows={4}
-                disabled={!values.projectEnabled}
+                disabled={!businessEditing.servicesDetails || !biz.projectEnabled}
                 sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
               />
             </Stack>

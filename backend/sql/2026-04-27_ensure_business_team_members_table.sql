@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS business_team_members (
   full_name TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'Team member',
   profile_photo TEXT,
-  assigned_services JSONB NOT NULL DEFAULT '{}'::JSONB,
+  assigned_services JSONB NOT NULL DEFAULT '[]'::JSONB,
   display_order INTEGER NOT NULL DEFAULT 1,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

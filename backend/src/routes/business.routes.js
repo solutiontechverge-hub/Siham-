@@ -20,6 +20,23 @@ const router = express.Router();
 const locationModes = ["fixed", "desired", "both"];
 const locationTypes = ["fixed", "desired"];
 const calendarStatuses = ["requested", "cancelled", "completed", "confirmed", "blocked"];
+const percentageFields = [
+  "prepayment_percentage",
+  "late_reschedule_fee_percentage",
+  "late_cancellation_fee_percentage",
+  "no_show_fee_percentage",
+];
+const nonNegativeNumberFields = ["kilometer_allowance"];
+const nonNegativeIntegerFields = [
+  "response_time_hours",
+  "appointment_before_hours",
+  "cancellation_before_hours",
+];
+const minuteFields = [
+  "response_time_minutes",
+  "appointment_before_minutes",
+  "cancellation_before_minutes",
+];
 
 const parseArrayLike = (value) => {
   if (Array.isArray(value)) {
@@ -89,6 +106,34 @@ router.put(
       .optional({ values: "falsy" })
       .custom((value) => Array.isArray(parseArrayLike(value)))
       .withMessage("service_categories must be an array."),
+    body("book_service_combinations")
+      .optional({ values: "falsy" })
+      .custom((value) => Array.isArray(parseArrayLike(value)))
+      .withMessage("book_service_combinations must be an array."),
+    ...percentageFields.map((field) =>
+      body(field)
+        .optional({ values: "falsy" })
+        .isFloat({ min: 0, max: 100 })
+        .withMessage(`${field} must be a number between 0 and 100.`),
+    ),
+    ...nonNegativeNumberFields.map((field) =>
+      body(field)
+        .optional({ values: "falsy" })
+        .isFloat({ min: 0 })
+        .withMessage(`${field} must be a non-negative number.`),
+    ),
+    ...nonNegativeIntegerFields.map((field) =>
+      body(field)
+        .optional({ values: "falsy" })
+        .isInt({ min: 0 })
+        .withMessage(`${field} must be a non-negative integer.`),
+    ),
+    ...minuteFields.map((field) =>
+      body(field)
+        .optional({ values: "falsy" })
+        .isInt({ min: 0, max: 59 })
+        .withMessage(`${field} must be an integer between 0 and 59.`),
+    ),
     body("team_members")
       .optional({ values: "falsy" })
       .custom((value) => Array.isArray(parseArrayLike(value)))

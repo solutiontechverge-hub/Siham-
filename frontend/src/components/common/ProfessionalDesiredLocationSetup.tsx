@@ -13,7 +13,11 @@ export type ProfessionalDesiredLocationSetupProps = Omit<
   data: DesiredLocationPageData;
 };
 
-export default function ProfessionalDesiredLocationSetup({ data, chrome = true }: ProfessionalDesiredLocationSetupProps) {
-  return <ProfessionalFixedLocationSetup data={data as any} chrome={chrome} />;
+export default function ProfessionalDesiredLocationSetup({
+  data,
+  chrome = true,
+  ...props
+}: ProfessionalDesiredLocationSetupProps) {
+  return <ProfessionalFixedLocationSetup data={data as any} chrome={chrome} {...props} />;
 }
 

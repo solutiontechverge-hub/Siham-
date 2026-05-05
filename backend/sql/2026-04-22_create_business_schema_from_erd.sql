@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS business_setups (
   service_categories JSONB NOT NULL DEFAULT '[]'::JSONB,
   project TEXT,
   book_service_notes TEXT,
+  book_service_combinations JSONB NOT NULL DEFAULT '[]'::JSONB,
   team_member_ids BIGINT[] NOT NULL DEFAULT '{}'::BIGINT[],
   additional_notes TEXT,
   price_range TEXT,
@@ -90,7 +91,7 @@ CREATE TABLE IF NOT EXISTS business_team_members (
   full_name TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'Team member',
   profile_photo TEXT,
-  assigned_services JSONB NOT NULL DEFAULT '{}'::JSONB,
+  assigned_services JSONB NOT NULL DEFAULT '[]'::JSONB,
   display_order INTEGER NOT NULL DEFAULT 1,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

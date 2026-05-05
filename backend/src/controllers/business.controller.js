@@ -115,6 +115,34 @@ const normalizeServiceCategories = (value) => {
     .filter(Boolean);
 };
 
+const normalizeBookServiceCombinations = (value) => {
+  return parseJsonArray(value)
+    .map((item) => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+
+      const categoryId = Number(item.category_id);
+      const serviceId = Number(item.service_id);
+
+      if (!Number.isInteger(categoryId) || categoryId <= 0) {
+        return null;
+      }
+
+      if (!Number.isInteger(serviceId) || serviceId <= 0) {
+        return null;
+      }
+
+      return {
+        category_id: categoryId,
+        category_title: item.category_title ? String(item.category_title).trim() : null,
+        service_id: serviceId,
+        service_title: item.service_title ? String(item.service_title).trim() : null,
+      };
+    })
+    .filter(Boolean);
+};
+
 const normalizeTeamMembers = (value) => {
   return parseJsonArray(value)
     .map((item, index) => {
@@ -151,7 +179,7 @@ const normalizeTeamMembers = (value) => {
         full_name: fullName,
         role: String(item.role ?? "Team member").trim() || "Team member",
         profile_photo: item.profile_photo ? String(item.profile_photo).trim() : null,
-        assigned_services: JSON.stringify(normalizedAssignedServices),
+        assigned_services: normalizedAssignedServices,
         display_order: parseOptionalInteger(item.display_order) ?? index + 1,
       };
     })
@@ -231,9 +259,16 @@ const getBusinessSetupDetailById = async (setupId, client = { query }) => {
     ),
   ]);
 
+  const teamMembers = teamMembersResult.rows.map((member) => ({
+    ...member,
+    assigned_services: parseJsonArray(member.assigned_services),
+  }));
+
   return {
     ...businessSetup,
-    team_members: teamMembersResult.rows,
+    service_categories: parseJsonArray(businessSetup.service_categories),
+    book_service_combinations: parseJsonArray(businessSetup.book_service_combinations),
+    team_members: teamMembers,
     service_details: serviceDetailsResult.rows,
   };
 };
@@ -398,6 +433,7 @@ export const upsertBusinessSetup = async (req, res) => {
     }
 
     const serviceCategories = normalizeServiceCategories(req.body.service_categories);
+    const bookServiceCombinations = normalizeBookServiceCombinations(req.body.book_service_combinations);
     const teamMembers = normalizeTeamMembers(req.body.team_members);
 
     const payload = {
@@ -413,9 +449,10 @@ export const upsertBusinessSetup = async (req, res) => {
       fixed_location_province: req.body.fixed_location_province ?? null,
       fixed_location_municipality: req.body.fixed_location_municipality ?? null,
       service_for: parseTextArray(req.body.service_for),
-      service_categories: serviceCategories,
+      service_categories: JSON.stringify(serviceCategories),
       project: req.body.project ?? null,
       book_service_notes: req.body.book_service_notes ?? null,
+      book_service_combinations: JSON.stringify(bookServiceCombinations),
       team_member_ids: [],
       additional_notes: req.body.additional_notes ?? null,
       price_range: req.body.price_range ?? null,
@@ -445,7 +482,7 @@ export const upsertBusinessSetup = async (req, res) => {
     const values = [professionalProfile.id, ...fields.map((field) => payload[field])];
     const updateAssignments = fields
       .map((field, index) => {
-        const castType = field === "service_categories" ? "::jsonb" : "";
+        const castType = ["service_categories", "book_service_combinations"].includes(field) ? "::jsonb" : "";
         return `${field} = $${index + 2}${castType}`;
       })
       .concat("updated_at = NOW()")
@@ -458,7 +495,7 @@ export const upsertBusinessSetup = async (req, res) => {
 
       const insertValues = fields
         .map((field, index) => {
-          const castType = field === "service_categories" ? "::jsonb" : "";
+          const castType = ["service_categories", "book_service_combinations"].includes(field) ? "::jsonb" : "";
           return `$${index + 2}${castType}`;
         })
         .join(", ");
@@ -560,9 +597,6 @@ export const upsertBusinessSetup = async (req, res) => {
           [businessSetup.id],
         );
       }
-      console.log(serviceCategories,'serviceCategory');
-      
-
       const serviceIds = serviceCategories.map((item) => item.service_id);
 
       if (serviceCategories.length > 0) {
