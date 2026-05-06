@@ -4,6 +4,10 @@ import {
   createBooking,
   createBusinessServiceDetail,
   createCalendarEntry,
+  updateCalendarEntryStatus,
+  updateBookingStatus,
+  getCalendarOverview,
+  upsertCalendarSettings,
   createCategory,
   createSubcategory,
   getBusinessSetup,
@@ -13,13 +17,14 @@ import {
   listCategories,
   upsertBusinessSetup,
 } from "../controllers/business.controller.js";
-import { authenticateUser } from "../middleware/auth.middleware.js";
+import { authenticateUser, authorizeRoles } from "../middleware/auth.middleware.js";
 import { validateRequest } from "../middleware/validate.middleware.js";
 
 const router = express.Router();
 const locationModes = ["fixed", "desired", "both"];
 const locationTypes = ["fixed", "desired"];
-const calendarStatuses = ["requested", "cancelled", "completed", "confirmed", "blocked"];
+const calendarStatuses = ["requested", "cancelled", "completed", "confirmed", "blocked", "no_show"];
+const bookingStatuses = ["requested", "cancelled", "completed", "confirmed", "no_show"];
 const percentageFields = [
   "prepayment_percentage",
   "late_reschedule_fee_percentage",
@@ -59,11 +64,13 @@ const parseArrayLike = (value) => {
 };
 
 router.use(authenticateUser);
+const requireProfessional = authorizeRoles("professional");
 
 router.get("/categories", listCategories);
 
 router.post(
   "/categories",
+  requireProfessional,
   body("title").trim().notEmpty().withMessage("title is required."),
   validateRequest,
   createCategory,
@@ -71,6 +78,7 @@ router.post(
 
 router.post(
   "/subcategories",
+  requireProfessional,
   [
     body("category_id").isInt({ min: 1 }).withMessage("category_id must be a valid integer."),
     body("title").trim().notEmpty().withMessage("title is required."),
@@ -79,10 +87,11 @@ router.post(
   createSubcategory,
 );
 
-router.get("/setup", getBusinessSetup);
+router.get("/setup", requireProfessional, getBusinessSetup);
 
 router.put(
   "/setup",
+  requireProfessional,
   [
     body("location_mode")
       .trim()
@@ -143,10 +152,11 @@ router.put(
   upsertBusinessSetup,
 );
 
-router.get("/service-details", listBusinessServiceDetails);
+router.get("/service-details", requireProfessional, listBusinessServiceDetails);
 
 router.post(
   "/service-details",
+  requireProfessional,
   [
     body("services")
       .isArray({ min: 1 })
@@ -162,17 +172,44 @@ router.post(
   createBusinessServiceDetail,
 );
 
-router.get("/calendar", listCalendarEntries);
+router.get("/calendar", requireProfessional, listCalendarEntries);
+router.get("/calendar/overview", requireProfessional, getCalendarOverview);
+router.put(
+  "/calendar/settings",
+  requireProfessional,
+  [
+    body("availability")
+      .optional({ values: "falsy" })
+      .custom((value) => typeof value === "object" || typeof value === "string")
+      .withMessage("availability must be an object."),
+    body("design")
+      .optional({ values: "falsy" })
+      .custom((value) => typeof value === "object" || typeof value === "string")
+      .withMessage("design must be an object."),
+  ],
+  validateRequest,
+  upsertCalendarSettings,
+);
 
 router.post(
   "/calendar",
+  requireProfessional,
   [
     body("status")
       .trim()
       .isIn(calendarStatuses)
       .withMessage("status must be requested, cancelled, completed, confirmed, or blocked."),
     body("title").trim().notEmpty().withMessage("title is required."),
-    body("unique_code").trim().notEmpty().withMessage("unique_code is required."),
+    body("unique_code").optional({ values: "falsy" }).trim(),
+    body("team_member_id")
+      .optional({ values: "falsy" })
+      .isInt({ min: 1 })
+      .withMessage("team_member_id must be a valid integer."),
+    body("booking_type")
+      .optional({ values: "falsy" })
+      .trim()
+      .isIn(["online", "offline", "project", "request"])
+      .withMessage("booking_type must be online, offline, project, or request."),
     body("location_type")
       .optional({ values: "falsy" })
       .trim()
@@ -181,6 +218,18 @@ router.post(
   ],
   validateRequest,
   createCalendarEntry,
+);
+router.patch(
+  "/calendar/:id/status",
+  requireProfessional,
+  [
+    body("status")
+      .trim()
+      .isIn(calendarStatuses)
+      .withMessage("status must be requested, cancelled, completed, confirmed, blocked, or no_show."),
+  ],
+  validateRequest,
+  updateCalendarEntryStatus,
 );
 
 router.get("/bookings", listBookings);
@@ -197,9 +246,31 @@ router.post(
       .trim()
       .isIn(locationTypes)
       .withMessage("location_type must be fixed or desired."),
+    body("booking_type")
+      .optional({ values: "falsy" })
+      .trim()
+      .isIn(["online", "offline", "project", "request"])
+      .withMessage("booking_type must be online, offline, project, or request."),
+    body("status")
+      .optional({ values: "falsy" })
+      .trim()
+      .isIn(bookingStatuses)
+      .withMessage("status must be requested, cancelled, completed, confirmed, or no_show."),
   ],
   validateRequest,
   createBooking,
+);
+router.patch(
+  "/bookings/:id/status",
+  requireProfessional,
+  [
+    body("status")
+      .trim()
+      .isIn(bookingStatuses)
+      .withMessage("status must be requested, cancelled, completed, confirmed, or no_show."),
+  ],
+  validateRequest,
+  updateBookingStatus,
 );
 
 export default router;

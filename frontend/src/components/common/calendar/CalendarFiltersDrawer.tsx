@@ -128,49 +128,51 @@ export default function CalendarFiltersDrawer({
             <Divider sx={{ mt: 1.5, borderColor: alpha(m.navy, 0.08) }} />
           </Box>
 
-          <Box>
-            <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.7), mb: 0.75 }}>Location</BodyText>
-            <Stack spacing={0.5}>
-              <FormControlLabel
-                control={
-                  <Checkbox
-                    size="small"
-                    checked={draftFilters.locationAll}
-                    onChange={(e) =>
-                      setDraftFilters((p) => ({
-                        ...p,
-                        locationAll: e.target.checked,
-                        locations: { FL: false, DL: false },
-                      }))
-                    }
-                  />
-                }
-                label={<BodyText sx={{ fontSize: 12, color: alpha(m.navy, 0.72) }}>All</BodyText>}
-                sx={{ m: 0, alignItems: "flex-start", "& .MuiFormControlLabel-label": { mt: "2px" } }}
-              />
-              {locations.map((loc) => (
+          {locations.length > 1 ? (
+            <Box>
+              <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.7), mb: 0.75 }}>Location</BodyText>
+              <Stack spacing={0.5}>
                 <FormControlLabel
-                  key={loc}
                   control={
                     <Checkbox
                       size="small"
-                      checked={!draftFilters.locationAll && Boolean(draftFilters.locations[loc])}
+                      checked={draftFilters.locationAll}
                       onChange={(e) =>
                         setDraftFilters((p) => ({
                           ...p,
-                          locationAll: false,
-                          locations: { ...p.locations, [loc]: e.target.checked },
+                          locationAll: e.target.checked,
+                          locations: { FL: false, DL: false },
                         }))
                       }
                     />
                   }
-                  label={<BodyText sx={{ fontSize: 12, color: alpha(m.navy, 0.72) }}>{loc}</BodyText>}
+                  label={<BodyText sx={{ fontSize: 12, color: alpha(m.navy, 0.72) }}>All</BodyText>}
                   sx={{ m: 0, alignItems: "flex-start", "& .MuiFormControlLabel-label": { mt: "2px" } }}
                 />
-              ))}
-            </Stack>
-            <Divider sx={{ mt: 1.5, borderColor: alpha(m.navy, 0.08) }} />
-          </Box>
+                {locations.map((loc) => (
+                  <FormControlLabel
+                    key={loc}
+                    control={
+                      <Checkbox
+                        size="small"
+                        checked={!draftFilters.locationAll && Boolean(draftFilters.locations[loc])}
+                        onChange={(e) =>
+                          setDraftFilters((p) => ({
+                            ...p,
+                            locationAll: false,
+                            locations: { ...p.locations, [loc]: e.target.checked },
+                          }))
+                        }
+                      />
+                    }
+                    label={<BodyText sx={{ fontSize: 12, color: alpha(m.navy, 0.72) }}>{loc}</BodyText>}
+                    sx={{ m: 0, alignItems: "flex-start", "& .MuiFormControlLabel-label": { mt: "2px" } }}
+                  />
+                ))}
+              </Stack>
+              <Divider sx={{ mt: 1.5, borderColor: alpha(m.navy, 0.08) }} />
+            </Box>
+          ) : null}
 
           <Box>
             <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.7), mb: 0.75 }}>Booking</BodyText>

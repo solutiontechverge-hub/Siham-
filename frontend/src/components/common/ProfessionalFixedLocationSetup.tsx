@@ -24,7 +24,6 @@ import {
   Switch,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import IosShareRoundedIcon from "@mui/icons-material/IosShareRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
@@ -542,6 +541,14 @@ export default function ProfessionalFixedLocationSetup({
     setIsBusinessLocked(false);
     setBusinessEditing((p) => ({ ...p, [key]: true }));
   }, []);
+  const enableAllBusinessEditing = React.useCallback(() => {
+    setIsBusinessLocked(false);
+    setBusinessEditing((p) => {
+      const next = { ...p };
+      for (const k of businessEditKeys) next[k] = true;
+      return next;
+    });
+  }, [businessEditKeys]);
   const closeAllBusinessEditing = React.useCallback(() => {
     setBusinessEditing((p) => {
       const next = { ...p };
@@ -2194,18 +2201,6 @@ export default function ProfessionalFixedLocationSetup({
             );
           })}
         </Box>
-        <IconButton
-          size="small"
-          onClick={() => enableBusinessEditing("offering")}
-          disabled={isBusinessLocked}
-          sx={{
-            border: `1px solid ${alpha(m.navy, 0.12)}`,
-            borderRadius: "8px",
-          }}
-          aria-label="Edit offering"
-        >
-          <MoreVertRoundedIcon fontSize="small" />
-        </IconButton>
       </Stack>
 
       <SectionShell
@@ -2386,31 +2381,13 @@ export default function ProfessionalFixedLocationSetup({
       </SectionShell>
 
       {(() => {
-        const locationEditAction = (
-          <IconButton
-            size="small"
-            onClick={() => enableBusinessEditing("location")}
-            sx={{
-              width: 32,
-              height: 32,
-              borderRadius: "999px",
-              bgcolor: alpha(m.navy, 0.06),
-              border: `1px solid ${alpha(m.navy, 0.10)}`,
-              color: alpha(m.navy, 0.72),
-              "&:hover": { bgcolor: alpha(m.navy, 0.08) },
-            }}
-          >
-            <EditOutlinedIcon sx={{ fontSize: 18 }} />
-          </IconButton>
-        );
-
         if (businessOfferingSelect === "Both") {
           return (
             <Stack spacing={2}>
-              <SectionShell title="Fixed Location" action={locationEditAction}>
+              <SectionShell title="Fixed Location">
                 <Box sx={businessEditing.location ? undefined : { pointerEvents: "none" }}>{fixedLocationForm}</Box>
               </SectionShell>
-              <SectionShell title="Desired Location" action={locationEditAction}>
+              <SectionShell title="Desired Location">
                 <Box sx={businessEditing.location ? undefined : { pointerEvents: "none" }}>{desiredLocationForm}</Box>
               </SectionShell>
             </Stack>
@@ -2418,7 +2395,7 @@ export default function ProfessionalFixedLocationSetup({
         }
 
         return (
-          <SectionShell title={locationSectionTitle} action={locationEditAction}>
+          <SectionShell title={locationSectionTitle}>
             <Box sx={businessEditing.location ? undefined : { pointerEvents: "none" }}>
               {showFixedLocationSection ? fixedLocationForm : null}
               {showDesiredLocationSection ? desiredLocationForm : null}
@@ -2427,26 +2404,7 @@ export default function ProfessionalFixedLocationSetup({
         );
       })()}
 
-      <SectionShell
-        title="Service For"
-        action={
-          <IconButton
-            size="small"
-            onClick={() => enableBusinessEditing("serviceFor")}
-            sx={{
-              width: 32,
-              height: 32,
-              borderRadius: "999px",
-              bgcolor: alpha(m.navy, 0.06),
-              border: `1px solid ${alpha(m.navy, 0.10)}`,
-              color: alpha(m.navy, 0.72),
-              "&:hover": { bgcolor: alpha(m.navy, 0.08) },
-            }}
-          >
-            <EditOutlinedIcon sx={{ fontSize: 18 }} />
-          </IconButton>
-        }
-      >
+      <SectionShell title="Service For">
         <Box sx={businessEditing.serviceFor ? undefined : { pointerEvents: "none" }}>
           {(() => {
           const allChecked = biz.serviceFor.men && biz.serviceFor.women && biz.serviceFor.kids;
@@ -2525,27 +2483,7 @@ export default function ProfessionalFixedLocationSetup({
         </Box>
       </SectionShell>
 
-      <SectionShell
-        title={data.servicesDetails.title}
-        action={
-          <IconButton
-            size="small"
-            onClick={() => enableBusinessEditing("servicesDetails")}
-            sx={{
-              width: 32,
-              height: 32,
-              borderRadius: "999px",
-              bgcolor: alpha(m.navy, 0.06),
-              border: `1px solid ${alpha(m.navy, 0.10)}`,
-              color: alpha(m.navy, 0.72),
-              "&:hover": { bgcolor: alpha(m.navy, 0.08) },
-            }}
-            aria-label="Edit services details"
-          >
-            <EditOutlinedIcon sx={{ fontSize: 18 }} />
-          </IconButton>
-        }
-      >
+      <SectionShell title={data.servicesDetails.title}>
         <Box sx={businessEditing.servicesDetails ? undefined : { pointerEvents: "none" }}>
           <Stack spacing={1.5}>
           <Stack direction="row" spacing={1.25} sx={{ overflowX: "auto", pb: 0.25 }}>
@@ -2944,20 +2882,6 @@ export default function ProfessionalFixedLocationSetup({
             >
               <AddRoundedIcon sx={{ fontSize: 18 }} />
             </IconButton>
-            <IconButton
-              size="small"
-              onClick={() => enableBusinessEditing("manageTeam")}
-              sx={{
-                width: 30,
-                height: 30,
-                borderRadius: "8px",
-                bgcolor: alpha(m.navy, 0.05),
-                "&:hover": { bgcolor: alpha(m.navy, 0.10) },
-              }}
-              aria-label="Edit manage team"
-            >
-              <EditRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
-            </IconButton>
           </Stack>
         }
       >
@@ -3110,25 +3034,7 @@ export default function ProfessionalFixedLocationSetup({
         </Box>
       </SectionShell>
 
-      <SectionShell
-        title={data.generalNotes.title}
-        action={
-          <IconButton
-            size="small"
-            onClick={() => enableBusinessEditing("generalNotes")}
-            sx={{
-              width: 30,
-              height: 30,
-              borderRadius: "999px",
-              bgcolor: alpha(m.navy, 0.05),
-              "&:hover": { bgcolor: alpha(m.navy, 0.10) },
-            }}
-            aria-label="Edit general notes"
-          >
-            <EditRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
-          </IconButton>
-        }
-      >
+      <SectionShell title={data.generalNotes.title}>
         <Box sx={businessEditing.generalNotes ? undefined : { pointerEvents: "none" }}>
         <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
           {data.generalNotes.notesLabel}
@@ -3149,25 +3055,7 @@ export default function ProfessionalFixedLocationSetup({
         </Box>
       </SectionShell>
 
-      <SectionShell
-        title="Price"
-        action={
-          <IconButton
-            size="small"
-            onClick={() => enableBusinessEditing("price")}
-            sx={{
-              width: 30,
-              height: 30,
-              borderRadius: "999px",
-              bgcolor: alpha(m.navy, 0.05),
-              "&:hover": { bgcolor: alpha(m.navy, 0.10) },
-            }}
-            aria-label="Edit price"
-          >
-            <EditRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
-          </IconButton>
-        }
-      >
+      <SectionShell title="Price">
         <Box sx={businessEditing.price ? undefined : { pointerEvents: "none" }}>
         <Stack spacing={2}>
           <Box>
@@ -3268,25 +3156,7 @@ export default function ProfessionalFixedLocationSetup({
         </Box>
       </SectionShell>
 
-      <SectionShell
-        title="Policy Section"
-        action={
-          <IconButton
-            size="small"
-            onClick={() => enableBusinessEditing("price")}
-            sx={{
-              width: 30,
-              height: 30,
-              borderRadius: "999px",
-              bgcolor: alpha(m.navy, 0.05),
-              "&:hover": { bgcolor: alpha(m.navy, 0.10) },
-            }}
-            aria-label="Edit policy"
-          >
-            <EditRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
-          </IconButton>
-        }
-      >
+      <SectionShell title="Policy Section">
         <Box sx={businessEditing.price ? undefined : { pointerEvents: "none" }}>
           <Stack spacing={1.6}>
             <Box>
@@ -3336,25 +3206,7 @@ export default function ProfessionalFixedLocationSetup({
         </Box>
       </SectionShell>
 
-      <SectionShell
-        title="Rescheduling Policy"
-        action={
-          <IconButton
-            size="small"
-            onClick={() => enableBusinessEditing("price")}
-            sx={{
-              width: 30,
-              height: 30,
-              borderRadius: "999px",
-              bgcolor: alpha(m.navy, 0.05),
-              "&:hover": { bgcolor: alpha(m.navy, 0.10) },
-            }}
-            aria-label="Edit rescheduling policy"
-          >
-            <EditRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
-          </IconButton>
-        }
-      >
+      <SectionShell title="Rescheduling Policy">
         <Box sx={businessEditing.price ? undefined : { pointerEvents: "none" }}>
           <Stack spacing={1.6}>
             <Box>
@@ -3421,25 +3273,7 @@ export default function ProfessionalFixedLocationSetup({
         </Box>
       </SectionShell>
 
-      <SectionShell
-        title="Cancellation Policy"
-        action={
-          <IconButton
-            size="small"
-            onClick={() => enableBusinessEditing("price")}
-            sx={{
-              width: 30,
-              height: 30,
-              borderRadius: "999px",
-              bgcolor: alpha(m.navy, 0.05),
-              "&:hover": { bgcolor: alpha(m.navy, 0.10) },
-            }}
-            aria-label="Edit cancellation policy"
-          >
-            <EditRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
-          </IconButton>
-        }
-      >
+      <SectionShell title="Cancellation Policy">
         <Box sx={businessEditing.price ? undefined : { pointerEvents: "none" }}>
           <Stack spacing={1.6}>
             <Box>
@@ -3506,25 +3340,7 @@ export default function ProfessionalFixedLocationSetup({
         </Box>
       </SectionShell>
 
-      <SectionShell
-        title="No Show Policy"
-        action={
-          <IconButton
-            size="small"
-            onClick={() => enableBusinessEditing("price")}
-            sx={{
-              width: 30,
-              height: 30,
-              borderRadius: "999px",
-              bgcolor: alpha(m.navy, 0.05),
-              "&:hover": { bgcolor: alpha(m.navy, 0.10) },
-            }}
-            aria-label="Edit no show policy"
-          >
-            <EditRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
-          </IconButton>
-        }
-      >
+      <SectionShell title="No Show Policy">
         <Box sx={businessEditing.price ? undefined : { pointerEvents: "none" }}>
           <Stack spacing={1.6}>
             <Box>
@@ -3561,20 +3377,6 @@ export default function ProfessionalFixedLocationSetup({
         title="Portfolio"
         action={
           <Stack direction="row" spacing={1} alignItems="center">
-            <IconButton
-              size="small"
-              onClick={() => enableBusinessEditing("portfolio")}
-              sx={{
-                width: 30,
-                height: 30,
-                borderRadius: "999px",
-                bgcolor: alpha(m.navy, 0.05),
-                "&:hover": { bgcolor: alpha(m.navy, 0.10) },
-              }}
-              aria-label="Edit portfolio"
-            >
-              <EditRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
-            </IconButton>
             <IconButton
               size="small"
               onClick={deleteSelectedPortfolio}
@@ -3761,8 +3563,7 @@ export default function ProfessionalFixedLocationSetup({
             size="small"
             onClick={() => {
               if (activeSubTab === "Business Setup") {
-                enableBusinessEditing("offering");
-                enableBusinessEditing("profile");
+                enableAllBusinessEditing();
               } else {
                 setIsProfessionalEditing(true);
               }

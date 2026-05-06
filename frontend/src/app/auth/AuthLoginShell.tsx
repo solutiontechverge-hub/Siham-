@@ -17,12 +17,14 @@ import {
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { getApiErrorMessage } from "../../lib/api-error";
+import { getDefaultRouteForUser } from "../../lib/auth-routing";
 import { persistAuthSession } from "../../lib/auth-storage";
 import { useAppDispatch } from "../../store/hooks";
 import { setAuthSession } from "../../store/slices/authSlice";
 import { useLoginMutation } from "../../store/services/authApi";
 import { SignupBg, SignupLs, SignupRs } from "../../../images";
 import { MarketingSiteHeader, MollureAuthLabeledField, MollureAuthLabeledPasswordField } from "../../components/common";
+import GuestGuard from "../../components/common/auth/GuestGuard";
 import type { AuthStripHeaderConfig } from "../../data/marketingShell.data";
 import { BodyText, SubHeading } from "../../components/ui/typography";
 import { useSnackbar } from "../../components/common/AppSnackbar";
@@ -92,13 +94,7 @@ export default function AuthLoginShell({ header, signupHref }: AuthLoginShellPro
         remember,
       });
 
-      router.push(
-        result.data.user.user_type === "individual"
-          ? "/clients/listing"
-          : result.data.user.user_type === "professional"
-            ? "/professionals/fixed-location/profile"
-            : "/clients/profile",
-      );
+      router.push(getDefaultRouteForUser(result.data.user.user_type));
       showSnackbar({ severity: "success", message: "Signed in successfully." });
     } catch (error) {
       showSnackbar({
@@ -109,14 +105,15 @@ export default function AuthLoginShell({ header, signupHref }: AuthLoginShellPro
   };
 
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        bgcolor: m.white ?? "#fff",
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
+    <GuestGuard>
+      <Box
+        sx={{
+          minHeight: "100vh",
+          bgcolor: m.white ?? "#fff",
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
       <Box
         aria-hidden
         sx={{
@@ -396,6 +393,7 @@ export default function AuthLoginShell({ header, signupHref }: AuthLoginShellPro
           </Box>
         </Container>
       </Box>
-    </Box>
+      </Box>
+    </GuestGuard>
   );
 }

@@ -11,6 +11,7 @@ import type { CalendarBookingLocation, CalendarResource } from "../../../app/pro
 import type { BlockTimeDraft } from "./calendar.utils";
 
 type CalendarBlockTimeModalProps = {
+  availableLocations?: readonly CalendarBookingLocation[];
   draft: BlockTimeDraft;
   onApply: () => void;
   onClose: () => void;
@@ -31,6 +32,7 @@ const dayOptions = [
 ];
 
 export default function CalendarBlockTimeModal({
+  availableLocations = ["FL", "DL"],
   draft,
   onApply,
   onClose,
@@ -125,14 +127,11 @@ export default function CalendarBlockTimeModal({
             renderValue={(selected) => {
               const locs = selected as readonly string[];
               if (!locs.length) return "Select Location";
-              if (locs.length === 2) return "All";
+              if (locs.length === availableLocations.length) return "All";
               return locs.join(", ");
             }}
             onChange={(val) => setDraft((p) => ({ ...p, locations: val as CalendarBookingLocation[] }))}
-            options={[
-              { label: "FL", value: "FL" },
-              { label: "DL", value: "DL" },
-            ]}
+            options={availableLocations.map((location) => ({ label: location, value: location }))}
             fullWidth
           />
 

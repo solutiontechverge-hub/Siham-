@@ -1,7 +1,9 @@
+"use client";
+
 import { MarketingSiteHeader } from "../../../components/common";
 import AuthGuard from "../../../components/common/auth/AuthGuard";
 
-export default function DesiredLocationLayout({ children }: { children: React.ReactNode }) {
+export default function ProfessionalsProfileLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthGuard allowedRoles={["professional"]}>
       <MarketingSiteHeader
