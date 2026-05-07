@@ -13,6 +13,7 @@ import LocationOnRoundedIcon from "@mui/icons-material/LocationOnRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import StickyNote2OutlinedIcon from "@mui/icons-material/StickyNote2Outlined";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import { Avatar, Box, Button, ButtonBase, Chip, IconButton, Paper, Popover, Stack, Tooltip } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../ui/typography";
@@ -55,6 +56,7 @@ import {
 import type {
   CalendarBookingType,
   CalendarBookingLocation,
+  CalendarEvent,
   CalendarSubTab,
   CalendarViewMode,
   ProfessionalFixedLocationCalendarData,
@@ -68,6 +70,12 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
   const theme = useTheme();
   const m = theme.palette.mollure;
   const { showSnackbar } = useSnackbar();
+
+  const [events, setEvents] = React.useState<readonly CalendarEvent[]>(() => [...data.events]);
+  const [editingEventId, setEditingEventId] = React.useState<string | null>(null);
+  const [isEditingExisting, setIsEditingExisting] = React.useState(false);
+
+  const isViewingExisting = Boolean(editingEventId) && !isEditingExisting;
 
   const serviceCatalog = React.useMemo(
     () =>
@@ -137,16 +145,59 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
     eurPerKm: "",
     totalKilometer: "",
   }));
+  React.useEffect(() => {
+    // Kilometer allowance is only applicable for Desired Location bookings.
+    if (slotLocation !== "DL") {
+      setShowKilometerAllowance(false);
+      setKilometerAllowanceDraft({ eurPerKm: "", totalKilometer: "" });
+    }
+  }, [slotLocation]);
   const [bookingMoreAnchor, setBookingMoreAnchor] = React.useState<HTMLElement | null>(null);
   const [slotBookingScreen, setSlotBookingScreen] = React.useState<
-    "new-booking" | "add-client-choice" | "non-mollure-type" | "non-mollure-individual" | "non-mollure-company" | "guest"
+    | "new-booking"
+    | "add-client-choice"
+    | "non-mollure-individual"
+    | "non-mollure-company"
+    | "guest"
   >("new-booking");
   const [nonMollureClientType, setNonMollureClientType] = React.useState<"" | "individual" | "company">("");
   const [slotSaveAttempted, setSlotSaveAttempted] = React.useState(false);
+  const [selectedClient, setSelectedClient] = React.useState<null | { name: string; email: string }>(null);
+  const [addClientSource, setAddClientSource] = React.useState<
+    "" | "client-list" | "mollure-platform" | "non-mollure" | "guest"
+  >("");
+  const [clientListSelectedEmail, setClientListSelectedEmail] = React.useState("");
+  const [platformSelectedEmail, setPlatformSelectedEmail] = React.useState("");
 
   React.useEffect(() => {
     setSlotSaveAttempted(false);
   }, [slotBookingScreen]);
+
+  React.useEffect(() => {
+    if (slotBookingScreen !== "add-client-choice") return;
+    setAddClientSource("");
+  }, [slotBookingScreen]);
+
+  const clientList = React.useMemo(
+    () =>
+      [
+        { name: "Sara Johnson", email: "sarajohnson@gmail.com" },
+        { name: "Emma Stone", email: "emma.stone@gmail.com" },
+        { name: "Noah Parker", email: "noah.parker@gmail.com" },
+        { name: "Priya Shah", email: "priya.shah@gmail.com" },
+      ] as const,
+    [],
+  );
+  const mollurePlatformClients = React.useMemo(
+    () =>
+      [
+        { name: "Alex Morgan", email: "alex.morgan@mollure.com" },
+        { name: "Yuki Tanaka", email: "yuki.tanaka@mollure.com" },
+        { name: "Liam Roberts", email: "liam.roberts@mollure.com" },
+        { name: "Ava Kim", email: "ava.kim@mollure.com" },
+      ] as const,
+    [],
+  );
 
   const servicesTotal = React.useMemo(() => selectedServices.reduce((sum, s) => sum + s.price, 0), [selectedServices]);
   const productsTotal = React.useMemo(() => selectedProducts.reduce((sum, p) => sum + p.price, 0), [selectedProducts]);
@@ -315,7 +366,7 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
 
   const eventsInRange = React.useMemo(
     () => {
-      const base = data.events.filter((e) => visibleDates.includes(e.date));
+      const base = events.filter((e) => visibleDates.includes(e.date));
       const byTeam = appliedFilters.teamAll
         ? base
         : base.filter((e) => appliedFilters.teamIds[e.resourceId]);
@@ -337,7 +388,7 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
       appliedFilters.locations,
       appliedFilters.teamAll,
       appliedFilters.teamIds,
-      data.events,
+      events,
       visibleDates,
     ],
   );
@@ -390,14 +441,6 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
 
     if (slotBookingScreen === "add-client-choice") {
       return { isValid: false as const, errors };
-    }
-
-    if (slotBookingScreen === "non-mollure-type") {
-      if (!nonMollureClientType) {
-        isValid = false;
-        errors.nonMollureClientType = "Select client type.";
-      }
-      return { isValid, errors };
     }
 
     if (slotBookingScreen === "guest") {
@@ -501,8 +544,22 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
       isValid = false;
       errors.bookingClient = "Client is required.";
     }
+    if (selectedServices.length === 0 && selectedProducts.length === 0) {
+      isValid = false;
+      errors.bookingClient = errors.bookingClient ?? "Select at least one item/service or product.";
+    }
     return { isValid, errors };
-  }, [guestDraft.firstName, guestDraft.lastName, nonMollureClientType, nonMollureDraft, slotBookingScreen, slotClientAdded, slotDrawerTab]);
+  }, [
+    guestDraft.firstName,
+    guestDraft.lastName,
+    nonMollureClientType,
+    nonMollureDraft,
+    selectedProducts.length,
+    selectedServices.length,
+    slotBookingScreen,
+    slotClientAdded,
+    slotDrawerTab,
+  ]);
 
   const slotErrors = React.useMemo(() => (slotSaveAttempted ? slotValidation.errors : {}), [slotSaveAttempted, slotValidation.errors]);
 
@@ -542,7 +599,7 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
   const getBusyFor = React.useCallback(
     (resourceId: string, iso: string): Interval[] => {
       const busy: Interval[] = [];
-      for (const e of data.events) {
+      for (const e of events) {
         if (e.resourceId !== resourceId || e.date !== iso) continue;
         busy.push({ startMin: minutesSinceMidnight(e.start), endMin: minutesSinceMidnight(e.end) });
       }
@@ -552,7 +609,7 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
       }
       return busy;
     },
-    [data.blocks, data.events],
+    [data.blocks, events],
   );
 
   const getDailyBookingRatio = React.useCallback(
@@ -575,6 +632,11 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
       setSlotLocation("FL");
       setSlotCalendarMonth(toMonthIso(payload.date));
       setSlotClientAdded(false);
+      setSelectedClient(null);
+      setSelectedServices([]);
+      setSelectedProducts([]);
+      setEditingEventId(null);
+      setIsEditingExisting(false);
       setGuestDraft({
         firstName: "",
         lastName: "",
@@ -603,6 +665,31 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
         province: "",
         municipality: "",
       });
+      setSlotDrawerOpen(true);
+    },
+    [],
+  );
+
+  const openExistingBooking = React.useCallback(
+    (ev: CalendarEvent) => {
+      setSelectedSlot({
+        resourceId: ev.resourceId,
+        date: ev.date,
+        start: ev.start,
+        end: ev.end,
+        freeStart: ev.start,
+        freeEnd: ev.end,
+      });
+      setSlotDrawerTab("booking");
+      setSlotBookingScreen("new-booking");
+      setSlotLocation(ev.location);
+      setSlotCalendarMonth(toMonthIso(ev.date));
+      setSlotClientAdded(true);
+      setSelectedClient({ name: ev.showClientName ?? "Client", email: "" });
+      setSelectedServices([]);
+      setSelectedProducts([]);
+      setEditingEventId(ev.id);
+      setIsEditingExisting(false);
       setSlotDrawerOpen(true);
     },
     [],
@@ -1304,6 +1391,7 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                                   return (
                                     <Box
                                       key={ev.id}
+                                      onClick={() => openExistingBooking(ev)}
                                       sx={{
                                         position: "absolute",
                                         top,
@@ -1319,6 +1407,7 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                                         // left accent bar via box-shadow so we avoid pseudo-element clipping issues
                                         boxShadow: `inset 4px 0 0 0 ${statusTone.bar}`,
                                         zIndex: 4,
+                                        cursor: "pointer",
                                       }}
                                     >
                                       {/* ── LEFT content (non-interactive) ── */}
@@ -1524,17 +1613,23 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                       {
                         label: "Add Prepayment",
                         onClick: () => {
+                          if (isViewingExisting) return;
                           setShowPrepayment(true);
                           showSnackbar({ severity: "info", message: "Prepayment enabled." });
                         },
                       },
-                      {
-                        label: "Add Kilometer Allowance",
-                        onClick: () => {
-                          setShowKilometerAllowance(true);
-                          showSnackbar({ severity: "info", message: "Kilometer Allowance enabled." });
-                        },
-                      },
+                      ...(slotLocation === "DL"
+                        ? ([
+                            {
+                              label: "Add Kilometer Allowance",
+                              onClick: () => {
+                                if (isViewingExisting) return;
+                                setShowKilometerAllowance(true);
+                                showSnackbar({ severity: "info", message: "Kilometer Allowance enabled." });
+                              },
+                            },
+                          ] as const)
+                        : []),
                       { label: "Add Discount to Total", onClick: () => showSnackbar({ severity: "info", message: "Add Discount to Total (mock)." }) },
                       { label: "Add Late Cancellation", onClick: () => showSnackbar({ severity: "info", message: "Add Late Cancellation (mock)." }) },
                       { label: "Add Late Rescheduling", onClick: () => showSnackbar({ severity: "info", message: "Add Late Rescheduling (mock)." }) },
@@ -1566,14 +1661,30 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                   </Stack>
                 </Popover>
                 <Box sx={{ flex: 1 }} />
+                {slotBookingScreen === "new-booking" && editingEventId ? (
+                  <Button
+                    variant="outlined"
+                    onClick={() => setIsEditingExisting(true)}
+                    startIcon={<EditRoundedIcon sx={{ fontSize: 18 }} />}
+                    disabled={isEditingExisting}
+                    sx={{
+                      borderRadius: "10px",
+                      textTransform: "none",
+                      fontWeight: 800,
+                      height: 38,
+                      borderColor: alpha(m.navy, 0.14),
+                      color: alpha(m.navy, 0.72),
+                      bgcolor: "#fff",
+                      minWidth: 110,
+                    }}
+                  >
+                    Edit
+                  </Button>
+                ) : null}
                 <Button
                   variant="outlined"
                   onClick={() => {
                     if (slotBookingScreen === "non-mollure-individual" || slotBookingScreen === "non-mollure-company") {
-                      setSlotBookingScreen("non-mollure-type");
-                      return;
-                    }
-                    if (slotBookingScreen === "non-mollure-type") {
                       setSlotBookingScreen("add-client-choice");
                       return;
                     }
@@ -1603,14 +1714,10 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                 <Button
                   variant="contained"
                   disableElevation
-                  disabled={!slotValidation.isValid}
+                  disabled={!slotValidation.isValid || (Boolean(editingEventId) && !isEditingExisting)}
                   onClick={() => {
                     setSlotSaveAttempted(true);
                     if (!slotValidation.isValid) return;
-                    if (slotBookingScreen === "non-mollure-type") {
-                      setSlotBookingScreen(nonMollureClientType === "individual" ? "non-mollure-individual" : "non-mollure-company");
-                      return;
-                    }
                     if (slotBookingScreen === "non-mollure-individual" || slotBookingScreen === "non-mollure-company") {
                       showSnackbar({ severity: "success", message: "Saved (mock)." });
                       setSlotBookingScreen("new-booking");
@@ -1623,9 +1730,35 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                       setSlotSaveAttempted(false);
                       return;
                     }
-                    showSnackbar({ severity: "success", message: "Saved (mock)." });
-                    setSlotDrawerOpen(false);
+                    if (!selectedSlot) return;
+
+                    const title =
+                      selectedServices[0]?.name ??
+                      selectedProducts[0]?.name ??
+                      "Booking";
+                    const clientName = selectedClient?.name ?? `${guestDraft.firstName} ${guestDraft.lastName}`.trim() ?? "Client";
+
+                    const nextEvent: CalendarEvent = {
+                      id: editingEventId ?? `b-${Date.now()}-a`,
+                      resourceId: selectedSlot.resourceId,
+                      date: selectedSlot.date,
+                      start: selectedSlot.start,
+                      end: selectedSlot.end,
+                      title,
+                      status: "Confirmed",
+                      location: slotLocation,
+                      bookingType: "Offline",
+                      showClientName: clientName || "Client",
+                    };
+
+                    setEvents((prev) => {
+                      if (!editingEventId) return [...prev, nextEvent];
+                      return prev.map((e) => (e.id === editingEventId ? nextEvent : e));
+                    });
+                    showSnackbar({ severity: "success", message: editingEventId ? "Booking updated." : "Booking saved." });
+                    // Keep the drawer open on the booking tab; the calendar behind will now show the booking on that slot.
                     setSlotSaveAttempted(false);
+                    if (editingEventId) setIsEditingExisting(false);
                   }}
                   sx={{
                     borderRadius: "10px",
@@ -1637,7 +1770,7 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                     minWidth: 110,
                   }}
                 >
-                  {slotBookingScreen === "new-booking" ? "Save" : "Save"}
+                  {editingEventId ? "Update" : "Save"}
                 </Button>
               </Stack>
             </Box>
@@ -1699,29 +1832,44 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                     <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 15 }}>
                       Add Client
                     </BodyText>
-                    <Stack spacing={1.25}>
-                      {[
-                        { label: "Add Non-Mollure Client", key: "non-mollure" },
-                        { label: "Add Guest", key: "guest" },
-                      ].map((item) => (
+
+                    {(
+                      [
+                        { label: "Add from client list", key: "client-list" as const },
+                        { label: "Add from Mollure platform", key: "mollure-platform" as const },
+                        { label: "Add Non-Mollure Client", key: "non-mollure" as const },
+                        { label: "Add Guest", key: "guest" as const },
+                      ] as const
+                    ).map((item) => (
+                      <React.Fragment key={item.key}>
                         <Box
-                          key={item.key}
                           role="button"
                           tabIndex={0}
                           onClick={() => {
-                            if (item.key === "non-mollure") setSlotBookingScreen("non-mollure-type");
-                            else {
-                              setSlotClientAdded(true);
-                              setSlotBookingScreen("new-booking");
+                            if (item.key === "client-list" || item.key === "mollure-platform") {
+                              setAddClientSource((p) => (p === item.key ? "" : item.key));
+                              return;
                             }
+                            if (item.key === "non-mollure") {
+                              // Default to Individual Client
+                              setNonMollureClientType("individual");
+                              setSlotBookingScreen("non-mollure-individual");
+                              return;
+                            }
+                            setSlotBookingScreen("guest");
                           }}
                           onKeyDown={(e) => {
                             if (e.key !== "Enter" && e.key !== " ") return;
-                            if (item.key === "non-mollure") setSlotBookingScreen("non-mollure-type");
-                            else {
-                              setSlotClientAdded(true);
-                              setSlotBookingScreen("new-booking");
+                            if (item.key === "client-list" || item.key === "mollure-platform") {
+                              setAddClientSource((p) => (p === item.key ? "" : item.key));
+                              return;
                             }
+                            if (item.key === "non-mollure") {
+                              setNonMollureClientType("individual");
+                              setSlotBookingScreen("non-mollure-individual");
+                              return;
+                            }
+                            setSlotBookingScreen("guest");
                           }}
                           sx={{
                             border: `1px solid ${alpha(m.navy, 0.14)}`,
@@ -1758,39 +1906,58 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                             {item.label}
                           </BodyText>
                         </Box>
-                      ))}
-                    </Stack>
-                    <Box sx={{ flex: 1, minHeight: 360 }} />
-                  </Stack>
-                ) : slotBookingScreen === "non-mollure-type" ? (
-                  <Stack spacing={1.6}>
-                    <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 22, letterSpacing: "-0.01em" }}>
-                      Add Non-Mollure Client
-                    </BodyText>
 
-                    <Box sx={{ pt: 0.5 }}>
-                      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
-                        Client Type
-                      </BodyText>
-                      <AppDropdown
-                        label=""
-                        value={nonMollureClientType}
-                        onChange={(val) => {
-                          const next = val as "" | "individual" | "company";
-                          setNonMollureClientType(next);
-                          if (next === "individual") setSlotBookingScreen("non-mollure-individual");
-                          if (next === "company") setSlotBookingScreen("non-mollure-company");
-                        }}
-                        options={[
-                          { label: "Individual Client", value: "individual" },
-                          { label: "Company Client", value: "company" },
-                        ]}
-                        fullWidth
-                        placeholder="Select Client Type"
-                        error={Boolean(slotErrors.nonMollureClientType)}
-                        helperText={slotErrors.nonMollureClientType}
-                      />
-                    </Box>
+                        {item.key === "client-list" && addClientSource === "client-list" ? (
+                          <AppDropdown
+                            label=""
+                            value={clientListSelectedEmail}
+                            onChange={(val) => {
+                              if (isViewingExisting) return;
+                              const email = String(val);
+                              setClientListSelectedEmail(email);
+                              const c = clientList.find((x) => x.email === email);
+                              if (!c) return;
+                              setSelectedClient({ name: c.name, email: c.email });
+                              setSlotClientAdded(true);
+                              setSlotClientSearch("");
+                              setSlotBookingScreen("new-booking");
+                            }}
+                            options={clientList.map((c) => ({
+                              label: c.name,
+                              value: c.email,
+                            }))}
+                            fullWidth
+                            placeholder="Search based on name"
+                            disabled={isViewingExisting}
+                          />
+                        ) : null}
+
+                        {item.key === "mollure-platform" && addClientSource === "mollure-platform" ? (
+                          <AppDropdown
+                            label=""
+                            value={platformSelectedEmail}
+                            onChange={(val) => {
+                              if (isViewingExisting) return;
+                              const email = String(val);
+                              setPlatformSelectedEmail(email);
+                              const c = mollurePlatformClients.find((x) => x.email === email);
+                              if (!c) return;
+                              setSelectedClient({ name: c.name, email: c.email });
+                              setSlotClientAdded(true);
+                              setSlotClientSearch("");
+                              setSlotBookingScreen("new-booking");
+                            }}
+                            options={mollurePlatformClients.map((c) => ({
+                              label: c.email,
+                              value: c.email,
+                            }))}
+                            fullWidth
+                            placeholder="Search based on email"
+                            disabled={isViewingExisting}
+                          />
+                        ) : null}
+                      </React.Fragment>
+                    ))}
 
                     <Box sx={{ flex: 1, minHeight: 360 }} />
                   </Stack>
@@ -1821,7 +1988,21 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                       <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
                         Client Type
                       </BodyText>
-                      <AppTextField value="Individual Client" fullWidth disabled />
+                      <AppDropdown
+                        label=""
+                        value={nonMollureClientType || "individual"}
+                        onChange={(val) => {
+                          const next = val as "individual" | "company";
+                          setNonMollureClientType(next);
+                          setSlotBookingScreen(next === "individual" ? "non-mollure-individual" : "non-mollure-company");
+                        }}
+                        options={[
+                          { label: "Individual Client", value: "individual" },
+                          { label: "Company Client", value: "company" },
+                        ]}
+                        fullWidth
+                        placeholder="Select Client Type"
+                      />
                     </Box>
 
                     <AppTextField
@@ -1941,7 +2122,21 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                       <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
                         Client Type
                       </BodyText>
-                      <AppTextField value="Company Client" fullWidth disabled />
+                      <AppDropdown
+                        label=""
+                        value={nonMollureClientType || "company"}
+                        onChange={(val) => {
+                          const next = val as "individual" | "company";
+                          setNonMollureClientType(next);
+                          setSlotBookingScreen(next === "individual" ? "non-mollure-individual" : "non-mollure-company");
+                        }}
+                        options={[
+                          { label: "Individual Client", value: "individual" },
+                          { label: "Company Client", value: "company" },
+                        ]}
+                        fullWidth
+                        placeholder="Select Client Type"
+                      />
                     </Box>
 
                     <AppTextField
@@ -2247,7 +2442,10 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                                 return (
                                   <ButtonBase
                                     key={loc}
-                                    onClick={() => setSlotLocation(loc)}
+                                    onClick={() => {
+                                      if (isViewingExisting) return;
+                                      setSlotLocation(loc);
+                                    }}
                                     sx={{
                                       height: 28,
                                       fontSize: 10,
@@ -2374,31 +2572,43 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                         >
                           <AppSearchField
                             value={slotClientSearch}
-                            onChange={(e) => setSlotClientSearch(e.target.value)}
-                            onClear={() => setSlotClientSearch("")}
+                            onChange={(e) => {
+                              if (isViewingExisting) return;
+                              setSlotClientSearch(e.target.value);
+                            }}
+                            onClear={() => {
+                              if (isViewingExisting) return;
+                              setSlotClientSearch("");
+                            }}
                             placeholder="Search client..."
                             size="small"
                             fullWidth
                             sx={{ mb: 1 }}
+                            disabled={isViewingExisting}
                           />
 
                           <Stack direction="row" alignItems="center" spacing={1.25}>
-                            <Avatar src="/images/testimonial.webp" sx={{ width: 34, height: 34 }} />
+                            <Avatar src="/images/testimonial.webp" sx={{ width: 34, height: 34 }}>
+                              {!selectedClient?.name ? null : selectedClient.name.slice(0, 1).toUpperCase()}
+                            </Avatar>
                             <Box sx={{ flex: 1, minWidth: 0 }}>
                               <BodyText sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78), lineHeight: 1.2 }}>
-                                Sara Johnson
+                                {selectedClient?.name ?? "Client"}
                               </BodyText>
                               <BodyText sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.46), lineHeight: 1.2 }}>
-                                Sarajohnson@gmail.com
+                                {selectedClient?.email ?? ""}
                               </BodyText>
                             </Box>
                             <IconButton
                               size="small"
                               onClick={() => {
+                                if (isViewingExisting) return;
                                 setSlotClientAdded(false);
                                 setSlotClientSearch("");
+                                setSelectedClient(null);
                               }}
                               sx={{ color: alpha(m.navy, 0.35) }}
+                              disabled={isViewingExisting}
                             >
                               <CloseRoundedIcon sx={{ fontSize: 17 }} />
                             </IconButton>
@@ -2458,12 +2668,6 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                     {slotClientAdded ? (
                       <>
                         <Box
-                          role="button"
-                          tabIndex={0}
-                          onClick={(e) => setSlotAddMenuAnchor(e.currentTarget)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") setSlotAddMenuAnchor(e.currentTarget as HTMLElement);
-                          }}
                           sx={{
                             border: `1px solid ${alpha(m.navy, 0.14)}`,
                             borderRadius: "10px",
@@ -2471,19 +2675,50 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                             width: 132,
                             display: "flex",
                             alignItems: "center",
-                            gap: 1,
-                            px: 1.25,
-                            cursor: "pointer",
                             bgcolor: "#fff",
+                            overflow: "hidden",
                           }}
                         >
-                          <Box sx={{ width: 22, height: 22, borderRadius: "999px", bgcolor: alpha(m.teal, 0.18), color: m.teal, display: "grid", placeItems: "center", fontSize: 17, fontWeight: 900 }}>
-                            +
-                          </Box>
-                          <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.62), flex: 1 }}>
-                            Add
-                          </BodyText>
-                          <KeyboardArrowDownRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.45) }} />
+                          <ButtonBase
+                            onClick={() => {
+                              // No default picker: open the menu from the arrow only
+                            }}
+                            sx={{
+                              flex: 1,
+                              height: "100%",
+                              px: 1.2,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 0.95,
+                              justifyContent: "flex-start",
+                            }}
+                            disabled={isViewingExisting}
+                          >
+                            <Box sx={{ width: 22, height: 22, borderRadius: "999px", bgcolor: alpha(m.teal, 0.18), color: m.teal, display: "grid", placeItems: "center", fontSize: 17, fontWeight: 900 }}>
+                              +
+                            </Box>
+                            <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.62), flex: 1, lineHeight: 1 }}>
+                              Add
+                            </BodyText>
+                          </ButtonBase>
+
+                          <IconButton
+                            size="small"
+                            onClick={(e) => setSlotAddMenuAnchor(e.currentTarget)}
+                            sx={{
+                              width: 36,
+                              height: "100%",
+                              borderRadius: 0,
+                              borderLeft: `1px solid ${alpha(m.navy, 0.10)}`,
+                              color: alpha(m.navy, 0.45),
+                              display: "grid",
+                              placeItems: "center",
+                            }}
+                            aria-label="Add menu"
+                            disabled={isViewingExisting}
+                          >
+                            <KeyboardArrowDownRoundedIcon sx={{ fontSize: 18 }} />
+                          </IconButton>
                         </Box>
 
                         <Popover
@@ -2505,15 +2740,22 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                         >
                           <Stack sx={{ p: 0.75 }}>
                             {[
-                              { key: "service", label: "Add Service" },
-                              { key: "product", label: "Add Product" },
+                              { key: "service", label: "Add item" },
+                              { key: "service-2", label: "Add service" },
+                              { key: "product", label: "Add product" },
                             ].map((item) => (
                               <ButtonBase
                                 key={item.key}
                                 onClick={() => {
                                   setSlotAddMenuAnchor(null);
-                                  if (item.key === "service") setServicePickerOpen(true);
-                                  if (item.key === "product") setProductPickerOpen(true);
+                                  if (item.key === "service" || item.key === "service-2") {
+                                    setProductPickerOpen(false);
+                                    setServicePickerOpen(true);
+                                  }
+                                  if (item.key === "product") {
+                                    setServicePickerOpen(false);
+                                    setProductPickerOpen(true);
+                                  }
                                 }}
                                 sx={{
                                   width: "100%",
@@ -2575,18 +2817,23 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                               <AppDropdown
                                 label=""
                                 value={selectedServiceId}
-                                onChange={(val) => setSelectedServiceId(val as string)}
+                                onChange={(val) => {
+                                  if (isViewingExisting) return;
+                                  setSelectedServiceId(val as string);
+                                }}
                                 options={[
                                   { label: "Select service", value: "" },
                                   ...serviceCatalog.map((s) => ({ label: `${s.name} — €${s.price}`, value: s.id })),
                                 ]}
                                 fullWidth
                                 placeholder="Select service"
+                                disabled={isViewingExisting}
                               />
                               <Button
                                 variant="outlined"
                                 disabled={!selectedServiceId}
                                 onClick={() => {
+                                  if (isViewingExisting) return;
                                   const s = serviceCatalog.find((x) => x.id === selectedServiceId);
                                   if (!s) return;
                                   setSelectedServices((p) => (p.some((it) => it.id === s.id) ? p : [...p, { id: s.id, name: s.name, price: s.price }]));
@@ -2621,6 +2868,7 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                                         onClick={() => setSelectedServices((p) => p.filter((x) => x.id !== s.id))}
                                         sx={{ color: alpha(m.navy, 0.3) }}
                                         aria-label={`Remove ${s.name}`}
+                                        disabled={isViewingExisting}
                                       >
                                         <CloseRoundedIcon sx={{ fontSize: 16 }} />
                                       </IconButton>
@@ -2655,18 +2903,23 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                               <AppDropdown
                                 label=""
                                 value={selectedProductId}
-                                onChange={(val) => setSelectedProductId(val as string)}
+                                onChange={(val) => {
+                                  if (isViewingExisting) return;
+                                  setSelectedProductId(val as string);
+                                }}
                                 options={[
                                   { label: "Select product", value: "" },
                                   ...productCatalog.map((p) => ({ label: `${p.name} — €${p.price}`, value: p.id })),
                                 ]}
                                 fullWidth
                                 placeholder="Select product"
+                                disabled={isViewingExisting}
                               />
                               <Button
                                 variant="outlined"
                                 disabled={!selectedProductId}
                                 onClick={() => {
+                                  if (isViewingExisting) return;
                                   const p = productCatalog.find((x) => x.id === selectedProductId);
                                   if (!p) return;
                                   setSelectedProducts((prev) => (prev.some((it) => it.id === p.id) ? prev : [...prev, { id: p.id, name: p.name, price: p.price }]));
@@ -2701,6 +2954,7 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                                         onClick={() => setSelectedProducts((prev) => prev.filter((x) => x.id !== p.id))}
                                         sx={{ color: alpha(m.navy, 0.3) }}
                                         aria-label={`Remove ${p.name}`}
+                                        disabled={isViewingExisting}
                                       >
                                         <CloseRoundedIcon sx={{ fontSize: 16 }} />
                                       </IconButton>
