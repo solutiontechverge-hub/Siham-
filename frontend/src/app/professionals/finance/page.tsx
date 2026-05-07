@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
-export default function FixedLocationFinanceIndexPage() {
+export default function ProfessionalsFinanceIndexPage() {
   redirect("/professionals/finance/overview");
 }
+

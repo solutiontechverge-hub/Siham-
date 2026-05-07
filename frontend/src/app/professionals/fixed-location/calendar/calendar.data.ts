@@ -61,6 +61,7 @@ export type ProfessionalFixedLocationCalendarData = {
   initialView: CalendarViewMode;
   initialDate: string; // "YYYY-MM-DD"
   resources: readonly CalendarResource[];
+  supportedLocations: readonly CalendarBookingLocation[];
   availability: readonly ResourceAvailability[];
   timeGrid: {
     startHour: number;
@@ -92,6 +93,7 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
     { id: "r-2", name: "Jordan Smith", avatarText: "J" },
     { id: "r-3", name: "Maya Patel", avatarText: "M" },
   ],
+  supportedLocations: ["FL", "DL"],
   availability: [
     {
       resourceId: "r-1",

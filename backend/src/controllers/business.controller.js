@@ -87,6 +87,36 @@ const parseOptionalInteger = (value) => {
   return Number.isInteger(parsed) ? parsed : null;
 };
 
+const toIsoDate = (value) => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString().slice(0, 10);
+};
+
+const toTimeLabel = (value) => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString().slice(11, 16);
+};
+
+const makeCalendarCode = (prefix = "OF123") => `${prefix}${Date.now()}${Math.random().toString(16).slice(2, 6)}`;
+const calendarStatusSet = new Set(["requested", "cancelled", "completed", "confirmed", "blocked", "no_show"]);
+const bookingStatusSet = new Set(["requested", "cancelled", "completed", "confirmed", "no_show"]);
+
+const normalizeCalendarStatus = (value, fallback = "confirmed") => {
+  const next = String(value ?? "").trim().toLowerCase();
+  if (next === "canceled") return "cancelled";
+  return calendarStatusSet.has(next) ? next : fallback;
+};
+
+const normalizeBookingStatus = (value, fallback = "requested") => {
+  const next = String(value ?? "").trim().toLowerCase();
+  if (next === "canceled") return "cancelled";
+  return bookingStatusSet.has(next) ? next : fallback;
+};
+
 const normalizeServiceCategories = (value) => {
   return parseJsonArray(value)
     .map((item) => {
@@ -776,7 +806,26 @@ export const listCalendarEntries = async (req, res) => {
     }
 
     const result = await query(
-      `SELECT *
+      `SELECT
+         id,
+         professional_profile_id,
+         team_member_id,
+         status,
+         title,
+         unique_code,
+         start_time,
+         end_time,
+         start_date,
+         end_date,
+         blocked_time_start,
+         blocked_time_end,
+         location_type,
+         booking_type,
+         client_name,
+         notes,
+         service_ids,
+         created_at,
+         updated_at
        FROM calendar_entries
        WHERE professional_profile_id = $1
        ORDER BY created_at DESC`,
@@ -819,9 +868,15 @@ export const createCalendarEntry = async (req, res) => {
       });
     }
 
+    const normalizedStatus = normalizeCalendarStatus(req.body.status, "confirmed");
+    const normalizedBookingType = req.body.booking_type ?? (normalizedStatus === "requested" ? "request" : "offline");
+    const codePrefix =
+      normalizedStatus === "blocked" ? "BLK" : normalizedBookingType === "online" ? "123" : "OF123";
+
     const result = await query(
       `INSERT INTO calendar_entries (
          professional_profile_id,
+         team_member_id,
          status,
          title,
          unique_code,
@@ -832,15 +887,19 @@ export const createCalendarEntry = async (req, res) => {
          blocked_time_start,
          blocked_time_end,
          location_type,
+         booking_type,
+         client_name,
+         notes,
          service_ids
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
        RETURNING *`,
       [
         professionalProfile.id,
-        req.body.status,
-        req.body.title,
-        req.body.unique_code,
+        parseOptionalInteger(req.body.team_member_id),
+        normalizedStatus,
+        req.body.title || (normalizedStatus === "blocked" ? "Blocked time" : "Offline booking"),
+        req.body.unique_code || makeCalendarCode(codePrefix),
         req.body.start_time ?? null,
         req.body.end_time ?? null,
         req.body.start_date ?? null,
@@ -848,6 +907,9 @@ export const createCalendarEntry = async (req, res) => {
         req.body.blocked_time_start ?? null,
         req.body.blocked_time_end ?? null,
         req.body.location_type ?? null,
+        normalizedBookingType,
+        req.body.client_name ?? null,
+        req.body.notes ?? null,
         parseBigIntArray(req.body.service_ids),
       ],
     );
@@ -861,6 +923,143 @@ export const createCalendarEntry = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to create calendar entry.",
+      data: {
+        error: error.message,
+      },
+    });
+  }
+};
+
+export const getCalendarOverview = async (req, res) => {
+  try {
+    if (req.user.user_type !== "professional") {
+      return res.status(403).json({
+        success: false,
+        message: "Only professional users can access calendar overview.",
+        data: null,
+      });
+    }
+
+    const professionalProfile = await getProfessionalProfile(req.user.id);
+
+    if (!professionalProfile) {
+      return res.status(404).json({
+        success: false,
+        message: "Professional profile not found.",
+        data: null,
+      });
+    }
+
+    const [entriesResult, bookingsResult, settingsResult] = await Promise.all([
+      query(
+        `SELECT *
+         FROM calendar_entries
+         WHERE professional_profile_id = $1
+         ORDER BY COALESCE(start_time, blocked_time_start, created_at) DESC`,
+        [professionalProfile.id],
+      ),
+      query(
+        `SELECT
+           b.*,
+           s.title AS service_title,
+           tm.full_name AS team_member_name
+         FROM bookings b
+         INNER JOIN business_setups bs ON bs.id = b.business_setup_id
+         LEFT JOIN subcategories s ON s.id = b.service_id
+         LEFT JOIN business_team_members tm ON tm.id = b.team_member_id
+         WHERE bs.professional_profile_id = $1
+         ORDER BY COALESCE(b.start_time, b.created_at) DESC`,
+        [professionalProfile.id],
+      ),
+      query(
+        `SELECT *
+         FROM calendar_settings
+         WHERE professional_profile_id = $1`,
+        [professionalProfile.id],
+      ),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      message: "Calendar overview fetched successfully.",
+      data: {
+        entries: entriesResult.rows.map((entry) => ({
+          ...entry,
+          date: toIsoDate(entry.start_time || entry.blocked_time_start || entry.start_date),
+          start: toTimeLabel(entry.start_time || entry.blocked_time_start),
+          end: toTimeLabel(entry.end_time || entry.blocked_time_end),
+        })),
+        bookings: bookingsResult.rows.map((booking) => ({
+          ...booking,
+          booking_type:
+            booking.booking_type || (normalizeBookingStatus(booking.status, "confirmed") === "requested" ? "request" : "online"),
+          unique_code: booking.unique_code || `123${booking.id}`,
+          date: toIsoDate(booking.booking_date || booking.start_time),
+          start: toTimeLabel(booking.start_time),
+          end: toTimeLabel(booking.end_time),
+        })),
+        settings: settingsResult.rows[0] || null,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch calendar overview.",
+      data: {
+        error: error.message,
+      },
+    });
+  }
+};
+
+export const upsertCalendarSettings = async (req, res) => {
+  try {
+    if (req.user.user_type !== "professional") {
+      return res.status(403).json({
+        success: false,
+        message: "Only professional users can manage calendar settings.",
+        data: null,
+      });
+    }
+
+    const professionalProfile = await getProfessionalProfile(req.user.id);
+
+    if (!professionalProfile) {
+      return res.status(404).json({
+        success: false,
+        message: "Professional profile not found.",
+        data: null,
+      });
+    }
+
+    const availability = parseJsonValue(req.body.availability, {});
+    const design = parseJsonValue(req.body.design, {});
+
+    const result = await query(
+      `INSERT INTO calendar_settings (
+         professional_profile_id,
+         availability,
+         design
+       )
+       VALUES ($1, $2::jsonb, $3::jsonb)
+       ON CONFLICT (professional_profile_id)
+       DO UPDATE SET
+         availability = EXCLUDED.availability,
+         design = EXCLUDED.design,
+         updated_at = NOW()
+       RETURNING *`,
+      [professionalProfile.id, JSON.stringify(availability), JSON.stringify(design)],
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Calendar settings saved successfully.",
+      data: result.rows[0],
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to save calendar settings.",
       data: {
         error: error.message,
       },
@@ -920,6 +1119,10 @@ export const createBooking = async (req, res) => {
   try {
     const locationDetails = parseJsonValue(req.body.location_details, {});
 
+    const normalizedStatus = normalizeBookingStatus(req.body.status, "requested");
+    const bookingType = req.body.booking_type ?? "online";
+    const generatedCodePrefix = bookingType === "offline" ? "OF123" : "123";
+
     const result = await query(
       `INSERT INTO bookings (
          booking_date,
@@ -934,6 +1137,8 @@ export const createBooking = async (req, res) => {
          notes,
          prepayment_status,
          status,
+         booking_type,
+         unique_code,
          total_price,
          images,
          contact_number,
@@ -945,7 +1150,7 @@ export const createBooking = async (req, res) => {
          postal_code
        )
        VALUES (
-         $1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
+         $1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23
        )
        RETURNING *`,
       [
@@ -960,7 +1165,9 @@ export const createBooking = async (req, res) => {
         JSON.stringify(locationDetails),
         req.body.notes ?? null,
         req.body.prepayment_status ?? null,
-        req.body.status ?? "requested",
+        normalizedStatus,
+        bookingType,
+        req.body.unique_code || makeCalendarCode(generatedCodePrefix),
         parseOptionalNumber(req.body.total_price),
         parseTextArray(req.body.images),
         req.body.contact_number ?? null,
@@ -982,6 +1189,140 @@ export const createBooking = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to create booking.",
+      data: {
+        error: error.message,
+      },
+    });
+  }
+};
+
+export const updateCalendarEntryStatus = async (req, res) => {
+  try {
+    if (req.user.user_type !== "professional") {
+      return res.status(403).json({
+        success: false,
+        message: "Only professional users can update calendar entry status.",
+        data: null,
+      });
+    }
+
+    const professionalProfile = await getProfessionalProfile(req.user.id);
+    if (!professionalProfile) {
+      return res.status(404).json({
+        success: false,
+        message: "Professional profile not found.",
+        data: null,
+      });
+    }
+
+    const entryId = Number.parseInt(req.params.id, 10);
+    if (!Number.isInteger(entryId) || entryId <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid calendar entry id.",
+        data: null,
+      });
+    }
+
+    const status = normalizeCalendarStatus(req.body.status, "confirmed");
+    if (status === "blocked") {
+      return res.status(400).json({
+        success: false,
+        message: "Blocked status cannot be set through status update endpoint.",
+        data: null,
+      });
+    }
+
+    const result = await query(
+      `UPDATE calendar_entries
+       SET status = $1,
+           updated_at = NOW()
+       WHERE id = $2
+         AND professional_profile_id = $3
+       RETURNING *`,
+      [status, entryId, professionalProfile.id],
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: "Calendar entry not found.",
+        data: null,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Calendar entry status updated successfully.",
+      data: result.rows[0],
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update calendar entry status.",
+      data: {
+        error: error.message,
+      },
+    });
+  }
+};
+
+export const updateBookingStatus = async (req, res) => {
+  try {
+    if (req.user.user_type !== "professional") {
+      return res.status(403).json({
+        success: false,
+        message: "Only professional users can update booking status.",
+        data: null,
+      });
+    }
+
+    const businessSetup = await getBusinessSetupByUserId(req.user.id);
+    if (!businessSetup) {
+      return res.status(404).json({
+        success: false,
+        message: "Business setup not found.",
+        data: null,
+      });
+    }
+
+    const bookingId = Number.parseInt(req.params.id, 10);
+    if (!Number.isInteger(bookingId) || bookingId <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid booking id.",
+        data: null,
+      });
+    }
+
+    const status = normalizeBookingStatus(req.body.status, "requested");
+    const result = await query(
+      `UPDATE bookings
+       SET status = $1,
+           updated_at = NOW()
+       WHERE id = $2
+         AND business_setup_id = $3
+       RETURNING *`,
+      [status, bookingId, businessSetup.id],
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found.",
+        data: null,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Booking status updated successfully.",
+      data: result.rows[0],
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update booking status.",
       data: {
         error: error.message,
       },

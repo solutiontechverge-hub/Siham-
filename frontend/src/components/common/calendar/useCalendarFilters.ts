@@ -7,19 +7,26 @@ import type {
 import type { CalendarFilters } from "./calendar.utils";
 
 const bookingTypes: readonly CalendarBookingType[] = ["Online", "Offline", "Project", "Requests"];
-const locations: readonly CalendarBookingLocation[] = ["FL", "DL"];
+const allLocations: readonly CalendarBookingLocation[] = ["FL", "DL"];
 
-export function useCalendarFilters(resources: readonly CalendarResource[]) {
+export function useCalendarFilters(
+  resources: readonly CalendarResource[],
+  availableLocations: readonly CalendarBookingLocation[] = allLocations,
+) {
+  const locations = availableLocations.length ? availableLocations : allLocations;
   const initialFilters = React.useMemo<CalendarFilters>(
     () => ({
       teamAll: true,
       teamIds: Object.fromEntries(resources.map((r) => [r.id, false])),
-      locationAll: true,
-      locations: { FL: false, DL: false },
+      locationAll: locations.length > 1,
+      locations: {
+        FL: locations.length === 1 && locations[0] === "FL",
+        DL: locations.length === 1 && locations[0] === "DL",
+      },
       bookingAll: true,
       booking: { Online: false, Offline: false, Project: false, Requests: false },
     }),
-    [resources],
+    [locations, resources],
   );
 
   const [draftFilters, setDraftFilters] = React.useState<CalendarFilters>(() => initialFilters);

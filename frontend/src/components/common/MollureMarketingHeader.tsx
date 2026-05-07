@@ -14,6 +14,9 @@ import { HeaderNavText } from "../ui/typography";
 import ClientProfileMenuPopover from "./ClientProfileMenuPopover";
 import ClientNotificationsDrawer from "./ClientNotificationsDrawer";
 import { clientNotificationsData } from "../../data/clientNotifications.data";
+import { useAppSelector } from "../../store/hooks";
+import { getPersistedAuthSession } from "../../lib/auth-storage";
+import ProfessionalProfileMenuPopover from "./ProfessionalProfileMenuPopover";
 
 export type MarketingNavItem = {
   label: string;
@@ -93,8 +96,8 @@ export default function MollureMarketingHeader({
   homeHref = "/",
   activePath,
   withDivider,
-  isAuthed = false,
-  userLabel = "user@example.com",
+  isAuthed: isAuthedProp,
+  userLabel: userLabelProp,
   userName,
   userAvatarSrc,
   rightSlot,
@@ -103,12 +106,21 @@ export default function MollureMarketingHeader({
 }: MollureMarketingHeaderProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
+  const accessToken = useAppSelector((state) => state.auth.accessToken);
+  const user = useAppSelector((state) => state.auth.user);
+  const [persisted, setPersisted] = React.useState<ReturnType<typeof getPersistedAuthSession> | null>(null);
   const pathname = usePathname() ?? "";
   const pathForActive = activePath ?? pathname;
   const isProfessionalsRoute = pathForActive === "/professionals" || pathForActive.startsWith("/professionals/");
   const resolvedLoginLabel = primaryActionLabel ?? loginLabel ?? "login";
   const resolvedLoginHref = primaryActionHref ?? loginHref ?? "/auth/login";
+  const derivedAuthed = Boolean(accessToken || persisted?.accessToken);
+  const isAuthed = isAuthedProp ?? derivedAuthed;
+  const userLabel = userLabelProp ?? user?.email ?? persisted?.user?.email ?? "user@example.com";
   const resolvedUserName = toDisplayName(userName, userLabel);
+  const userType = user?.user_type ?? persisted?.user?.user_type ?? null;
+  const isProfessionalContext = userType === "professional" || isProfessionalsRoute;
+  const showClientNotifications = Boolean(isAuthed && !isProfessionalContext);
   const [mounted, setMounted] = React.useState(false);
   const [profileAnchor, setProfileAnchor] = React.useState<HTMLElement | null>(null);
   const openProfileMenu = (anchor: HTMLElement) => setProfileAnchor(anchor);
@@ -119,6 +131,7 @@ export default function MollureMarketingHeader({
 
   React.useEffect(() => {
     setMounted(true);
+    setPersisted(getPersistedAuthSession());
   }, []);
 
   const pillBaseSx = {
@@ -297,18 +310,20 @@ export default function MollureMarketingHeader({
 
                 {isAuthed ? (
                   <>
-                    <IconButton
-                      aria-label="Notifications"
-                      onClick={openNotifications}
-                      sx={{
-                        width: { xs: 34, md: 36 },
-                        height: { xs: 34, md: 36 },
-                        borderRadius: 999,
-                        color: alpha(m.navy, 0.82),
-                      }}
-                    >
-                      <NotificationsNoneRoundedIcon sx={{ fontSize: 22 }} />
-                    </IconButton>
+                    {showClientNotifications ? (
+                      <IconButton
+                        aria-label="Notifications"
+                        onClick={openNotifications}
+                        sx={{
+                          width: { xs: 34, md: 36 },
+                          height: { xs: 34, md: 36 },
+                          borderRadius: 999,
+                          color: alpha(m.navy, 0.82),
+                        }}
+                      >
+                        <NotificationsNoneRoundedIcon sx={{ fontSize: 22 }} />
+                      </IconButton>
+                    ) : null}
 
                     <Stack
                       direction="row"
@@ -401,17 +416,28 @@ export default function MollureMarketingHeader({
       {withDivider ? <Divider /> : null}
 
       {isAuthed ? (
-        <ClientProfileMenuPopover
-          anchorEl={profileAnchor}
-          open={Boolean(profileAnchor)}
-          onClose={closeProfileMenu}
-          name={resolvedUserName}
-          email={userLabel}
-          avatarSrc={userAvatarSrc}
-        />
+        isProfessionalContext ? (
+          <ProfessionalProfileMenuPopover
+            anchorEl={profileAnchor}
+            open={Boolean(profileAnchor)}
+            onClose={closeProfileMenu}
+            name={resolvedUserName}
+            email={userLabel}
+            avatarSrc={userAvatarSrc}
+          />
+        ) : (
+          <ClientProfileMenuPopover
+            anchorEl={profileAnchor}
+            open={Boolean(profileAnchor)}
+            onClose={closeProfileMenu}
+            name={resolvedUserName}
+            email={userLabel}
+            avatarSrc={userAvatarSrc}
+          />
+        )
       ) : null}
 
-      {isAuthed ? (
+      {showClientNotifications ? (
         <ClientNotificationsDrawer
           open={notificationsOpen}
           onClose={closeNotifications}

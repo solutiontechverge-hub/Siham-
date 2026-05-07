@@ -106,6 +106,101 @@ export type BusinessSetup = {
   service_details: BusinessServiceDetail[];
 };
 
+export type CalendarEntry = {
+  id: number;
+  professional_profile_id: number;
+  team_member_id: number | null;
+  status: "requested" | "cancelled" | "completed" | "confirmed" | "blocked" | "no_show";
+  title: string;
+  unique_code: string;
+  start_time: string | null;
+  end_time: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  blocked_time_start: string | null;
+  blocked_time_end: string | null;
+  location_type: "fixed" | "desired" | null;
+  booking_type: "online" | "offline" | "project" | "request" | null;
+  client_name: string | null;
+  notes: string | null;
+  service_ids: number[];
+  date?: string | null;
+  start?: string | null;
+  end?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CalendarBooking = {
+  id: number;
+  booking_date: string;
+  business_setup_id: number;
+  customer_id: number;
+  service_id: number | null;
+  team_member_id: number | null;
+  start_time: string | null;
+  end_time: string | null;
+  location_type: "fixed" | "desired" | null;
+  notes: string | null;
+  status: string;
+  booking_type?: "online" | "offline" | "project" | "request" | null;
+  unique_code?: string | null;
+  total_price: string | number | null;
+  service_title?: string | null;
+  team_member_name?: string | null;
+  date?: string | null;
+  start?: string | null;
+  end?: string | null;
+};
+
+export type CalendarSettings = {
+  id: number;
+  professional_profile_id: number;
+  availability: Record<string, unknown>;
+  design: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CalendarOverview = {
+  entries: CalendarEntry[];
+  bookings: CalendarBooking[];
+  settings: CalendarSettings | null;
+};
+
+export type CreateCalendarEntryRequest = {
+  team_member_id?: number | null;
+  status?: CalendarEntry["status"];
+  title: string;
+  unique_code?: string;
+  start_time?: string | null;
+  end_time?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  blocked_time_start?: string | null;
+  blocked_time_end?: string | null;
+  location_type?: "fixed" | "desired" | null;
+  booking_type?: CalendarEntry["booking_type"];
+  client_name?: string | null;
+  notes?: string | null;
+  service_ids?: number[];
+};
+
+export type UpsertCalendarSettingsRequest = {
+  availability?: Record<string, unknown>;
+  design?: Record<string, unknown>;
+};
+
+export type UpdateCalendarEntryStatusRequest = {
+  id: number;
+  status: "requested" | "cancelled" | "completed" | "confirmed" | "no_show";
+};
+
+export type UpdateBookingStatusRequest = {
+  id: number;
+  status: "requested" | "cancelled" | "completed" | "confirmed" | "no_show";
+};
+
 export type UpsertBusinessSetupRequest = {
   location_mode: "fixed" | "desired" | "both";
   business_name?: string;
@@ -223,6 +318,110 @@ export const businessApi = baseApi.injectEndpoints({
       },
       providesTags: ["BusinessSetup"],
     }),
+    getCalendarOverview: builder.query<ApiEnvelope<CalendarOverview>, void>({
+      async queryFn(_arg, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: "/api/business/calendar/overview",
+          method: "GET",
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<CalendarOverview>;
+        if (!data.success || !data.data) {
+          return { error: customError(data.message || "Unable to fetch calendar overview.") };
+        }
+
+        return { data };
+      },
+      providesTags: ["Calendar"],
+    }),
+    createCalendarEntry: builder.mutation<ApiEnvelope<CalendarEntry>, CreateCalendarEntryRequest>({
+      async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: "/api/business/calendar",
+          method: "POST",
+          body: payload,
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<CalendarEntry>;
+        if (!data.success || !data.data) {
+          return { error: customError(data.message || "Unable to save calendar entry.") };
+        }
+
+        return { data };
+      },
+      invalidatesTags: ["Calendar"],
+    }),
+    upsertCalendarSettings: builder.mutation<ApiEnvelope<CalendarSettings>, UpsertCalendarSettingsRequest>({
+      async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: "/api/business/calendar/settings",
+          method: "PUT",
+          body: payload,
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<CalendarSettings>;
+        if (!data.success || !data.data) {
+          return { error: customError(data.message || "Unable to save calendar settings.") };
+        }
+
+        return { data };
+      },
+      invalidatesTags: ["Calendar"],
+    }),
+    updateCalendarEntryStatus: builder.mutation<ApiEnvelope<CalendarEntry>, UpdateCalendarEntryStatusRequest>({
+      async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: `/api/business/calendar/${payload.id}/status`,
+          method: "PATCH",
+          body: { status: payload.status },
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<CalendarEntry>;
+        if (!data.success || !data.data) {
+          return { error: customError(data.message || "Unable to update calendar entry status.") };
+        }
+
+        return { data };
+      },
+      invalidatesTags: ["Calendar"],
+    }),
+    updateBookingStatus: builder.mutation<ApiEnvelope<CalendarBooking>, UpdateBookingStatusRequest>({
+      async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: `/api/business/bookings/${payload.id}/status`,
+          method: "PATCH",
+          body: { status: payload.status },
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<CalendarBooking>;
+        if (!data.success || !data.data) {
+          return { error: customError(data.message || "Unable to update booking status.") };
+        }
+
+        return { data };
+      },
+      invalidatesTags: ["Calendar"],
+    }),
     upsertBusinessSetup: builder.mutation<ApiEnvelope<BusinessSetup>, UpsertBusinessSetupRequest>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
         console.log("[businessApi] upsertBusinessSetup payload:", payload);
@@ -257,5 +456,10 @@ export const businessApi = baseApi.injectEndpoints({
 export const {
   useGetBusinessCategoriesQuery,
   useGetBusinessSetupQuery,
+  useGetCalendarOverviewQuery,
+  useCreateCalendarEntryMutation,
+  useUpsertCalendarSettingsMutation,
+  useUpdateCalendarEntryStatusMutation,
+  useUpdateBookingStatusMutation,
   useUpsertBusinessSetupMutation,
 } = businessApi;
