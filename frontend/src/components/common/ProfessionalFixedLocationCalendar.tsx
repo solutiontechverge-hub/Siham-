@@ -61,12 +61,24 @@ import type {
   CalendarViewMode,
   ProfessionalFixedLocationCalendarData,
 } from "../../app/professionals/fixed-location/calendar/calendar.data";
+import type { CreateCalendarEntryRequest, UpsertCalendarSettingsRequest } from "../../store/services/businessApi";
 
 export type ProfessionalFixedLocationCalendarProps = {
   data: ProfessionalFixedLocationCalendarData;
+  isSaving?: boolean;
+  onCreateCalendarEntry?: (payload: CreateCalendarEntryRequest) => Promise<void>;
+  onSaveCalendarSettings?: (payload: UpsertCalendarSettingsRequest) => Promise<void>;
 };
 
-export default function ProfessionalFixedLocationCalendar({ data }: ProfessionalFixedLocationCalendarProps) {
+const toDateTimeInput = (date: string, time: string) => `${date}T${time}:00`;
+const locationToApi = (location: CalendarBookingLocation) => (location === "DL" ? "desired" : "fixed");
+
+export default function ProfessionalFixedLocationCalendar({
+  data,
+  isSaving = false,
+  onCreateCalendarEntry,
+  onSaveCalendarSettings,
+}: ProfessionalFixedLocationCalendarProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
   const { showSnackbar } = useSnackbar();
@@ -111,7 +123,11 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
   const [addAnchor, setAddAnchor] = React.useState<HTMLElement | null>(null);
   const [filtersOpen, setFiltersOpen] = React.useState(false);
   const [slotDrawerTab, setSlotDrawerTab] = React.useState<"booking" | "sales" | "activity">("booking");
-  const [slotLocation, setSlotLocation] = React.useState<CalendarBookingLocation>("FL");
+  const [slotLocation, setSlotLocation] = React.useState<CalendarBookingLocation>(data.supportedLocations[0] ?? "FL");
+  const [slotBookingType, setSlotBookingType] = React.useState<CalendarBookingType>("Offline");
+  const [slotStatus, setSlotStatus] = React.useState<"Confirmed" | "Requested" | "No Show" | "Completed" | "Cancelled">(
+    "Confirmed",
+  );
   const [slotCalendarMonth, setSlotCalendarMonth] = React.useState(() => toMonthIso(defaultDateIso));
   const [slotClientAdded, setSlotClientAdded] = React.useState(false);
   const [slotClientSearch, setSlotClientSearch] = React.useState("");
@@ -271,7 +287,12 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
     locations,
     setAppliedFilters,
     setDraftFilters,
-  } = useCalendarFilters(data.resources);
+  } = useCalendarFilters(data.resources, data.supportedLocations);
+  React.useEffect(() => {
+    if (!data.supportedLocations.includes(slotLocation)) {
+      setSlotLocation(data.supportedLocations[0] ?? "FL");
+    }
+  }, [data.supportedLocations, slotLocation]);
   const [blockTimeOpen, setBlockTimeOpen] = React.useState(false);
   const [publicBusinessHoursOpen, setPublicBusinessHoursOpen] = React.useState(false);
   const [designOpen, setDesignOpen] = React.useState(false);
@@ -291,7 +312,7 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
   const [blockDraft, setBlockDraft] = React.useState<BlockTimeDraft>(() => ({
     title: "Meeting",
     teamIds: data.resources.map((r) => r.id),
-    locations: ["FL", "DL"],
+    locations: [...data.supportedLocations],
     dateFrom: "2025-04-06",
     dateTo: "2025-04-06",
     dayFrom: "Monday",
@@ -329,6 +350,16 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
     return null;
   }, []);
 
+  React.useEffect(() => {
+    setBlockDraft((prev) => {
+      const nextLocations = prev.locations.filter((loc) => data.supportedLocations.includes(loc));
+      return {
+        ...prev,
+        locations: nextLocations.length ? nextLocations : [...data.supportedLocations],
+      };
+    });
+  }, [data.supportedLocations]);
+
   const teamLabelById = React.useMemo(() => {
     const map = new Map<string, string>();
     data.resources.forEach((r, idx) => {
@@ -363,6 +394,10 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
   const activeResource = React.useMemo(
     () => filteredResources.find((r) => r.id === selectedResourceId) ?? filteredResources[0],
     [filteredResources, selectedResourceId],
+  );
+  const displayedResources = React.useMemo(
+    () => (viewMode === "week" ? (activeResource ? [activeResource] : []) : filteredResources),
+    [activeResource, filteredResources, viewMode],
   );
 
   const eventsInRange = React.useMemo(
@@ -727,6 +762,72 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
       openBookingDrawer(payload);
     },
     [getAvailabilityFor, getBusyFor, grid.stepMinutes, openBookingDrawer, showSnackbar, startMin, todayIso],
+  );
+
+  const saveSelectedBooking = React.useCallback(
+    async (clientNameOverride?: string) => {
+      if (!selectedSlot) return;
+
+      if (!onCreateCalendarEntry) {
+        showSnackbar({ severity: "error", message: "Calendar API is not connected." });
+        return;
+      }
+
+      const clientName =
+        clientNameOverride ||
+        (slotClientAdded && guestDraft.firstName.trim()
+          ? `${guestDraft.firstName.trim()} ${guestDraft.lastName.trim()}`.trim()
+          : nonMollureDraft.firstName.trim()
+            ? `${nonMollureDraft.firstName.trim()} ${nonMollureDraft.lastName.trim()}`.trim()
+            : "Walk-in client");
+      const teamMemberId = Number(selectedSlot.resourceId);
+      const statusToApi: Record<typeof slotStatus, CreateCalendarEntryRequest["status"]> = {
+        Confirmed: "confirmed",
+        Requested: "requested",
+        "No Show": "no_show",
+        Completed: "completed",
+        Cancelled: "cancelled",
+      };
+      const bookingTypeToApi: Record<CalendarBookingType, NonNullable<CreateCalendarEntryRequest["booking_type"]>> = {
+        Online: "online",
+        Offline: "offline",
+        Project: "project",
+        Requests: "request",
+      };
+      const apiStatus = statusToApi[slotStatus];
+      const apiBookingType = bookingTypeToApi[slotBookingType];
+
+      try {
+        await onCreateCalendarEntry({
+          team_member_id: Number.isInteger(teamMemberId) ? teamMemberId : null,
+          status: apiStatus,
+          title: `${slotBookingType} booking`,
+          start_time: toDateTimeInput(selectedSlot.date, selectedSlot.start),
+          end_time: toDateTimeInput(selectedSlot.date, selectedSlot.end),
+          location_type: locationToApi(slotLocation),
+          booking_type: apiBookingType,
+          client_name: clientName,
+          notes: slotLocation,
+        });
+        showSnackbar({ severity: "success", message: "Booking saved." });
+        setSlotDrawerOpen(false);
+      } catch {
+        showSnackbar({ severity: "error", message: "Unable to save booking." });
+      }
+    },
+    [
+      guestDraft.firstName,
+      guestDraft.lastName,
+      nonMollureDraft.firstName,
+      nonMollureDraft.lastName,
+      onCreateCalendarEntry,
+      selectedSlot,
+      showSnackbar,
+      slotClientAdded,
+      slotBookingType,
+      slotStatus,
+      slotLocation,
+    ],
   );
 
   return (
@@ -1113,7 +1214,7 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                     flexDirection: "column",
                   }}
                 >
-                  {activeResource ? [activeResource].map((res, laneIdx) => {
+                  {displayedResources.map((res, laneIdx) => {
                     const laneDates = viewMode === "week" ? visibleDates : [activeDateIso];
                     return (
                       <Box
@@ -1559,7 +1660,7 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                         </Box>
                       </Box>
                     );
-                  }) : null}
+                  })}
                 </Box>
               </Box>
             </Box>
@@ -1684,7 +1785,7 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                 ) : null}
                 <Button
                   variant="outlined"
-                  onClick={() => {
+                  onClick={async () => {
                     if (slotBookingScreen === "non-mollure-individual" || slotBookingScreen === "non-mollure-company") {
                       setSlotBookingScreen("add-client-choice");
                       return;
@@ -1761,6 +1862,7 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                     setSlotSaveAttempted(false);
                     if (editingEventId) setIsEditingExisting(false);
                   }}
+                  disabled={isSaving}
                   sx={{
                     borderRadius: "10px",
                     textTransform: "none",
@@ -2426,10 +2528,44 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                           }}
                         >
                           <Box sx={{ p: 1.5 }}>
+                            <Stack direction="row" spacing={1} sx={{ mb: 1.2 }}>
+                              <AppDropdown
+                                label=""
+                                value={slotBookingType}
+                                onChange={(value) => {
+                                  const next = value as CalendarBookingType;
+                                  setSlotBookingType(next);
+                                  if (next === "Requests") setSlotStatus("Requested");
+                                  if (next === "Offline" && slotStatus === "Requested") setSlotStatus("Confirmed");
+                                }}
+                                options={[
+                                  { label: "Online", value: "Online" },
+                                  { label: "Offline", value: "Offline" },
+                                  { label: "Project", value: "Project" },
+                                  { label: "Requests", value: "Requests" },
+                                ]}
+                                fullWidth
+                                placeholder="Booking Type"
+                              />
+                              <AppDropdown
+                                label=""
+                                value={slotStatus}
+                                onChange={(value) => setSlotStatus(value as typeof slotStatus)}
+                                options={[
+                                  { label: "Confirmed", value: "Confirmed" },
+                                  { label: "Requested", value: "Requested" },
+                                  { label: "Completed", value: "Completed" },
+                                  { label: "Cancelled", value: "Cancelled" },
+                                  { label: "No Show", value: "No Show" },
+                                ]}
+                                fullWidth
+                                placeholder="Status"
+                              />
+                            </Stack>
                             <Box
                               sx={{
                                 display: "grid",
-                                gridTemplateColumns: "1fr 1fr",
+                                gridTemplateColumns: `repeat(${Math.max(1, data.supportedLocations.length)}, 1fr)`,
                                 border: `1px solid ${alpha(m.navy, 0.08)}`,
                                 borderRadius: "7px",
                                 overflow: "hidden",
@@ -2438,7 +2574,7 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                                 mx: "auto",
                               }}
                             >
-                              {(["FL", "DL"] as const).map((loc) => {
+                              {data.supportedLocations.map((loc) => {
                                 const active = slotLocation === loc;
                                 return (
                                   <ButtonBase
@@ -2453,7 +2589,10 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                                       fontWeight: 900,
                                       bgcolor: active ? m.teal : "#fff",
                                       color: active ? "#fff" : alpha(m.navy, 0.55),
-                                      borderRight: loc === "FL" ? `1px solid ${alpha(m.navy, 0.08)}` : undefined,
+                                      borderRight:
+                                        data.supportedLocations[data.supportedLocations.length - 1] !== loc
+                                          ? `1px solid ${alpha(m.navy, 0.08)}`
+                                          : undefined,
                                     }}
                                   >
                                     {loc === "FL" ? "Fixed Location" : "Desired Location"}
@@ -3311,10 +3450,35 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
         setDraftFilters={setDraftFilters}
       />
       <CalendarBlockTimeModal
+        availableLocations={data.supportedLocations}
         draft={blockDraft}
-        onApply={() => {
-          showSnackbar({ severity: "success", message: "Blocked time added (mock)." });
-          setBlockTimeOpen(false);
+        onApply={async () => {
+          if (!blockDraft.teamIds.length || !blockDraft.locations.length) {
+            showSnackbar({ severity: "warning", message: "Select team member and location." });
+            return;
+          }
+          try {
+            for (const teamId of blockDraft.teamIds) {
+              const teamMemberId = Number(teamId);
+              for (const location of blockDraft.locations) {
+                await onCreateCalendarEntry?.({
+                  team_member_id: Number.isInteger(teamMemberId) ? teamMemberId : null,
+                  status: "blocked",
+                  title: blockDraft.title || "Blocked time",
+                  blocked_time_start: toDateTimeInput(blockDraft.dateFrom, blockDraft.startTime),
+                  blocked_time_end: toDateTimeInput(blockDraft.dateTo || blockDraft.dateFrom, blockDraft.endTime),
+                  start_date: blockDraft.dateFrom,
+                  end_date: blockDraft.dateTo || blockDraft.dateFrom,
+                  location_type: locationToApi(location),
+                  notes: `${blockDraft.dayFrom || ""}${blockDraft.dayTo ? ` - ${blockDraft.dayTo}` : ""}`.trim() || null,
+                });
+              }
+            }
+            showSnackbar({ severity: "success", message: "Blocked time added." });
+            setBlockTimeOpen(false);
+          } catch {
+            showSnackbar({ severity: "error", message: "Unable to add blocked time." });
+          }
         }}
         onClose={() => setBlockTimeOpen(false)}
         open={blockTimeOpen}
@@ -3325,9 +3489,19 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
       <CalendarPublicBusinessHoursModal
         open={publicBusinessHoursOpen}
         onClose={() => setPublicBusinessHoursOpen(false)}
-        onApply={() => {
-          showSnackbar({ severity: "success", message: "Public business hours saved (mock)." });
-          setPublicBusinessHoursOpen(false);
+        onApply={async () => {
+          try {
+            await onSaveCalendarSettings?.({
+              availability: {
+                publicBusinessHours: publicBusinessHoursDraft,
+              },
+              design: appliedDesign,
+            });
+            showSnackbar({ severity: "success", message: "Public business hours saved." });
+            setPublicBusinessHoursOpen(false);
+          } catch {
+            showSnackbar({ severity: "error", message: "Unable to save public business hours." });
+          }
         }}
         draft={publicBusinessHoursDraft}
         setDraft={setPublicBusinessHoursDraft}
@@ -3335,10 +3509,20 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
       <CalendarDesignModal
         open={designOpen}
         onClose={() => setDesignOpen(false)}
-        onApply={() => {
-          setAppliedDesign(designDraft);
-          showSnackbar({ severity: "success", message: "Design saved (mock)." });
-          setDesignOpen(false);
+        onApply={async () => {
+          try {
+            setAppliedDesign(designDraft);
+            await onSaveCalendarSettings?.({
+              availability: {
+                publicBusinessHours: publicBusinessHoursDraft,
+              },
+              design: designDraft,
+            });
+            showSnackbar({ severity: "success", message: "Design saved." });
+            setDesignOpen(false);
+          } catch {
+            showSnackbar({ severity: "error", message: "Unable to save design." });
+          }
         }}
         draft={designDraft}
         setDraft={setDesignDraft}

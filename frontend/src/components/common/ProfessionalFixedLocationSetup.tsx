@@ -24,7 +24,6 @@ import {
   Switch,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import IosShareRoundedIcon from "@mui/icons-material/IosShareRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
@@ -39,14 +38,21 @@ import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import type { FixedLocationPageData } from "../../app/professionals/fixed-location/fixedLocation.data";
 import { useFixedLocationForm } from "../../app/professionals/fixed-location/fixedLocation.use";
 import type { ProfessionalProfile, ProfileResponse } from "../../store/services/profileApi";
+import type {
+  BusinessCategory,
+  BusinessSetup,
+  BusinessTeamMember,
+  UpsertBusinessSetupRequest,
+} from "../../store/services/businessApi";
 import MollureFormField from "./MollureFormField";
 import { Typography } from "../ui/typography";
 
 type ServiceDetailUiItem = {
   id: string;
-  categoryId: "hair" | "makeup" | "wimpers" | "wenbrauwen";
+  categoryId: string;
+  serviceId: number;
   name: string;
-  durationLabel: string;
+  durationLabel?: string;
   priceLabel: string;
 };
 
@@ -54,7 +60,10 @@ export type ProfessionalFixedLocationSetupProps = {
   data: FixedLocationPageData;
   chrome?: boolean;
   profileData?: ProfileResponse | null;
+  businessCategories?: BusinessCategory[];
+  businessSetupData?: BusinessSetup | null;
   isProfileSaving?: boolean;
+  isBusinessSetupSaving?: boolean;
   onSaveProfessionalProfile?: (payload: {
     email: string;
     password?: string;
@@ -75,6 +84,7 @@ export type ProfessionalFixedLocationSetupProps = {
     contact_last_name: string;
     phone: string;
   }) => Promise<void>;
+  onSaveBusinessSetup?: (payload: UpsertBusinessSetupRequest) => Promise<void>;
 };
 
 function SectionShell({
@@ -156,11 +166,32 @@ export default function ProfessionalFixedLocationSetup({
   data,
   chrome = true,
   profileData = null,
+  businessCategories = [],
+  businessSetupData = null,
   isProfileSaving = false,
+  isBusinessSetupSaving = false,
   onSaveProfessionalProfile,
+  onSaveBusinessSetup,
 }: ProfessionalFixedLocationSetupProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
+  type ProfileValidationField =
+    | "companyLegalName"
+    | "contactFirstName"
+    | "contactLastName"
+    | "contactEmail"
+    | "contactPassword"
+    | "contactRepeatPassword";
+  const [profileErrors, setProfileErrors] = React.useState<Partial<Record<ProfileValidationField, string>>>({});
+
+  const isValidEmail = React.useCallback((email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()), []);
+  const isValidName = React.useCallback((name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return false;
+    // letters (including accented), spaces, apostrophes, and hyphens — no digits
+    return /^[A-Za-zÀ-ÖØ-öø-ÿ' -]+$/.test(trimmed);
+  }, []);
+
   const {
     values,
     setField,
@@ -172,9 +203,7 @@ export default function ProfessionalFixedLocationSetup({
   const [activeSubTab, setActiveSubTab] = React.useState<string>(
     data.subTabsActive,
   );
-  const [activeServiceCategory, setActiveServiceCategory] = React.useState<
-    "all" | "hair" | "makeup" | "wimpers" | "wenbrauwen"
-  >("all");
+  const [activeServiceCategory, setActiveServiceCategory] = React.useState<string>("all");
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const [mediaSlides, setMediaSlides] = React.useState<string[]>([
     "/professionals/hero.png",
@@ -236,13 +265,13 @@ export default function ProfessionalFixedLocationSetup({
 
   // ── Manage Team ──────────────────────────────────────────────────────────
   type TeamService = {
-    hair: string;
-    makeup: string;
-    wimpers: string;
-    wenbrauwen: string;
-    lich1: string;
-    lich2: string;
-    lich3: string;
+    slot1: string;
+    slot2: string;
+    slot3: string;
+    slot4: string;
+    slot5: string;
+    slot6: string;
+    slot7: string;
   };
   type TeamMemberUi = {
     id: string;
@@ -254,43 +283,48 @@ export default function ProfessionalFixedLocationSetup({
     services: TeamService;
   };
 
-  const teamOpts = React.useMemo(() => ({
-    hair:    ["Haar(5)",   "Haar(0)",   "Haar(2)"],
-    makeup:  ["Make-up(2)","Make-up(0)","Make-up(4)"],
-    wimpers: ["Wimpers(8)","Wimpers(0)","Wimpers(3)"],
-    wenbrauwen: ["Wenkbrauwen(4)","Wenkbrauwen(0)","Wenkbrauwen(1)"],
-    lich: ["Lichaamsbehandeling(1)","Lichaamsbehandeling(5)","Lichaamsbehandeling"],
-  }), []);
+  const allSubcategoryOptions = React.useMemo(
+    () =>
+      businessCategories.flatMap((category) =>
+        category.subcategories.map((subcategory) => ({
+          value: String(subcategory.id),
+          label: subcategory.title,
+        })),
+      ),
+    [businessCategories],
+  );
+
+  const blankTeamServices = React.useMemo<TeamService>(
+    () => ({
+      slot1: "",
+      slot2: "",
+      slot3: "",
+      slot4: "",
+      slot5: "",
+      slot6: "",
+      slot7: "",
+    }),
+    [],
+  );
 
   const defaultServices = React.useCallback(
-    (offset = 0): TeamService => ({
-      hair:    teamOpts.hair[0]!,
-      makeup:  teamOpts.makeup[0]!,
-      wimpers: teamOpts.wimpers[0]!,
-      wenbrauwen: teamOpts.wenbrauwen[0]!,
-      lich1: teamOpts.lich[offset % 3]!,
-      lich2: teamOpts.lich[(offset + 1) % 3]!,
-      lich3: teamOpts.lich[(offset + 2) % 3]!,
-    }),
-    [teamOpts],
+    (assignedServices: BusinessTeamMember["assigned_services"] = []): TeamService => {
+      const values = assignedServices.map((service) => String(service.service_id)).filter(Boolean);
+
+      return {
+        slot1: values[0] ?? "",
+        slot2: values[1] ?? "",
+        slot3: values[2] ?? "",
+        slot4: values[3] ?? "",
+        slot5: values[4] ?? "",
+        slot6: values[5] ?? "",
+        slot7: values[6] ?? "",
+      };
+    },
+    [],
   );
 
-  const [teamMembers, setTeamMembers] = React.useState<TeamMemberUi[]>(() =>
-    data.manageTeam.members.map((m, i) => ({
-      id: m.id, name: m.name, role: m.role,
-      photoSrc: "/professionals/hero.png",
-      rating: 4.5, reviewsLabel: "(134 Reviews)",
-      services: {
-        hair:      teamOpts.hair[0]!,
-        makeup:    teamOpts.makeup[0]!,
-        wimpers:   teamOpts.wimpers[0]!,
-        wenbrauwen:teamOpts.wenbrauwen[0]!,
-        lich1: teamOpts.lich[i % 3]!,
-        lich2: teamOpts.lich[(i + 1) % 3]!,
-        lich3: teamOpts.lich[(i + 2) % 3]!,
-      },
-    })),
-  );
+  const [teamMembers, setTeamMembers] = React.useState<TeamMemberUi[]>([]);
 
   const [featureTeamPublic, setFeatureTeamPublic] = React.useState(true);
   const [teamDrawerOpen, setTeamDrawerOpen] = React.useState(false);
@@ -299,24 +333,16 @@ export default function ProfessionalFixedLocationSetup({
   const [draftTeamRole, setDraftTeamRole] = React.useState("");
   const [draftPhotoSrc, setDraftPhotoSrc] = React.useState<string>("/professionals/hero.png");
   const teamPhotoInputRef = React.useRef<HTMLInputElement | null>(null);
-  const [draftServices, setDraftServices] = React.useState<TeamService>(() => ({
-    hair: teamOpts.hair[0]!,
-    makeup: teamOpts.makeup[0]!,
-    wimpers: teamOpts.wimpers[0]!,
-    wenbrauwen: teamOpts.wenbrauwen[0]!,
-    lich1: teamOpts.lich[0]!,
-    lich2: teamOpts.lich[1]!,
-    lich3: teamOpts.lich[2]!,
-  }));
+  const [draftServices, setDraftServices] = React.useState<TeamService>(() => ({ ...blankTeamServices }));
 
   const openAddDrawer = React.useCallback(() => {
     setEditingMemberId(null);
     setDraftTeamName("");
     setDraftTeamRole("");
     setDraftPhotoSrc("/professionals/hero.png");
-    setDraftServices(defaultServices(0));
+    setDraftServices({ ...blankTeamServices });
     setTeamDrawerOpen(true);
-  }, [defaultServices]);
+  }, [blankTeamServices]);
 
   const openEditDrawer = React.useCallback((mem: TeamMemberUi) => {
     setEditingMemberId(mem.id);
@@ -443,6 +469,45 @@ export default function ProfessionalFixedLocationSetup({
     setField("contactPhone", professionalProfile?.phone || "");
     hydratedProfileRef.current = hydrationKey;
   }, [profileData, setField]);
+
+  const toDisplayNumber = React.useCallback((value: string | number | null | undefined) => {
+    if (value === null || value === undefined || value === "") {
+      return "";
+    }
+
+    return String(value);
+  }, []);
+
+  const toTeamServicePayload = React.useCallback((services: TeamService) => {
+    const orderedValues = [
+      services.slot1,
+      services.slot2,
+      services.slot3,
+      services.slot4,
+      services.slot5,
+      services.slot6,
+      services.slot7,
+    ].filter(Boolean);
+
+    const seen = new Set<string>();
+
+    return orderedValues
+      .filter((value) => {
+        if (seen.has(value)) {
+          return false;
+        }
+
+        seen.add(value);
+        return true;
+      })
+      .map((value) => {
+        const matched = allSubcategoryOptions.find((option) => option.value === value);
+        return {
+          service_id: Number(value),
+          title: matched?.label ?? null,
+        };
+      });
+  }, [allSubcategoryOptions]);
   const businessEditKeys = React.useMemo(
     () =>
       [
@@ -476,6 +541,14 @@ export default function ProfessionalFixedLocationSetup({
     setIsBusinessLocked(false);
     setBusinessEditing((p) => ({ ...p, [key]: true }));
   }, []);
+  const enableAllBusinessEditing = React.useCallback(() => {
+    setIsBusinessLocked(false);
+    setBusinessEditing((p) => {
+      const next = { ...p };
+      for (const k of businessEditKeys) next[k] = true;
+      return next;
+    });
+  }, [businessEditKeys]);
   const closeAllBusinessEditing = React.useCallback(() => {
     setBusinessEditing((p) => {
       const next = { ...p };
@@ -598,7 +671,6 @@ export default function ProfessionalFixedLocationSetup({
     [setField, useSameBusinessInfo],
   );
 
-  type DesiredAreaRow = { id: string; province: string; municipality: string };
   const desiredProvinceOptions = React.useMemo(
     () =>
       [
@@ -617,6 +689,8 @@ export default function ProfessionalFixedLocationSetup({
       ] as const,
     [],
   );
+  type DesiredProvince = (typeof desiredProvinceOptions)[number];
+  type DesiredAreaRow = { id: string; province: DesiredProvince; municipality: string };
   const desiredMunicipalityByProvince = React.useMemo(() => {
     const base = ["Municipality Name", "Amsterdam", "Rotterdam", "Utrecht", "Haarlem", "Groningen", "Eindhoven"];
     return desiredProvinceOptions.reduce((acc, p) => {
@@ -673,6 +747,13 @@ export default function ProfessionalFixedLocationSetup({
     setIsBusinessPublishEnabled(true);
     setDesiredAreas((prev) => prev.filter((r) => r.id !== id));
   }, []);
+
+  const fixedProvinceKey = React.useMemo<(typeof desiredProvinceOptions)[number]>(() => {
+    const province = fixedBiz.province;
+    return (desiredProvinceOptions as readonly string[]).includes(province)
+      ? (province as (typeof desiredProvinceOptions)[number])
+      : "Noord-Holland";
+  }, [fixedBiz.province, desiredProvinceOptions]);
 
   const fixedLocationForm = (
     <Grid container spacing={1.6}>
@@ -742,7 +823,7 @@ export default function ProfessionalFixedLocationSetup({
           disabled={!businessEditing.location}
         >
           <MenuItem value="">Municipality</MenuItem>
-          {(desiredMunicipalityByProvince[toProvinceKey(fixedBiz.province)] ?? []).map((o) => (
+          {((desiredMunicipalityByProvince as Record<string, string[]>)[fixedBiz.province || "Noord-Holland"] ?? []).map((o: string) => (
             <MenuItem key={o} value={o}>
               {o}
             </MenuItem>
@@ -844,7 +925,7 @@ export default function ProfessionalFixedLocationSetup({
             }}
           >
             {desiredAreas.map((r) => {
-              const options = desiredMunicipalityByProvince[toProvinceKey(r.province)] ?? [];
+              const options = (desiredMunicipalityByProvince as Record<string, string[]>)[r.province || "Noord-Holland"] ?? [];
               const safeOptions = options.includes(r.municipality) ? options : [r.municipality, ...options];
               return (
                 <Box
@@ -876,7 +957,7 @@ export default function ProfessionalFixedLocationSetup({
                       },
                     }}
                   >
-                    {safeOptions.map((o) => (
+                    {safeOptions.map((o: string) => (
                       <MenuItem key={o} value={o} sx={{ fontSize: 12 }}>
                         {o}
                       </MenuItem>
@@ -955,14 +1036,137 @@ export default function ProfessionalFixedLocationSetup({
     setIsBusinessPublishEnabled(true);
   }, []);
 
-  const onPublishBusinessSetup = React.useCallback(() => {
-    // This is where you'd call the real publish API.
-    // For now: treat "Publish" as the required save/apply action,
-    // then lock everything again.
+  const onPublishBusinessSetup = React.useCallback(async () => {
+    if (!onSaveBusinessSetup) {
+      setIsBusinessPublishEnabled(false);
+      setIsBusinessLocked(true);
+      closeAllBusinessEditing();
+      return;
+    }
+
+    const locationModeMap: Record<OfferingSelectOption, UpsertBusinessSetupRequest["location_mode"]> = {
+      "Fixed Location": "fixed",
+      "Desired Location": "desired",
+      Both: "both",
+    };
+    const sourceBiz = businessOfferingSelect === "Desired Location" ? desiredBusiness : fixedBiz;
+    const serviceItems = businessOfferingSelect === "Desired Location" ? servicesDesired : servicesFixed;
+    const desiredAreaText =
+      desiredAreaMode === "All Netherlands"
+        ? "All Netherlands"
+        : desiredAreas.map((area) => area.municipality).filter(Boolean).join(", ");
+    const desiredProvinceText =
+      desiredAreaMode === "All Netherlands"
+        ? "All Netherlands"
+        : Array.from(new Set(desiredAreas.map((area) => area.province).filter(Boolean))).join(", ");
+
+    await onSaveBusinessSetup({
+      location_mode: locationModeMap[businessOfferingSelect],
+      business_name: sourceBiz.profileName,
+      business_about: sourceBiz.about,
+      business_keywords: sourceBiz.keywords,
+      business_media: mediaSlides.filter((item) => item && !item.startsWith("blob:")).slice(0, 4),
+      salon_name: fixedBiz.salonName,
+      fixed_location_address: fixedBiz.streetAddress,
+      fixed_location_street_number: fixedBiz.streetNumber,
+      fixed_location_postal_code: fixedBiz.postalCode,
+      fixed_location_province: fixedBiz.province,
+      fixed_location_municipality: fixedBiz.municipality,
+      service_for: Object.entries(sourceBiz.serviceFor)
+        .filter(([, enabled]) => enabled)
+        .map(([key]) => key),
+      service_categories: serviceItems
+        .filter((item) => item.serviceId && item.categoryId)
+        .map((item) => ({
+          category_id: Number(item.categoryId),
+          service_id: item.serviceId,
+          amount: Number(String(item.priceLabel).replace(/[^0-9.]/g, "")) || 0,
+        })),
+      project: sourceBiz.projectEnabled ? sourceBiz.projectInstructions : "",
+      book_service_notes: sourceBiz.bookComboInstructions,
+      book_service_combinations: sourceBiz.projectEnabled
+        ? sourceBiz.bookCombos
+            .map((combo) => {
+              const category = businessCategories.find((item) => String(item.id) === combo.categoryId);
+              const service = category
+                ? category.subcategories.find((item) => String(item.id) === combo.serviceId)
+                : businessCategories
+                    .flatMap((item) => item.subcategories)
+                    .find((item) => String(item.id) === combo.serviceId);
+              const categoryId = Number(combo.categoryId);
+              const serviceId = Number(combo.serviceId);
+
+              if (!Number.isInteger(categoryId) || !Number.isInteger(serviceId)) {
+                return null;
+              }
+
+              return {
+                category_id: categoryId,
+                category_title: category?.title ?? null,
+                service_id: serviceId,
+                service_title: service?.title ?? null,
+              };
+            })
+            .filter(
+              (
+                combo,
+              ): combo is {
+                category_id: number;
+                category_title: string | null;
+                service_id: number;
+                service_title: string | null;
+              } => combo !== null,
+            )
+        : [],
+      additional_notes: sourceBiz.notes,
+      price_range: [sourceBiz.priceRangeFrom, sourceBiz.priceRangeTo].filter(Boolean).join(" - "),
+      prepayment_percentage: Number(sourceBiz.prepaymentPercent) || null,
+      prepayment_instruction: sourceBiz.prepaymentInstructions,
+      kilometer_allowance: Number(sourceBiz.kilometerAllowance) || null,
+      kilometer_allowance_instruction: sourceBiz.kilometerAllowanceInstructions,
+      response_time_hours: Number(values.policyResponseHours) || null,
+      response_time_minutes: Number(values.policyResponseMinutes) || null,
+      policy_custom_instruction: values.policyInstructions,
+      appointment_before_hours: Number(values.rescheduleMinimumHours) || null,
+      appointment_before_minutes: Number(values.rescheduleMinimumMinutes) || null,
+      late_reschedule_fee_percentage: Number(values.rescheduleLateFeePercent) || null,
+      late_reschedule_policy_instruction: values.rescheduleInstructions,
+      cancellation_before_hours: Number(values.cancelMinimumHours) || null,
+      cancellation_before_minutes: Number(values.cancelMinimumMinutes) || null,
+      late_cancellation_fee_percentage: Number(values.cancelLateFeePercent) || null,
+      cancellation_policy_instruction: values.cancelInstructions,
+      no_show_fee_percentage: Number(values.noShowFeePercent) || null,
+      no_show_fee_instruction: values.noShowInstructions,
+      desired_location_area: desiredAreaText,
+      desired_location_province: desiredProvinceText,
+      desired_location_services: serviceItems.map((item) => item.name),
+      team_members: teamMembers.map((member, index) => ({
+        id: /^\d+$/.test(member.id) ? Number(member.id) : undefined,
+        full_name: member.name,
+        role: member.role,
+        profile_photo: member.photoSrc.startsWith("blob:") ? null : member.photoSrc,
+        assigned_services: toTeamServicePayload(member.services),
+        display_order: index + 1,
+      })),
+    });
+
     setIsBusinessPublishEnabled(false);
     setIsBusinessLocked(true);
     closeAllBusinessEditing();
-  }, [closeAllBusinessEditing]);
+  }, [
+    businessOfferingSelect,
+    businessCategories,
+    closeAllBusinessEditing,
+    desiredAreaMode,
+    desiredAreas,
+    desiredBusiness,
+    fixedBiz,
+    mediaSlides,
+    onSaveBusinessSetup,
+    teamMembers,
+    toTeamServicePayload,
+    values,
+  ]);
 
   const onSwitchActiveBusinessTemplate = React.useCallback(
     (opt: OfferingOption) => {
@@ -974,8 +1178,8 @@ export default function ProfessionalFixedLocationSetup({
 
   // ── Services (template-aware) + drawer ────────────────────────────────────
   const initialServiceItems = React.useMemo(
-    () => (data.servicesDetails.items as unknown as ServiceDetailUiItem[]),
-    [data.servicesDetails.items],
+    () => [] as ServiceDetailUiItem[],
+    [],
   );
   const [servicesFixed, setServicesFixed] = React.useState<ServiceDetailUiItem[]>(() => initialServiceItems);
   const [servicesDesired, setServicesDesired] = React.useState<ServiceDetailUiItem[]>(() => initialServiceItems);
@@ -988,6 +1192,123 @@ export default function ProfessionalFixedLocationSetup({
     if (!useSameBusinessInfo) return;
     setServicesDesired(servicesFixed);
   }, [servicesFixed, useSameBusinessInfo]);
+
+  const hydratedBusinessRef = React.useRef<string | null>(null);
+
+  React.useEffect(() => {
+    if (!businessSetupData) {
+      return;
+    }
+
+    const hydrationKey = `${businessSetupData.id}:${businessSetupData.updated_at}`;
+    if (hydratedBusinessRef.current === hydrationKey) {
+      return;
+    }
+
+    const modeMap: Record<BusinessSetup["location_mode"], OfferingSelectOption> = {
+      fixed: "Fixed Location",
+      desired: "Desired Location",
+      both: "Both",
+    };
+
+    const nextOffering = modeMap[businessSetupData.location_mode];
+    setBusinessOfferingSelect(nextOffering);
+    setActiveBusinessTemplate(nextOffering === "Both" ? "Fixed Location" : nextOffering);
+    const savedBookCombos = (businessSetupData.book_service_combinations || []).map((combo, index) => ({
+      id: `combo-${combo.category_id}-${combo.service_id}-${index}`,
+      categoryId: String(combo.category_id),
+      serviceId: String(combo.service_id),
+    }));
+    const savedPriceRange = businessSetupData.price_range ? businessSetupData.price_range.split("-") : [];
+    const hydratedTemplateState: BusinessTemplateState = {
+      profileName: businessSetupData.business_name || "",
+      about: businessSetupData.business_about || "",
+      keywordDraft: "",
+      keywords: businessSetupData.business_keywords || [],
+      salonName: businessSetupData.salon_name || "",
+      streetAddress: businessSetupData.fixed_location_address || "",
+      streetNumber: businessSetupData.fixed_location_street_number || "",
+      postalCode: businessSetupData.fixed_location_postal_code || "",
+      province: businessSetupData.fixed_location_province || "",
+      municipality: businessSetupData.fixed_location_municipality || "",
+      serviceFor: {
+        men: (businessSetupData.service_for || []).includes("men"),
+        women: (businessSetupData.service_for || []).includes("women"),
+        kids: (businessSetupData.service_for || []).includes("kids"),
+      },
+      amenities: values.amenities,
+      projectEnabled: Boolean(businessSetupData.project),
+      projectInstructions: businessSetupData.project || "",
+      bookCategory: savedBookCombos[0]?.categoryId || "",
+      bookService: savedBookCombos[0]?.serviceId || "",
+      bookCombos: savedBookCombos,
+      bookComboInstructions: businessSetupData.book_service_notes || "",
+      discountEnabled: values.discountEnabled,
+      discountValue: values.discountValue,
+      depositEnabled: values.depositEnabled,
+      depositValue: values.depositValue,
+      notes: businessSetupData.additional_notes || "",
+      priceRangeFrom: savedPriceRange[0]?.trim() || "",
+      priceRangeTo: savedPriceRange[1]?.trim() || "",
+      prepaymentPercent: toDisplayNumber(businessSetupData.prepayment_percentage),
+      prepaymentInstructions: businessSetupData.prepayment_instruction || "",
+      kilometerAllowance: toDisplayNumber(businessSetupData.kilometer_allowance),
+      kilometerAllowanceInstructions: businessSetupData.kilometer_allowance_instruction || "",
+    };
+
+    Object.entries(hydratedTemplateState).forEach(([key, value]) => {
+      setField(key as any, value as any);
+    });
+    setDesiredBusiness(hydratedTemplateState);
+    setField("policyResponseHours", toDisplayNumber(businessSetupData.response_time_hours));
+    setField("policyResponseMinutes", toDisplayNumber(businessSetupData.response_time_minutes));
+    setField("policyInstructions", businessSetupData.policy_custom_instruction || "");
+    setField("rescheduleMinimumHours", toDisplayNumber(businessSetupData.appointment_before_hours));
+    setField("rescheduleMinimumMinutes", toDisplayNumber(businessSetupData.appointment_before_minutes));
+    setField("rescheduleLateFeePercent", toDisplayNumber(businessSetupData.late_reschedule_fee_percentage));
+    setField("rescheduleInstructions", businessSetupData.late_reschedule_policy_instruction || "");
+    setField("cancelMinimumHours", toDisplayNumber(businessSetupData.cancellation_before_hours));
+    setField("cancelMinimumMinutes", toDisplayNumber(businessSetupData.cancellation_before_minutes));
+    setField("cancelLateFeePercent", toDisplayNumber(businessSetupData.late_cancellation_fee_percentage));
+    setField("cancelInstructions", businessSetupData.cancellation_policy_instruction || "");
+    setField("noShowFeePercent", toDisplayNumber(businessSetupData.no_show_fee_percentage));
+    setField("noShowInstructions", businessSetupData.no_show_fee_instruction || "");
+
+    const nextMediaSlides =
+      businessSetupData.business_media && businessSetupData.business_media.length > 0
+        ? businessSetupData.business_media
+        : ["/professionals/hero.png"];
+    setMediaSlides(nextMediaSlides);
+    setMediaIdx(0);
+
+    const savedServices = businessSetupData.service_details.map((item) => ({
+      id: String(item.service_id),
+      categoryId: String(item.category_id),
+      serviceId: item.service_id,
+      name: item.service_title,
+      priceLabel: toDisplayNumber(item.price),
+    }));
+    setServicesFixed(savedServices);
+    setServicesDesired(savedServices);
+
+    if (businessSetupData.team_members.length > 0) {
+      setTeamMembers(
+        businessSetupData.team_members.map((member) => ({
+          id: String(member.id ?? `tm-${member.display_order}`),
+          name: member.full_name,
+          role: member.role,
+          photoSrc: member.profile_photo || "/professionals/hero.png",
+          rating: 4.5,
+          reviewsLabel: "(0 Reviews)",
+          services: defaultServices(member.assigned_services),
+        })),
+      );
+    } else {
+      setTeamMembers([]);
+    }
+
+    hydratedBusinessRef.current = hydrationKey;
+  }, [businessSetupData, defaultServices, setField, toDisplayNumber, values.amenities, values.depositEnabled, values.depositValue, values.discountEnabled, values.discountValue]);
 
   const activeServices = activeBusinessTemplate === "Fixed Location" ? servicesFixed : servicesDesired;
   const setActiveServices = React.useCallback(
@@ -1009,26 +1330,28 @@ export default function ProfessionalFixedLocationSetup({
 
   const [serviceDrawerOpen, setServiceDrawerOpen] = React.useState(false);
   const [editingServiceId, setEditingServiceId] = React.useState<string | null>(null);
-  const [draftServiceCategory, setDraftServiceCategory] =
-    React.useState<ServiceDetailUiItem["categoryId"]>("hair");
+  const [draftServiceCategory, setDraftServiceCategory] = React.useState<string>("");
+  const [draftServiceId, setDraftServiceId] = React.useState<number | "">("");
   const [draftServiceName, setDraftServiceName] = React.useState("");
   const [draftServiceDuration, setDraftServiceDuration] = React.useState("");
   const [draftServicePrice, setDraftServicePrice] = React.useState("");
 
   const openAddServiceDrawer = React.useCallback(() => {
     setEditingServiceId(null);
-    setDraftServiceCategory("hair");
+    setDraftServiceCategory(businessCategories[0] ? String(businessCategories[0].id) : "");
+    setDraftServiceId("");
     setDraftServiceName("");
     setDraftServiceDuration("");
     setDraftServicePrice("");
     setServiceDrawerOpen(true);
-  }, []);
+  }, [businessCategories]);
 
   const openEditServiceDrawer = React.useCallback((it: ServiceDetailUiItem) => {
     setEditingServiceId(it.id);
     setDraftServiceCategory(it.categoryId);
+    setDraftServiceId(it.serviceId);
     setDraftServiceName(it.name);
-    setDraftServiceDuration(it.durationLabel);
+    setDraftServiceDuration(it.durationLabel || "");
     setDraftServicePrice(it.priceLabel);
     setServiceDrawerOpen(true);
   }, []);
@@ -1036,28 +1359,38 @@ export default function ProfessionalFixedLocationSetup({
   const closeServiceDrawer = React.useCallback(() => setServiceDrawerOpen(false), []);
 
   const saveService = React.useCallback(() => {
-    const name = draftServiceName.trim();
-    if (!name) return;
+    if (!draftServiceCategory || !draftServiceId) return;
+    const matchedCategory = businessCategories.find((category) => String(category.id) === draftServiceCategory);
+    const matchedService = matchedCategory?.subcategories.find((subcategory) => subcategory.id === Number(draftServiceId));
+    if (!matchedService) return;
 
-    const durationLabel = draftServiceDuration.trim() || "45 Min";
+    const name = matchedService.title;
+    const durationLabel = "";
+
     const priceLabel = draftServicePrice.trim() || "25 €";
     const categoryId = draftServiceCategory;
 
     if (editingServiceId) {
       setActiveServices((prev) =>
         prev.map((s) =>
-          s.id === editingServiceId ? { ...s, name, durationLabel, priceLabel, categoryId } : s,
+          s.id === editingServiceId
+            ? { ...s, name, durationLabel, priceLabel, categoryId, serviceId: matchedService.id }
+            : s,
         ),
       );
     } else {
-      const id = `svc-${Date.now()}`;
-      setActiveServices((prev) => [{ id, categoryId, name, durationLabel, priceLabel }, ...prev]);
+      const id = String(matchedService.id);
+      setActiveServices((prev) => [
+        { id, categoryId, serviceId: matchedService.id, name, durationLabel, priceLabel },
+        ...prev.filter((item) => item.serviceId !== matchedService.id),
+      ]);
     }
     setServiceDrawerOpen(false);
   }, [
+    businessCategories,
     draftServiceCategory,
     draftServiceDuration,
-    draftServiceName,
+    draftServiceId,
     draftServicePrice,
     editingServiceId,
     setActiveServices,
@@ -1137,8 +1470,13 @@ export default function ProfessionalFixedLocationSetup({
               label="Legal Name*"
               placeholder="e.g Jane"
               value={values.companyLegalName}
-              onChange={(e) => setField("companyLegalName", e.target.value)}
+              onChange={(e) => {
+                setField("companyLegalName", e.target.value);
+                setProfileErrors((prev) => (prev.companyLegalName ? { ...prev, companyLegalName: undefined } : prev));
+              }}
               disabled={professionalFieldsDisabled}
+              error={Boolean(profileErrors.companyLegalName)}
+              helperText={profileErrors.companyLegalName}
             />
           </Grid>
           <Grid item xs={12} md={6}>
@@ -1279,8 +1617,13 @@ export default function ProfessionalFixedLocationSetup({
               label="First Name*"
               placeholder="e.g Jane"
               value={values.contactFirstName}
-              onChange={(e) => setField("contactFirstName", e.target.value)}
+              onChange={(e) => {
+                setField("contactFirstName", e.target.value);
+                setProfileErrors((prev) => (prev.contactFirstName ? { ...prev, contactFirstName: undefined } : prev));
+              }}
               disabled={professionalFieldsDisabled}
+              error={Boolean(profileErrors.contactFirstName)}
+              helperText={profileErrors.contactFirstName}
             />
           </Grid>
           <Grid item xs={12} md={6}>
@@ -1288,8 +1631,13 @@ export default function ProfessionalFixedLocationSetup({
               label="Last Name*"
               placeholder="e.g Doe"
               value={values.contactLastName}
-              onChange={(e) => setField("contactLastName", e.target.value)}
+              onChange={(e) => {
+                setField("contactLastName", e.target.value);
+                setProfileErrors((prev) => (prev.contactLastName ? { ...prev, contactLastName: undefined } : prev));
+              }}
               disabled={professionalFieldsDisabled}
+              error={Boolean(profileErrors.contactLastName)}
+              helperText={profileErrors.contactLastName}
             />
           </Grid>
           <Grid item xs={12} md={6}>
@@ -1297,8 +1645,10 @@ export default function ProfessionalFixedLocationSetup({
               label="Email*"
               placeholder="Your@gmail.com"
               value={values.contactEmail}
-              onChange={(e) => setField("contactEmail", e.target.value)}
+              inputProps={{ readOnly: true }}
               disabled={professionalFieldsDisabled}
+              error={Boolean(profileErrors.contactEmail)}
+              helperText={profileErrors.contactEmail}
             />
           </Grid>
           <Grid item xs={12} md={6}>
@@ -1315,8 +1665,13 @@ export default function ProfessionalFixedLocationSetup({
               type="password"
               placeholder="Enter Password"
               value={values.contactPassword}
-              onChange={(e) => setField("contactPassword", e.target.value)}
+              onChange={(e) => {
+                setField("contactPassword", e.target.value);
+                setProfileErrors((prev) => (prev.contactPassword ? { ...prev, contactPassword: undefined } : prev));
+              }}
               disabled={professionalFieldsDisabled}
+              error={Boolean(profileErrors.contactPassword)}
+              helperText={profileErrors.contactPassword}
             />
           </Grid>
           <Grid item xs={12} md={6}>
@@ -1325,8 +1680,15 @@ export default function ProfessionalFixedLocationSetup({
               type="password"
               placeholder="Confirm Password"
               value={values.contactRepeatPassword}
-              onChange={(e) => setField("contactRepeatPassword", e.target.value)}
+              onChange={(e) => {
+                setField("contactRepeatPassword", e.target.value);
+                setProfileErrors((prev) =>
+                  prev.contactRepeatPassword ? { ...prev, contactRepeatPassword: undefined } : prev,
+                );
+              }}
               disabled={professionalFieldsDisabled}
+              error={Boolean(profileErrors.contactRepeatPassword)}
+              helperText={profileErrors.contactRepeatPassword}
             />
           </Grid>
         </Grid>
@@ -1356,40 +1718,89 @@ export default function ProfessionalFixedLocationSetup({
     e.target.value = "";
   }, []);
 
-  const bookingCategoryOptions = React.useMemo(
-    () => ["Lichaamsbehandeling", "Hair", "Make-Up", "Wimpers", "Wenkbrauwen"] as const,
-    [],
+  const serviceCategoryTabs = React.useMemo<
+    Array<{ id: string; label: string; iconKey: "all" | "hair" | "makeup" | "wimpers" | "wenbrauwen" }>
+  >(
+    () => [
+      { id: "all", label: "All", iconKey: "all" },
+      ...businessCategories.map((category) => ({
+        id: String(category.id),
+        label: category.title,
+        iconKey: "all" as const,
+      })),
+    ],
+    [businessCategories],
   );
+
+  const bookingCategoryOptions = React.useMemo(
+    () =>
+      businessCategories.map((category) => ({
+        value: String(category.id),
+        label: category.title,
+      })),
+    [businessCategories],
+  );
+
+  const getBookingServiceOptions = React.useCallback(
+    (categoryId: string) => {
+      const selectedCategory = businessCategories.find((category) => String(category.id) === categoryId);
+      const subcategories = selectedCategory
+        ? selectedCategory.subcategories
+        : businessCategories.flatMap((category) => category.subcategories);
+
+      return subcategories.map((subcategory) => ({
+        value: String(subcategory.id),
+        label: subcategory.title,
+      }));
+    },
+    [businessCategories],
+  );
+
   const bookingServiceOptions = React.useMemo(
-    () => ["Neck massage", "Buzz Cut", "Make-up Basic", "Lash Lift", "Brow Shape"] as const,
-    [],
+    () => getBookingServiceOptions(biz.bookCategory),
+    [biz.bookCategory, getBookingServiceOptions],
   );
 
   const addBookingCombo = React.useCallback(() => {
+    const categoryId = biz.bookCategory || bookingCategoryOptions[0]?.value || "";
+    const serviceOptions = getBookingServiceOptions(categoryId);
+    const serviceId = biz.bookService || serviceOptions[0]?.value || "";
+    if (!categoryId || !serviceId) return;
+
     const id = `combo-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    const a = values.bookCategory || bookingCategoryOptions[0] || "";
-    const b = values.bookCategory || bookingCategoryOptions[0] || "";
-    setField("bookCombos", [...values.bookCombos, { id, a, b }]);
-  }, [bookingCategoryOptions, setField, values.bookCategory, values.bookCombos]);
+    setBizField("bookCombos", [...biz.bookCombos, { id, categoryId, serviceId }]);
+  }, [biz.bookCategory, biz.bookCombos, biz.bookService, bookingCategoryOptions, getBookingServiceOptions, setBizField]);
 
   const updateBookingCombo = React.useCallback(
-    (id: string, patch: Partial<{ a: string; b: string }>) => {
-      setField(
+    (id: string, patch: Partial<{ categoryId: string; serviceId: string }>) => {
+      setBizField(
         "bookCombos",
-        values.bookCombos.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+        biz.bookCombos.map((combo) => {
+          if (combo.id !== id) return combo;
+
+          const next = { ...combo, ...patch };
+          if (patch.categoryId) {
+            const serviceOptions = getBookingServiceOptions(patch.categoryId);
+            next.serviceId = serviceOptions.some((option) => option.value === next.serviceId)
+              ? next.serviceId
+              : serviceOptions[0]?.value || "";
+          }
+
+          return next;
+        }),
       );
     },
-    [setField, values.bookCombos],
+    [biz.bookCombos, getBookingServiceOptions, setBizField],
   );
 
   const deleteBookingCombo = React.useCallback(
     (id: string) => {
-      setField(
+      setBizField(
         "bookCombos",
-        values.bookCombos.filter((c) => c.id !== id),
+        biz.bookCombos.filter((c) => c.id !== id),
       );
     },
-    [setField, values.bookCombos],
+    [biz.bookCombos, setBizField],
   );
   const goPrevMedia = React.useCallback(() => {
     setMediaIdx((i) => (i - 1 + mediaSlides.length) % mediaSlides.length);
@@ -1410,6 +1821,27 @@ export default function ProfessionalFixedLocationSetup({
           onClick={async () => {
             if (!onSaveProfessionalProfile) {
               setIsProfessionalEditing(false);
+              return;
+            }
+
+            const nextErrors: Partial<Record<ProfileValidationField, string>> = {};
+            if (!isValidEmail(values.contactEmail)) nextErrors.contactEmail = "Enter a valid email address.";
+            if (!isValidName(values.companyLegalName)) nextErrors.companyLegalName = "Enter a valid legal name.";
+            if (!isValidName(values.contactFirstName)) nextErrors.contactFirstName = "Enter a valid first name.";
+            if (!isValidName(values.contactLastName)) nextErrors.contactLastName = "Enter a valid last name.";
+
+            const password = values.contactPassword.trim();
+            const repeatPassword = values.contactRepeatPassword.trim();
+            if (password || repeatPassword) {
+              if (!password) nextErrors.contactPassword = "Password is required.";
+              if (!repeatPassword) nextErrors.contactRepeatPassword = "Repeat password is required.";
+              if (password && repeatPassword && password !== repeatPassword) {
+                nextErrors.contactRepeatPassword = "Password and repeat password must match.";
+              }
+            }
+
+            if (Object.keys(nextErrors).length) {
+              setProfileErrors(nextErrors);
               return;
             }
 
@@ -1532,14 +1964,14 @@ export default function ProfessionalFixedLocationSetup({
 
         <Grid container spacing={1.5}>
           {([
-            ["hair",       "Hair",         teamOpts.hair],
-            ["makeup",     "Make-up",       teamOpts.makeup],
-            ["wimpers",    "Wimpers",       teamOpts.wimpers],
-            ["wenbrauwen", "Wenkbrauwen",   teamOpts.wenbrauwen],
-            ["lich1",      "Lichaamsbehandeling 1", teamOpts.lich],
-            ["lich2",      "Lichaamsbehandeling 2", teamOpts.lich],
-            ["lich3",      "Lichaamsbehandeling 3", teamOpts.lich],
-          ] as const).map(([key, label, opts]) => (
+            ["slot1", "Assigned Service 1"],
+            ["slot2", "Assigned Service 2"],
+            ["slot3", "Assigned Service 3"],
+            ["slot4", "Assigned Service 4"],
+            ["slot5", "Assigned Service 5"],
+            ["slot6", "Assigned Service 6"],
+            ["slot7", "Assigned Service 7"],
+          ] as const).map(([key, label]) => (
             <Grid key={key} item xs={12} sm={6}>
               <MollureFormField
                 select label={label}
@@ -1548,7 +1980,12 @@ export default function ProfessionalFixedLocationSetup({
                   setDraftServices((p) => ({ ...p, [key]: e.target.value }))
                 }
               >
-                {opts.map((o) => <MenuItem key={o} value={o}>{o}</MenuItem>)}
+                <MenuItem value="">Select service</MenuItem>
+                {allSubcategoryOptions.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
               </MollureFormField>
             </Grid>
           ))}
@@ -1589,22 +2026,31 @@ export default function ProfessionalFixedLocationSetup({
             select
             label="Category"
             value={draftServiceCategory}
-            onChange={(e) => setDraftServiceCategory(e.target.value as any)}
+            onChange={(e) => {
+              setDraftServiceCategory(String(e.target.value));
+              setDraftServiceId("");
+            }}
           >
-            {data.servicesDetails.categories
-              .filter((c) => c.id !== "all")
-              .map((c) => (
-                <MenuItem key={c.id} value={c.id}>
-                  {c.label}
-                </MenuItem>
-              ))}
+            {businessCategories.map((category) => (
+              <MenuItem key={category.id} value={String(category.id)}>
+                {category.title}
+              </MenuItem>
+            ))}
           </MollureFormField>
           <MollureFormField
-            label="Service name"
-            placeholder="e.g Buzz Cut"
-            value={draftServiceName}
-            onChange={(e) => setDraftServiceName(e.target.value)}
-          />
+            select
+            label="Service"
+            value={draftServiceId}
+            onChange={(e) => setDraftServiceId(Number(e.target.value))}
+          >
+            {(businessCategories.find((category) => String(category.id) === draftServiceCategory)?.subcategories ?? []).map(
+              (subcategory) => (
+                <MenuItem key={subcategory.id} value={subcategory.id}>
+                  {subcategory.title}
+                </MenuItem>
+              ),
+            )}
+          </MollureFormField>
           <MollureFormField
             label="Duration"
             placeholder="e.g 45 Min"
@@ -1638,7 +2084,7 @@ export default function ProfessionalFixedLocationSetup({
             onClick={saveService}
             variant="contained"
             disableElevation
-            disabled={!draftServiceName.trim()}
+            disabled={!draftServiceCategory || !draftServiceId}
             sx={{
               borderRadius: "8px",
               textTransform: "none",
@@ -1708,7 +2154,7 @@ export default function ProfessionalFixedLocationSetup({
           variant="contained"
           disableElevation
           onClick={onPublishBusinessSetup}
-          disabled={!isBusinessPublishEnabled}
+          disabled={!isBusinessPublishEnabled || isBusinessSetupSaving}
           sx={{
             borderRadius: "6px",
             textTransform: "none",
@@ -1721,7 +2167,7 @@ export default function ProfessionalFixedLocationSetup({
             alignSelf: { xs: "flex-start", md: "flex-end" },
           }}
         >
-          {data.publishLabel}
+          {isBusinessSetupSaving ? "Saving..." : data.publishLabel}
         </Button>
       </Stack>
 
@@ -1764,18 +2210,6 @@ export default function ProfessionalFixedLocationSetup({
             );
           })}
         </Box>
-        <IconButton
-          size="small"
-          onClick={() => enableBusinessEditing("offering")}
-          disabled={isBusinessLocked}
-          sx={{
-            border: `1px solid ${alpha(m.navy, 0.12)}`,
-            borderRadius: "8px",
-          }}
-          aria-label="Edit offering"
-        >
-          <MoreVertRoundedIcon fontSize="small" />
-        </IconButton>
       </Stack>
 
       <SectionShell
@@ -1956,31 +2390,13 @@ export default function ProfessionalFixedLocationSetup({
       </SectionShell>
 
       {(() => {
-        const locationEditAction = (
-          <IconButton
-            size="small"
-            onClick={() => enableBusinessEditing("location")}
-            sx={{
-              width: 32,
-              height: 32,
-              borderRadius: "999px",
-              bgcolor: alpha(m.navy, 0.06),
-              border: `1px solid ${alpha(m.navy, 0.10)}`,
-              color: alpha(m.navy, 0.72),
-              "&:hover": { bgcolor: alpha(m.navy, 0.08) },
-            }}
-          >
-            <EditOutlinedIcon sx={{ fontSize: 18 }} />
-          </IconButton>
-        );
-
         if (businessOfferingSelect === "Both") {
           return (
             <Stack spacing={2}>
-              <SectionShell title="Fixed Location" action={locationEditAction}>
+              <SectionShell title="Fixed Location">
                 <Box sx={businessEditing.location ? undefined : { pointerEvents: "none" }}>{fixedLocationForm}</Box>
               </SectionShell>
-              <SectionShell title="Desired Location" action={locationEditAction}>
+              <SectionShell title="Desired Location">
                 <Box sx={businessEditing.location ? undefined : { pointerEvents: "none" }}>{desiredLocationForm}</Box>
               </SectionShell>
             </Stack>
@@ -1988,7 +2404,7 @@ export default function ProfessionalFixedLocationSetup({
         }
 
         return (
-          <SectionShell title={locationSectionTitle} action={locationEditAction}>
+          <SectionShell title={locationSectionTitle}>
             <Box sx={businessEditing.location ? undefined : { pointerEvents: "none" }}>
               {showFixedLocationSection ? fixedLocationForm : null}
               {showDesiredLocationSection ? desiredLocationForm : null}
@@ -1997,26 +2413,7 @@ export default function ProfessionalFixedLocationSetup({
         );
       })()}
 
-      <SectionShell
-        title="Service For"
-        action={
-          <IconButton
-            size="small"
-            onClick={() => enableBusinessEditing("serviceFor")}
-            sx={{
-              width: 32,
-              height: 32,
-              borderRadius: "999px",
-              bgcolor: alpha(m.navy, 0.06),
-              border: `1px solid ${alpha(m.navy, 0.10)}`,
-              color: alpha(m.navy, 0.72),
-              "&:hover": { bgcolor: alpha(m.navy, 0.08) },
-            }}
-          >
-            <EditOutlinedIcon sx={{ fontSize: 18 }} />
-          </IconButton>
-        }
-      >
+      <SectionShell title="Service For">
         <Box sx={businessEditing.serviceFor ? undefined : { pointerEvents: "none" }}>
           {(() => {
           const allChecked = biz.serviceFor.men && biz.serviceFor.women && biz.serviceFor.kids;
@@ -2095,31 +2492,11 @@ export default function ProfessionalFixedLocationSetup({
         </Box>
       </SectionShell>
 
-      <SectionShell
-        title={data.servicesDetails.title}
-        action={
-          <IconButton
-            size="small"
-            onClick={() => enableBusinessEditing("servicesDetails")}
-            sx={{
-              width: 32,
-              height: 32,
-              borderRadius: "999px",
-              bgcolor: alpha(m.navy, 0.06),
-              border: `1px solid ${alpha(m.navy, 0.10)}`,
-              color: alpha(m.navy, 0.72),
-              "&:hover": { bgcolor: alpha(m.navy, 0.08) },
-            }}
-            aria-label="Edit services details"
-          >
-            <EditOutlinedIcon sx={{ fontSize: 18 }} />
-          </IconButton>
-        }
-      >
+      <SectionShell title={data.servicesDetails.title}>
         <Box sx={businessEditing.servicesDetails ? undefined : { pointerEvents: "none" }}>
           <Stack spacing={1.5}>
           <Stack direction="row" spacing={1.25} sx={{ overflowX: "auto", pb: 0.25 }}>
-            {data.servicesDetails.categories.map((c) => {
+            {serviceCategoryTabs.map((c) => {
               const active = c.id === activeServiceCategory;
               const icon =
                 c.iconKey === "hair"
@@ -2177,7 +2554,7 @@ export default function ProfessionalFixedLocationSetup({
             <Typography sx={{ fontWeight: 800, fontSize: 13.5, color: alpha(m.navy, 0.82) }}>
               {activeServiceCategory === "all"
                 ? "All"
-                : data.servicesDetails.categories.find((x) => x.id === activeServiceCategory)?.label ?? "Services"}
+                : serviceCategoryTabs.find((x) => x.id === activeServiceCategory)?.label ?? "Services"}
             </Typography>
             <Box sx={{ flex: 1 }} />
             <IconButton
@@ -2218,7 +2595,7 @@ export default function ProfessionalFixedLocationSetup({
                       {it.name}
                     </Typography>
                     <Typography sx={{ fontSize: 11.5, color: theme.palette.primary.main, fontWeight: 600 }}>
-                      {it.durationLabel} View
+                      {it.durationLabel ? `${it.durationLabel} View` : "View"}
                     </Typography>
                   </Box>
                   <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.72) }}>
@@ -2266,8 +2643,8 @@ export default function ProfessionalFixedLocationSetup({
                 sx={{ m: 0 }}
                 control={
                   <Checkbox
-                    checked={values.projectEnabled}
-                    onChange={(e) => setField("projectEnabled", e.target.checked)}
+                    checked={biz.projectEnabled}
+                    onChange={(e) => setBizField("projectEnabled", e.target.checked)}
                     sx={{
                       color: alpha(m.navy, 0.28),
                       "&.Mui-checked": { color: "primary.main" },
@@ -2285,11 +2662,11 @@ export default function ProfessionalFixedLocationSetup({
               </Typography>
               <MollureFormField
                 placeholder="Custom instructions for Project"
-                value={values.projectInstructions}
-                onChange={(e) => setField("projectInstructions", e.target.value)}
+                value={biz.projectInstructions}
+                onChange={(e) => setBizField("projectInstructions", e.target.value)}
                 multiline
                 minRows={3}
-                disabled={!businessEditing.servicesDetails || !values.projectEnabled}
+                disabled={!businessEditing.servicesDetails || !biz.projectEnabled}
                 sx={{
                   "& .MuiOutlinedInput-root": {
                     bgcolor: "#fff",
@@ -2323,14 +2700,25 @@ export default function ProfessionalFixedLocationSetup({
                   </Typography>
                   <MollureFormField
                     select
-                    value={values.bookCategory}
-                    onChange={(e) => setField("bookCategory", e.target.value)}
+                    value={biz.bookCategory}
+                    onChange={(e) => {
+                      const categoryId = e.target.value;
+                      setBizField("bookCategory", categoryId);
+                      const nextServices = getBookingServiceOptions(categoryId);
+                      setBizField(
+                        "bookService",
+                        nextServices.some((option) => option.value === biz.bookService)
+                          ? biz.bookService
+                          : nextServices[0]?.value || "",
+                      );
+                    }}
                     sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                    disabled={!businessEditing.servicesDetails || !values.projectEnabled}
+                    disabled={!businessEditing.servicesDetails || !biz.projectEnabled}
                   >
+                    <MenuItem value="">Select category</MenuItem>
                     {bookingCategoryOptions.map((opt) => (
-                      <MenuItem key={opt} value={opt}>
-                        {opt}
+                      <MenuItem key={opt.value} value={opt.value}>
+                        {opt.label}
                       </MenuItem>
                     ))}
                   </MollureFormField>
@@ -2341,14 +2729,15 @@ export default function ProfessionalFixedLocationSetup({
                   </Typography>
                   <MollureFormField
                     select
-                    value={values.bookService}
-                    onChange={(e) => setField("bookService", e.target.value)}
+                    value={biz.bookService}
+                    onChange={(e) => setBizField("bookService", e.target.value)}
                     sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                    disabled={!businessEditing.servicesDetails || !values.projectEnabled}
+                    disabled={!businessEditing.servicesDetails || !biz.projectEnabled}
                   >
+                    <MenuItem value="">Select service</MenuItem>
                     {bookingServiceOptions.map((opt) => (
-                      <MenuItem key={opt} value={opt}>
-                        {opt}
+                      <MenuItem key={opt.value} value={opt.value}>
+                        {opt.label}
                       </MenuItem>
                     ))}
                   </MollureFormField>
@@ -2356,7 +2745,7 @@ export default function ProfessionalFixedLocationSetup({
                 <Grid item xs={12} md={2} sx={{ display: "flex", justifyContent: { md: "flex-end" } }}>
                   <IconButton
                     onClick={addBookingCombo}
-                    disabled={!businessEditing.servicesDetails || !values.projectEnabled}
+                    disabled={!businessEditing.servicesDetails || !biz.projectEnabled || !biz.bookCategory || !biz.bookService}
                     sx={{
                       width: 34,
                       height: 34,
@@ -2386,7 +2775,10 @@ export default function ProfessionalFixedLocationSetup({
                     Available Combinations
                   </Typography>
                   <Stack direction="row" spacing={1.25} sx={{ overflowX: "auto", pb: 0.25 }}>
-                    {values.bookCombos.map((c) => (
+                    {biz.bookCombos.map((c) => {
+                      const comboServiceOptions = getBookingServiceOptions(c.categoryId);
+
+                      return (
                       <Stack
                         key={c.id}
                         direction="row"
@@ -2403,60 +2795,61 @@ export default function ProfessionalFixedLocationSetup({
                       >
                         <MollureFormField
                           select
-                          value={c.a}
-                          onChange={(e) => updateBookingCombo(c.id, { a: e.target.value })}
-                          disabled={!values.projectEnabled}
+                          value={c.categoryId}
+                          onChange={(e) => updateBookingCombo(c.id, { categoryId: e.target.value })}
+                          disabled={!businessEditing.servicesDetails || !biz.projectEnabled}
                           sx={{
                             width: 170,
                             "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" },
                           }}
                         >
                           {bookingCategoryOptions.map((opt) => (
-                            <MenuItem key={opt} value={opt}>
-                              {opt}
+                            <MenuItem key={opt.value} value={opt.value}>
+                              {opt.label}
                             </MenuItem>
                           ))}
                         </MollureFormField>
                         <Typography sx={{ fontWeight: 800, color: alpha(m.navy, 0.45) }}>+</Typography>
                         <MollureFormField
                           select
-                          value={c.b}
-                          onChange={(e) => updateBookingCombo(c.id, { b: e.target.value })}
-                          disabled={!values.projectEnabled}
+                          value={c.serviceId}
+                          onChange={(e) => updateBookingCombo(c.id, { serviceId: e.target.value })}
+                          disabled={!businessEditing.servicesDetails || !biz.projectEnabled}
                           sx={{
                             width: 170,
                             "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" },
                           }}
                         >
-                          {bookingCategoryOptions.map((opt) => (
-                            <MenuItem key={opt} value={opt}>
-                              {opt}
+                          {comboServiceOptions.map((opt) => (
+                            <MenuItem key={opt.value} value={opt.value}>
+                              {opt.label}
                             </MenuItem>
                           ))}
                         </MollureFormField>
                         <IconButton
                           size="small"
-                          disabled={!values.projectEnabled}
+                          disabled={!businessEditing.servicesDetails || !biz.projectEnabled}
                           onClick={() => deleteBookingCombo(c.id)}
                         >
                           <DeleteOutlineRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.55) }} />
                         </IconButton>
-                        <IconButton size="small" disabled={!values.projectEnabled}>
+                        <IconButton size="small" disabled={!businessEditing.servicesDetails || !biz.projectEnabled}>
                           <EditRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.55) }} />
                         </IconButton>
                       </Stack>
-                    ))}
+                    );
+                    })}
                   </Stack>
                 </Stack>
               </Paper>
 
               <MollureFormField
                 placeholder="Custom instructions for combo Service"
-                value={values.bookComboInstructions}
-                onChange={(e) => setField("bookComboInstructions", e.target.value)}
+                value={biz.bookComboInstructions}
+                onChange={(e) => setBizField("bookComboInstructions", e.target.value)}
                 multiline
                 minRows={4}
-                disabled={!values.projectEnabled}
+                disabled={!businessEditing.servicesDetails || !biz.projectEnabled}
                 sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
               />
             </Stack>
@@ -2497,20 +2890,6 @@ export default function ProfessionalFixedLocationSetup({
               }}
             >
               <AddRoundedIcon sx={{ fontSize: 18 }} />
-            </IconButton>
-            <IconButton
-              size="small"
-              onClick={() => enableBusinessEditing("manageTeam")}
-              sx={{
-                width: 30,
-                height: 30,
-                borderRadius: "8px",
-                bgcolor: alpha(m.navy, 0.05),
-                "&:hover": { bgcolor: alpha(m.navy, 0.10) },
-              }}
-              aria-label="Edit manage team"
-            >
-              <EditRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
             </IconButton>
           </Stack>
         }
@@ -2577,12 +2956,7 @@ export default function ProfessionalFixedLocationSetup({
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   {/* Row 1 – 4 dropdowns */}
                   <Grid container spacing={1} sx={{ mb: 1 }}>
-                    {([
-                      ["hair",       teamOpts.hair],
-                      ["makeup",     teamOpts.makeup],
-                      ["wimpers",    teamOpts.wimpers],
-                      ["wenbrauwen", teamOpts.wenbrauwen],
-                    ] as const).map(([key, opts]) => (
+                    {(["slot1", "slot2", "slot3", "slot4"] as const).map((key) => (
                       <Grid key={key} item xs={3}>
                         <MollureFormField
                           select
@@ -2597,14 +2971,19 @@ export default function ProfessionalFixedLocationSetup({
                             "& .MuiSvgIcon-root": { fontSize: 18, color: alpha(m.navy, 0.40) },
                           }}
                         >
-                          {opts.map((o) => <MenuItem key={o} value={o} sx={{ fontSize: 12 }}>{o}</MenuItem>)}
+                          <MenuItem value="">Select</MenuItem>
+                          {allSubcategoryOptions.map((option) => (
+                            <MenuItem key={option.value} value={option.value} sx={{ fontSize: 12 }}>
+                              {option.label}
+                            </MenuItem>
+                          ))}
                         </MollureFormField>
                       </Grid>
                     ))}
                   </Grid>
                   {/* Row 2 – 3 dropdowns */}
                   <Grid container spacing={1}>
-                    {(["lich1", "lich2", "lich3"] as const).map((key) => (
+                    {(["slot5", "slot6", "slot7"] as const).map((key) => (
                       <Grid key={key} item xs={4}>
                         <MollureFormField
                           select
@@ -2619,7 +2998,12 @@ export default function ProfessionalFixedLocationSetup({
                             "& .MuiSvgIcon-root": { fontSize: 18, color: alpha(m.navy, 0.40) },
                           }}
                         >
-                          {teamOpts.lich.map((o) => <MenuItem key={o} value={o} sx={{ fontSize: 12 }}>{o}</MenuItem>)}
+                          <MenuItem value="">Select</MenuItem>
+                          {allSubcategoryOptions.map((option) => (
+                            <MenuItem key={option.value} value={option.value} sx={{ fontSize: 12 }}>
+                              {option.label}
+                            </MenuItem>
+                          ))}
                         </MollureFormField>
                       </Grid>
                     ))}
@@ -2659,25 +3043,7 @@ export default function ProfessionalFixedLocationSetup({
         </Box>
       </SectionShell>
 
-      <SectionShell
-        title={data.generalNotes.title}
-        action={
-          <IconButton
-            size="small"
-            onClick={() => enableBusinessEditing("generalNotes")}
-            sx={{
-              width: 30,
-              height: 30,
-              borderRadius: "999px",
-              bgcolor: alpha(m.navy, 0.05),
-              "&:hover": { bgcolor: alpha(m.navy, 0.10) },
-            }}
-            aria-label="Edit general notes"
-          >
-            <EditRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
-          </IconButton>
-        }
-      >
+      <SectionShell title={data.generalNotes.title}>
         <Box sx={businessEditing.generalNotes ? undefined : { pointerEvents: "none" }}>
         <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
           {data.generalNotes.notesLabel}
@@ -2698,25 +3064,7 @@ export default function ProfessionalFixedLocationSetup({
         </Box>
       </SectionShell>
 
-      <SectionShell
-        title="Price"
-        action={
-          <IconButton
-            size="small"
-            onClick={() => enableBusinessEditing("price")}
-            sx={{
-              width: 30,
-              height: 30,
-              borderRadius: "999px",
-              bgcolor: alpha(m.navy, 0.05),
-              "&:hover": { bgcolor: alpha(m.navy, 0.10) },
-            }}
-            aria-label="Edit price"
-          >
-            <EditRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
-          </IconButton>
-        }
-      >
+      <SectionShell title="Price">
         <Box sx={businessEditing.price ? undefined : { pointerEvents: "none" }}>
         <Stack spacing={2}>
           <Box>
@@ -2817,25 +3165,7 @@ export default function ProfessionalFixedLocationSetup({
         </Box>
       </SectionShell>
 
-      <SectionShell
-        title="Policy Section"
-        action={
-          <IconButton
-            size="small"
-            onClick={() => enableBusinessEditing("price")}
-            sx={{
-              width: 30,
-              height: 30,
-              borderRadius: "999px",
-              bgcolor: alpha(m.navy, 0.05),
-              "&:hover": { bgcolor: alpha(m.navy, 0.10) },
-            }}
-            aria-label="Edit policy"
-          >
-            <EditRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
-          </IconButton>
-        }
-      >
+      <SectionShell title="Policy Section">
         <Box sx={businessEditing.price ? undefined : { pointerEvents: "none" }}>
           <Stack spacing={1.6}>
             <Box>
@@ -2885,25 +3215,7 @@ export default function ProfessionalFixedLocationSetup({
         </Box>
       </SectionShell>
 
-      <SectionShell
-        title="Rescheduling Policy"
-        action={
-          <IconButton
-            size="small"
-            onClick={() => enableBusinessEditing("price")}
-            sx={{
-              width: 30,
-              height: 30,
-              borderRadius: "999px",
-              bgcolor: alpha(m.navy, 0.05),
-              "&:hover": { bgcolor: alpha(m.navy, 0.10) },
-            }}
-            aria-label="Edit rescheduling policy"
-          >
-            <EditRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
-          </IconButton>
-        }
-      >
+      <SectionShell title="Rescheduling Policy">
         <Box sx={businessEditing.price ? undefined : { pointerEvents: "none" }}>
           <Stack spacing={1.6}>
             <Box>
@@ -2970,25 +3282,7 @@ export default function ProfessionalFixedLocationSetup({
         </Box>
       </SectionShell>
 
-      <SectionShell
-        title="Cancellation Policy"
-        action={
-          <IconButton
-            size="small"
-            onClick={() => enableBusinessEditing("price")}
-            sx={{
-              width: 30,
-              height: 30,
-              borderRadius: "999px",
-              bgcolor: alpha(m.navy, 0.05),
-              "&:hover": { bgcolor: alpha(m.navy, 0.10) },
-            }}
-            aria-label="Edit cancellation policy"
-          >
-            <EditRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
-          </IconButton>
-        }
-      >
+      <SectionShell title="Cancellation Policy">
         <Box sx={businessEditing.price ? undefined : { pointerEvents: "none" }}>
           <Stack spacing={1.6}>
             <Box>
@@ -3055,25 +3349,7 @@ export default function ProfessionalFixedLocationSetup({
         </Box>
       </SectionShell>
 
-      <SectionShell
-        title="No Show Policy"
-        action={
-          <IconButton
-            size="small"
-            onClick={() => enableBusinessEditing("price")}
-            sx={{
-              width: 30,
-              height: 30,
-              borderRadius: "999px",
-              bgcolor: alpha(m.navy, 0.05),
-              "&:hover": { bgcolor: alpha(m.navy, 0.10) },
-            }}
-            aria-label="Edit no show policy"
-          >
-            <EditRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
-          </IconButton>
-        }
-      >
+      <SectionShell title="No Show Policy">
         <Box sx={businessEditing.price ? undefined : { pointerEvents: "none" }}>
           <Stack spacing={1.6}>
             <Box>
@@ -3110,20 +3386,6 @@ export default function ProfessionalFixedLocationSetup({
         title="Portfolio"
         action={
           <Stack direction="row" spacing={1} alignItems="center">
-            <IconButton
-              size="small"
-              onClick={() => enableBusinessEditing("portfolio")}
-              sx={{
-                width: 30,
-                height: 30,
-                borderRadius: "999px",
-                bgcolor: alpha(m.navy, 0.05),
-                "&:hover": { bgcolor: alpha(m.navy, 0.10) },
-              }}
-              aria-label="Edit portfolio"
-            >
-              <EditRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
-            </IconButton>
             <IconButton
               size="small"
               onClick={deleteSelectedPortfolio}
@@ -3310,8 +3572,7 @@ export default function ProfessionalFixedLocationSetup({
             size="small"
             onClick={() => {
               if (activeSubTab === "Business Setup") {
-                enableBusinessEditing("offering");
-                enableBusinessEditing("profile");
+                enableAllBusinessEditing();
               } else {
                 setIsProfessionalEditing(true);
               }

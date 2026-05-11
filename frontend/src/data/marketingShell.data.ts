@@ -32,8 +32,8 @@ export type AuthStripHeaderConfig = {
   localeLabel: string;
   loginLabel: string;
   loginHref: string;
-  professionalLinkLabel: string;
-  professionalHref: string;
+  professionalLinkLabel?: string;
+  professionalHref?: string;
 };
 
 /** `/auth/login` — audience pill goes to professional login. */
@@ -42,8 +42,6 @@ export const authLoginHeaderClient: AuthStripHeaderConfig = {
   localeLabel: "EN",
   loginLabel: "login",
   loginHref: "/auth/login",
-  professionalLinkLabel: "for professional",
-  professionalHref: "/auth/professional/login",
 };
 
 /** `/auth/professional/login` — audience pill returns to client login. */
@@ -52,8 +50,6 @@ export const authLoginHeaderProfessional: AuthStripHeaderConfig = {
   localeLabel: "EN",
   loginLabel: "login",
   loginHref: "/auth/professional/login",
-  professionalLinkLabel: "for clients",
-  professionalHref: "/auth/login",
 };
 
 /** Client signup routes — “for professional” opens professional signup. */

@@ -9,6 +9,8 @@ export { default as AppSegmentTabs } from "./AppSegmentTabs";
 export { default as AppPillTabs } from "./AppPillTabs";
 export { default as AppSelect } from "./AppSelect";
 export { default as AppTextField } from "./AppTextField";
+export { default as ClientListHeaderCard } from "./ClientListHeaderCard";
+export { default as ClientListDataCard } from "./ClientListDataCard";
 export { default as MollureFormField } from "./MollureFormField";
 export {
   MollureLabeledField,
