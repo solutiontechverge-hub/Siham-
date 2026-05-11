@@ -76,6 +76,7 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
   const [isEditingExisting, setIsEditingExisting] = React.useState(false);
 
   const isViewingExisting = Boolean(editingEventId) && !isEditingExisting;
+  const addMenuButtonRef = React.useRef<HTMLButtonElement | null>(null);
 
   const serviceCatalog = React.useMemo(
     () =>
@@ -2668,6 +2669,17 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                     {slotClientAdded ? (
                       <>
                         <Box
+                          onClickCapture={(e) => {
+                            // Only the arrow button should open the menu.
+                            // If the click wasn't inside the arrow button, swallow it.
+                            const t = e.target as unknown;
+                            if (t && typeof t === "object" && "closest" in (t as any)) {
+                              const el = t as Element;
+                              if (el.closest('[data-add-menu-arrow="true"]')) return;
+                            }
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }}
                           sx={{
                             border: `1px solid ${alpha(m.navy, 0.14)}`,
                             borderRadius: "10px",
@@ -2677,12 +2689,11 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                             alignItems: "center",
                             bgcolor: "#fff",
                             overflow: "hidden",
+                            boxShadow: "0 4px 14px rgba(16, 35, 63, 0.06)",
+                            position: "relative",
                           }}
                         >
-                          <ButtonBase
-                            onClick={() => {
-                              // No default picker: open the menu from the arrow only
-                            }}
+                          <Box
                             sx={{
                               flex: 1,
                               height: "100%",
@@ -2691,8 +2702,10 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                               alignItems: "center",
                               gap: 0.95,
                               justifyContent: "flex-start",
+                              userSelect: "none",
+                              cursor: "default",
+                              opacity: isViewingExisting ? 0.55 : 1,
                             }}
-                            disabled={isViewingExisting}
                           >
                             <Box sx={{ width: 22, height: 22, borderRadius: "999px", bgcolor: alpha(m.teal, 0.18), color: m.teal, display: "grid", placeItems: "center", fontSize: 17, fontWeight: 900 }}>
                               +
@@ -2700,19 +2713,27 @@ export default function ProfessionalFixedLocationCalendar({ data }: Professional
                             <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.62), flex: 1, lineHeight: 1 }}>
                               Add
                             </BodyText>
-                          </ButtonBase>
+                          </Box>
+
+                          <Box sx={{ width: 1, height: "100%", bgcolor: alpha(m.navy, 0.10) }} />
 
                           <IconButton
                             size="small"
+                            ref={addMenuButtonRef}
                             onClick={(e) => setSlotAddMenuAnchor(e.currentTarget)}
+                            data-add-menu-arrow="true"
                             sx={{
-                              width: 36,
-                              height: "100%",
+                              width: 38,
+                              height: 38,
+                              flex: "0 0 38px",
                               borderRadius: 0,
-                              borderLeft: `1px solid ${alpha(m.navy, 0.10)}`,
+                              p: 0,
+                              m: 0,
                               color: alpha(m.navy, 0.45),
                               display: "grid",
                               placeItems: "center",
+                              "&:hover": { bgcolor: alpha(m.navy, 0.04) },
+                              zIndex: 1,
                             }}
                             aria-label="Add menu"
                             disabled={isViewingExisting}

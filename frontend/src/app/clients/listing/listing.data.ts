@@ -20,6 +20,7 @@ export type ListingCardData = {
   title: string;
   subtitle: string;
   municipalityLabel: string;
+  addressLabel: string;
   rating: number; // 0..5
   reviewsCount: number;
   locationModeDefault: "fixed" | "desired";
@@ -66,6 +67,7 @@ export const listingPageData = {
       title: "Lorem Ipsum Dolor Sit Amet",
       subtitle: "Consectetur.",
       municipalityLabel: "Noord-Holland",
+      addressLabel: "Marina-Park 50, Den Helder, Noord-Holland",
       rating: 5,
       reviewsCount: 134,
       locationModeDefault: "fixed",
@@ -82,6 +84,7 @@ export const listingPageData = {
       title: "Lorem Ipsum Dolor Sit Amet",
       subtitle: "Consectetur.",
       municipalityLabel: "Noord-Holland",
+      addressLabel: "Marina-Park 50, Den Helder, Noord-Holland",
       rating: 5,
       reviewsCount: 134,
       locationModeDefault: "desired",
@@ -98,6 +101,7 @@ export const listingPageData = {
       title: "Lorem Ipsum Dolor Sit Amet",
       subtitle: "Consectetur.",
       municipalityLabel: "Noord-Holland",
+      addressLabel: "Marina-Park 50, Den Helder, Noord-Holland",
       rating: 5,
       reviewsCount: 134,
       locationModeDefault: "fixed",
@@ -114,6 +118,7 @@ export const listingPageData = {
       title: "Lorem Ipsum Dolor Sit Amet",
       subtitle: "Consectetur.",
       municipalityLabel: "Noord-Holland",
+      addressLabel: "Marina-Park 50, Den Helder, Noord-Holland",
       rating: 5,
       reviewsCount: 134,
       locationModeDefault: "fixed",
@@ -130,6 +135,7 @@ export const listingPageData = {
       title: "Lorem Ipsum Dolor Sit Amet",
       subtitle: "Consectetur.",
       municipalityLabel: "Noord-Holland",
+      addressLabel: "Marina-Park 50, Den Helder, Noord-Holland",
       rating: 5,
       reviewsCount: 134,
       locationModeDefault: "desired",
@@ -146,6 +152,7 @@ export const listingPageData = {
       title: "Lorem Ipsum Dolor Sit Amet",
       subtitle: "Consectetur.",
       municipalityLabel: "Noord-Holland",
+      addressLabel: "Marina-Park 50, Den Helder, Noord-Holland",
       rating: 5,
       reviewsCount: 134,
       locationModeDefault: "fixed",
