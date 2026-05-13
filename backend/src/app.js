@@ -1,9 +1,9 @@
-import fs from "fs";
+import "./bootstrap-env.js";
 import path from "path";
 import cors from "cors";
-import dotenv from "dotenv";
 import express from "express";
 import { fileURLToPath } from "url";
+import { getUploadsDir } from "./config/uploads-dir.js";
 import authRoutes from "./routes/auth.routes.js";
 import businessRoutes from "./routes/business.routes.js";
 import userRoutes from "./routes/user.routes.js";
@@ -11,17 +11,13 @@ import userRoutes from "./routes/user.routes.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config({
-  path: path.resolve(__dirname, "../.env"),
-});
-
 const app = express();
-fs.mkdirSync(path.resolve("uploads"), { recursive: true });
+const uploadsDir = getUploadsDir();
 
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use("/uploads", express.static(path.resolve("uploads")));
+app.use("/uploads", express.static(uploadsDir));
 
 app.get("/api/health", (_req, res) => {
   res.status(200).json({

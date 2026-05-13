@@ -1,31 +1,33 @@
-import dotenv from "dotenv";
+import "../bootstrap-env.js";
 import pg from "pg";
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-dotenv.config({
-  path: path.resolve(__dirname, "../../.env"),
-});
 
 const { Pool } = pg;
-const connectionString = process.env.DB_URL || process.env.DATABASE_URL;
 
-if (!connectionString) {
-  throw new Error("DB_URL or DATABASE_URL is required.");
+let pool;
+
+function getPool() {
+  if (pool) {
+    return pool;
+  }
+
+  const connectionString = process.env.DB_URL || process.env.DATABASE_URL;
+
+  if (!connectionString) {
+    throw new Error("DB_URL or DATABASE_URL is required.");
+  }
+
+  const shouldUseSsl =
+    process.env.DB_SSL === "true" ||
+    process.env.PGSSLMODE === "require" ||
+    connectionString.includes("supabase.co");
+
+  pool = new Pool({
+    connectionString,
+    ssl: shouldUseSsl ? { rejectUnauthorized: false } : undefined,
+  });
+
+  return pool;
 }
 
-const shouldUseSsl =
-  process.env.DB_SSL === "true" ||
-  process.env.PGSSLMODE === "require" ||
-  connectionString.includes("supabase.co");
-
-export const pool = new Pool({
-  connectionString,
-  ssl: shouldUseSsl ? { rejectUnauthorized: false } : undefined,
-});
-
-export const query = (text, params) => pool.query(text, params);
-export const getClient = () => pool.connect();
+export const query = (text, params) => getPool().query(text, params);
+export const getClient = () => getPool().connect();
