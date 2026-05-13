@@ -19,6 +19,11 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static(uploadsDir));
 
+// Railway and other platforms often probe `/` — must return 2xx before routes that need DB.
+app.get("/", (_req, res) => {
+  res.status(200).type("text/plain").send("ok");
+});
+
 app.get("/api/health", (_req, res) => {
   res.status(200).json({
     success: true,
