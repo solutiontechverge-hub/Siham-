@@ -7,6 +7,7 @@ const theme = createTheme({
     mode: "light",
     primary: {
       main: "#21B8BF",
+      dark: "#149CA7",
     },
     secondary: {
       main: "#E9F8F9",
@@ -29,6 +30,10 @@ const theme = createTheme({
       footerText: "#D7E3EC",
       footerMuted: "rgba(215,227,236,0.68)",
       mintSoft: "#E8FBF7",
+      /** Mint → aqua for brand line icons (e.g. service category slider) */
+      iconGradientStart: "#A8E6CF",
+      iconGradientEnd: "#88D8D0",
+      iconGradient: "linear-gradient(180deg, #A8E6CF 0%, #88D8D0 100%)",
       heroGradientStart: "#DCF7EE",
       heroGradientEnd: "#B4EEE9",
       heroGlow:
@@ -76,7 +81,7 @@ const theme = createTheme({
       fontFamily: "inherit",
       fontWeight: 600,
       fontSize: "30px",
-      lineHeight: "16px",
+      lineHeight: 1.2,
       color: "#344054",
     },
     subHeading: {

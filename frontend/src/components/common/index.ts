@@ -1,5 +1,7 @@
 export { default as AppButton } from "./AppButton";
 export { default as AppCard } from "./AppCard";
+export { mollureGradientIconSx, useMollureIconGradient } from "./MollureIconGradient";
+export { default as ServiceCategorySliderCard } from "./ServiceCategorySliderCard";
 export { default as AppDrawer } from "./AppDrawer";
 export { default as AppDropdown } from "./AppDropdown";
 export { default as AppFooter } from "./AppFooter";

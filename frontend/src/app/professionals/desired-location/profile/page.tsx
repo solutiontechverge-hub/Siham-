@@ -1,7 +1,8 @@
 "use client";
 
+import dynamic from "next/dynamic";
+import { Box, CircularProgress } from "@mui/material";
 import DesiredLocationPageScaffold from "../../../../components/common/DesiredLocationPageScaffold";
-import ProfessionalDesiredLocationSetup from "../../../../components/common/ProfessionalDesiredLocationSetup";
 import { useSnackbar } from "../../../../components/common/AppSnackbar";
 import { getApiErrorMessage } from "../../../../lib/api-error";
 import { desiredLocationPageData } from "../desiredLocation.data";
@@ -12,6 +13,18 @@ import {
   useGetBusinessSetupQuery,
   useUpsertBusinessSetupMutation,
 } from "../../../../store/services/businessApi";
+
+const ProfessionalDesiredLocationSetup = dynamic(
+  () => import("../../../../components/common/ProfessionalDesiredLocationSetup"),
+  {
+    ssr: false,
+    loading: () => (
+      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", py: 8 }}>
+        <CircularProgress size={32} />
+      </Box>
+    ),
+  },
+);
 
 export default function DesiredLocationProfilePage() {
   const { data } = useGetProfileQuery();

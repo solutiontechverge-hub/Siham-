@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import BusinessCenterRoundedIcon from "@mui/icons-material/BusinessCenterRounded";
 import FactCheckRoundedIcon from "@mui/icons-material/FactCheckRounded";
 import PublicRoundedIcon from "@mui/icons-material/PublicRounded";
@@ -33,7 +34,10 @@ import MollureFormField from "../../../../../components/common/MollureFormField"
 import MollureModal from "../../../../../components/common/MollureModal";
 import { useSnackbar } from "../../../../../components/common/AppSnackbar";
 import FinanceDocumentPreviewDrawer from "../../../../../components/sections/finance/FinanceDocumentPreviewDrawer";
-import { useFinanceInvoiceSettings } from "../../../../../components/sections/finance/useFinanceInvoiceSettings";
+import {
+  useFinanceInvoiceSettings,
+  type FinanceInvoiceSettings,
+} from "../../../../../components/sections/finance/useFinanceInvoiceSettings";
 import { useGetProfileQuery } from "../../../../../store/services/profileApi";
 
 type SettingsTab = "stripe" | "transaction" | "invoice";
@@ -474,7 +478,7 @@ function InvoiceSettings() {
       ...prev,
       products: prev.products.filter((product) => product.id !== id),
     }));
-    showSnackbar({ severity: "success", message: "Product deleted successfully." });
+    showSnackbar({ severity: "error", message: "Product deleted successfully." });
   };
 
   const handleDeleteService = (id: string) => {
@@ -482,7 +486,7 @@ function InvoiceSettings() {
       ...prev,
       services: prev.services.filter((service) => service.id !== id),
     }));
-    showSnackbar({ severity: "success", message: "Service deleted successfully." });
+    showSnackbar({ severity: "error", message: "Service deleted successfully." });
   };
 
   const handleAddProductSaveOrUpdate = () => {
@@ -572,7 +576,7 @@ function InvoiceSettings() {
   };
 
   const updatePaymentTerm = React.useCallback(
-    (key: keyof typeof settings.paymentTerms, value: string) => {
+    (key: keyof FinanceInvoiceSettings["paymentTerms"], value: string) => {
       setSettings((prev) => ({
         ...prev,
         paymentTerms: {
@@ -581,11 +585,11 @@ function InvoiceSettings() {
         },
       }));
     },
-    [setSettings, settings.paymentTerms],
+    [setSettings],
   );
 
   const updateReminder = React.useCallback(
-    (key: keyof typeof settings.reminders, value: string) => {
+    (key: keyof FinanceInvoiceSettings["reminders"], value: string) => {
       setSettings((prev) => ({
         ...prev,
         reminders: {
@@ -594,7 +598,7 @@ function InvoiceSettings() {
         },
       }));
     },
-    [setSettings, settings.reminders],
+    [setSettings],
   );
 
   const templateTileSx = () =>
@@ -691,12 +695,15 @@ function InvoiceSettings() {
                   >
                     <Stack spacing={0.55} alignItems="center">
                       {settings.logoDataUrl ? (
-                        <Box
-                          component="img"
-                          src={settings.logoDataUrl}
-                          alt="Invoice logo"
-                          sx={{ width: 52, height: 52, objectFit: "contain", borderRadius: "10px" }}
-                        />
+                        <Box sx={{ position: "relative", width: 52, height: 52 }}>
+                          <Image
+                            src={settings.logoDataUrl}
+                            alt="Invoice logo"
+                            fill
+                            unoptimized
+                            style={{ objectFit: "contain", borderRadius: "10px" }}
+                          />
+                        </Box>
                       ) : (
                         <UploadFileRoundedIcon sx={{ fontSize: 20, color: alpha(m.navy, 0.55) }} />
                       )}

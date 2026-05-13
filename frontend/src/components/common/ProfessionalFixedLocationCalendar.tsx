@@ -1816,7 +1816,9 @@ export default function ProfessionalFixedLocationCalendar({
                 <Button
                   variant="contained"
                   disableElevation
-                  disabled={!slotValidation.isValid || (Boolean(editingEventId) && !isEditingExisting)}
+                  disabled={
+                    isSaving || !slotValidation.isValid || (Boolean(editingEventId) && !isEditingExisting)
+                  }
                   onClick={() => {
                     setSlotSaveAttempted(true);
                     if (!slotValidation.isValid) return;
@@ -1862,7 +1864,6 @@ export default function ProfessionalFixedLocationCalendar({
                     setSlotSaveAttempted(false);
                     if (editingEventId) setIsEditingExisting(false);
                   }}
-                  disabled={isSaving}
                   sx={{
                     borderRadius: "10px",
                     textTransform: "none",

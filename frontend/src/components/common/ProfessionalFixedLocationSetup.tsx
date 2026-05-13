@@ -29,12 +29,10 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
-import ContentCutRoundedIcon from "@mui/icons-material/ContentCutRounded";
-import BrushRoundedIcon from "@mui/icons-material/BrushRounded";
-import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
-import GestureRoundedIcon from "@mui/icons-material/GestureRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
+import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import type { FixedLocationPageData } from "../../app/professionals/fixed-location/fixedLocation.data";
 import { useFixedLocationForm, type FixedLocationFormState } from "../../app/professionals/fixed-location/fixedLocation.use";
 import type { ProfessionalProfile, ProfileResponse } from "../../store/services/profileApi";
@@ -45,7 +43,12 @@ import type {
   UpsertBusinessSetupRequest,
 } from "../../store/services/businessApi";
 import MollureFormField from "./MollureFormField";
+import ServiceCategorySliderCard, { SERVICE_CATEGORY_SLIDER_CARD_WIDTH } from "./ServiceCategorySliderCard";
 import { Typography } from "../ui/typography";
+import {
+  resolveServiceCategorySliderIconId,
+  type ServiceCategorySliderIconId,
+} from "../../data/businessServiceCategorySlider.data";
 
 type ServiceDetailUiItem = {
   id: string;
@@ -54,7 +57,130 @@ type ServiceDetailUiItem = {
   name: string;
   durationLabel?: string;
   priceLabel: string;
+  /** From API — used for “All” grouping when category tabs are missing or ids differ */
+  categoryTitle?: string;
+  priceType?: string;
+  priceAmount?: string;
+  discountType?: string;
+  discountAmount?: string;
 };
+
+type ServiceDrawerEditBaseline = {
+  categoryId: string;
+  serviceId: number;
+  name: string;
+  duration: string;
+  priceType: string;
+  priceAmount: string;
+  discountType: string;
+  discountAmount: string;
+};
+
+const SERVICE_DRAWER_PRICE_TYPES: { value: string; label: string }[] = [
+  { value: "fixed", label: "Fixed price" },
+  { value: "from", label: "Starting from" },
+];
+
+const SERVICE_DRAWER_DISCOUNT_TYPES: { value: string; label: string }[] = [
+  { value: "fixed", label: "Fixed discount" },
+  { value: "percent", label: "Percentage discount" },
+];
+
+function parseEuroAmountString(s: string): number | null {
+  const raw = String(s ?? "")
+    .trim()
+    .replace(",", ".")
+    .replace(/\s/g, "");
+  if (raw === "") return null;
+  const n = Number.parseFloat(raw);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+function normalizePriceType(type: string | undefined): "fixed" | "from" {
+  if (type === "from") return "from";
+  return "fixed";
+}
+
+function parsePriceLabelForDrawer(priceLabel: string): { type: string; amount: string } {
+  const t = priceLabel.trim().toLowerCase();
+  if (!t || t === "—" || t === "-") return { type: "fixed", amount: "" };
+  if (t.includes("free")) return { type: "fixed", amount: "0" };
+  if (t.startsWith("starting from")) {
+    const n = t.replace(/^starting from\s*/i, "").replace(/[€$eur,\s]/gi, "").match(/[\d.]+/);
+    return { type: "from", amount: n?.[0] ?? "" };
+  }
+  if (t.startsWith("from")) {
+    const n = t.replace(/^from\s*/i, "").replace(/[€$eur,\s]/gi, "").match(/[\d.]+/);
+    return { type: "from", amount: n?.[0] ?? "" };
+  }
+  const n = t.replace(/[€$eur,\s]/gi, "").match(/[\d.]+/);
+  return { type: "fixed", amount: n?.[0] ?? "" };
+}
+
+function formatServicePriceLabel(priceType: string, priceAmount: string): string {
+  const raw = priceAmount.trim().replace(",", ".").replace(/\s/g, "");
+  const n = raw === "" ? Number.NaN : Number.parseFloat(raw);
+  const amountPart = Number.isFinite(n) ? `${n} €` : "25 €";
+  if (normalizePriceType(priceType) === "from") return `Starting from ${amountPart}`;
+  return amountPart;
+}
+
+function normalizeDiscountType(t: string | undefined): "fixed" | "percent" {
+  return t === "percent" ? "percent" : "fixed";
+}
+
+function hasServiceDiscount(it: ServiceDetailUiItem): boolean {
+  const d = parseEuroAmountString(it.discountAmount ?? "");
+  if (d === null || d <= 0) return false;
+  const kind = normalizeDiscountType(it.discountType);
+  if (kind === "percent" && d > 100) return false;
+  return true;
+}
+
+function getServiceBaseAmountNumber(it: ServiceDetailUiItem): number | null {
+  const fromField = parseEuroAmountString(it.priceAmount ?? "");
+  if (fromField !== null) return fromField;
+  const parsed = parsePriceLabelForDrawer(it.priceLabel);
+  return parseEuroAmountString(parsed.amount);
+}
+
+function computeDiscountedBaseAmount(base: number, it: ServiceDetailUiItem): number {
+  if (!hasServiceDiscount(it)) return base;
+  const kind = normalizeDiscountType(it.discountType);
+  const d = parseEuroAmountString(it.discountAmount ?? "") ?? 0;
+  if (kind === "percent") return Math.max(0, base * (1 - Math.min(100, d) / 100));
+  return Math.max(0, base - d);
+}
+
+function formatEuroDisplay(n: number): string {
+  const rounded = Math.round(n * 100) / 100;
+  if (Number.isInteger(rounded)) return `${rounded} €`;
+  const s = rounded.toFixed(2).replace(/\.?0+$/, "");
+  return `${s} €`;
+}
+
+function formatPriceForCard(priceType: string, amount: number): string {
+  const core = formatEuroDisplay(amount);
+  if (normalizePriceType(priceType) === "from") return `Starting from ${core}`;
+  return core;
+}
+
+/** Primary = price after discount when applicable; optional strikethrough = pre-discount. */
+function getServiceCardPriceParts(it: ServiceDetailUiItem): { primary: string; strikethrough?: string } {
+  const parsed = parsePriceLabelForDrawer(it.priceLabel);
+  const pt = normalizePriceType(it.priceType ?? parsed.type);
+  const base = getServiceBaseAmountNumber(it);
+  if (base === null) {
+    const fallback = it.priceLabel?.trim();
+    return { primary: fallback && fallback !== "" ? fallback : "—" };
+  }
+  const originalStr = formatPriceForCard(pt, base);
+  if (!hasServiceDiscount(it)) return { primary: originalStr };
+  const finalAmount = computeDiscountedBaseAmount(base, it);
+  const finalStr = formatPriceForCard(pt, finalAmount);
+  if (finalStr === originalStr) return { primary: originalStr };
+  return { primary: finalStr, strikethrough: originalStr };
+}
 
 export type ProfessionalFixedLocationSetupProps = {
   data: FixedLocationPageData;
@@ -269,7 +395,7 @@ export default function ProfessionalFixedLocationSetup({
   const [activeSubTab, setActiveSubTab] = React.useState<string>(
     data.subTabsActive,
   );
-  const [activeServiceCategory, setActiveServiceCategory] = React.useState<string>("all");
+  const [activeServiceCategory, setActiveServiceCategory] = React.useState<string>("");
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const [mediaSlides, setMediaSlides] = React.useState<string[]>([
     "/professionals/hero.png",
@@ -287,9 +413,7 @@ export default function ProfessionalFixedLocationSetup({
     { id: "pf-3", src: "/professionals/hero.png" },
     { id: "pf-4", src: "/professionals/hero.png" },
   ]);
-  const [selectedPortfolioIds, setSelectedPortfolioIds] = React.useState<Record<string, boolean>>({
-    "pf-2": true,
-  });
+  const [selectedPortfolioIds, setSelectedPortfolioIds] = React.useState<Record<string, boolean>>({});
   const portfolioBlobUrlsRef = React.useRef<string[]>([]);
   React.useEffect(() => {
     return () => {
@@ -349,6 +473,27 @@ export default function ProfessionalFixedLocationSetup({
     services: TeamService;
   };
 
+  const TEAM_SERVICE_SLOT_KEYS: (keyof TeamService)[] = [
+    "slot1",
+    "slot2",
+    "slot3",
+    "slot4",
+    "slot5",
+    "slot6",
+    "slot7",
+  ];
+
+  /** At least one slot shown; always one trailing empty slot after the last filled (up to 7). */
+  function getVisibleTeamServiceSlotKeys(services: TeamService): (keyof TeamService)[] {
+    let lastFilled = -1;
+    for (let i = 0; i < TEAM_SERVICE_SLOT_KEYS.length; i++) {
+      const k = TEAM_SERVICE_SLOT_KEYS[i];
+      if (String(services[k] ?? "").trim()) lastFilled = i;
+    }
+    const count = Math.min(7, Math.max(1, lastFilled + 2));
+    return TEAM_SERVICE_SLOT_KEYS.slice(0, count);
+  }
+
   const allSubcategoryOptions = React.useMemo(
     () =>
       businessCategories.flatMap((category) =>
@@ -358,6 +503,31 @@ export default function ProfessionalFixedLocationSetup({
         })),
       ),
     [businessCategories],
+  );
+
+  const getSubcategoryLabel = React.useCallback(
+    (serviceId: string) => {
+      const v = String(serviceId ?? "").trim();
+      if (!v) return "";
+      return allSubcategoryOptions.find((o) => o.value === v)?.label ?? v;
+    },
+    [allSubcategoryOptions],
+  );
+
+  /** Category title + subcategory count (e.g. team card field labels). */
+  const getTeamServiceSelectLabel = React.useCallback(
+    (serviceId: string) => {
+      const sid = String(serviceId ?? "").trim();
+      if (!sid) return "Service";
+      for (const cat of businessCategories) {
+        const sub = cat.subcategories.find((s) => String(s.id) === sid);
+        if (sub) {
+          return `${cat.title}(${cat.subcategories.length})`;
+        }
+      }
+      return getSubcategoryLabel(sid);
+    },
+    [businessCategories, getSubcategoryLabel],
   );
 
   const blankTeamServices = React.useMemo<TeamService>(
@@ -466,14 +636,11 @@ export default function ProfessionalFixedLocationSetup({
     setTeamMembers((prev) => prev.filter((m) => m.id !== id));
   }, []);
 
-  const updateMemberService = React.useCallback(
-    (id: string, key: keyof TeamService, value: string) => {
-      setTeamMembers((prev) =>
-        prev.map((m) => (m.id === id ? { ...m, services: { ...m.services, [key]: value } } : m)),
-      );
-    },
-    [],
-  );
+  const updateMemberService = React.useCallback((id: string, key: keyof TeamService, value: string) => {
+    setTeamMembers((prev) =>
+      prev.map((m) => (m.id === id ? { ...m, services: { ...m.services, [key]: value } } : m)),
+    );
+  }, []);
 
   const addedBlobUrlsRef = React.useRef<string[]>([]);
   React.useEffect(() => {
@@ -820,7 +987,7 @@ export default function ProfessionalFixedLocationSetup({
   type DesiredProvince = (typeof desiredProvinceOptions)[number];
   type DesiredAreaRow = { id: string; province: DesiredProvince; municipality: string };
   const desiredMunicipalityByProvince = React.useMemo(() => {
-    const base = ["Municipality Name", "Amsterdam", "Rotterdam", "Utrecht", "Haarlem", "Groningen", "Eindhoven"];
+    const base = ["Amsterdam", "Rotterdam", "Utrecht", "Haarlem", "Groningen", "Eindhoven"];
     return desiredProvinceOptions.reduce((acc, p) => {
       acc[p] = base;
       return acc;
@@ -842,16 +1009,31 @@ export default function ProfessionalFixedLocationSetup({
   const [desiredProvinceDraft, setDesiredProvinceDraft] = React.useState<(typeof desiredProvinceOptions)[number]>(
     "Noord-Holland",
   );
-  const [desiredMunicipalityDraft, setDesiredMunicipalityDraft] = React.useState<string>("Municipality Name");
-  const [desiredAreas, setDesiredAreas] = React.useState<DesiredAreaRow[]>([
-    { id: "dl-1", province: "Drenthe", municipality: "Drenthe(5)" },
-    { id: "dl-2", province: "Zuid-Holland", municipality: "Zuid-Holland(2)" },
-    { id: "dl-3", province: "Groningen", municipality: "Groningen(8)" },
-    { id: "dl-4", province: "Noord-Holland", municipality: "Noord-Holland" },
-  ]);
+  const [desiredMunicipalityDraft, setDesiredMunicipalityDraft] = React.useState<string>("");
+  const [desiredAreas, setDesiredAreas] = React.useState<DesiredAreaRow[]>([]);
+
+  const desiredAreasByProvince = React.useMemo(() => {
+    const order: DesiredProvince[] = [];
+    const rowsByProvince = new Map<DesiredProvince, DesiredAreaRow[]>();
+    for (const row of desiredAreas) {
+      if (!rowsByProvince.has(row.province)) {
+        order.push(row.province);
+        rowsByProvince.set(row.province, []);
+      }
+      rowsByProvince.get(row.province)!.push(row);
+    }
+    return order.map((province) => ({
+      province,
+      rows: rowsByProvince.get(province)!,
+      label:
+        rowsByProvince.get(province)!.length === 1
+          ? province
+          : `${province}(${rowsByProvince.get(province)!.length})`,
+    }));
+  }, [desiredAreas]);
 
   const addDesiredArea = React.useCallback(() => {
-    if (!desiredProvinceDraft || !desiredMunicipalityDraft || desiredMunicipalityDraft === "Municipality Name") return;
+    if (!desiredProvinceDraft || !desiredMunicipalityDraft.trim()) return;
     const exists = desiredAreas.some(
       (r) => r.province === desiredProvinceDraft && r.municipality === desiredMunicipalityDraft,
     );
@@ -859,21 +1041,17 @@ export default function ProfessionalFixedLocationSetup({
     setIsBusinessPublishEnabled(true);
     setDesiredAreas((prev) => [
       ...prev,
-      { id: `dl-${Date.now()}-${Math.random().toString(16).slice(2)}`, province: desiredProvinceDraft, municipality: desiredMunicipalityDraft },
+      {
+        id: `dl-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        province: desiredProvinceDraft,
+        municipality: desiredMunicipalityDraft,
+      },
     ]);
   }, [desiredAreas, desiredMunicipalityDraft, desiredProvinceDraft]);
 
-  const updateDesiredArea = React.useCallback(
-    (id: string, patch: Partial<Omit<DesiredAreaRow, "id">>) => {
-      setIsBusinessPublishEnabled(true);
-      setDesiredAreas((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
-    },
-    [],
-  );
-
-  const removeDesiredArea = React.useCallback((id: string) => {
+  const removeDesiredProvinceGroup = React.useCallback((province: DesiredProvince) => {
     setIsBusinessPublishEnabled(true);
-    setDesiredAreas((prev) => prev.filter((r) => r.id !== id));
+    setDesiredAreas((prev) => prev.filter((r) => r.province !== province));
   }, []);
 
   const fixedProvinceKey = React.useMemo<(typeof desiredProvinceOptions)[number]>(() => {
@@ -989,7 +1167,7 @@ export default function ProfessionalFixedLocationSetup({
           onChange={(e) => {
             const p = e.target.value as any;
             setDesiredProvinceDraft(p);
-            setDesiredMunicipalityDraft("Municipality Name");
+            setDesiredMunicipalityDraft("");
           }}
           disabled={!businessEditing.location || desiredAreaMode !== "Specific areas only"}
           sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
@@ -1015,6 +1193,11 @@ export default function ProfessionalFixedLocationSetup({
               disabled={!businessEditing.location || desiredAreaMode !== "Specific areas only"}
               sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
             >
+              <MenuItem value="">
+                <Typography component="span" sx={{ fontSize: 13, color: alpha(m.navy, 0.45) }}>
+                  Select municipality
+                </Typography>
+              </MenuItem>
               {(desiredMunicipalityByProvince[desiredProvinceDraft] ?? []).map((o) => (
                 <MenuItem key={o} value={o}>
                   {o}
@@ -1024,7 +1207,11 @@ export default function ProfessionalFixedLocationSetup({
           </Box>
           <IconButton
             onClick={addDesiredArea}
-            disabled={!businessEditing.location || desiredAreaMode !== "Specific areas only"}
+            disabled={
+              !businessEditing.location ||
+              desiredAreaMode !== "Specific areas only" ||
+              !desiredMunicipalityDraft.trim()
+            }
             sx={{
               width: 36,
               height: 36,
@@ -1052,12 +1239,9 @@ export default function ProfessionalFixedLocationSetup({
               width: "100%",
             }}
           >
-            {desiredAreas.map((r) => {
-              const options = (desiredMunicipalityByProvince as Record<string, string[]>)[r.province || "Noord-Holland"] ?? [];
-              const safeOptions = options.includes(r.municipality) ? options : [r.municipality, ...options];
-              return (
+            {desiredAreasByProvince.map(({ province, label }) => (
                 <Box
-                  key={r.id}
+                  key={province}
                   sx={{
                     display: "flex",
                     alignItems: "center",
@@ -1066,33 +1250,32 @@ export default function ProfessionalFixedLocationSetup({
                     minWidth: 0,
                   }}
                 >
-                  <MollureFormField
-                    select
-                    value={r.municipality}
-                    onChange={(e) => updateDesiredArea(r.id, { municipality: e.target.value })}
-                    disabled={!businessEditing.location}
+                  <Box
                     sx={{
                       flex: "1 1 auto",
                       minWidth: 0,
-                      "& .MuiOutlinedInput-root": {
-                        bgcolor: "#fff",
-                        borderRadius: "10px",
-                        minHeight: 36,
-                      },
-                      "& .MuiSvgIcon-root": {
-                        fontSize: 18,
-                        color: alpha(m.navy, 0.40),
-                      },
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 1,
+                      minHeight: 36,
+                      px: 1.25,
+                      py: 0.5,
+                      borderRadius: "10px",
+                      bgcolor: "#fff",
+                      border: `1px solid ${alpha(m.navy, 0.12)}`,
+                      color: alpha(m.navy, 0.88),
+                      fontSize: 13,
+                      fontWeight: 500,
                     }}
                   >
-                    {safeOptions.map((o: string) => (
-                      <MenuItem key={o} value={o} sx={{ fontSize: 12 }}>
-                        {o}
-                      </MenuItem>
-                    ))}
-                  </MollureFormField>
+                    <Typography component="span" noWrap sx={{ fontSize: "inherit", fontWeight: "inherit" }}>
+                      {label}
+                    </Typography>
+                    <KeyboardArrowDownRoundedIcon sx={{ fontSize: 20, color: alpha(m.navy, 0.38), flexShrink: 0 }} />
+                  </Box>
                   <IconButton
-                    onClick={() => removeDesiredArea(r.id)}
+                    onClick={() => removeDesiredProvinceGroup(province)}
                     disabled={!businessEditing.location}
                     sx={{
                       width: 34,
@@ -1101,13 +1284,12 @@ export default function ProfessionalFixedLocationSetup({
                       bgcolor: alpha(m.navy, 0.04),
                       "&:hover": { bgcolor: alpha(m.navy, 0.08) },
                     }}
-                    aria-label="Remove desired area"
+                    aria-label={`Remove ${province} from desired areas`}
                   >
                     <DeleteOutlineRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.55) }} />
                   </IconButton>
                 </Box>
-              );
-            })}
+              ))}
           </Box>
         </Grid>
       ) : null}
@@ -1409,13 +1591,24 @@ export default function ProfessionalFixedLocationSetup({
     setMediaSlides(nextMediaSlides);
     setMediaIdx(0);
 
-    const savedServices = businessSetupData.service_details.map((item) => ({
-      id: String(item.service_id),
-      categoryId: String(item.category_id),
-      serviceId: item.service_id,
-      name: item.service_title,
-      priceLabel: toDisplayNumber(item.price),
-    }));
+    const savedServices = businessSetupData.service_details.map((item) => {
+      const rawPrice = item.price;
+      const priceStr =
+        rawPrice !== null && rawPrice !== undefined && String(rawPrice).trim() !== ""
+          ? (() => {
+              const n = String(rawPrice).trim().replace(/\s*€\s*$/i, "").trim();
+              return n.includes("€") ? n : `${n} €`;
+            })()
+          : "";
+      return {
+        id: String(item.service_id),
+        categoryId: String(item.category_id),
+        serviceId: item.service_id,
+        name: item.service_title || "",
+        categoryTitle: item.category_title || undefined,
+        priceLabel: priceStr,
+      };
+    });
     setServicesFixed(savedServices);
     setServicesDesired(savedServices);
 
@@ -1462,29 +1655,125 @@ export default function ProfessionalFixedLocationSetup({
   const [draftServiceId, setDraftServiceId] = React.useState<number | "">("");
   const [draftServiceName, setDraftServiceName] = React.useState("");
   const [draftServiceDuration, setDraftServiceDuration] = React.useState("");
-  const [draftServicePrice, setDraftServicePrice] = React.useState("");
+  const [draftServicePriceType, setDraftServicePriceType] = React.useState("fixed");
+  const [draftServicePriceAmount, setDraftServicePriceAmount] = React.useState("");
+  const [draftServiceDiscountType, setDraftServiceDiscountType] = React.useState("fixed");
+  const [draftServiceDiscountAmount, setDraftServiceDiscountAmount] = React.useState("");
+  const [serviceDrawerEditBaseline, setServiceDrawerEditBaseline] = React.useState<ServiceDrawerEditBaseline | null>(
+    null,
+  );
+  const [expandedServiceDetailIds, setExpandedServiceDetailIds] = React.useState<Record<string, boolean>>({});
+  /** View flow: fields stay read-only until the user taps the header edit control. */
+  const [serviceDrawerFieldsLocked, setServiceDrawerFieldsLocked] = React.useState(true);
+
+  const openAddServiceDrawerForCategory = React.useCallback(
+    (categoryId: string) => {
+      setEditingServiceId(null);
+      setServiceDrawerEditBaseline(null);
+      setServiceDrawerFieldsLocked(false);
+      const valid =
+        categoryId && businessCategories.some((c) => String(c.id) === categoryId)
+          ? categoryId
+          : businessCategories[0]
+            ? String(businessCategories[0].id)
+            : "";
+      setDraftServiceCategory(valid);
+      setDraftServiceId("");
+      setDraftServiceName("");
+      setDraftServiceDuration("");
+      setDraftServicePriceType("fixed");
+      setDraftServicePriceAmount("");
+      setDraftServiceDiscountType("fixed");
+      setDraftServiceDiscountAmount("");
+      setServiceDrawerOpen(true);
+    },
+    [businessCategories],
+  );
 
   const openAddServiceDrawer = React.useCallback(() => {
-    setEditingServiceId(null);
-    setDraftServiceCategory(businessCategories[0] ? String(businessCategories[0].id) : "");
-    setDraftServiceId("");
-    setDraftServiceName("");
-    setDraftServiceDuration("");
-    setDraftServicePrice("");
-    setServiceDrawerOpen(true);
-  }, [businessCategories]);
+    const cat =
+      activeServiceCategory &&
+      activeServiceCategory !== "all" &&
+      businessCategories.some((c) => String(c.id) === activeServiceCategory)
+        ? activeServiceCategory
+        : businessCategories[0]
+          ? String(businessCategories[0].id)
+          : "";
+    openAddServiceDrawerForCategory(cat);
+  }, [activeServiceCategory, businessCategories, openAddServiceDrawerForCategory]);
 
-  const openEditServiceDrawer = React.useCallback((it: ServiceDetailUiItem) => {
+  const toggleServiceDetailExpand = React.useCallback((id: string) => {
+    setExpandedServiceDetailIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  }, []);
+
+  const openEditServiceDrawer = React.useCallback((it: ServiceDetailUiItem, fieldsLocked = true) => {
     setEditingServiceId(it.id);
     setDraftServiceCategory(it.categoryId);
     setDraftServiceId(it.serviceId);
     setDraftServiceName(it.name);
     setDraftServiceDuration(it.durationLabel || "");
-    setDraftServicePrice(it.priceLabel);
+    const parsed = parsePriceLabelForDrawer(it.priceLabel);
+    const pt = normalizePriceType(it.priceType ?? parsed.type);
+    const pa = it.priceAmount ?? parsed.amount;
+    setDraftServicePriceType(pt);
+    setDraftServicePriceAmount(pa);
+    const dType = normalizeDiscountType(it.discountType);
+    setDraftServiceDiscountType(dType);
+    setDraftServiceDiscountAmount((it.discountAmount ?? "").trim());
+    setServiceDrawerEditBaseline({
+      categoryId: String(it.categoryId),
+      serviceId: it.serviceId,
+      name: it.name,
+      duration: it.durationLabel || "",
+      priceType: pt,
+      priceAmount: pa,
+      discountType: dType,
+      discountAmount: (it.discountAmount ?? "").trim(),
+    });
     setServiceDrawerOpen(true);
+    setServiceDrawerFieldsLocked(fieldsLocked);
   }, []);
 
-  const closeServiceDrawer = React.useCallback(() => setServiceDrawerOpen(false), []);
+  const closeServiceDrawer = React.useCallback(() => {
+    setServiceDrawerOpen(false);
+    setEditingServiceId(null);
+    setServiceDrawerEditBaseline(null);
+    setServiceDrawerFieldsLocked(true);
+    setDraftServicePriceType("fixed");
+    setDraftServicePriceAmount("");
+    setDraftServiceDiscountType("fixed");
+    setDraftServiceDiscountAmount("");
+  }, []);
+
+  const serviceDrawerDirty = React.useMemo(() => {
+    if (!editingServiceId || !serviceDrawerEditBaseline) return false;
+    const b = serviceDrawerEditBaseline;
+    const sid = draftServiceId === "" ? null : Number(draftServiceId);
+    if (sid === null || Number.isNaN(sid)) return false;
+    const discAmt = draftServiceDiscountAmount.trim();
+    const bDiscAmt = b.discountAmount.trim();
+    return (
+      b.categoryId !== draftServiceCategory ||
+      b.serviceId !== sid ||
+      b.name !== draftServiceName ||
+      b.duration !== draftServiceDuration ||
+      b.priceType !== draftServicePriceType ||
+      b.priceAmount !== draftServicePriceAmount ||
+      b.discountType !== draftServiceDiscountType ||
+      bDiscAmt !== discAmt
+    );
+  }, [
+    draftServiceCategory,
+    draftServiceDiscountAmount,
+    draftServiceDiscountType,
+    draftServiceDuration,
+    draftServiceId,
+    draftServiceName,
+    draftServicePriceAmount,
+    draftServicePriceType,
+    editingServiceId,
+    serviceDrawerEditBaseline,
+  ]);
 
   const saveService = React.useCallback(() => {
     if (!draftServiceCategory || !draftServiceId) return;
@@ -1492,34 +1781,62 @@ export default function ProfessionalFixedLocationSetup({
     const matchedService = matchedCategory?.subcategories.find((subcategory) => subcategory.id === Number(draftServiceId));
     if (!matchedService) return;
 
-    const name = matchedService.title;
-    const durationLabel = "";
+    const name = draftServiceName.trim() || matchedService.title;
+    const durationLabel = draftServiceDuration.trim();
 
-    const priceLabel = draftServicePrice.trim() || "25 €";
+    const priceLabel = formatServicePriceLabel(draftServicePriceType, draftServicePriceAmount);
+    const discountTypeSaved = normalizeDiscountType(draftServiceDiscountType);
+    const rawDisc = draftServiceDiscountAmount.trim();
+    const discVal = parseEuroAmountString(rawDisc);
+    let discountAmount = "";
+    if (discVal !== null && discVal > 0) {
+      if (discountTypeSaved === "percent" && discVal > 100) discountAmount = "";
+      else discountAmount = rawDisc;
+    }
     const categoryId = draftServiceCategory;
+    const categoryTitle = matchedCategory?.title;
+
+    const servicePayload = {
+      name,
+      durationLabel,
+      priceLabel,
+      categoryId,
+      serviceId: matchedService.id,
+      categoryTitle,
+      priceType: normalizePriceType(draftServicePriceType),
+      priceAmount: draftServicePriceAmount,
+      discountType: discountTypeSaved,
+      discountAmount,
+    };
 
     if (editingServiceId) {
       setActiveServices((prev) =>
-        prev.map((s) =>
-          s.id === editingServiceId
-            ? { ...s, name, durationLabel, priceLabel, categoryId, serviceId: matchedService.id }
-            : s,
-        ),
+        prev.map((s) => (s.id === editingServiceId ? { ...s, ...servicePayload } : s)),
       );
     } else {
       const id = String(matchedService.id);
       setActiveServices((prev) => [
-        { id, categoryId, serviceId: matchedService.id, name, durationLabel, priceLabel },
+        { id, ...servicePayload },
         ...prev.filter((item) => item.serviceId !== matchedService.id),
       ]);
     }
+    setEditingServiceId(null);
+    setServiceDrawerEditBaseline(null);
     setServiceDrawerOpen(false);
+    setDraftServicePriceType("fixed");
+    setDraftServicePriceAmount("");
+    setDraftServiceDiscountType("fixed");
+    setDraftServiceDiscountAmount("");
   }, [
     businessCategories,
     draftServiceCategory,
+    draftServiceDiscountAmount,
+    draftServiceDiscountType,
     draftServiceDuration,
     draftServiceId,
-    draftServicePrice,
+    draftServiceName,
+    draftServicePriceAmount,
+    draftServicePriceType,
     editingServiceId,
     setActiveServices,
   ]);
@@ -1529,6 +1846,133 @@ export default function ProfessionalFixedLocationSetup({
       setActiveServices((prev) => prev.filter((s) => s.id !== id));
     },
     [setActiveServices],
+  );
+
+  const renderServiceDetailRow = React.useCallback(
+    (it: ServiceDetailUiItem) => {
+      const expanded = Boolean(expandedServiceDetailIds[it.id]);
+      const cardPrice = getServiceCardPriceParts(it);
+      return (
+        <Paper
+          key={it.id}
+          elevation={0}
+          sx={{
+            borderRadius: "12px",
+            border: `1px solid ${alpha(m.navy, 0.10)}`,
+            bgcolor: "#fff",
+            px: 1.75,
+            py: 1.35,
+          }}
+        >
+          <Stack direction="row" alignItems="center" spacing={1.5} sx={{ flexWrap: { xs: "wrap", sm: "nowrap" } }}>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Typography sx={{ fontWeight: 800, fontSize: 14, color: alpha(m.navy, 0.92), lineHeight: 1.25 }}>
+                {it.name?.trim() ? it.name : "Untitled service"}
+              </Typography>
+              <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mt: 0.35, flexWrap: "wrap" }}>
+                {it.durationLabel ? (
+                  <Typography sx={{ fontSize: 12, fontWeight: 500, color: alpha(m.navy, 0.62) }}>
+                    {it.durationLabel}
+                  </Typography>
+                ) : null}
+                <Typography
+                  component="button"
+                  onClick={() => openEditServiceDrawer(it)}
+                  sx={{
+                    border: "none",
+                    background: "none",
+                    cursor: "pointer",
+                    p: 0,
+                    m: 0,
+                    font: "inherit",
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: "primary.main",
+                    textDecoration: "none",
+                    "&:hover": { textDecoration: "underline" },
+                  }}
+                >
+                  View
+                </Typography>
+              </Stack>
+            </Box>
+
+            <Stack direction="row" alignItems="center" spacing={1.25} sx={{ ml: { xs: 0, sm: "auto" } }}>
+              <Stack alignItems="flex-end" spacing={0.15} sx={{ minWidth: 56 }}>
+                {cardPrice.strikethrough ? (
+                  <Typography
+                    sx={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: alpha(m.navy, 0.42),
+                      textDecoration: "line-through",
+                      lineHeight: 1.15,
+                    }}
+                  >
+                    {cardPrice.strikethrough}
+                  </Typography>
+                ) : null}
+                <Typography
+                  sx={{
+                    fontSize: 14,
+                    fontWeight: 800,
+                    color: alpha(m.navy, 0.92),
+                    textAlign: "right",
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {cardPrice.primary}
+                </Typography>
+              </Stack>
+
+              <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexShrink: 0 }}>
+                <IconButton
+                  size="small"
+                  aria-label="Edit service"
+                  onClick={() => openEditServiceDrawer(it, false)}
+                  disabled={isBusinessLocked || !businessEditing.servicesDetails}
+                  sx={{ width: 32, height: 32, color: alpha(m.navy, 0.45) }}
+                >
+                  <EditRoundedIcon sx={{ fontSize: 20 }} />
+                </IconButton>
+                <IconButton
+                  size="small"
+                  aria-label="Delete service"
+                  onClick={() => deleteService(it.id)}
+                  disabled={isBusinessLocked || !businessEditing.servicesDetails}
+                  sx={{ width: 32, height: 32, color: alpha(m.navy, 0.45) }}
+                >
+                  <DeleteOutlineRoundedIcon sx={{ fontSize: 20 }} />
+                </IconButton>
+                <IconButton
+                  size="small"
+                  aria-label={expanded ? "Collapse details" : "Expand details"}
+                  onClick={() => toggleServiceDetailExpand(it.id)}
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    color: alpha(m.navy, 0.45),
+                    transform: expanded ? "rotate(180deg)" : "none",
+                    transition: "transform 0.2s ease",
+                  }}
+                >
+                  <KeyboardArrowDownRoundedIcon sx={{ fontSize: 22 }} />
+                </IconButton>
+              </Stack>
+            </Stack>
+          </Stack>
+        </Paper>
+      );
+    },
+    [
+      businessEditing.servicesDetails,
+      deleteService,
+      expandedServiceDetailIds,
+      isBusinessLocked,
+      m.navy,
+      openEditServiceDrawer,
+      toggleServiceDetailExpand,
+    ],
   );
 
   const professionalForm = (
@@ -1588,7 +2032,7 @@ export default function ProfessionalFixedLocationSetup({
       </Stack>
 
       <Box>
-        <Typography sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.82), mb: 1 }}>
+        <Typography variant="subHeading" sx={{ mb: 1 }}>
           Company Information
         </Typography>
         <Divider sx={{ mb: 1.5, borderColor: alpha(m.navy, 0.10) }} />
@@ -1735,7 +2179,7 @@ export default function ProfessionalFixedLocationSetup({
       </Box>
 
       <Box>
-        <Typography sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.82), mb: 1 }}>
+        <Typography variant="subHeading" sx={{ mb: 1 }}>
           Contact Person
         </Typography>
         <Divider sx={{ mb: 1.5, borderColor: alpha(m.navy, 0.10) }} />
@@ -1847,17 +2291,101 @@ export default function ProfessionalFixedLocationSetup({
   }, []);
 
   const serviceCategoryTabs = React.useMemo<
-    Array<{ id: string; label: string; iconKey: "all" | "hair" | "makeup" | "wimpers" | "wenbrauwen" }>
+    Array<{ id: string; label: string; iconId: ServiceCategorySliderIconId }>
   >(
     () => [
-      { id: "all", label: "All", iconKey: "all" },
+      { id: "all", label: "All", iconId: "all" },
       ...businessCategories.map((category) => ({
         id: String(category.id),
         label: category.title,
-        iconKey: "all" as const,
+        iconId: resolveServiceCategorySliderIconId(category.title),
       })),
     ],
     [businessCategories],
+  );
+
+  const groupedAllServiceSections = React.useMemo(() => {
+    const by = new Map<string, ServiceDetailUiItem[]>();
+    for (const s of activeServices) {
+      const key = String(s.categoryId ?? "").trim();
+      if (!key) continue;
+      const list = by.get(key) ?? [];
+      list.push(s);
+      by.set(key, list);
+    }
+
+    const titleFor = (categoryId: string, items: ServiceDetailUiItem[]) =>
+      businessCategories.find((c) => String(c.id) === categoryId)?.title ??
+      serviceCategoryTabs.find((t) => t.id === categoryId)?.label ??
+      items[0]?.categoryTitle ??
+      `Category ${categoryId}`;
+
+    const sections: Array<{ categoryId: string; title: string; items: ServiceDetailUiItem[] }> = [];
+    const seen = new Set<string>();
+
+    for (const t of serviceCategoryTabs) {
+      if (t.id === "all") continue;
+      const items = by.get(t.id);
+      if (!items?.length) continue;
+      sections.push({ categoryId: t.id, title: titleFor(t.id, items), items });
+      seen.add(t.id);
+    }
+
+    for (const [categoryId, items] of by.entries()) {
+      if (seen.has(categoryId) || !items.length) continue;
+      sections.push({ categoryId, title: titleFor(categoryId, items), items });
+      seen.add(categoryId);
+    }
+
+    return sections;
+  }, [activeServices, businessCategories, serviceCategoryTabs]);
+
+  const activeCategoryServices = React.useMemo(
+    () =>
+      activeServices.filter((it) => String(it.categoryId ?? "").trim() === String(activeServiceCategory ?? "").trim()),
+    [activeServiceCategory, activeServices],
+  );
+
+  const serviceCategoryTabsScrollRef = React.useRef<HTMLDivElement | null>(null);
+  const activeServiceCategoryTabRef = React.useRef<HTMLButtonElement | null>(null);
+  const [tabScrollState, setTabScrollState] = React.useState({ canLeft: false, canRight: false });
+
+  const updateTabScrollState = React.useCallback(() => {
+    const el = serviceCategoryTabsScrollRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setTabScrollState({
+      canLeft: scrollLeft > 2,
+      canRight: scrollLeft + clientWidth < scrollWidth - 2,
+    });
+  }, []);
+
+  React.useEffect(() => {
+    updateTabScrollState();
+    const el = serviceCategoryTabsScrollRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => updateTabScrollState());
+    ro.observe(el);
+    el.addEventListener("scroll", updateTabScrollState, { passive: true });
+    return () => {
+      ro.disconnect();
+      el.removeEventListener("scroll", updateTabScrollState);
+    };
+  }, [updateTabScrollState, serviceCategoryTabs.length, activeServices.length]);
+
+  React.useLayoutEffect(() => {
+    activeServiceCategoryTabRef.current?.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
+    updateTabScrollState();
+  }, [activeServiceCategory, updateTabScrollState]);
+
+  const scrollServiceCategoryTabs = React.useCallback(
+    (delta: number) => {
+      const el = serviceCategoryTabsScrollRef.current;
+      if (!el) return;
+      el.scrollBy({ left: delta, behavior: "smooth" });
+      window.setTimeout(() => updateTabScrollState(), 320);
+    },
+    [updateTabScrollState],
   );
 
   const bookingCategoryOptions = React.useMemo(
@@ -1868,6 +2396,9 @@ export default function ProfessionalFixedLocationSetup({
       })),
     [businessCategories],
   );
+
+  /** Booking combo row selects are read-only until that row’s edit (pencil) is toggled on. */
+  const [bookingComboEditId, setBookingComboEditId] = React.useState<string | null>(null);
 
   const getBookingServiceOptions = React.useCallback(
     (categoryId: string) => {
@@ -1923,6 +2454,7 @@ export default function ProfessionalFixedLocationSetup({
 
   const deleteBookingCombo = React.useCallback(
     (id: string) => {
+      setBookingComboEditId((prev) => (prev === id ? null : prev));
       setBizField(
         "bookCombos",
         biz.bookCombos.filter((c) => c.id !== id),
@@ -2041,186 +2573,410 @@ export default function ProfessionalFixedLocationSetup({
     </Box>
   );
 
+  const visibleTeamDrawerSlots = React.useMemo(
+    () => getVisibleTeamServiceSlotKeys(draftServices),
+    [draftServices],
+  );
+
   const teamDrawer = (
     <Drawer
       anchor="right"
       open={teamDrawerOpen}
       onClose={closeTeamDrawer}
-      PaperProps={{ sx: { width: { xs: "100%", sm: 460 }, p: 2.5 } }}
+      PaperProps={{
+        sx: {
+          width: { xs: "100%", sm: 460 },
+          p: 2.5,
+          borderTopLeftRadius: { sm: 12 },
+          borderBottomLeftRadius: { sm: 12 },
+        },
+      }}
     >
-      <Stack spacing={2} sx={{ height: "100%", overflowY: "auto" }}>
-        <Typography sx={{ fontWeight: 900, fontSize: 16, color: alpha(m.navy, 0.88) }}>
-          {editingMemberId ? "Edit team member" : "Add team member"}
-        </Typography>
-        <Typography sx={{ fontSize: 12.5, color: alpha(m.navy, 0.55) }}>
-          {editingMemberId
-            ? "Update the details and services for this member."
-            : "Fill in the details — they will appear in your team list."}
-        </Typography>
+      <Stack spacing={2.25} sx={{ height: "100%", overflowY: "auto" }}>
+        <Stack spacing={0.75}>
+          <Typography sx={{ fontWeight: 900, fontSize: 18, color: alpha(m.navy, 0.9), letterSpacing: "-0.02em" }}>
+            {editingMemberId ? "Edit team member" : "Add team member"}
+          </Typography>
+          <Typography sx={{ fontSize: 13, fontWeight: 500, color: alpha(m.navy, 0.52), lineHeight: 1.45 }}>
+            {editingMemberId
+              ? "Update their profile, photo, and assigned services."
+              : "Add their name and role, then assign one or more services."}
+          </Typography>
+        </Stack>
 
-        <MollureFormField label="Full name" placeholder="e.g. Craig Martha"
-          value={draftTeamName} onChange={(e) => setDraftTeamName(e.target.value)} />
-        <MollureFormField label="Role" placeholder="e.g. Stylist"
-          value={draftTeamRole} onChange={(e) => setDraftTeamRole(e.target.value)} />
+        <Stack spacing={1.75}>
+          <MollureFormField
+            label="Full name"
+            placeholder="e.g. Craig Martha"
+            value={draftTeamName}
+            onChange={(e) => setDraftTeamName(e.target.value)}
+            sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" } }}
+          />
+          <MollureFormField
+            label="Role"
+            placeholder="e.g. Stylist"
+            value={draftTeamRole}
+            onChange={(e) => setDraftTeamRole(e.target.value)}
+            sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" } }}
+          />
+        </Stack>
 
-        <Divider />
-        <Typography sx={{ fontWeight: 800, fontSize: 12.5, color: alpha(m.navy, 0.72) }}>
-          Profile photo
-        </Typography>
-        <Stack direction="row" spacing={1.25} alignItems="center">
-          <Box
-            sx={{
-              width: 56,
-              height: 56,
-              borderRadius: "999px",
-              overflow: "hidden",
-              bgcolor: alpha(m.navy, 0.06),
-              border: `1px solid ${alpha(m.navy, 0.10)}`,
-              flex: "0 0 auto",
-            }}
-          >
-            <Image
-              src={draftPhotoSrc}
-              alt="Team member photo"
-              width={56}
-              height={56}
-              unoptimized
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            />
-          </Box>
+        <Box
+          sx={{
+            borderRadius: "10px",
+            border: `1px solid ${alpha(m.navy, 0.08)}`,
+            bgcolor: alpha(m.navy, 0.03),
+            p: 2,
+          }}
+        >
+          <Typography sx={{ fontWeight: 800, fontSize: 13, color: alpha(m.navy, 0.78), mb: 1.5 }}>
+            Profile photo
+          </Typography>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Box
+              sx={{
+                width: 64,
+                height: 64,
+                borderRadius: "999px",
+                overflow: "hidden",
+                bgcolor: "#fff",
+                border: `1px solid ${alpha(m.navy, 0.10)}`,
+                flex: "0 0 auto",
+                boxShadow: `0 4px 14px ${alpha(m.navy, 0.06)}`,
+              }}
+            >
+              <Image
+                src={draftPhotoSrc}
+                alt="Team member photo"
+                width={64}
+                height={64}
+                unoptimized
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            </Box>
+            <Stack spacing={0.75} sx={{ minWidth: 0 }}>
+              <Button
+                onClick={onChooseTeamPhoto}
+                variant="outlined"
+                sx={{
+                  alignSelf: "flex-start",
+                  borderRadius: "8px",
+                  textTransform: "none",
+                  fontWeight: 800,
+                  borderColor: alpha(m.navy, 0.14),
+                  color: alpha(m.navy, 0.78),
+                  bgcolor: "#fff",
+                }}
+              >
+                Upload photo
+              </Button>
+              <Typography sx={{ fontSize: 11, fontWeight: 500, color: alpha(m.navy, 0.45) }}>
+                JPG or PNG, square works best.
+              </Typography>
+            </Stack>
+            <input ref={teamPhotoInputRef} type="file" accept="image/*" hidden onChange={onTeamPhotoSelected} />
+          </Stack>
+        </Box>
+
+        <Box
+          sx={{
+            borderRadius: "10px",
+            border: `1px solid ${alpha(m.navy, 0.08)}`,
+            bgcolor: alpha(m.navy, 0.03),
+            p: 2,
+          }}
+        >
+          <Typography sx={{ fontWeight: 800, fontSize: 13, color: alpha(m.navy, 0.78), mb: 0.5 }}>
+            Assigned services
+          </Typography>
+          <Typography sx={{ fontSize: 11, fontWeight: 500, color: alpha(m.navy, 0.45), mb: 1.5 }}>
+            Only the fields you need are shown. Pick a service to reveal the next slot (up to seven).
+          </Typography>
+          <Grid container spacing={1.5}>
+            {visibleTeamDrawerSlots.map((key) => {
+              const n = TEAM_SERVICE_SLOT_KEYS.indexOf(key) + 1;
+              return (
+                <Grid key={key} item xs={12} sm={6}>
+                  <MollureFormField
+                    select
+                    label={`Service ${n}`}
+                    value={draftServices[key]}
+                    onChange={(e) => setDraftServices((p) => ({ ...p, [key]: e.target.value }))}
+                    sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" } }}
+                  >
+                    <MenuItem value="">
+                      <Typography sx={{ color: alpha(m.navy, 0.45) }}>Select service</Typography>
+                    </MenuItem>
+                    {allSubcategoryOptions.map((option) => (
+                      <MenuItem key={option.value} value={option.value}>
+                        {option.label}
+                      </MenuItem>
+                    ))}
+                  </MollureFormField>
+                </Grid>
+              );
+            })}
+          </Grid>
+        </Box>
+
+        <Box sx={{ flex: 1, minHeight: 8 }} />
+        <Stack direction="row" spacing={1} justifyContent="flex-end" flexWrap="wrap">
           <Button
-            onClick={onChooseTeamPhoto}
+            onClick={closeTeamDrawer}
             variant="outlined"
             sx={{
               borderRadius: "8px",
               textTransform: "none",
-              fontWeight: 800,
+              fontWeight: 700,
               borderColor: alpha(m.navy, 0.14),
-              color: alpha(m.navy, 0.78),
-              bgcolor: "#fff",
+              color: alpha(m.navy, 0.72),
             }}
           >
-            Upload photo
-          </Button>
-          <input
-            ref={teamPhotoInputRef}
-            type="file"
-            accept="image/*"
-            hidden
-            onChange={onTeamPhotoSelected}
-          />
-        </Stack>
-
-        <Divider />
-        <Typography sx={{ fontWeight: 800, fontSize: 12.5, color: alpha(m.navy, 0.72) }}>
-          Assigned services
-        </Typography>
-
-        <Grid container spacing={1.5}>
-          {([
-            ["slot1", "Assigned Service 1"],
-            ["slot2", "Assigned Service 2"],
-            ["slot3", "Assigned Service 3"],
-            ["slot4", "Assigned Service 4"],
-            ["slot5", "Assigned Service 5"],
-            ["slot6", "Assigned Service 6"],
-            ["slot7", "Assigned Service 7"],
-          ] as const).map(([key, label]) => (
-            <Grid key={key} item xs={12} sm={6}>
-              <MollureFormField
-                select label={label}
-                value={draftServices[key as keyof TeamService]}
-                onChange={(e) =>
-                  setDraftServices((p) => ({ ...p, [key]: e.target.value }))
-                }
-              >
-                <MenuItem value="">Select service</MenuItem>
-                {allSubcategoryOptions.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </MollureFormField>
-            </Grid>
-          ))}
-        </Grid>
-
-        <Box sx={{ flex: 1 }} />
-        <Stack direction="row" spacing={1} justifyContent="flex-end">
-          <Button onClick={closeTeamDrawer} variant="outlined"
-            sx={{ borderRadius: "8px", textTransform: "none", fontWeight: 700,
-              borderColor: alpha(m.navy, 0.14), color: alpha(m.navy, 0.72) }}>
             Cancel
           </Button>
-          <Button onClick={saveTeamMember} variant="contained" disableElevation
+          <Button
+            onClick={saveTeamMember}
+            variant="contained"
+            disableElevation
             disabled={!draftTeamName.trim()}
-            sx={{ borderRadius: "8px", textTransform: "none", fontWeight: 800,
-              bgcolor: "primary.main", "&:hover": { bgcolor: "mollure.tealDark" } }}>
-            {editingMemberId ? "Save changes" : "Add member"}
+            sx={{
+              borderRadius: "8px",
+              textTransform: "none",
+              fontWeight: 800,
+              bgcolor: "primary.main",
+              "&:hover": { bgcolor: "mollure.tealDark" },
+            }}
+          >
+            Save
           </Button>
         </Stack>
       </Stack>
     </Drawer>
   );
 
+  const serviceDrawerFormDisabled =
+    Boolean(editingServiceId && serviceDrawerFieldsLocked) || isBusinessLocked || !businessEditing.servicesDetails;
+
   const serviceDrawer = (
     <Drawer
       anchor="right"
       open={serviceDrawerOpen}
       onClose={closeServiceDrawer}
-      PaperProps={{ sx: { width: { xs: "100%", sm: 460 }, p: 2.5 } }}
+      PaperProps={{
+        sx: {
+          width: { xs: "100%", sm: 460 },
+          p: 2.5,
+          borderTopLeftRadius: { sm: 12 },
+          borderBottomLeftRadius: { sm: 12 },
+        },
+      }}
     >
-      <Stack spacing={2} sx={{ height: "100%", overflowY: "auto" }}>
-        <Typography sx={{ fontWeight: 900, fontSize: 16, color: alpha(m.navy, 0.88) }}>
-          {editingServiceId ? "Edit service" : "Add service"}
-        </Typography>
+      <Stack spacing={2.25} sx={{ height: "100%", overflowY: "auto" }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+          <Typography sx={{ fontWeight: 900, fontSize: 18, color: alpha(m.navy, 0.9), letterSpacing: "-0.02em" }}>
+            {editingServiceId
+              ? serviceDrawerFieldsLocked
+                ? "View Service"
+                : "Edit Service"
+              : "Add service"}
+          </Typography>
+          {editingServiceId && serviceDrawerFieldsLocked ? (
+            <IconButton
+              size="small"
+              aria-label="Edit service"
+              disabled={isBusinessLocked || !businessEditing.servicesDetails}
+              onClick={() => setServiceDrawerFieldsLocked(false)}
+              sx={{ color: alpha(m.navy, 0.55) }}
+            >
+              <EditRoundedIcon sx={{ fontSize: 24 }} />
+            </IconButton>
+          ) : null}
+        </Stack>
 
-        <Stack spacing={1.5}>
+        <Stack spacing={2}>
+          {!editingServiceId ? (
+            <>
+              <MollureFormField
+                select
+                disabled={serviceDrawerFormDisabled}
+                label="Category"
+                value={draftServiceCategory}
+                onChange={(e) => {
+                  setDraftServiceCategory(String(e.target.value));
+                  setDraftServiceId("");
+                  setDraftServiceName("");
+                }}
+              >
+                {businessCategories.map((category) => (
+                  <MenuItem key={category.id} value={String(category.id)}>
+                    {category.title}
+                  </MenuItem>
+                ))}
+              </MollureFormField>
+              <MollureFormField
+                select
+                disabled={serviceDrawerFormDisabled}
+                label="Service"
+                value={draftServiceId}
+                onChange={(e) => {
+                  const sid = Number(e.target.value);
+                  setDraftServiceId(sid);
+                  const cat = businessCategories.find((c) => String(c.id) === draftServiceCategory);
+                  const sub = cat?.subcategories.find((s) => s.id === sid);
+                  if (sub) setDraftServiceName(sub.title);
+                }}
+              >
+                {(businessCategories.find((category) => String(category.id) === draftServiceCategory)?.subcategories ?? []).map(
+                  (subcategory) => (
+                    <MenuItem key={subcategory.id} value={subcategory.id}>
+                      {subcategory.title}
+                    </MenuItem>
+                  ),
+                )}
+              </MollureFormField>
+            </>
+          ) : null}
+
           <MollureFormField
-            select
-            label="Category"
-            value={draftServiceCategory}
-            onChange={(e) => {
-              setDraftServiceCategory(String(e.target.value));
-              setDraftServiceId("");
-            }}
-          >
-            {businessCategories.map((category) => (
-              <MenuItem key={category.id} value={String(category.id)}>
-                {category.title}
-              </MenuItem>
-            ))}
-          </MollureFormField>
+            disabled={serviceDrawerFormDisabled}
+            label="Service name"
+            placeholder="Service name"
+            value={draftServiceName}
+            onChange={(e) => setDraftServiceName(e.target.value)}
+          />
+
           <MollureFormField
-            select
-            label="Service"
-            value={draftServiceId}
-            onChange={(e) => setDraftServiceId(Number(e.target.value))}
-          >
-            {(businessCategories.find((category) => String(category.id) === draftServiceCategory)?.subcategories ?? []).map(
-              (subcategory) => (
-                <MenuItem key={subcategory.id} value={subcategory.id}>
-                  {subcategory.title}
-                </MenuItem>
-              ),
-            )}
-          </MollureFormField>
-          <MollureFormField
+            disabled={serviceDrawerFormDisabled}
             label="Duration"
-            placeholder="e.g 45 Min"
+            placeholder="e.g. 45 min"
             value={draftServiceDuration}
             onChange={(e) => setDraftServiceDuration(e.target.value)}
           />
-          <MollureFormField
-            label="Price"
-            placeholder="e.g 25 €"
-            value={draftServicePrice}
-            onChange={(e) => setDraftServicePrice(e.target.value)}
-          />
+
+          <Box>
+            <Typography
+              component="span"
+              sx={{
+                fontSize: "0.75rem",
+                fontWeight: 500,
+                color: alpha(m.navy, 0.62),
+                mb: 0.75,
+                display: "block",
+              }}
+            >
+              Price
+            </Typography>
+            <Stack direction="row" spacing={1} alignItems="flex-start">
+              <MollureFormField
+                select
+                disabled={serviceDrawerFormDisabled}
+                value={draftServicePriceType}
+                onChange={(e) => {
+                  const v = String(e.target.value);
+                  setDraftServicePriceType(v);
+                }}
+                sx={{ flex: "0 0 42%", minWidth: 0 }}
+                inputProps={{ "aria-label": "Price type" }}
+              >
+                {SERVICE_DRAWER_PRICE_TYPES.map((opt) => (
+                  <MenuItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </MenuItem>
+                ))}
+              </MollureFormField>
+              <MollureFormField
+                disabled={serviceDrawerFormDisabled}
+                placeholder="0"
+                value={draftServicePriceAmount}
+                onChange={(e) => setDraftServicePriceAmount(e.target.value.replace(/[^\d.,]/g, ""))}
+                sx={{ flex: 1, minWidth: 0 }}
+                inputProps={{ "aria-label": "Price amount" }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Typography sx={{ fontSize: 14, fontWeight: 600, color: alpha(m.navy, 0.55) }}>€</Typography>
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <Typography sx={{ fontSize: 11, fontWeight: 600, color: alpha(m.navy, 0.5) }}>EUR</Typography>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Stack>
+          </Box>
+
+          <Box
+            sx={{
+              borderRadius: "10px",
+              bgcolor: alpha(m.navy, 0.045),
+              border: `1px solid ${alpha(m.navy, 0.08)}`,
+              p: 2,
+            }}
+          >
+            <Typography sx={{ fontWeight: 700, fontSize: 14, color: alpha(m.navy, 0.88), mb: 1.75 }}>
+              Add Discount (Optional)
+            </Typography>
+            <Stack spacing={1.5}>
+              <MollureFormField
+                select
+                disabled={serviceDrawerFormDisabled}
+                label="Discount type"
+                value={draftServiceDiscountType}
+                onChange={(e) => setDraftServiceDiscountType(String(e.target.value))}
+              >
+                {SERVICE_DRAWER_DISCOUNT_TYPES.map((opt) => (
+                  <MenuItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </MenuItem>
+                ))}
+              </MollureFormField>
+              <MollureFormField
+                disabled={serviceDrawerFormDisabled}
+                label="Discount amount"
+                placeholder="0"
+                value={draftServiceDiscountAmount}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (draftServiceDiscountType === "percent") {
+                    const v = raw.replace(/[^\d.]/g, "");
+                    const dot = v.indexOf(".");
+                    if (dot === -1) setDraftServiceDiscountAmount(v);
+                    else setDraftServiceDiscountAmount(v.slice(0, dot + 1) + v.slice(dot + 1).replace(/\./g, ""));
+                  } else {
+                    setDraftServiceDiscountAmount(raw.replace(/[^\d.,]/g, ""));
+                  }
+                }}
+                InputProps={
+                  draftServiceDiscountType === "percent"
+                    ? {
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <Typography sx={{ fontSize: 11, fontWeight: 600, color: alpha(m.navy, 0.5) }}>%</Typography>
+                          </InputAdornment>
+                        ),
+                      }
+                    : {
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <Typography sx={{ fontSize: 14, fontWeight: 600, color: alpha(m.navy, 0.55) }}>€</Typography>
+                          </InputAdornment>
+                        ),
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <Typography sx={{ fontSize: 11, fontWeight: 600, color: alpha(m.navy, 0.5) }}>EUR</Typography>
+                          </InputAdornment>
+                        ),
+                      }
+                }
+              />
+            </Stack>
+          </Box>
         </Stack>
 
-        <Box sx={{ flex: 1 }} />
-        <Stack direction="row" spacing={1} justifyContent="flex-end">
+        <Box sx={{ flex: 1, minHeight: 8 }} />
+        <Stack direction="row" spacing={1} justifyContent="flex-end" flexWrap="wrap">
           <Button
             onClick={closeServiceDrawer}
             variant="outlined"
@@ -2234,21 +2990,41 @@ export default function ProfessionalFixedLocationSetup({
           >
             Cancel
           </Button>
-          <Button
-            onClick={saveService}
-            variant="contained"
-            disableElevation
-            disabled={!draftServiceCategory || !draftServiceId}
-            sx={{
-              borderRadius: "8px",
-              textTransform: "none",
-              fontWeight: 800,
-              bgcolor: "primary.main",
-              "&:hover": { bgcolor: "mollure.tealDark" },
-            }}
-          >
-            {editingServiceId ? "Save changes" : "Add service"}
-          </Button>
+          {editingServiceId ? (
+            !serviceDrawerFieldsLocked && serviceDrawerDirty ? (
+              <Button
+                onClick={saveService}
+                variant="contained"
+                disableElevation
+                disabled={!draftServiceCategory || !draftServiceId}
+                sx={{
+                  borderRadius: "8px",
+                  textTransform: "none",
+                  fontWeight: 800,
+                  bgcolor: "primary.main",
+                  "&:hover": { bgcolor: "mollure.tealDark" },
+                }}
+              >
+                Save
+              </Button>
+            ) : null
+          ) : (
+            <Button
+              onClick={saveService}
+              variant="contained"
+              disableElevation
+              disabled={!draftServiceCategory || !draftServiceId}
+              sx={{
+                borderRadius: "8px",
+                textTransform: "none",
+                fontWeight: 800,
+                bgcolor: "primary.main",
+                "&:hover": { bgcolor: "mollure.tealDark" },
+              }}
+            >
+              Save
+            </Button>
+          )}
         </Stack>
       </Stack>
     </Drawer>
@@ -2647,139 +3423,186 @@ export default function ProfessionalFixedLocationSetup({
       </SectionShell>
 
       <SectionShell title={data.servicesDetails.title}>
-        <Box sx={businessEditing.servicesDetails ? undefined : { pointerEvents: "none" }}>
-          <Stack spacing={1.5}>
-          <Stack direction="row" spacing={1.25} sx={{ overflowX: "auto", pb: 0.25 }}>
-            {serviceCategoryTabs.map((c) => {
-              const active = c.id === activeServiceCategory;
-              const icon =
-                c.iconKey === "hair"
-                  ? <ContentCutRoundedIcon sx={{ fontSize: 22 }} />
-                  : c.iconKey === "makeup"
-                    ? <BrushRoundedIcon sx={{ fontSize: 22 }} />
-                    : c.iconKey === "wimpers"
-                      ? <VisibilityRoundedIcon sx={{ fontSize: 22 }} />
-                      : c.iconKey === "wenbrauwen"
-                        ? <GestureRoundedIcon sx={{ fontSize: 22 }} />
-                        : null;
-
-              return (
-                <Box
-                  key={c.id}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setActiveServiceCategory(c.id)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") setActiveServiceCategory(c.id);
-                  }}
-                  sx={{
-                    flex: "0 0 auto",
-                    minWidth: 78,
-                    height: 58,
-                    px: 1.25,
-                    borderRadius: "8px",
-                    border: `1px solid ${active ? theme.palette.primary.main : alpha(m.navy, 0.10)}`,
-                    bgcolor: active ? alpha(theme.palette.primary.main, 0.06) : "#fff",
-                    display: "grid",
-                    placeItems: "center",
-                    gap: 0.35,
-                    userSelect: "none",
-                    cursor: "pointer",
-                  }}
-                >
-                  {icon ? (
-                    <Box sx={{ color: active ? theme.palette.primary.main : alpha(m.navy, 0.55) }}>{icon}</Box>
-                  ) : (
-                    <Typography sx={{ fontSize: 12, fontWeight: 700, color: active ? theme.palette.primary.main : alpha(m.navy, 0.55) }}>
-                      {c.label}
-                    </Typography>
-                  )}
-                  {icon ? (
-                    <Typography sx={{ fontSize: 11, fontWeight: 600, color: active ? theme.palette.primary.main : alpha(m.navy, 0.55) }}>
-                      {c.label}
-                    </Typography>
-                  ) : null}
-                </Box>
-              );
-            })}
-          </Stack>
-
-          <Stack direction="row" alignItems="center" spacing={1}>
-            <Typography sx={{ fontWeight: 800, fontSize: 13.5, color: alpha(m.navy, 0.82) }}>
-              {activeServiceCategory === "all"
-                ? "All"
-                : serviceCategoryTabs.find((x) => x.id === activeServiceCategory)?.label ?? "Services"}
-            </Typography>
-            <Box sx={{ flex: 1 }} />
+        <Stack spacing={1.5}>
+          <Stack
+            direction="row"
+            alignItems="center"
+            spacing={0.75}
+            sx={{ pointerEvents: "auto", width: "100%", minWidth: 0 }}
+          >
             <IconButton
+              type="button"
               size="small"
-              onClick={openAddServiceDrawer}
-              disabled={isBusinessLocked || !businessEditing.servicesDetails}
+              aria-label="Scroll categories left"
+              disabled={!tabScrollState.canLeft}
+              onClick={() => scrollServiceCategoryTabs(-SERVICE_CATEGORY_SLIDER_CARD_WIDTH * 2)}
               sx={{
-                width: 26,
-                height: 26,
-                borderRadius: "999px",
-                bgcolor: alpha(theme.palette.primary.main, 0.10),
-                color: theme.palette.primary.main,
-                "&:hover": { bgcolor: alpha(theme.palette.primary.main, 0.14) },
+                flex: "0 0 auto",
+                border: `1px solid ${alpha(m.navy, 0.12)}`,
+                bgcolor: "#fff",
               }}
             >
-              <AddRoundedIcon sx={{ fontSize: 18 }} />
+              <ChevronLeftRoundedIcon />
+            </IconButton>
+            <Stack
+              ref={serviceCategoryTabsScrollRef}
+              direction="row"
+              spacing={1.25}
+              role="tablist"
+              aria-label="Service categories"
+              sx={{
+                flex: 1,
+                minWidth: 0,
+                overflowX: "auto",
+                pb: 0.25,
+                scrollBehavior: "smooth",
+                scrollbarWidth: "none",
+                msOverflowStyle: "none",
+                "&::-webkit-scrollbar": { display: "none" },
+              }}
+            >
+              {serviceCategoryTabs.map((c) => (
+                <ServiceCategorySliderCard
+                  key={c.id}
+                  ref={c.id === activeServiceCategory ? activeServiceCategoryTabRef : undefined}
+                  label={c.label}
+                  iconId={c.iconId}
+                  active={c.id === activeServiceCategory}
+                  onSelect={() => setActiveServiceCategory(c.id)}
+                />
+              ))}
+            </Stack>
+            <IconButton
+              type="button"
+              size="small"
+              aria-label="Scroll categories right"
+              disabled={!tabScrollState.canRight}
+              onClick={() => scrollServiceCategoryTabs(SERVICE_CATEGORY_SLIDER_CARD_WIDTH * 2)}
+              sx={{
+                flex: "0 0 auto",
+                border: `1px solid ${alpha(m.navy, 0.12)}`,
+                bgcolor: "#fff",
+              }}
+            >
+              <ChevronRightRoundedIcon />
             </IconButton>
           </Stack>
 
-          <Stack spacing={1}>
-            {(activeServiceCategory === "all"
-              ? activeServices
-              : activeServices.filter((it) => it.categoryId === activeServiceCategory)
-            ).map((it) => (
-              <Paper
-                key={it.id}
-                elevation={0}
-                sx={{
-                  borderRadius: "10px",
-                  border: `1px solid ${alpha(m.navy, 0.10)}`,
-                  px: 1.5,
-                  py: 1.15,
-                }}
-              >
-                <Stack direction="row" alignItems="center" spacing={1.25}>
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography sx={{ fontWeight: 800, fontSize: 13, color: alpha(m.navy, 0.86) }}>
-                      {it.name}
-                    </Typography>
-                    <Typography sx={{ fontSize: 11.5, color: theme.palette.primary.main, fontWeight: 600 }}>
-                      {it.durationLabel ? `${it.durationLabel} View` : "View"}
-                    </Typography>
-                  </Box>
-                  <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.72) }}>
-                    {it.priceLabel}
-                  </Typography>
-                  <Stack direction="row" spacing={0.5} alignItems="center">
-                    <IconButton size="small" sx={{ width: 28, height: 28 }}>
-                      <AddRoundedIcon sx={{ fontSize: 18, color: theme.palette.primary.main }} />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={() => openEditServiceDrawer(it as any)}
-                      disabled={isBusinessLocked || !businessEditing.servicesDetails}
-                      sx={{ width: 28, height: 28 }}
+          <Box sx={businessEditing.servicesDetails ? undefined : { pointerEvents: "none" }}>
+            <Stack spacing={1.5}>
+              {activeServiceCategory === "" ? (
+                <Typography
+                  sx={{
+                    fontSize: 13,
+                    fontWeight: 500,
+                    color: alpha(m.navy, 0.55),
+                    py: 2,
+                    px: 1,
+                    textAlign: "center",
+                  }}
+                >
+                  Select a category above to view or manage services.
+                </Typography>
+              ) : (
+                <>
+                  {activeServiceCategory !== "all" ? (
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        borderRadius: "10px",
+                        border: `1px solid ${alpha(m.navy, 0.08)}`,
+                        bgcolor: alpha(m.navy, 0.045),
+                        px: 1.75,
+                        py: 1.1,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1.5,
+                      }}
                     >
-                      <EditRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.62) }} />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={() => deleteService(it.id)}
-                      disabled={isBusinessLocked || !businessEditing.servicesDetails}
-                      sx={{ width: 28, height: 28 }}
-                    >
-                      <DeleteOutlineRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.50) }} />
-                    </IconButton>
-                  </Stack>
-                </Stack>
-              </Paper>
-            ))}
-          </Stack>
+                      <Typography sx={{ fontWeight: 500, fontSize: 14, color: alpha(m.navy, 0.88), flex: 1 }}>
+                        {serviceCategoryTabs.find((x) => x.id === activeServiceCategory)?.label ?? "Services"}
+                      </Typography>
+                      <IconButton
+                        size="small"
+                        onClick={openAddServiceDrawer}
+                        disabled={isBusinessLocked || !businessEditing.servicesDetails}
+                        aria-label="Add service"
+                        sx={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: "999px",
+                          bgcolor: "primary.main",
+                          color: "#fff",
+                          "&:hover": { bgcolor: "primary.dark" },
+                          "&.Mui-disabled": { bgcolor: alpha(m.navy, 0.12), color: alpha(m.navy, 0.35) },
+                        }}
+                      >
+                        <AddRoundedIcon sx={{ fontSize: 22 }} />
+                      </IconButton>
+                    </Paper>
+                  ) : null}
+
+                  {activeServiceCategory === "all" ? (
+                    <Stack spacing={2}>
+                      {groupedAllServiceSections.length === 0 ? (
+                        <Typography sx={{ fontSize: 13, color: alpha(m.navy, 0.55) }}>No services yet.</Typography>
+                      ) : (
+                        groupedAllServiceSections.map((group) => (
+                          <Stack key={group.categoryId} spacing={1}>
+                            <Paper
+                              elevation={0}
+                              sx={{
+                                borderRadius: "10px",
+                                border: `1px solid ${alpha(m.navy, 0.08)}`,
+                                bgcolor: alpha(m.navy, 0.045),
+                                px: 1.75,
+                                py: 1.1,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 1.5,
+                              }}
+                            >
+                              <Typography sx={{ fontWeight: 500, fontSize: 14, color: alpha(m.navy, 0.88), flex: 1 }}>
+                                {group.title}
+                              </Typography>
+                              <IconButton
+                                size="small"
+                                onClick={() => openAddServiceDrawerForCategory(group.categoryId)}
+                                disabled={isBusinessLocked || !businessEditing.servicesDetails}
+                                aria-label={`Add service to ${group.title}`}
+                                sx={{
+                                  width: 36,
+                                  height: 36,
+                                  borderRadius: "999px",
+                                  bgcolor: "primary.main",
+                                  color: "#fff",
+                                  "&:hover": { bgcolor: "primary.dark" },
+                                  "&.Mui-disabled": { bgcolor: alpha(m.navy, 0.12), color: alpha(m.navy, 0.35) },
+                                }}
+                              >
+                                <AddRoundedIcon sx={{ fontSize: 22 }} />
+                              </IconButton>
+                            </Paper>
+                            <Stack spacing={1}>{group.items.map((it) => renderServiceDetailRow(it))}</Stack>
+                          </Stack>
+                        ))
+                      )}
+                    </Stack>
+                  ) : (
+                    <Stack spacing={1}>
+                      {activeCategoryServices.length === 0 ? (
+                        <Typography sx={{ fontSize: 13, color: alpha(m.navy, 0.55) }}>
+                          No services in this category.
+                        </Typography>
+                      ) : (
+                        activeCategoryServices.map((it) => renderServiceDetailRow(it))
+                      )}
+                    </Stack>
+                  )}
+                </>
+              )}
+            </Stack>
+          </Box>
 
           <Paper
             elevation={0}
@@ -2931,6 +3754,9 @@ export default function ProfessionalFixedLocationSetup({
                   <Stack direction="row" spacing={1.25} sx={{ overflowX: "auto", pb: 0.25 }}>
                     {biz.bookCombos.map((c) => {
                       const comboServiceOptions = getBookingServiceOptions(c.categoryId);
+                      const comboFieldsLocked = bookingComboEditId !== c.id;
+                      const comboFieldsDisabled =
+                        !businessEditing.servicesDetails || !biz.projectEnabled || comboFieldsLocked;
 
                       return (
                       <Stack
@@ -2951,7 +3777,7 @@ export default function ProfessionalFixedLocationSetup({
                           select
                           value={c.categoryId}
                           onChange={(e) => updateBookingCombo(c.id, { categoryId: e.target.value })}
-                          disabled={!businessEditing.servicesDetails || !biz.projectEnabled}
+                          disabled={comboFieldsDisabled}
                           sx={{
                             width: 170,
                             "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" },
@@ -2968,7 +3794,7 @@ export default function ProfessionalFixedLocationSetup({
                           select
                           value={c.serviceId}
                           onChange={(e) => updateBookingCombo(c.id, { serviceId: e.target.value })}
-                          disabled={!businessEditing.servicesDetails || !biz.projectEnabled}
+                          disabled={comboFieldsDisabled}
                           sx={{
                             width: 170,
                             "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" },
@@ -2987,8 +3813,23 @@ export default function ProfessionalFixedLocationSetup({
                         >
                           <DeleteOutlineRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.55) }} />
                         </IconButton>
-                        <IconButton size="small" disabled={!businessEditing.servicesDetails || !biz.projectEnabled}>
-                          <EditRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.55) }} />
+                        <IconButton
+                          size="small"
+                          disabled={!businessEditing.servicesDetails || !biz.projectEnabled}
+                          onClick={() => setBookingComboEditId((prev) => (prev === c.id ? null : c.id))}
+                          aria-label={bookingComboEditId === c.id ? "Done editing combination" : "Edit combination"}
+                          sx={
+                            bookingComboEditId === c.id
+                              ? { bgcolor: alpha(theme.palette.primary.main, 0.1) }
+                              : undefined
+                          }
+                        >
+                          <EditRoundedIcon
+                            sx={{
+                              fontSize: 18,
+                              color: bookingComboEditId === c.id ? "primary.main" : alpha(m.navy, 0.55),
+                            }}
+                          />
                         </IconButton>
                       </Stack>
                     );
@@ -3009,7 +3850,6 @@ export default function ProfessionalFixedLocationSetup({
             </Stack>
           </Paper>
         </Stack>
-        </Box>
       </SectionShell>
 
       <SectionShell
@@ -3062,15 +3902,19 @@ export default function ProfessionalFixedLocationSetup({
                 py: 1.5,
               }}
             >
-              {/* ── Single row: avatar block | dropdowns grid | action buttons ── */}
-              <Stack direction="row" spacing={0} alignItems="flex-start">
-
-                {/* Left – profile photo + name + stars */}
+              <Stack direction="row" alignItems="stretch" sx={{ width: "100%" }}>
+                {/* Left – profile */}
                 <Stack
                   direction="row"
                   spacing={1.25}
                   alignItems="center"
-                  sx={{ minWidth: 175, pr: 2 }}
+                  sx={{
+                    flex: "0 0 auto",
+                    minWidth: 0,
+                    maxWidth: 240,
+                    pr: 2,
+                    borderRight: `1px solid ${alpha(m.navy, 0.10)}`,
+                  }}
                 >
                   <Box
                     sx={{
@@ -3093,103 +3937,115 @@ export default function ProfessionalFixedLocationSetup({
                     />
                   </Box>
                   <Box sx={{ minWidth: 0 }}>
-                    <Typography sx={{ fontWeight: 800, fontSize: 13.5, color: alpha(m.navy, 0.88), lineHeight: 1.3 }}>
+                    <Typography sx={{ fontWeight: 500, fontSize: 14, color: alpha(m.navy, 0.88), lineHeight: 1.35 }}>
                       {mem.name}
                     </Typography>
-                    <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.3 }}>
-                      <Rating value={mem.rating} precision={0.5} readOnly size="small"
-                        sx={{ fontSize: 14, "& .MuiRating-iconFilled": { color: "#FAAF00" } }} />
-                      <Typography sx={{ fontSize: 10.5, color: alpha(m.navy, 0.50), fontWeight: 600 }}>
+                    <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.35 }}>
+                      <Rating
+                        value={mem.rating}
+                        precision={0.5}
+                        readOnly
+                        size="small"
+                        sx={{ fontSize: 14, "& .MuiRating-iconFilled": { color: "#FAAF00" } }}
+                      />
+                      <Typography sx={{ fontSize: 10.5, color: alpha(m.navy, 0.50), fontWeight: 500 }}>
                         {mem.reviewsLabel}
                       </Typography>
                     </Stack>
                   </Box>
                 </Stack>
 
-                {/* Middle – 4 + 3 dropdown grid */}
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  {/* Row 1 – 4 dropdowns */}
-                  <Grid container spacing={1} sx={{ mb: 1 }}>
-                    {(["slot1", "slot2", "slot3", "slot4"] as const).map((key) => (
-                      <Grid key={key} item xs={3}>
-                        <MollureFormField
-                          select
-                          value={mem.services[key as keyof typeof mem.services]}
-                          onChange={(e) => updateMemberService(mem.id, key as keyof TeamService, e.target.value)}
-                          sx={{
-                            "& .MuiOutlinedInput-root": {
-                              minHeight: 36, borderRadius: "8px",
-                              "& fieldset": { borderColor: alpha(m.navy, 0.12) },
-                            },
-                            "& .MuiSelect-select": { fontSize: 12, fontWeight: 600, py: "7px", color: alpha(m.navy, 0.72) },
-                            "& .MuiSvgIcon-root": { fontSize: 18, color: alpha(m.navy, 0.40) },
-                          }}
-                        >
-                          <MenuItem value="">Select</MenuItem>
-                          {allSubcategoryOptions.map((option) => (
-                            <MenuItem key={option.value} value={option.value} sx={{ fontSize: 12 }}>
-                              {option.label}
-                            </MenuItem>
-                          ))}
-                        </MollureFormField>
-                      </Grid>
-                    ))}
-                  </Grid>
-                  {/* Row 2 – 3 dropdowns */}
-                  <Grid container spacing={1}>
-                    {(["slot5", "slot6", "slot7"] as const).map((key) => (
-                      <Grid key={key} item xs={4}>
-                        <MollureFormField
-                          select
-                          value={mem.services[key]}
-                          onChange={(e) => updateMemberService(mem.id, key, e.target.value)}
-                          sx={{
-                            "& .MuiOutlinedInput-root": {
-                              minHeight: 36, borderRadius: "8px",
-                              "& fieldset": { borderColor: alpha(m.navy, 0.12) },
-                            },
-                            "& .MuiSelect-select": { fontSize: 12, fontWeight: 600, py: "7px", color: alpha(m.navy, 0.72) },
-                            "& .MuiSvgIcon-root": { fontSize: 18, color: alpha(m.navy, 0.40) },
-                          }}
-                        >
-                          <MenuItem value="">Select</MenuItem>
-                          {allSubcategoryOptions.map((option) => (
-                            <MenuItem key={option.value} value={option.value} sx={{ fontSize: 12 }}>
-                              {option.label}
-                            </MenuItem>
-                          ))}
-                        </MollureFormField>
-                      </Grid>
-                    ))}
-                  </Grid>
+                {/* Middle – assigned services as compact selects */}
+                <Box
+                  sx={{
+                    flex: 1,
+                    minWidth: 0,
+                    px: 2,
+                    py: 0.25,
+                    borderRight: `1px solid ${alpha(m.navy, 0.10)}`,
+                    alignSelf: "center",
+                  }}
+                >
+                  {TEAM_SERVICE_SLOT_KEYS.some((key) => String(mem.services[key] ?? "").trim()) ? (
+                    <Grid container spacing={1}>
+                      {TEAM_SERVICE_SLOT_KEYS.filter((key) => String(mem.services[key] ?? "").trim()).map((key) => (
+                        <Grid key={key} item xs={12} sm={6} md={4}>
+                          <Typography
+                            sx={{ fontSize: 10.5, fontWeight: 600, color: alpha(m.navy, 0.52), mb: 0.35, lineHeight: 1.2 }}
+                          >
+                            {getTeamServiceSelectLabel(mem.services[key])}
+                          </Typography>
+                          <MollureFormField
+                            select
+                            value={mem.services[key]}
+                            onChange={(e) => updateMemberService(mem.id, key, e.target.value)}
+                            disabled={isBusinessLocked || !businessEditing.manageTeam}
+                            sx={{
+                              "& .MuiOutlinedInput-root": {
+                                minHeight: 36,
+                                borderRadius: "8px",
+                                bgcolor: "#fff",
+                                "& fieldset": { borderColor: alpha(m.navy, 0.12) },
+                              },
+                              "& .MuiSelect-select": {
+                                fontSize: 12,
+                                fontWeight: 500,
+                                py: "7px",
+                                color: alpha(m.navy, 0.72),
+                              },
+                              "& .MuiSvgIcon-root": { fontSize: 18, color: alpha(m.navy, 0.40) },
+                            }}
+                          >
+                            <MenuItem value="">Select</MenuItem>
+                            {allSubcategoryOptions.map((option) => (
+                              <MenuItem key={option.value} value={option.value} sx={{ fontSize: 12 }}>
+                                {option.label}
+                              </MenuItem>
+                            ))}
+                          </MollureFormField>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  ) : (
+                    <Typography sx={{ fontSize: 12, fontWeight: 500, color: alpha(m.navy, 0.42) }}>
+                      No services assigned
+                    </Typography>
+                  )}
                 </Box>
 
-                {/* Right – edit / delete stacked */}
-                <Stack spacing={0.75} alignItems="center" sx={{ pl: 1.5, pt: 0.25 }}>
+                {/* Right – actions */}
+                <Stack spacing={1} alignItems="center" justifyContent="flex-start" sx={{ flex: "0 0 auto", pl: 1.5, pr: 0.5, pt: 0.5 }}>
                   <IconButton
                     size="small"
                     onClick={() => openEditDrawer(mem)}
+                    disabled={isBusinessLocked || !businessEditing.manageTeam}
                     sx={{
-                      width: 30, height: 30, borderRadius: "8px",
-                      bgcolor: alpha(m.navy, 0.05),
+                      width: 36,
+                      height: 36,
+                      borderRadius: "999px",
+                      bgcolor: alpha(m.navy, 0.06),
+                      border: `1px solid ${alpha(m.navy, 0.10)}`,
                       "&:hover": { bgcolor: alpha(m.navy, 0.10) },
                     }}
                   >
-                    <EditRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.50) }} />
+                    <EditRoundedIcon sx={{ fontSize: 17, color: alpha(m.navy, 0.48) }} />
                   </IconButton>
                   <IconButton
                     size="small"
                     onClick={() => removeTeamMember(mem.id)}
+                    disabled={isBusinessLocked || !businessEditing.manageTeam}
                     sx={{
-                      width: 30, height: 30, borderRadius: "8px",
-                      bgcolor: alpha(m.navy, 0.05),
+                      width: 36,
+                      height: 36,
+                      borderRadius: "999px",
+                      bgcolor: alpha(m.navy, 0.06),
+                      border: `1px solid ${alpha(m.navy, 0.10)}`,
                       "&:hover": { bgcolor: alpha(m.navy, 0.10) },
                     }}
                   >
-                    <DeleteOutlineRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.50) }} />
+                    <DeleteOutlineRoundedIcon sx={{ fontSize: 17, color: alpha(m.navy, 0.48) }} />
                   </IconButton>
                 </Stack>
-
               </Stack>
             </Paper>
           ))}
@@ -3543,7 +4399,10 @@ export default function ProfessionalFixedLocationSetup({
             <IconButton
               size="small"
               onClick={deleteSelectedPortfolio}
-              disabled={!businessEditing.portfolio}
+              disabled={
+                !businessEditing.portfolio ||
+                !Object.values(selectedPortfolioIds).some(Boolean)
+              }
               sx={{
                 width: 30,
                 height: 30,
@@ -3592,11 +4451,15 @@ export default function ProfessionalFixedLocationSetup({
             return (
               <Box
                 key={it.id}
-                role="button"
+                role="checkbox"
+                aria-checked={checked}
                 tabIndex={0}
                 onClick={() => togglePortfolio(it.id)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") togglePortfolio(it.id);
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    togglePortfolio(it.id);
+                  }
                 }}
                 sx={{
                   position: "relative",
@@ -3616,24 +4479,27 @@ export default function ProfessionalFixedLocationSetup({
                   unoptimized
                   style={{ width: "100%", height: "140px", objectFit: "cover", display: "block" }}
                 />
-                <Checkbox
-                  checked={checked}
-                  tabIndex={-1}
+                <Box
+                  aria-hidden
                   sx={{
                     position: "absolute",
                     top: 8,
                     left: 8,
-                    p: 0,
+                    zIndex: 2,
                     width: 20,
                     height: 20,
                     borderRadius: "4px",
-                    bgcolor: checked ? theme.palette.primary.main : alpha("#fff", 0.55),
-                    color: checked ? "#fff" : "transparent",
-                    border: `1px solid ${alpha(m.navy, 0.18)}`,
-                    "& .MuiSvgIcon-root": { fontSize: 18 },
-                    "&:hover": { bgcolor: checked ? theme.palette.primary.main : alpha("#fff", 0.75) },
+                    border: `1.5px solid ${checked ? theme.palette.primary.dark : alpha(m.navy, 0.22)}`,
+                    bgcolor: checked ? theme.palette.primary.dark : alpha("#fff", 0.92),
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    pointerEvents: "none",
+                    boxShadow: checked ? "none" : `inset 0 0 0 1px ${alpha(m.navy, 0.06)}`,
                   }}
-                />
+                >
+                  {checked ? <CheckRoundedIcon sx={{ fontSize: 14, color: "#fff" }} /> : null}
+                </Box>
               </Box>
             );
           })}

@@ -62,5 +62,9 @@ export const baseApi = createApi({
   reducerPath: "baseApi",
   tagTypes: ["Profile", "BusinessSetup", "BusinessCategories", "Calendar"],
   baseQuery: baseQueryWithAuthHandling,
+  /** Keep cached query data longer after the last subscriber unmounts (seconds). */
+  keepUnusedDataFor: 600,
+  /** Avoid automatic refetch when arguments are unchanged on remount (aligns with typical “stale” UX). */
+  refetchOnMountOrArgChange: false,
   endpoints: () => ({}),
 });

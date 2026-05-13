@@ -44,12 +44,11 @@ import { marketingShellFooter } from "../../../data/marketingShell.data";
 import { profilePageData } from "../profile/data-profile";
 import { useAppSelector } from "../../../store/hooks";
 
-export default function ClientBookingPage() {
+function ClientBookingHistoryView() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const router = useRouter();
   const theme = useTheme();
   const m = theme.palette.mollure;
+  const user = useAppSelector((s) => s.auth.user);
 
   const clientTopTabs = React.useMemo(
     () =>
@@ -61,10 +60,128 @@ export default function ClientBookingPage() {
     [],
   );
 
-  const view = searchParams?.get("view") ?? "";
-  const mode = searchParams?.get("mode") ?? "";
-  const showHistory = view === "history" || mode !== "create";
-  const user = useAppSelector((s) => s.auth.user);
+  const [confirmedBookings, setConfirmedBookings] = React.useState<any[]>([]);
+
+  React.useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem("mollure:client_bookings");
+      const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+      setConfirmedBookings(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setConfirmedBookings([]);
+    }
+  }, []);
+
+  const fallbackAddress = "Marina-Park 50, Den Helder, Noord-Holland";
+
+  return (
+    <Box sx={{ minHeight: "100vh", bgcolor: profilePageData.pageBg }}>
+      <MollureMarketingHeader
+        navItems={[]}
+        isAuthed
+        userLabel={user?.email ?? ""}
+        userName={user?.email ?? ""}
+        userAvatarSrc={undefined}
+        homeHref="/clients/listing"
+      />
+
+      <Box sx={{ mt: 2, bgcolor: "transparent" }}>
+        <Container maxWidth="lg" sx={{ px: { xs: 2, sm: 3, md: 4 }, py: 1.5 }}>
+          <ClientTopTabs
+            tabs={clientTopTabs}
+            activeLabel={pathname?.includes("/clients/booking") ? "Booking" : pathname?.includes("/clients/favourites") ? "Favorites" : "Profile"}
+          />
+        </Container>
+      </Box>
+
+      <Container maxWidth="lg" sx={{ pb: 5 }}>
+        <Paper
+          elevation={0}
+          sx={{
+            borderRadius: "12px",
+            border: `1px solid ${alpha(m.navy, 0.08)}`,
+            bgcolor: "#fff",
+            overflow: "hidden",
+            boxShadow: "0 10px 22px rgba(16, 35, 63, 0.05)",
+          }}
+        >
+          <Box sx={{ px: { xs: 2, md: 2.5 }, py: 1.75, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <Typography sx={{ fontWeight: 900, color: alpha(m.navy, 0.86), fontSize: 14 }}>Your Bookings</Typography>
+            <Button
+              component={Link}
+              href="/clients/listing"
+              variant="contained"
+              disableElevation
+              sx={{ borderRadius: "10px", textTransform: "none", fontWeight: 900, bgcolor: m.teal, "&:hover": { bgcolor: m.tealDark } }}
+            >
+              New Booking
+            </Button>
+          </Box>
+          <Divider />
+          <Box sx={{ p: { xs: 2, md: 2.5 } }}>
+            {confirmedBookings.length === 0 ? (
+              <Typography sx={{ fontWeight: 800, color: alpha(m.navy, 0.55) }}>
+                No bookings yet.
+              </Typography>
+            ) : (
+              <Stack spacing={1.25}>
+                {confirmedBookings.map((b) => {
+                  const shopName = b?.shop?.shopName ?? "Salon";
+                  const address = b?.shop?.addressLabel ?? b?.shop?.municipalityLabel ?? fallbackAddress;
+                  const date = b?.draft?.selectedDateISO ?? "";
+                  const time = b?.draft?.selectedTime ?? "";
+                  const total = b?.draft?.total ?? 0;
+                  return (
+                    <Paper
+                      key={b?.id ?? `${shopName}-${date}-${time}`}
+                      elevation={0}
+                      sx={{
+                        borderRadius: "12px",
+                        border: `1px solid ${alpha(m.navy, 0.10)}`,
+                        p: 1.6,
+                      }}
+                    >
+                      <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1.25}>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography sx={{ fontWeight: 900, color: alpha(m.navy, 0.85) }}>{shopName}</Typography>
+                          <Typography sx={{ mt: 0.25, fontWeight: 800, color: alpha(m.navy, 0.55), fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {address}
+                          </Typography>
+                          <Typography sx={{ mt: 0.35, fontWeight: 900, color: alpha(m.teal, 0.95), fontSize: 12 }}>
+                            {date} {time ? `• ${time}` : ""}
+                          </Typography>
+                        </Box>
+                        <Stack alignItems={{ xs: "flex-start", sm: "flex-end" }} spacing={0.5}>
+                          <Chip
+                            label="Confirmed"
+                            size="small"
+                            sx={{ height: 22, fontWeight: 900, bgcolor: alpha(m.teal, 0.12), color: m.teal }}
+                          />
+                          <Typography sx={{ fontWeight: 1000, color: alpha(m.navy, 0.85) }}>{total} €</Typography>
+                        </Stack>
+                      </Stack>
+                    </Paper>
+                  );
+                })}
+              </Stack>
+            )}
+          </Box>
+        </Paper>
+      </Container>
+
+      <MarketingSiteFooter
+        columns={marketingShellFooter.columns.map((col) => ({ title: col.title, items: [...col.items] }))}
+        copyright={marketingShellFooter.copyright}
+        sx={{ mt: 2 }}
+      />
+    </Box>
+  );
+}
+
+function ClientBookingCreateView() {
+  const router = useRouter();
+  const theme = useTheme();
+  const m = theme.palette.mollure;
 
   const [shop, setShop] = React.useState<{
     shopId: string;
@@ -75,124 +192,6 @@ export default function ClientBookingPage() {
   } | null>(null);
 
   const fallbackAddress = "Marina-Park 50, Den Helder, Noord-Holland";
-
-  const [confirmedBookings, setConfirmedBookings] = React.useState<any[]>([]);
-
-  React.useEffect(() => {
-    if (!showHistory) return;
-    try {
-      const raw = window.localStorage.getItem("mollure:client_bookings");
-      const parsed = raw ? (JSON.parse(raw) as unknown) : [];
-      setConfirmedBookings(Array.isArray(parsed) ? parsed : []);
-    } catch {
-      setConfirmedBookings([]);
-    }
-  }, [showHistory]);
-
-  if (showHistory) {
-    return (
-      <Box sx={{ minHeight: "100vh", bgcolor: profilePageData.pageBg }}>
-        <MollureMarketingHeader
-          navItems={[]}
-          isAuthed
-          userLabel={user?.email ?? ""}
-          userName={user?.email ?? ""}
-          userAvatarSrc={undefined}
-          homeHref="/clients/listing"
-        />
-
-        <Box sx={{ mt: 2, bgcolor: "transparent" }}>
-          <Container maxWidth="lg" sx={{ px: { xs: 2, sm: 3, md: 4 }, py: 1.5 }}>
-            <ClientTopTabs
-              tabs={clientTopTabs}
-              activeLabel={pathname?.includes("/clients/booking") ? "Booking" : pathname?.includes("/clients/favourites") ? "Favorites" : "Profile"}
-            />
-          </Container>
-        </Box>
-
-        <Container maxWidth="lg" sx={{ pb: 5 }}>
-          <Paper
-            elevation={0}
-            sx={{
-              borderRadius: "12px",
-              border: `1px solid ${alpha(m.navy, 0.08)}`,
-              bgcolor: "#fff",
-              overflow: "hidden",
-              boxShadow: "0 10px 22px rgba(16, 35, 63, 0.05)",
-            }}
-          >
-            <Box sx={{ px: { xs: 2, md: 2.5 }, py: 1.75, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <Typography sx={{ fontWeight: 900, color: alpha(m.navy, 0.86), fontSize: 14 }}>Your Bookings</Typography>
-              <Button
-                component={Link}
-                href="/clients/listing"
-                variant="contained"
-                disableElevation
-                sx={{ borderRadius: "10px", textTransform: "none", fontWeight: 900, bgcolor: m.teal, "&:hover": { bgcolor: m.tealDark } }}
-              >
-                New Booking
-              </Button>
-            </Box>
-            <Divider />
-            <Box sx={{ p: { xs: 2, md: 2.5 } }}>
-              {confirmedBookings.length === 0 ? (
-                <Typography sx={{ fontWeight: 800, color: alpha(m.navy, 0.55) }}>
-                  No bookings yet.
-                </Typography>
-              ) : (
-                <Stack spacing={1.25}>
-                  {confirmedBookings.map((b) => {
-                    const shopName = b?.shop?.shopName ?? "Salon";
-                    const address = b?.shop?.addressLabel ?? b?.shop?.municipalityLabel ?? fallbackAddress;
-                    const date = b?.draft?.selectedDateISO ?? "";
-                    const time = b?.draft?.selectedTime ?? "";
-                    const total = b?.draft?.total ?? 0;
-                    return (
-                      <Paper
-                        key={b?.id ?? `${shopName}-${date}-${time}`}
-                        elevation={0}
-                        sx={{
-                          borderRadius: "12px",
-                          border: `1px solid ${alpha(m.navy, 0.10)}`,
-                          p: 1.6,
-                        }}
-                      >
-                        <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1.25}>
-                          <Box sx={{ minWidth: 0 }}>
-                            <Typography sx={{ fontWeight: 900, color: alpha(m.navy, 0.85) }}>{shopName}</Typography>
-                            <Typography sx={{ mt: 0.25, fontWeight: 800, color: alpha(m.navy, 0.55), fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                              {address}
-                            </Typography>
-                            <Typography sx={{ mt: 0.35, fontWeight: 900, color: alpha(m.teal, 0.95), fontSize: 12 }}>
-                              {date} {time ? `• ${time}` : ""}
-                            </Typography>
-                          </Box>
-                          <Stack alignItems={{ xs: "flex-start", sm: "flex-end" }} spacing={0.5}>
-                            <Chip
-                              label="Confirmed"
-                              size="small"
-                              sx={{ height: 22, fontWeight: 900, bgcolor: alpha(m.teal, 0.12), color: m.teal }}
-                            />
-                            <Typography sx={{ fontWeight: 1000, color: alpha(m.navy, 0.85) }}>{total} €</Typography>
-                          </Stack>
-                        </Stack>
-                      </Paper>
-                    );
-                  })}
-                </Stack>
-              )}
-            </Box>
-          </Paper>
-        </Container>
-
-        <MarketingSiteFooter
-          columns={marketingShellFooter.columns.map((col) => ({ title: col.title, items: [...col.items] }))}
-          copyright={marketingShellFooter.copyright}
-          sx={{ mt: 2 }}
-        />
-      </Box>
-    );
-  }
 
   const startOfDay = (d: Date) => {
     const next = new Date(d);
@@ -1513,4 +1512,13 @@ export default function ClientBookingPage() {
       </Container>
     </Box>
   );
+}
+
+export default function ClientBookingPage() {
+  const searchParams = useSearchParams();
+  const view = searchParams?.get("view") ?? "";
+  const mode = searchParams?.get("mode") ?? "";
+  const showHistory = view === "history" || mode !== "create";
+  if (showHistory) return <ClientBookingHistoryView />;
+  return <ClientBookingCreateView />;
 }

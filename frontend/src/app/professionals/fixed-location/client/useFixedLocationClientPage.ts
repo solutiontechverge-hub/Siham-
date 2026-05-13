@@ -84,7 +84,6 @@ export function useFixedLocationClientPage() {
   const [nonMollureClientType, setNonMollureClientType] = React.useState<"" | "Individual Client" | "Company Client">(
     "",
   );
-  const [nonMollureStep, setNonMollureStep] = React.useState<"type" | "individual" | "company">("type");
   const [indFirstName, setIndFirstName] = React.useState("");
   const [indLastName, setIndLastName] = React.useState("");
   const [indGender, setIndGender] = React.useState("");
@@ -310,7 +309,6 @@ export function useFixedLocationClientPage() {
 
   const resetNonMollureAddForm = React.useCallback(() => {
     setNonMollureClientType("");
-    setNonMollureStep("type");
     setIndFirstName("");
     setIndLastName("");
     setIndGender("");
@@ -383,7 +381,11 @@ export function useFixedLocationClientPage() {
   }, [formatAddedOn, selectedMollureId]);
 
   const addNonMollureClient = React.useCallback(() => {
-    if (nonMollureStep === "individual") {
+    if (!nonMollureClientType) {
+      setNonMollureTypeError("Please select a client type");
+      return false;
+    }
+    if (nonMollureClientType === "Individual Client") {
       if (!validateIndividual()) return false;
       const fullName = `${indFirstName.trim()} ${indLastName.trim()}`.trim();
       const email = indEmail.trim().toLowerCase();
@@ -427,7 +429,7 @@ export function useFixedLocationClientPage() {
       return true;
     }
 
-    if (nonMollureStep === "company") {
+    if (nonMollureClientType === "Company Client") {
       if (!validateCompany()) return false;
       const email = coEmail.trim().toLowerCase();
       const contactName = `${coContactFirst.trim()} ${coContactLast.trim()}`.trim();
@@ -489,7 +491,7 @@ export function useFixedLocationClientPage() {
     indGender,
     indLastName,
     indPhone,
-    nonMollureStep,
+    nonMollureClientType,
     resetNonMollureAddForm,
     validateCompany,
     validateIndividual,
@@ -497,6 +499,8 @@ export function useFixedLocationClientPage() {
 
   const openNonMollureAddDrawer = React.useCallback(() => {
     resetNonMollureAddForm();
+    setNonMollureClientType("Individual Client");
+    setNonMollureTypeError("");
     setAddNonMollureOpen(true);
   }, [resetNonMollureAddForm]);
 
@@ -515,7 +519,7 @@ export function useFixedLocationClientPage() {
       setClientDetailsMode("view");
     }
     if (blockClientId === id) setBlockClientId(null);
-    setSnackbar({ open: true, message: "Client Deleted", severity: "info" });
+    setSnackbar({ open: true, message: "Client Deleted", severity: "error" });
   }, [blockClientId, deleteClientId, viewClientId]);
 
   const confirmBlockClient = React.useCallback(() => {
@@ -528,7 +532,7 @@ export function useFixedLocationClientPage() {
       setClientDetailsMode("view");
     }
     if (deleteClientId === id) setDeleteClientId(null);
-    setSnackbar({ open: true, message: "Client Blocked", severity: "info" });
+    setSnackbar({ open: true, message: "Client Blocked", severity: "error" });
   }, [blockClientId, deleteClientId, viewClientId]);
 
   const saveClientEdits = React.useCallback(() => {
@@ -623,8 +627,6 @@ export function useFixedLocationClientPage() {
     setSelectedMollureId,
     nonMollureClientType,
     setNonMollureClientType,
-    nonMollureStep,
-    setNonMollureStep,
     indFirstName,
     setIndFirstName,
     indLastName,

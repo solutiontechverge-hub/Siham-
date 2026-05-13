@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import { Box, Button, Stack, Table, TableBody, TableCell, TableHead, TableRow } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import type {
@@ -203,11 +204,14 @@ export default function FinanceDocumentPreviewDrawer({
   const professionalCoc = professionalProfile?.ccc_number || "-";
   const clientParty = row?.document?.client;
 
-  const clientLines = [
-    `Legal Name: ${clientParty?.legalName || row?.clientName || "Sara Johnson"}`,
-    ...(clientParty?.address ? [`Client Address: ${clientParty.address}`] : []),
-    `Email: ${clientParty?.email || row?.clientEmail || "sarajohnson@gmail.com"}`,
-  ];
+  const clientLines = React.useMemo(
+    () => [
+      `Legal Name: ${clientParty?.legalName || row?.clientName || "Sara Johnson"}`,
+      ...(clientParty?.address ? [`Client Address: ${clientParty.address}`] : []),
+      `Email: ${clientParty?.email || row?.clientEmail || "sarajohnson@gmail.com"}`,
+    ],
+    [clientParty, row?.clientEmail, row?.clientName],
+  );
 
   const downloadDocumentPdf = React.useCallback(async () => {
     try {
@@ -398,14 +402,17 @@ export default function FinanceDocumentPreviewDrawer({
               <BodyText sx={{ mt: 0.2, fontSize: 12.5, color: alpha(m.navy, 0.62) }}>Due Date: {dueDate}</BodyText>
             </Box>
 
-            <Box sx={{ pt: 0.25, display: "flex", justifyContent: "center" }}>
+            <Box sx={{ pt: 0.25, display: "flex", justifyContent: "center", width: 48, height: 48, flexShrink: 0 }}>
               {settings.logoDataUrl ? (
-                <Box
-                  component="img"
-                  src={settings.logoDataUrl}
-                  alt={`${titleLabel} logo`}
-                  sx={{ width: 48, height: 48, objectFit: "contain", borderRadius: "10px" }}
-                />
+                <Box sx={{ position: "relative", width: 48, height: 48 }}>
+                  <Image
+                    src={settings.logoDataUrl}
+                    alt={`${titleLabel} logo`}
+                    fill
+                    unoptimized
+                    style={{ objectFit: "contain", borderRadius: "10px" }}
+                  />
+                </Box>
               ) : null}
             </Box>
 
