@@ -2,7 +2,7 @@
 # One shell command per preDeployCommand entry (see Railway config-as-code docs).
 
 [deploy]
-startCommand = "npm run start"
+startCommand = "npm run start:backend"
 preDeployCommand = ["npm run migrate"]
 healthcheckPath = "/api/health"
 healthcheckTimeout = 300
