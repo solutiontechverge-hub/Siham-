@@ -25,11 +25,7 @@ app.get("/", (_req, res) => {
 });
 
 app.get("/api/health", (_req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "API is running.",
-    data: null,
-  });
+  res.status(200).json({ status: "ok" });
 });
 
 app.use("/api/auth", authRoutes);
