@@ -21,6 +21,7 @@ export type TransactionsTableProps = {
   selected: Record<string, boolean>;
   onToggleOne: (id: string) => void;
   onToggleAll: (checked: boolean) => void;
+  onOpenDocument: (row: TransactionRow, documentType: "invoice" | "receipt") => void;
   canLoadMore: boolean;
   onLoadMore?: () => void;
   theme: Theme;
@@ -32,6 +33,7 @@ export default function TransactionsTable({
   selected,
   onToggleOne,
   onToggleAll,
+  onOpenDocument,
   canLoadMore,
   onLoadMore,
   theme,
@@ -161,6 +163,7 @@ export default function TransactionsTable({
                         key={label}
                         component="button"
                         type="button"
+                        onClick={() => onOpenDocument(row, label.toLowerCase() as "invoice" | "receipt")}
                         underline="hover"
                         sx={{
                           fontSize: 12,

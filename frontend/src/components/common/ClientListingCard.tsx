@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import FavoriteBorderRoundedIcon from "@mui/icons-material/FavoriteBorderRounded";
 import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
@@ -19,7 +20,24 @@ export type ClientListingCardProps = {
 
 export default function ClientListingCard({ item, isFavorite, onToggleFavorite }: ClientListingCardProps) {
   const tokens = useTheme().palette.mollure;
+  const router = useRouter();
   const [mode, setMode] = React.useState<"fixed" | "desired">(item.locationModeDefault);
+
+  const onOpenBooking = () => {
+    try {
+      const payload = {
+        shopId: item.id,
+        shopName: `${item.title} ${item.subtitle}`.trim(),
+        municipalityLabel: item.municipalityLabel,
+        addressLabel: item.addressLabel,
+        locationMode: mode,
+      };
+      window.localStorage.setItem("mollure:selected_shop", JSON.stringify(payload));
+    } catch {
+      // ignore
+    }
+    router.push("/clients/booking?mode=create");
+  };
 
   return (
     <AppCard
@@ -29,7 +47,10 @@ export default function ClientListingCard({ item, isFavorite, onToggleFavorite }
         backgroundColor: "#fff",
         border: `1px solid ${tokens.cardBorder}`,
         boxShadow: "0 10px 22px rgba(16, 24, 40, 0.08)",
+        cursor: "pointer",
+        "&:hover": { transform: "translateY(-1px)" },
       }}
+      onClick={onOpenBooking}
     >
       <Box sx={{ position: "relative" }}>
         <Box sx={{ position: "relative", height: 170 }}>
@@ -37,7 +58,10 @@ export default function ClientListingCard({ item, isFavorite, onToggleFavorite }
         </Box>
 
         <IconButton
-          onClick={onToggleFavorite}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleFavorite();
+          }}
           sx={{
             position: "absolute",
             top: 10,
@@ -123,7 +147,10 @@ export default function ClientListingCard({ item, isFavorite, onToggleFavorite }
             }}
           >
             <Button
-              onClick={() => setMode("fixed")}
+              onClick={(e) => {
+                e.stopPropagation();
+                setMode("fixed");
+              }}
               sx={{
                 flex: 1,
                 py: 1.0,
@@ -140,7 +167,10 @@ export default function ClientListingCard({ item, isFavorite, onToggleFavorite }
             </Button>
             <Divider orientation="vertical" flexItem sx={{ borderColor: alpha(tokens.navy, 0.12) }} />
             <Button
-              onClick={() => setMode("desired")}
+              onClick={(e) => {
+                e.stopPropagation();
+                setMode("desired");
+              }}
               sx={{
                 flex: 1,
                 py: 1.0,

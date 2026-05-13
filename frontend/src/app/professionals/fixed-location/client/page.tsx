@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import FixedLocationPageScaffold from "../../../../components/common/FixedLocationPageScaffold";
 import {
   Alert,
@@ -44,6 +45,42 @@ export default function FixedLocationClientPage() {
   const theme = useTheme();
   const m = theme.palette.mollure;
 
+  const genderSelectProps = useMemo(
+    () => ({
+      displayEmpty: true as const,
+      renderValue: (selected: unknown) => {
+        const v = String(selected ?? "").trim();
+        if (!v) {
+          return (
+            <Typography component="span" sx={{ color: alpha(m.navy, 0.48), fontWeight: 500, fontSize: "0.8125rem" }}>
+              Select gender
+            </Typography>
+          );
+        }
+        return v;
+      },
+    }),
+    [m.navy],
+  );
+
+  const clientTypeSelectProps = useMemo(
+    () => ({
+      displayEmpty: true as const,
+      renderValue: (selected: unknown) => {
+        const v = String(selected ?? "").trim();
+        if (!v) {
+          return (
+            <Typography component="span" sx={{ color: alpha(m.navy, 0.48), fontWeight: 500, fontSize: "0.8125rem" }}>
+              Select client type
+            </Typography>
+          );
+        }
+        return v;
+      },
+    }),
+    [m.navy],
+  );
+
   const {
     clients,
     query,
@@ -75,8 +112,6 @@ export default function FixedLocationClientPage() {
     setSelectedMollureId,
     nonMollureClientType,
     setNonMollureClientType,
-    nonMollureStep,
-    setNonMollureStep,
     indFirstName,
     setIndFirstName,
     indLastName,
@@ -756,15 +791,18 @@ export default function FixedLocationClientPage() {
                     />
                     <MollureFormField
                       select
-                      value={editCompanyForm.gender || "Select Gender"}
+                      label="Gender"
+                      value={editCompanyForm.gender}
                       onChange={(e) => setEditCompanyForm((p) => ({ ...p, gender: e.target.value }))}
                       sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                      SelectProps={genderSelectProps}
                     >
-                      {["Select Gender", "Male", "Female", "Other"].map((o) => (
-                        <MenuItem key={o} value={o === "Select Gender" ? "" : o}>
-                          {o}
-                        </MenuItem>
-                      ))}
+                      <MenuItem value="">
+                        <Typography sx={{ color: alpha(m.navy, 0.5) }}>Select gender</Typography>
+                      </MenuItem>
+                      <MenuItem value="Male">Male</MenuItem>
+                      <MenuItem value="Female">Female</MenuItem>
+                      <MenuItem value="Other">Other</MenuItem>
                     </MollureFormField>
 
                     <Box sx={{ pt: 0.25 }}>
@@ -951,15 +989,18 @@ export default function FixedLocationClientPage() {
                     />
                     <MollureFormField
                       select
-                      value={editIndividualForm.gender || "Select Gender"}
+                      label="Gender"
+                      value={editIndividualForm.gender}
                       onChange={(e) => setEditIndividualForm((p) => ({ ...p, gender: e.target.value }))}
                       sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                      SelectProps={genderSelectProps}
                     >
-                      {["Select Gender", "Male", "Female", "Other"].map((o) => (
-                        <MenuItem key={o} value={o === "Select Gender" ? "" : o}>
-                          {o}
-                        </MenuItem>
-                      ))}
+                      <MenuItem value="">
+                        <Typography sx={{ color: alpha(m.navy, 0.5) }}>Select gender</Typography>
+                      </MenuItem>
+                      <MenuItem value="Male">Male</MenuItem>
+                      <MenuItem value="Female">Female</MenuItem>
+                      <MenuItem value="Other">Other</MenuItem>
                     </MollureFormField>
                     <Box sx={{ pt: 0.25 }}>
                       <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
@@ -1413,22 +1454,7 @@ export default function FixedLocationClientPage() {
         open={addNonMollureOpen}
         onClose={() => setAddNonMollureOpen(false)}
         width={{ xs: "100%", sm: 440 }}
-        title={
-          nonMollureStep === "individual"
-            ? "Add Individual Client"
-            : nonMollureStep === "company"
-              ? "Add Company Client"
-              : "Add Non-Mollure Client"
-        }
-        onBack={
-          nonMollureStep !== "type"
-            ? () => {
-                setNonMollureStep("type");
-                setIndErrors({});
-                setCompErrors({});
-              }
-            : undefined
-        }
+        title="Add Non-Mollure Client"
         footer={
           <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ px: 2.5, py: 2 }}>
             <Button
@@ -1451,24 +1477,7 @@ export default function FixedLocationClientPage() {
               variant="contained"
               disableElevation
               onClick={() => {
-                if (nonMollureStep === "type") {
-                  if (!nonMollureClientType) {
-                    setNonMollureTypeError("Please select a client type");
-                    return;
-                  }
-                  setNonMollureTypeError("");
-                  setIndErrors({});
-                  setCompErrors({});
-                  setNonMollureStep(nonMollureClientType === "Company Client" ? "company" : "individual");
-                  return;
-                }
-                if (nonMollureStep === "individual") {
-                  addNonMollureClient();
-                  return;
-                }
-                if (nonMollureStep === "company") {
-                  addNonMollureClient();
-                }
+                addNonMollureClient();
               }}
               sx={{
                 borderRadius: "8px",
@@ -1481,46 +1490,42 @@ export default function FixedLocationClientPage() {
                 px: 3,
               }}
             >
-              {nonMollureStep === "company" ? "Save" : "Next"}
+              Save
             </Button>
           </Stack>
         }
       >
         <Box sx={{ px: 2.5, py: 2 }}>
-            {nonMollureStep === "type" && (
-              <>
-                <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
-                  Client Type
-                </Typography>
-                <MollureFormField
-                  select
-                  value={nonMollureClientType || "Select Client Type"}
-                  onChange={(e) => {
-                    const nextType = e.target.value as "" | "Individual Client" | "Company Client";
-                    setNonMollureClientType(nextType);
-                    setNonMollureTypeError("");
-                    setIndErrors({});
-                    setCompErrors({});
-                    if (nextType === "Company Client") {
-                      setNonMollureStep("company");
-                    } else if (nextType === "Individual Client") {
-                      setNonMollureStep("individual");
-                    }
-                  }}
-                  error={Boolean(nonMollureTypeError)}
-                  helperText={nonMollureTypeError}
-                  sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                >
-                  {["Select Client Type", "Individual Client", "Company Client"].map((o) => (
-                    <MenuItem key={o} value={o === "Select Client Type" ? "" : o}>
-                      {o}
-                    </MenuItem>
-                  ))}
-                </MollureFormField>
-              </>
-            )}
+          <Stack spacing={2}>
+            <Box>
+              <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
+                Client Type
+              </Typography>
+              <MollureFormField
+                select
+                value={nonMollureClientType}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  const nextType = raw as "" | "Individual Client" | "Company Client";
+                  setNonMollureClientType(nextType);
+                  setNonMollureTypeError("");
+                  setIndErrors({});
+                  setCompErrors({});
+                }}
+                error={Boolean(nonMollureTypeError)}
+                helperText={nonMollureTypeError}
+                sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                SelectProps={clientTypeSelectProps}
+              >
+                <MenuItem value="">
+                  <Typography sx={{ color: alpha(m.navy, 0.5) }}>Select client type</Typography>
+                </MenuItem>
+                <MenuItem value="Individual Client">Individual Client</MenuItem>
+                <MenuItem value="Company Client">Company Client</MenuItem>
+              </MollureFormField>
+            </Box>
 
-            {nonMollureStep === "individual" && (
+            {nonMollureClientType === "Individual Client" && (
               <Stack spacing={1.25}>
                 <MollureFormField
                   placeholder="First Name"
@@ -1545,7 +1550,8 @@ export default function FixedLocationClientPage() {
 
                 <MollureFormField
                   select
-                  value={indGender || "Select Gender"}
+                  label="Gender"
+                  value={indGender}
                   onChange={(e) => {
                     setIndGender(e.target.value);
                     setIndErrors((p) => ({ ...p, gender: undefined }));
@@ -1553,12 +1559,14 @@ export default function FixedLocationClientPage() {
                   error={Boolean(indErrors.gender)}
                   helperText={indErrors.gender}
                   sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                  SelectProps={genderSelectProps}
                 >
-                  {["Select Gender", "Male", "Female", "Other"].map((o) => (
-                    <MenuItem key={o} value={o === "Select Gender" ? "" : o}>
-                      {o}
-                    </MenuItem>
-                  ))}
+                  <MenuItem value="">
+                    <Typography sx={{ color: alpha(m.navy, 0.5) }}>Select gender</Typography>
+                  </MenuItem>
+                  <MenuItem value="Male">Male</MenuItem>
+                  <MenuItem value="Female">Female</MenuItem>
+                  <MenuItem value="Other">Other</MenuItem>
                 </MollureFormField>
 
                 <Box sx={{ pt: 0.25 }}>
@@ -1633,7 +1641,7 @@ export default function FixedLocationClientPage() {
               </Stack>
             )}
 
-            {nonMollureStep === "company" && (
+            {nonMollureClientType === "Company Client" && (
               <Stack spacing={1.25}>
                 <MollureFormField
                   placeholder="Legal Name"
@@ -1687,7 +1695,8 @@ export default function FixedLocationClientPage() {
                 />
                 <MollureFormField
                   select
-                  value={coGender || "Select Gender"}
+                  label="Gender"
+                  value={coGender}
                   onChange={(e) => {
                     setCoGender(e.target.value);
                     setCompErrors((p) => ({ ...p, gender: undefined }));
@@ -1695,12 +1704,14 @@ export default function FixedLocationClientPage() {
                   error={Boolean(compErrors.gender)}
                   helperText={compErrors.gender}
                   sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                  SelectProps={genderSelectProps}
                 >
-                  {["Select Gender", "Male", "Female", "Other"].map((o) => (
-                    <MenuItem key={o} value={o === "Select Gender" ? "" : o}>
-                      {o}
-                    </MenuItem>
-                  ))}
+                  <MenuItem value="">
+                    <Typography sx={{ color: alpha(m.navy, 0.5) }}>Select gender</Typography>
+                  </MenuItem>
+                  <MenuItem value="Male">Male</MenuItem>
+                  <MenuItem value="Female">Female</MenuItem>
+                  <MenuItem value="Other">Other</MenuItem>
                 </MollureFormField>
 
                 <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.62), pt: 0.5 }}>
@@ -1837,6 +1848,7 @@ export default function FixedLocationClientPage() {
                 />
               </Stack>
             )}
+          </Stack>
         </Box>
       </MollureDrawer>
     </FixedLocationPageScaffold>

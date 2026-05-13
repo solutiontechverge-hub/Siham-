@@ -31,6 +31,9 @@ declare module "@mui/material/styles" {
     footerText: string;
     footerMuted: string;
     mintSoft: string;
+    iconGradientStart: string;
+    iconGradientEnd: string;
+    iconGradient: string;
     heroGradientStart: string;
     heroGradientEnd: string;
     heroGlow: string;

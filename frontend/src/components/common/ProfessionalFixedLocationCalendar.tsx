@@ -13,12 +13,14 @@ import LocationOnRoundedIcon from "@mui/icons-material/LocationOnRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import StickyNote2OutlinedIcon from "@mui/icons-material/StickyNote2Outlined";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import { Avatar, Box, Button, ButtonBase, Chip, IconButton, Paper, Popover, Stack, Tooltip } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../ui/typography";
 import { useSnackbar } from "./AppSnackbar";
 import AppPillTabs from "./AppPillTabs";
 import MollureDrawer from "./MollureDrawer";
+import AppSearchField from "./AppSearchField";
 import AppTextField from "./AppTextField";
 import AppDropdown from "./AppDropdown";
 import CalendarAddMenu from "./calendar/CalendarAddMenu";
@@ -54,6 +56,7 @@ import {
 import type {
   CalendarBookingType,
   CalendarBookingLocation,
+  CalendarEvent,
   CalendarSubTab,
   CalendarViewMode,
   ProfessionalFixedLocationCalendarData,
@@ -80,6 +83,33 @@ export default function ProfessionalFixedLocationCalendar({
   const m = theme.palette.mollure;
   const { showSnackbar } = useSnackbar();
 
+  const [events, setEvents] = React.useState<readonly CalendarEvent[]>(() => [...data.events]);
+  const [editingEventId, setEditingEventId] = React.useState<string | null>(null);
+  const [isEditingExisting, setIsEditingExisting] = React.useState(false);
+
+  const isViewingExisting = Boolean(editingEventId) && !isEditingExisting;
+  const addMenuButtonRef = React.useRef<HTMLButtonElement | null>(null);
+
+  const serviceCatalog = React.useMemo(
+    () =>
+      [
+        { id: "svc-haircut", name: "Haircut", price: 60 },
+        { id: "svc-color", name: "Hair Color", price: 95 },
+        { id: "svc-styling", name: "Hair Styling", price: 45 },
+        { id: "svc-facemask", name: "Face Mask", price: 35 },
+      ] as const,
+    [],
+  );
+  const productCatalog = React.useMemo(
+    () =>
+      [
+        { id: "prd-hair", name: "Hair Product", price: 25 },
+        { id: "prd-mask", name: "Face Mask", price: 18 },
+        { id: "prd-serum", name: "Hair Serum", price: 22 },
+      ] as const,
+    [],
+  );
+
   const defaultDateIso = React.useMemo(() => toIsoLocalDate(new Date()), []);
   const [activeSubTab, setActiveSubTab] = React.useState<CalendarSubTab>(data.initialSubTab);
   const [viewMode, setViewMode] = React.useState<CalendarViewMode>(data.initialView);
@@ -100,10 +130,101 @@ export default function ProfessionalFixedLocationCalendar({
   );
   const [slotCalendarMonth, setSlotCalendarMonth] = React.useState(() => toMonthIso(defaultDateIso));
   const [slotClientAdded, setSlotClientAdded] = React.useState(false);
+  const [slotClientSearch, setSlotClientSearch] = React.useState("");
+  const [slotAddMenuAnchor, setSlotAddMenuAnchor] = React.useState<HTMLElement | null>(null);
+  const [servicePickerOpen, setServicePickerOpen] = React.useState(false);
+  const [productPickerOpen, setProductPickerOpen] = React.useState(false);
+  const [selectedServiceId, setSelectedServiceId] = React.useState("");
+  const [selectedProductId, setSelectedProductId] = React.useState("");
+  const [selectedServices, setSelectedServices] = React.useState<Array<{ id: string; name: string; price: number }>>([]);
+  const [selectedProducts, setSelectedProducts] = React.useState<Array<{ id: string; name: string; price: number }>>([]);
+  const [desiredLocationDraft, setDesiredLocationDraft] = React.useState<{
+    street: string;
+    number: string;
+    postalCode: string;
+    province: string;
+    municipality: string;
+  }>(() => ({
+    street: "",
+    number: "",
+    postalCode: "",
+    province: "",
+    municipality: "",
+  }));
+  const [showPrepayment, setShowPrepayment] = React.useState(false);
+  const [prepaymentPercent, setPrepaymentPercent] = React.useState("");
+  const [paymentMethod, setPaymentMethod] = React.useState<"online" | "offline">("online");
+  const [showKilometerAllowance, setShowKilometerAllowance] = React.useState(false);
+  const [kilometerAllowanceDraft, setKilometerAllowanceDraft] = React.useState<{
+    eurPerKm: string;
+    totalKilometer: string;
+  }>(() => ({
+    eurPerKm: "",
+    totalKilometer: "",
+  }));
+  React.useEffect(() => {
+    // Kilometer allowance is only applicable for Desired Location bookings.
+    if (slotLocation !== "DL") {
+      setShowKilometerAllowance(false);
+      setKilometerAllowanceDraft({ eurPerKm: "", totalKilometer: "" });
+    }
+  }, [slotLocation]);
+  const [bookingMoreAnchor, setBookingMoreAnchor] = React.useState<HTMLElement | null>(null);
   const [slotBookingScreen, setSlotBookingScreen] = React.useState<
-    "new-booking" | "add-client-choice" | "non-mollure-type" | "non-mollure-individual" | "non-mollure-company" | "guest"
+    | "new-booking"
+    | "add-client-choice"
+    | "non-mollure-individual"
+    | "non-mollure-company"
+    | "guest"
   >("new-booking");
   const [nonMollureClientType, setNonMollureClientType] = React.useState<"" | "individual" | "company">("");
+  const [slotSaveAttempted, setSlotSaveAttempted] = React.useState(false);
+  const [selectedClient, setSelectedClient] = React.useState<null | { name: string; email: string }>(null);
+  const [addClientSource, setAddClientSource] = React.useState<
+    "" | "client-list" | "mollure-platform" | "non-mollure" | "guest"
+  >("");
+  const [clientListSelectedEmail, setClientListSelectedEmail] = React.useState("");
+  const [platformSelectedEmail, setPlatformSelectedEmail] = React.useState("");
+
+  React.useEffect(() => {
+    setSlotSaveAttempted(false);
+  }, [slotBookingScreen]);
+
+  React.useEffect(() => {
+    if (slotBookingScreen !== "add-client-choice") return;
+    setAddClientSource("");
+  }, [slotBookingScreen]);
+
+  const clientList = React.useMemo(
+    () =>
+      [
+        { name: "Sara Johnson", email: "sarajohnson@gmail.com" },
+        { name: "Emma Stone", email: "emma.stone@gmail.com" },
+        { name: "Noah Parker", email: "noah.parker@gmail.com" },
+        { name: "Priya Shah", email: "priya.shah@gmail.com" },
+      ] as const,
+    [],
+  );
+  const mollurePlatformClients = React.useMemo(
+    () =>
+      [
+        { name: "Alex Morgan", email: "alex.morgan@mollure.com" },
+        { name: "Yuki Tanaka", email: "yuki.tanaka@mollure.com" },
+        { name: "Liam Roberts", email: "liam.roberts@mollure.com" },
+        { name: "Ava Kim", email: "ava.kim@mollure.com" },
+      ] as const,
+    [],
+  );
+
+  const servicesTotal = React.useMemo(() => selectedServices.reduce((sum, s) => sum + s.price, 0), [selectedServices]);
+  const productsTotal = React.useMemo(() => selectedProducts.reduce((sum, p) => sum + p.price, 0), [selectedProducts]);
+  const totalPrice = servicesTotal + productsTotal;
+  const prepaymentAmount = React.useMemo(() => {
+    const pct = Number(prepaymentPercent);
+    if (!Number.isFinite(pct) || pct <= 0) return 0;
+    return Math.round((totalPrice * pct) / 100);
+  }, [prepaymentPercent, totalPrice]);
+  const remainingAfterPrepayment = Math.max(0, totalPrice - prepaymentAmount);
   const [guestDraft, setGuestDraft] = React.useState<{
     firstName: string;
     lastName: string;
@@ -281,7 +402,7 @@ export default function ProfessionalFixedLocationCalendar({
 
   const eventsInRange = React.useMemo(
     () => {
-      const base = data.events.filter((e) => visibleDates.includes(e.date));
+      const base = events.filter((e) => visibleDates.includes(e.date));
       const byTeam = appliedFilters.teamAll
         ? base
         : base.filter((e) => appliedFilters.teamIds[e.resourceId]);
@@ -303,7 +424,7 @@ export default function ProfessionalFixedLocationCalendar({
       appliedFilters.locations,
       appliedFilters.teamAll,
       appliedFilters.teamIds,
-      data.events,
+      events,
       visibleDates,
     ],
   );
@@ -318,14 +439,180 @@ export default function ProfessionalFixedLocationCalendar({
 
   const todayIso = defaultDateIso;
 
+  const slotValidation = React.useMemo(() => {
+    const isBlank = (v: string) => v.trim().length === 0;
+
+    const errors: Partial<
+      Record<
+        | "nonMollureClientType"
+        | "guestFirstName"
+        | "guestLastName"
+        | "nonMollureFirstName"
+        | "nonMollureLastName"
+        | "nonMollureGender"
+        | "nonMollureDob"
+        | "nonMollurePhoneCode"
+        | "nonMollurePhoneNumber"
+        | "nonMollureEmail"
+        | "nonMollureLegalName"
+        | "nonMollureCoc"
+        | "nonMollureVat"
+        | "nonMollureContactFirstName"
+        | "nonMollureContactLastName"
+        | "nonMollureStreet"
+        | "nonMollureStreetNumber"
+        | "nonMollurePostalCode"
+        | "nonMollureProvince"
+        | "nonMollureMunicipality"
+        | "bookingClient",
+        string
+      >
+    > = {};
+
+    let isValid = true;
+
+    if (slotDrawerTab !== "booking") {
+      return { isValid: true as const, errors };
+    }
+
+    if (slotBookingScreen === "add-client-choice") {
+      return { isValid: false as const, errors };
+    }
+
+    if (slotBookingScreen === "guest") {
+      if (isBlank(guestDraft.firstName)) {
+        isValid = false;
+        errors.guestFirstName = "First name is required.";
+      }
+      if (isBlank(guestDraft.lastName)) {
+        isValid = false;
+        errors.guestLastName = "Last name is required.";
+      }
+      return { isValid, errors };
+    }
+
+    if (slotBookingScreen === "non-mollure-individual") {
+      if (isBlank(nonMollureDraft.firstName)) {
+        isValid = false;
+        errors.nonMollureFirstName = "First name is required.";
+      }
+      if (isBlank(nonMollureDraft.lastName)) {
+        isValid = false;
+        errors.nonMollureLastName = "Last name is required.";
+      }
+      if (!nonMollureDraft.gender) {
+        isValid = false;
+        errors.nonMollureGender = "Gender is required.";
+      }
+      if (isBlank(nonMollureDraft.dob)) {
+        isValid = false;
+        errors.nonMollureDob = "Date of birth is required.";
+      }
+      if (isBlank(nonMollureDraft.phoneCode)) {
+        isValid = false;
+        errors.nonMollurePhoneCode = "Country code is required.";
+      }
+      if (isBlank(nonMollureDraft.phoneNumber)) {
+        isValid = false;
+        errors.nonMollurePhoneNumber = "Phone number is required.";
+      }
+      if (isBlank(nonMollureDraft.email)) {
+        isValid = false;
+        errors.nonMollureEmail = "Email is required.";
+      }
+      return { isValid, errors };
+    }
+
+    if (slotBookingScreen === "non-mollure-company") {
+      if (isBlank(nonMollureDraft.legalName)) {
+        isValid = false;
+        errors.nonMollureLegalName = "Legal name is required.";
+      }
+      if (isBlank(nonMollureDraft.coc)) {
+        isValid = false;
+        errors.nonMollureCoc = "COC is required.";
+      }
+      if (isBlank(nonMollureDraft.vat)) {
+        isValid = false;
+        errors.nonMollureVat = "VAT is required.";
+      }
+      if (isBlank(nonMollureDraft.contactFirstName)) {
+        isValid = false;
+        errors.nonMollureContactFirstName = "Contact first name is required.";
+      }
+      if (isBlank(nonMollureDraft.contactLastName)) {
+        isValid = false;
+        errors.nonMollureContactLastName = "Contact last name is required.";
+      }
+      if (!nonMollureDraft.gender) {
+        isValid = false;
+        errors.nonMollureGender = "Gender is required.";
+      }
+      if (isBlank(nonMollureDraft.street)) {
+        isValid = false;
+        errors.nonMollureStreet = "Street is required.";
+      }
+      if (isBlank(nonMollureDraft.streetNumber)) {
+        isValid = false;
+        errors.nonMollureStreetNumber = "Number is required.";
+      }
+      if (isBlank(nonMollureDraft.postalCode)) {
+        isValid = false;
+        errors.nonMollurePostalCode = "Postal code is required.";
+      }
+      if (isBlank(nonMollureDraft.province)) {
+        isValid = false;
+        errors.nonMollureProvince = "Province is required.";
+      }
+      if (isBlank(nonMollureDraft.municipality)) {
+        isValid = false;
+        errors.nonMollureMunicipality = "Municipality is required.";
+      }
+      if (isBlank(nonMollureDraft.email)) {
+        isValid = false;
+        errors.nonMollureEmail = "Email is required.";
+      }
+      return { isValid, errors };
+    }
+
+    // new-booking
+    if (!slotClientAdded) {
+      isValid = false;
+      errors.bookingClient = "Client is required.";
+    }
+    if (selectedServices.length === 0 && selectedProducts.length === 0) {
+      isValid = false;
+      errors.bookingClient = errors.bookingClient ?? "Select at least one item/service or product.";
+    }
+    return { isValid, errors };
+  }, [
+    guestDraft.firstName,
+    guestDraft.lastName,
+    nonMollureClientType,
+    nonMollureDraft,
+    selectedProducts.length,
+    selectedServices.length,
+    slotBookingScreen,
+    slotClientAdded,
+    slotDrawerTab,
+  ]);
+
+  const slotErrors = React.useMemo(() => (slotSaveAttempted ? slotValidation.errors : {}), [slotSaveAttempted, slotValidation.errors]);
+
+  const prevCandidateIso = React.useMemo(() => {
+    if (viewMode === "week") return addDaysIso(activeDateIso, -7);
+    if (viewMode === "month") return addDaysIso(activeDateIso, -30);
+    return addDaysIso(activeDateIso, -1);
+  }, [activeDateIso, viewMode]);
+
+  const canGoPrev = prevCandidateIso >= todayIso;
+
   const onToday = () => {
     setActiveDateIso(todayIso);
   };
 
   const onPrev = () => {
-    if (viewMode === "week") setActiveDateIso(addDaysIso(activeDateIso, -7));
-    else if (viewMode === "month") setActiveDateIso(addDaysIso(activeDateIso, -30));
-    else setActiveDateIso(addDaysIso(activeDateIso, -1));
+    setActiveDateIso(canGoPrev ? prevCandidateIso : todayIso);
   };
 
   const onNext = () => {
@@ -348,7 +635,7 @@ export default function ProfessionalFixedLocationCalendar({
   const getBusyFor = React.useCallback(
     (resourceId: string, iso: string): Interval[] => {
       const busy: Interval[] = [];
-      for (const e of data.events) {
+      for (const e of events) {
         if (e.resourceId !== resourceId || e.date !== iso) continue;
         busy.push({ startMin: minutesSinceMidnight(e.start), endMin: minutesSinceMidnight(e.end) });
       }
@@ -358,7 +645,7 @@ export default function ProfessionalFixedLocationCalendar({
       }
       return busy;
     },
-    [data.blocks, data.events],
+    [data.blocks, events],
   );
 
   const getDailyBookingRatio = React.useCallback(
@@ -381,6 +668,11 @@ export default function ProfessionalFixedLocationCalendar({
       setSlotLocation("FL");
       setSlotCalendarMonth(toMonthIso(payload.date));
       setSlotClientAdded(false);
+      setSelectedClient(null);
+      setSelectedServices([]);
+      setSelectedProducts([]);
+      setEditingEventId(null);
+      setIsEditingExisting(false);
       setGuestDraft({
         firstName: "",
         lastName: "",
@@ -409,6 +701,31 @@ export default function ProfessionalFixedLocationCalendar({
         province: "",
         municipality: "",
       });
+      setSlotDrawerOpen(true);
+    },
+    [],
+  );
+
+  const openExistingBooking = React.useCallback(
+    (ev: CalendarEvent) => {
+      setSelectedSlot({
+        resourceId: ev.resourceId,
+        date: ev.date,
+        start: ev.start,
+        end: ev.end,
+        freeStart: ev.start,
+        freeEnd: ev.end,
+      });
+      setSlotDrawerTab("booking");
+      setSlotBookingScreen("new-booking");
+      setSlotLocation(ev.location);
+      setSlotCalendarMonth(toMonthIso(ev.date));
+      setSlotClientAdded(true);
+      setSelectedClient({ name: ev.showClientName ?? "Client", email: "" });
+      setSelectedServices([]);
+      setSelectedProducts([]);
+      setEditingEventId(ev.id);
+      setIsEditingExisting(false);
       setSlotDrawerOpen(true);
     },
     [],
@@ -538,6 +855,7 @@ export default function ProfessionalFixedLocationCalendar({
               <IconButton
                 size="small"
                 onClick={onPrev}
+                disabled={!canGoPrev}
                 sx={{
                   width: 26,
                   height: 26,
@@ -1175,6 +1493,7 @@ export default function ProfessionalFixedLocationCalendar({
                                   return (
                                     <Box
                                       key={ev.id}
+                                      onClick={() => openExistingBooking(ev)}
                                       sx={{
                                         position: "absolute",
                                         top,
@@ -1190,6 +1509,7 @@ export default function ProfessionalFixedLocationCalendar({
                                         // left accent bar via box-shadow so we avoid pseudo-element clipping issues
                                         boxShadow: `inset 4px 0 0 0 ${statusTone.bar}`,
                                         zIndex: 4,
+                                        cursor: "pointer",
                                       }}
                                     >
                                       {/* ── LEFT content (non-interactive) ── */}
@@ -1361,6 +1681,7 @@ export default function ProfessionalFixedLocationCalendar({
                 {slotBookingScreen === "new-booking" && slotClientAdded ? (
                   <IconButton
                     size="small"
+                    onClick={(e) => setBookingMoreAnchor(e.currentTarget)}
                     sx={{
                       width: 36,
                       height: 36,
@@ -1373,15 +1694,99 @@ export default function ProfessionalFixedLocationCalendar({
                     <MoreVertRoundedIcon sx={{ fontSize: 18 }} />
                   </IconButton>
                 ) : null}
+                <Popover
+                  open={Boolean(bookingMoreAnchor)}
+                  anchorEl={bookingMoreAnchor}
+                  onClose={() => setBookingMoreAnchor(null)}
+                  anchorOrigin={{ vertical: "top", horizontal: "left" }}
+                  transformOrigin={{ vertical: "bottom", horizontal: "left" }}
+                  PaperProps={{
+                    sx: {
+                      borderRadius: "10px",
+                      border: `1px solid ${alpha(m.navy, 0.10)}`,
+                      boxShadow: "0 10px 24px rgba(16, 35, 63, 0.14)",
+                      overflow: "hidden",
+                      minWidth: 240,
+                    },
+                  }}
+                >
+                  <Stack sx={{ py: 0.5 }}>
+                    {[
+                      {
+                        label: "Add Prepayment",
+                        onClick: () => {
+                          if (isViewingExisting) return;
+                          setShowPrepayment(true);
+                          showSnackbar({ severity: "info", message: "Prepayment enabled." });
+                        },
+                      },
+                      ...(slotLocation === "DL"
+                        ? ([
+                            {
+                              label: "Add Kilometer Allowance",
+                              onClick: () => {
+                                if (isViewingExisting) return;
+                                setShowKilometerAllowance(true);
+                                showSnackbar({ severity: "info", message: "Kilometer Allowance enabled." });
+                              },
+                            },
+                          ] as const)
+                        : []),
+                      { label: "Add Discount to Total", onClick: () => showSnackbar({ severity: "info", message: "Add Discount to Total (mock)." }) },
+                      { label: "Add Late Cancellation", onClick: () => showSnackbar({ severity: "info", message: "Add Late Cancellation (mock)." }) },
+                      { label: "Add Late Rescheduling", onClick: () => showSnackbar({ severity: "info", message: "Add Late Rescheduling (mock)." }) },
+                      { label: "Add Note", onClick: () => showSnackbar({ severity: "info", message: "Add Note (mock)." }) },
+                    ].map((item) => (
+                      <Box
+                        key={item.label}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                          setBookingMoreAnchor(null);
+                          item.onClick();
+                        }}
+                        sx={{
+                          px: 1.5,
+                          py: 1,
+                          cursor: "pointer",
+                          fontSize: 12.5,
+                          fontWeight: 800,
+                          color: alpha(m.navy, 0.72),
+                          borderBottom: `1px solid ${alpha(m.navy, 0.06)}`,
+                          "&:hover": { bgcolor: alpha(m.navy, 0.04) },
+                          "&:last-of-type": { borderBottom: "none" },
+                        }}
+                      >
+                        {item.label}
+                      </Box>
+                    ))}
+                  </Stack>
+                </Popover>
                 <Box sx={{ flex: 1 }} />
+                {slotBookingScreen === "new-booking" && editingEventId ? (
+                  <Button
+                    variant="outlined"
+                    onClick={() => setIsEditingExisting(true)}
+                    startIcon={<EditRoundedIcon sx={{ fontSize: 18 }} />}
+                    disabled={isEditingExisting}
+                    sx={{
+                      borderRadius: "10px",
+                      textTransform: "none",
+                      fontWeight: 800,
+                      height: 38,
+                      borderColor: alpha(m.navy, 0.14),
+                      color: alpha(m.navy, 0.72),
+                      bgcolor: "#fff",
+                      minWidth: 110,
+                    }}
+                  >
+                    Edit
+                  </Button>
+                ) : null}
                 <Button
                   variant="outlined"
                   onClick={async () => {
                     if (slotBookingScreen === "non-mollure-individual" || slotBookingScreen === "non-mollure-company") {
-                      setSlotBookingScreen("non-mollure-type");
-                      return;
-                    }
-                    if (slotBookingScreen === "non-mollure-type") {
                       setSlotBookingScreen("add-client-choice");
                       return;
                     }
@@ -1411,38 +1816,54 @@ export default function ProfessionalFixedLocationCalendar({
                 <Button
                   variant="contained"
                   disableElevation
-                  onClick={async () => {
-                    if (slotBookingScreen === "non-mollure-type") {
-                      if (!nonMollureClientType) {
-                        showSnackbar({ severity: "warning", message: "Please select Client Type." });
-                        return;
-                      }
-                      setSlotBookingScreen(nonMollureClientType === "individual" ? "non-mollure-individual" : "non-mollure-company");
-                      return;
-                    }
+                  disabled={
+                    isSaving || !slotValidation.isValid || (Boolean(editingEventId) && !isEditingExisting)
+                  }
+                  onClick={() => {
+                    setSlotSaveAttempted(true);
+                    if (!slotValidation.isValid) return;
                     if (slotBookingScreen === "non-mollure-individual" || slotBookingScreen === "non-mollure-company") {
-                      const clientName =
-                        slotBookingScreen === "non-mollure-company"
-                          ? nonMollureDraft.companyName.trim() ||
-                            nonMollureDraft.legalName.trim() ||
-                            `${nonMollureDraft.contactFirstName.trim()} ${nonMollureDraft.contactLastName.trim()}`.trim()
-                          : `${nonMollureDraft.firstName.trim()} ${nonMollureDraft.lastName.trim()}`.trim();
-                      await saveSelectedBooking(clientName || "Non-Mollure client");
+                      showSnackbar({ severity: "success", message: "Saved (mock)." });
+                      setSlotBookingScreen("new-booking");
+                      setSlotSaveAttempted(false);
                       return;
                     }
                     if (slotBookingScreen === "guest") {
-                      const first = guestDraft.firstName.trim();
-                      const last = guestDraft.lastName.trim();
-                      if (!first || !last) {
-                        showSnackbar({ severity: "warning", message: "Guest first name and last name are required." });
-                        return;
-                      }
-                      await saveSelectedBooking(`${first} ${last}`);
+                      showSnackbar({ severity: "success", message: "Guest added (mock)." });
+                      setSlotBookingScreen("new-booking");
+                      setSlotSaveAttempted(false);
                       return;
                     }
-                    await saveSelectedBooking();
+                    if (!selectedSlot) return;
+
+                    const title =
+                      selectedServices[0]?.name ??
+                      selectedProducts[0]?.name ??
+                      "Booking";
+                    const clientName = selectedClient?.name ?? `${guestDraft.firstName} ${guestDraft.lastName}`.trim() ?? "Client";
+
+                    const nextEvent: CalendarEvent = {
+                      id: editingEventId ?? `b-${Date.now()}-a`,
+                      resourceId: selectedSlot.resourceId,
+                      date: selectedSlot.date,
+                      start: selectedSlot.start,
+                      end: selectedSlot.end,
+                      title,
+                      status: "Confirmed",
+                      location: slotLocation,
+                      bookingType: "Offline",
+                      showClientName: clientName || "Client",
+                    };
+
+                    setEvents((prev) => {
+                      if (!editingEventId) return [...prev, nextEvent];
+                      return prev.map((e) => (e.id === editingEventId ? nextEvent : e));
+                    });
+                    showSnackbar({ severity: "success", message: editingEventId ? "Booking updated." : "Booking saved." });
+                    // Keep the drawer open on the booking tab; the calendar behind will now show the booking on that slot.
+                    setSlotSaveAttempted(false);
+                    if (editingEventId) setIsEditingExisting(false);
                   }}
-                  disabled={isSaving}
                   sx={{
                     borderRadius: "10px",
                     textTransform: "none",
@@ -1453,7 +1874,7 @@ export default function ProfessionalFixedLocationCalendar({
                     minWidth: 110,
                   }}
                 >
-                  {slotBookingScreen === "new-booking" ? "Save" : "Save"}
+                  {editingEventId ? "Update" : "Save"}
                 </Button>
               </Stack>
             </Box>
@@ -1515,29 +1936,44 @@ export default function ProfessionalFixedLocationCalendar({
                     <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 15 }}>
                       Add Client
                     </BodyText>
-                    <Stack spacing={1.25}>
-                      {[
-                        { label: "Add Non-Mollure Client", key: "non-mollure" },
-                        { label: "Add Guest", key: "guest" },
-                      ].map((item) => (
+
+                    {(
+                      [
+                        { label: "Add from client list", key: "client-list" as const },
+                        { label: "Add from Mollure platform", key: "mollure-platform" as const },
+                        { label: "Add Non-Mollure Client", key: "non-mollure" as const },
+                        { label: "Add Guest", key: "guest" as const },
+                      ] as const
+                    ).map((item) => (
+                      <React.Fragment key={item.key}>
                         <Box
-                          key={item.key}
                           role="button"
                           tabIndex={0}
                           onClick={() => {
-                            if (item.key === "non-mollure") setSlotBookingScreen("non-mollure-type");
-                            else {
-                              setSlotClientAdded(true);
-                              setSlotBookingScreen("new-booking");
+                            if (item.key === "client-list" || item.key === "mollure-platform") {
+                              setAddClientSource((p) => (p === item.key ? "" : item.key));
+                              return;
                             }
+                            if (item.key === "non-mollure") {
+                              // Default to Individual Client
+                              setNonMollureClientType("individual");
+                              setSlotBookingScreen("non-mollure-individual");
+                              return;
+                            }
+                            setSlotBookingScreen("guest");
                           }}
                           onKeyDown={(e) => {
                             if (e.key !== "Enter" && e.key !== " ") return;
-                            if (item.key === "non-mollure") setSlotBookingScreen("non-mollure-type");
-                            else {
-                              setSlotClientAdded(true);
-                              setSlotBookingScreen("new-booking");
+                            if (item.key === "client-list" || item.key === "mollure-platform") {
+                              setAddClientSource((p) => (p === item.key ? "" : item.key));
+                              return;
                             }
+                            if (item.key === "non-mollure") {
+                              setNonMollureClientType("individual");
+                              setSlotBookingScreen("non-mollure-individual");
+                              return;
+                            }
+                            setSlotBookingScreen("guest");
                           }}
                           sx={{
                             border: `1px solid ${alpha(m.navy, 0.14)}`,
@@ -1574,37 +2010,58 @@ export default function ProfessionalFixedLocationCalendar({
                             {item.label}
                           </BodyText>
                         </Box>
-                      ))}
-                    </Stack>
-                    <Box sx={{ flex: 1, minHeight: 360 }} />
-                  </Stack>
-                ) : slotBookingScreen === "non-mollure-type" ? (
-                  <Stack spacing={1.6}>
-                    <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 22, letterSpacing: "-0.01em" }}>
-                      Add Non-Mollure Client
-                    </BodyText>
 
-                    <Box sx={{ pt: 0.5 }}>
-                      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
-                        Client Type
-                      </BodyText>
-                      <AppDropdown
-                        label=""
-                        value={nonMollureClientType}
-                        onChange={(val) => {
-                          const next = val as "" | "individual" | "company";
-                          setNonMollureClientType(next);
-                          if (next === "individual") setSlotBookingScreen("non-mollure-individual");
-                          if (next === "company") setSlotBookingScreen("non-mollure-company");
-                        }}
-                        options={[
-                          { label: "Individual Client", value: "individual" },
-                          { label: "Company Client", value: "company" },
-                        ]}
-                        fullWidth
-                        placeholder="Select Client Type"
-                      />
-                    </Box>
+                        {item.key === "client-list" && addClientSource === "client-list" ? (
+                          <AppDropdown
+                            label=""
+                            value={clientListSelectedEmail}
+                            onChange={(val) => {
+                              if (isViewingExisting) return;
+                              const email = String(val);
+                              setClientListSelectedEmail(email);
+                              const c = clientList.find((x) => x.email === email);
+                              if (!c) return;
+                              setSelectedClient({ name: c.name, email: c.email });
+                              setSlotClientAdded(true);
+                              setSlotClientSearch("");
+                              setSlotBookingScreen("new-booking");
+                            }}
+                            options={clientList.map((c) => ({
+                              label: c.name,
+                              value: c.email,
+                            }))}
+                            fullWidth
+                            placeholder="Search based on name"
+                            disabled={isViewingExisting}
+                          />
+                        ) : null}
+
+                        {item.key === "mollure-platform" && addClientSource === "mollure-platform" ? (
+                          <AppDropdown
+                            label=""
+                            value={platformSelectedEmail}
+                            onChange={(val) => {
+                              if (isViewingExisting) return;
+                              const email = String(val);
+                              setPlatformSelectedEmail(email);
+                              const c = mollurePlatformClients.find((x) => x.email === email);
+                              if (!c) return;
+                              setSelectedClient({ name: c.name, email: c.email });
+                              setSlotClientAdded(true);
+                              setSlotClientSearch("");
+                              setSlotBookingScreen("new-booking");
+                            }}
+                            options={mollurePlatformClients.map((c) => ({
+                              label: c.email,
+                              value: c.email,
+                            }))}
+                            fullWidth
+                            placeholder="Search based on email"
+                            disabled={isViewingExisting}
+                          />
+                        ) : null}
+                      </React.Fragment>
+                    ))}
 
                     <Box sx={{ flex: 1, minHeight: 360 }} />
                   </Stack>
@@ -1635,7 +2092,21 @@ export default function ProfessionalFixedLocationCalendar({
                       <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
                         Client Type
                       </BodyText>
-                      <AppTextField value="Individual Client" fullWidth disabled />
+                      <AppDropdown
+                        label=""
+                        value={nonMollureClientType || "individual"}
+                        onChange={(val) => {
+                          const next = val as "individual" | "company";
+                          setNonMollureClientType(next);
+                          setSlotBookingScreen(next === "individual" ? "non-mollure-individual" : "non-mollure-company");
+                        }}
+                        options={[
+                          { label: "Individual Client", value: "individual" },
+                          { label: "Company Client", value: "company" },
+                        ]}
+                        fullWidth
+                        placeholder="Select Client Type"
+                      />
                     </Box>
 
                     <AppTextField
@@ -1643,12 +2114,16 @@ export default function ProfessionalFixedLocationCalendar({
                       value={nonMollureDraft.firstName}
                       onChange={(e) => setNonMollureDraft((p) => ({ ...p, firstName: e.target.value }))}
                       fullWidth
+                        error={Boolean(slotErrors.nonMollureFirstName)}
+                        helperText={slotErrors.nonMollureFirstName}
                     />
                     <AppTextField
                       placeholder="Last Name"
                       value={nonMollureDraft.lastName}
                       onChange={(e) => setNonMollureDraft((p) => ({ ...p, lastName: e.target.value }))}
                       fullWidth
+                        error={Boolean(slotErrors.nonMollureLastName)}
+                        helperText={slotErrors.nonMollureLastName}
                     />
 
                     <AppDropdown
@@ -1662,6 +2137,8 @@ export default function ProfessionalFixedLocationCalendar({
                       ]}
                       fullWidth
                       placeholder="Select Gender"
+                      error={Boolean(slotErrors.nonMollureGender)}
+                      helperText={slotErrors.nonMollureGender}
                     />
 
                     <Box>
@@ -1674,6 +2151,8 @@ export default function ProfessionalFixedLocationCalendar({
                         onChange={(e) => setNonMollureDraft((p) => ({ ...p, dob: e.target.value }))}
                         fullWidth
                         placeholder="mm/dd/yyyy"
+                        error={Boolean(slotErrors.nonMollureDob)}
+                        helperText={slotErrors.nonMollureDob}
                       />
                     </Box>
 
@@ -1695,12 +2174,16 @@ export default function ProfessionalFixedLocationCalendar({
                           fullWidth
                           sx={{ maxWidth: 140 }}
                           placeholder="Select Country Code"
+                          error={Boolean(slotErrors.nonMollurePhoneCode)}
+                          helperText={slotErrors.nonMollurePhoneCode}
                         />
                         <AppTextField
                           placeholder="+442xxxxxxxxxx"
                           value={nonMollureDraft.phoneNumber}
                           onChange={(e) => setNonMollureDraft((p) => ({ ...p, phoneNumber: e.target.value }))}
                           fullWidth
+                          error={Boolean(slotErrors.nonMollurePhoneNumber)}
+                          helperText={slotErrors.nonMollurePhoneNumber}
                         />
                       </Stack>
                     </Box>
@@ -1710,6 +2193,8 @@ export default function ProfessionalFixedLocationCalendar({
                       value={nonMollureDraft.email}
                       onChange={(e) => setNonMollureDraft((p) => ({ ...p, email: e.target.value }))}
                       fullWidth
+                      error={Boolean(slotErrors.nonMollureEmail)}
+                      helperText={slotErrors.nonMollureEmail}
                     />
 
                     <Box sx={{ flex: 1, minHeight: 140 }} />
@@ -1741,7 +2226,21 @@ export default function ProfessionalFixedLocationCalendar({
                       <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
                         Client Type
                       </BodyText>
-                      <AppTextField value="Company Client" fullWidth disabled />
+                      <AppDropdown
+                        label=""
+                        value={nonMollureClientType || "company"}
+                        onChange={(val) => {
+                          const next = val as "individual" | "company";
+                          setNonMollureClientType(next);
+                          setSlotBookingScreen(next === "individual" ? "non-mollure-individual" : "non-mollure-company");
+                        }}
+                        options={[
+                          { label: "Individual Client", value: "individual" },
+                          { label: "Company Client", value: "company" },
+                        ]}
+                        fullWidth
+                        placeholder="Select Client Type"
+                      />
                     </Box>
 
                     <AppTextField
@@ -1749,18 +2248,24 @@ export default function ProfessionalFixedLocationCalendar({
                       value={nonMollureDraft.legalName}
                       onChange={(e) => setNonMollureDraft((p) => ({ ...p, legalName: e.target.value }))}
                       fullWidth
+                      error={Boolean(slotErrors.nonMollureLegalName)}
+                      helperText={slotErrors.nonMollureLegalName}
                     />
                     <AppTextField
                       placeholder="COC"
                       value={nonMollureDraft.coc}
                       onChange={(e) => setNonMollureDraft((p) => ({ ...p, coc: e.target.value }))}
                       fullWidth
+                      error={Boolean(slotErrors.nonMollureCoc)}
+                      helperText={slotErrors.nonMollureCoc}
                     />
                     <AppTextField
                       placeholder="VAT"
                       value={nonMollureDraft.vat}
                       onChange={(e) => setNonMollureDraft((p) => ({ ...p, vat: e.target.value }))}
                       fullWidth
+                      error={Boolean(slotErrors.nonMollureVat)}
+                      helperText={slotErrors.nonMollureVat}
                     />
 
                     <AppTextField
@@ -1768,12 +2273,16 @@ export default function ProfessionalFixedLocationCalendar({
                       value={nonMollureDraft.contactFirstName}
                       onChange={(e) => setNonMollureDraft((p) => ({ ...p, contactFirstName: e.target.value }))}
                       fullWidth
+                      error={Boolean(slotErrors.nonMollureContactFirstName)}
+                      helperText={slotErrors.nonMollureContactFirstName}
                     />
                     <AppTextField
                       placeholder="Contact Person’s Last Name"
                       value={nonMollureDraft.contactLastName}
                       onChange={(e) => setNonMollureDraft((p) => ({ ...p, contactLastName: e.target.value }))}
                       fullWidth
+                      error={Boolean(slotErrors.nonMollureContactLastName)}
+                      helperText={slotErrors.nonMollureContactLastName}
                     />
 
                     <AppDropdown
@@ -1787,6 +2296,8 @@ export default function ProfessionalFixedLocationCalendar({
                       ]}
                       fullWidth
                       placeholder="Select Gender"
+                      error={Boolean(slotErrors.nonMollureGender)}
+                      helperText={slotErrors.nonMollureGender}
                     />
 
                     <Box sx={{ pt: 0.5 }}>
@@ -1800,12 +2311,16 @@ export default function ProfessionalFixedLocationCalendar({
                             value={nonMollureDraft.street}
                             onChange={(e) => setNonMollureDraft((p) => ({ ...p, street: e.target.value }))}
                             fullWidth
+                            error={Boolean(slotErrors.nonMollureStreet)}
+                            helperText={slotErrors.nonMollureStreet}
                           />
                           <AppTextField
                             placeholder="Number"
                             value={nonMollureDraft.streetNumber}
                             onChange={(e) => setNonMollureDraft((p) => ({ ...p, streetNumber: e.target.value }))}
                             fullWidth
+                            error={Boolean(slotErrors.nonMollureStreetNumber)}
+                            helperText={slotErrors.nonMollureStreetNumber}
                           />
                         </Stack>
                         <Stack direction="row" spacing={1.25}>
@@ -1814,6 +2329,8 @@ export default function ProfessionalFixedLocationCalendar({
                             value={nonMollureDraft.postalCode}
                             onChange={(e) => setNonMollureDraft((p) => ({ ...p, postalCode: e.target.value }))}
                             fullWidth
+                            error={Boolean(slotErrors.nonMollurePostalCode)}
+                            helperText={slotErrors.nonMollurePostalCode}
                           />
                           <AppDropdown
                             label=""
@@ -1826,6 +2343,8 @@ export default function ProfessionalFixedLocationCalendar({
                             ]}
                             fullWidth
                             placeholder="Province"
+                            error={Boolean(slotErrors.nonMollureProvince)}
+                            helperText={slotErrors.nonMollureProvince}
                           />
                         </Stack>
                         <AppDropdown
@@ -1839,6 +2358,8 @@ export default function ProfessionalFixedLocationCalendar({
                           ]}
                           fullWidth
                           placeholder="Municipality"
+                          error={Boolean(slotErrors.nonMollureMunicipality)}
+                          helperText={slotErrors.nonMollureMunicipality}
                         />
                       </Stack>
                     </Box>
@@ -1876,6 +2397,8 @@ export default function ProfessionalFixedLocationCalendar({
                       value={nonMollureDraft.email}
                       onChange={(e) => setNonMollureDraft((p) => ({ ...p, email: e.target.value }))}
                       fullWidth
+                      error={Boolean(slotErrors.nonMollureEmail)}
+                      helperText={slotErrors.nonMollureEmail}
                     />
 
                     <Box sx={{ flex: 1, minHeight: 140 }} />
@@ -1909,12 +2432,16 @@ export default function ProfessionalFixedLocationCalendar({
                         value={guestDraft.firstName}
                         onChange={(e) => setGuestDraft((p) => ({ ...p, firstName: e.target.value }))}
                         fullWidth
+                        error={Boolean(slotErrors.guestFirstName)}
+                        helperText={slotErrors.guestFirstName}
                       />
                       <AppTextField
                         placeholder="Last Name*"
                         value={guestDraft.lastName}
                         onChange={(e) => setGuestDraft((p) => ({ ...p, lastName: e.target.value }))}
                         fullWidth
+                        error={Boolean(slotErrors.guestLastName)}
+                        helperText={slotErrors.guestLastName}
                       />
                     </Stack>
 
@@ -1976,13 +2503,13 @@ export default function ProfessionalFixedLocationCalendar({
                           alignItems: "center",
                           justifyContent: "space-between",
                           bgcolor: "#fff",
-                          color: slotClientAdded ? alpha(m.navy, 0.74) : alpha(m.navy, 0.45),
+                          color: alpha(m.navy, 0.74),
                           fontSize: 12.5,
                           fontWeight: 800,
                         }}
                       >
                         <Box component="span">
-                          {slotClientAdded ? `${slotLocation}: ${formatMdyDate(selectedSlot.date)}` : "Select calendar"}
+                          {selectedSlot ? `${slotLocation}: ${formatMdyDate(selectedSlot.date)}` : "Select calendar"}
                         </Box>
                         <KeyboardArrowDownRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.45) }} />
                       </Box>
@@ -2053,7 +2580,10 @@ export default function ProfessionalFixedLocationCalendar({
                                 return (
                                   <ButtonBase
                                     key={loc}
-                                    onClick={() => setSlotLocation(loc)}
+                                    onClick={() => {
+                                      if (isViewingExisting) return;
+                                      setSlotLocation(loc);
+                                    }}
                                     sx={{
                                       height: 28,
                                       fontSize: 10,
@@ -2175,26 +2705,55 @@ export default function ProfessionalFixedLocationCalendar({
                             border: `1px solid ${alpha(m.navy, 0.12)}`,
                             borderRadius: "10px",
                             minHeight: 64,
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 1.25,
                             px: 1.5,
+                            py: 1.25,
                             bgcolor: "#fff",
                             boxShadow: `0 0 0 6px ${alpha(m.teal, 0.08)}`,
                           }}
                         >
-                          <Avatar src="/images/testimonial.webp" sx={{ width: 34, height: 34 }} />
-                          <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <BodyText sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78), lineHeight: 1.2 }}>
-                              Sara Johnson
-                            </BodyText>
-                            <BodyText sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.46), lineHeight: 1.2 }}>
-                              Sarajohnson@gmail.com
-                            </BodyText>
-                          </Box>
-                          <IconButton size="small" onClick={() => setSlotClientAdded(false)} sx={{ color: alpha(m.navy, 0.35) }}>
-                            <CloseRoundedIcon sx={{ fontSize: 17 }} />
-                          </IconButton>
+                          <AppSearchField
+                            value={slotClientSearch}
+                            onChange={(e) => {
+                              if (isViewingExisting) return;
+                              setSlotClientSearch(e.target.value);
+                            }}
+                            onClear={() => {
+                              if (isViewingExisting) return;
+                              setSlotClientSearch("");
+                            }}
+                            placeholder="Search client..."
+                            size="small"
+                            fullWidth
+                            sx={{ mb: 1 }}
+                            disabled={isViewingExisting}
+                          />
+
+                          <Stack direction="row" alignItems="center" spacing={1.25}>
+                            <Avatar src="/images/testimonial.webp" sx={{ width: 34, height: 34 }}>
+                              {!selectedClient?.name ? null : selectedClient.name.slice(0, 1).toUpperCase()}
+                            </Avatar>
+                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                              <BodyText sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78), lineHeight: 1.2 }}>
+                                {selectedClient?.name ?? "Client"}
+                              </BodyText>
+                              <BodyText sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.46), lineHeight: 1.2 }}>
+                                {selectedClient?.email ?? ""}
+                              </BodyText>
+                            </Box>
+                            <IconButton
+                              size="small"
+                              onClick={() => {
+                                if (isViewingExisting) return;
+                                setSlotClientAdded(false);
+                                setSlotClientSearch("");
+                                setSelectedClient(null);
+                              }}
+                              sx={{ color: alpha(m.navy, 0.35) }}
+                              disabled={isViewingExisting}
+                            >
+                              <CloseRoundedIcon sx={{ fontSize: 17 }} />
+                            </IconButton>
+                          </Stack>
                         </Box>
                       ) : (
                         <Box
@@ -2240,16 +2799,26 @@ export default function ProfessionalFixedLocationCalendar({
                           </BodyText>
                         </Box>
                       )}
+                      {slotErrors.bookingClient ? (
+                        <BodyText sx={{ mt: 0.6, fontSize: 11.5, fontWeight: 800, color: theme.palette.error.main }}>
+                          {slotErrors.bookingClient}
+                        </BodyText>
+                      ) : null}
                     </Box>
 
                     {slotClientAdded ? (
                       <>
                         <Box
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => setSlotBookingScreen("add-client-choice")}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") setSlotBookingScreen("add-client-choice");
+                          onClickCapture={(e) => {
+                            // Only the arrow button should open the menu.
+                            // If the click wasn't inside the arrow button, swallow it.
+                            const t = e.target as unknown;
+                            if (t && typeof t === "object" && "closest" in (t as any)) {
+                              const el = t as Element;
+                              if (el.closest('[data-add-menu-arrow="true"]')) return;
+                            }
+                            e.preventDefault();
+                            e.stopPropagation();
                           }}
                           sx={{
                             border: `1px solid ${alpha(m.navy, 0.14)}`,
@@ -2258,33 +2827,432 @@ export default function ProfessionalFixedLocationCalendar({
                             width: 132,
                             display: "flex",
                             alignItems: "center",
-                            gap: 1,
-                            px: 1.25,
-                            cursor: "pointer",
                             bgcolor: "#fff",
+                            overflow: "hidden",
+                            boxShadow: "0 4px 14px rgba(16, 35, 63, 0.06)",
+                            position: "relative",
                           }}
                         >
-                          <Box sx={{ width: 22, height: 22, borderRadius: "999px", bgcolor: alpha(m.teal, 0.18), color: m.teal, display: "grid", placeItems: "center", fontSize: 17, fontWeight: 900 }}>
-                            +
+                          <Box
+                            sx={{
+                              flex: 1,
+                              height: "100%",
+                              px: 1.2,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 0.95,
+                              justifyContent: "flex-start",
+                              userSelect: "none",
+                              cursor: "default",
+                              opacity: isViewingExisting ? 0.55 : 1,
+                            }}
+                          >
+                            <Box sx={{ width: 22, height: 22, borderRadius: "999px", bgcolor: alpha(m.teal, 0.18), color: m.teal, display: "grid", placeItems: "center", fontSize: 17, fontWeight: 900 }}>
+                              +
+                            </Box>
+                            <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.62), flex: 1, lineHeight: 1 }}>
+                              Add
+                            </BodyText>
                           </Box>
-                          <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.62), flex: 1 }}>
-                            Add
-                          </BodyText>
-                          <KeyboardArrowDownRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.45) }} />
+
+                          <Box sx={{ width: 1, height: "100%", bgcolor: alpha(m.navy, 0.10) }} />
+
+                          <IconButton
+                            size="small"
+                            ref={addMenuButtonRef}
+                            onClick={(e) => setSlotAddMenuAnchor(e.currentTarget)}
+                            data-add-menu-arrow="true"
+                            sx={{
+                              width: 38,
+                              height: 38,
+                              flex: "0 0 38px",
+                              borderRadius: 0,
+                              p: 0,
+                              m: 0,
+                              color: alpha(m.navy, 0.45),
+                              display: "grid",
+                              placeItems: "center",
+                              "&:hover": { bgcolor: alpha(m.navy, 0.04) },
+                              zIndex: 1,
+                            }}
+                            aria-label="Add menu"
+                            disabled={isViewingExisting}
+                          >
+                            <KeyboardArrowDownRoundedIcon sx={{ fontSize: 18 }} />
+                          </IconButton>
                         </Box>
+
+                        <Popover
+                          open={Boolean(slotAddMenuAnchor)}
+                          anchorEl={slotAddMenuAnchor}
+                          onClose={() => setSlotAddMenuAnchor(null)}
+                          anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+                          transformOrigin={{ vertical: "top", horizontal: "left" }}
+                          PaperProps={{
+                            sx: {
+                              mt: 0.8,
+                              borderRadius: "12px",
+                              border: `1px solid ${alpha(m.navy, 0.08)}`,
+                              boxShadow: "0 16px 44px rgba(16, 35, 63, 0.18)",
+                              overflow: "hidden",
+                              minWidth: 210,
+                            },
+                          }}
+                        >
+                          <Stack sx={{ p: 0.75 }}>
+                            {[
+                              { key: "service", label: "Add item" },
+                              { key: "service-2", label: "Add service" },
+                              { key: "product", label: "Add product" },
+                            ].map((item) => (
+                              <ButtonBase
+                                key={item.key}
+                                onClick={() => {
+                                  setSlotAddMenuAnchor(null);
+                                  if (item.key === "service" || item.key === "service-2") {
+                                    setProductPickerOpen(false);
+                                    setServicePickerOpen(true);
+                                  }
+                                  if (item.key === "product") {
+                                    setServicePickerOpen(false);
+                                    setProductPickerOpen(true);
+                                  }
+                                }}
+                                sx={{
+                                  width: "100%",
+                                  textAlign: "left",
+                                  borderRadius: "10px",
+                                  px: 1.25,
+                                  py: 1,
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 1,
+                                  "&:hover": { bgcolor: alpha(m.navy, 0.035) },
+                                }}
+                              >
+                                <Box
+                                  sx={{
+                                    width: 30,
+                                    height: 30,
+                                    borderRadius: "999px",
+                                    bgcolor: alpha(m.teal, 0.12),
+                                    color: m.teal,
+                                    display: "grid",
+                                    placeItems: "center",
+                                    fontWeight: 900,
+                                    flexShrink: 0,
+                                    fontSize: 18,
+                                    border: `1px solid ${alpha(m.teal, 0.22)}`,
+                                  }}
+                                >
+                                  +
+                                </Box>
+                                <BodyText sx={{ fontSize: 12.5, fontWeight: 850, color: alpha(m.navy, 0.76) }}>
+                                  {item.label}
+                                </BodyText>
+                              </ButtonBase>
+                            ))}
+                          </Stack>
+                        </Popover>
+
+                        {servicePickerOpen ? (
+                          <Box
+                            sx={{
+                              borderRadius: "12px",
+                              bgcolor: "#fff",
+                              border: `1px solid ${alpha(m.navy, 0.08)}`,
+                              boxShadow: "0 10px 26px rgba(16, 35, 63, 0.08)",
+                              p: 1.5,
+                            }}
+                          >
+                            <Stack direction="row" alignItems="center" spacing={1}>
+                              <BodyText sx={{ flex: 1, fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
+                                Services
+                              </BodyText>
+                              <IconButton size="small" onClick={() => setServicePickerOpen(false)} sx={{ color: alpha(m.navy, 0.35) }}>
+                                <CloseRoundedIcon sx={{ fontSize: 17 }} />
+                              </IconButton>
+                            </Stack>
+
+                            <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                              <AppDropdown
+                                label=""
+                                value={selectedServiceId}
+                                onChange={(val) => {
+                                  if (isViewingExisting) return;
+                                  setSelectedServiceId(val as string);
+                                }}
+                                options={[
+                                  { label: "Select service", value: "" },
+                                  ...serviceCatalog.map((s) => ({ label: `${s.name} — €${s.price}`, value: s.id })),
+                                ]}
+                                fullWidth
+                                placeholder="Select service"
+                                disabled={isViewingExisting}
+                              />
+                              <Button
+                                variant="outlined"
+                                disabled={!selectedServiceId}
+                                onClick={() => {
+                                  if (isViewingExisting) return;
+                                  const s = serviceCatalog.find((x) => x.id === selectedServiceId);
+                                  if (!s) return;
+                                  setSelectedServices((p) => (p.some((it) => it.id === s.id) ? p : [...p, { id: s.id, name: s.name, price: s.price }]));
+                                  setSelectedServiceId("");
+                                }}
+                                sx={{ borderRadius: "10px", textTransform: "none", fontWeight: 850, minWidth: 90 }}
+                              >
+                                Add
+                              </Button>
+                            </Stack>
+
+                            {selectedServices.length ? (
+                              <Stack spacing={0.75} sx={{ mt: 1.25 }}>
+                                {selectedServices.map((s) => (
+                                  <Box
+                                    key={s.id}
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "space-between",
+                                      borderRadius: "10px",
+                                      border: `1px solid ${alpha(m.navy, 0.08)}`,
+                                      px: 1.25,
+                                      py: 0.85,
+                                    }}
+                                  >
+                                    <BodyText sx={{ fontSize: 12.5, fontWeight: 850, color: alpha(m.navy, 0.72) }}>{s.name}</BodyText>
+                                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                                      <BodyText sx={{ fontSize: 12.5, fontWeight: 950, color: alpha(m.navy, 0.82) }}>€{s.price}</BodyText>
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => setSelectedServices((p) => p.filter((x) => x.id !== s.id))}
+                                        sx={{ color: alpha(m.navy, 0.3) }}
+                                        aria-label={`Remove ${s.name}`}
+                                        disabled={isViewingExisting}
+                                      >
+                                        <CloseRoundedIcon sx={{ fontSize: 16 }} />
+                                      </IconButton>
+                                    </Stack>
+                                  </Box>
+                                ))}
+                              </Stack>
+                            ) : null}
+                          </Box>
+                        ) : null}
+
+                        {productPickerOpen ? (
+                          <Box
+                            sx={{
+                              borderRadius: "12px",
+                              bgcolor: "#fff",
+                              border: `1px solid ${alpha(m.navy, 0.08)}`,
+                              boxShadow: "0 10px 26px rgba(16, 35, 63, 0.08)",
+                              p: 1.5,
+                            }}
+                          >
+                            <Stack direction="row" alignItems="center" spacing={1}>
+                              <BodyText sx={{ flex: 1, fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
+                                Products
+                              </BodyText>
+                              <IconButton size="small" onClick={() => setProductPickerOpen(false)} sx={{ color: alpha(m.navy, 0.35) }}>
+                                <CloseRoundedIcon sx={{ fontSize: 17 }} />
+                              </IconButton>
+                            </Stack>
+
+                            <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                              <AppDropdown
+                                label=""
+                                value={selectedProductId}
+                                onChange={(val) => {
+                                  if (isViewingExisting) return;
+                                  setSelectedProductId(val as string);
+                                }}
+                                options={[
+                                  { label: "Select product", value: "" },
+                                  ...productCatalog.map((p) => ({ label: `${p.name} — €${p.price}`, value: p.id })),
+                                ]}
+                                fullWidth
+                                placeholder="Select product"
+                                disabled={isViewingExisting}
+                              />
+                              <Button
+                                variant="outlined"
+                                disabled={!selectedProductId}
+                                onClick={() => {
+                                  if (isViewingExisting) return;
+                                  const p = productCatalog.find((x) => x.id === selectedProductId);
+                                  if (!p) return;
+                                  setSelectedProducts((prev) => (prev.some((it) => it.id === p.id) ? prev : [...prev, { id: p.id, name: p.name, price: p.price }]));
+                                  setSelectedProductId("");
+                                }}
+                                sx={{ borderRadius: "10px", textTransform: "none", fontWeight: 850, minWidth: 90 }}
+                              >
+                                Add
+                              </Button>
+                            </Stack>
+
+                            {selectedProducts.length ? (
+                              <Stack spacing={0.75} sx={{ mt: 1.25 }}>
+                                {selectedProducts.map((p) => (
+                                  <Box
+                                    key={p.id}
+                                    sx={{
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "space-between",
+                                      borderRadius: "10px",
+                                      border: `1px solid ${alpha(m.navy, 0.08)}`,
+                                      px: 1.25,
+                                      py: 0.85,
+                                    }}
+                                  >
+                                    <BodyText sx={{ fontSize: 12.5, fontWeight: 850, color: alpha(m.navy, 0.72) }}>{p.name}</BodyText>
+                                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                                      <BodyText sx={{ fontSize: 12.5, fontWeight: 950, color: alpha(m.navy, 0.82) }}>€{p.price}</BodyText>
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => setSelectedProducts((prev) => prev.filter((x) => x.id !== p.id))}
+                                        sx={{ color: alpha(m.navy, 0.3) }}
+                                        aria-label={`Remove ${p.name}`}
+                                        disabled={isViewingExisting}
+                                      >
+                                        <CloseRoundedIcon sx={{ fontSize: 16 }} />
+                                      </IconButton>
+                                    </Stack>
+                                  </Box>
+                                ))}
+                              </Stack>
+                            ) : null}
+                          </Box>
+                        ) : null}
 
                         <Box sx={{ borderRadius: "10px", bgcolor: alpha(m.navy, 0.025), p: 1.5 }}>
                           <BodyText sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.76), mb: 1 }}>
                             Location
                           </BodyText>
-                          <Stack direction="row" spacing={4}>
-                            <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.68) }}>
-                              {slotLocation === "FL" ? "Fixed Location" : "Desired Location"}
-                            </BodyText>
-                            <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.42) }}>
-                              St. Salon 123
-                            </BodyText>
-                          </Stack>
+                          {slotLocation === "FL" ? (
+                            <Stack direction="row" spacing={4}>
+                              <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.68) }}>
+                                Fixed Location
+                              </BodyText>
+                              <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.42) }}>
+                                St. Salon 123
+                              </BodyText>
+                            </Stack>
+                          ) : (
+                            <Box>
+                              {showKilometerAllowance ? (
+                                <Box
+                                  sx={{
+                                    borderRadius: "12px",
+                                    bgcolor: "#fff",
+                                    border: `1px solid ${alpha(m.navy, 0.08)}`,
+                                    boxShadow: "0 10px 26px rgba(16, 35, 63, 0.08)",
+                                    p: 1.5,
+                                    mb: 1.25,
+                                  }}
+                                >
+                                  <Stack direction="row" alignItems="center" spacing={1}>
+                                    <BodyText sx={{ flex: 1, fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
+                                      Kilometer Allowance
+                                    </BodyText>
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => setShowKilometerAllowance(false)}
+                                      sx={{ color: alpha(m.navy, 0.35) }}
+                                      aria-label="Remove kilometer allowance"
+                                    >
+                                      <CloseRoundedIcon sx={{ fontSize: 17 }} />
+                                    </IconButton>
+                                  </Stack>
+
+                                  <BodyText sx={{ fontSize: 12.25, fontWeight: 850, color: alpha(m.navy, 0.6), mt: 1, mb: 0.75 }}>
+                                    Amount/Per Kilometer
+                                  </BodyText>
+
+                                  <Stack direction="row" spacing={1}>
+                                    <AppTextField
+                                      placeholder="EUR/Km"
+                                      value={kilometerAllowanceDraft.eurPerKm}
+                                      onChange={(e) => setKilometerAllowanceDraft((p) => ({ ...p, eurPerKm: e.target.value }))}
+                                      fullWidth
+                                    />
+                                    <AppTextField
+                                      placeholder="Total Kilometer"
+                                      value={kilometerAllowanceDraft.totalKilometer}
+                                      onChange={(e) => setKilometerAllowanceDraft((p) => ({ ...p, totalKilometer: e.target.value }))}
+                                      fullWidth
+                                    />
+                                  </Stack>
+
+                                  <Box
+                                    sx={{
+                                      mt: 1.25,
+                                      pt: 1.25,
+                                      borderTop: `1px solid ${alpha(m.navy, 0.08)}`,
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "space-between",
+                                    }}
+                                  >
+                                    <BodyText sx={{ fontSize: 12.5, fontWeight: 850, color: alpha(m.navy, 0.62) }}>Total Price</BodyText>
+                                    <BodyText sx={{ fontSize: 18, fontWeight: 950, color: alpha(m.navy, 0.84) }}>20€</BodyText>
+                                  </Box>
+                                </Box>
+                              ) : null}
+
+                              <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.68), mb: 1 }}>
+                                Desired Location
+                              </BodyText>
+                              <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
+                                <AppTextField
+                                  placeholder="Street"
+                                  value={desiredLocationDraft.street}
+                                  onChange={(e) => setDesiredLocationDraft((p) => ({ ...p, street: e.target.value }))}
+                                  fullWidth
+                                />
+                                <AppTextField
+                                  placeholder="Number"
+                                  value={desiredLocationDraft.number}
+                                  onChange={(e) => setDesiredLocationDraft((p) => ({ ...p, number: e.target.value }))}
+                                  fullWidth
+                                />
+                              </Stack>
+                              <Stack direction="row" spacing={1}>
+                                <AppTextField
+                                  placeholder="Postal Code"
+                                  value={desiredLocationDraft.postalCode}
+                                  onChange={(e) => setDesiredLocationDraft((p) => ({ ...p, postalCode: e.target.value }))}
+                                  fullWidth
+                                />
+                                <AppDropdown
+                                  label=""
+                                  value={desiredLocationDraft.province}
+                                  onChange={(val) => setDesiredLocationDraft((p) => ({ ...p, province: val as string }))}
+                                  options={[
+                                    { label: "Province", value: "" },
+                                    { label: "Province 1", value: "Province 1" },
+                                    { label: "Province 2", value: "Province 2" },
+                                  ]}
+                                  fullWidth
+                                  placeholder="Province"
+                                />
+                                <AppDropdown
+                                  label=""
+                                  value={desiredLocationDraft.municipality}
+                                  onChange={(val) => setDesiredLocationDraft((p) => ({ ...p, municipality: val as string }))}
+                                  options={[
+                                    { label: "Municipality", value: "" },
+                                    { label: "Municipality 1", value: "Municipality 1" },
+                                    { label: "Municipality 2", value: "Municipality 2" },
+                                  ]}
+                                  fullWidth
+                                  placeholder="Municipality"
+                                />
+                              </Stack>
+                            </Box>
+                          )}
                         </Box>
 
                         <Box>
@@ -2304,6 +3272,125 @@ export default function ProfessionalFixedLocationCalendar({
                             <AppTextField placeholder="+442xxxxxxxxxx" fullWidth />
                           </Stack>
                         </Box>
+
+                        <Box
+                          sx={{
+                            borderRadius: "10px",
+                            border: `1px solid ${alpha(m.navy, 0.16)}`,
+                            bgcolor: "#fff",
+                            px: 2,
+                            py: 1.6,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                          }}
+                        >
+                          <BodyText sx={{ fontSize: 16, fontWeight: 950, color: alpha(m.navy, 0.78) }}>Total Price:</BodyText>
+                          <BodyText sx={{ fontSize: 18, fontWeight: 950, color: alpha(m.navy, 0.9) }}>€{totalPrice}</BodyText>
+                        </Box>
+
+                        {showPrepayment ? (
+                          <>
+                            <Box
+                              sx={{
+                                borderRadius: "12px",
+                                bgcolor: "#fff",
+                                border: `1px solid ${alpha(m.navy, 0.08)}`,
+                                boxShadow: "0 10px 26px rgba(16, 35, 63, 0.08)",
+                                p: 1.5,
+                              }}
+                            >
+                              <Stack direction="row" alignItems="center" spacing={1}>
+                                <BodyText sx={{ flex: 1, fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
+                                  Prepayment
+                                </BodyText>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => setShowPrepayment(false)}
+                                  sx={{ color: alpha(m.navy, 0.35) }}
+                                  aria-label="Remove prepayment"
+                                >
+                                  <CloseRoundedIcon sx={{ fontSize: 17 }} />
+                                </IconButton>
+                              </Stack>
+
+                              <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 1 }}>
+                                <BodyText sx={{ flex: 1, fontSize: 12.5, fontWeight: 850, color: alpha(m.navy, 0.62) }}>
+                                  Prepayment:
+                                </BodyText>
+                                <AppTextField
+                                  placeholder="%"
+                                  value={prepaymentPercent}
+                                  onChange={(e) => setPrepaymentPercent(e.target.value)}
+                                  sx={{ maxWidth: 86 }}
+                                />
+                                <BodyText sx={{ fontSize: 16, fontWeight: 950, color: alpha(m.navy, 0.85) }}>€{prepaymentAmount}</BodyText>
+                              </Stack>
+
+                              <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 1 }}>
+                                <BodyText sx={{ flex: 1, fontSize: 12.5, fontWeight: 850, color: alpha(m.navy, 0.55) }}>
+                                  Remaining after prepayment
+                                </BodyText>
+                                <BodyText sx={{ fontSize: 16, fontWeight: 950, color: alpha(m.navy, 0.85) }}>€{remainingAfterPrepayment}</BodyText>
+                              </Stack>
+
+                              <Box sx={{ mt: 1.25, pt: 1.25, borderTop: `1px solid ${alpha(m.navy, 0.08)}` }}>
+                                <BodyText sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78), mb: 0.75 }}>
+                                  Payment method
+                                </BodyText>
+
+                                {[
+                                  { key: "online" as const, label: "Online Direct" },
+                                  { key: "offline" as const, label: "Offline Direct" },
+                                ].map((pm) => {
+                                  const active = paymentMethod === pm.key;
+                                  return (
+                                    <ButtonBase
+                                      key={pm.key}
+                                      onClick={() => setPaymentMethod(pm.key)}
+                                      sx={{
+                                        width: "100%",
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "space-between",
+                                        py: 0.65,
+                                        borderRadius: "10px",
+                                        "&:hover": { bgcolor: alpha(m.navy, 0.03) },
+                                      }}
+                                    >
+                                      <Stack direction="row" alignItems="center" spacing={1}>
+                                        <Box
+                                          sx={{
+                                            width: 18,
+                                            height: 12,
+                                            borderRadius: "3px",
+                                            border: `1px solid ${alpha(m.navy, 0.22)}`,
+                                            bgcolor: alpha(m.navy, 0.04),
+                                          }}
+                                        />
+                                        <BodyText sx={{ fontSize: 12.75, fontWeight: 850, color: alpha(m.navy, 0.74) }}>
+                                          {pm.label}
+                                        </BodyText>
+                                      </Stack>
+                                      <Box
+                                        sx={{
+                                          width: 18,
+                                          height: 18,
+                                          borderRadius: "999px",
+                                          border: `2px solid ${active ? m.teal : alpha(m.navy, 0.22)}`,
+                                          display: "grid",
+                                          placeItems: "center",
+                                        }}
+                                      >
+                                        {active ? <Box sx={{ width: 8, height: 8, borderRadius: "999px", bgcolor: m.teal }} /> : null}
+                                      </Box>
+                                    </ButtonBase>
+                                  );
+                                })}
+                              </Box>
+                            </Box>
+                          </>
+                        ) : null}
 
                         <Box sx={{ borderRadius: "10px", bgcolor: alpha(m.navy, 0.025), p: 1.5 }}>
                           <Button

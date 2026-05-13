@@ -1,7 +1,8 @@
  "use client";
 
+import dynamic from "next/dynamic";
+import { Box, CircularProgress } from "@mui/material";
 import FixedLocationPageScaffold from "../../../components/common/FixedLocationPageScaffold";
-import ProfessionalFixedLocationSetup from "../../../components/common/ProfessionalFixedLocationSetup";
 import { useSnackbar } from "../../../components/common/AppSnackbar";
 import { getApiErrorMessage } from "../../../lib/api-error";
 import { fixedLocationPageData } from "../fixed-location/fixedLocation.data";
@@ -12,6 +13,18 @@ import {
   useGetBusinessSetupQuery,
   useUpsertBusinessSetupMutation,
 } from "../../../store/services/businessApi";
+
+const ProfessionalFixedLocationSetup = dynamic(
+  () => import("../../../components/common/ProfessionalFixedLocationSetup"),
+  {
+    ssr: false,
+    loading: () => (
+      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", py: 8 }}>
+        <CircularProgress size={32} />
+      </Box>
+    ),
+  },
+);
 
 export default function ProfessionalsProfilePage() {
   const { data } = useGetProfileQuery();
