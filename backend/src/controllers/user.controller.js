@@ -1,5 +1,10 @@
 import bcrypt from "bcrypt";
 import { query } from "../db/index.js";
+import {
+  deleteProfileMediaIfOwned,
+  isS3UploadConfigured,
+  uploadProfileMulterFilesToS3,
+} from "../services/s3-upload.service.js";
 
 const SALT_ROUNDS = 12;
 
@@ -116,12 +121,39 @@ export const updateProfile = async (req, res) => {
       }
     }
 
-    if (req.files?.profile_picture?.[0] && config.fields.includes("profile_picture")) {
-      updates.profile_picture = req.files.profile_picture[0].filename;
+    const hasPic = req.files?.profile_picture?.[0]?.buffer?.length;
+    const hasLogo = req.files?.logo?.[0]?.buffer?.length;
+    if ((hasPic || hasLogo) && !isS3UploadConfigured()) {
+      return res.status(503).json({
+        success: false,
+        message: "File upload is temporarily unavailable.",
+        data: null,
+      });
     }
 
-    if (req.files?.logo?.[0] && config.fields.includes("logo")) {
-      updates.logo = req.files.logo[0].filename;
+    const uploaded = await uploadProfileMulterFilesToS3(req.user.id, req.files);
+    if (uploaded.profile_picture && config.fields.includes("profile_picture")) {
+      updates.profile_picture = uploaded.profile_picture;
+    }
+    if (uploaded.logo && config.fields.includes("logo")) {
+      updates.logo = uploaded.logo;
+    }
+
+    const previousMediaCols = [];
+    if (uploaded.profile_picture && config.fields.includes("profile_picture")) {
+      previousMediaCols.push("profile_picture");
+    }
+    if (uploaded.logo && config.fields.includes("logo")) {
+      previousMediaCols.push("logo");
+    }
+
+    let previousMedia = {};
+    if (previousMediaCols.length > 0) {
+      const previousResult = await query(
+        `SELECT ${previousMediaCols.join(", ")} FROM ${config.table} WHERE user_id = $1`,
+        [req.user.id],
+      );
+      previousMedia = previousResult.rows[0] || {};
     }
 
     if (req.body.email !== undefined) {
@@ -163,6 +195,17 @@ export const updateProfile = async (req, res) => {
           message: "Profile not found.",
           data: null,
         });
+      }
+
+      if (
+        uploaded.profile_picture &&
+        previousMedia.profile_picture &&
+        previousMedia.profile_picture !== uploaded.profile_picture
+      ) {
+        await deleteProfileMediaIfOwned(previousMedia.profile_picture, req.user.id);
+      }
+      if (uploaded.logo && previousMedia.logo && previousMedia.logo !== uploaded.logo) {
+        await deleteProfileMediaIfOwned(previousMedia.logo, req.user.id);
       }
     }
 

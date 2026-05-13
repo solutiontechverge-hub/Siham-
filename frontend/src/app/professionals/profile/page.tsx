@@ -51,6 +51,7 @@ export default function ProfessionalsProfilePage() {
               severity: "success",
               message: result.message || "Professional profile updated successfully.",
             });
+            return result.data;
           } catch (error) {
             showSnackbar({
               severity: "error",

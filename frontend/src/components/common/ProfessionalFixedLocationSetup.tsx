@@ -35,15 +35,26 @@ import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import type { FixedLocationPageData } from "../../app/professionals/fixed-location/fixedLocation.data";
 import { useFixedLocationForm, type FixedLocationFormState } from "../../app/professionals/fixed-location/fixedLocation.use";
-import type { ProfessionalProfile, ProfileResponse } from "../../store/services/profileApi";
+import type {
+  ProfessionalProfile,
+  ProfileResponse,
+  UpdateProfilePayload,
+} from "../../store/services/profileApi";
 import type {
   BusinessCategory,
   BusinessSetup,
   BusinessTeamMember,
   UpsertBusinessSetupRequest,
 } from "../../store/services/businessApi";
+import { useSnackbar } from "./AppSnackbar";
 import MollureFormField from "./MollureFormField";
 import ServiceCategorySliderCard, { SERVICE_CATEGORY_SLIDER_CARD_WIDTH } from "./ServiceCategorySliderCard";
+import {
+  filterAllowedProfileImageFiles,
+  isAllowedProfileImageFile,
+  PROFILE_IMAGE_FILE_ACCEPT,
+  PROFILE_IMAGE_INVALID_MESSAGE,
+} from "../../lib/profileImageUpload";
 import { Typography } from "../ui/typography";
 import {
   resolveServiceCategorySliderIconId,
@@ -190,26 +201,7 @@ export type ProfessionalFixedLocationSetupProps = {
   businessSetupData?: BusinessSetup | null;
   isProfileSaving?: boolean;
   isBusinessSetupSaving?: boolean;
-  onSaveProfessionalProfile?: (payload: {
-    email: string;
-    password?: string;
-    confirm_password?: string;
-    legal_name: string;
-    ccc_number: string;
-    vat_number: string;
-    street: string;
-    street_number: string;
-    postal_code: string;
-    province: string;
-    municipality: string;
-    business_type: string;
-    website: string;
-    instagram: string;
-    other_link: string;
-    contact_first_name: string;
-    contact_last_name: string;
-    phone: string;
-  }) => Promise<void>;
+  onSaveProfessionalProfile?: (payload: UpdateProfilePayload) => Promise<ProfileResponse | void>;
   onSaveBusinessSetup?: (payload: UpsertBusinessSetupRequest) => Promise<void>;
 };
 
@@ -361,6 +353,7 @@ export default function ProfessionalFixedLocationSetup({
 }: ProfessionalFixedLocationSetupProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
+  const { showSnackbar } = useSnackbar();
   type ProfileValidationField =
     | "companyLegalName"
     | "contactFirstName"
@@ -430,17 +423,30 @@ export default function ProfessionalFixedLocationSetup({
     portfolioInputRef.current?.click();
   }, []);
 
-  const onPortfolioFilesSelected = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []).filter((f) => f.type.startsWith("image/"));
-    if (!files.length) return;
-    const next = files.map((f) => {
-      const url = URL.createObjectURL(f);
-      portfolioBlobUrlsRef.current.push(url);
-      return { id: `pf-${Date.now()}-${Math.random().toString(16).slice(2)}`, src: url };
-    });
-    setPortfolioItems((prev) => [...next, ...prev]);
-    e.target.value = "";
-  }, []);
+  const onPortfolioFilesSelected = React.useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const { allowed, rejected } = filterAllowedProfileImageFiles(Array.from(e.target.files ?? []));
+      if (rejected > 0 && !allowed.length) {
+        showSnackbar({ severity: "error", message: PROFILE_IMAGE_INVALID_MESSAGE });
+        e.target.value = "";
+        return;
+      }
+      if (rejected > 0) {
+        showSnackbar({
+          severity: "warning",
+          message: `${rejected} file(s) skipped. ${PROFILE_IMAGE_INVALID_MESSAGE}`,
+        });
+      }
+      const next = allowed.map((f) => {
+        const url = URL.createObjectURL(f);
+        portfolioBlobUrlsRef.current.push(url);
+        return { id: `pf-${Date.now()}-${Math.random().toString(16).slice(2)}`, src: url };
+      });
+      setPortfolioItems((prev) => [...next, ...prev]);
+      e.target.value = "";
+    },
+    [showSnackbar],
+  );
 
   const deleteSelectedPortfolio = React.useCallback(() => {
     const selected = new Set(Object.entries(selectedPortfolioIds).filter(([, v]) => v).map(([k]) => k));
@@ -623,14 +629,22 @@ export default function ProfessionalFixedLocationSetup({
     teamPhotoInputRef.current?.click();
   }, []);
 
-  const onTeamPhotoSelected = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    teamBlobUrlsRef.current.push(url);
-    setDraftPhotoSrc(url);
-    e.target.value = "";
-  }, []);
+  const onTeamPhotoSelected = React.useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (!isAllowedProfileImageFile(file)) {
+        showSnackbar({ severity: "error", message: PROFILE_IMAGE_INVALID_MESSAGE });
+        e.target.value = "";
+        return;
+      }
+      const url = URL.createObjectURL(file);
+      teamBlobUrlsRef.current.push(url);
+      setDraftPhotoSrc(url);
+      e.target.value = "";
+    },
+    [showSnackbar],
+  );
 
   const removeTeamMember = React.useCallback((id: string) => {
     setTeamMembers((prev) => prev.filter((m) => m.id !== id));
@@ -652,6 +666,7 @@ export default function ProfessionalFixedLocationSetup({
   }, []);
 
   const professionalPhotoInputRef = React.useRef<HTMLInputElement | null>(null);
+  const [pendingProfessionalPhoto, setPendingProfessionalPhoto] = React.useState<File | null>(null);
   const onChooseProfessionalPhoto = React.useCallback(() => {
     professionalPhotoInputRef.current?.click();
   }, []);
@@ -659,12 +674,19 @@ export default function ProfessionalFixedLocationSetup({
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
       if (!file) return;
+      if (!isAllowedProfileImageFile(file)) {
+        showSnackbar({ severity: "error", message: PROFILE_IMAGE_INVALID_MESSAGE });
+        e.target.value = "";
+        return;
+      }
       const url = URL.createObjectURL(file);
       addedBlobUrlsRef.current.push(url);
+      setPendingProfessionalPhoto(file);
       setField("professionalPhotoSrc", url);
+      setIsProfessionalEditing(true);
       e.target.value = "";
     },
-    [setField],
+    [setField, showSnackbar],
   );
 
   const [isProfessionalEditing, setIsProfessionalEditing] = React.useState(false);
@@ -737,10 +759,13 @@ export default function ProfessionalFixedLocationSetup({
     ],
   );
   const isProfessionalDirty = React.useMemo(
-    () => professionalEditableFieldKeys.some((key) => professionalDraft[key] !== savedProfessionalDraft[key]),
-    [professionalDraft, savedProfessionalDraft],
+    () =>
+      Boolean(pendingProfessionalPhoto) ||
+      professionalEditableFieldKeys.some((key) => professionalDraft[key] !== savedProfessionalDraft[key]),
+    [pendingProfessionalPhoto, professionalDraft, savedProfessionalDraft],
   );
   const cancelProfessionalEditing = React.useCallback(() => {
+    setPendingProfessionalPhoto(null);
     applyProfessionalDraft(savedProfessionalDraft, savedProfessionalPhotoSrc);
     setProfileErrors({});
     setIsProfessionalEditing(false);
@@ -759,6 +784,7 @@ export default function ProfessionalFixedLocationSetup({
     const nextProfessionalDraft = buildProfessionalDraftFromProfile(profileData);
     const nextProfessionalPhotoSrc = getProfessionalPhotoSrcFromProfile(profileData);
 
+    setPendingProfessionalPhoto(null);
     applyProfessionalDraft(nextProfessionalDraft, nextProfessionalPhotoSrc);
     setSavedProfessionalDraft(nextProfessionalDraft);
     setSavedProfessionalPhotoSrc(nextProfessionalPhotoSrc);
@@ -1979,6 +2005,16 @@ export default function ProfessionalFixedLocationSetup({
     <Stack spacing={2.1}>
       <Stack direction="row" spacing={2} alignItems="center">
         <Box
+          onClick={onChooseProfessionalPhoto}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onChooseProfessionalPhoto();
+            }
+          }}
+          role="button"
+          tabIndex={0}
+          aria-label="Choose profile picture"
           sx={{
             width: 90,
             height: 90,
@@ -1988,20 +2024,42 @@ export default function ProfessionalFixedLocationSetup({
             border: `1px solid ${alpha(m.navy, 0.08)}`,
             flex: "0 0 auto",
             position: "relative",
+            cursor: "pointer",
+            outline: "none",
+            "&:hover": {
+              borderColor: alpha(m.navy, 0.18),
+              bgcolor: alpha(m.navy, 0.08),
+            },
+            "&:focus-visible": {
+              boxShadow: `0 0 0 3px ${alpha(m.teal, 0.35)}`,
+            },
           }}
         >
-          <Image
-            src={values.professionalPhotoSrc}
-            alt="Profile"
-            width={90}
-            height={90}
-            unoptimized
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-          />
+          {/^https?:\/\//i.test(values.professionalPhotoSrc) ? (
+            <Box
+              component="img"
+              src={values.professionalPhotoSrc}
+              alt="Profile"
+              sx={{ width: "100%", height: "100%", objectFit: "cover", display: "block", pointerEvents: "none" }}
+            />
+          ) : (
+            <Box sx={{ width: "100%", height: "100%", pointerEvents: "none", position: "relative" }}>
+              <Image
+                src={values.professionalPhotoSrc}
+                alt="Profile"
+                width={90}
+                height={90}
+                unoptimized
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            </Box>
+          )}
           <IconButton
             size="small"
-            onClick={onChooseProfessionalPhoto}
-            disabled={professionalFieldsDisabled}
+            onClick={(ev) => {
+              ev.stopPropagation();
+              onChooseProfessionalPhoto();
+            }}
             sx={{
               position: "absolute",
               right: -6,
@@ -2025,7 +2083,7 @@ export default function ProfessionalFixedLocationSetup({
         <input
           ref={professionalPhotoInputRef}
           type="file"
-          accept="image/*"
+          accept={PROFILE_IMAGE_FILE_ACCEPT}
           hidden
           onChange={onProfessionalPhotoSelected}
         />
@@ -2276,19 +2334,32 @@ export default function ProfessionalFixedLocationSetup({
     fileInputRef.current?.click();
   }, []);
 
-  const onFilesSelected = React.useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    if (!files.length) return;
-    const urls = files
-      .filter((f) => f.type.startsWith("image/"))
-      .map((f) => URL.createObjectURL(f));
-    if (!urls.length) return;
-    addedBlobUrlsRef.current.push(...urls);
-    setMediaSlides((prev) => [...urls, ...prev]);
-    setMediaIdx(0);
-    // Allow selecting the same file again later.
-    e.target.value = "";
-  }, []);
+  const onFilesSelected = React.useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const { allowed, rejected } = filterAllowedProfileImageFiles(Array.from(e.target.files ?? []));
+      if (rejected > 0 && !allowed.length) {
+        showSnackbar({ severity: "error", message: PROFILE_IMAGE_INVALID_MESSAGE });
+        e.target.value = "";
+        return;
+      }
+      if (rejected > 0) {
+        showSnackbar({
+          severity: "warning",
+          message: `${rejected} file(s) skipped. ${PROFILE_IMAGE_INVALID_MESSAGE}`,
+        });
+      }
+      const urls = allowed.map((f) => URL.createObjectURL(f));
+      if (!urls.length) {
+        e.target.value = "";
+        return;
+      }
+      addedBlobUrlsRef.current.push(...urls);
+      setMediaSlides((prev) => [...urls, ...prev]);
+      setMediaIdx(0);
+      e.target.value = "";
+    },
+    [showSnackbar],
+  );
 
   const serviceCategoryTabs = React.useMemo<
     Array<{ id: string; label: string; iconId: ServiceCategorySliderIconId }>
@@ -2525,7 +2596,7 @@ export default function ProfessionalFixedLocationSetup({
                 return;
               }
 
-              await onSaveProfessionalProfile({
+              const jsonPayload = {
                 email: values.contactEmail,
                 password: values.contactPassword || undefined,
                 confirm_password: values.contactRepeatPassword || undefined,
@@ -2544,14 +2615,35 @@ export default function ProfessionalFixedLocationSetup({
                 contact_first_name: values.contactFirstName,
                 contact_last_name: values.contactLastName,
                 phone: values.contactPhone,
-              });
+              };
+
+              let updated: ProfileResponse | void;
+              if (pendingProfessionalPhoto) {
+                const fd = new FormData();
+                for (const [key, value] of Object.entries(jsonPayload)) {
+                  if (value === undefined || value === "") continue;
+                  fd.append(key, String(value));
+                }
+                fd.append("profile_picture", pendingProfessionalPhoto);
+                updated = await onSaveProfessionalProfile(fd);
+              } else {
+                updated = await onSaveProfessionalProfile(jsonPayload);
+              }
+
+              const nextPhotoSrc =
+                updated && updated.user_type === "professional"
+                  ? getProfessionalPhotoSrcFromProfile(updated)
+                  : savedProfessionalPhotoSrc;
+
               const nextSavedProfessionalDraft = {
                 ...professionalDraft,
                 contactPassword: "",
                 contactRepeatPassword: "",
               };
               setSavedProfessionalDraft(nextSavedProfessionalDraft);
-              applyProfessionalDraft(nextSavedProfessionalDraft, savedProfessionalPhotoSrc);
+              setSavedProfessionalPhotoSrc(nextPhotoSrc);
+              applyProfessionalDraft(nextSavedProfessionalDraft, nextPhotoSrc);
+              setPendingProfessionalPhoto(null);
               setProfileErrors({});
               setIsProfessionalEditing(false);
             }}
@@ -2671,10 +2763,10 @@ export default function ProfessionalFixedLocationSetup({
                 Upload photo
               </Button>
               <Typography sx={{ fontSize: 11, fontWeight: 500, color: alpha(m.navy, 0.45) }}>
-                JPG or PNG, square works best.
+                JPG, JPEG, PNG, or WebP (max 5 MB).
               </Typography>
             </Stack>
-            <input ref={teamPhotoInputRef} type="file" accept="image/*" hidden onChange={onTeamPhotoSelected} />
+            <input ref={teamPhotoInputRef} type="file" accept={PROFILE_IMAGE_FILE_ACCEPT} hidden onChange={onTeamPhotoSelected} />
           </Stack>
         </Box>
 
@@ -3244,7 +3336,7 @@ export default function ProfessionalFixedLocationSetup({
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/*"
+                  accept={PROFILE_IMAGE_FILE_ACCEPT}
                   multiple
                   onChange={onFilesSelected}
                   style={{ display: "none" }}
@@ -4430,7 +4522,7 @@ export default function ProfessionalFixedLocationSetup({
             <input
               ref={portfolioInputRef}
               type="file"
-              accept="image/*"
+              accept={PROFILE_IMAGE_FILE_ACCEPT}
               multiple
               hidden
               onChange={onPortfolioFilesSelected}
