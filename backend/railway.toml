@@ -1,8 +1,11 @@
-[build]
-builder = "NIXPACKS"
+# Railway config-as-code (https://docs.railway.com/reference/config-as-code)
+# When the service root is the monorepo repo root, use workspace scripts so
+# `npm run start` does not run the root "start" (Next.js frontend).
 
 [deploy]
-startCommand = "npm run start"
-healthcheckPath = "/api/health"
+startCommand = "npm run start:backend"
+preDeployCommand = ["npm", "--workspace", "backend", "run", "migrate"]
+healthcheckPath = "/"
+healthcheckTimeout = 300
 restartPolicyType = "ON_FAILURE"
-
+restartPolicyMaxRetries = 5
