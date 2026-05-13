@@ -31,8 +31,10 @@ import { BodyText, CardTitle, SubHeading } from "../../../../../components/ui/ty
 import AppCard from "../../../../../components/common/AppCard";
 import MollureFormField from "../../../../../components/common/MollureFormField";
 import MollureModal from "../../../../../components/common/MollureModal";
-import MollureDrawer from "../../../../../components/common/MollureDrawer";
 import { useSnackbar } from "../../../../../components/common/AppSnackbar";
+import FinanceDocumentPreviewDrawer from "../../../../../components/sections/finance/FinanceDocumentPreviewDrawer";
+import { useFinanceInvoiceSettings } from "../../../../../components/sections/finance/useFinanceInvoiceSettings";
+import { useGetProfileQuery } from "../../../../../store/services/profileApi";
 
 type SettingsTab = "stripe" | "transaction" | "invoice";
 
@@ -419,6 +421,8 @@ function InvoiceSettings() {
   const theme = useTheme();
   const m = theme.palette.mollure;
   const { showSnackbar } = useSnackbar();
+  const { settings, setSettings } = useFinanceInvoiceSettings();
+  const { data: profileResponse } = useGetProfileQuery();
   const [paymentsEditing, setPaymentsEditing] = React.useState(false);
   const [addProductOpen, setAddProductOpen] = React.useState(false);
   const [editingProductId, setEditingProductId] = React.useState<string | null>(null);
@@ -432,154 +436,7 @@ function InvoiceSettings() {
   const [addServiceDraft, setAddServiceDraft] = React.useState({ service: "Hair Protein", vat: "20%" });
 
   const logoInputRef = React.useRef<HTMLInputElement | null>(null);
-  const [invoiceLogoUrl, setInvoiceLogoUrl] = React.useState<string | null>(null);
   const [invoiceDrawerOpen, setInvoiceDrawerOpen] = React.useState(false);
-  const [invoiceType, setInvoiceType] = React.useState<"individual" | "company">("individual");
-
-  const downloadInvoicePdf = React.useCallback(async () => {
-    try {
-      const { jsPDF } = await import("jspdf");
-      const doc = new jsPDF({ unit: "pt", format: "a4" });
-
-      const left = 48;
-      const right = 48;
-      const top = 56;
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const usableWidth = pageWidth - left - right;
-
-      // Header
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(16);
-      doc.text("Invoice", left, top);
-
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10.5);
-      doc.text("Service Date: 12/04/2023", left, top + 18);
-      doc.text("Due Date: 12/04/2023", left, top + 34);
-
-      doc.text("Invoice Date: 12/04/2023", left + usableWidth - 150, top + 18, { align: "left" });
-      doc.text("Invoice Number: 0535833", left + usableWidth - 150, top + 34, { align: "left" });
-
-      // Logo (optional)
-      if (invoiceLogoUrl) {
-        const m = /^data:image\/(png|jpeg|jpg);base64,/.exec(invoiceLogoUrl);
-        const fmt = m?.[1]?.toUpperCase() === "JPG" ? "JPEG" : m?.[1]?.toUpperCase();
-        if (fmt === "PNG" || fmt === "JPEG") {
-          doc.addImage(invoiceLogoUrl, fmt, left + usableWidth / 2 - 22, top - 6, 44, 44);
-        }
-      }
-
-      doc.setTextColor(70);
-      doc.setFontSize(10.5);
-      doc.text("Late payment fee: 1% of the outstanding amount applies after the due date.", left, top + 62);
-
-      // Business info blocks
-      let y = top + 92;
-      const blockH = invoiceType === "company" ? 86 : 64;
-      const blockGap = 10;
-
-      const drawBlock = (title: string, lines: string[]) => {
-        doc.setDrawColor(220);
-        doc.setFillColor("#FAFAFA");
-        doc.roundedRect(left, y, usableWidth, blockH, 8, 8, "FD");
-        doc.setTextColor(40);
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(11);
-        doc.text(title, left + 14, y + 18);
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(10.5);
-        lines.forEach((ln, idx) => {
-          doc.text(ln, left + 14, y + 36 + idx * 16);
-        });
-        y += blockH + blockGap;
-      };
-
-      drawBlock("Professional's Business Info", [
-        "Legal Name: Craig Martha",
-        "Professional Address: 2464 Royal Ln, Mesa, New Jersey",
-        ...(invoiceType === "company"
-          ? ["Professional VAT No: 123456789", "Professional COC No: 123456789"]
-          : []),
-      ]);
-
-      drawBlock("Company Clients Business Info", [
-        "Legal Name: Sara Johnson",
-        "Client Address: 2464 Royal Ln, Mesa, New Jersey",
-        ...(invoiceType === "company" ? ["Client VAT No: 123456789", "Client COC No: 123456789"] : []),
-      ]);
-
-      // Booking related info
-      doc.setDrawColor(220);
-      doc.setFillColor("#FAFAFA");
-      doc.roundedRect(left, y, usableWidth, 82, 8, 8, "FD");
-      doc.setTextColor(40);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(11);
-      doc.text("Booking Related Info", left + 14, y + 18);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10.5);
-      doc.text("Scissor Cut", left + 14, y + 38);
-      doc.text("€100.00", left + usableWidth - 14, y + 38, { align: "right" });
-      doc.text("Blow Dry", left + 14, y + 54);
-      doc.text("€150.00", left + usableWidth - 14, y + 54, { align: "right" });
-      doc.setFont("helvetica", "bold");
-      doc.text("Total Price:", left + 14, y + 72);
-      doc.text("€250", left + usableWidth - 14, y + 72, { align: "right" });
-      y += 82 + 10;
-
-      // Line items table (simple)
-      const tableTop = y + 10;
-      doc.setTextColor(40);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-
-      const cols = [
-        { label: "Description", w: 180 },
-        { label: "Quantity", w: 70 },
-        { label: "VAT %", w: 60 },
-        { label: "Price/Unit", w: 90 },
-        { label: "Total", w: 60 },
-      ] as const;
-
-      let x = left;
-      cols.forEach((c) => {
-        doc.text(c.label, x, tableTop);
-        x += c.w;
-      });
-
-      doc.setDrawColor(220);
-      doc.line(left, tableTop + 6, left + cols.reduce((s, c) => s + c.w, 0), tableTop + 6);
-
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10.5);
-      const rows = [
-        ["Service 1", "2", "10%", "13 EUR", "€13"],
-        ["Service 2", "2", "9%", "13 EUR", "€13"],
-      ];
-      rows.forEach((r, idx) => {
-        let cx = left;
-        const ry = tableTop + 26 + idx * 18;
-        doc.text(r[0], cx, ry);
-        cx += cols[0].w;
-        doc.text(r[1], cx, ry);
-        cx += cols[1].w;
-        doc.text(r[2], cx, ry);
-        cx += cols[2].w;
-        doc.text(r[3], cx, ry);
-        cx += cols[3].w;
-        doc.text(r[4], cx, ry);
-      });
-
-      doc.setFont("helvetica", "bold");
-      doc.text("Total (incl. VAT)", left, tableTop + 26 + rows.length * 18 + 22);
-      doc.text("€13", left + usableWidth - 20, tableTop + 26 + rows.length * 18 + 22, { align: "right" });
-
-      doc.save(`invoice-${invoiceType}.pdf`);
-      showSnackbar({ severity: "success", message: "Invoice downloaded successfully." });
-    } catch {
-      showSnackbar({ severity: "error", message: "Failed to download invoice PDF." });
-    }
-  }, [invoiceLogoUrl, invoiceType, showSnackbar]);
 
   const sectionCardSx = {
     borderRadius: "10px",
@@ -612,23 +469,19 @@ function InvoiceSettings() {
     { label: "Eye Makeup", category: "Makeup" },
   ] as const;
 
-  const [products, setProducts] = React.useState<Array<{ id: string; name: string; price: string; vat: string }>>([
-    { id: "p1", name: "Shampoo", price: "30EUR", vat: "30%" },
-    { id: "p2", name: "Eye Lashes", price: "50EUR", vat: "10%" },
-  ]);
-
-  const [services, setServices] = React.useState<Array<{ id: string; category: string; service: string; vat: string }>>([
-    { id: "s1", category: "Hair", service: "Dye", vat: "20%" },
-    { id: "s2", category: "Makeup", service: "Eye Makeup", vat: "10%" },
-  ]);
-
   const handleDeleteProduct = (id: string) => {
-    setProducts((prev) => prev.filter((p) => p.id !== id));
+    setSettings((prev) => ({
+      ...prev,
+      products: prev.products.filter((product) => product.id !== id),
+    }));
     showSnackbar({ severity: "success", message: "Product deleted successfully." });
   };
 
   const handleDeleteService = (id: string) => {
-    setServices((prev) => prev.filter((s) => s.id !== id));
+    setSettings((prev) => ({
+      ...prev,
+      services: prev.services.filter((service) => service.id !== id),
+    }));
     showSnackbar({ severity: "success", message: "Service deleted successfully." });
   };
 
@@ -640,10 +493,18 @@ function InvoiceSettings() {
     const price = priceRaw ? `${priceRaw}EUR` : "0EUR";
 
     if (editingProductId) {
-      setProducts((prev) => prev.map((p) => (p.id === editingProductId ? { ...p, name, price, vat } : p)));
+      setSettings((prev) => ({
+        ...prev,
+        products: prev.products.map((product) =>
+          product.id === editingProductId ? { ...product, name, price, vat } : product,
+        ),
+      }));
       showSnackbar({ severity: "success", message: "Product updated successfully." });
     } else {
-      setProducts((prev) => [{ id: `p-${Date.now()}`, name, price, vat }, ...prev]);
+      setSettings((prev) => ({
+        ...prev,
+        products: [{ id: `p-${Date.now()}`, name, price, vat }, ...prev.products],
+      }));
       showSnackbar({ severity: "success", message: "Successfully added product." });
     }
 
@@ -659,12 +520,18 @@ function InvoiceSettings() {
     const category = match?.category ?? "Other";
 
     if (editingServiceId) {
-      setServices((prev) =>
-        prev.map((s) => (s.id === editingServiceId ? { ...s, category, service, vat } : s)),
-      );
+      setSettings((prev) => ({
+        ...prev,
+        services: prev.services.map((item) =>
+          item.id === editingServiceId ? { ...item, category, service, vat } : item,
+        ),
+      }));
       showSnackbar({ severity: "success", message: "Service updated successfully." });
     } else {
-      setServices((prev) => [{ id: `s-${Date.now()}`, category, service, vat }, ...prev]);
+      setSettings((prev) => ({
+        ...prev,
+        services: [{ id: `s-${Date.now()}`, category, service, vat }, ...prev.services],
+      }));
       showSnackbar({ severity: "success", message: "Successfully added service." });
     }
 
@@ -679,7 +546,7 @@ function InvoiceSettings() {
   };
 
   const openEditProduct = (id: string) => {
-    const p = products.find((x) => x.id === id);
+    const p = settings.products.find((x) => x.id === id);
     if (!p) return;
     setEditingProductId(id);
     setAddProductDraft({
@@ -697,12 +564,38 @@ function InvoiceSettings() {
   };
 
   const openEditService = (id: string) => {
-    const s = services.find((x) => x.id === id);
+    const s = settings.services.find((x) => x.id === id);
     if (!s) return;
     setEditingServiceId(id);
     setAddServiceDraft({ service: s.service, vat: s.vat });
     setAddServiceOpen(true);
   };
+
+  const updatePaymentTerm = React.useCallback(
+    (key: keyof typeof settings.paymentTerms, value: string) => {
+      setSettings((prev) => ({
+        ...prev,
+        paymentTerms: {
+          ...prev.paymentTerms,
+          [key]: value,
+        },
+      }));
+    },
+    [setSettings, settings.paymentTerms],
+  );
+
+  const updateReminder = React.useCallback(
+    (key: keyof typeof settings.reminders, value: string) => {
+      setSettings((prev) => ({
+        ...prev,
+        reminders: {
+          ...prev.reminders,
+          [key]: value,
+        },
+      }));
+    },
+    [setSettings, settings.reminders],
+  );
 
   const templateTileSx = () =>
     ({
@@ -797,9 +690,18 @@ function InvoiceSettings() {
                     onClick={() => logoInputRef.current?.click()}
                   >
                     <Stack spacing={0.55} alignItems="center">
-                      <UploadFileRoundedIcon sx={{ fontSize: 20, color: alpha(m.navy, 0.55) }} />
+                      {settings.logoDataUrl ? (
+                        <Box
+                          component="img"
+                          src={settings.logoDataUrl}
+                          alt="Invoice logo"
+                          sx={{ width: 52, height: 52, objectFit: "contain", borderRadius: "10px" }}
+                        />
+                      ) : (
+                        <UploadFileRoundedIcon sx={{ fontSize: 20, color: alpha(m.navy, 0.55) }} />
+                      )}
                       <BodyText sx={{ fontWeight: 900, fontSize: 12.5, color: alpha(m.navy, 0.72) }}>
-                        Upload logo for invoice
+                        {settings.logoDataUrl ? "Change invoice logo" : "Upload logo for invoice"}
                       </BodyText>
                       <BodyText sx={{ fontSize: 10.5, color: alpha(m.navy, 0.52) }}>PNG, JPG, SVG up to 5MB</BodyText>
                     </Stack>
@@ -815,7 +717,7 @@ function InvoiceSettings() {
                       const reader = new FileReader();
                       reader.onload = () => {
                         const url = typeof reader.result === "string" ? reader.result : null;
-                        setInvoiceLogoUrl(url);
+                        setSettings((prev) => ({ ...prev, logoDataUrl: url }));
                         showSnackbar({ severity: "success", message: "Logo uploaded successfully." });
                       };
                       reader.readAsDataURL(file);
@@ -826,14 +728,16 @@ function InvoiceSettings() {
                     sx={{
                       ...templateTileSx(),
                       borderStyle: "solid",
-                      borderColor: alpha(m.navy, 0.12),
+                      borderColor:
+                        settings.defaultInvoiceType === "individual" ? alpha(m.teal, 0.5) : alpha(m.navy, 0.12),
+                      bgcolor: settings.defaultInvoiceType === "individual" ? alpha(m.teal, 0.04) : "#fff",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       cursor: "pointer",
                     }}
                     onClick={() => {
-                      setInvoiceType("individual");
+                      setSettings((prev) => ({ ...prev, defaultInvoiceType: "individual" }));
                       setInvoiceDrawerOpen(true);
                     }}
                   >
@@ -865,14 +769,16 @@ function InvoiceSettings() {
                     sx={{
                       ...templateTileSx(),
                       borderStyle: "solid",
-                      borderColor: alpha(m.navy, 0.12),
+                      borderColor:
+                        settings.defaultInvoiceType === "company" ? alpha(m.teal, 0.5) : alpha(m.navy, 0.12),
+                      bgcolor: settings.defaultInvoiceType === "company" ? alpha(m.teal, 0.04) : "#fff",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       cursor: "pointer",
                     }}
                     onClick={() => {
-                      setInvoiceType("company");
+                      setSettings((prev) => ({ ...prev, defaultInvoiceType: "company" }));
                       setInvoiceDrawerOpen(true);
                     }}
                   >
@@ -987,7 +893,7 @@ function InvoiceSettings() {
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {products.map((p) => (
+                        {settings.products.map((p) => (
                           <TableRow key={p.id} hover>
                             <TableCell sx={tableBodyCellSx}>{p.name}</TableCell>
                             <TableCell sx={tableBodyCellSx}>{p.price}</TableCell>
@@ -1093,7 +999,7 @@ function InvoiceSettings() {
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {services.map((s) => (
+                        {settings.services.map((s) => (
                           <TableRow key={s.id} hover>
                             <TableCell sx={tableBodyCellSx}>{s.category}</TableCell>
                             <TableCell sx={tableBodyCellSx}>{s.service}</TableCell>
@@ -1144,16 +1050,32 @@ function InvoiceSettings() {
                         <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} alignItems={{ md: "flex-start" }}>
                           <BodyText sx={rowLabelSx}>Due Date:</BodyText>
                           <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ flex: 1 }}>
-                            <MollureFormField disabled={!paymentsEditing} placeholder="2" />
-                            <MollureFormField disabled={!paymentsEditing} placeholder="Weeks" />
+                            <MollureFormField
+                              disabled={!paymentsEditing}
+                              value={settings.paymentTerms.originalDueValue}
+                              onChange={(e) => updatePaymentTerm("originalDueValue", e.target.value)}
+                            />
+                            <MollureFormField
+                              disabled={!paymentsEditing}
+                              value={settings.paymentTerms.originalDueUnit}
+                              onChange={(e) => updatePaymentTerm("originalDueUnit", e.target.value)}
+                            />
                           </Stack>
                         </Stack>
 
                         <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} alignItems={{ md: "flex-start" }}>
                           <BodyText sx={rowLabelSx}>Penalty Fee</BodyText>
                           <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ flex: 1 }}>
-                            <MollureFormField disabled={!paymentsEditing} placeholder="10" />
-                            <MollureFormField disabled={!paymentsEditing} placeholder="%" />
+                            <MollureFormField
+                              disabled={!paymentsEditing}
+                              value={settings.paymentTerms.originalPenaltyValue}
+                              onChange={(e) => updatePaymentTerm("originalPenaltyValue", e.target.value)}
+                            />
+                            <MollureFormField
+                              disabled={!paymentsEditing}
+                              value={settings.paymentTerms.originalPenaltyUnit}
+                              onChange={(e) => updatePaymentTerm("originalPenaltyUnit", e.target.value)}
+                            />
                           </Stack>
                         </Stack>
                       </Stack>
@@ -1162,22 +1084,42 @@ function InvoiceSettings() {
                       <Stack spacing={1.25} sx={{ mt: 1.25 }}>
                         <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} alignItems={{ md: "flex-start" }}>
                           <BodyText sx={rowLabelSx}>Trigger:</BodyText>
-                          <MollureFormField disabled={!paymentsEditing} placeholder="Automatic" />
+                          <MollureFormField
+                            disabled={!paymentsEditing}
+                            value={settings.paymentTerms.firstReissueTrigger}
+                            onChange={(e) => updatePaymentTerm("firstReissueTrigger", e.target.value)}
+                          />
                         </Stack>
 
                         <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} alignItems={{ md: "flex-start" }}>
                           <BodyText sx={rowLabelSx}>Due Date:</BodyText>
                           <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ flex: 1 }}>
-                            <MollureFormField disabled={!paymentsEditing} placeholder="2" />
-                            <MollureFormField disabled={!paymentsEditing} placeholder="Weeks" />
+                            <MollureFormField
+                              disabled={!paymentsEditing}
+                              value={settings.paymentTerms.firstReissueDueValue}
+                              onChange={(e) => updatePaymentTerm("firstReissueDueValue", e.target.value)}
+                            />
+                            <MollureFormField
+                              disabled={!paymentsEditing}
+                              value={settings.paymentTerms.firstReissueDueUnit}
+                              onChange={(e) => updatePaymentTerm("firstReissueDueUnit", e.target.value)}
+                            />
                           </Stack>
                         </Stack>
 
                         <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} alignItems={{ md: "flex-start" }}>
                           <BodyText sx={rowLabelSx}>Penalty Fee</BodyText>
                           <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ flex: 1 }}>
-                            <MollureFormField disabled={!paymentsEditing} placeholder="20EUR" />
-                            <MollureFormField disabled={!paymentsEditing} placeholder="%" />
+                            <MollureFormField
+                              disabled={!paymentsEditing}
+                              value={settings.paymentTerms.firstReissuePenaltyValue}
+                              onChange={(e) => updatePaymentTerm("firstReissuePenaltyValue", e.target.value)}
+                            />
+                            <MollureFormField
+                              disabled={!paymentsEditing}
+                              value={settings.paymentTerms.firstReissuePenaltyUnit}
+                              onChange={(e) => updatePaymentTerm("firstReissuePenaltyUnit", e.target.value)}
+                            />
                           </Stack>
                         </Stack>
                       </Stack>
@@ -1186,22 +1128,42 @@ function InvoiceSettings() {
                       <Stack spacing={1.25} sx={{ mt: 1.25 }}>
                         <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} alignItems={{ md: "flex-start" }}>
                           <BodyText sx={rowLabelSx}>Trigger:</BodyText>
-                          <MollureFormField disabled={!paymentsEditing} placeholder="Automatic" />
+                          <MollureFormField
+                            disabled={!paymentsEditing}
+                            value={settings.paymentTerms.secondReissueTrigger}
+                            onChange={(e) => updatePaymentTerm("secondReissueTrigger", e.target.value)}
+                          />
                         </Stack>
 
                         <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} alignItems={{ md: "flex-start" }}>
                           <BodyText sx={rowLabelSx}>Due Date:</BodyText>
                           <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ flex: 1 }}>
-                            <MollureFormField disabled={!paymentsEditing} placeholder="2" />
-                            <MollureFormField disabled={!paymentsEditing} placeholder="Weeks" />
+                            <MollureFormField
+                              disabled={!paymentsEditing}
+                              value={settings.paymentTerms.secondReissueDueValue}
+                              onChange={(e) => updatePaymentTerm("secondReissueDueValue", e.target.value)}
+                            />
+                            <MollureFormField
+                              disabled={!paymentsEditing}
+                              value={settings.paymentTerms.secondReissueDueUnit}
+                              onChange={(e) => updatePaymentTerm("secondReissueDueUnit", e.target.value)}
+                            />
                           </Stack>
                         </Stack>
 
                         <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} alignItems={{ md: "flex-start" }}>
                           <BodyText sx={rowLabelSx}>Penalty Fee</BodyText>
                           <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ flex: 1 }}>
-                            <MollureFormField disabled={!paymentsEditing} placeholder="20EUR" />
-                            <MollureFormField disabled={!paymentsEditing} placeholder="%" />
+                            <MollureFormField
+                              disabled={!paymentsEditing}
+                              value={settings.paymentTerms.secondReissuePenaltyValue}
+                              onChange={(e) => updatePaymentTerm("secondReissuePenaltyValue", e.target.value)}
+                            />
+                            <MollureFormField
+                              disabled={!paymentsEditing}
+                              value={settings.paymentTerms.secondReissuePenaltyUnit}
+                              onChange={(e) => updatePaymentTerm("secondReissuePenaltyUnit", e.target.value)}
+                            />
                           </Stack>
                         </Stack>
                       </Stack>
@@ -1214,15 +1176,31 @@ function InvoiceSettings() {
                       <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} sx={{ mt: 0.25 }}>
                         <BodyText sx={rowLabelSx}>Reminder 1</BodyText>
                         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ flex: 1 }}>
-                          <MollureFormField disabled={!paymentsEditing} placeholder="2" />
-                          <MollureFormField disabled={!paymentsEditing} placeholder="Weeks" />
+                          <MollureFormField
+                            disabled={!paymentsEditing}
+                            value={settings.reminders.reminder1Value}
+                            onChange={(e) => updateReminder("reminder1Value", e.target.value)}
+                          />
+                          <MollureFormField
+                            disabled={!paymentsEditing}
+                            value={settings.reminders.reminder1Unit}
+                            onChange={(e) => updateReminder("reminder1Unit", e.target.value)}
+                          />
                         </Stack>
                       </Stack>
                       <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} sx={{ mt: 1.25 }}>
                         <BodyText sx={rowLabelSx}>Reminder 2</BodyText>
                         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ flex: 1 }}>
-                          <MollureFormField disabled={!paymentsEditing} placeholder="2" />
-                          <MollureFormField disabled={!paymentsEditing} placeholder="Weeks" />
+                          <MollureFormField
+                            disabled={!paymentsEditing}
+                            value={settings.reminders.reminder2Value}
+                            onChange={(e) => updateReminder("reminder2Value", e.target.value)}
+                          />
+                          <MollureFormField
+                            disabled={!paymentsEditing}
+                            value={settings.reminders.reminder2Unit}
+                            onChange={(e) => updateReminder("reminder2Unit", e.target.value)}
+                          />
                         </Stack>
                       </Stack>
                     </Box>
@@ -1402,205 +1380,14 @@ function InvoiceSettings() {
         </Box>
       </MollureModal>
 
-      <MollureDrawer
-        anchor="right"
+      <FinanceDocumentPreviewDrawer
         open={invoiceDrawerOpen}
         onClose={() => setInvoiceDrawerOpen(false)}
-        title="View Invoice"
-        width={{ xs: "100%", sm: 560 }}
-        contentSx={{ p: 2.25 }}
-      >
-        <Stack spacing={2}>
-          <Stack direction="row" spacing={2} sx={{ borderBottom: `1px solid ${alpha(m.navy, 0.08)}`, pb: 1 }}>
-            {["Booking", "Sales", "Activity"].map((t, idx) => (
-              <BodyText
-                key={t}
-                sx={{
-                  fontWeight: 800,
-                  fontSize: 12.5,
-                  color: idx === 1 ? m.teal : alpha(m.navy, 0.55),
-                  borderBottom: idx === 1 ? `2px solid ${m.teal}` : "2px solid transparent",
-                  pb: 0.75,
-                }}
-              >
-                {t}
-              </BodyText>
-            ))}
-          </Stack>
-
-          <Box
-            sx={{
-              borderRadius: "10px",
-              border: `1px solid ${alpha(m.navy, 0.10)}`,
-              bgcolor: "#fff",
-              p: 2,
-            }}
-          >
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: "1fr auto 1fr",
-                alignItems: "start",
-                columnGap: 2,
-              }}
-            >
-              <Box>
-                <SubHeading sx={{ fontSize: 18, fontWeight: 900, color: alpha(m.navy, 0.86) }}>Invoice</SubHeading>
-                <BodyText sx={{ mt: 0.5, fontSize: 12.5, color: alpha(m.navy, 0.62) }}>
-                  Service Date: 12/04/2023
-                </BodyText>
-                <BodyText sx={{ mt: 0.2, fontSize: 12.5, color: alpha(m.navy, 0.62) }}>Due Date: 12/04/2023</BodyText>
-              </Box>
-
-              <Box sx={{ pt: 0.25, display: "flex", justifyContent: "center" }}>
-                {invoiceLogoUrl ? (
-                  <Box
-                    component="img"
-                    src={invoiceLogoUrl}
-                    alt="Invoice logo"
-                    sx={{ width: 48, height: 48, objectFit: "contain", borderRadius: "10px" }}
-                  />
-                ) : null}
-              </Box>
-
-              <Box sx={{ textAlign: "right" }}>
-                <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.62) }}>Invoice Date: 12/04/2023</BodyText>
-                <BodyText sx={{ mt: 0.2, fontSize: 12.5, color: alpha(m.navy, 0.62) }}>
-                  Invoice Number: 0535833
-                </BodyText>
-              </Box>
-            </Box>
-
-            <BodyText sx={{ mt: 1.4, fontSize: 12.5, color: alpha(m.navy, 0.62) }}>
-              Late payment fee: 1% of the outstanding amount applies after the due date.
-            </BodyText>
-
-            <Stack spacing={1.25} sx={{ mt: 2 }}>
-              <Box
-                sx={{
-                  p: 1.75,
-                  borderRadius: "10px",
-                  bgcolor: alpha(m.navy, 0.015),
-                  border: `1px solid ${alpha(m.navy, 0.08)}`,
-                }}
-              >
-                <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.78) }}>Professional&apos;s Business Info</BodyText>
-                <Stack spacing={0.5} sx={{ mt: 1.1 }}>
-                  <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.62) }}>Legal Name: Craig Martha</BodyText>
-                  <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.62) }}>
-                    Professional Address: 2464 Royal Ln, Mesa, New Jersey
-                  </BodyText>
-                  {invoiceType === "company" ? (
-                    <>
-                      <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.62) }}>Professional VAT No: 123456789</BodyText>
-                      <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.62) }}>Professional COC No: 123456789</BodyText>
-                    </>
-                  ) : null}
-                </Stack>
-              </Box>
-
-              <Box
-                sx={{
-                  p: 1.75,
-                  borderRadius: "10px",
-                  bgcolor: alpha(m.navy, 0.015),
-                  border: `1px solid ${alpha(m.navy, 0.08)}`,
-                }}
-              >
-                <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.78) }}>Company Clients Business Info</BodyText>
-                <Stack spacing={0.5} sx={{ mt: 1.1 }}>
-                  <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.62) }}>Legal Name: Sara Johnson</BodyText>
-                  <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.62) }}>
-                    Client Address: 2464 Royal Ln, Mesa, New Jersey
-                  </BodyText>
-                  {invoiceType === "company" ? (
-                    <>
-                      <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.62) }}>Client VAT No: 123456789</BodyText>
-                      <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.62) }}>Client COC No: 123456789</BodyText>
-                    </>
-                  ) : null}
-                </Stack>
-              </Box>
-
-              <Box
-                sx={{
-                  p: 1.75,
-                  borderRadius: "10px",
-                  bgcolor: alpha(m.navy, 0.015),
-                  border: `1px solid ${alpha(m.navy, 0.08)}`,
-                }}
-              >
-                <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.78) }}>Booking Related Info</BodyText>
-                <Stack spacing={0.75} sx={{ mt: 1.1 }}>
-                  {[
-                    { label: "Scissor Cut", value: "€100.00" },
-                    { label: "Blow Dry", value: "€150.00" },
-                  ].map((r) => (
-                    <Stack key={r.label} direction="row" alignItems="center" justifyContent="space-between">
-                      <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.70) }}>{r.label}</BodyText>
-                      <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.70) }}>{r.value}</BodyText>
-                    </Stack>
-                  ))}
-
-                  <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: 0.25 }}>
-                    <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.70) }}>Total Price:</BodyText>
-                    <BodyText sx={{ fontSize: 18, fontWeight: 900, color: alpha(m.navy, 0.82) }}>€250</BodyText>
-                  </Stack>
-                </Stack>
-              </Box>
-            </Stack>
-
-            <Box sx={{ mt: 2 }}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    {["Description", "Quantity", "VAT %", "Price Per Unit", "Total Price"].map((h) => (
-                      <TableCell key={h} sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), borderBottom: `1px solid ${alpha(m.navy, 0.08)}` }}>
-                        {h}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {[
-                    { d: "Service 1", q: "2", v: "10%", p: "13 EUR", t: "13" },
-                    { d: "Service 2", q: "2", v: "9%", p: "13 EUR", t: "13" },
-                  ].map((r, i) => (
-                    <TableRow key={i} hover>
-                      <TableCell sx={{ fontSize: 12.5, color: alpha(m.navy, 0.75) }}>{r.d}</TableCell>
-                      <TableCell sx={{ fontSize: 12.5, color: alpha(m.navy, 0.75) }}>{r.q}</TableCell>
-                      <TableCell sx={{ fontSize: 12.5, color: alpha(m.navy, 0.75) }}>{r.v}</TableCell>
-                      <TableCell sx={{ fontSize: 12.5, color: alpha(m.navy, 0.75) }}>{r.p}</TableCell>
-                      <TableCell sx={{ fontSize: 12.5, color: alpha(m.navy, 0.75) }}>€{r.t}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              <Stack direction="row" justifyContent="space-between" sx={{ mt: 1.5 }}>
-                <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.65) }}>Total (incl. VAT)</BodyText>
-                <BodyText sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78) }}>€13</BodyText>
-              </Stack>
-            </Box>
-
-            <Stack direction="row" justifyContent="center" sx={{ mt: 2 }}>
-              <Button
-                variant="outlined"
-                onClick={downloadInvoicePdf}
-                sx={{
-                  borderRadius: "10px",
-                  textTransform: "none",
-                  fontWeight: 900,
-                  borderColor: alpha(m.navy, 0.16),
-                  color: alpha(m.navy, 0.70),
-                  "&:hover": { borderColor: alpha(m.navy, 0.24), bgcolor: alpha(m.navy, 0.02) },
-                }}
-              >
-                Download Invoice
-              </Button>
-            </Stack>
-          </Box>
-        </Stack>
-      </MollureDrawer>
+        documentType="invoice"
+        invoiceType={settings.defaultInvoiceType}
+        settings={settings}
+        profileData={profileResponse?.data ?? null}
+      />
     </Stack>
   );
 }

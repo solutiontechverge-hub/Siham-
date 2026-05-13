@@ -36,7 +36,7 @@ import GestureRoundedIcon from "@mui/icons-material/GestureRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import type { FixedLocationPageData } from "../../app/professionals/fixed-location/fixedLocation.data";
-import { useFixedLocationForm } from "../../app/professionals/fixed-location/fixedLocation.use";
+import { useFixedLocationForm, type FixedLocationFormState } from "../../app/professionals/fixed-location/fixedLocation.use";
 import type { ProfessionalProfile, ProfileResponse } from "../../store/services/profileApi";
 import type {
   BusinessCategory,
@@ -86,6 +86,66 @@ export type ProfessionalFixedLocationSetupProps = {
   }) => Promise<void>;
   onSaveBusinessSetup?: (payload: UpsertBusinessSetupRequest) => Promise<void>;
 };
+
+const professionalEditableFieldKeys = [
+  "companyLegalName",
+  "companyCocNumber",
+  "companyVatNumber",
+  "companyStreet",
+  "companyStreetNumber",
+  "companyPostalCode",
+  "companyProvince",
+  "companyMunicipality",
+  "companyBusinessType",
+  "companyWebsite",
+  "socialInstagram",
+  "socialOther",
+  "contactFirstName",
+  "contactLastName",
+  "contactEmail",
+  "contactPhone",
+  "contactPassword",
+  "contactRepeatPassword",
+] as const;
+
+type ProfessionalEditableDraft = Pick<FixedLocationFormState, (typeof professionalEditableFieldKeys)[number]>;
+
+function getProfessionalProfileRecord(profileData: ProfileResponse | null) {
+  if (!profileData || profileData.user_type !== "professional") {
+    return null;
+  }
+
+  return profileData.profile as ProfessionalProfile | null;
+}
+
+function buildProfessionalDraftFromProfile(profileData: ProfileResponse | null): ProfessionalEditableDraft {
+  const professionalProfile = getProfessionalProfileRecord(profileData);
+
+  return {
+    companyLegalName: professionalProfile?.legal_name || "",
+    companyCocNumber: professionalProfile?.ccc_number || "",
+    companyVatNumber: professionalProfile?.vat_number || "",
+    companyStreet: professionalProfile?.street || "",
+    companyStreetNumber: professionalProfile?.street_number || "",
+    companyPostalCode: professionalProfile?.postal_code || "",
+    companyProvince: professionalProfile?.province || "",
+    companyMunicipality: professionalProfile?.municipality || "",
+    companyBusinessType: professionalProfile?.business_type || "",
+    companyWebsite: professionalProfile?.website || "",
+    socialInstagram: professionalProfile?.instagram || "",
+    socialOther: professionalProfile?.other_link || "",
+    contactFirstName: professionalProfile?.contact_first_name || "",
+    contactLastName: professionalProfile?.contact_last_name || "",
+    contactEmail: profileData?.email || "",
+    contactPhone: professionalProfile?.phone || "",
+    contactPassword: "",
+    contactRepeatPassword: "",
+  };
+}
+
+function getProfessionalPhotoSrcFromProfile(profileData: ProfileResponse | null) {
+  return getProfessionalProfileRecord(profileData)?.profile_picture || "/professionals/hero.png";
+}
 
 function SectionShell({
   title,
@@ -200,6 +260,12 @@ export default function ProfessionalFixedLocationSetup({
     addKeyword,
     removeKeyword,
   } = useFixedLocationForm();
+  const [savedProfessionalDraft, setSavedProfessionalDraft] = React.useState<ProfessionalEditableDraft>(() =>
+    buildProfessionalDraftFromProfile(profileData),
+  );
+  const [savedProfessionalPhotoSrc, setSavedProfessionalPhotoSrc] = React.useState(() =>
+    getProfessionalPhotoSrcFromProfile(profileData),
+  );
   const [activeSubTab, setActiveSubTab] = React.useState<string>(
     data.subTabsActive,
   );
@@ -437,6 +503,81 @@ export default function ProfessionalFixedLocationSetup({
   const [isProfessionalEditing, setIsProfessionalEditing] = React.useState(false);
   const professionalFieldsDisabled = !isProfessionalEditing;
   const hydratedProfileRef = React.useRef<string | null>(null);
+  const applyProfessionalDraft = React.useCallback(
+    (draft: ProfessionalEditableDraft, photoSrc: string) => {
+      setField("professionalPhotoSrc", photoSrc);
+      setField("companyLegalName", draft.companyLegalName);
+      setField("companyCocNumber", draft.companyCocNumber);
+      setField("companyVatNumber", draft.companyVatNumber);
+      setField("companyStreet", draft.companyStreet);
+      setField("companyStreetNumber", draft.companyStreetNumber);
+      setField("companyPostalCode", draft.companyPostalCode);
+      setField("companyProvince", draft.companyProvince);
+      setField("companyMunicipality", draft.companyMunicipality);
+      setField("companyBusinessType", draft.companyBusinessType);
+      setField("companyWebsite", draft.companyWebsite);
+      setField("socialInstagram", draft.socialInstagram);
+      setField("socialOther", draft.socialOther);
+      setField("contactFirstName", draft.contactFirstName);
+      setField("contactLastName", draft.contactLastName);
+      setField("contactEmail", draft.contactEmail);
+      setField("contactPhone", draft.contactPhone);
+      setField("contactPassword", draft.contactPassword);
+      setField("contactRepeatPassword", draft.contactRepeatPassword);
+    },
+    [setField],
+  );
+  const professionalDraft = React.useMemo<ProfessionalEditableDraft>(
+    () => ({
+      companyLegalName: values.companyLegalName,
+      companyCocNumber: values.companyCocNumber,
+      companyVatNumber: values.companyVatNumber,
+      companyStreet: values.companyStreet,
+      companyStreetNumber: values.companyStreetNumber,
+      companyPostalCode: values.companyPostalCode,
+      companyProvince: values.companyProvince,
+      companyMunicipality: values.companyMunicipality,
+      companyBusinessType: values.companyBusinessType,
+      companyWebsite: values.companyWebsite,
+      socialInstagram: values.socialInstagram,
+      socialOther: values.socialOther,
+      contactFirstName: values.contactFirstName,
+      contactLastName: values.contactLastName,
+      contactEmail: values.contactEmail,
+      contactPhone: values.contactPhone,
+      contactPassword: values.contactPassword,
+      contactRepeatPassword: values.contactRepeatPassword,
+    }),
+    [
+      values.companyBusinessType,
+      values.companyCocNumber,
+      values.companyLegalName,
+      values.companyMunicipality,
+      values.companyPostalCode,
+      values.companyProvince,
+      values.companyStreet,
+      values.companyStreetNumber,
+      values.companyVatNumber,
+      values.companyWebsite,
+      values.contactEmail,
+      values.contactFirstName,
+      values.contactLastName,
+      values.contactPassword,
+      values.contactPhone,
+      values.contactRepeatPassword,
+      values.socialInstagram,
+      values.socialOther,
+    ],
+  );
+  const isProfessionalDirty = React.useMemo(
+    () => professionalEditableFieldKeys.some((key) => professionalDraft[key] !== savedProfessionalDraft[key]),
+    [professionalDraft, savedProfessionalDraft],
+  );
+  const cancelProfessionalEditing = React.useCallback(() => {
+    applyProfessionalDraft(savedProfessionalDraft, savedProfessionalPhotoSrc);
+    setProfileErrors({});
+    setIsProfessionalEditing(false);
+  }, [applyProfessionalDraft, savedProfessionalDraft, savedProfessionalPhotoSrc]);
 
   React.useEffect(() => {
     if (!profileData || profileData.user_type !== "professional") {
@@ -448,27 +589,14 @@ export default function ProfessionalFixedLocationSetup({
       return;
     }
 
-    const professionalProfile = profileData.profile as ProfessionalProfile | null;
+    const nextProfessionalDraft = buildProfessionalDraftFromProfile(profileData);
+    const nextProfessionalPhotoSrc = getProfessionalPhotoSrcFromProfile(profileData);
 
-    setField("professionalPhotoSrc", professionalProfile?.profile_picture || "/professionals/hero.png");
-    setField("companyLegalName", professionalProfile?.legal_name || "");
-    setField("companyCocNumber", professionalProfile?.ccc_number || "");
-    setField("companyVatNumber", professionalProfile?.vat_number || "");
-    setField("companyStreet", professionalProfile?.street || "");
-    setField("companyStreetNumber", professionalProfile?.street_number || "");
-    setField("companyPostalCode", professionalProfile?.postal_code || "");
-    setField("companyProvince", professionalProfile?.province || "");
-    setField("companyMunicipality", professionalProfile?.municipality || "");
-    setField("companyBusinessType", professionalProfile?.business_type || "");
-    setField("companyWebsite", professionalProfile?.website || "");
-    setField("socialInstagram", professionalProfile?.instagram || "");
-    setField("socialOther", professionalProfile?.other_link || "");
-    setField("contactFirstName", professionalProfile?.contact_first_name || "");
-    setField("contactLastName", professionalProfile?.contact_last_name || "");
-    setField("contactEmail", profileData.email || "");
-    setField("contactPhone", professionalProfile?.phone || "");
+    applyProfessionalDraft(nextProfessionalDraft, nextProfessionalPhotoSrc);
+    setSavedProfessionalDraft(nextProfessionalDraft);
+    setSavedProfessionalPhotoSrc(nextProfessionalPhotoSrc);
     hydratedProfileRef.current = hydrationKey;
-  }, [profileData, setField]);
+  }, [applyProfessionalDraft, profileData]);
 
   const toDisplayNumber = React.useCallback((value: string | number | null | undefined) => {
     if (value === null || value === undefined || value === "") {
@@ -1814,75 +1942,101 @@ export default function ProfessionalFixedLocationSetup({
       <Stack spacing={2.1}>
         {professionalForm}
 
-        <Button
-          fullWidth
-          variant="contained"
-          disableElevation
-          onClick={async () => {
-            if (!onSaveProfessionalProfile) {
-              setIsProfessionalEditing(false);
-              return;
-            }
-
-            const nextErrors: Partial<Record<ProfileValidationField, string>> = {};
-            if (!isValidEmail(values.contactEmail)) nextErrors.contactEmail = "Enter a valid email address.";
-            if (!isValidName(values.companyLegalName)) nextErrors.companyLegalName = "Enter a valid legal name.";
-            if (!isValidName(values.contactFirstName)) nextErrors.contactFirstName = "Enter a valid first name.";
-            if (!isValidName(values.contactLastName)) nextErrors.contactLastName = "Enter a valid last name.";
-
-            const password = values.contactPassword.trim();
-            const repeatPassword = values.contactRepeatPassword.trim();
-            if (password || repeatPassword) {
-              if (!password) nextErrors.contactPassword = "Password is required.";
-              if (!repeatPassword) nextErrors.contactRepeatPassword = "Repeat password is required.";
-              if (password && repeatPassword && password !== repeatPassword) {
-                nextErrors.contactRepeatPassword = "Password and repeat password must match.";
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ mt: 0.5 }}>
+          {isProfessionalEditing ? (
+            <Button
+              fullWidth
+              variant="outlined"
+              onClick={cancelProfessionalEditing}
+              disabled={isProfileSaving}
+              sx={{
+                borderRadius: "6px",
+                textTransform: "none",
+                fontWeight: 800,
+                minHeight: 44,
+                borderColor: alpha(m.navy, 0.14),
+                color: alpha(m.navy, 0.74),
+                "&:hover": { borderColor: alpha(m.navy, 0.24), bgcolor: alpha(m.navy, 0.03) },
+              }}
+            >
+              Cancel
+            </Button>
+          ) : null}
+          <Button
+            fullWidth
+            variant="contained"
+            disableElevation
+            onClick={async () => {
+              if (!onSaveProfessionalProfile) {
+                setIsProfessionalEditing(false);
+                return;
               }
-            }
 
-            if (Object.keys(nextErrors).length) {
-              setProfileErrors(nextErrors);
-              return;
-            }
+              const nextErrors: Partial<Record<ProfileValidationField, string>> = {};
+              if (!isValidEmail(values.contactEmail)) nextErrors.contactEmail = "Enter a valid email address.";
+              if (!isValidName(values.companyLegalName)) nextErrors.companyLegalName = "Enter a valid legal name.";
+              if (!isValidName(values.contactFirstName)) nextErrors.contactFirstName = "Enter a valid first name.";
+              if (!isValidName(values.contactLastName)) nextErrors.contactLastName = "Enter a valid last name.";
 
-            await onSaveProfessionalProfile({
-              email: values.contactEmail,
-              password: values.contactPassword || undefined,
-              confirm_password: values.contactRepeatPassword || undefined,
-              legal_name: values.companyLegalName,
-              ccc_number: values.companyCocNumber,
-              vat_number: values.companyVatNumber,
-              street: values.companyStreet,
-              street_number: values.companyStreetNumber,
-              postal_code: values.companyPostalCode,
-              province: values.companyProvince,
-              municipality: values.companyMunicipality,
-              business_type: values.companyBusinessType,
-              website: values.companyWebsite,
-              instagram: values.socialInstagram,
-              other_link: values.socialOther,
-              contact_first_name: values.contactFirstName,
-              contact_last_name: values.contactLastName,
-              phone: values.contactPhone,
-            });
-            setField("contactPassword", "");
-            setField("contactRepeatPassword", "");
-            setIsProfessionalEditing(false);
-          }}
-          disabled={!isProfessionalEditing || isProfileSaving}
-          sx={{
-            borderRadius: "6px",
-            textTransform: "none",
-            fontWeight: 900,
-            bgcolor: m.teal,
-            color: "#fff",
-            "&:hover": { bgcolor: m.tealDark },
-            minHeight: 44,
-            mt: 0.5,
-          }}
-        >
-          {isProfileSaving ? <CircularProgress size={20} color="inherit" /> : "Update"}
-        </Button>
+              const password = values.contactPassword.trim();
+              const repeatPassword = values.contactRepeatPassword.trim();
+              if (password || repeatPassword) {
+                if (!password) nextErrors.contactPassword = "Password is required.";
+                if (!repeatPassword) nextErrors.contactRepeatPassword = "Repeat password is required.";
+                if (password && repeatPassword && password !== repeatPassword) {
+                  nextErrors.contactRepeatPassword = "Password and repeat password must match.";
+                }
+              }
+
+              if (Object.keys(nextErrors).length) {
+                setProfileErrors(nextErrors);
+                return;
+              }
+
+              await onSaveProfessionalProfile({
+                email: values.contactEmail,
+                password: values.contactPassword || undefined,
+                confirm_password: values.contactRepeatPassword || undefined,
+                legal_name: values.companyLegalName,
+                ccc_number: values.companyCocNumber,
+                vat_number: values.companyVatNumber,
+                street: values.companyStreet,
+                street_number: values.companyStreetNumber,
+                postal_code: values.companyPostalCode,
+                province: values.companyProvince,
+                municipality: values.companyMunicipality,
+                business_type: values.companyBusinessType,
+                website: values.companyWebsite,
+                instagram: values.socialInstagram,
+                other_link: values.socialOther,
+                contact_first_name: values.contactFirstName,
+                contact_last_name: values.contactLastName,
+                phone: values.contactPhone,
+              });
+              const nextSavedProfessionalDraft = {
+                ...professionalDraft,
+                contactPassword: "",
+                contactRepeatPassword: "",
+              };
+              setSavedProfessionalDraft(nextSavedProfessionalDraft);
+              applyProfessionalDraft(nextSavedProfessionalDraft, savedProfessionalPhotoSrc);
+              setProfileErrors({});
+              setIsProfessionalEditing(false);
+            }}
+            disabled={!isProfessionalEditing || !isProfessionalDirty || isProfileSaving}
+            sx={{
+              borderRadius: "6px",
+              textTransform: "none",
+              fontWeight: 900,
+              bgcolor: m.teal,
+              color: "#fff",
+              "&:hover": { bgcolor: m.tealDark },
+              minHeight: 44,
+            }}
+          >
+            {isProfileSaving ? <CircularProgress size={20} color="inherit" /> : "Update"}
+          </Button>
+        </Stack>
       </Stack>
     </Box>
   );
