@@ -1,4 +1,5 @@
-const fallbackBaseUrl = "http://localhost:5000";
+const fallbackBaseUrl =
+  "https://siham-x1lo-git-main-techvergesolutions-projects.vercel.app";
 
 export const apiBaseUrl =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") || fallbackBaseUrl;
