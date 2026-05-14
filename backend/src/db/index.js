@@ -1,5 +1,6 @@
 import "../bootstrap-env.js";
 import pg from "pg";
+import { getDatabaseConnectionString } from "./connectionString.js";
 
 const { Pool } = pg;
 
@@ -10,10 +11,12 @@ function getPool() {
     return pool;
   }
 
-  const connectionString = process.env.DB_URL || process.env.DATABASE_URL;
+  const connectionString = getDatabaseConnectionString();
 
   if (!connectionString) {
-    throw new Error("DB_URL or DATABASE_URL is required.");
+    throw new Error(
+      "Database URL missing: set DATABASE_URL or DB_URL, or PGHOST/PGUSER/PGDATABASE (and PGPASSWORD if needed).",
+    );
   }
 
   const shouldUseSsl =
