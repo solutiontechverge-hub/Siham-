@@ -43,7 +43,7 @@ async function proxyRequest(request: NextRequest, { params }: RouteContext) {
       {
         success: false,
         message:
-          "Live API is blocked by Vercel Deployment Protection. Use the local backend (npm run dev in /backend) or set VERCEL_PROTECTION_BYPASS in frontend/.env.local.",
+          "API is unreachable (wrong backend URL or Vercel Deployment Protection). Set NEXT_PUBLIC_API_PROXY_TARGET to the live API host, add VERCEL_PROTECTION_BYPASS on the frontend Vercel project, or disable protection on the backend project.",
         data: null,
       },
       { status: 502 },

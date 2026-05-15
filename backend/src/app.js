@@ -28,9 +28,11 @@ const isAllowedOrigin = (origin) => {
   if (corsOrigins.includes(normalized)) {
     return true;
   }
-  return /^https:\/\/sihammilestone123(-[a-z0-9-]+)?\.vercel\.app$/i.test(
-    normalized,
-  );
+  // Production + preview: sihammilestone123.vercel.app, sihammilestone123-git-dev-....vercel.app
+  if (/^https:\/\/sihammilestone123[a-z0-9-]*\.vercel\.app$/i.test(normalized)) {
+    return true;
+  }
+  return false;
 };
 
 app.use(
