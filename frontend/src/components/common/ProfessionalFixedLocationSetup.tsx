@@ -3315,7 +3315,7 @@ export default function ProfessionalFixedLocationSetup({
               </Stack>
             </Stack>
           </Grid>
-          </Grid>
+          </Grid> 
         </Box>
       </SectionShell>
 

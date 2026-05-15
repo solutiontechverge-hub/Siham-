@@ -1,5 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Monorepo + Vercel: eslint-config-next can fail to resolve ./parser.js during remote build.
+  // Run `npm run lint:frontend` locally or in CI for lint coverage.
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
   async rewrites() {
     return [
       { source: "/client", destination: "/clients/listing" },
