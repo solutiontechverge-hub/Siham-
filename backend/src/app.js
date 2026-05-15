@@ -4,6 +4,7 @@ import cors from "cors";
 import express from "express";
 import { fileURLToPath } from "url";
 import { getUploadsDir } from "./config/uploads-dir.js";
+import { getDatabaseConnectionString } from "./db/connectionString.js";
 import authRoutes from "./routes/auth.routes.js";
 import businessRoutes from "./routes/business.routes.js";
 import userRoutes from "./routes/user.routes.js";
@@ -57,6 +58,16 @@ app.get("/", (_req, res) => {
 
 app.get("/api/health", (_req, res) => {
   res.status(200).json({ status: "ok" });
+});
+
+/** Safe check for Vercel env (no secrets returned). */
+app.get("/api/health/db", (_req, res) => {
+  const connectionString = getDatabaseConnectionString();
+  res.status(200).json({
+    status: "ok",
+    dbConfigured: Boolean(connectionString),
+    vercel: Boolean(process.env.VERCEL),
+  });
 });
 
 app.use("/api/auth", authRoutes);
