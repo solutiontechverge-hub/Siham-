@@ -5,21 +5,42 @@ import { useRouter } from "next/navigation";
 import { alpha, useTheme } from "@mui/material/styles";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
+import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
 import { Box, Button, Chip, Container, Divider, Grid, MenuItem, Paper, Stack, TextField, Typography } from "@mui/material";
+import { ServiceSummaryMetaLine } from "../../../../components/common/ServiceSummaryMetaLine";
+import { parseTimeLabelToMinutes, serviceTimeRangeLabel } from "../booking-time";
 
 type DraftService = {
   id: string;
   name: string;
   durationMins: number;
   price: number;
-  assignedTo: string | null;
+  guestId?: string | null;
+  teamMemberId?: string | null;
+  assignedTo?: string | null;
 }; 
+
+type DraftPerson = {
+  id: string;
+  name: string;
+  participantType?: "model" | "planning" | "guest";
+  planningActivity?: string;
+  planningDuration?: string;
+  planningIsLocked?: boolean;
+};
+
+type DraftTeamMember = {
+  id: string;
+  name: string;
+};
 
 type DraftPayload = {
   selectedDateISO: string;
   selectedTime: string;
   combineServices: boolean;
+  people?: DraftPerson[];
   services: DraftService[];
+  teamMembers?: DraftTeamMember[];
   total: number;
 };
 
@@ -70,10 +91,10 @@ export default function ClientBookingCheckoutPage() {
     }
   }, []);
 
-  const groups = React.useMemo(() => {
+  const serviceGroups = React.useMemo(() => {
     const map = new Map<string, DraftService[]>();
     for (const s of draft?.services ?? []) {
-      const key = s.assignedTo ?? "guest";
+      const key = s.guestId ?? s.assignedTo ?? "unassigned";
       const prev = map.get(key) ?? [];
       prev.push(s);
       map.set(key, prev);
@@ -81,22 +102,89 @@ export default function ClientBookingCheckoutPage() {
     return map;
   }, [draft?.services]);
 
+  const isPlanningPerson = (p: DraftPerson) => p.participantType === "planning" || p.name === "Planning";
+
+  const assigneeTitle = (assigneeId: string) => {
+    if (assigneeId === "p-requester") return "Elly";
+    if (assigneeId === "unassigned") return "Unassigned";
+    if (assigneeId.startsWith("p-guest-")) return "Guest";
+    return assigneeId.replace(/^p-/, "").replaceAll("-", " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  };
+
+  type SummarySection = {
+    key: string;
+    title: string;
+    items: DraftService[];
+    planningItem?: { activity: string; duration: string };
+    teamMemberLabel?: string;
+  };
+
+  const teamMemberNameById = React.useMemo(() => {
+    const map = new Map<string, string>();
+    for (const tm of draft?.teamMembers ?? []) map.set(tm.id, tm.name);
+    return map;
+  }, [draft?.teamMembers]);
+
+  const teamMemberChipLabelForItems = React.useCallback(
+    (items: DraftService[]) => {
+      const ids = [...new Set(items.map((s) => s.teamMemberId).filter((id): id is string => Boolean(id)))];
+      if (ids.length !== 1) return undefined;
+      const fullName = teamMemberNameById.get(ids[0]);
+      if (!fullName) return undefined;
+      return fullName.split(/\s+/)[0];
+    },
+    [teamMemberNameById],
+  );
+
+  const summarySections = React.useMemo((): SummarySection[] => {
+    const people = draft?.people ?? [];
+    if (people.length) {
+      const sections: SummarySection[] = [];
+      for (const p of people) {
+        const items = serviceGroups.get(p.id) ?? [];
+        const planningItem =
+          isPlanningPerson(p) && p.planningIsLocked
+            ? {
+                activity: p.planningActivity?.trim() ?? "",
+                duration: p.planningDuration?.trim() ?? "",
+              }
+            : undefined;
+        const hasPlanning = Boolean(planningItem?.activity || planningItem?.duration);
+        if (!items.length && !hasPlanning) continue;
+        const teamMemberLabel = teamMemberChipLabelForItems(items);
+        sections.push({
+          key: p.id,
+          title: p.name,
+          items,
+          ...(hasPlanning ? { planningItem } : {}),
+          ...(teamMemberLabel ? { teamMemberLabel } : {}),
+        });
+      }
+      return sections;
+    }
+
+    return [...serviceGroups.entries()].map(([key, items]) => {
+      const teamMemberLabel = teamMemberChipLabelForItems(items);
+      return {
+        key,
+        title: key === "unassigned" ? "Unassigned" : assigneeTitle(key),
+        items,
+        ...(teamMemberLabel ? { teamMemberLabel } : {}),
+      };
+    });
+  }, [draft?.people, serviceGroups, teamMemberChipLabelForItems]);
+
+  const bookingStartMinutes = React.useMemo(
+    () => (draft?.selectedTime ? parseTimeLabelToMinutes(draft.selectedTime) : 0),
+    [draft?.selectedTime],
+  );
+
   const dateLabel = React.useMemo(() => {
     if (!draft?.selectedDateISO) return "";
     const dt = new Date(`${draft.selectedDateISO}T00:00:00`);
     if (Number.isNaN(dt.getTime())) return draft.selectedDateISO;
     return dt.toLocaleDateString("en-US", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
   }, [draft?.selectedDateISO]);
-
-  const assigneeTitle = (assigneeId: string) => {
-    // We don’t have real names yet; show a stable label.
-    if (assigneeId === "p-elly") return "Elly";
-    if (assigneeId === "p-sara") return "Sara";
-    if (assigneeId === "p-mary") return "Mary";
-    if (assigneeId === "guest") return "Guest";
-    // team member ids like tm-elly-1
-    return assigneeId.replace(/^tm-/, "").replaceAll("-", " ").replace(/\b\w/g, (c) => c.toUpperCase());
-  };
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "#EAF9FB", py: { xs: 2.5, md: 3.5 } }}>
@@ -196,12 +284,75 @@ export default function ClientBookingCheckoutPage() {
 
               <Box sx={{ p: 2 }}>
                 <Stack spacing={1.6}>
-                  {[...groups.entries()].map(([key, items], idx) => (
+                  {summarySections.map(({ key, title, items, planningItem, teamMemberLabel }) => (
                     <Box key={key}>
+                      {teamMemberLabel ? (
+                        <Box
+                          sx={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 0.65,
+                            borderRadius: "999px",
+                            border: `1px solid ${alpha(m.navy, 0.12)}`,
+                            bgcolor: "#fff",
+                            px: 1,
+                            py: 0.45,
+                            mb: 0.65,
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              width: 22,
+                              height: 22,
+                              borderRadius: "999px",
+                              border: `1px solid ${alpha(m.navy, 0.14)}`,
+                              display: "grid",
+                              placeItems: "center",
+                              flexShrink: 0,
+                            }}
+                          >
+                            <PersonOutlineRoundedIcon sx={{ fontSize: 14, color: alpha(m.navy, 0.45) }} />
+                          </Box>
+                          <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: alpha(m.navy, 0.62), lineHeight: 1 }}>
+                            {teamMemberLabel}
+                          </Typography>
+                        </Box>
+                      ) : null}
                       <Typography sx={{ fontWeight: 900, fontSize: 12, color: alpha(m.navy, 0.78), mb: 0.9 }}>
-                        {key === "guest" ? `Guest ${idx}` : assigneeTitle(key)}
+                        {title}
                       </Typography>
                       <Stack spacing={0.75}>
+                        {planningItem ? (
+                          <Box
+                            sx={{
+                              borderRadius: "10px",
+                              border: `1px solid ${alpha(m.navy, 0.06)}`,
+                              px: 1.2,
+                              py: 0.9,
+                              bgcolor: alpha(m.navy, 0.02),
+                            }}
+                          >
+                            <Box sx={{ minWidth: 0 }}>
+                              {planningItem.activity ? (
+                                <Typography sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.78), lineHeight: 1.1 }}>
+                                  {planningItem.activity}
+                                </Typography>
+                              ) : null}
+                              {planningItem.duration ? (
+                                <Typography
+                                  sx={{
+                                    mt: planningItem.activity ? 0.25 : 0,
+                                    fontSize: 10.5,
+                                    fontWeight: 700,
+                                    color: alpha(m.navy, 0.48),
+                                  }}
+                                >
+                                  {planningItem.duration}
+                                </Typography>
+                              ) : null}
+                            </Box>
+                          </Box>
+                        ) : null}
                         {items.map((s) => (
                           <Box
                             key={s.id}
@@ -218,9 +369,14 @@ export default function ClientBookingCheckoutPage() {
                                 <Typography sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.78), lineHeight: 1.1 }}>
                                   {s.name}
                                 </Typography>
-                                <Typography sx={{ mt: 0.25, fontSize: 10.5, fontWeight: 700, color: alpha(m.navy, 0.48) }}>
-                                  {s.durationMins} Mins
-                                </Typography>
+                                <ServiceSummaryMetaLine
+                                  timeRange={
+                                    draft?.selectedTime
+                                      ? serviceTimeRangeLabel(bookingStartMinutes, s.durationMins)
+                                      : undefined
+                                  }
+                                  durationLabel={`${s.durationMins} Mins`}
+                                />
                               </Box>
                               <Typography sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.76) }}>{s.price} €</Typography>
                             </Stack>

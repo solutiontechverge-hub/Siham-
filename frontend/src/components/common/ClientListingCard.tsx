@@ -10,6 +10,7 @@ import { Box, Button, CardContent, Divider, IconButton, Stack, Typography } from
 import { alpha, useTheme } from "@mui/material/styles";
 import Image from "next/image";
 import type { ListingCardData } from "../../app/clients/listing/listing.data";
+import { resolveBusinessOfferingFlags } from "../../data/businessPublicProfile.data";
 import AppCard from "./AppCard";
 
 export type ClientListingCardProps = {
@@ -21,9 +22,17 @@ export type ClientListingCardProps = {
 export default function ClientListingCard({ item, isFavorite, onToggleFavorite }: ClientListingCardProps) {
   const tokens = useTheme().palette.mollure;
   const router = useRouter();
-  const [mode, setMode] = React.useState<"fixed" | "desired">(item.locationModeDefault);
+  const offering = resolveBusinessOfferingFlags(item.businessOffering);
+  const initialMode = !offering.supportsFixedLocation
+    ? "desired"
+    : !offering.supportsDesiredLocation
+      ? "fixed"
+      : item.locationModeDefault;
+  const [mode, setMode] = React.useState<"fixed" | "desired">(initialMode);
+  const canPickFixed = offering.supportsFixedLocation;
+  const canPickDesired = offering.supportsDesiredLocation;
 
-  const onOpenBooking = () => {
+  const onOpenProfile = () => {
     try {
       const payload = {
         shopId: item.id,
@@ -36,7 +45,7 @@ export default function ClientListingCard({ item, isFavorite, onToggleFavorite }
     } catch {
       // ignore
     }
-    router.push("/clients/booking?mode=create");
+    router.push(`/clients/listing/${item.id}`);
   };
 
   return (
@@ -50,7 +59,7 @@ export default function ClientListingCard({ item, isFavorite, onToggleFavorite }
         cursor: "pointer",
         "&:hover": { transform: "translateY(-1px)" },
       }}
-      onClick={onOpenBooking}
+      onClick={onOpenProfile}
     >
       <Box sx={{ position: "relative" }}>
         <Box sx={{ position: "relative", height: 170 }}>
@@ -137,55 +146,71 @@ export default function ClientListingCard({ item, isFavorite, onToggleFavorite }
             <Typography sx={{ fontSize: 12, color: alpha(tokens.navy, 0.55) }}>{item.reviewsCount} Reviews</Typography>
           </Box>
 
-          <Box
-            sx={{
-              display: "flex",
-              border: `1px solid ${alpha(tokens.navy, 0.12)}`,
-              borderRadius: "8px",
-              overflow: "hidden",
-              bgcolor: "#fff",
-            }}
-          >
-            <Button
-              onClick={(e) => {
-                e.stopPropagation();
-                setMode("fixed");
-              }}
+          {canPickFixed && canPickDesired ? (
+            <Box
               sx={{
-                flex: 1,
-                py: 1.0,
-                textTransform: "none",
-                fontWeight: 700,
-                fontSize: 14,
-                borderRadius: 0,
-                color: mode === "fixed" ? "#fff" : tokens.slate,
-                bgcolor: mode === "fixed" ? tokens.teal : "transparent",
-                "&:hover": { bgcolor: mode === "fixed" ? tokens.tealDark : "rgba(33, 184, 191, 0.08)" },
+                display: "flex",
+                border: `1px solid ${alpha(tokens.navy, 0.12)}`,
+                borderRadius: "8px",
+                overflow: "hidden",
+                bgcolor: "#fff",
               }}
             >
-              Fixed Location
-            </Button>
-            <Divider orientation="vertical" flexItem sx={{ borderColor: alpha(tokens.navy, 0.12) }} />
-            <Button
-              onClick={(e) => {
-                e.stopPropagation();
-                setMode("desired");
-              }}
+              <Button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMode("fixed");
+                }}
+                sx={{
+                  flex: 1,
+                  py: 1.0,
+                  textTransform: "none",
+                  fontWeight: 700,
+                  fontSize: 14,
+                  borderRadius: 0,
+                  color: mode === "fixed" ? "#fff" : tokens.slate,
+                  bgcolor: mode === "fixed" ? tokens.teal : "transparent",
+                  "&:hover": { bgcolor: mode === "fixed" ? tokens.tealDark : "rgba(33, 184, 191, 0.08)" },
+                }}
+              >
+                Fixed Location
+              </Button>
+              <Divider orientation="vertical" flexItem sx={{ borderColor: alpha(tokens.navy, 0.12) }} />
+              <Button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setMode("desired");
+                }}
+                sx={{
+                  flex: 1,
+                  py: 1.0,
+                  textTransform: "none",
+                  fontWeight: 700,
+                  fontSize: 14,
+                  borderRadius: 0,
+                  color: mode === "desired" ? "#fff" : tokens.slate,
+                  bgcolor: mode === "desired" ? tokens.teal : "transparent",
+                  "&:hover": { bgcolor: mode === "desired" ? tokens.tealDark : "rgba(33, 184, 191, 0.08)" },
+                }}
+              >
+                Desired Location
+              </Button>
+            </Box>
+          ) : (
+            <Box
               sx={{
-                flex: 1,
-                py: 1.0,
-                textTransform: "none",
-                fontWeight: 700,
-                fontSize: 14,
-                borderRadius: 0,
-                color: mode === "desired" ? "#fff" : tokens.slate,
-                bgcolor: mode === "desired" ? tokens.teal : "transparent",
-                "&:hover": { bgcolor: mode === "desired" ? tokens.tealDark : "rgba(33, 184, 191, 0.08)" },
+                py: 1,
+                px: 1.25,
+                borderRadius: "8px",
+                bgcolor: alpha(tokens.teal, 0.1),
+                border: `1px solid ${alpha(tokens.teal, 0.25)}`,
               }}
             >
-              Desired Location
-            </Button>
-          </Box>
+              <Typography sx={{ fontSize: 13, fontWeight: 800, color: tokens.teal }}>
+                {canPickDesired ? "Desired Location" : "Fixed Location"}
+              </Typography>
+            </Box>
+          )}
 
           <Box sx={{ pt: 0.75, textAlign: "left" }}>
             <Stack spacing={1}>
