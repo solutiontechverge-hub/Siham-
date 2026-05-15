@@ -14,7 +14,36 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const uploadsDir = getUploadsDir();
 
-app.use(cors());
+const corsOrigins = [
+  "https://sihammilestone123.vercel.app",
+  "http://localhost:3000",
+  process.env.FRONTEND_URL,
+  process.env.CORS_ORIGIN,
+]
+  .filter(Boolean)
+  .map((origin) => origin.replace(/\/$/, ""));
+
+const isAllowedOrigin = (origin) => {
+  const normalized = origin.replace(/\/$/, "");
+  if (corsOrigins.includes(normalized)) {
+    return true;
+  }
+  return /^https:\/\/sihammilestone123(-[a-z0-9-]+)?\.vercel\.app$/i.test(
+    normalized,
+  );
+};
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || isAllowedOrigin(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error(`CORS not allowed for origin: ${origin}`));
+    },
+  }),
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static(uploadsDir));

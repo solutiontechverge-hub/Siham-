@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --watch src/index.js",
-    "start": "node src/index.js",
-    "start:backend": "node src/index.js",
-    "migrate": "node src/migrate-once.js",
+    "dev": "node --watch --env-file=.env src/index.js",
+    "start": "node --env-file=.env src/index.js",
+    "start:backend": "node --env-file=.env src/index.js",
+    "migrate": "node --env-file=.env src/migrate-once.js",
     "build": "node -e \"console.log('Backend: no compile step')\""
   },
   "dependencies": {
