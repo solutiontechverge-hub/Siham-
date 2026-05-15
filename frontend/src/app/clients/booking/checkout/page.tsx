@@ -13,7 +13,7 @@ type DraftService = {
   durationMins: number;
   price: number;
   assignedTo: string | null;
-};
+}; 
 
 type DraftPayload = {
   selectedDateISO: string;
