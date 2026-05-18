@@ -154,6 +154,7 @@ export const selectUserType = async (req, res) =>
 
 export const register = async (req, res) => {
   const client = await getClient();
+  let transactionCommitted = false;
 
   try {
     const { email, password, user_type: userType } = req.body;
@@ -222,20 +223,34 @@ export const register = async (req, res) => {
       [user.id, hashToken(rawVerificationToken), false],
     );
 
-    await sendVerificationEmail({
-      email: user.email,
-      token: rawVerificationToken,
-    });
-
     await client.query("COMMIT");
+    transactionCommitted = true;
+
+    let verificationEmailSent = false;
+    try {
+      await sendVerificationEmail({
+        email: user.email,
+        token: rawVerificationToken,
+      });
+      verificationEmailSent = true;
+    } catch (emailError) {
+      console.error(
+        `[auth] Verification email failed for ${user.email}:`,
+        emailError.message,
+      );
+    }
 
     return res.status(201).json({
       success: true,
-      message: "User registered successfully. Verification email sent.",
+      message: verificationEmailSent
+        ? "User registered successfully. Verification email sent."
+        : "User registered successfully. We could not send the verification email right now; please contact support if you need to verify your account.",
       data: await getUserWithProfile(user.id),
     });
   } catch (error) {
-    await client.query("ROLLBACK");
+    if (!transactionCommitted) {
+      await client.query("ROLLBACK");
+    }
     return res.status(500).json({
       success: false,
       message: "Failed to register user.",
@@ -321,6 +336,7 @@ export const login = async (req, res) => {
 
 export const forgotPassword = async (req, res) => {
   const client = await getClient();
+  let transactionCommitted = false;
 
   try {
     const { email } = req.body;
@@ -360,12 +376,20 @@ export const forgotPassword = async (req, res) => {
       [user.id, hashToken(resetToken), hashedOtp, false],
     );
 
-    await sendPasswordResetOtpEmail({
-      email: user.email,
-      otp,
-    });
-
     await client.query("COMMIT");
+    transactionCommitted = true;
+
+    try {
+      await sendPasswordResetOtpEmail({
+        email: user.email,
+        otp,
+      });
+    } catch (emailError) {
+      console.error(
+        `[auth] Password reset email failed for ${user.email}:`,
+        emailError.message,
+      );
+    }
 
     return res.status(200).json({
       success: true,
@@ -373,7 +397,9 @@ export const forgotPassword = async (req, res) => {
       data: null,
     });
   } catch (error) {
-    await client.query("ROLLBACK");
+    if (!transactionCommitted) {
+      await client.query("ROLLBACK");
+    }
     return res.status(500).json({
       success: false,
       message: "Failed to process forgot password request.",
