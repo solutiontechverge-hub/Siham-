@@ -11,6 +11,7 @@ import {
   createCategory,
   createSubcategory,
   getBusinessSetup,
+  uploadBusinessMedia,
   listBookings,
   listBusinessServiceDetails,
   listCalendarEntries,
@@ -19,6 +20,7 @@ import {
 } from "../controllers/business.controller.js";
 import { authenticateUser, authorizeRoles } from "../middleware/auth.middleware.js";
 import { validateRequest } from "../middleware/validate.middleware.js";
+import { upload } from "../middleware/upload.middleware.js";
 
 const router = express.Router();
 const locationModes = ["fixed", "desired", "both"];
@@ -88,6 +90,13 @@ router.post(
 );
 
 router.get("/setup", requireProfessional, getBusinessSetup);
+
+router.post(
+  "/setup/media",
+  requireProfessional,
+  upload.array("business_media", 4),
+  uploadBusinessMedia,
+);
 
 router.put(
   "/setup",

@@ -422,6 +422,31 @@ export const businessApi = baseApi.injectEndpoints({
       },
       invalidatesTags: ["Calendar"],
     }),
+    uploadBusinessMedia: builder.mutation<ApiEnvelope<{ business_media: string[] }>, File[]>({
+      async queryFn(files, _api, _extraOptions, fetchWithBQ) {
+        const formData = new FormData();
+        for (const file of files) {
+          formData.append("business_media", file);
+        }
+
+        const response = await fetchWithBQ({
+          url: "/api/business/setup/media",
+          method: "POST",
+          body: formData,
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<{ business_media: string[] }>;
+        if (!data.success || !Array.isArray(data.data?.business_media)) {
+          return { error: customError(data.message || "Unable to upload business media.") };
+        }
+
+        return { data };
+      },
+    }),
     upsertBusinessSetup: builder.mutation<ApiEnvelope<BusinessSetup>, UpsertBusinessSetupRequest>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
         console.log("[businessApi] upsertBusinessSetup payload:", payload);
@@ -461,5 +486,6 @@ export const {
   useUpsertCalendarSettingsMutation,
   useUpdateCalendarEntryStatusMutation,
   useUpdateBookingStatusMutation,
+  useUploadBusinessMediaMutation,
   useUpsertBusinessSetupMutation,
 } = businessApi;

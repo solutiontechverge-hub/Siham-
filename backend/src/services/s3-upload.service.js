@@ -147,6 +147,27 @@ export async function deleteProfileMediaIfOwned(storedUrl, userId) {
   }
 }
 
+export async function uploadBusinessMediaFilesToS3(userId, files = []) {
+  const urls = [];
+
+  for (const file of files) {
+    if (!file?.buffer?.length) {
+      continue;
+    }
+
+    const url = await uploadUserProfileAsset({
+      userId,
+      assetKind: "business_media",
+      buffer: file.buffer,
+      contentType: file.mimetype,
+      originalName: file.originalname,
+    });
+    urls.push(url);
+  }
+
+  return urls;
+}
+
 export async function uploadProfileMulterFilesToS3(userId, files) {
   const out = {};
 

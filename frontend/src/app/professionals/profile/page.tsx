@@ -11,6 +11,7 @@ import { useGetProfileQuery, useUpdateProfileMutation } from "../../../store/ser
 import {
   useGetBusinessCategoriesQuery,
   useGetBusinessSetupQuery,
+  useUploadBusinessMediaMutation,
   useUpsertBusinessSetupMutation,
 } from "../../../store/services/businessApi";
 
@@ -32,6 +33,7 @@ export default function ProfessionalsProfilePage() {
   const { data: businessSetupData } = useGetBusinessSetupQuery();
   const [updateProfile, { isLoading: isProfileSaving }] = useUpdateProfileMutation();
   const [upsertBusinessSetup, { isLoading: isBusinessSetupSaving }] = useUpsertBusinessSetupMutation();
+  const [uploadBusinessMedia, { isLoading: isBusinessMediaUploading }] = useUploadBusinessMediaMutation();
   const { showSnackbar } = useSnackbar();
 
   return (
@@ -44,6 +46,23 @@ export default function ProfessionalsProfilePage() {
         businessSetupData={businessSetupData?.data ?? null}
         isProfileSaving={isProfileSaving}
         isBusinessSetupSaving={isBusinessSetupSaving}
+        isBusinessMediaUploading={isBusinessMediaUploading}
+        onUploadBusinessMedia={async (files) => {
+          try {
+            const result = await uploadBusinessMedia(files).unwrap();
+            showSnackbar({
+              severity: "success",
+              message: result.message || "Media uploaded successfully.",
+            });
+            return result.data.business_media;
+          } catch (error) {
+            showSnackbar({
+              severity: "error",
+              message: getApiErrorMessage(error, "Unable to upload media."),
+            });
+            throw error;
+          }
+        }}
         onSaveProfessionalProfile={async (payload) => {
           try {
             const result = await updateProfile(payload).unwrap();

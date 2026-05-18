@@ -50,8 +50,10 @@ import { useSnackbar } from "./AppSnackbar";
 import MollureFormField from "./MollureFormField";
 import ServiceCategorySliderCard, { SERVICE_CATEGORY_SLIDER_CARD_WIDTH } from "./ServiceCategorySliderCard";
 import {
+  BUSINESS_MEDIA_MAX_COUNT,
   filterAllowedProfileImageFiles,
   isAllowedProfileImageFile,
+  isPersistedMediaUrl,
   PROFILE_IMAGE_FILE_ACCEPT,
   PROFILE_IMAGE_INVALID_MESSAGE,
 } from "../../lib/profileImageUpload";
@@ -201,8 +203,10 @@ export type ProfessionalFixedLocationSetupProps = {
   businessSetupData?: BusinessSetup | null;
   isProfileSaving?: boolean;
   isBusinessSetupSaving?: boolean;
+  isBusinessMediaUploading?: boolean;
   onSaveProfessionalProfile?: (payload: UpdateProfilePayload) => Promise<ProfileResponse | void>;
   onSaveBusinessSetup?: (payload: UpsertBusinessSetupRequest) => Promise<void>;
+  onUploadBusinessMedia?: (files: File[]) => Promise<string[]>;
 };
 
 const professionalEditableFieldKeys = [
@@ -348,8 +352,10 @@ export default function ProfessionalFixedLocationSetup({
   businessSetupData = null,
   isProfileSaving = false,
   isBusinessSetupSaving = false,
+  isBusinessMediaUploading = false,
   onSaveProfessionalProfile,
   onSaveBusinessSetup,
+  onUploadBusinessMedia,
 }: ProfessionalFixedLocationSetupProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -390,12 +396,7 @@ export default function ProfessionalFixedLocationSetup({
   );
   const [activeServiceCategory, setActiveServiceCategory] = React.useState<string>("");
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
-  const [mediaSlides, setMediaSlides] = React.useState<string[]>([
-    "/professionals/hero.png",
-    "/professionals/hero.png",
-    "/professionals/hero.png",
-    "/professionals/hero.png",
-  ]);
+  const [mediaSlides, setMediaSlides] = React.useState<string[]>(["/professionals/hero.png"]);
   const [mediaIdx, setMediaIdx] = React.useState(0);
 
   // ── Portfolio ─────────────────────────────────────────────────────────────
@@ -851,6 +852,10 @@ export default function ProfessionalFixedLocationSetup({
       return acc;
     }, {} as Record<BusinessEditKey, boolean>);
   });
+  React.useEffect(() => {
+    if (!onUploadBusinessMedia) return;
+    setBusinessEditing((prev) => (prev.profile ? prev : { ...prev, profile: true }));
+  }, [onUploadBusinessMedia]);
   const isAnyBusinessEditing = React.useMemo(
     () => businessEditKeys.some((k) => businessEditing[k]),
     [businessEditKeys, businessEditing],
@@ -1401,7 +1406,7 @@ export default function ProfessionalFixedLocationSetup({
       business_name: sourceBiz.profileName,
       business_about: sourceBiz.about,
       business_keywords: sourceBiz.keywords,
-      business_media: mediaSlides.filter((item) => item && !item.startsWith("blob:")).slice(0, 4),
+      business_media: mediaSlides.filter(isPersistedMediaUrl).slice(0, BUSINESS_MEDIA_MAX_COUNT),
       salon_name: fixedBiz.salonName,
       fixed_location_address: fixedBiz.streetAddress,
       fixed_location_street_number: fixedBiz.streetNumber,
@@ -2335,7 +2340,7 @@ export default function ProfessionalFixedLocationSetup({
   }, []);
 
   const onFilesSelected = React.useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
       const { allowed, rejected } = filterAllowedProfileImageFiles(Array.from(e.target.files ?? []));
       if (rejected > 0 && !allowed.length) {
         showSnackbar({ severity: "error", message: PROFILE_IMAGE_INVALID_MESSAGE });
@@ -2348,17 +2353,49 @@ export default function ProfessionalFixedLocationSetup({
           message: `${rejected} file(s) skipped. ${PROFILE_IMAGE_INVALID_MESSAGE}`,
         });
       }
-      const urls = allowed.map((f) => URL.createObjectURL(f));
-      if (!urls.length) {
+
+      const persistedCount = mediaSlides.filter(isPersistedMediaUrl).length;
+      const slotsLeft = BUSINESS_MEDIA_MAX_COUNT - persistedCount;
+      if (slotsLeft <= 0) {
+        showSnackbar({
+          severity: "error",
+          message: `You can upload at most ${BUSINESS_MEDIA_MAX_COUNT} images.`,
+        });
         e.target.value = "";
         return;
       }
-      addedBlobUrlsRef.current.push(...urls);
-      setMediaSlides((prev) => [...urls, ...prev]);
-      setMediaIdx(0);
-      e.target.value = "";
+
+      const toUpload = allowed.slice(0, slotsLeft);
+      if (!toUpload.length) {
+        e.target.value = "";
+        return;
+      }
+
+      if (allowed.length > slotsLeft) {
+        showSnackbar({
+          severity: "warning",
+          message: `Only ${slotsLeft} more image(s) can be added (max ${BUSINESS_MEDIA_MAX_COUNT}).`,
+        });
+      }
+
+      if (!onUploadBusinessMedia) {
+        showSnackbar({ severity: "error", message: "Media upload is not available." });
+        e.target.value = "";
+        return;
+      }
+
+      try {
+        const uploaded = await onUploadBusinessMedia(toUpload);
+        const nextSlides = uploaded.length > 0 ? uploaded : ["/professionals/hero.png"];
+        setMediaSlides(nextSlides);
+        setMediaIdx(0);
+      } catch {
+        // Parent shows error snackbar.
+      } finally {
+        e.target.value = "";
+      }
     },
-    [showSnackbar],
+    [mediaSlides, onUploadBusinessMedia, showSnackbar],
   );
 
   const serviceCategoryTabs = React.useMemo<
@@ -3257,7 +3294,9 @@ export default function ProfessionalFixedLocationSetup({
                       alt=""
                       fill
                       sizes="(max-width: 900px) 100vw, 520px"
-                      unoptimized={mediaSlides[mediaIdx]?.startsWith("blob:")}
+                      unoptimized={
+                        mediaSlides[mediaIdx]?.startsWith("blob:") || isPersistedMediaUrl(mediaSlides[mediaIdx] ?? "")
+                      }
                       style={{ objectFit: "cover" }}
                     />
                   </Box>
@@ -3344,8 +3383,11 @@ export default function ProfessionalFixedLocationSetup({
                 <Button
                   fullWidth
                   variant="outlined"
-                  startIcon={<IosShareRoundedIcon />}
+                  startIcon={
+                    isBusinessMediaUploading ? <CircularProgress size={18} color="inherit" /> : <IosShareRoundedIcon />
+                  }
                   onClick={onUploadMedia}
+                  disabled={isBusinessMediaUploading || !businessEditing.profile}
                   sx={{
                     borderRadius: "8px",
                     textTransform: "none",

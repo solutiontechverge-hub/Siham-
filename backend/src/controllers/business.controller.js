@@ -1,4 +1,8 @@
 import { getClient, query } from "../db/index.js";
+import {
+  isS3UploadConfigured,
+  uploadBusinessMediaFilesToS3,
+} from "../services/s3-upload.service.js";
 
 const parseJsonValue = (value, fallback) => {
   if (value === undefined || value === null || value === "") {
@@ -435,6 +439,108 @@ export const getBusinessSetup = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to fetch business setup.",
+      data: {
+        error: error.message,
+      },
+    });
+  }
+};
+
+const isPersistedMediaUrl = (value) =>
+  typeof value === "string" && (value.startsWith("http://") || value.startsWith("https://"));
+
+export const uploadBusinessMedia = async (req, res) => {
+  try {
+    if (req.user.user_type !== "professional") {
+      return res.status(403).json({
+        success: false,
+        message: "Only professional users can upload business media.",
+        data: null,
+      });
+    }
+
+    const files = Array.isArray(req.files) ? req.files : [];
+
+    if (!files.length) {
+      return res.status(400).json({
+        success: false,
+        message: "No image files provided.",
+        data: null,
+      });
+    }
+
+    if (!isS3UploadConfigured()) {
+      return res.status(503).json({
+        success: false,
+        message: "File upload is temporarily unavailable.",
+        data: null,
+      });
+    }
+
+    const professionalProfile = await getProfessionalProfile(req.user.id);
+
+    if (!professionalProfile) {
+      return res.status(404).json({
+        success: false,
+        message: "Professional profile not found.",
+        data: null,
+      });
+    }
+
+    const existingSetup = await getBusinessSetupByUserId(req.user.id);
+    const existingMedia = parseTextArray(existingSetup?.business_media).filter(isPersistedMediaUrl);
+
+    if (existingMedia.length + files.length > 4) {
+      return res.status(400).json({
+        success: false,
+        message: `You can upload at most 4 images (${existingMedia.length} already saved).`,
+        data: null,
+      });
+    }
+
+    const uploadedUrls = await uploadBusinessMediaFilesToS3(req.user.id, files);
+    const nextMedia = [...existingMedia, ...uploadedUrls].slice(0, 4);
+
+    let businessSetupId;
+
+    if (existingSetup) {
+      const result = await query(
+        `UPDATE business_setups
+         SET business_media = $2, updated_at = NOW()
+         WHERE id = $1
+         RETURNING id`,
+        [existingSetup.id, nextMedia],
+      );
+      businessSetupId = result.rows[0]?.id;
+    } else {
+      const result = await query(
+        `INSERT INTO business_setups (professional_profile_id, location_mode, business_media)
+         VALUES ($1, 'fixed', $2)
+         RETURNING id`,
+        [professionalProfile.id, nextMedia],
+      );
+      businessSetupId = result.rows[0]?.id;
+    }
+
+    if (!businessSetupId) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to save business media.",
+        data: null,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Business media uploaded successfully.",
+      data: {
+        business_media: nextMedia,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to upload business media.",
       data: {
         error: error.message,
       },
