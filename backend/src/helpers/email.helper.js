@@ -29,6 +29,28 @@ const isPlaceholderValue = (value) => {
   );
 };
 
+const normalizeEnvValue = (value) => {
+  if (value === undefined || value === null) {
+    return value;
+  }
+
+  let normalized = String(value).trim();
+
+  if (
+    (normalized.startsWith('"') && normalized.endsWith('"')) ||
+    (normalized.startsWith("'") && normalized.endsWith("'"))
+  ) {
+    normalized = normalized.slice(1, -1);
+  }
+
+  return normalized;
+};
+
+const getSmtpPass = () => {
+  const pass = normalizeEnvValue(process.env.SMTP_PASS);
+  return pass ? pass.replace(/\s+/g, "") : pass;
+};
+
 const ensureEmailConfig = () => {
   const missing = requiredEmailEnv.filter((key) => !process.env[key]);
   const hasPlaceholderConfig = requiredEmailEnv.some((key) =>
@@ -50,12 +72,12 @@ const getTransporter = () => {
     process.env.SMTP_SECURE === "true" || port === 465;
 
   return nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
+    host: normalizeEnvValue(process.env.SMTP_HOST),
     port,
     secure,
     auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
+      user: normalizeEnvValue(process.env.SMTP_USER),
+      pass: getSmtpPass(),
     },
     tls: {
       rejectUnauthorized: false,
