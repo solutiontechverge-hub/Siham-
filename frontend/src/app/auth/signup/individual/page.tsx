@@ -192,12 +192,16 @@ export default function IndividualSignupPage() {
         // ignore storage failures
       }
 
+      const registeredEmail = form.email.trim().toLowerCase();
+      window.sessionStorage.setItem("mollure_verify_email", registeredEmail);
       showSnackbar({
         severity: "success",
-        message: result.message || "Account created successfully. Please check your email.",
+        message:
+          result.message ||
+          "Account created. Check your email for a verification code, or log in if your account was activated.",
       });
       setForm(initialForm);
-      router.push("/auth/login");
+      router.push("/auth/verify-email?login=/auth/login");
     } catch (error) {
       showSnackbar({
         severity: "error",

@@ -8,6 +8,7 @@
     "start": "node --env-file=.env src/index.js",
     "start:backend": "node --env-file=.env src/index.js",
     "migrate": "node --env-file=.env src/migrate-once.js",
+    "verify-user": "node --env-file=.env scripts/verify-user-by-email.mjs",
     "build": "node -e \"console.log('Backend: no compile step')\""
   },
   "dependencies": {

@@ -6,7 +6,9 @@ import {
   register,
   resetPassword,
   selectUserType,
+  resendVerification,
   verifyEmail,
+  verifyEmailOtp,
   verifyOtp,
 } from "../controllers/auth.controller.js";
 import { validateRequest } from "../middleware/validate.middleware.js";
@@ -103,6 +105,26 @@ router.post(
   ],
   validateRequest,
   resetPassword,
+);
+
+router.post(
+  "/resend-verification",
+  body("email").trim().isEmail().withMessage("A valid email is required.").normalizeEmail(),
+  validateRequest,
+  resendVerification,
+);
+
+router.post(
+  "/verify-email-otp",
+  [
+    body("email").trim().isEmail().withMessage("A valid email is required.").normalizeEmail(),
+    body("otp")
+      .trim()
+      .matches(/^\d{6}$/)
+      .withMessage("otp must be a 6-digit code."),
+  ],
+  validateRequest,
+  verifyEmailOtp,
 );
 
 router.post(

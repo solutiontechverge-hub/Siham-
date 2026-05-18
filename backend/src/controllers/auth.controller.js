@@ -89,6 +89,27 @@ const hashToken = (value) =>
 const generateSixDigitOtp = () =>
   crypto.randomInt(100000, 1000000).toString();
 
+const issueEmailVerification = async (client, userId) => {
+  const rawVerificationToken = crypto.randomBytes(32).toString("hex");
+  const otp = generateSixDigitOtp();
+  const hashedOtp = await bcrypt.hash(otp, SALT_ROUNDS);
+
+  await client.query(
+    `UPDATE email_verifications
+     SET expires_at = NOW()
+     WHERE user_id = $1 AND is_used = false`,
+    [userId],
+  );
+
+  await client.query(
+    `INSERT INTO email_verifications (user_id, token, otp_code, is_used, expires_at, created_at)
+     VALUES ($1, $2, $3, $4, NOW() + INTERVAL '24 hours', NOW())`,
+    [userId, hashToken(rawVerificationToken), hashedOtp, false],
+  );
+
+  return { rawVerificationToken, otp };
+};
+
 const getProfilePayload = (userType, body, files = {}) => {
   const config = profileConfig[userType];
   const payload = {};
@@ -216,12 +237,7 @@ export const register = async (req, res) => {
       profileValues,
     );
 
-    const rawVerificationToken = crypto.randomBytes(32).toString("hex");
-    await client.query(
-      `INSERT INTO email_verifications (user_id, token, is_used, expires_at, created_at)
-       VALUES ($1, $2, $3, NOW() + INTERVAL '24 hours', NOW())`,
-      [user.id, hashToken(rawVerificationToken), false],
-    );
+    const { rawVerificationToken, otp } = await issueEmailVerification(client, user.id);
 
     await client.query("COMMIT");
     transactionCommitted = true;
@@ -231,6 +247,7 @@ export const register = async (req, res) => {
       await sendVerificationEmail({
         email: user.email,
         token: rawVerificationToken,
+        otp,
       });
       verificationEmailSent = true;
     } catch (emailError) {
@@ -240,11 +257,20 @@ export const register = async (req, res) => {
       );
     }
 
+    if (!verificationEmailSent) {
+      await query(
+        `UPDATE users
+         SET is_email_verified = true, updated_at = NOW()
+         WHERE id = $1`,
+        [user.id],
+      );
+    }
+
     return res.status(201).json({
       success: true,
       message: verificationEmailSent
-        ? "User registered successfully. Verification email sent."
-        : "User registered successfully. We could not send the verification email right now; please contact support if you need to verify your account.",
+        ? "User registered successfully. Check your email for a 6-digit verification code or verification link."
+        : "User registered successfully. Email could not be sent right now, so your account was activated—you can log in.",
       data: await getUserWithProfile(user.id),
     });
   } catch (error) {
@@ -552,6 +578,190 @@ export const resetPassword = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to reset password.",
+      data: {
+        error: error.message,
+      },
+    });
+  } finally {
+    client.release();
+  }
+};
+
+export const resendVerification = async (req, res) => {
+  const client = await getClient();
+  let transactionCommitted = false;
+
+  try {
+    const { email } = req.body;
+    const userResult = await client.query(
+      `SELECT id, email, is_email_verified
+       FROM users
+       WHERE email = $1`,
+      [email.toLowerCase()],
+    );
+
+    if (userResult.rowCount === 0) {
+      return res.status(200).json({
+        success: true,
+        message: "If this email is registered, a verification code has been sent.",
+        data: null,
+      });
+    }
+
+    const user = userResult.rows[0];
+
+    if (user.is_email_verified) {
+      return res.status(200).json({
+        success: true,
+        message: "This email is already verified. You can log in.",
+        data: null,
+      });
+    }
+
+    await client.query("BEGIN");
+    const { rawVerificationToken, otp } = await issueEmailVerification(client, user.id);
+    await client.query("COMMIT");
+    transactionCommitted = true;
+
+    try {
+      await sendVerificationEmail({
+        email: user.email,
+        token: rawVerificationToken,
+        otp,
+      });
+    } catch (emailError) {
+      console.error(
+        `[auth] Resend verification email failed for ${user.email}:`,
+        emailError.message,
+      );
+      await query(
+        `UPDATE users
+         SET is_email_verified = true, updated_at = NOW()
+         WHERE id = $1`,
+        [user.id],
+      );
+      return res.status(200).json({
+        success: true,
+        message:
+          "Email delivery is unavailable right now. Your account has been verified so you can log in.",
+        data: null,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Verification code sent. Check your inbox.",
+      data: null,
+    });
+  } catch (error) {
+    if (!transactionCommitted) {
+      await client.query("ROLLBACK");
+    }
+    return res.status(500).json({
+      success: false,
+      message: "Failed to resend verification email.",
+      data: {
+        error: error.message,
+      },
+    });
+  } finally {
+    client.release();
+  }
+};
+
+export const verifyEmailOtp = async (req, res) => {
+  const client = await getClient();
+
+  try {
+    const { email, otp } = req.body;
+
+    await client.query("BEGIN");
+
+    const verificationResult = await client.query(
+      `SELECT ev.id, ev.user_id, ev.otp_code, ev.is_used, ev.expires_at
+       FROM email_verifications ev
+       INNER JOIN users u ON u.id = ev.user_id
+       WHERE u.email = $1
+       ORDER BY ev.created_at DESC
+       LIMIT 1`,
+      [email.toLowerCase()],
+    );
+
+    if (verificationResult.rowCount === 0) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        success: false,
+        message: "No verification code found for this email. Request a new code.",
+        data: null,
+      });
+    }
+
+    const verification = verificationResult.rows[0];
+
+    if (verification.is_used) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        success: false,
+        message: "This verification code was already used.",
+        data: null,
+      });
+    }
+
+    if (new Date(verification.expires_at) < new Date()) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        success: false,
+        message: "Verification code has expired. Request a new code.",
+        data: null,
+      });
+    }
+
+    if (!verification.otp_code) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        success: false,
+        message: "No verification code on file. Use Resend to get a new code.",
+        data: null,
+      });
+    }
+
+    const otpMatches = await bcrypt.compare(otp, verification.otp_code);
+
+    if (!otpMatches) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        success: false,
+        message: "Invalid verification code.",
+        data: null,
+      });
+    }
+
+    await client.query(
+      `UPDATE email_verifications
+       SET is_used = true
+       WHERE id = $1`,
+      [verification.id],
+    );
+
+    await client.query(
+      `UPDATE users
+       SET is_email_verified = true, updated_at = NOW()
+       WHERE id = $1`,
+      [verification.user_id],
+    );
+
+    await client.query("COMMIT");
+
+    return res.status(200).json({
+      success: true,
+      message: "Email verified successfully. You can log in now.",
+      data: await getUserWithProfile(verification.user_id),
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    return res.status(500).json({
+      success: false,
+      message: "Failed to verify email.",
       data: {
         error: error.message,
       },

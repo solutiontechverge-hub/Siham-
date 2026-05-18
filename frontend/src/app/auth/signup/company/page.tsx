@@ -210,13 +210,16 @@ export default function CompanySignupPage() {
         contact_last_name: form.contactLastName.trim(),
       }).unwrap();
 
+      const registeredEmail = form.contactEmail.trim().toLowerCase();
+      window.sessionStorage.setItem("mollure_verify_email", registeredEmail);
       showSnackbar({
         severity: "success",
         message:
-          result.message || "Company account created successfully. Please check your email.",
+          result.message ||
+          "Company account created. Check your email for a verification code, or log in if your account was activated.",
       });
       setForm(initialForm);
-      router.push("/auth/professional/login");
+      router.push("/auth/verify-email?login=/auth/professional/login");
     } catch (error) {
       showSnackbar({
         severity: "error",

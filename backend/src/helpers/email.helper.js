@@ -106,19 +106,31 @@ const sendMail = async ({ to, subject, html, text }) => {
   return info;
 };
 
-export const sendVerificationEmail = async ({ email, token }) => {
-  const appBaseUrl =
-    process.env.APP_BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
-  const verificationLink = `${appBaseUrl}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
+export const sendVerificationEmail = async ({ email, token, otp }) => {
+  const frontendBaseUrl =
+    process.env.FRONTEND_URL ||
+    process.env.APP_BASE_URL ||
+    `http://localhost:${process.env.PORT || 5000}`;
+  const verificationLink = `${frontendBaseUrl.replace(/\/$/, "")}/auth/verify-email?token=${encodeURIComponent(token)}`;
+  const otpBlock = otp
+    ? `
+        <p>Or enter this verification code on the website:</p>
+        <p style="font-size: 28px; font-weight: 700; letter-spacing: 4px;">${otp}</p>
+        <p>This code expires in 24 hours.</p>
+      `
+    : "";
 
   await sendMail({
     to: email,
     subject: "Verify your email address",
-    text: `Verify your email by opening this link: ${verificationLink}`,
+    text: otp
+      ? `Your verification code is ${otp}. It expires in 24 hours. Or open: ${verificationLink}`
+      : `Verify your email by opening this link: ${verificationLink}`,
     html: `
       <div style="font-family: Arial, sans-serif; color: #1f2937;">
         <h2>Email Verification</h2>
-        <p>Please verify your email address by clicking the button below.</p>
+        <p>Please verify your email address.</p>
+        ${otpBlock}
         <p>
           <a href="${verificationLink}" style="display:inline-block;padding:12px 20px;background:#111827;color:#ffffff;text-decoration:none;border-radius:6px;">
             Verify Email
