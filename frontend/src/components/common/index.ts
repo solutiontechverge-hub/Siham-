@@ -34,9 +34,31 @@ export * from "./ListingFilterBox";
 export { default as ClientProfileMenuPopover } from "./ClientProfileMenuPopover";
 export { default as ClientListingCard } from "./ClientListingCard";
 export { default as BusinessPublicProfile } from "./BusinessPublicProfile";
+export {
+  ClientBookingDetailsView,
+  ClientBookingPaymentDetailsCard,
+  ClientBookingPoliciesAccordion,
+  buildBookingSummarySections,
+  parsePrepaymentPercent,
+  useClientBookingDraft,
+  useClientRequesterProfile,
+} from "./client-booking";
+export type { ClientBookingDetailsVariant, ClientBookingDraft } from "./client-booking";
 export { default as ClientNotificationsDrawer } from "./ClientNotificationsDrawer";
+export {
+  MessagingPageView,
+  MessagingPageShell,
+  getMessagingHref,
+  messagingSearchPlaceholder,
+} from "./messaging";
+export type { MessagingAudience } from "./messaging";
 export { default as ExportMenuPopover } from "./ExportMenuPopover";
-export { default as ClientTopTabs } from "./ClientTopTabs";
+export {
+  default as ClientTopTabs,
+  ClientPageTabsBar,
+  CLIENT_TOP_TABS,
+  clientTopTabsActiveLabel,
+} from "./ClientTopTabs";
 export { default as MarketingSiteHeader } from "./MarketingSiteHeader";
 export { default as MollureMarketingHeader } from "./MollureMarketingHeader";
 export { default as MarketingSiteFooter } from "./MarketingSiteFooter";

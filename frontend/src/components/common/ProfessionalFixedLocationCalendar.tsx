@@ -836,6 +836,7 @@ export default function ProfessionalFixedLocationCalendar({
         tabs={data.subTabs.map((label) => ({ label }))}
         active={activeSubTab}
         onChange={(next) => setActiveSubTab(next as CalendarSubTab)}
+        alignStart={false}
       />
 
       <Paper

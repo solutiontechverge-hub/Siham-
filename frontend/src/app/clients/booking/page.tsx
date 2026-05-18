@@ -42,13 +42,28 @@ import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
 import ModeEditOutlineRoundedIcon from "@mui/icons-material/ModeEditOutlineRounded";
-import { AppDropdown, ClientTopTabs, MarketingSiteFooter, MollureMarketingHeader } from "../../../components/common";
+import { AppDropdown, ClientPageTabsBar, clientTopTabsActiveLabel, MarketingSiteFooter, MollureMarketingHeader } from "../../../components/common";
 import { ServiceSummaryMetaLine } from "../../../components/common/ServiceSummaryMetaLine";
 import { fmtMinutesToTimeLabel, parseTimeLabelToMinutes, serviceTimeRangeLabel } from "./booking-time";
-import { marketingShellFooter } from "../../../data/marketingShell.data";
-import { profilePageData } from "../profile/data-profile";
+import ClientBookingListView from "./ClientBookingListView";
+import ClientBookingPageShell from "./ClientBookingPageShell";
+import { parseBookingListTab } from "./bookingPillTabs";
+import { upsertRequestedBooking } from "./clientBookingRecords";
+import { ACTIVE_BOOKING_ID_KEY, createBookingRef, setActiveBookingSession } from "./clientBookingSession";
+import {
+  getBusinessPublicProfileByShopId,
+  getServicesForLocationMode,
+} from "../../../data/businessPublicProfile.data";
+import { parsePrepaymentPercent } from "../../../components/common/client-booking/parsePrepaymentPercent";
 import { loadPublicProfileBookingSelection } from "../../../data/publicProfileBookingSelection";
 import { useAppSelector } from "../../../store/hooks";
+import {
+  useGetProfileQuery,
+  type CompanyProfile,
+  type IndividualProfile,
+  type ProfessionalProfile,
+  type ProfileResponse,
+} from "../../../store/services/profileApi";
 
 const DEFAULT_BOOKING_SERVICES: Array<{
   id: string;
@@ -90,138 +105,71 @@ const DEFAULT_SHOP_TEAM_MEMBERS: Array<{ id: string; name: string; locationModes
   { id: "tm-omar", name: "Omar Haddad", locationModes: ["fixed", "desired"] },
 ];
 
-function ClientBookingHistoryView() {
-  const pathname = usePathname();
-  const theme = useTheme();
-  const m = theme.palette.mollure;
-  const user = useAppSelector((s) => s.auth.user);
+function readClientProfileNameFromStorage(userEmail?: string): string {
+  if (typeof window === "undefined") return "";
+  try {
+    const raw = window.localStorage.getItem("mollure:client_profile");
+    if (!raw) return "";
+    const data = JSON.parse(raw) as {
+      email?: string;
+      first_name?: string;
+      last_name?: string;
+      display_name?: string;
+    };
+    const authedEmail = userEmail?.trim().toLowerCase();
+    const persistedEmail = data?.email?.trim().toLowerCase();
+    if (authedEmail && persistedEmail && authedEmail !== persistedEmail) return "";
+    const persistedName = (data.display_name ?? "").trim();
+    const fullName = `${data.first_name ?? ""} ${data.last_name ?? ""}`.trim();
+    return persistedName || fullName;
+  } catch {
+    return "";
+  }
+}
 
-  const clientTopTabs = React.useMemo(
-    () =>
-      [
-        { label: "Booking", href: "/clients/booking" },
-        { label: "Favorites", href: "/clients/favourites" },
-        { label: "Profile", href: "/clients/profile" },
-      ] as const,
-    [],
-  );
-
-  const [confirmedBookings, setConfirmedBookings] = React.useState<any[]>([]);
-
-  React.useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem("mollure:client_bookings");
-      const parsed = raw ? (JSON.parse(raw) as unknown) : [];
-      setConfirmedBookings(Array.isArray(parsed) ? parsed : []);
-    } catch {
-      setConfirmedBookings([]);
-    }
-  }, []);
-
-  const fallbackAddress = "Marina-Park 50, Den Helder, Noord-Holland";
-
+function resolveNameFromProfileResponse(profile: ProfileResponse | null | undefined): string {
+  if (!profile) return "";
+  if (profile.user_type === "company") {
+    const companyProfile = profile.profile as CompanyProfile | null;
+    return (
+      companyProfile?.legal_name?.trim() ||
+      `${companyProfile?.contact_first_name ?? ""} ${companyProfile?.contact_last_name ?? ""}`.trim() ||
+      ""
+    );
+  }
+  if (profile.user_type === "professional") {
+    const professionalProfile = profile.profile as ProfessionalProfile | null;
+    return (
+      `${professionalProfile?.contact_first_name ?? ""} ${professionalProfile?.contact_last_name ?? ""}`.trim() ||
+      professionalProfile?.legal_name?.trim() ||
+      ""
+    );
+  }
+  const individualProfile = profile.profile as IndividualProfile | null;
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: profilePageData.pageBg }}>
-      <MollureMarketingHeader
-        navItems={[]}
-        isAuthed
-        userLabel={user?.email ?? ""}
-        userName={user?.email ?? ""}
-        userAvatarSrc={undefined}
-        homeHref="/clients/listing"
-      />
-
-      <Box sx={{ mt: 2, bgcolor: "transparent" }}>
-        <Container maxWidth="lg" sx={{ px: { xs: 2, sm: 3, md: 4 }, py: 1.5 }}>
-          <ClientTopTabs
-            tabs={clientTopTabs}
-            activeLabel={pathname?.includes("/clients/booking") ? "Booking" : pathname?.includes("/clients/favourites") ? "Favorites" : "Profile"}
-          />
-        </Container>
-      </Box>
-
-      <Container maxWidth="lg" sx={{ pb: 5 }}>
-        <Paper
-          elevation={0}
-          sx={{
-            borderRadius: "12px",
-            border: `1px solid ${alpha(m.navy, 0.08)}`,
-            bgcolor: "#fff",
-            overflow: "hidden",
-            boxShadow: "0 10px 22px rgba(16, 35, 63, 0.05)",
-          }}
-        >
-          <Box sx={{ px: { xs: 2, md: 2.5 }, py: 1.75, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <Typography sx={{ fontWeight: 900, color: alpha(m.navy, 0.86), fontSize: 14 }}>Your Bookings</Typography>
-            <Button
-              component={Link}
-              href="/clients/listing"
-              variant="contained"
-              disableElevation
-              sx={{ borderRadius: "10px", textTransform: "none", fontWeight: 900, bgcolor: m.teal, "&:hover": { bgcolor: m.tealDark } }}
-            >
-              New Booking
-            </Button>
-          </Box>
-          <Divider />
-          <Box sx={{ p: { xs: 2, md: 2.5 } }}>
-            {confirmedBookings.length === 0 ? (
-              <Typography sx={{ fontWeight: 800, color: alpha(m.navy, 0.55) }}>
-                No bookings yet.
-              </Typography>
-            ) : (
-              <Stack spacing={1.25}>
-                {confirmedBookings.map((b) => {
-                  const shopName = b?.shop?.shopName ?? "Salon";
-                  const address = b?.shop?.addressLabel ?? b?.shop?.municipalityLabel ?? fallbackAddress;
-                  const date = b?.draft?.selectedDateISO ?? "";
-                  const time = b?.draft?.selectedTime ?? "";
-                  const total = b?.draft?.total ?? 0;
-                  return (
-                    <Paper
-                      key={b?.id ?? `${shopName}-${date}-${time}`}
-                      elevation={0}
-                      sx={{
-                        borderRadius: "12px",
-                        border: `1px solid ${alpha(m.navy, 0.10)}`,
-                        p: 1.6,
-                      }}
-                    >
-                      <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1.25}>
-                        <Box sx={{ minWidth: 0 }}>
-                          <Typography sx={{ fontWeight: 900, color: alpha(m.navy, 0.85) }}>{shopName}</Typography>
-                          <Typography sx={{ mt: 0.25, fontWeight: 800, color: alpha(m.navy, 0.55), fontSize: 12, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                            {address}
-                          </Typography>
-                          <Typography sx={{ mt: 0.35, fontWeight: 900, color: alpha(m.teal, 0.95), fontSize: 12 }}>
-                            {date} {time ? `• ${time}` : ""}
-                          </Typography>
-                        </Box>
-                        <Stack alignItems={{ xs: "flex-start", sm: "flex-end" }} spacing={0.5}>
-                          <Chip
-                            label="Confirmed"
-                            size="small"
-                            sx={{ height: 22, fontWeight: 900, bgcolor: alpha(m.teal, 0.12), color: m.teal }}
-                          />
-                          <Typography sx={{ fontWeight: 1000, color: alpha(m.navy, 0.85) }}>{total} €</Typography>
-                        </Stack>
-                      </Stack>
-                    </Paper>
-                  );
-                })}
-              </Stack>
-            )}
-          </Box>
-        </Paper>
-      </Container>
-
-      <MarketingSiteFooter
-        columns={marketingShellFooter.columns.map((col) => ({ title: col.title, items: [...col.items] }))}
-        copyright={marketingShellFooter.copyright}
-        sx={{ mt: 2 }}
-      />
-    </Box>
+    individualProfile?.display_name?.trim() ||
+    `${individualProfile?.first_name ?? ""} ${individualProfile?.last_name ?? ""}`.trim() ||
+    ""
   );
+}
+
+function resolveRequesterDisplayName(user: unknown, profileResponse?: ProfileResponse | null): string {
+  const fromApi = resolveNameFromProfileResponse(profileResponse);
+  if (fromApi) return fromApi;
+
+  const u = user as { display_name?: string; first_name?: string; last_name?: string; email?: string } | null;
+  const fromAuthUser =
+    u?.display_name?.trim() || `${u?.first_name ?? ""} ${u?.last_name ?? ""}`.trim();
+  if (fromAuthUser) return fromAuthUser;
+
+  const fromStorage = readClientProfileNameFromStorage(u?.email);
+  if (fromStorage) return fromStorage;
+
+  return "Guest";
+}
+
+function isServiceTeamAssigned(service: { teamMemberId: string | null }) {
+  return Boolean(service.teamMemberId);
 }
 
 function ClientBookingCreateView() {
@@ -231,6 +179,12 @@ function ClientBookingCreateView() {
   const profileHydrationToken = searchParams?.get("t") ?? "";
   const theme = useTheme();
   const m = theme.palette.mollure;
+  const user = useAppSelector((s) => s.auth.user);
+  const { data: profileQueryData } = useGetProfileQuery();
+  const requesterDisplayName = React.useMemo(
+    () => resolveRequesterDisplayName(user, profileQueryData?.data),
+    [profileQueryData?.data, user],
+  );
 
   const [shop, setShop] = React.useState<{
     shopId: string;
@@ -317,9 +271,15 @@ function ClientBookingCreateView() {
     planningIsLocked?: boolean;
   };
   const [people, setPeople] = React.useState<BookingPerson[]>(() => [
-    { id: "p-requester", name: "Elly", isRequester: true },
+    { id: "p-requester", name: "Guest", isRequester: true },
   ]);
   const [draggingPersonId, setDraggingPersonId] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    setPeople((prev) =>
+      prev.map((p) => (p.isRequester ? { ...p, name: requesterDisplayName } : p)),
+    );
+  }, [requesterDisplayName]);
 
   type ShopTeamMember = { id: string; name: string; locationModes: Array<"fixed" | "desired"> };
   const [shopTeamMembers, setShopTeamMembers] = React.useState<ShopTeamMember[]>(DEFAULT_SHOP_TEAM_MEMBERS);
@@ -333,7 +293,7 @@ function ClientBookingCreateView() {
     discountPct?: number;
   };
 
-  const catalogByTeamMemberId = React.useMemo<Record<string, CatalogService[]>>(
+  const defaultCatalogByTeamMemberId = React.useMemo<Record<string, CatalogService[]>>(
     () => ({
       "tm-elly": [
         { id: "cat-buzz", name: "Buzz Cut", durationMins: 45, price: 25, originalPrice: 50, discountPct: 50 },
@@ -368,8 +328,8 @@ function ClientBookingCreateView() {
   };
 
   const getPreferredServiceTab = React.useCallback((items: Service[]): "assigned" | "unassigned" => {
-    const hasUnassigned = items.some((s) => !s.guestId);
-    const hasAssigned = items.some((s) => Boolean(s.guestId));
+    const hasUnassigned = items.some((s) => !isServiceTeamAssigned(s));
+    const hasAssigned = items.some((s) => isServiceTeamAssigned(s));
     if (hasUnassigned && !hasAssigned) return "unassigned";
     return "assigned";
   }, []);
@@ -402,6 +362,26 @@ function ClientBookingCreateView() {
   const locationMode = shop?.locationMode ?? "fixed";
   const isDesiredLocation = locationMode === "desired";
   const participantLabel = isDesiredLocation ? "Model" : "Guest";
+
+  const catalogByTeamMemberId = React.useMemo<Record<string, CatalogService[]>>(() => {
+    if (!shop?.shopId || !profileHydrated) return defaultCatalogByTeamMemberId;
+
+    const businessProfile = getBusinessPublicProfileByShopId(shop.shopId);
+    if (!businessProfile) return defaultCatalogByTeamMemberId;
+
+    const catalogItems: CatalogService[] = getServicesForLocationMode(businessProfile, locationMode).map((s) => ({
+      id: s.id,
+      name: s.name,
+      durationMins: s.durationMins,
+      price: s.priceValue,
+    }));
+
+    const map: Record<string, CatalogService[]> = {};
+    for (const tm of shopTeamMembers) {
+      map[tm.id] = catalogItems;
+    }
+    return Object.keys(map).length > 0 ? map : defaultCatalogByTeamMemberId;
+  }, [defaultCatalogByTeamMemberId, locationMode, profileHydrated, shop?.shopId, shopTeamMembers]);
 
   const isPlanningPerson = React.useCallback(
     (p: BookingPerson) => p.participantType === "planning" || p.name === "Planning",
@@ -464,10 +444,13 @@ function ClientBookingCreateView() {
   };
 
   const selectedServicesCount = React.useMemo(() => Object.values(selectedServiceIds).filter(Boolean).length, [selectedServiceIds]);
-  const allServicesAssigned = React.useMemo(() => services.length > 0 && services.every((s) => Boolean(s.guestId)), [services]);
+  const allServicesAssigned = React.useMemo(
+    () => services.length > 0 && services.every((s) => isServiceTeamAssigned(s)),
+    [services],
+  );
 
-  const assigned = services.filter((s) => s.guestId);
-  const unassigned = services.filter((s) => !s.guestId);
+  const assigned = services.filter((s) => isServiceTeamAssigned(s));
+  const unassigned = services.filter((s) => !isServiceTeamAssigned(s));
 
   React.useEffect(() => {
     if (!profileHydrated && fromProfile) return;
@@ -568,20 +551,43 @@ function ClientBookingCreateView() {
 
   React.useEffect(() => {
     try {
+      const profileSelection = loadPublicProfileBookingSelection();
       const raw = window.localStorage.getItem("mollure:selected_shop");
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as {
-        shopId: string;
-        shopName: string;
-        municipalityLabel?: string;
-        addressLabel?: string;
-        locationMode?: "fixed" | "desired";
-      };
-      if (parsed?.shopId && parsed?.shopName) setShop(parsed);
+      const parsed = raw
+        ? (JSON.parse(raw) as {
+            shopId?: string;
+            shopName?: string;
+            municipalityLabel?: string;
+            addressLabel?: string;
+            locationMode?: "fixed" | "desired";
+          })
+        : null;
+
+      if (fromProfile && profileSelection?.shopId) {
+        const addressSource = parsed?.shopId === profileSelection.shopId ? parsed : null;
+        setShop({
+          shopId: profileSelection.shopId,
+          shopName: profileSelection.shopName ?? addressSource?.shopName ?? "Salon",
+          municipalityLabel: addressSource?.municipalityLabel,
+          addressLabel: addressSource?.addressLabel,
+          locationMode: profileSelection.locationMode,
+        });
+        return;
+      }
+
+      if (parsed?.shopId && parsed?.shopName) {
+        setShop({
+          shopId: parsed.shopId,
+          shopName: parsed.shopName,
+          municipalityLabel: parsed.municipalityLabel,
+          addressLabel: parsed.addressLabel,
+          locationMode: parsed.locationMode,
+        });
+      }
     } catch {
       // ignore
     }
-  }, []);
+  }, [fromProfile, profileHydrationToken]);
 
   const applyProfileSelection = React.useCallback(
     (profileSelection: NonNullable<ReturnType<typeof loadPublicProfileBookingSelection>>) => {
@@ -594,7 +600,7 @@ function ClientBookingCreateView() {
         name: row.name,
         durationMins: row.durationMins,
         price: row.price,
-        guestId: null,
+        guestId: row.teamMemberId ? "p-requester" : null,
         teamMemberId: row.teamMemberId,
       }));
 
@@ -627,41 +633,42 @@ function ClientBookingCreateView() {
   );
 
   React.useEffect(() => {
-    if (!shop?.shopId) return;
-
     const profileSelection = loadPublicProfileBookingSelection();
-    const shouldUseProfile =
-      profileSelection?.shopId === shop.shopId && profileSelection.services.length > 0;
 
-    if (shouldUseProfile) {
-      const signature = `${profileHydrationToken}:${profileSelection.savedAt ?? ""}:${profileSelection.services
+    const applyProfileIfNeeded = (
+      selection: NonNullable<ReturnType<typeof loadPublicProfileBookingSelection>>,
+    ) => {
+      const signature = `${profileHydrationToken}:${selection.savedAt ?? ""}:${selection.services
         .map((row) => `${row.id}:${row.teamMemberId ?? ""}`)
         .join("|")}`;
-      if (hydrationSignatureRef.current !== signature) {
-        hydrationSignatureRef.current = signature;
-        applyProfileSelection(profileSelection);
-      }
+      if (hydrationSignatureRef.current === signature) return;
+      hydrationSignatureRef.current = signature;
+      applyProfileSelection(selection);
+    };
+
+    if (fromProfile && profileSelection?.services.length) {
+      applyProfileIfNeeded(profileSelection);
+      return;
+    }
+
+    if (!shop?.shopId) return;
+
+    if (profileSelection?.shopId === shop.shopId && profileSelection.services.length > 0) {
+      applyProfileIfNeeded(profileSelection);
       return;
     }
 
     if (fromProfile) return;
 
     const defaultSignature = `default:${shop.shopId}`;
-    if (hydrationSignatureRef.current === defaultSignature && services.length > 0) return;
+    if (hydrationSignatureRef.current === defaultSignature) return;
     hydrationSignatureRef.current = defaultSignature;
 
     setServices(DEFAULT_BOOKING_SERVICES);
     setShopTeamMembers(DEFAULT_SHOP_TEAM_MEMBERS);
     setServiceTab(getPreferredServiceTab(DEFAULT_BOOKING_SERVICES));
     setProfileHydrated(true);
-  }, [
-    applyProfileSelection,
-    fromProfile,
-    getPreferredServiceTab,
-    profileHydrationToken,
-    services.length,
-    shop?.shopId,
-  ]);
+  }, [applyProfileSelection, fromProfile, getPreferredServiceTab, profileHydrationToken, shop?.shopId]);
 
   React.useEffect(() => {
     if (!people.some((p) => p.id === selectedPersonId)) {
@@ -827,9 +834,18 @@ function ClientBookingCreateView() {
   };
 
   const updateServiceTeamMember = (serviceId: string, teamMemberId: string) => {
+    const nextTeamMemberId = teamMemberId || null;
     setServices((prev) =>
-      prev.map((s) => (s.id === serviceId ? { ...s, teamMemberId: teamMemberId || null } : s)),
+      prev.map((s) => {
+        if (s.id !== serviceId) return s;
+        return {
+          ...s,
+          teamMemberId: nextTeamMemberId,
+          guestId: nextTeamMemberId ? (s.guestId ?? selectedPersonId) : null,
+        };
+      }),
     );
+    if (nextTeamMemberId) setServiceTab("assigned");
   };
 
   const toggleServiceSelection = (serviceId: string, checked: boolean) => {
@@ -873,7 +889,32 @@ function ClientBookingCreateView() {
     } catch {
       // ignore
     }
-    router.push("/clients/booking/checkout");
+    const businessProfile = shop?.shopId ? getBusinessPublicProfileByShopId(shop.shopId) : null;
+    const requiresPrepayment = parsePrepaymentPercent(businessProfile?.prepaymentLabel) > 0;
+
+    try {
+      const existingId =
+        typeof window !== "undefined" ? window.sessionStorage.getItem(ACTIVE_BOOKING_ID_KEY) : null;
+      const bookingRef =
+        (typeof window !== "undefined" && window.sessionStorage.getItem("mollure:checkout_booking_ref")) ||
+        createBookingRef();
+      const requested = {
+        id: existingId ?? `bk_req_${Date.now()}`,
+        bookingRef,
+        status: "requested" as const,
+        shop,
+        draft: payload,
+        createdAt: new Date().toISOString(),
+        requiresPrepayment,
+        prepaid: requiresPrepayment,
+      };
+      upsertRequestedBooking(requested);
+      setActiveBookingSession(requested);
+    } catch {
+      // ignore
+    }
+
+    router.push(requiresPrepayment ? "/clients/booking/checkout/prepaid" : "/clients/booking/checkout");
   };
 
   const planningFieldSx = {
@@ -1135,7 +1176,6 @@ function ClientBookingCreateView() {
                     placeholder="Select team member"
                     size="small"
                     fullWidth
-                    disabled={serviceTab === "unassigned" && !selectedServiceIds[s.id]}
                     InputProps={{
                       startAdornment: (
                         <PersonOutlineRoundedIcon
@@ -2085,12 +2125,12 @@ function ClientBookingCreateView() {
 
                   {isDesiredLocation && isPlanningCardSelected ? (
                     renderPlanningForm()
-                  ) : isDesiredLocation ? (
+                  ) : (
                     <>
                       <Divider />
                       {renderServicesDetails()}
                     </>
-                  ) : null}
+                  )}
                 </Paper>
               </Grid>
 
@@ -2336,9 +2376,23 @@ function ClientBookingCreateView() {
 
 export default function ClientBookingPage() {
   const searchParams = useSearchParams();
-  const view = searchParams?.get("view") ?? "";
   const mode = searchParams?.get("mode") ?? "";
-  const showHistory = view === "history" || mode !== "create";
-  if (showHistory) return <ClientBookingHistoryView />;
-  return <ClientBookingCreateView />;
+  const showCreate = mode === "create";
+  const tabParam = searchParams?.get("tab");
+  const legacyView = searchParams?.get("view");
+  const activeTab = parseBookingListTab(tabParam ?? (legacyView === "history" ? "outgoing" : undefined));
+
+  if (showCreate) {
+    return (
+      <ClientBookingPageShell activeTab="upcoming">
+        <ClientBookingCreateView />
+      </ClientBookingPageShell>
+    );
+  }
+
+  return (
+    <ClientBookingPageShell activeTab={activeTab}>
+      <ClientBookingListView listTab={activeTab} />
+    </ClientBookingPageShell>
+  );
 }
