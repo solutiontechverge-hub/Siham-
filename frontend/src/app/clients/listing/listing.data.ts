@@ -19,11 +19,15 @@ export type ListingCardData = {
   image: any;
   title: string;
   subtitle: string;
+  category: string;
+  categoryLabel: string;
   municipalityLabel: string;
   addressLabel: string;
   rating: number; // 0..5
   reviewsCount: number;
   locationModeDefault: "fixed" | "desired";
+  /** When set, professional supports both location types for filtering. */
+  locationModes?: ("fixed" | "desired")[];
   services: ListingCardService[];
   startingFromLabel: string;
 };
@@ -66,6 +70,8 @@ export const listingPageData = {
       image: ListingImage1,
       title: "Lorem Ipsum Dolor Sit Amet",
       subtitle: "Consectetur.",
+      category: "hair_stylist",
+      categoryLabel: "Hair Stylist",
       municipalityLabel: "Noord-Holland",
       addressLabel: "Marina-Park 50, Den Helder, Noord-Holland",
       rating: 5,
@@ -83,8 +89,11 @@ export const listingPageData = {
       image: ListingImage2,
       title: "Lorem Ipsum Dolor Sit Amet",
       subtitle: "Consectetur.",
-      municipalityLabel: "Noord-Holland",
-      addressLabel: "Marina-Park 50, Den Helder, Noord-Holland",
+      category: "makeup_artist",
+      categoryLabel: "Makeup Artist",
+      municipalityLabel: "Amsterdam",
+      addressLabel: "Keizersgracht 100, Amsterdam",
+      locationModes: ["fixed", "desired"],
       rating: 5,
       reviewsCount: 134,
       locationModeDefault: "desired",
@@ -100,8 +109,10 @@ export const listingPageData = {
       image: ListingImage3,
       title: "Lorem Ipsum Dolor Sit Amet",
       subtitle: "Consectetur.",
-      municipalityLabel: "Noord-Holland",
-      addressLabel: "Marina-Park 50, Den Helder, Noord-Holland",
+      category: "barber",
+      categoryLabel: "Barber",
+      municipalityLabel: "Rotterdam",
+      addressLabel: "Coolsingel 12, Rotterdam",
       rating: 5,
       reviewsCount: 134,
       locationModeDefault: "fixed",
@@ -117,11 +128,14 @@ export const listingPageData = {
       image: ListingImage4,
       title: "Lorem Ipsum Dolor Sit Amet",
       subtitle: "Consectetur.",
-      municipalityLabel: "Noord-Holland",
-      addressLabel: "Marina-Park 50, Den Helder, Noord-Holland",
+      category: "nail_technician",
+      categoryLabel: "Nail Technician",
+      municipalityLabel: "Utrecht",
+      addressLabel: "Oudegracht 20, Utrecht",
       rating: 5,
       reviewsCount: 134,
       locationModeDefault: "fixed",
+      locationModes: ["fixed", "desired"],
       services: [
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
@@ -134,8 +148,10 @@ export const listingPageData = {
       image: ListingImage5,
       title: "Lorem Ipsum Dolor Sit Amet",
       subtitle: "Consectetur.",
-      municipalityLabel: "Noord-Holland",
-      addressLabel: "Marina-Park 50, Den Helder, Noord-Holland",
+      category: "skincare",
+      categoryLabel: "Skincare",
+      municipalityLabel: "Den Haag",
+      addressLabel: "Spui 5, Den Haag",
       rating: 5,
       reviewsCount: 134,
       locationModeDefault: "desired",
@@ -151,11 +167,14 @@ export const listingPageData = {
       image: ListingImage6,
       title: "Lorem Ipsum Dolor Sit Amet",
       subtitle: "Consectetur.",
+      category: "hair_stylist",
+      categoryLabel: "Hair Stylist",
       municipalityLabel: "Noord-Holland",
       addressLabel: "Marina-Park 50, Den Helder, Noord-Holland",
       rating: 5,
       reviewsCount: 134,
       locationModeDefault: "fixed",
+      locationModes: ["fixed", "desired"],
       services: [
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },

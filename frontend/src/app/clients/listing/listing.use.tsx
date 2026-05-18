@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useTheme } from "@mui/material/styles";
 import type { ListingFilterValues } from "../../../components/common";
-import type { ListingCardData } from "./listing.data";
+import { listingPageData, type ListingCardData } from "./listing.data";
 
 export type ListingSortValue = "recommended" | "rating" | "price_asc" | "price_desc";
 
@@ -12,7 +12,48 @@ const initialFilters: ListingFilterValues = {
   category: "",
   municipality: "",
   keyword: "",
-  locationMode: "fixed",
+  locationModes: { fixed: true, desired: true },
+};
+
+const municipalityLabels = Object.fromEntries(
+  listingPageData.filters.municipalityOptions.map((opt) => [opt.value, opt.label]),
+) as Record<string, string>;
+
+const getCardLocationModes = (card: ListingCardData): ("fixed" | "desired")[] =>
+  card.locationModes?.length ? card.locationModes : [card.locationModeDefault];
+
+const matchesMunicipality = (card: ListingCardData, municipalityValue: string) => {
+  if (!municipalityValue) return true;
+
+  const label = municipalityLabels[municipalityValue]?.toLowerCase() ?? "";
+  const token = municipalityValue.replaceAll("_", " ").toLowerCase();
+  const haystack = `${card.municipalityLabel} ${card.addressLabel}`.toLowerCase();
+
+  return haystack.includes(label) || haystack.includes(token);
+};
+
+const matchesLocationModes = (
+  card: ListingCardData,
+  locationModes: ListingFilterValues["locationModes"],
+) => {
+  const { fixed, desired } = locationModes;
+  if (!fixed && !desired) return true;
+
+  const cardModes = getCardLocationModes(card);
+  return (fixed && cardModes.includes("fixed")) || (desired && cardModes.includes("desired"));
+};
+
+const matchesCategory = (card: ListingCardData, category: string) => {
+  if (!category) return true;
+  return card.category === category;
+};
+
+const matchesKeyword = (card: ListingCardData, keyword: string) => {
+  const q = keyword.trim().toLowerCase();
+  if (!q) return true;
+
+  const hay = `${card.title} ${card.subtitle} ${card.municipalityLabel} ${card.addressLabel} ${card.categoryLabel ?? ""}`.toLowerCase();
+  return hay.includes(q);
 };
 
 export function useListingTokens() {
@@ -20,7 +61,8 @@ export function useListingTokens() {
 }
 
 export function useClientListingState(cards: ListingCardData[]) {
-  const [filters, setFilters] = React.useState<ListingFilterValues>(initialFilters);
+  const [draftFilters, setDraftFilters] = React.useState<ListingFilterValues>(initialFilters);
+  const [appliedFilters, setAppliedFilters] = React.useState<ListingFilterValues>(initialFilters);
   const [sort, setSort] = React.useState<ListingSortValue>("recommended");
   const [page, setPage] = React.useState(1);
   const [favorites, setFavorites] = React.useState<Record<string, boolean>>(() => {
@@ -48,20 +90,14 @@ export function useClientListingState(cards: ListingCardData[]) {
   }, [favorites]);
 
   const filtered = React.useMemo(() => {
-    const keyword = filters.keyword.trim().toLowerCase();
     return cards.filter((card) => {
-      if (filters.municipality && filters.municipality !== "noord_holland") {
-        // demo matching - map value to label where possible
-        const m = filters.municipality.replaceAll("_", " ").toLowerCase();
-        if (!card.municipalityLabel.toLowerCase().includes(m)) return false;
-      }
-      if (keyword) {
-        const hay = `${card.title} ${card.subtitle} ${card.municipalityLabel}`.toLowerCase();
-        if (!hay.includes(keyword)) return false;
-      }
+      if (!matchesCategory(card, appliedFilters.category)) return false;
+      if (!matchesMunicipality(card, appliedFilters.municipality)) return false;
+      if (!matchesLocationModes(card, appliedFilters.locationModes)) return false;
+      if (!matchesKeyword(card, appliedFilters.keyword)) return false;
       return true;
     });
-  }, [cards, filters.keyword, filters.municipality]);
+  }, [appliedFilters, cards]);
 
   const sorted = React.useMemo(() => {
     if (sort === "recommended") return filtered;
@@ -70,7 +106,6 @@ export function useClientListingState(cards: ListingCardData[]) {
       clone.sort((a, b) => b.rating - a.rating);
       return clone;
     }
-    // price sorting using first service "Starting From XX EUR"
     const getPrice = (c: ListingCardData) => {
       const text = c.services[0]?.priceLabel || c.startingFromLabel;
       const match = text.match(/(\d+)\s*EUR/i);
@@ -92,12 +127,13 @@ export function useClientListingState(cards: ListingCardData[]) {
   }, [page, sorted]);
 
   const applyFilters = React.useCallback(() => {
+    setAppliedFilters(draftFilters);
     setPage(1);
-  }, []);
+  }, [draftFilters]);
 
   return {
-    filters,
-    setFilters,
+    filters: draftFilters,
+    setFilters: setDraftFilters,
     applyFilters,
     sort,
     setSort,
@@ -110,4 +146,3 @@ export function useClientListingState(cards: ListingCardData[]) {
     totalCount: sorted.length,
   };
 }
-

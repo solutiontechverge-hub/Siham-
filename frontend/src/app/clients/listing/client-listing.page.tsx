@@ -210,21 +210,40 @@ export default function ClientListingPage() {
           </MollureTextField>
         </Stack>
 
-        <Grid container spacing={2.5}>
-          {state.items.map((item) => (
-            <Grid item xs={12} sm={6} md={4} key={item.id}>
-              <ClientListingCard
-                item={item}
-                isFavorite={Boolean(state.favorites[item.id])}
-                onToggleFavorite={() => {
-                  const wasFavorite = Boolean(state.favorites[item.id]);
-                  state.toggleFavorite(item.id);
-                  if (!wasFavorite) setSnackbarOpen(true);
-                }}
-              />
-            </Grid>
-          ))}
-        </Grid>
+        {state.totalCount === 0 ? (
+          <Box
+            sx={{
+              py: 6,
+              textAlign: "center",
+              borderRadius: 2,
+              border: `1px dashed ${alpha(tokens.navy, 0.2)}`,
+              bgcolor: alpha(tokens.navy, 0.02),
+            }}
+          >
+            <Typography sx={{ fontWeight: 600, color: alpha(tokens.navy, 0.85) }}>
+              No professionals match your filters
+            </Typography>
+            <Typography sx={{ mt: 1, color: alpha(tokens.navy, 0.6) }}>
+              Try selecting both location types, clearing the municipality, or using a different category.
+            </Typography>
+          </Box>
+        ) : (
+          <Grid container spacing={2.5}>
+            {state.items.map((item) => (
+              <Grid item xs={12} sm={6} md={4} key={item.id}>
+                <ClientListingCard
+                  item={item}
+                  isFavorite={Boolean(state.favorites[item.id])}
+                  onToggleFavorite={() => {
+                    const wasFavorite = Boolean(state.favorites[item.id]);
+                    state.toggleFavorite(item.id);
+                    if (!wasFavorite) setSnackbarOpen(true);
+                  }}
+                />
+              </Grid>
+            ))}
+          </Grid>
+        )}
 
         <Box sx={{ mt: 3.5 }}>
           <AppPagination

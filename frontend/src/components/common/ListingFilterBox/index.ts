@@ -3,5 +3,6 @@ export type {
   ListingFilterBoxProps,
   ListingFilterOption,
   ListingFilterValues,
+  ListingLocationModes,
 } from "./ListingFilterBox";
 

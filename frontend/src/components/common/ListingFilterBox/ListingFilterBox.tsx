@@ -31,12 +31,17 @@ function assetUrl(asset: any) {
 
 export type ListingFilterOption = { label: string; value: string };
 
+export type ListingLocationModes = {
+  fixed: boolean;
+  desired: boolean;
+};
+
 export type ListingFilterValues = {
   dateTime: CalendarPopoverValue;
   category: string;
   municipality: string;
   keyword: string;
-  locationMode: "fixed" | "desired";
+  locationModes: ListingLocationModes;
 };
 
 export type ListingFilterBoxProps = Omit<PaperProps, "onChange"> & {
@@ -104,33 +109,47 @@ export default function ListingFilterBox({
       })
     : "";
 
+  const toggleLocationMode = (key: keyof ListingLocationModes) => {
+    set({
+      locationModes: {
+        ...values.locationModes,
+        [key]: !values.locationModes[key],
+      },
+    });
+  };
+
   const LocationPill = ({
     icon,
     label,
     checked,
-    onClick,
+    modeKey,
   }: {
     icon: any;
     label: string;
     checked: boolean;
-    onClick: () => void;
+    modeKey: keyof ListingLocationModes;
   }) => (
-    <Button
-      onClick={onClick}
-      variant="text"
-      disableRipple
+    <Box
+      role="button"
+      tabIndex={0}
+      onClick={() => toggleLocationMode(modeKey)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          toggleLocationMode(modeKey);
+        }
+      }}
       sx={{
+        display: "flex",
+        alignItems: "center",
         justifyContent: "space-between",
-        textTransform: "none",
         px: 1.5,
         py: 1.05,
         borderRadius: "12px",
         bgcolor: alpha(tokens.navy, 0.03),
-        color: tokens.navy,
-        fontWeight: 600,
+        cursor: "pointer",
         "&:hover": { bgcolor: alpha(tokens.teal, 0.06) },
       }}
-      fullWidth
     >
       <Stack direction="row" spacing={1.1} alignItems="center">
         <Image src={icon} alt={label} width={18} height={18} />
@@ -140,7 +159,9 @@ export default function ListingFilterBox({
       </Stack>
       <Checkbox
         checked={checked}
-        onChange={onClick}
+        tabIndex={-1}
+        onClick={(event) => event.stopPropagation()}
+        onChange={() => toggleLocationMode(modeKey)}
         sx={{
           p: 0,
           ml: 1,
@@ -148,7 +169,7 @@ export default function ListingFilterBox({
           "&.Mui-checked": { color: tokens.teal },
         }}
       />
-    </Button>
+    </Box>
   );
 
   return (
@@ -210,14 +231,17 @@ export default function ListingFilterBox({
             SelectProps={{
               displayEmpty: true,
               IconComponent: () => null,
-              renderValue: (selected) =>
-                selected ? (
-                  selected as any
-                ) : (
-                  <BodyText sx={{ color: alpha(tokens.navy, 0.55), fontSize: "1.05rem", fontWeight: 500 }}>
-                    Select Category
-                  </BodyText>
-                ),
+              renderValue: (selected) => {
+                if (!selected) {
+                  return (
+                    <BodyText sx={{ color: alpha(tokens.navy, 0.55), fontSize: "1.05rem", fontWeight: 500 }}>
+                      Select Category
+                    </BodyText>
+                  );
+                }
+                const label = categoryOptions.find((opt) => opt.value === selected)?.label;
+                return label ?? String(selected);
+              },
             }}
           >
             <MenuItem value="">
@@ -237,16 +261,16 @@ export default function ListingFilterBox({
               <LocationPill
                 icon={FixedLocationIcon}
                 label="Fixed Location"
-                checked={values.locationMode === "fixed"}
-                onClick={() => set({ locationMode: "fixed" })}
+                checked={values.locationModes.fixed}
+                modeKey="fixed"
               />
             </Grid>
             <Grid item xs={12} sm={6}>
               <LocationPill
                 icon={DesiredLocationIcon}
                 label="Desired Location"
-                checked={values.locationMode === "desired"}
-                onClick={() => set({ locationMode: "desired" })}
+                checked={values.locationModes.desired}
+                modeKey="desired"
               />
             </Grid>
           </Grid>
@@ -268,14 +292,17 @@ export default function ListingFilterBox({
             SelectProps={{
               displayEmpty: true,
               IconComponent: () => null,
-              renderValue: (selected) =>
-                selected ? (
-                  selected as any
-                ) : (
-                  <BodyText sx={{ color: alpha(tokens.navy, 0.55), fontSize: "1.05rem", fontWeight: 500 }}>
-                    Select Municipality
-                  </BodyText>
-                ),
+              renderValue: (selected) => {
+                if (!selected) {
+                  return (
+                    <BodyText sx={{ color: alpha(tokens.navy, 0.55), fontSize: "1.05rem", fontWeight: 500 }}>
+                      Select Municipality
+                    </BodyText>
+                  );
+                }
+                const label = municipalityOptions.find((opt) => opt.value === selected)?.label;
+                return label ?? String(selected);
+              },
             }}
           >
             <MenuItem value="">

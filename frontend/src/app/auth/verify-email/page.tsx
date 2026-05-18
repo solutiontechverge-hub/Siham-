@@ -210,7 +210,7 @@ export default function VerifyEmailPage() {
           </Box>
           <Box sx={{ p: { xs: 3, md: 5 } }}>
             <SubHeading sx={{ mb: 1 }}>Verify your email</SubHeading>
-            <BodyText sx={{ mb: 3, color: m.textSecondary }}>
+            <BodyText sx={{ mb: 3, color: alpha(m.navy, 0.65) }}>
               Enter the 6-digit code sent to your email, or open the verification link from that
               email. If you did not receive a code, use Resend (when email is configured) or try
               logging in—accounts may be activated automatically when email cannot be sent.
