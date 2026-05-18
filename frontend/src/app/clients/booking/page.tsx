@@ -47,7 +47,48 @@ import { ServiceSummaryMetaLine } from "../../../components/common/ServiceSummar
 import { fmtMinutesToTimeLabel, parseTimeLabelToMinutes, serviceTimeRangeLabel } from "./booking-time";
 import { marketingShellFooter } from "../../../data/marketingShell.data";
 import { profilePageData } from "../profile/data-profile";
+import { loadPublicProfileBookingSelection } from "../../../data/publicProfileBookingSelection";
 import { useAppSelector } from "../../../store/hooks";
+
+const DEFAULT_BOOKING_SERVICES: Array<{
+  id: string;
+  name: string;
+  durationMins: number;
+  price: number;
+  originalPrice?: number;
+  discountPct?: number;
+  guestId: string | null;
+  teamMemberId: string | null;
+}> = [
+  {
+    id: "svc-1",
+    name: "Buzz Cut",
+    durationMins: 45,
+    price: 25,
+    originalPrice: 50,
+    discountPct: 50,
+    guestId: "p-requester",
+    teamMemberId: "tm-elly",
+  },
+  {
+    id: "svc-2",
+    name: "Buzz Cut",
+    durationMins: 45,
+    price: 25,
+    originalPrice: 50,
+    discountPct: 50,
+    guestId: null,
+    teamMemberId: "tm-elly",
+  },
+  { id: "svc-4", name: "Nose Wax", durationMins: 15, price: 5, guestId: "p-requester", teamMemberId: "tm-elly" },
+];
+
+const DEFAULT_SHOP_TEAM_MEMBERS: Array<{ id: string; name: string; locationModes: Array<"fixed" | "desired"> }> = [
+  { id: "tm-elly", name: "Elly Elsavy", locationModes: ["fixed", "desired"] },
+  { id: "tm-james", name: "James Cole", locationModes: ["fixed"] },
+  { id: "tm-nina", name: "Nina Park", locationModes: ["desired"] },
+  { id: "tm-omar", name: "Omar Haddad", locationModes: ["fixed", "desired"] },
+];
 
 function ClientBookingHistoryView() {
   const pathname = usePathname();
@@ -185,6 +226,9 @@ function ClientBookingHistoryView() {
 
 function ClientBookingCreateView() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const fromProfile = searchParams?.get("from") === "profile";
+  const profileHydrationToken = searchParams?.get("t") ?? "";
   const theme = useTheme();
   const m = theme.palette.mollure;
 
@@ -278,15 +322,7 @@ function ClientBookingCreateView() {
   const [draggingPersonId, setDraggingPersonId] = React.useState<string | null>(null);
 
   type ShopTeamMember = { id: string; name: string; locationModes: Array<"fixed" | "desired"> };
-  const shopTeamMembers = React.useMemo<ShopTeamMember[]>(
-    () => [
-      { id: "tm-elly", name: "Elly Elsavy", locationModes: ["fixed", "desired"] },
-      { id: "tm-james", name: "James Cole", locationModes: ["fixed"] },
-      { id: "tm-nina", name: "Nina Park", locationModes: ["desired"] },
-      { id: "tm-omar", name: "Omar Haddad", locationModes: ["fixed", "desired"] },
-    ],
-    [],
-  );
+  const [shopTeamMembers, setShopTeamMembers] = React.useState<ShopTeamMember[]>(DEFAULT_SHOP_TEAM_MEMBERS);
 
   type CatalogService = {
     id: string;
@@ -331,35 +367,22 @@ function ClientBookingCreateView() {
     teamMemberId: string | null;
   };
 
-  const [services, setServices] = React.useState<Service[]>([
-    {
-      id: "svc-1",
-      name: "Buzz Cut",
-      durationMins: 45,
-      price: 25,
-      originalPrice: 50,
-      discountPct: 50,
-      guestId: "p-requester",
-      teamMemberId: "tm-elly",
-    },
-    {
-      id: "svc-2",
-      name: "Buzz Cut",
-      durationMins: 45,
-      price: 25,
-      originalPrice: 50,
-      discountPct: 50,
-      guestId: null,
-      teamMemberId: "tm-elly",
-    },
-    { id: "svc-4", name: "Nose Wax", durationMins: 15, price: 5, guestId: "p-requester", teamMemberId: "tm-elly" },
-  ]);
+  const getPreferredServiceTab = React.useCallback((items: Service[]): "assigned" | "unassigned" => {
+    const hasUnassigned = items.some((s) => !s.guestId);
+    const hasAssigned = items.some((s) => Boolean(s.guestId));
+    if (hasUnassigned && !hasAssigned) return "unassigned";
+    return "assigned";
+  }, []);
+
+  const [services, setServices] = React.useState<Service[]>([]);
+  const [profileHydrated, setProfileHydrated] = React.useState(false);
+  const hydrationSignatureRef = React.useRef<string | null>(null);
 
   const [selectedTime, setSelectedTime] = React.useState(times[1]!);
   const [combineServices, setCombineServices] = React.useState(true);
   const [selectedPersonId, setSelectedPersonId] = React.useState<string>("p-requester");
   const [selectedTeamMemberId, setSelectedTeamMemberId] = React.useState<string>("tm-elly");
-  const [serviceTab, setServiceTab] = React.useState<"assigned" | "unassigned">("unassigned");
+  const [serviceTab, setServiceTab] = React.useState<"assigned" | "unassigned">("assigned");
   const [selectedServiceIds, setSelectedServiceIds] = React.useState<Record<string, boolean>>({});
 
   const [addServiceDialogOpen, setAddServiceDialogOpen] = React.useState(false);
@@ -445,6 +468,15 @@ function ClientBookingCreateView() {
 
   const assigned = services.filter((s) => s.guestId);
   const unassigned = services.filter((s) => !s.guestId);
+
+  React.useEffect(() => {
+    if (!profileHydrated && fromProfile) return;
+    if (serviceTab === "assigned" && assigned.length === 0 && unassigned.length > 0) {
+      setServiceTab("unassigned");
+    } else if (serviceTab === "unassigned" && unassigned.length === 0 && assigned.length > 0) {
+      setServiceTab("assigned");
+    }
+  }, [assigned.length, fromProfile, profileHydrated, serviceTab, unassigned.length]);
 
   const selectedUnassignedServices = React.useMemo(
     () => unassigned.filter((s) => selectedServiceIds[s.id]),
@@ -550,6 +582,86 @@ function ClientBookingCreateView() {
       // ignore
     }
   }, []);
+
+  const applyProfileSelection = React.useCallback(
+    (profileSelection: NonNullable<ReturnType<typeof loadPublicProfileBookingSelection>>) => {
+      if (profileSelection.teamMembers.length > 0) {
+        setShopTeamMembers(profileSelection.teamMembers);
+      }
+
+      const profileServices = profileSelection.services.map((row) => ({
+        id: row.id,
+        name: row.name,
+        durationMins: row.durationMins,
+        price: row.price,
+        guestId: null,
+        teamMemberId: row.teamMemberId,
+      }));
+
+      setServices(profileServices);
+      setServiceTab(getPreferredServiceTab(profileServices));
+      setSelectedServiceIds({});
+
+      if (profileSelection.locationMode === "desired" && profileSelection.projectEnabled) {
+        setProjectDescription(profileSelection.projectInstructions);
+      }
+
+      setShop((prev) => ({
+        shopId: profileSelection.shopId,
+        shopName: profileSelection.shopName ?? prev?.shopName ?? "Salon",
+        municipalityLabel: prev?.municipalityLabel,
+        addressLabel: prev?.addressLabel,
+        locationMode: profileSelection.locationMode,
+      }));
+
+      if (profileSelection.teamMembers.length > 0) {
+        const firstMember = profileSelection.teamMembers.find((tm) =>
+          tm.locationModes.includes(profileSelection.locationMode),
+        );
+        if (firstMember) setSelectedTeamMemberId(firstMember.id);
+      }
+
+      setProfileHydrated(true);
+    },
+    [getPreferredServiceTab],
+  );
+
+  React.useEffect(() => {
+    if (!shop?.shopId) return;
+
+    const profileSelection = loadPublicProfileBookingSelection();
+    const shouldUseProfile =
+      profileSelection?.shopId === shop.shopId && profileSelection.services.length > 0;
+
+    if (shouldUseProfile) {
+      const signature = `${profileHydrationToken}:${profileSelection.savedAt ?? ""}:${profileSelection.services
+        .map((row) => `${row.id}:${row.teamMemberId ?? ""}`)
+        .join("|")}`;
+      if (hydrationSignatureRef.current !== signature) {
+        hydrationSignatureRef.current = signature;
+        applyProfileSelection(profileSelection);
+      }
+      return;
+    }
+
+    if (fromProfile) return;
+
+    const defaultSignature = `default:${shop.shopId}`;
+    if (hydrationSignatureRef.current === defaultSignature && services.length > 0) return;
+    hydrationSignatureRef.current = defaultSignature;
+
+    setServices(DEFAULT_BOOKING_SERVICES);
+    setShopTeamMembers(DEFAULT_SHOP_TEAM_MEMBERS);
+    setServiceTab(getPreferredServiceTab(DEFAULT_BOOKING_SERVICES));
+    setProfileHydrated(true);
+  }, [
+    applyProfileSelection,
+    fromProfile,
+    getPreferredServiceTab,
+    profileHydrationToken,
+    services.length,
+    shop?.shopId,
+  ]);
 
   React.useEffect(() => {
     if (!people.some((p) => p.id === selectedPersonId)) {

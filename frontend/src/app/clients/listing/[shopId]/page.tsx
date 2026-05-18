@@ -8,6 +8,10 @@ import {
   getBusinessPublicProfileByShopId,
   resolveBusinessOfferingFlags,
 } from "../../../../data/businessPublicProfile.data";
+import {
+  savePublicProfileBookingSelection,
+  type PublicProfileBookingSelection,
+} from "../../../../data/publicProfileBookingSelection";
 import { marketingShellFooter } from "../../../../data/marketingShell.data";
 import { useAppSelector } from "../../../../store/hooks";
 
@@ -84,9 +88,24 @@ export default function ClientBusinessProfilePage() {
     [persistSelectedShop, profile],
   );
 
-  const onBookNow = () => {
-    persistSelectedShop();
-    router.push("/clients/booking?mode=create");
+  const onBookNow = (selection: PublicProfileBookingSelection) => {
+    persistSelectedShop(selection.locationMode);
+    try {
+      window.localStorage.setItem(
+        "mollure:selected_shop",
+        JSON.stringify({
+          shopId: selection.shopId,
+          shopName: selection.shopName ?? profile?.shopName,
+          municipalityLabel: profile?.fixedLocation.municipality,
+          addressLabel: profile?.fixedLocation.formattedAddress,
+          locationMode: selection.locationMode,
+        }),
+      );
+    } catch {
+      // ignore
+    }
+    savePublicProfileBookingSelection(selection);
+    router.push(`/clients/booking?mode=create&from=profile&t=${Date.now()}`);
   };
 
   if (!profile) {
