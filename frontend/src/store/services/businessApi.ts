@@ -26,6 +26,8 @@ export type BusinessServiceDetail = {
   business_setup_id: number;
   service_id: number;
   price: string | number;
+  /** From service_categories JSONB (computed on read) */
+  duration_label?: string | null;
   created_at: string;
   service_title: string;
   category_id: number;
@@ -54,6 +56,117 @@ export type BusinessBookServiceCombination = {
   service_title?: string | null;
 };
 
+export type BusinessSetupListingTimeBlock = {
+  hours: number | null;
+  minutes: number | null;
+};
+
+export type BusinessSetupListingLocation = {
+  address: string | null;
+  streetNumber: string | null;
+  postalCode: string | null;
+  province: string | null;
+  municipality: string | null;
+};
+
+export type BusinessSetupListingDesiredLocation = {
+  area: string | null;
+  province: string | null;
+  services: string[];
+};
+
+export type BusinessSetupListingPolicy = {
+  beforeHours?: number | null;
+  beforeMinutes?: number | null;
+  feePercentage: number | null;
+  instruction: string | null;
+};
+
+export type BusinessSetupListingCancellationPolicy = BusinessSetupListingPolicy & {
+  beforeHours: number | null;
+  beforeMinutes: number | null;
+};
+
+export type BusinessSetupListingServiceDetail = {
+  id: number | null;
+  serviceId: number | null;
+  price: number | null;
+  durationLabel: string | null;
+  serviceTitle: string | null;
+  categoryId: number | null;
+  categoryTitle: string | null;
+  createdAt: string | null;
+};
+
+export type BusinessSetupListingTeamMember = {
+  id: number | null;
+  fullName: string | null;
+  role: string;
+  profilePhoto: string | null;
+  assignedServices: Array<{
+    service_id?: number;
+    serviceId?: number;
+    title?: string | null;
+  }>;
+  displayOrder: number;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
+export type BusinessSetupListing = {
+  id: number;
+  professionalProfileId: number | null;
+  businessName: string | null;
+  about: string | null;
+  rating: number;
+  totalReviews: number;
+  media: string[];
+  locationMode: "fixed" | "desired" | "both" | null;
+  salonName: string | null;
+  fixedLocation: BusinessSetupListingLocation;
+  desiredLocation: BusinessSetupListingDesiredLocation;
+  serviceCategories: Array<{
+    category_id?: number;
+    categoryId?: number;
+    service_id?: number;
+    serviceId?: number;
+    amount?: number;
+    duration_label?: string | null;
+    durationLabel?: string | null;
+  }>;
+  serviceFor: string[];
+  bookServiceCombinations: Array<{
+    category_id?: number;
+    categoryId?: number;
+    category_title?: string | null;
+    categoryTitle?: string | null;
+    service_id?: number;
+    serviceId?: number;
+    service_title?: string | null;
+    serviceTitle?: string | null;
+  }>;
+  serviceDetails: BusinessSetupListingServiceDetail[];
+  priceRange: string | null;
+  prepaymentPercentage: number | null;
+  prepaymentInstruction: string | null;
+  kilometerAllowance: number | null;
+  kilometerAllowanceInstruction: string | null;
+  responseTime: BusinessSetupListingTimeBlock;
+  appointmentBefore: BusinessSetupListingTimeBlock;
+  policyCustomInstruction: string | null;
+  cancellationPolicy: BusinessSetupListingCancellationPolicy;
+  reschedulePolicy: BusinessSetupListingPolicy;
+  noShowPolicy: BusinessSetupListingPolicy;
+  keywords: string[];
+  additionalNotes: string | null;
+  notes: string | null;
+  project: string | null;
+  teamMemberIds: number[];
+  teamMembers: BusinessSetupListingTeamMember[];
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
 export type BusinessSetup = {
   id: number;
   professional_profile_id: number;
@@ -73,6 +186,7 @@ export type BusinessSetup = {
     category_id: number;
     service_id: number;
     amount: number;
+    duration_label?: string | null;
   }>;
   project: string | null;
   book_service_notes: string | null;
@@ -218,6 +332,7 @@ export type UpsertBusinessSetupRequest = {
     category_id: number;
     service_id: number;
     amount: number;
+    duration_label?: string | null;
   }>;
   project?: string;
   book_service_notes?: string;
@@ -297,6 +412,26 @@ export const businessApi = baseApi.injectEndpoints({
         return { data };
       },
       providesTags: ["BusinessCategories"],
+    }),
+    getAllBusinessSetups: builder.query<ApiEnvelope<BusinessSetupListing[]>, void>({
+      async queryFn(_arg, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: "/api/business-setups/all",
+          method: "GET",
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<BusinessSetupListing[]>;
+        if (!data.success || !Array.isArray(data.data)) {
+          return { error: customError(data.message || "Unable to fetch business listings.") };
+        }
+
+        return { data };
+      },
+      providesTags: ["BusinessSetupsListing"],
     }),
     getBusinessSetup: builder.query<ApiEnvelope<BusinessSetup | null>, void>({
       async queryFn(_arg, _api, _extraOptions, fetchWithBQ) {
@@ -480,6 +615,7 @@ export const businessApi = baseApi.injectEndpoints({
 
 export const {
   useGetBusinessCategoriesQuery,
+  useGetAllBusinessSetupsQuery,
   useGetBusinessSetupQuery,
   useGetCalendarOverviewQuery,
   useCreateCalendarEntryMutation,

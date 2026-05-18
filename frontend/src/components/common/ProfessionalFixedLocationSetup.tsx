@@ -109,6 +109,25 @@ function parseEuroAmountString(s: string): number | null {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
+function normalizeDurationLabel(value: string) {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) return "";
+  if (/^\d+$/.test(trimmed)) return `${trimmed} min`;
+  return trimmed;
+}
+
+const mapServiceItemsToCategories = (items: ServiceDetailUiItem[]) =>
+  items
+    .filter((item) => item.serviceId && item.categoryId)
+    .map((item) => ({
+      category_id: Number(item.categoryId),
+      service_id: item.serviceId,
+      amount:
+        (parseEuroAmountString(item.priceAmount ?? "") ??
+          Number(String(item.priceLabel).replace(/[^0-9.]/g, ""))) || 0,
+      duration_label: normalizeDurationLabel(item.durationLabel ?? "") || null,
+    }));
+
 function normalizePriceType(type: string | undefined): "fixed" | "from" {
   if (type === "from") return "from";
   return "fixed";
@@ -830,58 +849,8 @@ export default function ProfessionalFixedLocationSetup({
         };
       });
   }, [allSubcategoryOptions]);
-  const businessEditKeys = React.useMemo(
-    () =>
-      [
-        "offering",
-        "profile",
-        "location",
-        "serviceFor",
-        "servicesDetails",
-        "manageTeam",
-        "generalNotes",
-        "price",
-        "portfolio",
-      ] as const,
-    [],
-  );
-  type BusinessEditKey = (typeof businessEditKeys)[number];
-  const [businessEditing, setBusinessEditing] = React.useState<Record<BusinessEditKey, boolean>>(() => {
-    return businessEditKeys.reduce((acc, k) => {
-      acc[k] = false;
-      return acc;
-    }, {} as Record<BusinessEditKey, boolean>);
-  });
-  React.useEffect(() => {
-    if (!onUploadBusinessMedia) return;
-    setBusinessEditing((prev) => (prev.profile ? prev : { ...prev, profile: true }));
-  }, [onUploadBusinessMedia]);
-  const isAnyBusinessEditing = React.useMemo(
-    () => businessEditKeys.some((k) => businessEditing[k]),
-    [businessEditKeys, businessEditing],
-  );
   const [isBusinessPublishEnabled, setIsBusinessPublishEnabled] = React.useState(false);
-  const [isBusinessLocked, setIsBusinessLocked] = React.useState(false);
-  const enableBusinessEditing = React.useCallback((key: BusinessEditKey) => {
-    // Unlock on any edit action, but require Publish to lock again.
-    setIsBusinessLocked(false);
-    setBusinessEditing((p) => ({ ...p, [key]: true }));
-  }, []);
-  const enableAllBusinessEditing = React.useCallback(() => {
-    setIsBusinessLocked(false);
-    setBusinessEditing((p) => {
-      const next = { ...p };
-      for (const k of businessEditKeys) next[k] = true;
-      return next;
-    });
-  }, [businessEditKeys]);
-  const closeAllBusinessEditing = React.useCallback(() => {
-    setBusinessEditing((p) => {
-      const next = { ...p };
-      for (const k of Object.keys(next) as BusinessEditKey[]) next[k] = false;
-      return next;
-    });
-  }, []);
+  const businessFormDisabled = isBusinessSetupSaving;
   const templateOptions = React.useMemo(() => ["Fixed Location", "Desired Location"] as const, []);
   type OfferingOption = (typeof templateOptions)[number];
   type OfferingSelectOption = OfferingOption | "Both";
@@ -1100,7 +1069,7 @@ export default function ProfessionalFixedLocationSetup({
           placeholder="Makelush"
           value={fixedBiz.salonName}
           onChange={(e) => setFixedBizField("salonName", e.target.value)}
-          disabled={!businessEditing.location}
+          disabled={businessFormDisabled}
         />
       </Grid>
       <Grid item xs={12}>
@@ -1114,7 +1083,7 @@ export default function ProfessionalFixedLocationSetup({
           placeholder="Street Address"
           value={fixedBiz.streetAddress}
           onChange={(e) => setFixedBizField("streetAddress", e.target.value)}
-          disabled={!businessEditing.location}
+          disabled={businessFormDisabled}
         />
       </Grid>
       <Grid item xs={12} sm={6}>
@@ -1123,7 +1092,7 @@ export default function ProfessionalFixedLocationSetup({
           placeholder="Street Number"
           value={fixedBiz.streetNumber}
           onChange={(e) => setFixedBizField("streetNumber", e.target.value)}
-          disabled={!businessEditing.location}
+          disabled={businessFormDisabled}
         />
       </Grid>
       <Grid item xs={12} sm={4}>
@@ -1132,7 +1101,7 @@ export default function ProfessionalFixedLocationSetup({
           placeholder="Postal code"
           value={fixedBiz.postalCode}
           onChange={(e) => setFixedBizField("postalCode", e.target.value)}
-          disabled={!businessEditing.location}
+          disabled={businessFormDisabled}
         />
       </Grid>
       <Grid item xs={12} sm={4}>
@@ -1141,7 +1110,7 @@ export default function ProfessionalFixedLocationSetup({
           label="Province"
           value={fixedBiz.province}
           onChange={(e) => setFixedBizField("province", e.target.value)}
-          disabled={!businessEditing.location}
+          disabled={businessFormDisabled}
         >
           <MenuItem value="">Province</MenuItem>
           {desiredProvinceOptions.map((p) => (
@@ -1157,7 +1126,7 @@ export default function ProfessionalFixedLocationSetup({
           label="Municipality"
           value={fixedBiz.municipality}
           onChange={(e) => setFixedBizField("municipality", e.target.value)}
-          disabled={!businessEditing.location}
+          disabled={businessFormDisabled}
         >
           <MenuItem value="">Municipality</MenuItem>
           {((desiredMunicipalityByProvince as Record<string, string[]>)[fixedBiz.province || "Noord-Holland"] ?? []).map((o: string) => (
@@ -1180,7 +1149,7 @@ export default function ProfessionalFixedLocationSetup({
           select
           value={desiredAreaMode}
           onChange={(e) => setDesiredAreaMode(e.target.value as any)}
-          disabled={!businessEditing.location}
+          disabled={businessFormDisabled}
           sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
         >
           <MenuItem value="Specific areas only">Specific areas only</MenuItem>
@@ -1200,7 +1169,7 @@ export default function ProfessionalFixedLocationSetup({
             setDesiredProvinceDraft(p);
             setDesiredMunicipalityDraft("");
           }}
-          disabled={!businessEditing.location || desiredAreaMode !== "Specific areas only"}
+          disabled={businessFormDisabled || desiredAreaMode !== "Specific areas only"}
           sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
         >
           {desiredProvinceOptions.map((p) => (
@@ -1221,7 +1190,7 @@ export default function ProfessionalFixedLocationSetup({
               select
               value={desiredMunicipalityDraft}
               onChange={(e) => setDesiredMunicipalityDraft(e.target.value)}
-              disabled={!businessEditing.location || desiredAreaMode !== "Specific areas only"}
+              disabled={businessFormDisabled || desiredAreaMode !== "Specific areas only"}
               sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
             >
               <MenuItem value="">
@@ -1239,7 +1208,7 @@ export default function ProfessionalFixedLocationSetup({
           <IconButton
             onClick={addDesiredArea}
             disabled={
-              !businessEditing.location ||
+              businessFormDisabled ||
               desiredAreaMode !== "Specific areas only" ||
               !desiredMunicipalityDraft.trim()
             }
@@ -1307,7 +1276,7 @@ export default function ProfessionalFixedLocationSetup({
                   </Box>
                   <IconButton
                     onClick={() => removeDesiredProvinceGroup(province)}
-                    disabled={!businessEditing.location}
+                    disabled={businessFormDisabled}
                     sx={{
                       width: 34,
                       height: 34,
@@ -1372,16 +1341,15 @@ export default function ProfessionalFixedLocationSetup({
   );
 
   const onSaveBusinessProfile = React.useCallback(() => {
-    // Keep the section open for editing; enable publishing after a save.
-    setBusinessEditing((p) => ({ ...p, profile: true }));
     setIsBusinessPublishEnabled(true);
   }, []);
+
+  const servicesFixedRef = React.useRef<ServiceDetailUiItem[]>([]);
+  const servicesDesiredRef = React.useRef<ServiceDetailUiItem[]>([]);
 
   const onPublishBusinessSetup = React.useCallback(async () => {
     if (!onSaveBusinessSetup) {
       setIsBusinessPublishEnabled(false);
-      setIsBusinessLocked(true);
-      closeAllBusinessEditing();
       return;
     }
 
@@ -1391,7 +1359,8 @@ export default function ProfessionalFixedLocationSetup({
       Both: "both",
     };
     const sourceBiz = businessOfferingSelect === "Desired Location" ? desiredBusiness : fixedBiz;
-    const serviceItems = businessOfferingSelect === "Desired Location" ? servicesDesired : servicesFixed;
+    const serviceItems =
+      businessOfferingSelect === "Desired Location" ? servicesDesiredRef.current : servicesFixedRef.current;
     const desiredAreaText =
       desiredAreaMode === "All Netherlands"
         ? "All Netherlands"
@@ -1416,13 +1385,7 @@ export default function ProfessionalFixedLocationSetup({
       service_for: Object.entries(sourceBiz.serviceFor)
         .filter(([, enabled]) => enabled)
         .map(([key]) => key),
-      service_categories: serviceItems
-        .filter((item) => item.serviceId && item.categoryId)
-        .map((item) => ({
-          category_id: Number(item.categoryId),
-          service_id: item.serviceId,
-          amount: Number(String(item.priceLabel).replace(/[^0-9.]/g, "")) || 0,
-        })),
+      service_categories: mapServiceItemsToCategories(serviceItems),
       project: sourceBiz.projectEnabled ? sourceBiz.projectInstructions : "",
       book_service_notes: sourceBiz.bookComboInstructions,
       book_service_combinations: sourceBiz.projectEnabled
@@ -1492,12 +1455,9 @@ export default function ProfessionalFixedLocationSetup({
     });
 
     setIsBusinessPublishEnabled(false);
-    setIsBusinessLocked(true);
-    closeAllBusinessEditing();
   }, [
     businessOfferingSelect,
     businessCategories,
-    closeAllBusinessEditing,
     desiredAreaMode,
     desiredAreas,
     desiredBusiness,
@@ -1509,13 +1469,9 @@ export default function ProfessionalFixedLocationSetup({
     values,
   ]);
 
-  const onSwitchActiveBusinessTemplate = React.useCallback(
-    (opt: OfferingOption) => {
-      if (isBusinessLocked) return;
-      setActiveBusinessTemplate(opt);
-    },
-    [isBusinessLocked],
-  );
+  const onSwitchActiveBusinessTemplate = React.useCallback((opt: OfferingOption) => {
+    setActiveBusinessTemplate(opt);
+  }, []);
 
   // ── Services (template-aware) + drawer ────────────────────────────────────
   const initialServiceItems = React.useMemo(
@@ -1524,6 +1480,8 @@ export default function ProfessionalFixedLocationSetup({
   );
   const [servicesFixed, setServicesFixed] = React.useState<ServiceDetailUiItem[]>(() => initialServiceItems);
   const [servicesDesired, setServicesDesired] = React.useState<ServiceDetailUiItem[]>(() => initialServiceItems);
+  servicesFixedRef.current = servicesFixed;
+  servicesDesiredRef.current = servicesDesired;
   React.useEffect(() => {
     setServicesFixed(initialServiceItems);
     setServicesDesired(initialServiceItems);
@@ -1622,6 +1580,13 @@ export default function ProfessionalFixedLocationSetup({
     setMediaSlides(nextMediaSlides);
     setMediaIdx(0);
 
+    const categoryDurationByServiceId = new Map(
+      (businessSetupData.service_categories ?? []).map((entry) => [
+        entry.service_id,
+        typeof entry.duration_label === "string" ? entry.duration_label.trim() : "",
+      ]),
+    );
+
     const savedServices = businessSetupData.service_details.map((item) => {
       const rawPrice = item.price;
       const priceStr =
@@ -1631,6 +1596,7 @@ export default function ProfessionalFixedLocationSetup({
               return n.includes("€") ? n : `${n} €`;
             })()
           : "";
+      const durationLabel = categoryDurationByServiceId.get(item.service_id) || "";
       return {
         id: String(item.service_id),
         categoryId: String(item.category_id),
@@ -1638,6 +1604,7 @@ export default function ProfessionalFixedLocationSetup({
         name: item.service_title || "",
         categoryTitle: item.category_title || undefined,
         priceLabel: priceStr,
+        durationLabel: durationLabel || undefined,
       };
     });
     setServicesFixed(savedServices);
@@ -1694,14 +1661,10 @@ export default function ProfessionalFixedLocationSetup({
     null,
   );
   const [expandedServiceDetailIds, setExpandedServiceDetailIds] = React.useState<Record<string, boolean>>({});
-  /** View flow: fields stay read-only until the user taps the header edit control. */
-  const [serviceDrawerFieldsLocked, setServiceDrawerFieldsLocked] = React.useState(true);
-
   const openAddServiceDrawerForCategory = React.useCallback(
     (categoryId: string) => {
       setEditingServiceId(null);
       setServiceDrawerEditBaseline(null);
-      setServiceDrawerFieldsLocked(false);
       const valid =
         categoryId && businessCategories.some((c) => String(c.id) === categoryId)
           ? categoryId
@@ -1737,7 +1700,7 @@ export default function ProfessionalFixedLocationSetup({
     setExpandedServiceDetailIds((prev) => ({ ...prev, [id]: !prev[id] }));
   }, []);
 
-  const openEditServiceDrawer = React.useCallback((it: ServiceDetailUiItem, fieldsLocked = true) => {
+  const openEditServiceDrawer = React.useCallback((it: ServiceDetailUiItem) => {
     setEditingServiceId(it.id);
     setDraftServiceCategory(it.categoryId);
     setDraftServiceId(it.serviceId);
@@ -1762,14 +1725,12 @@ export default function ProfessionalFixedLocationSetup({
       discountAmount: (it.discountAmount ?? "").trim(),
     });
     setServiceDrawerOpen(true);
-    setServiceDrawerFieldsLocked(fieldsLocked);
   }, []);
 
   const closeServiceDrawer = React.useCallback(() => {
     setServiceDrawerOpen(false);
     setEditingServiceId(null);
     setServiceDrawerEditBaseline(null);
-    setServiceDrawerFieldsLocked(true);
     setDraftServicePriceType("fixed");
     setDraftServicePriceAmount("");
     setDraftServiceDiscountType("fixed");
@@ -1813,7 +1774,7 @@ export default function ProfessionalFixedLocationSetup({
     if (!matchedService) return;
 
     const name = draftServiceName.trim() || matchedService.title;
-    const durationLabel = draftServiceDuration.trim();
+    const durationLabel = normalizeDurationLabel(draftServiceDuration);
 
     const priceLabel = formatServicePriceLabel(draftServicePriceType, draftServicePriceAmount);
     const discountTypeSaved = normalizeDiscountType(draftServiceDiscountType);
@@ -1923,7 +1884,7 @@ export default function ProfessionalFixedLocationSetup({
                     "&:hover": { textDecoration: "underline" },
                   }}
                 >
-                  View
+                  Edit
                 </Typography>
               </Stack>
             </Box>
@@ -1960,8 +1921,8 @@ export default function ProfessionalFixedLocationSetup({
                 <IconButton
                   size="small"
                   aria-label="Edit service"
-                  onClick={() => openEditServiceDrawer(it, false)}
-                  disabled={isBusinessLocked || !businessEditing.servicesDetails}
+                  onClick={() => openEditServiceDrawer(it)}
+                  disabled={businessFormDisabled}
                   sx={{ width: 32, height: 32, color: alpha(m.navy, 0.45) }}
                 >
                   <EditRoundedIcon sx={{ fontSize: 20 }} />
@@ -1970,7 +1931,7 @@ export default function ProfessionalFixedLocationSetup({
                   size="small"
                   aria-label="Delete service"
                   onClick={() => deleteService(it.id)}
-                  disabled={isBusinessLocked || !businessEditing.servicesDetails}
+                  disabled={businessFormDisabled}
                   sx={{ width: 32, height: 32, color: alpha(m.navy, 0.45) }}
                 >
                   <DeleteOutlineRoundedIcon sx={{ fontSize: 20 }} />
@@ -1995,15 +1956,7 @@ export default function ProfessionalFixedLocationSetup({
         </Paper>
       );
     },
-    [
-      businessEditing.servicesDetails,
-      deleteService,
-      expandedServiceDetailIds,
-      isBusinessLocked,
-      m.navy,
-      openEditServiceDrawer,
-      toggleServiceDetailExpand,
-    ],
+    [businessFormDisabled, deleteService, expandedServiceDetailIds, m.navy, openEditServiceDrawer, toggleServiceDetailExpand],
   );
 
   const professionalForm = (
@@ -2883,8 +2836,7 @@ export default function ProfessionalFixedLocationSetup({
     </Drawer>
   );
 
-  const serviceDrawerFormDisabled =
-    Boolean(editingServiceId && serviceDrawerFieldsLocked) || isBusinessLocked || !businessEditing.servicesDetails;
+  const serviceDrawerFormDisabled = businessFormDisabled;
 
   const serviceDrawer = (
     <Drawer
@@ -2903,23 +2855,8 @@ export default function ProfessionalFixedLocationSetup({
       <Stack spacing={2.25} sx={{ height: "100%", overflowY: "auto" }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
           <Typography sx={{ fontWeight: 900, fontSize: 18, color: alpha(m.navy, 0.9), letterSpacing: "-0.02em" }}>
-            {editingServiceId
-              ? serviceDrawerFieldsLocked
-                ? "View Service"
-                : "Edit Service"
-              : "Add service"}
+            {editingServiceId ? "Edit Service" : "Add service"}
           </Typography>
-          {editingServiceId && serviceDrawerFieldsLocked ? (
-            <IconButton
-              size="small"
-              aria-label="Edit service"
-              disabled={isBusinessLocked || !businessEditing.servicesDetails}
-              onClick={() => setServiceDrawerFieldsLocked(false)}
-              sx={{ color: alpha(m.navy, 0.55) }}
-            >
-              <EditRoundedIcon sx={{ fontSize: 24 }} />
-            </IconButton>
-          ) : null}
         </Stack>
 
         <Stack spacing={2}>
@@ -3120,7 +3057,7 @@ export default function ProfessionalFixedLocationSetup({
             Cancel
           </Button>
           {editingServiceId ? (
-            !serviceDrawerFieldsLocked && serviceDrawerDirty ? (
+            serviceDrawerDirty ? (
               <Button
                 onClick={saveService}
                 variant="contained"
@@ -3190,7 +3127,7 @@ export default function ProfessionalFixedLocationSetup({
               else onSwitchActiveBusinessTemplate("Fixed Location");
               setIsBusinessPublishEnabled(true);
             }}
-            disabled={isBusinessLocked || !businessEditing.offering}
+            disabled={businessFormDisabled}
             sx={{
               "& .MuiOutlinedInput-root": {
                 bgcolor: "#fff",
@@ -3249,7 +3186,7 @@ export default function ProfessionalFixedLocationSetup({
                 key={opt}
                 onClick={() => onSwitchActiveBusinessTemplate(opt)}
                 disableElevation
-                disabled={isBusinessLocked || (!useSameBusinessInfo && !selected)}
+                disabled={!useSameBusinessInfo && !selected}
                 sx={{
                   minHeight: 30,
                   px: 2,
@@ -3275,8 +3212,7 @@ export default function ProfessionalFixedLocationSetup({
         title={data.profile.title}
         action={<PrimaryMiniButton onClick={onSaveBusinessProfile}>{data.profile.saveLabel}</PrimaryMiniButton>}
       >
-        <Box sx={businessEditing.profile ? undefined : { pointerEvents: "none" }}>
-          <Grid container spacing={2.25}>
+        <Grid container spacing={2.25}>
           <Grid item xs={12} md={6}>
             <Paper
               elevation={0}
@@ -3387,7 +3323,7 @@ export default function ProfessionalFixedLocationSetup({
                     isBusinessMediaUploading ? <CircularProgress size={18} color="inherit" /> : <IosShareRoundedIcon />
                   }
                   onClick={onUploadMedia}
-                  disabled={isBusinessMediaUploading || !businessEditing.profile}
+                  disabled={isBusinessMediaUploading || businessFormDisabled}
                   sx={{
                     borderRadius: "8px",
                     textTransform: "none",
@@ -3409,7 +3345,7 @@ export default function ProfessionalFixedLocationSetup({
                 label={data.profile.nameLabel}
                 value={biz.profileName}
                 onChange={(e) => setBizField("profileName", e.target.value)}
-                disabled={!businessEditing.profile}
+                disabled={businessFormDisabled}
               />
               <MollureFormField
                 label={data.profile.aboutLabel}
@@ -3417,7 +3353,7 @@ export default function ProfessionalFixedLocationSetup({
                 onChange={(e) => setBizField("about", e.target.value)}
                 multiline
                 minRows={4}
-                disabled={!businessEditing.profile}
+                disabled={businessFormDisabled}
               />
               <MollureFormField
                 label={data.profile.keywordsLabel}
@@ -3430,14 +3366,14 @@ export default function ProfessionalFixedLocationSetup({
                     addBizKeyword();
                   }
                 }}
-                disabled={!businessEditing.profile}
+                disabled={businessFormDisabled}
               />
               <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
                 {biz.keywords.map((k) => (
                   <Chip
                     key={k}
                     label={k}
-                    onDelete={businessEditing.profile ? () => removeBizKeyword(k) : undefined}
+                    onDelete={businessFormDisabled ? undefined : () => removeBizKeyword(k)}
                     sx={{
                       borderRadius: "8px",
                       bgcolor: alpha(m.navy, 0.06),
@@ -3449,8 +3385,7 @@ export default function ProfessionalFixedLocationSetup({
               </Stack>
             </Stack>
           </Grid>
-          </Grid> 
-        </Box>
+        </Grid>
       </SectionShell>
 
       {(() => {
@@ -3458,10 +3393,10 @@ export default function ProfessionalFixedLocationSetup({
           return (
             <Stack spacing={2}>
               <SectionShell title="Fixed Location">
-                <Box sx={businessEditing.location ? undefined : { pointerEvents: "none" }}>{fixedLocationForm}</Box>
+                {fixedLocationForm}
               </SectionShell>
               <SectionShell title="Desired Location">
-                <Box sx={businessEditing.location ? undefined : { pointerEvents: "none" }}>{desiredLocationForm}</Box>
+                {desiredLocationForm}
               </SectionShell>
             </Stack>
           );
@@ -3469,16 +3404,13 @@ export default function ProfessionalFixedLocationSetup({
 
         return (
           <SectionShell title={locationSectionTitle}>
-            <Box sx={businessEditing.location ? undefined : { pointerEvents: "none" }}>
-              {showFixedLocationSection ? fixedLocationForm : null}
-              {showDesiredLocationSection ? desiredLocationForm : null}
-            </Box>
+            {showFixedLocationSection ? fixedLocationForm : null}
+            {showDesiredLocationSection ? desiredLocationForm : null}
           </SectionShell>
         );
       })()}
 
       <SectionShell title="Service For">
-        <Box sx={businessEditing.serviceFor ? undefined : { pointerEvents: "none" }}>
           {(() => {
           const allChecked = biz.serviceFor.men && biz.serviceFor.women && biz.serviceFor.kids;
           const anyChecked = biz.serviceFor.men || biz.serviceFor.women || biz.serviceFor.kids;
@@ -3553,7 +3485,6 @@ export default function ProfessionalFixedLocationSetup({
             </Stack>
           );
           })()}
-        </Box>
       </SectionShell>
 
       <SectionShell title={data.servicesDetails.title}>
@@ -3622,7 +3553,6 @@ export default function ProfessionalFixedLocationSetup({
             </IconButton>
           </Stack>
 
-          <Box sx={businessEditing.servicesDetails ? undefined : { pointerEvents: "none" }}>
             <Stack spacing={1.5}>
               {activeServiceCategory === "" ? (
                 <Typography
@@ -3659,7 +3589,7 @@ export default function ProfessionalFixedLocationSetup({
                       <IconButton
                         size="small"
                         onClick={openAddServiceDrawer}
-                        disabled={isBusinessLocked || !businessEditing.servicesDetails}
+                        disabled={businessFormDisabled}
                         aria-label="Add service"
                         sx={{
                           width: 36,
@@ -3702,7 +3632,7 @@ export default function ProfessionalFixedLocationSetup({
                               <IconButton
                                 size="small"
                                 onClick={() => openAddServiceDrawerForCategory(group.categoryId)}
-                                disabled={isBusinessLocked || !businessEditing.servicesDetails}
+                                disabled={businessFormDisabled}
                                 aria-label={`Add service to ${group.title}`}
                                 sx={{
                                   width: 36,
@@ -3736,7 +3666,6 @@ export default function ProfessionalFixedLocationSetup({
                 </>
               )}
             </Stack>
-          </Box>
 
           <Paper
             elevation={0}
@@ -3777,7 +3706,7 @@ export default function ProfessionalFixedLocationSetup({
                 onChange={(e) => setBizField("projectInstructions", e.target.value)}
                 multiline
                 minRows={3}
-                disabled={!businessEditing.servicesDetails || !biz.projectEnabled}
+                disabled={businessFormDisabled || !biz.projectEnabled}
                 sx={{
                   "& .MuiOutlinedInput-root": {
                     bgcolor: "#fff",
@@ -3824,7 +3753,7 @@ export default function ProfessionalFixedLocationSetup({
                       );
                     }}
                     sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                    disabled={!businessEditing.servicesDetails || !biz.projectEnabled}
+                    disabled={businessFormDisabled || !biz.projectEnabled}
                   >
                     <MenuItem value="">Select category</MenuItem>
                     {bookingCategoryOptions.map((opt) => (
@@ -3843,7 +3772,7 @@ export default function ProfessionalFixedLocationSetup({
                     value={biz.bookService}
                     onChange={(e) => setBizField("bookService", e.target.value)}
                     sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                    disabled={!businessEditing.servicesDetails || !biz.projectEnabled}
+                    disabled={businessFormDisabled || !biz.projectEnabled}
                   >
                     <MenuItem value="">Select service</MenuItem>
                     {bookingServiceOptions.map((opt) => (
@@ -3856,7 +3785,7 @@ export default function ProfessionalFixedLocationSetup({
                 <Grid item xs={12} md={2} sx={{ display: "flex", justifyContent: { md: "flex-end" } }}>
                   <IconButton
                     onClick={addBookingCombo}
-                    disabled={!businessEditing.servicesDetails || !biz.projectEnabled || !biz.bookCategory || !biz.bookService}
+                    disabled={businessFormDisabled || !biz.projectEnabled || !biz.bookCategory || !biz.bookService}
                     sx={{
                       width: 34,
                       height: 34,
@@ -3890,7 +3819,7 @@ export default function ProfessionalFixedLocationSetup({
                       const comboServiceOptions = getBookingServiceOptions(c.categoryId);
                       const comboFieldsLocked = bookingComboEditId !== c.id;
                       const comboFieldsDisabled =
-                        !businessEditing.servicesDetails || !biz.projectEnabled || comboFieldsLocked;
+                        businessFormDisabled || !biz.projectEnabled || comboFieldsLocked;
 
                       return (
                       <Stack
@@ -3942,14 +3871,14 @@ export default function ProfessionalFixedLocationSetup({
                         </MollureFormField>
                         <IconButton
                           size="small"
-                          disabled={!businessEditing.servicesDetails || !biz.projectEnabled}
+                          disabled={businessFormDisabled || !biz.projectEnabled}
                           onClick={() => deleteBookingCombo(c.id)}
                         >
                           <DeleteOutlineRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.55) }} />
                         </IconButton>
                         <IconButton
                           size="small"
-                          disabled={!businessEditing.servicesDetails || !biz.projectEnabled}
+                          disabled={businessFormDisabled || !biz.projectEnabled}
                           onClick={() => setBookingComboEditId((prev) => (prev === c.id ? null : c.id))}
                           aria-label={bookingComboEditId === c.id ? "Done editing combination" : "Edit combination"}
                           sx={
@@ -3978,7 +3907,7 @@ export default function ProfessionalFixedLocationSetup({
                 onChange={(e) => setBizField("bookComboInstructions", e.target.value)}
                 multiline
                 minRows={4}
-                disabled={!businessEditing.servicesDetails || !biz.projectEnabled}
+                disabled={businessFormDisabled || !biz.projectEnabled}
                 sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
               />
             </Stack>
@@ -3996,7 +3925,7 @@ export default function ProfessionalFixedLocationSetup({
                 <Checkbox
                   checked={featureTeamPublic}
                   onChange={(e) => setFeatureTeamPublic(e.target.checked)}
-                  disabled={!businessEditing.manageTeam}
+                  disabled={businessFormDisabled}
                   sx={{ color: alpha(m.navy, 0.28), "&.Mui-checked": { color: "primary.main" } }}
                 />
               }
@@ -4009,7 +3938,7 @@ export default function ProfessionalFixedLocationSetup({
             <IconButton
               onClick={openAddDrawer}
               size="small"
-              disabled={!businessEditing.manageTeam}
+              disabled={businessFormDisabled}
               sx={{
                 width: 32, height: 32, borderRadius: "999px",
                 bgcolor: theme.palette.primary.main,
@@ -4022,7 +3951,6 @@ export default function ProfessionalFixedLocationSetup({
           </Stack>
         }
       >
-        <Box sx={businessEditing.manageTeam ? undefined : { pointerEvents: "none" }}>
         <Stack spacing={1.5}>
           {teamMembers.map((mem) => (
             <Paper
@@ -4113,7 +4041,7 @@ export default function ProfessionalFixedLocationSetup({
                             select
                             value={mem.services[key]}
                             onChange={(e) => updateMemberService(mem.id, key, e.target.value)}
-                            disabled={isBusinessLocked || !businessEditing.manageTeam}
+                            disabled={businessFormDisabled}
                             sx={{
                               "& .MuiOutlinedInput-root": {
                                 minHeight: 36,
@@ -4152,7 +4080,7 @@ export default function ProfessionalFixedLocationSetup({
                   <IconButton
                     size="small"
                     onClick={() => openEditDrawer(mem)}
-                    disabled={isBusinessLocked || !businessEditing.manageTeam}
+                    disabled={businessFormDisabled}
                     sx={{
                       width: 36,
                       height: 36,
@@ -4167,7 +4095,7 @@ export default function ProfessionalFixedLocationSetup({
                   <IconButton
                     size="small"
                     onClick={() => removeTeamMember(mem.id)}
-                    disabled={isBusinessLocked || !businessEditing.manageTeam}
+                    disabled={businessFormDisabled}
                     sx={{
                       width: 36,
                       height: 36,
@@ -4184,11 +4112,9 @@ export default function ProfessionalFixedLocationSetup({
             </Paper>
           ))}
         </Stack>
-        </Box>
       </SectionShell>
 
       <SectionShell title={data.generalNotes.title}>
-        <Box sx={businessEditing.generalNotes ? undefined : { pointerEvents: "none" }}>
         <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
           {data.generalNotes.notesLabel}
         </Typography>
@@ -4198,18 +4124,16 @@ export default function ProfessionalFixedLocationSetup({
           onChange={(e) => setField("notes", e.target.value)}
           multiline
           minRows={4}
-          disabled={!businessEditing.generalNotes}
+          disabled={businessFormDisabled}
           sx={{
             "& .MuiOutlinedInput-root": {
               bgcolor: alpha(m.navy, 0.01),
             },
           }}
         />
-        </Box>
       </SectionShell>
 
       <SectionShell title="Price">
-        <Box sx={businessEditing.price ? undefined : { pointerEvents: "none" }}>
         <Stack spacing={2}>
           <Box>
             <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
@@ -4255,7 +4179,7 @@ export default function ProfessionalFixedLocationSetup({
               value={values.prepaymentPercent}
               onChange={(e) => setField("prepaymentPercent", e.target.value)}
               placeholder="0"
-              disabled={!businessEditing.price}
+              disabled={businessFormDisabled}
               sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
               InputProps={{
                 endAdornment: <InputAdornment position="end">%</InputAdornment>,
@@ -4269,7 +4193,7 @@ export default function ProfessionalFixedLocationSetup({
                 onChange={(e) => setField("prepaymentInstructions", e.target.value)}
                 multiline
                 minRows={3}
-                disabled={!businessEditing.price}
+                disabled={businessFormDisabled}
                 sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
               />
             </Box>
@@ -4284,7 +4208,7 @@ export default function ProfessionalFixedLocationSetup({
                 value={values.kilometerAllowance}
                 onChange={(e) => setField("kilometerAllowance", e.target.value)}
                 placeholder="€ 0"
-                disabled={!businessEditing.price}
+                disabled={businessFormDisabled}
                 sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                 InputProps={{
                   startAdornment: <InputAdornment position="start">€</InputAdornment>,
@@ -4299,18 +4223,16 @@ export default function ProfessionalFixedLocationSetup({
                   onChange={(e) => setField("kilometerAllowanceInstructions", e.target.value)}
                   multiline
                   minRows={3}
-                  disabled={!businessEditing.price}
+                  disabled={businessFormDisabled}
                   sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                 />
               </Box>
             </Box>
           ) : null}
         </Stack>
-        </Box>
       </SectionShell>
 
       <SectionShell title="Policy Section">
-        <Box sx={businessEditing.price ? undefined : { pointerEvents: "none" }}>
           <Stack spacing={1.6}>
             <Box>
               <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
@@ -4322,7 +4244,7 @@ export default function ProfessionalFixedLocationSetup({
                     placeholder="Hour"
                     value={values.policyResponseHours}
                     onChange={(e) => setField("policyResponseHours", e.target.value)}
-                    disabled={!businessEditing.price}
+                    disabled={businessFormDisabled}
                     sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     InputProps={{
                       endAdornment: <InputAdornment position="end">H</InputAdornment>,
@@ -4335,7 +4257,7 @@ export default function ProfessionalFixedLocationSetup({
                     placeholder="Minutes"
                     value={values.policyResponseMinutes}
                     onChange={(e) => setField("policyResponseMinutes", e.target.value)}
-                    disabled={!businessEditing.price}
+                    disabled={businessFormDisabled}
                     sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     InputProps={{
                       endAdornment: <InputAdornment position="end">Min</InputAdornment>,
@@ -4352,15 +4274,13 @@ export default function ProfessionalFixedLocationSetup({
               onChange={(e) => setField("policyInstructions", e.target.value)}
               multiline
               minRows={3}
-              disabled={!businessEditing.price}
+              disabled={businessFormDisabled}
               sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
             />
           </Stack>
-        </Box>
       </SectionShell>
 
       <SectionShell title="Rescheduling Policy">
-        <Box sx={businessEditing.price ? undefined : { pointerEvents: "none" }}>
           <Stack spacing={1.6}>
             <Box>
               <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
@@ -4372,7 +4292,7 @@ export default function ProfessionalFixedLocationSetup({
                     placeholder="Hour"
                     value={values.rescheduleMinimumHours}
                     onChange={(e) => setField("rescheduleMinimumHours", e.target.value)}
-                    disabled={!businessEditing.price}
+                    disabled={businessFormDisabled}
                     sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     InputProps={{
                       endAdornment: <InputAdornment position="end">H</InputAdornment>,
@@ -4385,7 +4305,7 @@ export default function ProfessionalFixedLocationSetup({
                     placeholder="Minutes"
                     value={values.rescheduleMinimumMinutes}
                     onChange={(e) => setField("rescheduleMinimumMinutes", e.target.value)}
-                    disabled={!businessEditing.price}
+                    disabled={businessFormDisabled}
                     sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     InputProps={{
                       endAdornment: <InputAdornment position="end">Min</InputAdornment>,
@@ -4404,7 +4324,7 @@ export default function ProfessionalFixedLocationSetup({
                 placeholder="0"
                 value={values.rescheduleLateFeePercent}
                 onChange={(e) => setField("rescheduleLateFeePercent", e.target.value)}
-                disabled={!businessEditing.price}
+                disabled={businessFormDisabled}
                 sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                 InputProps={{
                   endAdornment: <InputAdornment position="end">%</InputAdornment>,
@@ -4419,15 +4339,13 @@ export default function ProfessionalFixedLocationSetup({
               onChange={(e) => setField("rescheduleInstructions", e.target.value)}
               multiline
               minRows={3}
-              disabled={!businessEditing.price}
+              disabled={businessFormDisabled}
               sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
             />
           </Stack>
-        </Box>
       </SectionShell>
 
       <SectionShell title="Cancellation Policy">
-        <Box sx={businessEditing.price ? undefined : { pointerEvents: "none" }}>
           <Stack spacing={1.6}>
             <Box>
               <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
@@ -4439,7 +4357,7 @@ export default function ProfessionalFixedLocationSetup({
                     placeholder="Hour"
                     value={values.cancelMinimumHours}
                     onChange={(e) => setField("cancelMinimumHours", e.target.value)}
-                    disabled={!businessEditing.price}
+                    disabled={businessFormDisabled}
                     sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     InputProps={{
                       endAdornment: <InputAdornment position="end">H</InputAdornment>,
@@ -4452,7 +4370,7 @@ export default function ProfessionalFixedLocationSetup({
                     placeholder="Minutes"
                     value={values.cancelMinimumMinutes}
                     onChange={(e) => setField("cancelMinimumMinutes", e.target.value)}
-                    disabled={!businessEditing.price}
+                    disabled={businessFormDisabled}
                     sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     InputProps={{
                       endAdornment: <InputAdornment position="end">Min</InputAdornment>,
@@ -4471,7 +4389,7 @@ export default function ProfessionalFixedLocationSetup({
                 placeholder="0"
                 value={values.cancelLateFeePercent}
                 onChange={(e) => setField("cancelLateFeePercent", e.target.value)}
-                disabled={!businessEditing.price}
+                disabled={businessFormDisabled}
                 sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                 InputProps={{
                   endAdornment: <InputAdornment position="end">%</InputAdornment>,
@@ -4486,15 +4404,13 @@ export default function ProfessionalFixedLocationSetup({
               onChange={(e) => setField("cancelInstructions", e.target.value)}
               multiline
               minRows={3}
-              disabled={!businessEditing.price}
+              disabled={businessFormDisabled}
               sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
             />
           </Stack>
-        </Box>
       </SectionShell>
 
       <SectionShell title="No Show Policy">
-        <Box sx={businessEditing.price ? undefined : { pointerEvents: "none" }}>
           <Stack spacing={1.6}>
             <Box>
               <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
@@ -4504,7 +4420,7 @@ export default function ProfessionalFixedLocationSetup({
                 placeholder="0"
                 value={values.noShowFeePercent}
                 onChange={(e) => setField("noShowFeePercent", e.target.value)}
-                disabled={!businessEditing.price}
+                disabled={businessFormDisabled}
                 sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                 InputProps={{
                   endAdornment: <InputAdornment position="end">%</InputAdornment>,
@@ -4519,11 +4435,10 @@ export default function ProfessionalFixedLocationSetup({
               onChange={(e) => setField("noShowInstructions", e.target.value)}
               multiline
               minRows={3}
-              disabled={!businessEditing.price}
+              disabled={businessFormDisabled}
               sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
             />
           </Stack>
-        </Box>
       </SectionShell>
 
       <SectionShell
@@ -4534,8 +4449,7 @@ export default function ProfessionalFixedLocationSetup({
               size="small"
               onClick={deleteSelectedPortfolio}
               disabled={
-                !businessEditing.portfolio ||
-                !Object.values(selectedPortfolioIds).some(Boolean)
+                businessFormDisabled || !Object.values(selectedPortfolioIds).some(Boolean)
               }
               sx={{
                 width: 30,
@@ -4550,7 +4464,7 @@ export default function ProfessionalFixedLocationSetup({
             <IconButton
               size="small"
               onClick={onUploadPortfolio}
-              disabled={!businessEditing.portfolio}
+              disabled={businessFormDisabled}
               sx={{
                 width: 30,
                 height: 30,
@@ -4574,7 +4488,6 @@ export default function ProfessionalFixedLocationSetup({
       >
         <Box
           sx={{
-            ...(businessEditing.portfolio ? null : { pointerEvents: "none" }),
             display: "grid",
             gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(3, 1fr)", md: "repeat(4, 1fr)" },
             gap: 2,
@@ -4722,26 +4635,32 @@ export default function ProfessionalFixedLocationSetup({
             {activeSubTab === "Business Setup" ? data.title : "Professional"}
           </Typography>
 
-          <IconButton
-            size="small"
-            onClick={() => {
-              if (activeSubTab === "Business Setup") {
-                enableAllBusinessEditing();
-              } else {
-                setIsProfessionalEditing(true);
-              }
-            }}
-            sx={{
-              width: 28,
-              height: 28,
-              borderRadius: "999px",
-              bgcolor: alpha(m.navy, 0.06),
-              "&:hover": { bgcolor: alpha(m.navy, 0.09) },
-            }}
-            aria-label={activeSubTab === "Business Setup" ? "Edit business setup" : "Edit professional profile"}
-          >
-            <EditRoundedIcon sx={{ fontSize: 15, color: alpha(m.navy, 0.55) }} />
-          </IconButton>
+          {activeSubTab === "Business Setup" ? (
+            isBusinessPublishEnabled ? (
+              <Chip
+                label="Unsaved changes"
+                size="small"
+                color="warning"
+                variant="outlined"
+                sx={{ fontWeight: 600 }}
+              />
+            ) : null
+          ) : (
+            <IconButton
+              size="small"
+              onClick={() => setIsProfessionalEditing(true)}
+              sx={{
+                width: 28,
+                height: 28,
+                borderRadius: "999px",
+                bgcolor: alpha(m.navy, 0.06),
+                "&:hover": { bgcolor: alpha(m.navy, 0.09) },
+              }}
+              aria-label="Edit professional profile"
+            >
+              <EditRoundedIcon sx={{ fontSize: 15, color: alpha(m.navy, 0.55) }} />
+            </IconButton>
+          )}
         </Box>
         <Divider />
         <Box sx={{ px: 2.25, py: 2.1 }}>

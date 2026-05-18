@@ -56,7 +56,8 @@ export function useClientListingState(cards: ListingCardData[]) {
         if (!card.municipalityLabel.toLowerCase().includes(m)) return false;
       }
       if (keyword) {
-        const hay = `${card.title} ${card.subtitle} ${card.municipalityLabel}`.toLowerCase();
+        const hay =
+          card.searchText ?? `${card.title} ${card.subtitle} ${card.municipalityLabel}`.toLowerCase();
         if (!hay.includes(keyword)) return false;
       }
       return true;

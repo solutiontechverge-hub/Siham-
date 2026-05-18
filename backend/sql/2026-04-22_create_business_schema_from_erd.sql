@@ -76,14 +76,7 @@ CREATE TABLE IF NOT EXISTS business_setups (
   CHECK (cancellation_before_minutes IS NULL OR (cancellation_before_minutes >= 0 AND cancellation_before_minutes < 60))
 );
 
-CREATE TABLE IF NOT EXISTS business_service_details (
-  id BIGSERIAL PRIMARY KEY,
-  business_setup_id BIGINT NOT NULL REFERENCES business_setups(id) ON DELETE CASCADE,
-  service_id BIGINT NOT NULL REFERENCES subcategories(id) ON DELETE CASCADE,
-  price NUMERIC(12,2) NOT NULL CHECK (price >= 0),
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (business_setup_id, service_id)
-);
+-- Service price/duration: business_setups.service_categories (JSONB)
 
 CREATE TABLE IF NOT EXISTS business_team_members (
   id BIGSERIAL PRIMARY KEY,
@@ -151,12 +144,6 @@ CREATE INDEX IF NOT EXISTS idx_subcategories_category_id
 
 CREATE INDEX IF NOT EXISTS idx_business_setups_professional_profile_id
   ON business_setups(professional_profile_id);
-
-CREATE INDEX IF NOT EXISTS idx_business_service_details_business_setup_id
-  ON business_service_details(business_setup_id);
-
-CREATE INDEX IF NOT EXISTS idx_business_service_details_service_id
-  ON business_service_details(service_id);
 
 CREATE INDEX IF NOT EXISTS idx_business_team_members_business_setup_id
   ON business_team_members(business_setup_id);

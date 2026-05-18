@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import { useTheme } from "@mui/material/styles";
-import { listingPageData } from "../listing/listing.data";
 import { favouritesPageData } from "./data-favourites";
+import { useListingCards } from "../listing/use-listing-cards";
 
 export function useFavouritesTokens() {
   return useTheme().palette.mollure;
@@ -34,7 +34,8 @@ export function useClientFavouritesPage() {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  const allItems = listingPageData.cards.filter((c) => Boolean(favorites[c.id]));
+  const { cards: listingCards, isLoading } = useListingCards();
+  const allItems = listingCards.filter((c) => Boolean(favorites[c.id]));
 
   const pageSize = favouritesPageData.pagination.pageSize;
   const totalPages = Math.max(1, Math.ceil(allItems.length / pageSize));
@@ -75,6 +76,7 @@ export function useClientFavouritesPage() {
     totalPages,
     totalCount: allItems.length,
     rangeLabel,
+    isLoading,
   };
 }
 

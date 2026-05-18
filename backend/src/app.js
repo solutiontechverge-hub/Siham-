@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 import { getUploadsDir } from "./config/uploads-dir.js";
 import authRoutes from "./routes/auth.routes.js";
 import businessRoutes from "./routes/business.routes.js";
+import businessSetupsRoutes from "./routes/business-setups.routes.js";
 import userRoutes from "./routes/user.routes.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -31,6 +32,7 @@ app.get("/api/health", (_req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/business", businessRoutes);
+app.use("/api/business-setups", businessSetupsRoutes);
 
 app.use((req, res) => {
   res.status(404).json({

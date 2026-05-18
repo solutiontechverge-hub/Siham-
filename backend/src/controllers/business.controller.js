@@ -3,6 +3,7 @@ import {
   isS3UploadConfigured,
   uploadBusinessMediaFilesToS3,
 } from "../services/s3-upload.service.js";
+import { buildServiceDetailsFromCategories } from "../utils/business-service-categories.js";
 
 const parseJsonValue = (value, fallback) => {
   if (value === undefined || value === null || value === "") {
@@ -131,6 +132,7 @@ const normalizeServiceCategories = (value) => {
       const categoryId = Number(item.category_id);
       const serviceId = Number(item.service_id);
       const amount = parseOptionalNumber(item.amount);
+      const durationLabel = String(item.duration_label ?? item.duration ?? "").trim() || null;
 
       if (!Number.isInteger(categoryId) || categoryId <= 0) {
         return null;
@@ -144,6 +146,7 @@ const normalizeServiceCategories = (value) => {
         category_id: categoryId,
         service_id: serviceId,
         amount: amount ?? 0,
+        duration_label: durationLabel,
       };
     })
     .filter(Boolean);
@@ -257,53 +260,41 @@ const getBusinessSetupDetailById = async (setupId, client = { query }) => {
     return null;
   }
 
-  const [teamMembersResult, serviceDetailsResult] = await Promise.all([
-    client.query(
-      `SELECT
-         id,
-         business_setup_id,
-         full_name,
-         role,
-         profile_photo,
-         assigned_services,
-         display_order,
-         created_at,
-         updated_at
-       FROM business_team_members
-       WHERE business_setup_id = $1
-       ORDER BY display_order ASC, id ASC`,
-      [setupId],
-    ),
-    client.query(
-      `SELECT
-         bsd.id,
-         bsd.business_setup_id,
-         bsd.service_id,
-         bsd.price,
-         bsd.created_at,
-         s.title AS service_title,
-         s.category_id,
-         c.title AS category_title
-       FROM business_service_details bsd
-       INNER JOIN subcategories s ON s.id = bsd.service_id
-       INNER JOIN categories c ON c.id = s.category_id
-       WHERE bsd.business_setup_id = $1
-       ORDER BY c.title, s.title`,
-      [setupId],
-    ),
-  ]);
+  const teamMembersResult = await client.query(
+    `SELECT
+       id,
+       business_setup_id,
+       full_name,
+       role,
+       profile_photo,
+       assigned_services,
+       display_order,
+       created_at,
+       updated_at
+     FROM business_team_members
+     WHERE business_setup_id = $1
+     ORDER BY display_order ASC, id ASC`,
+    [setupId],
+  );
 
   const teamMembers = teamMembersResult.rows.map((member) => ({
     ...member,
     assigned_services: parseJsonArray(member.assigned_services),
   }));
 
+  const serviceCategories = parseJsonArray(businessSetup.service_categories);
+  const serviceDetails = await buildServiceDetailsFromCategories(
+    serviceCategories,
+    setupId,
+    client.query.bind(client),
+  );
+
   return {
     ...businessSetup,
-    service_categories: parseJsonArray(businessSetup.service_categories),
+    service_categories: serviceCategories,
     book_service_combinations: parseJsonArray(businessSetup.book_service_combinations),
     team_members: teamMembers,
-    service_details: serviceDetailsResult.rows,
+    service_details: serviceDetails,
   };
 };
 
@@ -733,33 +724,6 @@ export const upsertBusinessSetup = async (req, res) => {
           [businessSetup.id],
         );
       }
-      const serviceIds = serviceCategories.map((item) => item.service_id);
-
-      if (serviceCategories.length > 0) {
-        for (const item of serviceCategories) {
-          await client.query(
-            `INSERT INTO business_service_details (business_setup_id, service_id, price)
-             VALUES ($1, $2, $3)
-             ON CONFLICT (business_setup_id, service_id)
-             DO UPDATE SET price = EXCLUDED.price`,
-            [businessSetup.id, item.service_id, item.amount],
-          );
-        }
-
-        await client.query(
-          `DELETE FROM business_service_details
-           WHERE business_setup_id = $1
-             AND NOT (service_id = ANY($2::bigint[]))`,
-          [businessSetup.id, serviceIds],
-        );
-      } else {
-        await client.query(
-          `DELETE FROM business_service_details
-           WHERE business_setup_id = $1`,
-          [businessSetup.id],
-        );
-      }
-
       await client.query(
         `UPDATE business_setups
          SET
@@ -788,102 +752,6 @@ export const upsertBusinessSetup = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to save business setup.",
-      data: {
-        error: error.message,
-      },
-    });
-  }
-};
-
-export const createBusinessServiceDetail = async (req, res) => {
-  try {
-    if (req.user.user_type !== "professional") {
-      return res.status(403).json({
-        success: false,
-        message: "Only professional users can manage business services.",
-        data: null,
-      });
-    }
-
-    const businessSetup = await getBusinessSetupByUserId(req.user.id);
-
-    if (!businessSetup) {
-      return res.status(404).json({
-        success: false,
-        message: "Business setup not found.",
-        data: null,
-      });
-    }
-
-    const services = req.body.services;
-    const insertedServices = [];
-
-    for (const service of services) {
-      const result = await query(
-        `INSERT INTO business_service_details (business_setup_id, service_id, price)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (business_setup_id, service_id)
-         DO UPDATE SET price = EXCLUDED.price
-         RETURNING *`,
-        [businessSetup.id, service.service_id, service.price],
-      );
-      insertedServices.push(result.rows[0]);
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: "Business service details saved successfully.",
-      data: insertedServices,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to save business service details.",
-      data: {
-        error: error.message,
-      },
-    });
-  }
-};
-
-export const listBusinessServiceDetails = async (req, res) => {
-  try {
-    if (req.user.user_type !== "professional") {
-      return res.status(403).json({
-        success: false,
-        message: "Only professional users can access business service details.",
-        data: null,
-      });
-    }
-
-    const businessSetup = await getBusinessSetupByUserId(req.user.id);
-
-    if (!businessSetup) {
-      return res.status(200).json({
-        success: true,
-        message: "Business service details fetched successfully.",
-        data: [],
-      });
-    }
-
-    const result = await query(
-      `SELECT bsd.*, s.title AS service_title
-       FROM business_service_details bsd
-       INNER JOIN subcategories s ON s.id = bsd.service_id
-       WHERE bsd.business_setup_id = $1
-       ORDER BY s.title`,
-      [businessSetup.id],
-    );
-
-    return res.status(200).json({
-      success: true,
-      message: "Business service details fetched successfully.",
-      data: result.rows,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch business service details.",
       data: {
         error: error.message,
       },
