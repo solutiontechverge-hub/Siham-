@@ -37,6 +37,10 @@ import {
   getServicesForLocationMode,
   getTeamForLocationMode,
 } from "../../data/businessPublicProfile.data";
+import {
+  buildPublicProfileBookingSelection,
+  type PublicProfileBookingSelection,
+} from "../../data/publicProfileBookingSelection";
 import ServiceCategorySliderCard from "./ServiceCategorySliderCard";
 import AppDropdown from "./AppDropdown";
 
@@ -245,7 +249,7 @@ export type BusinessPublicProfileProps = {
   data: BusinessPublicProfileData;
   locationMode: "fixed" | "desired";
   onLocationModeChange?: (mode: "fixed" | "desired") => void;
-  onBookNow: () => void;
+  onBookNow: (selection: PublicProfileBookingSelection) => void;
   pageTitle?: string;
   publicProfileTitle?: string;
 };
@@ -390,24 +394,29 @@ function ProfileLocationToggle({
   const fixedActive = locationMode === "fixed";
   const desiredActive = locationMode === "desired";
 
-  const segmentSx = (active: boolean, offered: boolean) => ({
+  const segmentSx = (side: "left" | "right", active: boolean) => ({
     flex: 1,
-    minWidth: { xs: 100, sm: 118 },
-    py: 1,
+    minWidth: { xs: 108, sm: 128 },
+    py: 1.05,
     px: { xs: 1.25, sm: 1.75 },
+    minHeight: 40,
     textTransform: "none" as const,
-    fontWeight: 700,
+    fontWeight: active ? 700 : 600,
     fontSize: { xs: 13, sm: 14 },
     lineHeight: 1.2,
-    borderRadius: 0,
-    color: active ? "#fff" : m.slate,
-    bgcolor: active ? m.teal : "transparent",
+    boxShadow: "none",
+    borderRadius: side === "left" ? "7px 0 0 7px" : "0 7px 7px 0",
+    color: active ? "#fff" : alpha(m.navy, 0.55),
+    bgcolor: active ? m.teal : "#fff",
+    border: "none",
+    transition: "background-color 160ms ease, color 160ms ease",
     "&:hover": {
-      bgcolor: !canSwitch || !offered ? (active ? m.teal : "transparent") : active ? m.tealDark : alpha(m.teal, 0.08),
+      boxShadow: "none",
+      bgcolor: !canSwitch ? (active ? m.teal : "#fff") : active ? m.tealDark : alpha(m.teal, 0.07),
     },
     "&.Mui-disabled": {
       color: active ? "#fff" : alpha(m.navy, 0.32),
-      bgcolor: active ? m.teal : "transparent",
+      bgcolor: active ? m.teal : "#fff",
     },
   });
 
@@ -416,7 +425,7 @@ function ProfileLocationToggle({
       sx={{
         display: "inline-flex",
         alignItems: "stretch",
-        border: `1px solid ${alpha(m.navy, 0.12)}`,
+        border: `1px solid ${alpha(m.navy, 0.14)}`,
         borderRadius: "8px",
         overflow: "hidden",
         bgcolor: "#fff",
@@ -426,21 +435,22 @@ function ProfileLocationToggle({
       aria-label="Location type"
     >
       <Button
+        disableElevation
         disabled={!canSwitch || !supportsFixed}
         onClick={() => {
           if (canSwitch) onChange?.("fixed");
         }}
-        sx={segmentSx(fixedActive, supportsFixed)}
+        sx={segmentSx("left", fixedActive)}
       >
         Fixed Location
       </Button>
-      <Divider orientation="vertical" flexItem sx={{ borderColor: alpha(m.navy, 0.12) }} />
       <Button
+        disableElevation
         disabled={!canSwitch || !supportsDesired}
         onClick={() => {
           if (canSwitch) onChange?.("desired");
         }}
-        sx={segmentSx(desiredActive, supportsDesired)}
+        sx={segmentSx("right", desiredActive)}
       >
         Desired Location
       </Button>
@@ -1419,7 +1429,20 @@ export default function BusinessPublicProfile({
               variant="contained"
               disableElevation
               disabled={selectionSummary.count === 0}
-              onClick={onBookNow}
+              onClick={() => {
+                onBookNow(
+                  buildPublicProfileBookingSelection({
+                    data,
+                    locationMode: effectiveLocationMode,
+                    selectedServiceIds,
+                    serviceQty,
+                    selectedComboIds,
+                    teamAssignments,
+                    teamDraftAssignments,
+                    projectEnabled,
+                  }),
+                );
+              }}
               sx={{
                 borderRadius: "10px",
                 textTransform: "none",

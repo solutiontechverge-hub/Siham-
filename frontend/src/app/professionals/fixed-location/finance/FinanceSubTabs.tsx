@@ -20,6 +20,7 @@ export default function FinanceSubTabs() {
         { label: "Setting", href: SETTING_HREF },
       ]}
       active={isSetting ? "Setting" : isOverview ? "Overview" : "Overview"}
+      alignStart={false}
     />
   );
 }

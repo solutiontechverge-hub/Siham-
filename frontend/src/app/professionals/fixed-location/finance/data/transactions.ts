@@ -28,6 +28,7 @@ export type TransactionDocumentBookingItem = {
 
 export type TransactionDocument = {
   documentNumber: string;
+  receiptNumber?: string;
   serviceDate: string;
   invoiceDate: string;
   dueDate: string;
