@@ -17,6 +17,10 @@ export type ListingCardService = {
 export type ListingCardData = {
   id: string;
   image: any;
+  /** All business media URLs from API (up to 4) */
+  media: string[];
+  /** business_keywords from API */
+  businessKeywords: string[];
   title: string;
   subtitle: string;
   municipalityLabel: string;
@@ -26,6 +30,8 @@ export type ListingCardData = {
   locationModeDefault: "fixed" | "desired";
   services: ListingCardService[];
   startingFromLabel: string;
+  /** Used for client-side keyword filtering */
+  searchText?: string;
 };
 
 export const listingPageData = {
@@ -64,6 +70,8 @@ export const listingPageData = {
     {
       id: "1",
       image: ListingImage1,
+      media: [],
+      businessKeywords: [],
       title: "Lorem Ipsum Dolor Sit Amet",
       subtitle: "Consectetur.",
       municipalityLabel: "Noord-Holland",
@@ -81,6 +89,8 @@ export const listingPageData = {
     {
       id: "2",
       image: ListingImage2,
+      media: [],
+      businessKeywords: [],
       title: "Lorem Ipsum Dolor Sit Amet",
       subtitle: "Consectetur.",
       municipalityLabel: "Noord-Holland",
@@ -98,6 +108,8 @@ export const listingPageData = {
     {
       id: "3",
       image: ListingImage3,
+      media: [],
+      businessKeywords: [],
       title: "Lorem Ipsum Dolor Sit Amet",
       subtitle: "Consectetur.",
       municipalityLabel: "Noord-Holland",
@@ -115,6 +127,8 @@ export const listingPageData = {
     {
       id: "4",
       image: ListingImage4,
+      media: [],
+      businessKeywords: [],
       title: "Lorem Ipsum Dolor Sit Amet",
       subtitle: "Consectetur.",
       municipalityLabel: "Noord-Holland",
@@ -132,6 +146,8 @@ export const listingPageData = {
     {
       id: "5",
       image: ListingImage5,
+      media: [],
+      businessKeywords: [],
       title: "Lorem Ipsum Dolor Sit Amet",
       subtitle: "Consectetur.",
       municipalityLabel: "Noord-Holland",
@@ -149,6 +165,8 @@ export const listingPageData = {
     {
       id: "6",
       image: ListingImage6,
+      media: [],
+      businessKeywords: [],
       title: "Lorem Ipsum Dolor Sit Amet",
       subtitle: "Consectetur.",
       municipalityLabel: "Noord-Holland",

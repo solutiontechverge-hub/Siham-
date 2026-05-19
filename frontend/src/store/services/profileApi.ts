@@ -102,6 +102,8 @@ export type UpdateProfileRequest = Partial<{
   profile_picture?: string;
 };
 
+export type UpdateProfilePayload = UpdateProfileRequest | FormData;
+
 type MutationError = FetchBaseQueryError;
 
 const toMutationError = (error: FetchBaseQueryError): MutationError => {
@@ -154,7 +156,7 @@ export const profileApi = baseApi.injectEndpoints({
       },
       providesTags: ["Profile"],
     }),
-    updateProfile: builder.mutation<ApiEnvelope<ProfileResponse>, UpdateProfileRequest>({
+    updateProfile: builder.mutation<ApiEnvelope<ProfileResponse>, UpdateProfilePayload>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
         const response = await fetchWithBQ({
           url: "/api/user/profile",

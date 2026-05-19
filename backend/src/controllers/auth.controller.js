@@ -9,6 +9,10 @@ import {
   generateAccessToken,
   generateRefreshToken,
 } from "../helpers/jwt.helper.js";
+import {
+  isS3UploadConfigured,
+  uploadProfileMulterFilesToS3,
+} from "../services/s3-upload.service.js";
 
 const SALT_ROUNDS = 12;
 const USER_TYPES = ["individual", "company", "professional"];
@@ -89,7 +93,7 @@ const hashToken = (value) =>
 const generateSixDigitOtp = () =>
   crypto.randomInt(100000, 1000000).toString();
 
-const getProfilePayload = (userType, body, files = {}) => {
+const getProfilePayload = (userType, body) => {
   const config = profileConfig[userType];
   const payload = {};
 
@@ -97,17 +101,6 @@ const getProfilePayload = (userType, body, files = {}) => {
     if (body[field] !== undefined) {
       payload[field] = body[field];
     }
-  }
-
-  const profilePicture = files.profile_picture?.[0]?.filename;
-  const logo = files.logo?.[0]?.filename;
-
-  if (profilePicture && config.fields.includes("profile_picture")) {
-    payload.profile_picture = profilePicture;
-  }
-
-  if (logo && config.fields.includes("logo")) {
-    payload.logo = logo;
   }
 
   return payload;
@@ -204,7 +197,20 @@ export const register = async (req, res) => {
 
     const user = userResult.rows[0];
     const config = profileConfig[userType];
-    const profilePayload = getProfilePayload(userType, req.body, req.files);
+
+    const hasUpload =
+      req.files?.profile_picture?.[0]?.buffer?.length || req.files?.logo?.[0]?.buffer?.length;
+    if (hasUpload && !isS3UploadConfigured()) {
+      await client.query("ROLLBACK");
+      return res.status(503).json({
+        success: false,
+        message: "File upload is temporarily unavailable.",
+        data: null,
+      });
+    }
+
+    const profilePayload = getProfilePayload(userType, req.body);
+    Object.assign(profilePayload, await uploadProfileMulterFilesToS3(user.id, req.files));
     const profileFields = ["user_id", ...config.fields];
     const profileValues = [user.id, ...config.fields.map((field) => profilePayload[field] ?? null)];
     const placeholders = profileFields.map((_, index) => `$${index + 1}`).join(", ");

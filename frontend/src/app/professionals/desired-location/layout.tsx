@@ -1,10 +1,10 @@
-import { MarketingSiteHeader } from "../../../components/common";
+import { ProfessionalMarketingHeader } from "../../../components/common";
 import AuthGuard from "../../../components/common/auth/AuthGuard";
 
 export default function DesiredLocationLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthGuard allowedRoles={["professional"]}>
-      <MarketingSiteHeader
+      <ProfessionalMarketingHeader
         navItems={[]}
         primaryActionLabel="signup"
         primaryActionHref="/auth/signup"

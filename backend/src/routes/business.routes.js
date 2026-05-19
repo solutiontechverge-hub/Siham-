@@ -2,7 +2,6 @@ import express from "express";
 import { body } from "express-validator";
 import {
   createBooking,
-  createBusinessServiceDetail,
   createCalendarEntry,
   updateCalendarEntryStatus,
   updateBookingStatus,
@@ -11,14 +10,15 @@ import {
   createCategory,
   createSubcategory,
   getBusinessSetup,
+  uploadBusinessMedia,
   listBookings,
-  listBusinessServiceDetails,
   listCalendarEntries,
   listCategories,
   upsertBusinessSetup,
 } from "../controllers/business.controller.js";
 import { authenticateUser, authorizeRoles } from "../middleware/auth.middleware.js";
 import { validateRequest } from "../middleware/validate.middleware.js";
+import { upload } from "../middleware/upload.middleware.js";
 
 const router = express.Router();
 const locationModes = ["fixed", "desired", "both"];
@@ -89,6 +89,13 @@ router.post(
 
 router.get("/setup", requireProfessional, getBusinessSetup);
 
+router.post(
+  "/setup/media",
+  requireProfessional,
+  upload.array("business_media", 4),
+  uploadBusinessMedia,
+);
+
 router.put(
   "/setup",
   requireProfessional,
@@ -150,26 +157,6 @@ router.put(
   ],
   validateRequest,
   upsertBusinessSetup,
-);
-
-router.get("/service-details", requireProfessional, listBusinessServiceDetails);
-
-router.post(
-  "/service-details",
-  requireProfessional,
-  [
-    body("services")
-      .isArray({ min: 1 })
-      .withMessage("services must be an array with at least one item."),
-    body("services.*.service_id")
-      .isInt({ min: 1 })
-      .withMessage("Each service must have a valid service_id."),
-    body("services.*.price")
-      .isFloat({ min: 0 })
-      .withMessage("Each service must have a non-negative price."),
-  ],
-  validateRequest,
-  createBusinessServiceDetail,
 );
 
 router.get("/calendar", requireProfessional, listCalendarEntries);
