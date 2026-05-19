@@ -27,5 +27,5 @@ export function useActiveClientBooking() {
     return () => window.removeEventListener(BOOKINGS_CHANGED_EVENT, refresh);
   }, [refresh]);
 
-  return record;
+  return { record, refresh };
 }

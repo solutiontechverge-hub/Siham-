@@ -24,6 +24,8 @@ declare module "@mui/material/styles" {
   interface MollurePalette {
     teal: string;
     tealDark: string;
+    success: string;
+    successDark: string;
     navy: string;
     slate: string;
     surface: string;

@@ -35,6 +35,14 @@ export function buildBookingSummarySections(draft: ClientBookingDraft | null): C
 
   const people = draft.people ?? [];
   if (people.length) {
+    const requesterPerson = people.find((p) => p.isRequester) ?? people[0];
+    const unassigned = serviceGroups.get("unassigned");
+    if (unassigned?.length && requesterPerson) {
+      const requesterItems = serviceGroups.get(requesterPerson.id) ?? [];
+      serviceGroups.set(requesterPerson.id, [...requesterItems, ...unassigned]);
+      serviceGroups.delete("unassigned");
+    }
+
     const sections: ClientBookingSummarySection[] = [];
     for (const p of people) {
       const items = serviceGroups.get(p.id) ?? [];

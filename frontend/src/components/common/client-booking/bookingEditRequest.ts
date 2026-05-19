@@ -1,9 +1,18 @@
-export type BookingEditRequestStatus = "none" | "pending" | "approved";
+export type BookingEditRequestStatus =
+  | "none"
+  | "pending"
+  | "approved"
+  | "suggested"
+  | "rejected";
 
 export type BookingEditRequestRecord = {
   status: BookingEditRequestStatus;
   requestedAt?: string;
   approvedAt?: string;
+  suggestedAt?: string;
+  rejectedAt?: string;
+  /** Optional note from professional when suggesting changes */
+  professionalNote?: string;
 };
 
 const STORAGE_KEY = "mollure:booking_edit_requests";
@@ -36,6 +45,7 @@ export function getBookingEditRequest(bookingRef: string): BookingEditRequestRec
   return record ?? { status: "none" };
 }
 
+/** Client sends an edit request to the professional. */
 export function sendBookingEditRequest(bookingRef: string): BookingEditRequestRecord {
   const all = loadAll();
   const next: BookingEditRequestRecord = {
@@ -47,7 +57,7 @@ export function sendBookingEditRequest(bookingRef: string): BookingEditRequestRe
   return next;
 }
 
-/** Called when the professional approves the client's edit request. */
+/** Professional approves the client's edit request. */
 export function approveBookingEditRequest(bookingRef: string): BookingEditRequestRecord {
   const all = loadAll();
   const prev = all[bookingRef];
@@ -56,6 +66,57 @@ export function approveBookingEditRequest(bookingRef: string): BookingEditReques
     requestedAt: prev?.requestedAt,
     approvedAt: new Date().toISOString(),
   };
+  all[bookingRef] = next;
+  saveAll(all);
+  return next;
+}
+
+/** Professional suggests changes — client must accept to confirm. */
+export function professionalSuggestBookingChanges(
+  bookingRef: string,
+  professionalNote?: string,
+): BookingEditRequestRecord {
+  const all = loadAll();
+  const next: BookingEditRequestRecord = {
+    status: "suggested",
+    suggestedAt: new Date().toISOString(),
+    professionalNote,
+  };
+  all[bookingRef] = next;
+  saveAll(all);
+  return next;
+}
+
+/** Professional rejects the client's edit request. */
+export function professionalRejectEditRequest(bookingRef: string): BookingEditRequestRecord {
+  const all = loadAll();
+  const prev = all[bookingRef];
+  const next: BookingEditRequestRecord = {
+    status: "rejected",
+    requestedAt: prev?.requestedAt,
+    rejectedAt: new Date().toISOString(),
+  };
+  all[bookingRef] = next;
+  saveAll(all);
+  return next;
+}
+
+/** Client accepts professional's suggested changes — booking can move to confirmed. */
+export function clientAcceptSuggestedChanges(bookingRef: string): BookingEditRequestRecord {
+  const all = loadAll();
+  const next: BookingEditRequestRecord = {
+    status: "none",
+    approvedAt: new Date().toISOString(),
+  };
+  all[bookingRef] = next;
+  saveAll(all);
+  return next;
+}
+
+/** Client acknowledges rejection (Ok) — clears ER state. */
+export function clientAcknowledgeRejectedEdit(bookingRef: string): BookingEditRequestRecord {
+  const all = loadAll();
+  const next: BookingEditRequestRecord = { status: "none" };
   all[bookingRef] = next;
   saveAll(all);
   return next;

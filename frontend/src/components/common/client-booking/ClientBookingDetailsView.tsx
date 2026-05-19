@@ -24,9 +24,29 @@ import { useClientRequesterProfile } from "./useClientRequesterProfile";
 import { useActiveClientBooking } from "./useActiveClientBooking";
 import { useCheckoutBookingRef } from "./useCheckoutBookingRef";
 import { ACTIVE_BOOKING_ID_KEY, CHECKOUT_REF_KEY } from "../../../app/clients/booking/clientBookingSession";
-import { markClientBookingCancelled, removeClientBookingById } from "../../../app/clients/booking/clientBookingRecords";
+import {
+  markClientBookingCancelled,
+  markClientBookingPrepaid,
+  removeClientBookingById,
+  updateClientBookingStatus,
+  type ClientBookingStatus,
+} from "../../../app/clients/booking/clientBookingRecords";
+import ClientBookingChangeResponsePanel from "./ClientBookingChangeResponsePanel";
+import {
+  clientAcceptSuggestedChanges,
+  clientAcknowledgeRejectedEdit,
+} from "./bookingEditRequest";
+import { useBookingEditRequest } from "./useBookingEditRequest";
+import {
+  FinanceDocumentPreviewDrawer,
+  buildClientBookingTransactionRow,
+  readFinanceInvoiceSettings,
+} from "../finance-documents";
 import type { ClientBookingDraft } from "./types";
 import type { BusinessPublicProfilePolicySection } from "../../../data/businessPublicProfile.data";
+import { getBusinessPublicProfileByShopId } from "../../../data/businessPublicProfile.data";
+import { useSnackbar } from "../AppSnackbar";
+import StripePrepaymentDialog from "./StripePrepaymentDialog";
 
 const bookingPillTabs = [
   { label: "Past", value: "past" },
@@ -83,21 +103,36 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
   const isPrepaid = variant === "prepaid";
   const locationMode = shop?.locationMode ?? "fixed";
   const bookingRef = useCheckoutBookingRef();
-  const activeBooking = useActiveClientBooking();
-  const isAwaitingApproval = activeBooking?.status === "requested";
+  const { record: activeBooking, refresh: refreshActiveBooking } = useActiveClientBooking();
+  const editRequest = useBookingEditRequest(bookingRef);
+  const bookingStatus: ClientBookingStatus = activeBooking?.status ?? "confirmed";
+  const isPrepaymentPaid = Boolean(activeBooking?.prepaid);
+  const prepaymentState = !requiresPrepayment
+    ? ("none" as const)
+    : isPrepaymentPaid
+      ? ("paid" as const)
+      : ("required" as const);
 
   const [phone, setPhone] = React.useState("");
   const [cancelDialogOpen, setCancelDialogOpen] = React.useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [isCancelled, setIsCancelled] = React.useState(false);
+  const [financeSettings, setFinanceSettings] = React.useState(() => readFinanceInvoiceSettings());
+  const [activeDocument, setActiveDocument] = React.useState<"invoice" | "receipt" | null>(null);
+  const [stripeDialogOpen, setStripeDialogOpen] = React.useState(false);
+  const { showSnackbar } = useSnackbar();
+
+  React.useEffect(() => {
+    setFinanceSettings(readFinanceInvoiceSettings());
+  }, []);
 
   React.useEffect(() => {
     if (requesterPhone && !phone) setPhone(requesterPhone);
   }, [phone, requesterPhone]);
 
   React.useEffect(() => {
-    setIsCancelled(isCheckoutBookingCancelled(bookingRef));
-  }, [bookingRef]);
+    setIsCancelled(isCheckoutBookingCancelled(bookingRef) || bookingStatus === "cancelled");
+  }, [bookingRef, bookingStatus]);
 
   React.useEffect(() => {
     if (!isPrepaid || !shop?.shopId) return;
@@ -157,13 +192,142 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
     router.push("/clients/booking?tab=upcoming");
   };
 
-  const headerStatusLabel = isCancelled
-    ? "Cancelled"
-    : isPrepaid
-      ? "Prepayment required"
-      : isAwaitingApproval
-        ? "Awaiting approval"
-        : "Confirmed";
+  const prepaidAmount = React.useMemo(() => {
+    const total = draft?.total ?? 0;
+    return Math.round(((total * prepaymentPercent) / 100 + Number.EPSILON) * 100) / 100;
+  }, [draft?.total, prepaymentPercent]);
+
+  const professionalBusinessOverride = React.useMemo(() => {
+    const profile = shop?.shopId ? getBusinessPublicProfileByShopId(shop.shopId) : null;
+    const fixed = profile?.fixedLocation;
+    return {
+      legalName: fixed?.salonName ?? profile?.shopName ?? shop?.shopName ?? professional.name,
+      address:
+        shop?.addressLabel ??
+        shop?.municipalityLabel ??
+        fixed?.formattedAddress ??
+        address,
+    };
+  }, [address, professional.name, shop]);
+
+  const bookingTransactionRow = React.useMemo(() => {
+    if (!draft?.services?.length) return null;
+    return buildClientBookingTransactionRow({
+      bookingRef,
+      draft,
+      requesterName,
+      requesterEmail: user?.email,
+      financeSettings,
+    });
+  }, [bookingRef, draft, financeSettings, requesterName, user?.email]);
+
+  const prepaymentReceiptRow = React.useMemo(() => {
+    if (!draft?.services?.length || prepaymentState !== "paid") return null;
+    return buildClientBookingTransactionRow({
+      bookingRef: `${bookingRef}-prepay`,
+      draft,
+      requesterName,
+      requesterEmail: user?.email,
+      financeSettings,
+      documentAmount: prepaidAmount,
+    });
+  }, [bookingRef, draft, financeSettings, prepaymentState, prepaidAmount, requesterName, user?.email]);
+
+  const completePrepayment = React.useCallback(() => {
+    try {
+      const activeId = window.sessionStorage.getItem(ACTIVE_BOOKING_ID_KEY);
+      if (activeId) markClientBookingPrepaid(activeId);
+    } catch {
+      // ignore
+    }
+    setStripeDialogOpen(false);
+    showSnackbar({ severity: "success", message: "Prepayment received. Thank you!" });
+  }, [showSnackbar]);
+
+  const handlePayNow = React.useCallback(() => {
+    if (prepaidAmount <= 0) {
+      showSnackbar({ severity: "error", message: "No prepayment amount due." });
+      return;
+    }
+    setStripeDialogOpen(true);
+  }, [prepaidAmount, showSnackbar]);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("payment") !== "success") return;
+    completePrepayment();
+    const url = new URL(window.location.href);
+    url.searchParams.delete("payment");
+    url.searchParams.delete("ref");
+    window.history.replaceState({}, "", url.pathname + url.search);
+  }, [completePrepayment]);
+
+  const refreshFinanceSettings = React.useCallback(() => {
+    setFinanceSettings(readFinanceInvoiceSettings());
+  }, []);
+
+  const openInvoice = React.useCallback(() => {
+    if (!bookingTransactionRow) return;
+    refreshFinanceSettings();
+    setActiveDocument("invoice");
+  }, [bookingTransactionRow, refreshFinanceSettings]);
+
+  const openReceipt = React.useCallback(() => {
+    if (!(prepaymentReceiptRow ?? bookingTransactionRow)) return;
+    refreshFinanceSettings();
+    setActiveDocument("receipt");
+  }, [bookingTransactionRow, prepaymentReceiptRow, refreshFinanceSettings]);
+
+  const returnToBookingDetailsStart = React.useCallback(
+    (mode: "accept_suggested" | "acknowledge_rejected") => {
+      if (mode === "accept_suggested") {
+        clientAcceptSuggestedChanges(bookingRef);
+      } else {
+        clientAcknowledgeRejectedEdit(bookingRef);
+      }
+
+      try {
+        const activeId = window.sessionStorage.getItem(ACTIVE_BOOKING_ID_KEY);
+        if (activeId) updateClientBookingStatus(activeId, "confirmed");
+      } catch {
+        // ignore
+      }
+
+      editRequest.refresh();
+      refreshActiveBooking();
+      setActiveDocument(null);
+      setStripeDialogOpen(false);
+
+      if (typeof window !== "undefined") {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+
+      showSnackbar({
+        severity: "success",
+        message:
+          mode === "accept_suggested"
+            ? "Changes accepted. Your booking is confirmed."
+            : "Booking details updated.",
+      });
+    },
+    [bookingRef, editRequest, refreshActiveBooking, showSnackbar],
+  );
+
+  const handleOkSuggestedChanges = React.useCallback(() => {
+    returnToBookingDetailsStart("accept_suggested");
+  }, [returnToBookingDetailsStart]);
+
+  const handleSuggestChange = React.useCallback(() => {
+    router.push("/clients/booking?mode=create");
+  }, [router]);
+
+  const handleAcknowledgeRejected = React.useCallback(() => {
+    returnToBookingDetailsStart("acknowledge_rejected");
+  }, [returnToBookingDetailsStart]);
+
+  const showChangeResponsePanel = editRequest.isSuggested || editRequest.isRejected;
+  const detailsContentKey = `${bookingRef}-${editRequest.status ?? "none"}-${bookingStatus}`;
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "#EAF9FB" }}>
@@ -193,8 +357,9 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
           <ClientBookingDetailsHeader
             bookingRef={bookingRef}
             dateTimeLabel={dateTimeLabel}
-            statusLabel={headerStatusLabel}
+            bookingStatus={bookingStatus}
             isCancelled={isCancelled}
+            requiresPrepayment={requiresPrepayment}
             onDeleteBooking={() => setDeleteDialogOpen(true)}
           />
 
@@ -207,13 +372,32 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
               phone={phone}
             />
 
-            <ClientBookingPaymentDetailsCard
-              draft={draft}
-              requesterName={requesterName}
-              requesterAvatarUrl={requesterAvatarUrl}
-              showPrepaidBreakdown={isPrepaid}
-              prepaymentPercent={prepaymentPercent}
-            />
+            {showChangeResponsePanel ? (
+              <ClientBookingChangeResponsePanel
+                variant={editRequest.isRejected ? "rejected" : "suggested"}
+                total={draft?.total ?? 0}
+                prepaidAmount={prepaidAmount}
+                prepaymentPaid={prepaymentState === "paid"}
+                onOk={editRequest.isRejected ? handleAcknowledgeRejected : handleOkSuggestedChanges}
+                onSuggestChange={handleSuggestChange}
+                onViewInvoice={bookingTransactionRow ? openInvoice : undefined}
+                onViewReceipt={(prepaymentReceiptRow ?? bookingTransactionRow) ? openReceipt : undefined}
+              />
+            ) : (
+              <ClientBookingPaymentDetailsCard
+                key={detailsContentKey}
+                draft={draft}
+                requesterName={requesterName}
+                requesterAvatarUrl={requesterAvatarUrl}
+                prepaymentState={isPrepaid ? prepaymentState : "none"}
+                prepaymentPercent={prepaymentPercent}
+                onPayNow={prepaymentState === "required" ? handlePayNow : undefined}
+                onViewInvoice={prepaymentState === "paid" && bookingTransactionRow ? openInvoice : undefined}
+                onViewReceipt={
+                  prepaymentState === "paid" && (prepaymentReceiptRow ?? bookingTransactionRow) ? openReceipt : undefined
+                }
+              />
+            )}
 
             <Box sx={{ mt: 2 }}>
               <ClientBookingPoliciesAccordion
@@ -235,6 +419,28 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
         open={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}
         onConfirm={handleDeleteBooking}
+      />
+
+      <StripePrepaymentDialog
+        open={stripeDialogOpen}
+        amount={prepaidAmount}
+        bookingRef={bookingRef}
+        onClose={() => setStripeDialogOpen(false)}
+        onSuccess={completePrepayment}
+      />
+
+      <FinanceDocumentPreviewDrawer
+        open={Boolean(activeDocument)}
+        onClose={() => setActiveDocument(null)}
+        documentType={activeDocument ?? "invoice"}
+        invoiceType={financeSettings.defaultInvoiceType}
+        settings={financeSettings}
+        row={
+          activeDocument === "receipt"
+            ? (prepaymentReceiptRow ?? bookingTransactionRow)
+            : bookingTransactionRow
+        }
+        professionalBusinessOverride={professionalBusinessOverride}
       />
 
       <MarketingSiteFooter

@@ -30,6 +30,8 @@ export function useBookingEditRequest(bookingRef: string) {
     ...record,
     isApproved: record.status === "approved",
     isPending: record.status === "pending",
+    isSuggested: record.status === "suggested",
+    isRejected: record.status === "rejected",
     refresh,
   };
 }

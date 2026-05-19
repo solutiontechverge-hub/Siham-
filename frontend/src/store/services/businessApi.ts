@@ -1,4 +1,6 @@
 import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
+import { mapApiBookingStatusToClient } from "../../app/clients/booking/clientBookingStatus";
+import { updateClientBookingStatusByRef } from "../../app/clients/booking/clientBookingRecords";
 import { baseApi } from "./baseApi";
 
 type ApiEnvelope<T> = {
@@ -416,6 +418,12 @@ export const businessApi = baseApi.injectEndpoints({
         const data = response.data as ApiEnvelope<CalendarBooking>;
         if (!data.success || !data.data) {
           return { error: customError(data.message || "Unable to update booking status.") };
+        }
+
+        const clientStatus = mapApiBookingStatusToClient(data.data.status);
+        const bookingRef = data.data.unique_code;
+        if (clientStatus && bookingRef) {
+          updateClientBookingStatusByRef(bookingRef, clientStatus);
         }
 
         return { data };

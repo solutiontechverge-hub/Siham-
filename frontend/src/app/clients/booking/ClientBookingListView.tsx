@@ -12,7 +12,9 @@ import {
   statusChipLabel,
   type BookingListTab,
   type ClientBookingRecord,
+  type ClientBookingStatus,
 } from "./clientBookingRecords";
+import { bookingStatusChipColors } from "./clientBookingStatus";
 import { getCheckoutPath, setActiveBookingSession } from "./clientBookingSession";
 
 const fallbackAddress = "Marina-Park 50, Den Helder, Noord-Holland";
@@ -91,8 +93,9 @@ export default function ClientBookingListView({ listTab }: Props) {
                 const date = b.draft?.selectedDateISO ?? "";
                 const time = b.draft?.selectedTime ?? "";
                 const total = b.draft?.total ?? 0;
-                const status = b.status ?? "requested";
-                const chipLabel = statusChipLabel(status, b.requiresPrepayment);
+                const status = (b.status ?? "confirmed") as ClientBookingStatus;
+                const chipLabel = statusChipLabel(status);
+                const chipColors = bookingStatusChipColors(status);
                 return (
                   <ButtonBase
                     key={b.id}
@@ -153,18 +156,9 @@ export default function ClientBookingListView({ listTab }: Props) {
                           sx={{
                             height: 22,
                             fontWeight: 900,
-                            bgcolor:
-                              status === "completed"
-                                ? alpha(m.navy, 0.08)
-                                : status === "confirmed"
-                                  ? alpha(m.teal, 0.12)
-                                  : alpha("#FF9800", 0.14),
-                            color:
-                              status === "completed"
-                                ? alpha(m.navy, 0.6)
-                                : status === "confirmed"
-                                  ? m.teal
-                                  : "#E65100",
+                            bgcolor: chipColors.bgcolor,
+                            color: chipColors.color,
+                            border: chipColors.border,
                           }}
                         />
                         <Typography sx={{ fontWeight: 1000, color: alpha(m.navy, 0.85) }}>{total} €</Typography>

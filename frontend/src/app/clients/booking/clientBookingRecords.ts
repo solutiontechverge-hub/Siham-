@@ -1,6 +1,12 @@
 import type { ClientBookingDraft } from "../../../components/common/client-booking/types";
 
-export type ClientBookingStatus = "requested" | "confirmed" | "completed" | "cancelled";
+export type ClientBookingStatus =
+  | "draft"
+  | "requested"
+  | "confirmed"
+  | "completed"
+  | "cancelled"
+  | "no_show";
 
 export type ClientBookingRecord = {
   id: string;
@@ -54,6 +60,8 @@ function isPastBooking(record: ClientBookingRecord, today = startOfDay(new Date(
 
 function normalizeStatus(record: ClientBookingRecord): ClientBookingStatus {
   if (record.status === "cancelled") return "cancelled";
+  if (record.status === "no_show") return "no_show";
+  if (record.status === "draft") return "confirmed";
   if (record.status === "requested") return "requested";
   if (record.status === "completed") return "completed";
   if (record.status === "confirmed") {
@@ -125,6 +133,36 @@ export function markClientBookingCancelled(id: string) {
   saveClientBookings(next);
 }
 
+export function markClientBookingPrepaid(id: string) {
+  const all = loadClientBookings();
+  const idx = all.findIndex((b) => b.id === id);
+  if (idx < 0) return;
+  const next = [...all];
+  next[idx] = { ...next[idx], prepaid: true };
+  saveClientBookings(next);
+}
+
+export function updateClientBookingStatus(id: string, status: ClientBookingStatus) {
+  const all = loadClientBookings();
+  const idx = all.findIndex((b) => b.id === id);
+  if (idx < 0) return;
+  const next = [...all];
+  next[idx] = { ...next[idx], status };
+  saveClientBookings(next);
+}
+
+export function updateClientBookingStatusByRef(bookingRef: string, status: ClientBookingStatus) {
+  const normalizedRef = bookingRef.replace(/^#/, "").trim();
+  const all = loadClientBookings();
+  const idx = all.findIndex(
+    (b) => b.bookingRef === normalizedRef || b.bookingRef === bookingRef || b.id === normalizedRef,
+  );
+  if (idx < 0) return;
+  const next = [...all];
+  next[idx] = { ...next[idx], status };
+  saveClientBookings(next);
+}
+
 function seedDemoBookings(): ClientBookingRecord[] {
   const today = new Date();
   const past = new Date(today);
@@ -164,13 +202,35 @@ function seedDemoBookings(): ClientBookingRecord[] {
     {
       id: "demo-requested-1",
       status: "requested",
-      shop: { shopName: "Nina Studio", addressLabel: "Rotterdam Centrum" },
+      requiresPrepayment: true,
+      prepaid: false,
+      prepaymentPercent: 20,
+      shop: { shopId: "1", shopName: "Ryan Harris Salon", addressLabel: "Marina-Park 50, Den Helder" },
       draft: {
         selectedDateISO: fmt(future),
-        selectedTime: "4:30 PM",
+        selectedTime: "11:15 AM",
         combineServices: false,
-        services: [{ id: "s3", name: "Hair Coloring", durationMins: 90, price: 120, guestId: null, teamMemberId: null }],
-        total: 120,
+        people: [{ id: "p-requester", name: "Guest", isRequester: true }],
+        teamMembers: [{ id: "tm-2", name: "Ryan Harris" }],
+        services: [
+          {
+            id: "s3",
+            name: "Make-up Basic",
+            durationMins: 60,
+            price: 80,
+            guestId: "p-requester",
+            teamMemberId: "tm-2",
+          },
+          {
+            id: "s4",
+            name: "Lash Lift",
+            durationMins: 50,
+            price: 55,
+            guestId: "p-requester",
+            teamMemberId: "tm-2",
+          },
+        ],
+        total: 135,
       },
       createdAt: today.toISOString(),
     },
@@ -181,9 +241,11 @@ export function filterBookingsByTab(bookings: ClientBookingRecord[], tab: Bookin
   const today = startOfDay(new Date());
   const filtered = bookings.filter((b) => {
     const status = normalizeStatus(b);
-    if (tab === "past") return status === "completed";
+    if (tab === "past") {
+      return status === "completed" || status === "cancelled" || status === "no_show";
+    }
     if (tab === "outgoing") return status === "confirmed" && isPresentBooking(b, today);
-    return status === "requested";
+    return status === "requested" || status === "draft" || (status === "confirmed" && isPresentBooking(b, today));
   });
   return filtered.sort((a, b) => {
     const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
@@ -192,9 +254,4 @@ export function filterBookingsByTab(bookings: ClientBookingRecord[], tab: Bookin
   });
 }
 
-export function statusChipLabel(status: ClientBookingStatus, requiresPrepayment?: boolean): string {
-  if (status === "completed") return "Completed";
-  if (status === "confirmed") return "Confirmed";
-  if (requiresPrepayment) return "Prepayment required";
-  return "Awaiting approval";
-}
+export { bookingStatusLabel as statusChipLabel } from "./clientBookingStatus";

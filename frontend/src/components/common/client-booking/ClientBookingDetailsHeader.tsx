@@ -4,19 +4,26 @@ import * as React from "react";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
-import { Badge, Box, Button, Chip, Divider, IconButton, Menu, MenuItem, Stack, Typography } from "@mui/material";
+import { Badge, Box, Button, Divider, IconButton, Menu, MenuItem, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useRouter } from "next/navigation";
 import { useSnackbar } from "../AppSnackbar";
 import { getMessagingHref, useClientMessagingUnread } from "../messaging";
-import { sendBookingEditRequest } from "./bookingEditRequest";
+import type { ClientBookingStatus } from "../../../app/clients/booking/clientBookingRecords";
+import BookingRequestStatusRow, { type BookingRequestRowMode } from "./BookingRequestStatusRow";
+import {
+  professionalRejectEditRequest,
+  professionalSuggestBookingChanges,
+  sendBookingEditRequest,
+} from "./bookingEditRequest";
 import { useBookingEditRequest } from "./useBookingEditRequest";
 
 type Props = {
   bookingRef: string;
   dateTimeLabel: string;
-  statusLabel?: string;
+  bookingStatus?: ClientBookingStatus;
   isCancelled?: boolean;
+  requiresPrepayment?: boolean;
   onEditServices?: () => void;
   onDeleteBooking?: () => void;
   messagingHref?: string;
@@ -25,8 +32,9 @@ type Props = {
 export default function ClientBookingDetailsHeader({
   bookingRef,
   dateTimeLabel,
-  statusLabel = "Confirmed",
+  bookingStatus = "confirmed",
   isCancelled = false,
+  requiresPrepayment = false,
   onEditServices,
   onDeleteBooking,
   messagingHref,
@@ -35,6 +43,7 @@ export default function ClientBookingDetailsHeader({
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
   const [editAnchor, setEditAnchor] = React.useState<HTMLElement | null>(null);
+  const [activityAnchor, setActivityAnchor] = React.useState<HTMLElement | null>(null);
   const chatHref = messagingHref ?? getMessagingHref("client");
   const unreadFromProfessional = useClientMessagingUnread(bookingRef);
   const editRequest = useBookingEditRequest(bookingRef);
@@ -55,26 +64,13 @@ export default function ClientBookingDetailsHeader({
 
   const menuItemSx = { fontSize: 12.5, fontWeight: 800 };
 
-  const isWarningStatus =
-    statusLabel === "Prepayment required" || statusLabel === "Awaiting approval";
+  const displayStatus: ClientBookingStatus = isCancelled ? "cancelled" : bookingStatus;
 
-  const statusChipSx = isCancelled
-    ? {
-        bgcolor: alpha("#E57373", 0.22),
-        color: "#C62828",
-        border: `1px solid ${alpha("#E57373", 0.35)}`,
-      }
-    : isWarningStatus
-      ? {
-          bgcolor: alpha("#FF9800", 0.14),
-          color: "#E65100",
-          border: `1px solid ${alpha("#FF9800", 0.28)}`,
-        }
-      : {
-          bgcolor: alpha("#4CAF50", 0.14),
-          color: "#2E7D32",
-          border: `1px solid ${alpha("#4CAF50", 0.25)}`,
-        };
+  const requestRowMode: BookingRequestRowMode = editRequest.isSuggested
+    ? "professional_suggested"
+    : editRequest.isRejected
+      ? "professional_rejected"
+      : "default";
 
   const headerActionBtnSx = {
     borderRadius: "8px",
@@ -159,7 +155,12 @@ export default function ClientBookingDetailsHeader({
               >
                 Edit
               </Button>
-              <Button variant="outlined" sx={headerActionBtnSx}>
+              <Button
+                variant="outlined"
+                sx={headerActionBtnSx}
+                disabled={isCancelled}
+                onClick={(e) => setActivityAnchor(e.currentTarget)}
+              >
                 Activity
               </Button>
               {isCancelled ? (
@@ -168,20 +169,47 @@ export default function ClientBookingDetailsHeader({
                 </Button>
               ) : null}
             </Stack>
-            <Chip
-              label={isCancelled ? "Cancelled" : statusLabel}
-              size="small"
-              sx={{
-                height: 22,
-                fontWeight: 900,
-                fontSize: 10.5,
-                ...statusChipSx,
-              }}
+            <BookingRequestStatusRow
+              bookingStatus={displayStatus}
+              requiresPrepayment={requiresPrepayment && requestRowMode === "default"}
+              rowMode={requestRowMode}
             />
           </Stack>
         </Stack>
       </Box>
       <Divider />
+
+      <Menu
+        anchorEl={activityAnchor}
+        open={Boolean(activityAnchor)}
+        onClose={() => setActivityAnchor(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "right" }}
+        PaperProps={{ sx: { borderRadius: "10px", minWidth: 240, mt: 0.5 } }}
+      >
+        <MenuItem
+          onClick={() => {
+            setActivityAnchor(null);
+            professionalSuggestBookingChanges(bookingRef);
+            editRequest.refresh();
+            showSnackbar({ severity: "info", message: "Professional suggested changes (demo)." });
+          }}
+          sx={menuItemSx}
+        >
+          Professional suggests changes
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            setActivityAnchor(null);
+            professionalRejectEditRequest(bookingRef);
+            editRequest.refresh();
+            showSnackbar({ severity: "info", message: "Professional rejected edit request (demo)." });
+          }}
+          sx={menuItemSx}
+        >
+          Professional rejects edit
+        </MenuItem>
+      </Menu>
 
       <Menu
         anchorEl={editAnchor}
@@ -219,7 +247,7 @@ export default function ClientBookingDetailsHeader({
           </MenuItem>
         ) : (
           <MenuItem onClick={handleSendEditRequest} sx={menuItemSx}>
-            Send Edit request to professional
+            Send edit request to professional
           </MenuItem>
         )}
       </Menu>

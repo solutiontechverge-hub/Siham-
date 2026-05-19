@@ -854,37 +854,44 @@ function ClientBookingCreateView() {
   };
 
   const onContinue = () => {
-    try {
-      const peopleForDraft =
-        planningPersonId != null
-          ? people.map((p) =>
-              p.id === planningPersonId
-                ? {
-                    ...p,
-                    planningActivity: planningActivity.trim(),
-                    planningDuration: planningDuration.trim(),
-                  }
-                : p,
-            )
-          : people;
+    const peopleForDraft =
+      planningPersonId != null
+        ? people.map((p) =>
+            p.id === planningPersonId
+              ? {
+                  ...p,
+                  planningActivity: planningActivity.trim(),
+                  planningDuration: planningDuration.trim(),
+                }
+              : p,
+          )
+        : people;
 
-      const payload = {
-        selectedDateISO: toISO(selectedDate),
-        selectedTime,
-        combineServices,
-        people: peopleForDraft,
-        services,
-        teamMembers: shopTeamMembers.map(({ id, name }) => ({ id, name })),
-        total,
-        ...(isDesiredLocation
-          ? {
-              projectDetails: {
-                description: projectDescription,
-                uploads: projectUploads.map((u) => ({ id: u.id, name: u.name })),
-              },
-            }
-          : {}),
-      };
+    const requesterId = peopleForDraft.find((p) => p.isRequester)?.id ?? peopleForDraft[0]?.id ?? "p-requester";
+    const servicesForDraft = services.map((s) => ({
+      ...s,
+      guestId: s.guestId ?? requesterId,
+    }));
+
+    const payload = {
+      selectedDateISO: toISO(selectedDate),
+      selectedTime,
+      combineServices,
+      people: peopleForDraft,
+      services: servicesForDraft,
+      teamMembers: shopTeamMembers.map(({ id, name }) => ({ id, name })),
+      total,
+      ...(isDesiredLocation
+        ? {
+            projectDetails: {
+              description: projectDescription,
+              uploads: projectUploads.map((u) => ({ id: u.id, name: u.name })),
+            },
+          }
+        : {}),
+    };
+
+    try {
       window.localStorage.setItem("mollure:booking_draft", JSON.stringify(payload));
     } catch {
       // ignore
@@ -901,12 +908,15 @@ function ClientBookingCreateView() {
       const requested = {
         id: existingId ?? `bk_req_${Date.now()}`,
         bookingRef,
-        status: "requested" as const,
+        status: "confirmed" as const,
         shop,
         draft: payload,
         createdAt: new Date().toISOString(),
         requiresPrepayment,
-        prepaid: requiresPrepayment,
+        prepaymentPercent: requiresPrepayment
+          ? parsePrepaymentPercent(businessProfile?.prepaymentLabel)
+          : 0,
+        prepaid: false,
       };
       upsertRequestedBooking(requested);
       setActiveBookingSession(requested);
