@@ -5,6 +5,10 @@ import { useTheme } from "@mui/material/styles";
 import { profilePageData } from "./data-profile";
 import { getPasswordStrength } from "../../../lib/passwordStrength";
 import {
+  isAllowedProfileImageFile,
+  PROFILE_IMAGE_INVALID_MESSAGE,
+} from "../../../lib/profileImageUpload";
+import {
   type CompanyProfile,
   type IndividualProfile,
   type ProfileResponse,
@@ -183,12 +187,41 @@ export function useClientProfilePage() {
   });
   const [isEditing, setIsEditing] = React.useState(false);
   const [form, setForm] = React.useState<ProfileFormState>(initialForm);
+  const [pendingAvatarFile, setPendingAvatarFile] = React.useState<File | null>(null);
   const [successMessage, setSuccessMessage] = React.useState("");
   const [errorMessage, setErrorMessage] = React.useState("");
 
   const profile = data?.data ?? null;
   const profileKind = profile?.user_type ?? "individual";
   const isCompanyProfile = profileKind === "company";
+
+  const avatarObjectUrl = React.useMemo(() => {
+    if (!pendingAvatarFile) return null;
+    return URL.createObjectURL(pendingAvatarFile);
+  }, [pendingAvatarFile]);
+
+  React.useEffect(() => {
+    return () => {
+      if (avatarObjectUrl) URL.revokeObjectURL(avatarObjectUrl);
+    };
+  }, [avatarObjectUrl]);
+
+  const prevProfileVersionRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!profile) {
+      prevProfileVersionRef.current = null;
+      return;
+    }
+    const version = `${profile.id}:${profile.updated_at}`;
+    if (prevProfileVersionRef.current === null) {
+      prevProfileVersionRef.current = version;
+      return;
+    }
+    if (prevProfileVersionRef.current !== version) {
+      prevProfileVersionRef.current = version;
+      setPendingAvatarFile(null);
+    }
+  }, [profile?.id, profile?.updated_at, profile]);
 
   React.useEffect(() => {
     if (!profile) {
@@ -291,7 +324,24 @@ export function useClientProfilePage() {
               confirm_password: form.confirmPassword || undefined,
             };
 
-      const result = await updateProfile(payload).unwrap();
+      let result;
+      if (pendingAvatarFile) {
+        const fd = new FormData();
+        for (const [key, value] of Object.entries(payload)) {
+          if (value === undefined || value === "") continue;
+          fd.append(key, String(value));
+        }
+        if (profile.user_type === "company") {
+          fd.append("logo", pendingAvatarFile);
+        } else {
+          fd.append("profile_picture", pendingAvatarFile);
+        }
+        result = await updateProfile(fd).unwrap();
+      } else {
+        result = await updateProfile(payload).unwrap();
+      }
+
+      setPendingAvatarFile(null);
 
       if (result.data.user_type === "company") {
         const companyProfile = result.data.profile as CompanyProfile | null;
@@ -333,8 +383,17 @@ export function useClientProfilePage() {
     }
   };
 
-  const setAvatarUrl = React.useCallback((nextUrl: string | null) => {
-    setForm((prev) => ({ ...prev, logoOrProfilePicture: nextUrl }));
+  const registerAvatarFile = React.useCallback((file: File | null) => {
+    if (!file) {
+      setPendingAvatarFile(null);
+      return;
+    }
+    if (!isAllowedProfileImageFile(file)) {
+      setErrorMessage(PROFILE_IMAGE_INVALID_MESSAGE);
+      return;
+    }
+    setErrorMessage("");
+    setPendingAvatarFile(file);
   }, []);
 
   const fieldsDisabled = !isEditing;
@@ -362,8 +421,8 @@ export function useClientProfilePage() {
     profile,
     profileKind,
     isCompanyProfile,
-    avatarUrl: form.logoOrProfilePicture,
-    setAvatarUrl,
+    avatarUrl: avatarObjectUrl ?? form.logoOrProfilePicture,
+    registerAvatarFile,
     form,
     isLoading,
     loadError,

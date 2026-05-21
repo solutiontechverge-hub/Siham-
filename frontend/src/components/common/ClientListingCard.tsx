@@ -2,6 +2,8 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import FavoriteBorderRoundedIcon from "@mui/icons-material/FavoriteBorderRounded";
 import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
@@ -12,6 +14,35 @@ import Image from "next/image";
 import type { ListingCardData } from "../../app/clients/listing/listing.data";
 import { resolveBusinessOfferingFlags } from "../../data/businessPublicProfile.data";
 import AppCard from "./AppCard";
+
+function toImageSrc(img: ListingCardData["image"]) {
+  if (!img) return "";
+  if (typeof img === "string") return img;
+  if (typeof img === "object") {
+    if (typeof img.src === "string") return img.src;
+    if (typeof img.default === "string") return img.default;
+    if (typeof img.default === "object") return toImageSrc(img.default);
+  }
+  return String(img);
+}
+
+function ListingCardImage({ image, alt }: { image: ListingCardData["image"]; alt: string }) {
+  const src = toImageSrc(image);
+  const isRemote = src.startsWith("http://") || src.startsWith("https://");
+
+  if (isRemote) {
+    return (
+      <Box
+        component="img"
+        src={src}
+        alt={alt}
+        sx={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+      />
+    );
+  }
+
+  return <Image src={image} alt={alt} fill priority={false} style={{ objectFit: "cover" }} />;
+}
 
 export type ClientListingCardProps = {
   item: ListingCardData;
@@ -31,6 +62,28 @@ export default function ClientListingCard({ item, isFavorite, onToggleFavorite }
   const [mode, setMode] = React.useState<"fixed" | "desired">(initialMode);
   const canPickFixed = offering.supportsFixedLocation;
   const canPickDesired = offering.supportsDesiredLocation;
+  const slides = React.useMemo(() => {
+    if (item.media.length > 0) {
+      return item.media;
+    }
+    return [item.image];
+  }, [item.image, item.media]);
+
+  const [activeSlide, setActiveSlide] = React.useState(0);
+
+  React.useEffect(() => {
+    setActiveSlide(0);
+  }, [item.id, slides.length]);
+
+  const safeSlideIndex = Math.min(activeSlide, Math.max(0, slides.length - 1));
+  const currentImage = slides[safeSlideIndex] ?? item.image;
+  const keywordRows = React.useMemo(() => {
+    const keywords = item.businessKeywords.filter(Boolean);
+    if (keywords.length === 0) return [];
+    if (keywords.length <= 2) return [keywords.join(" | ")];
+    const midpoint = Math.ceil(keywords.length / 2);
+    return [keywords.slice(0, midpoint).join(" | "), keywords.slice(midpoint).join(" | ")];
+  }, [item.businessKeywords]);
 
   const onOpenProfile = () => {
     try {
@@ -63,7 +116,7 @@ export default function ClientListingCard({ item, isFavorite, onToggleFavorite }
     >
       <Box sx={{ position: "relative" }}>
         <Box sx={{ position: "relative", height: 170 }}>
-          <Image src={item.image} alt={item.title} fill priority={false} style={{ objectFit: "cover" }} />
+          <ListingCardImage image={currentImage} alt={item.title} />
         </Box>
 
         <IconButton
@@ -91,46 +144,111 @@ export default function ClientListingCard({ item, isFavorite, onToggleFavorite }
           )}
         </IconButton>
 
-        {/* Carousel dots (visual only) */}
-        <Box
-          sx={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            bottom: 10,
-            display: "flex",
-            justifyContent: "center",
-            gap: 0.75,
-            pointerEvents: "none",
-          }}
-        >
-          {[0, 1, 2, 3].map((i) => (
-            <Box
-              key={i}
-              sx={{
-                width: 8,
-                height: 8,
-                borderRadius: 999,
-                bgcolor: i === 1 ? "#fff" : "rgba(255,255,255,0.55)",
-                border: i === 1 ? "1px solid rgba(0,0,0,0.12)" : "1px solid rgba(0,0,0,0.08)",
+        {slides.length > 1 ? (
+          <>
+            <IconButton
+              aria-label="Previous image"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveSlide((i) => (i - 1 + slides.length) % slides.length);
               }}
-            />
-          ))}
-        </Box>
+              size="small"
+              sx={{
+                position: "absolute",
+                left: 8,
+                top: "50%",
+                transform: "translateY(-50%)",
+                zIndex: 2,
+                width: 30,
+                height: 30,
+                bgcolor: "rgba(255,255,255,0.9)",
+                border: `1px solid ${tokens.border}`,
+                boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
+                "&:hover": { bgcolor: "#fff" },
+              }}
+            >
+              <ChevronLeftRoundedIcon sx={{ fontSize: 18 }} />
+            </IconButton>
+            <IconButton
+              aria-label="Next image"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveSlide((i) => (i + 1) % slides.length);
+              }}
+              size="small"
+              sx={{
+                position: "absolute",
+                right: 8,
+                top: "50%",
+                transform: "translateY(-50%)",
+                zIndex: 2,
+                width: 30,
+                height: 30,
+                bgcolor: "rgba(255,255,255,0.9)",
+                border: `1px solid ${tokens.border}`,
+                boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
+                "&:hover": { bgcolor: "#fff" },
+              }}
+            >
+              <ChevronRightRoundedIcon sx={{ fontSize: 18 }} />
+            </IconButton>
+          <Box
+            sx={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 10,
+              display: "flex",
+              justifyContent: "center",
+              gap: 0.75,
+            }}
+          >
+            {slides.map((_, i) => (
+              <Box
+                key={i}
+                component="button"
+                type="button"
+                aria-label={`Show image ${i + 1}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActiveSlide(i);
+                }}
+                sx={{
+                  width: 8,
+                  height: 8,
+                  p: 0,
+                  border: i === safeSlideIndex ? "1px solid rgba(0,0,0,0.12)" : "1px solid rgba(0,0,0,0.08)",
+                  borderRadius: 999,
+                  cursor: "pointer",
+                  bgcolor: i === safeSlideIndex ? "#fff" : "rgba(255,255,255,0.55)",
+                }}
+              />
+            ))}
+          </Box>
+          </>
+        ) : null}
       </Box>
 
       <CardContent sx={{ p: 2.25 }}>
         <Stack spacing={1.4} sx={{ textAlign: "center" }}>
-          <Box sx={{ color: alpha(tokens.navy, 0.5), fontSize: 13, lineHeight: 1.2 }}>
-            Lorem Ipsum | Lorem | Lorem Ipsum
-          </Box>
-          <Box sx={{ color: alpha(tokens.navy, 0.5), fontSize: 13, lineHeight: 1.2 }}>
-            Lorem Ipsum | Lorem | Lorem Ipsum
-          </Box>
+          {keywordRows.map((row, rowIndex) => (
+            <Typography
+              key={`${row}-${rowIndex}`}
+              sx={{ color: alpha(tokens.navy, 0.5), fontSize: 13, lineHeight: 1.2 }}
+            >
+              {row}
+            </Typography>
+          ))}
 
           <Typography sx={{ fontWeight: 400, color: alpha(tokens.navy, 0.78), fontSize: 18, lineHeight: 1.35 }}>
-            {item.title} {item.subtitle}
+            {item.title}
           </Typography>
+
+          {item.subtitle ? (
+            <Typography sx={{ fontSize: 13, color: alpha(tokens.navy, 0.55), lineHeight: 1.35 }}>
+              {item.subtitle}
+            </Typography>
+          ) : null}
 
           <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.75}>
             <LocationOnOutlinedIcon sx={{ fontSize: 16, color: alpha(tokens.navy, 0.55) }} />
@@ -143,7 +261,9 @@ export default function ClientListingCard({ item, isFavorite, onToggleFavorite }
                 <StarRoundedIcon key={i} sx={{ fontSize: 22, color: tokens.star }} />
               ))}
             </Box>
-            <Typography sx={{ fontSize: 12, color: alpha(tokens.navy, 0.55) }}>{item.reviewsCount} Reviews</Typography>
+            <Typography sx={{ fontSize: 12, color: alpha(tokens.navy, 0.55) }}>
+              {item.reviewsCount} Reviews · {item.rating.toFixed(1)}
+            </Typography>
           </Box>
 
           {canPickFixed && canPickDesired ? (
@@ -242,4 +362,3 @@ export default function ClientListingCard({ item, isFavorite, onToggleFavorite }
     </AppCard>
   );
 }
-

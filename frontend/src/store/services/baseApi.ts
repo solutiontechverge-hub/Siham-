@@ -31,8 +31,6 @@ const rawBaseQuery = fetchBaseQuery({
       headers.set("authorization", `Bearer ${token}`);
     }
 
-    headers.set("Content-Type", "application/json");
-
     return headers;
   },
 });
@@ -60,7 +58,7 @@ const baseQueryWithAuthHandling: BaseQueryFn<string | FetchArgs, unknown, FetchB
 
 export const baseApi = createApi({
   reducerPath: "baseApi",
-  tagTypes: ["Profile", "BusinessSetup", "BusinessCategories", "Calendar"],
+  tagTypes: ["Profile", "BusinessSetup", "BusinessSetupsListing", "BusinessCategories", "Calendar"],
   baseQuery: baseQueryWithAuthHandling,
   /** Keep cached query data longer after the last subscriber unmounts (seconds). */
   keepUnusedDataFor: 600,

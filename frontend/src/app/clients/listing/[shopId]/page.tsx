@@ -2,24 +2,22 @@
 
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Box, Container } from "@mui/material";
+import { Box, CircularProgress, Container, Typography } from "@mui/material";
 import { BusinessPublicProfile, MarketingSiteFooter, MollureMarketingHeader } from "../../../../components/common";
-import {
-  getBusinessPublicProfileByShopId,
-  resolveBusinessOfferingFlags,
-} from "../../../../data/businessPublicProfile.data";
+import { resolveBusinessOfferingFlags } from "../../../../data/businessPublicProfile.data";
 import {
   savePublicProfileBookingSelection,
   type PublicProfileBookingSelection,
 } from "../../../../data/publicProfileBookingSelection";
 import { marketingShellFooter } from "../../../../data/marketingShell.data";
+import { useBusinessPublicProfile } from "../../../../hooks/useBusinessPublicProfile";
 import { useAppSelector } from "../../../../store/hooks";
 
 export default function ClientBusinessProfilePage() {
   const router = useRouter();
   const params = useParams();
   const shopId = typeof params?.shopId === "string" ? params.shopId : "";
-  const profile = React.useMemo(() => getBusinessPublicProfileByShopId(shopId), [shopId]);
+  const { profile, isLoading, isError } = useBusinessPublicProfile(shopId);
 
   const user = useAppSelector((s) => s.auth.user);
   const displayName =
@@ -108,11 +106,25 @@ export default function ClientBusinessProfilePage() {
     router.push(`/clients/booking?mode=create&from=profile&t=${Date.now()}`);
   };
 
-  if (!profile) {
+  if (isLoading) {
     return (
       <Box sx={{ minHeight: "100vh", bgcolor: "#EAF9FB", py: 4 }}>
         <Container maxWidth="lg">
-          <Box sx={{ textAlign: "center", py: 8 }}>Business not found.</Box>
+          <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+            <CircularProgress />
+          </Box>
+        </Container>
+      </Box>
+    );
+  }
+
+  if (isError || !profile) {
+    return (
+      <Box sx={{ minHeight: "100vh", bgcolor: "#EAF9FB", py: 4 }}>
+        <Container maxWidth="lg">
+          <Box sx={{ textAlign: "center", py: 8 }}>
+            <Typography>{isError ? "Unable to load business profile." : "Business not found."}</Typography>
+          </Box>
         </Container>
       </Box>
     );

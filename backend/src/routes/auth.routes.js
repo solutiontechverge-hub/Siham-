@@ -11,6 +11,7 @@ import {
 } from "../controllers/auth.controller.js";
 import { validateRequest } from "../middleware/validate.middleware.js";
 import { upload } from "../middleware/upload.middleware.js";
+import { optionalOtherLink, optionalWebsite } from "../validators/optionalWebUrl.js";
 
 const router = express.Router();
 const userTypes = ["individual", "company", "professional"];
@@ -43,14 +44,8 @@ router.post(
     body("confirm_password")
       .custom((value, { req }) => value === req.body.password)
       .withMessage("confirm_password must match password."),
-    body("website")
-      .optional({ values: "falsy" })
-      .isURL()
-      .withMessage("website must be a valid URL."),
-    body("other_link")
-      .optional({ values: "falsy" })
-      .isURL()
-      .withMessage("other_link must be a valid URL."),
+    optionalWebsite(),
+    optionalOtherLink(),
     body("experience_years")
       .optional({ values: "falsy" })
       .isInt({ min: 0 })

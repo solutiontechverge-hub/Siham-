@@ -8,6 +8,7 @@ import {
   Alert,
   Box,
   Button,
+  CircularProgress,
   Container,
   Grid,
   MenuItem,
@@ -25,8 +26,9 @@ import {
   MollureMarketingHeader,
   MollureTextField,
 } from "../../../components/common";
-import { listingPageData, type ListingCardData } from "./listing.data";
+import { listingPageData } from "./listing.data";
 import { useClientListingState, useListingTokens, type ListingSortValue } from "./listing.use";
+import { useListingCards } from "./use-listing-cards";
 import { ListingBG, FixedLocationIcon, DesiredLocationIcon } from "../../../../images";
 import { useAppSelector } from "../../../store/hooks";
 import { marketingShellFooter } from "../../../data/marketingShell.data";
@@ -44,7 +46,8 @@ function toSrc(img: any) {
 
 export default function ClientListingPage() {
   const tokens = useListingTokens();
-  const { header, filters: filterData, toolbar, cards } = listingPageData;
+  const { filters: filterData, toolbar } = listingPageData;
+  const { cards, isLoading, isError, error } = useListingCards();
   const state = useClientListingState(cards);
   const user = useAppSelector((s) => s.auth.user);
   const displayName =
@@ -210,30 +213,50 @@ export default function ClientListingPage() {
           </MollureTextField>
         </Stack>
 
-        <Grid container spacing={2.5}>
-          {state.items.map((item) => (
-            <Grid item xs={12} sm={6} md={4} key={item.id}>
-              <ClientListingCard
-                item={item}
-                isFavorite={Boolean(state.favorites[item.id])}
-                onToggleFavorite={() => {
-                  const wasFavorite = Boolean(state.favorites[item.id]);
-                  state.toggleFavorite(item.id);
-                  if (!wasFavorite) setSnackbarOpen(true);
-                }}
-              />
-            </Grid>
-          ))}
-        </Grid>
+        {isLoading ? (
+          <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+            <CircularProgress sx={{ color: tokens.teal }} />
+          </Box>
+        ) : isError ? (
+          <Alert severity="error" sx={{ borderRadius: 2 }}>
+            {typeof error === "object" && error && "data" in error
+              ? String((error as { data?: { message?: string } }).data?.message ?? "Unable to load listings.")
+              : "Unable to load listings."}
+          </Alert>
+        ) : state.items.length === 0 ? (
+          <Box sx={{ py: 6, textAlign: "center" }}>
+            <Typography sx={{ color: alpha(tokens.navy, 0.65), fontWeight: 600 }}>
+              No professionals found. Try adjusting your filters.
+            </Typography>
+          </Box>
+        ) : (
+          <Grid container spacing={2.5}>
+            {state.items.map((item) => (
+              <Grid item xs={12} sm={6} md={4} key={item.id}>
+                <ClientListingCard
+                  item={item}
+                  isFavorite={Boolean(state.favorites[item.id])}
+                  onToggleFavorite={() => {
+                    const wasFavorite = Boolean(state.favorites[item.id]);
+                    state.toggleFavorite(item.id);
+                    if (!wasFavorite) setSnackbarOpen(true);
+                  }}
+                />
+              </Grid>
+            ))}
+          </Grid>
+        )}
 
-        <Box sx={{ mt: 3.5 }}>
-          <AppPagination
-            count={state.totalPages}
-            page={state.page}
-            onChange={(_e, next) => state.setPage(next)}
-            summary={`${state.totalCount} results`}
-          />
-        </Box>
+        {!isLoading && !isError ? (
+          <Box sx={{ mt: 3.5 }}>
+            <AppPagination
+              count={state.totalPages}
+              page={state.page}
+              onChange={(_e, next) => state.setPage(next)}
+              summary={`${state.totalCount} results`}
+            />
+          </Box>
+        ) : null}
       </Container>
 
       <MarketingSiteFooter

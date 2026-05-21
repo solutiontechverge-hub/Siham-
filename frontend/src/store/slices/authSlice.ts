@@ -1,7 +1,7 @@
 import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 
 export type AuthUser = {
-  id: number;
+  id: string;
   email: string;
   user_type: string;
   is_email_verified: boolean;

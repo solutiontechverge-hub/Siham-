@@ -10,8 +10,8 @@ type ApiEnvelope<T> = {
 export type UserType = "individual" | "company" | "professional";
 
 export type IndividualProfile = {
-  id: number;
-  user_id: number;
+  id: string;
+  user_id: string;
   first_name: string | null;
   last_name: string | null;
   display_name: string | null;
@@ -23,8 +23,8 @@ export type IndividualProfile = {
 };
 
 export type CompanyProfile = {
-  id: number;
-  user_id: number;
+  id: string;
+  user_id: string;
   legal_name: string | null;
   ccc_number: string | null;
   vat_number: string | null;
@@ -40,8 +40,8 @@ export type CompanyProfile = {
 };
 
 export type ProfessionalProfile = {
-  id: number;
-  user_id: number;
+  id: string;
+  user_id: string;
   legal_name: string | null;
   ccc_number: string | null;
   vat_number: string | null;
@@ -62,7 +62,7 @@ export type ProfessionalProfile = {
 };
 
 export type ProfileResponse = {
-  id: number;
+  id: string;
   user_type: UserType;
   email: string;
   is_email_verified: boolean;
@@ -101,6 +101,8 @@ export type UpdateProfileRequest = Partial<{
   logo?: string;
   profile_picture?: string;
 };
+
+export type UpdateProfilePayload = UpdateProfileRequest | FormData;
 
 type MutationError = FetchBaseQueryError;
 
@@ -154,7 +156,7 @@ export const profileApi = baseApi.injectEndpoints({
       },
       providesTags: ["Profile"],
     }),
-    updateProfile: builder.mutation<ApiEnvelope<ProfileResponse>, UpdateProfileRequest>({
+    updateProfile: builder.mutation<ApiEnvelope<ProfileResponse>, UpdateProfilePayload>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
         const response = await fetchWithBQ({
           url: "/api/user/profile",

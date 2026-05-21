@@ -34,6 +34,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo, Profile as AvatarPlaceholder } from "../../../../images";
+import { PROFILE_IMAGE_FILE_ACCEPT } from "../../../lib/profileImageUpload";
 import { profilePageData } from "./data-profile";
 import { useClientProfilePage } from "./use-profile";
 import { ClientPageTabsBar, clientTopTabsActiveLabel, MollureMarketingHeader } from "../../../components/common";
@@ -65,7 +66,7 @@ export default function ClientProfilePage() {
     profile,
     isCompanyProfile,
     avatarUrl,
-    setAvatarUrl,
+    registerAvatarFile,
     form,
     isLoading,
     loadError,
@@ -95,13 +96,7 @@ export default function ClientProfilePage() {
   const handleAvatarPick = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = typeof reader.result === "string" ? reader.result : null;
-      if (result) setAvatarUrl(result);
-    };
-    reader.readAsDataURL(file);
-    // allow picking same file again
+    registerAvatarFile(file);
     event.target.value = "";
   };
 
@@ -400,7 +395,7 @@ export default function ClientProfilePage() {
           <Box sx={{ px: { xs: 2.5, sm: 3.5 }, pt: 3, pb: { xs: 2.5, sm: 3.5 } }}>
             <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 3 }}>
               <Box component="label" sx={{ cursor: "pointer", display: "inline-flex" }}>
-                <input type="file" accept="image/*" hidden onChange={handleAvatarPick} />
+                <input type="file" accept={PROFILE_IMAGE_FILE_ACCEPT} hidden onChange={handleAvatarPick} />
                 <Avatar
                   src={avatarUrl || imgSrc(AvatarPlaceholder)}
                   sx={{ width: 72, height: 72, bgcolor: tokens.avatarBg }}

@@ -1,4 +1,15 @@
 import { getClient, query } from "../db/index.js";
+import {
+  isS3UploadConfigured,
+  uploadBusinessMediaFilesToS3,
+} from "../services/s3-upload.service.js";
+import { buildServiceDetailsFromCategories } from "../utils/business-service-categories.js";
+import {
+  isValidUuid,
+  parseOptionalUuid,
+  parseUuid,
+  parseUuidArray,
+} from "../utils/uuid.js";
 
 const parseJsonValue = (value, fallback) => {
   if (value === undefined || value === null || value === "") {
@@ -39,13 +50,6 @@ const parseTextArray = (value) => {
   }
 
   return [];
-};
-
-const parseBigIntArray = (value) => {
-  const items = parseTextArray(value);
-  return items
-    .map((item) => Number(item))
-    .filter((item) => Number.isInteger(item) && item > 0);
 };
 
 const parseJsonArray = (value) => {
@@ -124,15 +128,12 @@ const normalizeServiceCategories = (value) => {
         return null;
       }
 
-      const categoryId = Number(item.category_id);
-      const serviceId = Number(item.service_id);
+      const categoryId = parseUuid(item.category_id);
+      const serviceId = parseUuid(item.service_id);
       const amount = parseOptionalNumber(item.amount);
+      const durationLabel = String(item.duration_label ?? item.duration ?? "").trim() || null;
 
-      if (!Number.isInteger(categoryId) || categoryId <= 0) {
-        return null;
-      }
-
-      if (!Number.isInteger(serviceId) || serviceId <= 0) {
+      if (!categoryId || !serviceId) {
         return null;
       }
 
@@ -140,6 +141,7 @@ const normalizeServiceCategories = (value) => {
         category_id: categoryId,
         service_id: serviceId,
         amount: amount ?? 0,
+        duration_label: durationLabel,
       };
     })
     .filter(Boolean);
@@ -152,14 +154,10 @@ const normalizeBookServiceCombinations = (value) => {
         return null;
       }
 
-      const categoryId = Number(item.category_id);
-      const serviceId = Number(item.service_id);
+      const categoryId = parseUuid(item.category_id);
+      const serviceId = parseUuid(item.service_id);
 
-      if (!Number.isInteger(categoryId) || categoryId <= 0) {
-        return null;
-      }
-
-      if (!Number.isInteger(serviceId) || serviceId <= 0) {
+      if (!categoryId || !serviceId) {
         return null;
       }
 
@@ -185,15 +183,15 @@ const normalizeTeamMembers = (value) => {
         return null;
       }
 
-      const id = Number(item.id);
+      const id = parseUuid(item.id);
       const normalizedAssignedServices = parseJsonArray(item.assigned_services)
         .map((service) => {
           if (!service || typeof service !== "object") {
             return null;
           }
 
-          const serviceId = Number(service.service_id);
-          if (!Number.isInteger(serviceId) || serviceId <= 0) {
+          const serviceId = parseUuid(service.service_id);
+          if (!serviceId) {
             return null;
           }
 
@@ -205,7 +203,7 @@ const normalizeTeamMembers = (value) => {
         .filter(Boolean);
 
       return {
-        id: Number.isInteger(id) && id > 0 ? id : null,
+        id: id || null,
         full_name: fullName,
         role: String(item.role ?? "Team member").trim() || "Team member",
         profile_photo: item.profile_photo ? String(item.profile_photo).trim() : null,
@@ -253,53 +251,41 @@ const getBusinessSetupDetailById = async (setupId, client = { query }) => {
     return null;
   }
 
-  const [teamMembersResult, serviceDetailsResult] = await Promise.all([
-    client.query(
-      `SELECT
-         id,
-         business_setup_id,
-         full_name,
-         role,
-         profile_photo,
-         assigned_services,
-         display_order,
-         created_at,
-         updated_at
-       FROM business_team_members
-       WHERE business_setup_id = $1
-       ORDER BY display_order ASC, id ASC`,
-      [setupId],
-    ),
-    client.query(
-      `SELECT
-         bsd.id,
-         bsd.business_setup_id,
-         bsd.service_id,
-         bsd.price,
-         bsd.created_at,
-         s.title AS service_title,
-         s.category_id,
-         c.title AS category_title
-       FROM business_service_details bsd
-       INNER JOIN subcategories s ON s.id = bsd.service_id
-       INNER JOIN categories c ON c.id = s.category_id
-       WHERE bsd.business_setup_id = $1
-       ORDER BY c.title, s.title`,
-      [setupId],
-    ),
-  ]);
+  const teamMembersResult = await client.query(
+    `SELECT
+       id,
+       business_setup_id,
+       full_name,
+       role,
+       profile_photo,
+       assigned_services,
+       display_order,
+       created_at,
+       updated_at
+     FROM business_team_members
+     WHERE business_setup_id = $1
+     ORDER BY display_order ASC, id ASC`,
+    [setupId],
+  );
 
   const teamMembers = teamMembersResult.rows.map((member) => ({
     ...member,
     assigned_services: parseJsonArray(member.assigned_services),
   }));
 
+  const serviceCategories = parseJsonArray(businessSetup.service_categories);
+  const serviceDetails = await buildServiceDetailsFromCategories(
+    serviceCategories,
+    setupId,
+    client.query.bind(client),
+  );
+
   return {
     ...businessSetup,
-    service_categories: parseJsonArray(businessSetup.service_categories),
+    service_categories: serviceCategories,
     book_service_combinations: parseJsonArray(businessSetup.book_service_combinations),
     team_members: teamMembers,
-    service_details: serviceDetailsResult.rows,
+    service_details: serviceDetails,
   };
 };
 
@@ -435,6 +421,108 @@ export const getBusinessSetup = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to fetch business setup.",
+      data: {
+        error: error.message,
+      },
+    });
+  }
+};
+
+const isPersistedMediaUrl = (value) =>
+  typeof value === "string" && (value.startsWith("http://") || value.startsWith("https://"));
+
+export const uploadBusinessMedia = async (req, res) => {
+  try {
+    if (req.user.user_type !== "professional") {
+      return res.status(403).json({
+        success: false,
+        message: "Only professional users can upload business media.",
+        data: null,
+      });
+    }
+
+    const files = Array.isArray(req.files) ? req.files : [];
+
+    if (!files.length) {
+      return res.status(400).json({
+        success: false,
+        message: "No image files provided.",
+        data: null,
+      });
+    }
+
+    if (!isS3UploadConfigured()) {
+      return res.status(503).json({
+        success: false,
+        message: "File upload is temporarily unavailable.",
+        data: null,
+      });
+    }
+
+    const professionalProfile = await getProfessionalProfile(req.user.id);
+
+    if (!professionalProfile) {
+      return res.status(404).json({
+        success: false,
+        message: "Professional profile not found.",
+        data: null,
+      });
+    }
+
+    const existingSetup = await getBusinessSetupByUserId(req.user.id);
+    const existingMedia = parseTextArray(existingSetup?.business_media).filter(isPersistedMediaUrl);
+
+    if (existingMedia.length + files.length > 4) {
+      return res.status(400).json({
+        success: false,
+        message: `You can upload at most 4 images (${existingMedia.length} already saved).`,
+        data: null,
+      });
+    }
+
+    const uploadedUrls = await uploadBusinessMediaFilesToS3(req.user.id, files);
+    const nextMedia = [...existingMedia, ...uploadedUrls].slice(0, 4);
+
+    let businessSetupId;
+
+    if (existingSetup) {
+      const result = await query(
+        `UPDATE business_setups
+         SET business_media = $2, updated_at = NOW()
+         WHERE id = $1
+         RETURNING id`,
+        [existingSetup.id, nextMedia],
+      );
+      businessSetupId = result.rows[0]?.id;
+    } else {
+      const result = await query(
+        `INSERT INTO business_setups (professional_profile_id, location_mode, business_media)
+         VALUES ($1, 'fixed', $2)
+         RETURNING id`,
+        [professionalProfile.id, nextMedia],
+      );
+      businessSetupId = result.rows[0]?.id;
+    }
+
+    if (!businessSetupId) {
+      return res.status(500).json({
+        success: false,
+        message: "Failed to save business media.",
+        data: null,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Business media uploaded successfully.",
+      data: {
+        business_media: nextMedia,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to upload business media.",
       data: {
         error: error.message,
       },
@@ -617,7 +705,7 @@ export const upsertBusinessSetup = async (req, res) => {
         await client.query(
           `DELETE FROM business_team_members
            WHERE business_setup_id = $1
-             AND NOT (id = ANY($2::bigint[]))`,
+             AND NOT (id = ANY($2::uuid[]))`,
           [businessSetup.id, syncedTeamMemberIds],
         );
       } else {
@@ -627,37 +715,10 @@ export const upsertBusinessSetup = async (req, res) => {
           [businessSetup.id],
         );
       }
-      const serviceIds = serviceCategories.map((item) => item.service_id);
-
-      if (serviceCategories.length > 0) {
-        for (const item of serviceCategories) {
-          await client.query(
-            `INSERT INTO business_service_details (business_setup_id, service_id, price)
-             VALUES ($1, $2, $3)
-             ON CONFLICT (business_setup_id, service_id)
-             DO UPDATE SET price = EXCLUDED.price`,
-            [businessSetup.id, item.service_id, item.amount],
-          );
-        }
-
-        await client.query(
-          `DELETE FROM business_service_details
-           WHERE business_setup_id = $1
-             AND NOT (service_id = ANY($2::bigint[]))`,
-          [businessSetup.id, serviceIds],
-        );
-      } else {
-        await client.query(
-          `DELETE FROM business_service_details
-           WHERE business_setup_id = $1`,
-          [businessSetup.id],
-        );
-      }
-
       await client.query(
         `UPDATE business_setups
          SET
-           team_member_ids = $2::bigint[],
+           team_member_ids = $2::uuid[],
            updated_at = NOW()
          WHERE id = $1`,
         [businessSetup.id, syncedTeamMemberIds],
@@ -682,102 +743,6 @@ export const upsertBusinessSetup = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to save business setup.",
-      data: {
-        error: error.message,
-      },
-    });
-  }
-};
-
-export const createBusinessServiceDetail = async (req, res) => {
-  try {
-    if (req.user.user_type !== "professional") {
-      return res.status(403).json({
-        success: false,
-        message: "Only professional users can manage business services.",
-        data: null,
-      });
-    }
-
-    const businessSetup = await getBusinessSetupByUserId(req.user.id);
-
-    if (!businessSetup) {
-      return res.status(404).json({
-        success: false,
-        message: "Business setup not found.",
-        data: null,
-      });
-    }
-
-    const services = req.body.services;
-    const insertedServices = [];
-
-    for (const service of services) {
-      const result = await query(
-        `INSERT INTO business_service_details (business_setup_id, service_id, price)
-         VALUES ($1, $2, $3)
-         ON CONFLICT (business_setup_id, service_id)
-         DO UPDATE SET price = EXCLUDED.price
-         RETURNING *`,
-        [businessSetup.id, service.service_id, service.price],
-      );
-      insertedServices.push(result.rows[0]);
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: "Business service details saved successfully.",
-      data: insertedServices,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to save business service details.",
-      data: {
-        error: error.message,
-      },
-    });
-  }
-};
-
-export const listBusinessServiceDetails = async (req, res) => {
-  try {
-    if (req.user.user_type !== "professional") {
-      return res.status(403).json({
-        success: false,
-        message: "Only professional users can access business service details.",
-        data: null,
-      });
-    }
-
-    const businessSetup = await getBusinessSetupByUserId(req.user.id);
-
-    if (!businessSetup) {
-      return res.status(200).json({
-        success: true,
-        message: "Business service details fetched successfully.",
-        data: [],
-      });
-    }
-
-    const result = await query(
-      `SELECT bsd.*, s.title AS service_title
-       FROM business_service_details bsd
-       INNER JOIN subcategories s ON s.id = bsd.service_id
-       WHERE bsd.business_setup_id = $1
-       ORDER BY s.title`,
-      [businessSetup.id],
-    );
-
-    return res.status(200).json({
-      success: true,
-      message: "Business service details fetched successfully.",
-      data: result.rows,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch business service details.",
       data: {
         error: error.message,
       },
@@ -896,7 +861,7 @@ export const createCalendarEntry = async (req, res) => {
        RETURNING *`,
       [
         professionalProfile.id,
-        parseOptionalInteger(req.body.team_member_id),
+        parseOptionalUuid(req.body.team_member_id),
         normalizedStatus,
         req.body.title || (normalizedStatus === "blocked" ? "Blocked time" : "Offline booking"),
         req.body.unique_code || makeCalendarCode(codePrefix),
@@ -910,7 +875,7 @@ export const createCalendarEntry = async (req, res) => {
         normalizedBookingType,
         req.body.client_name ?? null,
         req.body.notes ?? null,
-        parseBigIntArray(req.body.service_ids),
+        parseUuidArray(req.body.service_ids),
       ],
     );
 
@@ -1215,8 +1180,8 @@ export const updateCalendarEntryStatus = async (req, res) => {
       });
     }
 
-    const entryId = Number.parseInt(req.params.id, 10);
-    if (!Number.isInteger(entryId) || entryId <= 0) {
+    const entryId = parseUuid(req.params.id);
+    if (!entryId) {
       return res.status(400).json({
         success: false,
         message: "Invalid calendar entry id.",
@@ -1286,8 +1251,8 @@ export const updateBookingStatus = async (req, res) => {
       });
     }
 
-    const bookingId = Number.parseInt(req.params.id, 10);
-    if (!Number.isInteger(bookingId) || bookingId <= 0) {
+    const bookingId = parseUuid(req.params.id);
+    if (!bookingId) {
       return res.status(400).json({
         success: false,
         message: "Invalid booking id.",

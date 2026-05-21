@@ -60,6 +60,7 @@ export {
   clientTopTabsActiveLabel,
 } from "./ClientTopTabs";
 export { default as MarketingSiteHeader } from "./MarketingSiteHeader";
+export { default as ProfessionalMarketingHeader } from "./ProfessionalMarketingHeader";
 export { default as MollureMarketingHeader } from "./MollureMarketingHeader";
 export { default as MarketingSiteFooter } from "./MarketingSiteFooter";
 export { default as MarketingSectionHeading } from "./MarketingSectionHeading";

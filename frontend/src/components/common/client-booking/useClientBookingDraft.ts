@@ -6,7 +6,7 @@ import {
   type ClientBookingRecord,
 } from "../../../app/clients/booking/clientBookingRecords";
 import { ACTIVE_BOOKING_ID_KEY } from "../../../app/clients/booking/clientBookingSession";
-import { getBusinessPublicProfileByShopId } from "../../../data/businessPublicProfile.data";
+import { useBusinessPublicProfile } from "../../../hooks/useBusinessPublicProfile";
 import { useActiveClientBooking } from "./useActiveClientBooking";
 import type { ClientBookingDraft, ClientBookingSelectedShop } from "./types";
 import { parsePrepaymentPercent } from "./parsePrepaymentPercent";
@@ -65,15 +65,19 @@ export function useClientBookingDraft() {
     return () => window.removeEventListener(BOOKINGS_CHANGED_EVENT, hydrateFromStorage);
   }, [hydrateFromStorage]);
 
-  const businessProfile = React.useMemo(
-    () => (shop?.shopId ? getBusinessPublicProfileByShopId(shop.shopId) : null),
-    [shop?.shopId],
-  );
+  const { profile: businessProfile, isLoading: isBusinessProfileLoading } = useBusinessPublicProfile(shop?.shopId);
 
   const prepaymentPercent = React.useMemo(
     () => parsePrepaymentPercent(businessProfile?.prepaymentLabel),
     [businessProfile?.prepaymentLabel],
   );
 
-  return { draft, shop, businessProfile, prepaymentPercent, requiresPrepayment: prepaymentPercent > 0 };
+  return {
+    draft,
+    shop,
+    businessProfile,
+    prepaymentPercent,
+    requiresPrepayment: prepaymentPercent > 0,
+    isBusinessProfileLoading,
+  };
 }
