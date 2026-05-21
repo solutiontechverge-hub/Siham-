@@ -1,13 +1,18 @@
 export { default as AppButton } from "./AppButton";
 export { default as AppCard } from "./AppCard";
+export { mollureGradientIconSx, useMollureIconGradient } from "./MollureIconGradient";
+export { default as ServiceCategorySliderCard } from "./ServiceCategorySliderCard";
 export { default as AppDrawer } from "./AppDrawer";
 export { default as AppDropdown } from "./AppDropdown";
 export { default as AppFooter } from "./AppFooter";
 export { default as AppPagination } from "./AppPagination";
 export { default as AppSearchField } from "./AppSearchField";
 export { default as AppSegmentTabs } from "./AppSegmentTabs";
+export { default as AppPillTabs } from "./AppPillTabs";
 export { default as AppSelect } from "./AppSelect";
 export { default as AppTextField } from "./AppTextField";
+export { default as ClientListHeaderCard } from "./ClientListHeaderCard";
+export { default as ClientListDataCard } from "./ClientListDataCard";
 export { default as MollureFormField } from "./MollureFormField";
 export {
   MollureLabeledField,
@@ -26,6 +31,34 @@ export { default as ContentCard } from "./ContentCard";
 export { default as FilterPanel } from "./FilterPanel";
 export { default as ImageCard } from "./ImageCard";
 export * from "./ListingFilterBox";
+export { default as ClientProfileMenuPopover } from "./ClientProfileMenuPopover";
+export { default as ClientListingCard } from "./ClientListingCard";
+export { default as BusinessPublicProfile } from "./BusinessPublicProfile";
+export {
+  ClientBookingDetailsView,
+  ClientBookingPaymentDetailsCard,
+  ClientBookingPoliciesAccordion,
+  buildBookingSummarySections,
+  parsePrepaymentPercent,
+  useClientBookingDraft,
+  useClientRequesterProfile,
+} from "./client-booking";
+export type { ClientBookingDetailsVariant, ClientBookingDraft } from "./client-booking";
+export { default as ClientNotificationsDrawer } from "./ClientNotificationsDrawer";
+export {
+  MessagingPageView,
+  MessagingPageShell,
+  getMessagingHref,
+  messagingSearchPlaceholder,
+} from "./messaging";
+export type { MessagingAudience } from "./messaging";
+export { default as ExportMenuPopover } from "./ExportMenuPopover";
+export {
+  default as ClientTopTabs,
+  ClientPageTabsBar,
+  CLIENT_TOP_TABS,
+  clientTopTabsActiveLabel,
+} from "./ClientTopTabs";
 export { default as MarketingSiteHeader } from "./MarketingSiteHeader";
 export { default as MollureMarketingHeader } from "./MollureMarketingHeader";
 export { default as MarketingSiteFooter } from "./MarketingSiteFooter";

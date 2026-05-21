@@ -4,6 +4,8 @@ import * as React from "react";
 import { Box, Container, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import DesiredLocationTopTabs, { type DesiredLocationTopTab } from "./DesiredLocationTopTabs";
+import MarketingSiteFooter from "./MarketingSiteFooter";
+import { professionalsMarketingFooter } from "../../data/marketingShell.data";
 
 export type DesiredLocationPageScaffoldProps = {
   activeTopTab: string;
@@ -27,6 +29,12 @@ export default function DesiredLocationPageScaffold({
           {children}
         </Stack>
       </Container>
+
+      <MarketingSiteFooter
+        columns={professionalsMarketingFooter.columns.map((col) => ({ title: col.title, items: [...col.items] }))}
+        copyright={professionalsMarketingFooter.copyright}
+        sx={{ mt: 2 }}
+      />
     </Box>
   );
 }

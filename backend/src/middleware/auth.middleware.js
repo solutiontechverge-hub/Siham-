@@ -1,11 +1,35 @@
 import { query } from "../db/index.js";
 import { verifyAccessToken } from "../helpers/jwt.helper.js";
 
+const parseCookieHeader = (cookieHeader = "") => {
+  return cookieHeader
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .reduce((acc, pair) => {
+      const separatorIndex = pair.indexOf("=");
+      if (separatorIndex <= 0) return acc;
+      const key = pair.slice(0, separatorIndex).trim();
+      const value = pair.slice(separatorIndex + 1).trim();
+      if (key) acc[key] = decodeURIComponent(value);
+      return acc;
+    }, {});
+};
+
+const extractAccessToken = (req) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith("Bearer ")) {
+    return authHeader.split(" ")[1];
+  }
+
+  const cookies = parseCookieHeader(req.headers.cookie);
+  return cookies.access_token || cookies.token || null;
+};
+
 export const authenticateUser = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader?.startsWith("Bearer ")) {
+    const token = extractAccessToken(req);
+    if (!token) {
       return res.status(401).json({
         success: false,
         message: "Authorization token is required.",
@@ -13,7 +37,6 @@ export const authenticateUser = async (req, res, next) => {
       });
     }
 
-    const token = authHeader.split(" ")[1];
     const decoded = verifyAccessToken(token);
 
     const result = await query(
@@ -50,4 +73,32 @@ export const authenticateUser = async (req, res, next) => {
       data: null,
     });
   }
+};
+
+export const authorizeRoles = (...allowedRoles) => {
+  const normalizedRoles = allowedRoles
+    .flat()
+    .map((role) => String(role).trim().toLowerCase())
+    .filter(Boolean);
+
+  return (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication is required.",
+        data: null,
+      });
+    }
+
+    const userRole = String(req.user.user_type ?? "").trim().toLowerCase();
+    if (!normalizedRoles.includes(userRole)) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not authorized to access this resource.",
+        data: null,
+      });
+    }
+
+    return next();
+  };
 };

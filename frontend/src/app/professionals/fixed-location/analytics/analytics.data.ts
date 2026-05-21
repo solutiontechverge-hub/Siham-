@@ -48,6 +48,13 @@ export type BookingByServiceCategoryRow = {
   isTotal?: boolean;
 };
 
+import type { ProfessionalFixedLocationSalesVolumeAnalyticsData } from "./salesVolumeAnalytics.data";
+import { professionalFixedLocationSalesVolumeAnalyticsData } from "./salesVolumeAnalytics.data";
+import type { ProfessionalFixedLocationPerformanceAnalyticsData } from "./performanceAnalytics.data";
+import { professionalFixedLocationPerformanceAnalyticsData } from "./performanceAnalytics.data";
+import type { ProfessionalFixedLocationRatingReviewAnalyticsData } from "./ratingReviewAnalytics.data";
+import { professionalFixedLocationRatingReviewAnalyticsData } from "./ratingReviewAnalytics.data";
+
 export type ProfessionalFixedLocationAnalyticsData = {
   header: {
     title: string;
@@ -55,6 +62,9 @@ export type ProfessionalFixedLocationAnalyticsData = {
   };
   subTabs: readonly ProfessionalAnalyticsSubTab[];
   initialSubTab: ProfessionalAnalyticsSubTab;
+  salesVolume: ProfessionalFixedLocationSalesVolumeAnalyticsData;
+  performance: ProfessionalFixedLocationPerformanceAnalyticsData;
+  ratingReview: ProfessionalFixedLocationRatingReviewAnalyticsData;
   sections: {
     bookingOriginAndType: {
       title: string;
@@ -101,6 +111,9 @@ export const professionalFixedLocationAnalyticsData: ProfessionalFixedLocationAn
     "Rating and Review Analytics",
   ],
   initialSubTab: "Booking and Operational Analytics",
+  salesVolume: professionalFixedLocationSalesVolumeAnalyticsData,
+  performance: professionalFixedLocationPerformanceAnalyticsData,
+  ratingReview: professionalFixedLocationRatingReviewAnalyticsData,
   sections: {
     bookingOriginAndType: {
       title: "1.1 Booking Origin and type",

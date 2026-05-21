@@ -82,6 +82,7 @@ export default function MollureListToolbar({
               height: 34,
               px: 1.25,
               bgcolor: "primary.main",
+              color: "#fff",
               "&:hover": { bgcolor: "mollure.tealDark" },
             }}
           >

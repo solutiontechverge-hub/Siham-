@@ -7,6 +7,7 @@ const theme = createTheme({
     mode: "light",
     primary: {
       main: "#21B8BF",
+      dark: "#149CA7",
     },
     secondary: {
       main: "#E9F8F9",
@@ -19,9 +20,17 @@ const theme = createTheme({
       primary: "#344A66",
       secondary: "#71819A",
     },
+    success: {
+      main: "#4CAF50",
+      dark: "#2E7D32",
+      light: "#E8F5E9",
+      contrastText: "#FFFFFF",
+    },
     mollure: {
       teal: "#21B8BF",
       tealDark: "#149CA7",
+      success: "#4CAF50",
+      successDark: "#2E7D32",
       navy: "#344A66",
       slate: "#71819A",
       surface: "#F7FBFD",
@@ -29,6 +38,10 @@ const theme = createTheme({
       footerText: "#D7E3EC",
       footerMuted: "rgba(215,227,236,0.68)",
       mintSoft: "#E8FBF7",
+      /** Mint → aqua for brand line icons (e.g. service category slider) */
+      iconGradientStart: "#A8E6CF",
+      iconGradientEnd: "#88D8D0",
+      iconGradient: "linear-gradient(180deg, #A8E6CF 0%, #88D8D0 100%)",
       heroGradientStart: "#DCF7EE",
       heroGradientEnd: "#B4EEE9",
       heroGlow:
@@ -55,6 +68,16 @@ const theme = createTheme({
       descriptionText: "#5A5A5A",
       warmwarning: "#FFFCF5",
       white: "#FFFFFF",
+      // Fixed-location schedule palette (from provided design)
+      fxLavenderTint: "#FAF6FFCF",
+      fxMintTint: "#EFFDF199",
+      fxGrayF2F4F7: "#F2F4F7",
+      fxGrayF4F4F4: "#F4F4F4",
+      fxGrayDCDFE3: "#DCDFE3",
+      fxGrayF9FAFB: "#F9FAFB",
+      fxSurface: "#FFFFFF",
+      fxPillTrack: "#EFFDF199",
+      fxPillBorder: "#DCDFE3",
     },
     
   },
@@ -66,7 +89,7 @@ const theme = createTheme({
       fontFamily: "inherit",
       fontWeight: 600,
       fontSize: "30px",
-      lineHeight: "16px",
+      lineHeight: 1.2,
       color: "#344054",
     },
     subHeading: {
@@ -104,6 +127,13 @@ const theme = createTheme({
       lineHeight: "22px",
       letterSpacing: "0.01em",
     },
+    formLabel: {
+      fontFamily: "inherit",
+      fontWeight: 500,
+      fontSize: "14px",
+      lineHeight: "normal",
+      color: "#71819A",
+    },
   },
 
   components: {
@@ -116,6 +146,7 @@ const theme = createTheme({
           cardTitle: "h3",
           bodyText: "p",
           headerNav: "span",
+          formLabel: "span",
         },
       },
     },

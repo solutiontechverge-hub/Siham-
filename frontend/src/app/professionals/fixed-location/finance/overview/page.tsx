@@ -8,11 +8,14 @@ import {
   Paper,
 } from "@mui/material";
 import { alpha, useTheme, type Theme } from "@mui/material/styles";
-import { mockTransactions } from "../data/transactions";
+import { mockTransactions, type TransactionRow } from "../data/transactions";
 import FinanceFiltersDrawerView, { type FinanceFiltersValue } from "../../../../../components/sections/finance/FinanceFiltersDrawerView";
+import FinanceDocumentPreviewDrawer from "../../../../../components/sections/finance/FinanceDocumentPreviewDrawer";
 import TransactionsHeader from "../../../../../components/sections/finance/TransactionsHeader";
 import TransactionsTable from "../../../../../components/sections/finance/TransactionsTable";
 import TransactionsToolbar from "../../../../../components/sections/finance/TransactionsToolbar";
+import { useFinanceInvoiceSettings } from "../../../../../components/sections/finance/useFinanceInvoiceSettings";
+import { useGetProfileQuery } from "../../../../../store/services/profileApi";
 
 const INITIAL_VISIBLE = 4;
 
@@ -27,6 +30,8 @@ function normalizeMethod(value?: string | null) {
 export default function FinanceOverviewPage() {
   const theme = useTheme();
   const m = theme.palette.mollure;
+  const { settings } = useFinanceInvoiceSettings();
+  const { data: profileResponse } = useGetProfileQuery();
 
   const [query, setQuery] = React.useState("");
   const [selected, setSelected] = React.useState<Record<string, boolean>>({});
@@ -38,6 +43,10 @@ export default function FinanceOverviewPage() {
   const [toDate, setToDate] = React.useState<string | null>(null);
   const [dateRangeError, setDateRangeError] = React.useState<string | null>(null);
   const [visibleCount, setVisibleCount] = React.useState(INITIAL_VISIBLE);
+  const [activeDocument, setActiveDocument] = React.useState<{
+    row: TransactionRow;
+    documentType: "invoice" | "receipt";
+  } | null>(null);
 
   React.useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE);
@@ -258,6 +267,7 @@ export default function FinanceOverviewPage() {
         selected={selected}
         onToggleOne={toggleOne}
         onToggleAll={toggleAll}
+        onOpenDocument={(row, documentType) => setActiveDocument({ row, documentType })}
         canLoadMore={canLoadMore}
         onLoadMore={
           canLoadMore
@@ -266,6 +276,16 @@ export default function FinanceOverviewPage() {
         }
         theme={theme as Theme}
         m={m}
+      />
+
+      <FinanceDocumentPreviewDrawer
+        open={Boolean(activeDocument)}
+        onClose={() => setActiveDocument(null)}
+        documentType={activeDocument?.documentType ?? "invoice"}
+        invoiceType={settings.defaultInvoiceType}
+        settings={settings}
+        row={activeDocument?.row ?? null}
+        profileData={profileResponse?.data ?? null}
       />
     </Paper>
   );

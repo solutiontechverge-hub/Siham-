@@ -1,7 +1,9 @@
 "use client";
 
+import { useMemo } from "react";
 import FixedLocationPageScaffold from "../../../../components/common/FixedLocationPageScaffold";
 import {
+  Alert,
   Avatar,
   Box,
   Button,
@@ -12,6 +14,7 @@ import {
   MenuItem,
   Paper,
   Grid,
+  Snackbar,
   Stack,
   Table,
   TableBody,
@@ -34,12 +37,49 @@ import MollureFormField from "../../../../components/common/MollureFormField";
 import MollureModal from "../../../../components/common/MollureModal";
 import MollureDrawer from "../../../../components/common/MollureDrawer";
 import MollureListToolbar from "../../../../components/common/MollureListToolbar";
+import { ClientListDataCard, ClientListHeaderCard } from "../../../../components/common";
 import { useFixedLocationClientPage } from "./useFixedLocationClientPage";
 import { Typography } from "../../../../components/ui/typography";
 
 export default function FixedLocationClientPage() {
   const theme = useTheme();
   const m = theme.palette.mollure;
+
+  const genderSelectProps = useMemo(
+    () => ({
+      displayEmpty: true as const,
+      renderValue: (selected: unknown) => {
+        const v = String(selected ?? "").trim();
+        if (!v) {
+          return (
+            <Typography component="span" sx={{ color: alpha(m.navy, 0.48), fontWeight: 500, fontSize: "0.8125rem" }}>
+              Select gender
+            </Typography>
+          );
+        }
+        return v;
+      },
+    }),
+    [m.navy],
+  );
+
+  const clientTypeSelectProps = useMemo(
+    () => ({
+      displayEmpty: true as const,
+      renderValue: (selected: unknown) => {
+        const v = String(selected ?? "").trim();
+        if (!v) {
+          return (
+            <Typography component="span" sx={{ color: alpha(m.navy, 0.48), fontWeight: 500, fontSize: "0.8125rem" }}>
+              Select client type
+            </Typography>
+          );
+        }
+        return v;
+      },
+    }),
+    [m.navy],
+  );
 
   const {
     clients,
@@ -72,8 +112,6 @@ export default function FixedLocationClientPage() {
     setSelectedMollureId,
     nonMollureClientType,
     setNonMollureClientType,
-    nonMollureStep,
-    setNonMollureStep,
     indFirstName,
     setIndFirstName,
     indLastName,
@@ -132,13 +170,30 @@ export default function FixedLocationClientPage() {
     deleteClient,
     openClientDetailsEdit,
     mollureResults,
+    addMollureClient,
+    addNonMollureClient,
+    snackbar,
+    closeSnackbar,
     openNonMollureAddDrawer,
     closeClientDetailsDrawer,
     confirmDeleteClient,
+    confirmBlockClient,
+    saveClientEdits,
   } = useFixedLocationClientPage();
 
   return (
     <FixedLocationPageScaffold activeTopTab="Client" topTabs={fixedLocationTopTabs}>
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={2500}
+        onClose={closeSnackbar}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert onClose={closeSnackbar} severity={snackbar.severity} variant="filled" sx={{ fontWeight: 700 }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+
       <Paper
         elevation={0}
         sx={{
@@ -149,16 +204,10 @@ export default function FixedLocationClientPage() {
           overflow: "hidden",
         }}
       >
-        {/* Header */}
+        {/* Header Card */}
         <Box sx={{ px: 2.25, py: 1.75 }}>
-          <Typography sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 18, lineHeight: 1.15 }}>
-            Client List
-          </Typography>
-          <Typography sx={{ mt: 0.4, color: alpha(m.navy, 0.55), fontSize: 12.5, fontWeight: 600 }}>
-            View Clients added to the list
-          </Typography>
+          <ClientListHeaderCard title="Client List" subtitle="View Clients added to the list" />
         </Box>
-        <Box sx={{ height: 1, bgcolor: alpha(m.navy, 0.06) }} />
 
         {/* Toolbar */}
         <MollureListToolbar
@@ -251,133 +300,165 @@ export default function FixedLocationClientPage() {
         </Menu>
 
         {/* Table */}
-        <Box sx={{ px: 2.25, pb: 2.25 }}>
-          <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.72), mb: 1 }}>
-            Clients ({clients.length})
-          </Typography>
+        <Box sx={{ px: 2.25, pb: 2.5 }}>
+          <ClientListDataCard>
+            <Typography
+              sx={{
+                fontSize: 13,
+                fontWeight: 800,
+                color: alpha(m.navy, 0.78),
+                mb: 1.25,
+              }}
+            >
+              Clients ({clients.length})
+            </Typography>
 
-          <TableContainer
-            component={Paper}
-            elevation={0}
-            sx={{
-              borderRadius: "10px",
-              border: `1px solid ${alpha(m.navy, 0.10)}`,
-              overflow: "hidden",
-            }}
-          >
-            <Table size="small">
-              <TableHead>
-                <TableRow sx={{ bgcolor: alpha(m.navy, 0.02) }}>
-                  {["Client Name", "Phone Number", "Total Sales", "Last Booking Date", ""].map((h) => (
-                    <TableCell
-                      key={h || "actions"}
-                      sx={{
-                        fontSize: 11.5,
-                        fontWeight: 800,
-                        color: alpha(m.navy, 0.62),
-                        py: 1.2,
-                        borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
-                      }}
-                      align={h === "" ? "right" : "left"}
-                    >
-                      {h}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {filtered.map((c) => (
-                  <TableRow key={c.id} hover sx={{ "& td": { borderBottom: `1px solid ${alpha(m.navy, 0.06)}` } }}>
-                    <TableCell sx={{ py: 1.25 }}>
-                      <Stack direction="row" spacing={1.1} alignItems="center">
-                        <Avatar
-                          src={c.photoSrc}
-                          sx={{
-                            width: 30,
-                            height: 30,
-                            bgcolor: alpha(m.navy, 0.08),
-                            color: alpha(m.navy, 0.78),
-                            fontWeight: 800,
-                            fontSize: 12,
-                          }}
-                        >
-                          {c.name
-                            .split(" ")
-                            .map((p) => p[0])
-                            .join("")
-                            .slice(0, 2)
-                            .toUpperCase()}
-                        </Avatar>
-                        <Box sx={{ minWidth: 0 }}>
-                          <Stack direction="row" spacing={0.75} alignItems="center">
-                            <Typography sx={{ fontWeight: 900, fontSize: 12.5, color: alpha(m.navy, 0.86) }}>
-                              {c.name}
-                            </Typography>
-                            {c.tags.includes("CC") && (
+            <TableContainer
+              component={Paper}
+              elevation={0}
+              sx={{
+                borderRadius: "12px",
+                border: `1px solid ${alpha(m.navy, 0.06)}`,
+                overflow: "hidden",
+              }}
+            >
+              <Table
+                size="small"
+                sx={{
+                  borderCollapse: "collapse",
+                  "& td": {
+                    borderBottom: `1px solid ${alpha(m.navy, 0.035)}`,
+                    borderRight: `1px solid ${alpha(m.navy, 0.04)}`,
+                  },
+                  "& tr > td:last-of-type": {
+                    borderRight: "none",
+                  },
+                  "& tbody tr:hover": {
+                    backgroundColor: alpha(m.navy, 0.025),
+                  },
+                }}
+              >
+                <TableHead>
+                  <TableRow sx={{ bgcolor: alpha(m.navy, 0.02) }}>
+                    {["Client Name", "Phone Number", "Total Sales", "Last Booking Date", ""].map((h, colIdx, arr) => (
+                      <TableCell
+                        key={h || "actions"}
+                        sx={{
+                          fontSize: 12,
+                          fontWeight: 800,
+                          color: alpha(m.navy, 0.7),
+                          py: 1.25,
+                          letterSpacing: "0.02em",
+                          borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
+                          borderRight: colIdx < arr.length - 1 ? `1px solid ${alpha(m.navy, 0.04)}` : "none",
+                        }}
+                        align={h === "" ? "right" : "left"}
+                      >
+                        {h}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filtered.map((c) => (
+                    <TableRow key={c.id} hover>
+                      <TableCell sx={{ py: 1.35 }}>
+                        <Stack direction="row" spacing={1.1} alignItems="center">
+                          <Avatar
+                            src={c.photoSrc}
+                            sx={{
+                              width: 32,
+                              height: 32,
+                              bgcolor: alpha(m.navy, 0.08),
+                              color: alpha(m.navy, 0.78),
+                              fontWeight: 800,
+                              fontSize: 13,
+                            }}
+                          >
+                            {c.name
+                              .split(" ")
+                              .map((p) => p[0])
+                              .join("")
+                              .slice(0, 2)
+                              .toUpperCase()}
+                          </Avatar>
+                          <Box sx={{ minWidth: 0 }}>
+                            <Stack direction="row" spacing={0.75} alignItems="center">
+                              <Typography
+                                sx={{
+                                  fontWeight: 900,
+                                  fontSize: 13,
+                                  color: alpha(m.navy, 0.88),
+                                }}
+                              >
+                                {c.name}
+                              </Typography>
+                              {c.tags.includes("CC") && (
+                                <Chip
+                                  label="CC Client"
+                                  size="small"
+                                  sx={{
+                                    height: 18,
+                                    borderRadius: "999px",
+                                    bgcolor: alpha(theme.palette.primary.main, 0.10),
+                                    color: theme.palette.primary.main,
+                                    fontSize: 10,
+                                    fontWeight: 800,
+                                    px: 0.5,
+                                  }}
+                                />
+                              )}
                               <Chip
-                                label="CC Client"
+                                label={c.tags.includes("Mollure") ? "Mollure" : "Non-Mollure"}
                                 size="small"
                                 sx={{
                                   height: 18,
                                   borderRadius: "999px",
-                                  bgcolor: alpha(theme.palette.primary.main, 0.10),
-                                  color: theme.palette.primary.main,
+                                  bgcolor: c.tags.includes("Mollure")
+                                    ? alpha(theme.palette.primary.main, 0.10)
+                                    : alpha(m.teal, 0.14),
+                                  color: c.tags.includes("Mollure") ? theme.palette.primary.main : alpha(m.teal, 0.95),
                                   fontSize: 10,
                                   fontWeight: 800,
                                   px: 0.5,
                                 }}
                               />
-                            )}
-                            <Chip
-                              label={c.tags.includes("Mollure") ? "Mollure" : "Non-Mollure"}
-                              size="small"
-                              sx={{
-                                height: 18,
-                                borderRadius: "999px",
-                                bgcolor: c.tags.includes("Mollure")
-                                  ? alpha(theme.palette.primary.main, 0.10)
-                                  : alpha(m.teal, 0.14),
-                                color: c.tags.includes("Mollure") ? theme.palette.primary.main : alpha(m.teal, 0.95),
-                                fontSize: 10,
-                                fontWeight: 800,
-                                px: 0.5,
-                              }}
-                            />
-                          </Stack>
-                          <Typography sx={{ fontSize: 11.5, fontWeight: 600, color: alpha(m.navy, 0.50) }}>
-                            {c.email}
-                          </Typography>
-                        </Box>
-                      </Stack>
-                    </TableCell>
-                    <TableCell sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.75) }}>
-                      {c.phone}
-                    </TableCell>
-                    <TableCell sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.78) }}>
-                      {c.totalSales}
-                    </TableCell>
-                    <TableCell sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.75) }}>
-                      {c.lastBooking}
-                    </TableCell>
-                    <TableCell align="right">
-                      <IconButton
-                        size="small"
-                        onClick={(e) => setRowMenu({ id: c.id, anchor: e.currentTarget })}
-                        sx={{
-                          width: 30,
-                          height: 30,
-                          borderRadius: "8px",
-                          color: alpha(m.navy, 0.55),
-                        }}
-                      >
-                        <MoreVertRoundedIcon sx={{ fontSize: 18 }} />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                            </Stack>
+                            <Typography sx={{ fontSize: 11.5, fontWeight: 600, color: alpha(m.navy, 0.50) }}>
+                              {c.email}
+                            </Typography>
+                          </Box>
+                        </Stack>
+                      </TableCell>
+                      <TableCell sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.75) }}>
+                        {c.phone}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.78) }}>
+                        {c.totalSales}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.75) }}>
+                        {c.lastBooking}
+                      </TableCell>
+                      <TableCell align="right">
+                        <IconButton
+                          size="small"
+                          onClick={(e) => setRowMenu({ id: c.id, anchor: e.currentTarget })}
+                          sx={{
+                            width: 30,
+                            height: 30,
+                            borderRadius: "8px",
+                            color: alpha(m.navy, 0.55),
+                          }}
+                        >
+                          <MoreVertRoundedIcon sx={{ fontSize: 18 }} />
+                        </IconButton>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </ClientListDataCard>
         </Box>
 
         <Menu
@@ -456,15 +537,13 @@ export default function FixedLocationClientPage() {
             <Button
               variant="contained"
               disableElevation
-              onClick={() => {
-                // Hook your API here. For now: close modal only.
-                setBlockClientId(null);
-              }}
+              onClick={confirmBlockClient}
               sx={{
                 borderRadius: "8px",
                 textTransform: "none",
                 fontWeight: 900,
                 bgcolor: "primary.main",
+                color: "#fff",
                 "&:hover": { bgcolor: "mollure.tealDark" },
                 height: 34,
                 px: 3,
@@ -595,6 +674,23 @@ export default function FixedLocationClientPage() {
               >
                 Cancel
               </Button>
+              <Button
+                variant="contained"
+                disableElevation
+                onClick={saveClientEdits}
+                sx={{
+                  borderRadius: "8px",
+                  textTransform: "none",
+                  fontWeight: 900,
+                  bgcolor: "primary.main",
+                  color: "#fff",
+                  "&:hover": { bgcolor: "mollure.tealDark" },
+                  height: 36,
+                  px: 3,
+                }}
+              >
+                Update
+              </Button>
             </Stack>
           ) : null
         }
@@ -695,15 +791,18 @@ export default function FixedLocationClientPage() {
                     />
                     <MollureFormField
                       select
-                      value={editCompanyForm.gender || "Select Gender"}
+                      label="Gender"
+                      value={editCompanyForm.gender}
                       onChange={(e) => setEditCompanyForm((p) => ({ ...p, gender: e.target.value }))}
                       sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                      SelectProps={genderSelectProps}
                     >
-                      {["Select Gender", "Male", "Female", "Other"].map((o) => (
-                        <MenuItem key={o} value={o === "Select Gender" ? "" : o}>
-                          {o}
-                        </MenuItem>
-                      ))}
+                      <MenuItem value="">
+                        <Typography sx={{ color: alpha(m.navy, 0.5) }}>Select gender</Typography>
+                      </MenuItem>
+                      <MenuItem value="Male">Male</MenuItem>
+                      <MenuItem value="Female">Female</MenuItem>
+                      <MenuItem value="Other">Other</MenuItem>
                     </MollureFormField>
 
                     <Box sx={{ pt: 0.25 }}>
@@ -890,15 +989,18 @@ export default function FixedLocationClientPage() {
                     />
                     <MollureFormField
                       select
-                      value={editIndividualForm.gender || "Select Gender"}
+                      label="Gender"
+                      value={editIndividualForm.gender}
                       onChange={(e) => setEditIndividualForm((p) => ({ ...p, gender: e.target.value }))}
                       sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                      SelectProps={genderSelectProps}
                     >
-                      {["Select Gender", "Male", "Female", "Other"].map((o) => (
-                        <MenuItem key={o} value={o === "Select Gender" ? "" : o}>
-                          {o}
-                        </MenuItem>
-                      ))}
+                      <MenuItem value="">
+                        <Typography sx={{ color: alpha(m.navy, 0.5) }}>Select gender</Typography>
+                      </MenuItem>
+                      <MenuItem value="Male">Male</MenuItem>
+                      <MenuItem value="Female">Female</MenuItem>
+                      <MenuItem value="Other">Other</MenuItem>
                     </MollureFormField>
                     <Box sx={{ pt: 0.25 }}>
                       <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
@@ -1241,12 +1343,13 @@ export default function FixedLocationClientPage() {
               variant="contained"
               disableElevation
               disabled={!selectedMollureId}
-              onClick={() => setAddMollureOpen(false)}
+              onClick={addMollureClient}
               sx={{
                 borderRadius: "8px",
                 textTransform: "none",
                 fontWeight: 900,
                 bgcolor: "primary.main",
+                color: "#fff",
                 "&:hover": { bgcolor: "mollure.tealDark" },
                 height: 36,
                 px: 2.25,
@@ -1351,22 +1454,7 @@ export default function FixedLocationClientPage() {
         open={addNonMollureOpen}
         onClose={() => setAddNonMollureOpen(false)}
         width={{ xs: "100%", sm: 440 }}
-        title={
-          nonMollureStep === "individual"
-            ? "Add Individual Client"
-            : nonMollureStep === "company"
-              ? "Add Company Client"
-              : "Add Non-Mollure Client"
-        }
-        onBack={
-          nonMollureStep !== "type"
-            ? () => {
-                setNonMollureStep("type");
-                setIndErrors({});
-                setCompErrors({});
-              }
-            : undefined
-        }
+        title="Add Non-Mollure Client"
         footer={
           <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ px: 2.5, py: 2 }}>
             <Button
@@ -1389,69 +1477,55 @@ export default function FixedLocationClientPage() {
               variant="contained"
               disableElevation
               onClick={() => {
-                if (nonMollureStep === "type") {
-                  if (!nonMollureClientType) {
-                    setNonMollureTypeError("Please select a client type");
-                    return;
-                  }
-                  setNonMollureTypeError("");
-                  setIndErrors({});
-                  setCompErrors({});
-                  setNonMollureStep(nonMollureClientType === "Company Client" ? "company" : "individual");
-                  return;
-                }
-                if (nonMollureStep === "individual") {
-                  if (!validateIndividual()) return;
-                  setAddNonMollureOpen(false);
-                  return;
-                }
-                if (nonMollureStep === "company") {
-                  if (!validateCompany()) return;
-                  setAddNonMollureOpen(false);
-                }
+                addNonMollureClient();
               }}
               sx={{
                 borderRadius: "8px",
                 textTransform: "none",
                 fontWeight: 900,
                 bgcolor: "primary.main",
+                color: "#fff",
                 "&:hover": { bgcolor: "mollure.tealDark" },
                 height: 36,
                 px: 3,
               }}
             >
-              {nonMollureStep === "company" ? "Save" : "Next"}
+              Save
             </Button>
           </Stack>
         }
       >
         <Box sx={{ px: 2.5, py: 2 }}>
-            {nonMollureStep === "type" && (
-              <>
-                <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
-                  Client Type
-                </Typography>
-                <MollureFormField
-                  select
-                  value={nonMollureClientType || "Select Client Type"}
-                  onChange={(e) => {
-                    setNonMollureClientType(e.target.value as "" | "Individual Client" | "Company Client");
-                    setNonMollureTypeError("");
-                  }}
-                  error={Boolean(nonMollureTypeError)}
-                  helperText={nonMollureTypeError}
-                  sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                >
-                  {["Select Client Type", "Individual Client", "Company Client"].map((o) => (
-                    <MenuItem key={o} value={o === "Select Client Type" ? "" : o}>
-                      {o}
-                    </MenuItem>
-                  ))}
-                </MollureFormField>
-              </>
-            )}
+          <Stack spacing={2}>
+            <Box>
+              <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
+                Client Type
+              </Typography>
+              <MollureFormField
+                select
+                value={nonMollureClientType}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  const nextType = raw as "" | "Individual Client" | "Company Client";
+                  setNonMollureClientType(nextType);
+                  setNonMollureTypeError("");
+                  setIndErrors({});
+                  setCompErrors({});
+                }}
+                error={Boolean(nonMollureTypeError)}
+                helperText={nonMollureTypeError}
+                sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                SelectProps={clientTypeSelectProps}
+              >
+                <MenuItem value="">
+                  <Typography sx={{ color: alpha(m.navy, 0.5) }}>Select client type</Typography>
+                </MenuItem>
+                <MenuItem value="Individual Client">Individual Client</MenuItem>
+                <MenuItem value="Company Client">Company Client</MenuItem>
+              </MollureFormField>
+            </Box>
 
-            {nonMollureStep === "individual" && (
+            {nonMollureClientType === "Individual Client" && (
               <Stack spacing={1.25}>
                 <MollureFormField
                   placeholder="First Name"
@@ -1476,7 +1550,8 @@ export default function FixedLocationClientPage() {
 
                 <MollureFormField
                   select
-                  value={indGender || "Select Gender"}
+                  label="Gender"
+                  value={indGender}
                   onChange={(e) => {
                     setIndGender(e.target.value);
                     setIndErrors((p) => ({ ...p, gender: undefined }));
@@ -1484,12 +1559,14 @@ export default function FixedLocationClientPage() {
                   error={Boolean(indErrors.gender)}
                   helperText={indErrors.gender}
                   sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                  SelectProps={genderSelectProps}
                 >
-                  {["Select Gender", "Male", "Female", "Other"].map((o) => (
-                    <MenuItem key={o} value={o === "Select Gender" ? "" : o}>
-                      {o}
-                    </MenuItem>
-                  ))}
+                  <MenuItem value="">
+                    <Typography sx={{ color: alpha(m.navy, 0.5) }}>Select gender</Typography>
+                  </MenuItem>
+                  <MenuItem value="Male">Male</MenuItem>
+                  <MenuItem value="Female">Female</MenuItem>
+                  <MenuItem value="Other">Other</MenuItem>
                 </MollureFormField>
 
                 <Box sx={{ pt: 0.25 }}>
@@ -1497,11 +1574,14 @@ export default function FixedLocationClientPage() {
                     Date of Birth
                   </Typography>
                   <MollureFormField
-                    placeholder="MM/DD/YY"
+                    type="date"
                     value={indDob}
                     onChange={(e) => {
                       setIndDob(e.target.value);
                       setIndErrors((p) => ({ ...p, dob: undefined }));
+                    }}
+                    inputProps={{
+                      max: new Date().toISOString().slice(0, 10),
                     }}
                     error={Boolean(indErrors.dob)}
                     helperText={indErrors.dob}
@@ -1561,7 +1641,7 @@ export default function FixedLocationClientPage() {
               </Stack>
             )}
 
-            {nonMollureStep === "company" && (
+            {nonMollureClientType === "Company Client" && (
               <Stack spacing={1.25}>
                 <MollureFormField
                   placeholder="Legal Name"
@@ -1615,7 +1695,8 @@ export default function FixedLocationClientPage() {
                 />
                 <MollureFormField
                   select
-                  value={coGender || "Select Gender"}
+                  label="Gender"
+                  value={coGender}
                   onChange={(e) => {
                     setCoGender(e.target.value);
                     setCompErrors((p) => ({ ...p, gender: undefined }));
@@ -1623,12 +1704,14 @@ export default function FixedLocationClientPage() {
                   error={Boolean(compErrors.gender)}
                   helperText={compErrors.gender}
                   sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                  SelectProps={genderSelectProps}
                 >
-                  {["Select Gender", "Male", "Female", "Other"].map((o) => (
-                    <MenuItem key={o} value={o === "Select Gender" ? "" : o}>
-                      {o}
-                    </MenuItem>
-                  ))}
+                  <MenuItem value="">
+                    <Typography sx={{ color: alpha(m.navy, 0.5) }}>Select gender</Typography>
+                  </MenuItem>
+                  <MenuItem value="Male">Male</MenuItem>
+                  <MenuItem value="Female">Female</MenuItem>
+                  <MenuItem value="Other">Other</MenuItem>
                 </MollureFormField>
 
                 <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.62), pt: 0.5 }}>
@@ -1765,6 +1848,7 @@ export default function FixedLocationClientPage() {
                 />
               </Stack>
             )}
+          </Stack>
         </Box>
       </MollureDrawer>
     </FixedLocationPageScaffold>

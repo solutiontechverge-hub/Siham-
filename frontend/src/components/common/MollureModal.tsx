@@ -6,7 +6,7 @@ import { Box, Dialog, Divider, IconButton, Stack, type DialogProps } from "@mui/
 import { alpha, useTheme } from "@mui/material/styles";
 import { SubHeading } from "../ui/typography";
 
-type MollureModalProps = Omit<DialogProps, "children"> & {
+type MollureModalProps = Omit<DialogProps, "children" | "title"> & {
   title: React.ReactNode;
   children: React.ReactNode;
   footer?: React.ReactNode;

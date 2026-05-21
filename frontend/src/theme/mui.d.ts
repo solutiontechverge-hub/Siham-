@@ -8,6 +8,7 @@ declare module "@mui/material/styles" {
     cardTitle: React.CSSProperties;
     bodyText: React.CSSProperties;
     headerNav: React.CSSProperties;
+    formLabel: React.CSSProperties;
   }
 
   interface TypographyVariantsOptions {
@@ -17,11 +18,14 @@ declare module "@mui/material/styles" {
     cardTitle?: React.CSSProperties;
     bodyText?: React.CSSProperties;
     headerNav?: React.CSSProperties;
+    formLabel?: React.CSSProperties;
   }
 
   interface MollurePalette {
     teal: string;
     tealDark: string;
+    success: string;
+    successDark: string;
     navy: string;
     slate: string;
     surface: string;
@@ -29,6 +33,9 @@ declare module "@mui/material/styles" {
     footerText: string;
     footerMuted: string;
     mintSoft: string;
+    iconGradientStart: string;
+    iconGradientEnd: string;
+    iconGradient: string;
     heroGradientStart: string;
     heroGradientEnd: string;
     heroGlow: string;
@@ -54,6 +61,15 @@ declare module "@mui/material/styles" {
     descriptionText: string;
     warmwarning: string;
     white: string;
+    fxLavenderTint: string;
+    fxMintTint: string;
+    fxGrayF2F4F7: string;
+    fxGrayF4F4F4: string;
+    fxGrayDCDFE3: string;
+    fxGrayF9FAFB: string;
+    fxSurface: string;
+    fxPillTrack: string;
+    fxPillBorder: string;
   }
 
   interface Palette {
@@ -73,6 +89,7 @@ declare module "@mui/material/Typography" {
     cardTitle: true;
     bodyText: true;
     headerNav: true;
+    formLabel: true;
   }
 }
 

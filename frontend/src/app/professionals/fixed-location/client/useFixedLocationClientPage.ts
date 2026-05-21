@@ -84,7 +84,6 @@ export function useFixedLocationClientPage() {
   const [nonMollureClientType, setNonMollureClientType] = React.useState<"" | "Individual Client" | "Company Client">(
     "",
   );
-  const [nonMollureStep, setNonMollureStep] = React.useState<"type" | "individual" | "company">("type");
   const [indFirstName, setIndFirstName] = React.useState("");
   const [indLastName, setIndLastName] = React.useState("");
   const [indGender, setIndGender] = React.useState("");
@@ -110,6 +109,17 @@ export function useFixedLocationClientPage() {
   const [coPhone, setCoPhone] = React.useState("");
   const [coEmail, setCoEmail] = React.useState("");
   const [compErrors, setCompErrors] = React.useState<Partial<Record<string, string>>>({});
+
+  const [snackbar, setSnackbar] = React.useState<{
+    open: boolean;
+    message: string;
+    severity: "success" | "info" | "error";
+  }>({ open: false, message: "", severity: "success" });
+
+  const closeSnackbar = React.useCallback((_e?: unknown, reason?: string) => {
+    if (reason === "clickaway") return;
+    setSnackbar((p) => ({ ...p, open: false }));
+  }, []);
 
   const validateCompany = React.useCallback(() => {
     const next: Partial<Record<string, string>> = {};
@@ -162,15 +172,21 @@ export function useFixedLocationClientPage() {
     const dob = indDob.trim();
     if (!dob) {
       next.dob = "Date of birth is required";
-    } else if (!/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(dob)) {
-      next.dob = "Use format MM/DD/YY or MM/DD/YYYY";
+    } else if (!/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(dob) && !/^\d{4}-\d{2}-\d{2}$/.test(dob)) {
+      next.dob = "Use format MM/DD/YY, MM/DD/YYYY, or YYYY-MM-DD";
     } else {
-      const [mm, dd, yy] = dob.split("/").map((x) => Number(x));
-      const yFull = yy < 100 ? 2000 + yy : yy;
-      const d = new Date(yFull, mm - 1, dd);
-      if (d.getFullYear() !== yFull || d.getMonth() !== mm - 1 || d.getDate() !== dd) {
-        next.dob = "Enter a valid date";
-      }
+      const parseDob = (raw: string) => {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+          const [yyyy, mm, dd] = raw.split("-").map((x) => Number(x));
+          return { yyyy, mm, dd };
+        }
+        const [mm, dd, yy] = raw.split("/").map((x) => Number(x));
+        const yyyy = yy < 100 ? 2000 + yy : yy;
+        return { yyyy, mm, dd };
+      };
+      const { yyyy, mm, dd } = parseDob(dob);
+      const d = new Date(yyyy, mm - 1, dd);
+      if (d.getFullYear() !== yyyy || d.getMonth() !== mm - 1 || d.getDate() !== dd) next.dob = "Enter a valid date";
     }
     const digits = indPhone.replace(/\D/g, "");
     if (!digits) {
@@ -293,7 +309,6 @@ export function useFixedLocationClientPage() {
 
   const resetNonMollureAddForm = React.useCallback(() => {
     setNonMollureClientType("");
-    setNonMollureStep("type");
     setIndFirstName("");
     setIndLastName("");
     setIndGender("");
@@ -320,8 +335,172 @@ export function useFixedLocationClientPage() {
     setCompErrors({});
   }, []);
 
+  const formatAddedOn = React.useCallback(() => {
+    // Matches the existing mock style like "March 2, 2024"
+    return new Date().toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
+  }, []);
+
+  const addMollureClient = React.useCallback(() => {
+    const id = String(selectedMollureId || "").trim();
+    if (!id) return false;
+    const row = mockMollureDirectory.find((r) => r.id === id);
+    if (!row) return false;
+
+    setClients((prev) => {
+      // Add a new row for every selected Mollure member (even if the email
+      // already exists in the list), so the user can add all members and
+      // the total count increases.
+      const nextId = `c_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+      const next: ClientRecord = {
+        id: nextId,
+        name: row.name,
+        email: row.email,
+        phone: "—",
+        totalSales: "€0",
+        lastBooking: "—",
+        tags: ["Mollure"],
+        kind: "individual",
+        addedOn: formatAddedOn(),
+        bookingsCompleted: 0,
+        averageBookingValue: "€0",
+        recentServices: [],
+        bookingHistory: [],
+      };
+      return [next, ...prev];
+    });
+
+    setSelectedMollureId("");
+    setMollureSearch("");
+    setAddMollureOpen(false);
+    setSnackbar({
+      open: true,
+      message: "Client Added",
+      severity: "success",
+    });
+    return true;
+  }, [formatAddedOn, selectedMollureId]);
+
+  const addNonMollureClient = React.useCallback(() => {
+    if (!nonMollureClientType) {
+      setNonMollureTypeError("Please select a client type");
+      return false;
+    }
+    if (nonMollureClientType === "Individual Client") {
+      if (!validateIndividual()) return false;
+      const fullName = `${indFirstName.trim()} ${indLastName.trim()}`.trim();
+      const email = indEmail.trim().toLowerCase();
+      const normalizeDob = (raw: string) => {
+        const v = raw.trim();
+        if (!v) return "";
+        if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
+          const [yyyy, mm, dd] = v.split("-");
+          return `${Number(mm)}/${Number(dd)}/${yyyy}`;
+        }
+        return v;
+      };
+
+      setClients((prev) => {
+        if (prev.some((c) => c.email.trim().toLowerCase() === email)) return prev;
+        const nextId = `c_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+        const next: ClientRecord = {
+          id: nextId,
+          name: fullName,
+          email,
+          phone: `${indCountryCode} ${indPhone}`.trim(),
+          totalSales: "€0",
+          lastBooking: "—",
+          tags: [],
+          kind: "individual",
+          addedOn: formatAddedOn(),
+          gender: indGender || undefined,
+          dateOfBirth: normalizeDob(indDob) || undefined,
+          residentialAddress: undefined,
+          bookingsCompleted: 0,
+          averageBookingValue: "€0",
+          recentServices: [],
+          bookingHistory: [],
+        };
+        return [next, ...prev];
+      });
+
+      setAddNonMollureOpen(false);
+      resetNonMollureAddForm();
+      setSnackbar({ open: true, message: "Client Added", severity: "success" });
+      return true;
+    }
+
+    if (nonMollureClientType === "Company Client") {
+      if (!validateCompany()) return false;
+      const email = coEmail.trim().toLowerCase();
+      const contactName = `${coContactFirst.trim()} ${coContactLast.trim()}`.trim();
+
+      setClients((prev) => {
+        if (prev.some((c) => c.email.trim().toLowerCase() === email)) return prev;
+        const nextId = `c_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+        const next: ClientRecord = {
+          id: nextId,
+          name: coLegalName.trim(),
+          email,
+          phone: `${coCountryCode} ${coPhone}`.trim(),
+          totalSales: "€0",
+          lastBooking: "—",
+          tags: [],
+          kind: "company",
+          addedOn: formatAddedOn(),
+          legalName: coLegalName.trim(),
+          coc: coCoc.trim(),
+          vat: coVat.trim(),
+          contactPersonName: contactName || undefined,
+          gender: coGender || undefined,
+          businessAddress: `${coStreet.trim()} ${coStreetNumber.trim()}, ${coMunicipality.trim()} ${coPostal.trim()}`.trim(),
+          detailEmail: email,
+          bookingsCompleted: 0,
+          averageBookingValue: "€0",
+          recentServices: [],
+          bookingHistory: [],
+        };
+        return [next, ...prev];
+      });
+
+      setAddNonMollureOpen(false);
+      resetNonMollureAddForm();
+      setSnackbar({ open: true, message: "Client Added", severity: "success" });
+      return true;
+    }
+
+    return false;
+  }, [
+    coCoc,
+    coContactFirst,
+    coContactLast,
+    coCountryCode,
+    coEmail,
+    coGender,
+    coLegalName,
+    coMunicipality,
+    coPhone,
+    coPostal,
+    coStreet,
+    coStreetNumber,
+    coVat,
+    formatAddedOn,
+    indCountryCode,
+    indDob,
+    indEmail,
+    indFirstName,
+    indGender,
+    indLastName,
+    indPhone,
+    nonMollureClientType,
+    resetNonMollureAddForm,
+    validateCompany,
+    validateIndividual,
+  ]);
+
   const openNonMollureAddDrawer = React.useCallback(() => {
     resetNonMollureAddForm();
+    setNonMollureClientType("Individual Client");
+    setNonMollureTypeError("");
     setAddNonMollureOpen(true);
   }, [resetNonMollureAddForm]);
 
@@ -340,7 +519,78 @@ export function useFixedLocationClientPage() {
       setClientDetailsMode("view");
     }
     if (blockClientId === id) setBlockClientId(null);
+    setSnackbar({ open: true, message: "Client Deleted", severity: "error" });
   }, [blockClientId, deleteClientId, viewClientId]);
+
+  const confirmBlockClient = React.useCallback(() => {
+    if (!blockClientId) return;
+    const id = blockClientId;
+    setClients((prev) => prev.filter((c) => c.id !== id));
+    setBlockClientId(null);
+    if (viewClientId === id) {
+      setViewClientId(null);
+      setClientDetailsMode("view");
+    }
+    if (deleteClientId === id) setDeleteClientId(null);
+    setSnackbar({ open: true, message: "Client Blocked", severity: "error" });
+  }, [blockClientId, deleteClientId, viewClientId]);
+
+  const saveClientEdits = React.useCallback(() => {
+    if (!viewClientId) return false;
+
+    setClients((prev) =>
+      prev.map((c) => {
+        if (c.id !== viewClientId) return c;
+
+        if (c.kind === "company") {
+          const email = editCompanyForm.email.trim().toLowerCase();
+          const contactPersonName = `${editCompanyForm.contactFirst.trim()} ${editCompanyForm.contactLast.trim()}`.trim();
+          const businessAddress = [
+            editCompanyForm.street.trim(),
+            editCompanyForm.streetNumber.trim(),
+            editCompanyForm.municipality.trim(),
+            editCompanyForm.postal.trim(),
+            editCompanyForm.province.trim(),
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .trim();
+
+          return {
+            ...c,
+            name: editCompanyForm.legalName.trim() || c.name,
+            legalName: editCompanyForm.legalName.trim() || undefined,
+            coc: editCompanyForm.coc.trim() || undefined,
+            vat: editCompanyForm.vat.trim() || undefined,
+            contactPersonName: contactPersonName || undefined,
+            gender: editCompanyForm.gender || undefined,
+            phone: `${editCompanyForm.countryCode} ${editCompanyForm.phone}`.trim(),
+            email: email || c.email,
+            detailEmail: email || c.detailEmail,
+            businessAddress: businessAddress || undefined,
+          };
+        }
+
+        // individual
+        const email = editIndividualForm.email.trim().toLowerCase();
+        const fullName = `${editIndividualForm.firstName.trim()} ${editIndividualForm.lastName.trim()}`.trim();
+        return {
+          ...c,
+          name: fullName || c.name,
+          gender: editIndividualForm.gender || undefined,
+          dateOfBirth: editIndividualForm.dob.trim() || undefined,
+          phone: `${editIndividualForm.countryCode} ${editIndividualForm.phone}`.trim(),
+          email: email || c.email,
+          residentialAddress: editIndividualForm.residentialAddress.trim() || undefined,
+        };
+      }),
+    );
+
+    setClientDetailsMode("view");
+    setViewClientId(null);
+    setSnackbar({ open: true, message: "Client Updated", severity: "success" });
+    return true;
+  }, [editCompanyForm, editIndividualForm, viewClientId]);
 
   return {
     clients,
@@ -377,8 +627,6 @@ export function useFixedLocationClientPage() {
     setSelectedMollureId,
     nonMollureClientType,
     setNonMollureClientType,
-    nonMollureStep,
-    setNonMollureStep,
     indFirstName,
     setIndFirstName,
     indLastName,
@@ -437,9 +685,15 @@ export function useFixedLocationClientPage() {
     deleteClient,
     openClientDetailsEdit,
     mollureResults,
+    addMollureClient,
+    addNonMollureClient,
+    snackbar,
+    closeSnackbar,
     resetNonMollureAddForm,
     openNonMollureAddDrawer,
     closeClientDetailsDrawer,
     confirmDeleteClient,
+    confirmBlockClient,
+    saveClientEdits,
   };
 }

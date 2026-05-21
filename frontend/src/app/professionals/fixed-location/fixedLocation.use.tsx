@@ -29,7 +29,7 @@ export type FixedLocationFormState = {
 
   bookCategory: string;
   bookService: string;
-  bookCombos: Array<{ id: string; a: string; b: string }>;
+  bookCombos: Array<{ id: string; categoryId: string; serviceId: string }>;
   bookComboInstructions: string;
 
   discountEnabled: boolean;
@@ -72,6 +72,27 @@ export type FixedLocationFormState = {
   prepaymentInstructions: string;
   kilometerAllowance: string;
   kilometerAllowanceInstructions: string;
+
+  // Policy
+  policyResponseHours: string;
+  policyResponseMinutes: string;
+  policyInstructions: string;
+
+  // Rescheduling Policy
+  rescheduleMinimumHours: string;
+  rescheduleMinimumMinutes: string;
+  rescheduleLateFeePercent: string;
+  rescheduleInstructions: string;
+
+  // Cancellation Policy
+  cancelMinimumHours: string;
+  cancelMinimumMinutes: string;
+  cancelLateFeePercent: string;
+  cancelInstructions: string;
+
+  // No Show Policy
+  noShowFeePercent: string;
+  noShowInstructions: string;
 };
 
 const initialState: FixedLocationFormState = {
@@ -93,12 +114,9 @@ const initialState: FixedLocationFormState = {
   projectEnabled: true,
   projectInstructions: "",
 
-  bookCategory: "Lichaamsbehandeling",
-  bookService: "Neck massage",
-  bookCombos: [
-    { id: "combo-1", a: "Lichaamsbehandeling", b: "Lichaamsbehandeling" },
-    { id: "combo-2", a: "Lichaamsbehandeling", b: "Lichaamsbehandeling" },
-  ],
+  bookCategory: "",
+  bookService: "",
+  bookCombos: [],
   bookComboInstructions: "",
 
   discountEnabled: false,
@@ -139,6 +157,23 @@ const initialState: FixedLocationFormState = {
   prepaymentInstructions: "",
   kilometerAllowance: "",
   kilometerAllowanceInstructions: "",
+
+  policyResponseHours: "",
+  policyResponseMinutes: "",
+  policyInstructions: "",
+
+  rescheduleMinimumHours: "",
+  rescheduleMinimumMinutes: "",
+  rescheduleLateFeePercent: "",
+  rescheduleInstructions: "",
+
+  cancelMinimumHours: "",
+  cancelMinimumMinutes: "",
+  cancelLateFeePercent: "",
+  cancelInstructions: "",
+
+  noShowFeePercent: "",
+  noShowInstructions: "",
 };
 
 export function useFixedLocationForm() {

@@ -12,6 +12,8 @@ import {
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText, CardTitle } from "../ui/typography";
+import { useAppSelector } from "../../store/hooks";
+import { getPersistedAuthSession } from "../../lib/auth-storage";
 
 export type AuthAwareHeaderProps = {
   signupLabel?: string;
@@ -37,9 +39,16 @@ export default function AuthAwareHeader({
   const theme = useTheme();
   const m = theme.palette.mollure;
 
-  // Stub: if you already have auth state in Redux, plug it here.
-  const isAuthed = false;
-  const userLabel = "user@example.com";
+  const accessToken = useAppSelector((state) => state.auth.accessToken);
+  const user = useAppSelector((state) => state.auth.user);
+  const [persisted, setPersisted] = React.useState<ReturnType<typeof getPersistedAuthSession> | null>(null);
+
+  React.useEffect(() => {
+    setPersisted(getPersistedAuthSession());
+  }, []);
+
+  const isAuthed = Boolean(accessToken || persisted?.accessToken);
+  const userLabel = user?.email ?? persisted?.user?.email ?? "User";
 
   return (
     <Box sx={{ bgcolor: alpha(m.teal, 0.10) }}>

@@ -20,9 +20,12 @@ export type ListingCardData = {
   title: string;
   subtitle: string;
   municipalityLabel: string;
+  addressLabel: string;
   rating: number; // 0..5
   reviewsCount: number;
   locationModeDefault: "fixed" | "desired";
+  /** Professional offering: Fixed Location, Desired Location, or Both */
+  businessOffering: "fixed" | "desired" | "both";
   services: ListingCardService[];
   startingFromLabel: string;
 };
@@ -66,9 +69,11 @@ export const listingPageData = {
       title: "Lorem Ipsum Dolor Sit Amet",
       subtitle: "Consectetur.",
       municipalityLabel: "Noord-Holland",
+      addressLabel: "Marina-Park 50, Den Helder, Noord-Holland",
       rating: 5,
       reviewsCount: 134,
       locationModeDefault: "fixed",
+      businessOffering: "fixed",
       services: [
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
@@ -82,9 +87,11 @@ export const listingPageData = {
       title: "Lorem Ipsum Dolor Sit Amet",
       subtitle: "Consectetur.",
       municipalityLabel: "Noord-Holland",
+      addressLabel: "Marina-Park 50, Den Helder, Noord-Holland",
       rating: 5,
       reviewsCount: 134,
       locationModeDefault: "desired",
+      businessOffering: "desired",
       services: [
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
@@ -98,9 +105,11 @@ export const listingPageData = {
       title: "Lorem Ipsum Dolor Sit Amet",
       subtitle: "Consectetur.",
       municipalityLabel: "Noord-Holland",
+      addressLabel: "Marina-Park 50, Den Helder, Noord-Holland",
       rating: 5,
       reviewsCount: 134,
       locationModeDefault: "fixed",
+      businessOffering: "both",
       services: [
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
@@ -114,9 +123,11 @@ export const listingPageData = {
       title: "Lorem Ipsum Dolor Sit Amet",
       subtitle: "Consectetur.",
       municipalityLabel: "Noord-Holland",
+      addressLabel: "Marina-Park 50, Den Helder, Noord-Holland",
       rating: 5,
       reviewsCount: 134,
       locationModeDefault: "fixed",
+      businessOffering: "fixed",
       services: [
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
@@ -130,9 +141,11 @@ export const listingPageData = {
       title: "Lorem Ipsum Dolor Sit Amet",
       subtitle: "Consectetur.",
       municipalityLabel: "Noord-Holland",
+      addressLabel: "Marina-Park 50, Den Helder, Noord-Holland",
       rating: 5,
       reviewsCount: 134,
       locationModeDefault: "desired",
+      businessOffering: "both",
       services: [
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
@@ -146,9 +159,11 @@ export const listingPageData = {
       title: "Lorem Ipsum Dolor Sit Amet",
       subtitle: "Consectetur.",
       municipalityLabel: "Noord-Holland",
+      addressLabel: "Marina-Park 50, Den Helder, Noord-Holland",
       rating: 5,
       reviewsCount: 134,
       locationModeDefault: "fixed",
+      businessOffering: "desired",
       services: [
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
