@@ -28,6 +28,8 @@ export type ListingCardData = {
   rating: number; // 0..5
   reviewsCount: number;
   locationModeDefault: "fixed" | "desired";
+  /** Professional offering: Fixed Location, Desired Location, or Both */
+  businessOffering: "fixed" | "desired" | "both";
   services: ListingCardService[];
   startingFromLabel: string;
   /** Used for client-side keyword filtering */
@@ -79,6 +81,7 @@ export const listingPageData = {
       rating: 5,
       reviewsCount: 134,
       locationModeDefault: "fixed",
+      businessOffering: "fixed",
       services: [
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
@@ -98,6 +101,7 @@ export const listingPageData = {
       rating: 5,
       reviewsCount: 134,
       locationModeDefault: "desired",
+      businessOffering: "desired",
       services: [
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
@@ -117,6 +121,7 @@ export const listingPageData = {
       rating: 5,
       reviewsCount: 134,
       locationModeDefault: "fixed",
+      businessOffering: "both",
       services: [
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
@@ -136,6 +141,7 @@ export const listingPageData = {
       rating: 5,
       reviewsCount: 134,
       locationModeDefault: "fixed",
+      businessOffering: "fixed",
       services: [
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
@@ -155,6 +161,7 @@ export const listingPageData = {
       rating: 5,
       reviewsCount: 134,
       locationModeDefault: "desired",
+      businessOffering: "both",
       services: [
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
@@ -174,6 +181,7 @@ export const listingPageData = {
       rating: 5,
       reviewsCount: 134,
       locationModeDefault: "fixed",
+      businessOffering: "desired",
       services: [
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },

@@ -37,7 +37,7 @@ import { Logo, Profile as AvatarPlaceholder } from "../../../../images";
 import { PROFILE_IMAGE_FILE_ACCEPT } from "../../../lib/profileImageUpload";
 import { profilePageData } from "./data-profile";
 import { useClientProfilePage } from "./use-profile";
-import { ClientTopTabs, MollureMarketingHeader } from "../../../components/common";
+import { ClientPageTabsBar, clientTopTabsActiveLabel, MollureMarketingHeader } from "../../../components/common";
 import { MarketingSiteFooter } from "../../../components/common";
 import { marketingShellFooter } from "../../../data/marketingShell.data";
 import {
@@ -45,12 +45,6 @@ import {
   MollureLabeledPasswordField,
   PasswordStrengthBar,
 } from "../../../components/common";
-
-const clientTopTabs = [
-  { label: "Booking", href: "/clients/booking" },
-  { label: "Favorites", href: "/clients/favourites" },
-  { label: "Profile", href: "/clients/profile" },
-] as const;
 
 function imgSrc(img: unknown): string {
   if (!img) return "";
@@ -140,14 +134,7 @@ export default function ClientProfilePage() {
         homeHref="/clients/listing"
       />
 
-      <Box sx={{ mt: 2, bgcolor: "transparent" }}>
-        <Container maxWidth="lg" sx={{ px: { xs: 2, sm: 3, md: 4 }, py: 1.5 }}>
-          <ClientTopTabs
-            tabs={clientTopTabs}
-            activeLabel={pathname?.includes("/clients/booking") ? "Booking" : pathname?.includes("/clients/favourites") ? "Favorites" : "Profile"}
-          />
-        </Container>
-      </Box>
+      <ClientPageTabsBar activeLabel={clientTopTabsActiveLabel(pathname)} />
 
       <Popover
         open={Boolean(profileMenuAnchor)}

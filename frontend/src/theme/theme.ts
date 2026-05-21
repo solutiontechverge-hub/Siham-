@@ -20,9 +20,17 @@ const theme = createTheme({
       primary: "#344A66",
       secondary: "#71819A",
     },
+    success: {
+      main: "#4CAF50",
+      dark: "#2E7D32",
+      light: "#E8F5E9",
+      contrastText: "#FFFFFF",
+    },
     mollure: {
       teal: "#21B8BF",
       tealDark: "#149CA7",
+      success: "#4CAF50",
+      successDark: "#2E7D32",
       navy: "#344A66",
       slate: "#71819A",
       surface: "#F7FBFD",

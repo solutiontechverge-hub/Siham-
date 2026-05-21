@@ -22,6 +22,9 @@ const nextConfig = {
     "@emotion/react",
     "@emotion/styled",
   ],
+  experimental: {
+    serverComponentsExternalPackages: ["stripe"],
+  },
 };
 
 module.exports = nextConfig;

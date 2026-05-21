@@ -4,7 +4,7 @@ export const contactUsData = {
   whoAreYou: {
     label: "Who are you?",
     options: ["Client", "Professional", "Guest"],
-  },
+  }, 
   fields: {
     name: { label: "Name", placeholder: "Sara" },
     email: { label: "Email", placeholder: "sara@gmail.com" },
