@@ -1,5 +1,7 @@
+import { mapBusinessPublicProfileFromSetups } from "../app/clients/listing/businessPublicProfile.mapper";
 import type { ListingCardData } from "../app/clients/listing/listing.data";
 import { listingPageData } from "../app/clients/listing/listing.data";
+import type { BusinessSetupListing } from "../store/services/businessApi";
 import { fixedLocationPageData } from "../app/professionals/fixed-location/fixedLocation.data";
 import type { ServiceCategorySliderIconId } from "./businessServiceCategorySlider.data";
 import { resolveServiceCategorySliderIconId } from "./businessServiceCategorySlider.data";
@@ -421,7 +423,14 @@ export function mapListingCardToPublicProfile(card: ListingCardData): BusinessPu
   };
 }
 
-export function getBusinessPublicProfileByShopId(shopId: string): BusinessPublicProfileData | null {
+export function getBusinessPublicProfileByShopId(
+  shopId: string,
+  setups?: BusinessSetupListing[] | null,
+): BusinessPublicProfileData | null {
+  if (setups?.length) {
+    return mapBusinessPublicProfileFromSetups(shopId, setups);
+  }
+
   const card = listingPageData.cards.find((c) => c.id === shopId);
   if (!card) return null;
   return mapListingCardToPublicProfile(card);

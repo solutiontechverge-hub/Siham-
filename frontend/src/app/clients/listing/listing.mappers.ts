@@ -7,6 +7,7 @@ import {
   ListingImage6,
 } from "../../../../images";
 import type { BusinessSetupListing } from "../../../store/services/businessApi";
+import { resolveBusinessOffering } from "./businessPublicProfile.mapper";
 import type { ListingCardData } from "./listing.data";
 
 const FALLBACK_IMAGES = [
@@ -170,6 +171,7 @@ export const mapBusinessSetupToListingCard = (
     rating: setup.rating,
     reviewsCount: setup.totalReviews,
     locationModeDefault: resolveLocationModeDefault(setup.locationMode),
+    businessOffering: resolveBusinessOffering(setup.locationMode),
     services,
     startingFromLabel: resolveStartingFromLabel(setup, services),
     searchText,

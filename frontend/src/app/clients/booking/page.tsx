@@ -50,10 +50,8 @@ import ClientBookingPageShell from "./ClientBookingPageShell";
 import { parseBookingListTab } from "./bookingPillTabs";
 import { upsertRequestedBooking } from "./clientBookingRecords";
 import { ACTIVE_BOOKING_ID_KEY, createBookingRef, setActiveBookingSession } from "./clientBookingSession";
-import {
-  getBusinessPublicProfileByShopId,
-  getServicesForLocationMode,
-} from "../../../data/businessPublicProfile.data";
+import { getServicesForLocationMode, getTeamForLocationMode } from "../../../data/businessPublicProfile.data";
+import { useBusinessPublicProfile } from "../../../hooks/useBusinessPublicProfile";
 import { parsePrepaymentPercent } from "../../../components/common/client-booking/parsePrepaymentPercent";
 import { loadPublicProfileBookingSelection } from "../../../data/publicProfileBookingSelection";
 import { useAppSelector } from "../../../store/hooks";
@@ -193,6 +191,8 @@ function ClientBookingCreateView() {
     addressLabel?: string;
     locationMode?: "fixed" | "desired";
   } | null>(null);
+
+  const { profile: businessProfile } = useBusinessPublicProfile(shop?.shopId);
 
   const fallbackAddress = "Marina-Park 50, Den Helder, Noord-Holland";
 
@@ -364,10 +364,7 @@ function ClientBookingCreateView() {
   const participantLabel = isDesiredLocation ? "Model" : "Guest";
 
   const catalogByTeamMemberId = React.useMemo<Record<string, CatalogService[]>>(() => {
-    if (!shop?.shopId || !profileHydrated) return defaultCatalogByTeamMemberId;
-
-    const businessProfile = getBusinessPublicProfileByShopId(shop.shopId);
-    if (!businessProfile) return defaultCatalogByTeamMemberId;
+    if (!shop?.shopId || !profileHydrated || !businessProfile) return defaultCatalogByTeamMemberId;
 
     const catalogItems: CatalogService[] = getServicesForLocationMode(businessProfile, locationMode).map((s) => ({
       id: s.id,
@@ -381,7 +378,7 @@ function ClientBookingCreateView() {
       map[tm.id] = catalogItems;
     }
     return Object.keys(map).length > 0 ? map : defaultCatalogByTeamMemberId;
-  }, [defaultCatalogByTeamMemberId, locationMode, profileHydrated, shop?.shopId, shopTeamMembers]);
+  }, [businessProfile, defaultCatalogByTeamMemberId, locationMode, profileHydrated, shop?.shopId, shopTeamMembers]);
 
   const isPlanningPerson = React.useCallback(
     (p: BookingPerson) => p.participantType === "planning" || p.name === "Planning",
@@ -660,15 +657,33 @@ function ClientBookingCreateView() {
 
     if (fromProfile) return;
 
+    if (!businessProfile) return;
+
     const defaultSignature = `default:${shop.shopId}`;
     if (hydrationSignatureRef.current === defaultSignature) return;
     hydrationSignatureRef.current = defaultSignature;
 
+    const apiTeam = businessProfile
+      ? getTeamForLocationMode(businessProfile, shop.locationMode ?? "fixed").map((tm) => ({
+          id: tm.id,
+          name: tm.name,
+          locationModes: tm.locationModes,
+        }))
+      : [];
+
     setServices(DEFAULT_BOOKING_SERVICES);
-    setShopTeamMembers(DEFAULT_SHOP_TEAM_MEMBERS);
+    setShopTeamMembers(apiTeam.length > 0 ? apiTeam : DEFAULT_SHOP_TEAM_MEMBERS);
     setServiceTab(getPreferredServiceTab(DEFAULT_BOOKING_SERVICES));
     setProfileHydrated(true);
-  }, [applyProfileSelection, fromProfile, getPreferredServiceTab, profileHydrationToken, shop?.shopId]);
+  }, [
+    applyProfileSelection,
+    businessProfile,
+    fromProfile,
+    getPreferredServiceTab,
+    profileHydrationToken,
+    shop?.locationMode,
+    shop?.shopId,
+  ]);
 
   React.useEffect(() => {
     if (!people.some((p) => p.id === selectedPersonId)) {
@@ -896,7 +911,6 @@ function ClientBookingCreateView() {
     } catch {
       // ignore
     }
-    const businessProfile = shop?.shopId ? getBusinessPublicProfileByShopId(shop.shopId) : null;
     const requiresPrepayment = parsePrepaymentPercent(businessProfile?.prepaymentLabel) > 0;
 
     try {

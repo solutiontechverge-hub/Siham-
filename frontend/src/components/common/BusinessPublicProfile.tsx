@@ -1,12 +1,14 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
+import RemoteAwareImage from "./RemoteAwareImage";
 import type { Swiper as SwiperInstance } from "swiper";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { alpha, useTheme } from "@mui/material/styles";
 import "swiper/css";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
@@ -199,13 +201,50 @@ function ProfileHeroSwiper({ images, alt }: { images: string[]; alt: string }) {
         {images.map((src, index) => (
           <SwiperSlide key={`${src}-${index}`}>
             <Box sx={{ position: "relative", width: "100%", height: { xs: 220, md: 280 } }}>
-              <Image src={src} alt={alt} fill style={{ objectFit: "cover" }} priority={index === 0} draggable={false} />
+              <RemoteAwareImage src={src} alt={alt} fill style={{ objectFit: "cover" }} priority={index === 0} draggable={false} />
             </Box>
           </SwiperSlide>
         ))}
       </Swiper>
 
       {images.length > 1 ? (
+        <>
+          <IconButton
+            aria-label="Previous image"
+            onClick={() => swiperRef.current?.slidePrev()}
+            size="small"
+            sx={{
+              position: "absolute",
+              left: 10,
+              top: "50%",
+              transform: "translateY(-50%)",
+              zIndex: 3,
+              bgcolor: alpha("#fff", 0.9),
+              border: `1px solid ${alpha(m.navy, 0.1)}`,
+              boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+              "&:hover": { bgcolor: "#fff" },
+            }}
+          >
+            <ChevronLeftRoundedIcon fontSize="small" />
+          </IconButton>
+          <IconButton
+            aria-label="Next image"
+            onClick={() => swiperRef.current?.slideNext()}
+            size="small"
+            sx={{
+              position: "absolute",
+              right: 10,
+              top: "50%",
+              transform: "translateY(-50%)",
+              zIndex: 3,
+              bgcolor: alpha("#fff", 0.9),
+              border: `1px solid ${alpha(m.navy, 0.1)}`,
+              boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+              "&:hover": { bgcolor: "#fff" },
+            }}
+          >
+            <ChevronRightRoundedIcon fontSize="small" />
+          </IconButton>
         <Box
           sx={{
             position: "absolute",
@@ -240,6 +279,7 @@ function ProfileHeroSwiper({ images, alt }: { images: string[]; alt: string }) {
             />
           ))}
         </Box>
+        </>
       ) : null}
     </Box>
   );
@@ -1193,7 +1233,7 @@ export default function BusinessPublicProfile({
                       }}
                     >
                       {member.avatarUrl ? (
-                        <Image src={member.avatarUrl} alt={member.name} fill style={{ objectFit: "cover" }} />
+                        <RemoteAwareImage src={member.avatarUrl} alt={member.name} fill style={{ objectFit: "cover" }} />
                       ) : null}
                     </Box>
                     <Box sx={{ minWidth: 0 }}>
@@ -1396,7 +1436,7 @@ export default function BusinessPublicProfile({
                 <Grid item xs={6} sm={3} key={`${idx}-${src}`}>
                   <Box sx={{ position: "relative", borderRadius: "10px", overflow: "hidden", pt: "100%" }}>
                     {src ? (
-                      <Image src={src} alt="" fill style={{ objectFit: "cover" }} />
+                      <RemoteAwareImage src={src} alt="" fill style={{ objectFit: "cover" }} />
                     ) : (
                       <Box sx={{ position: "absolute", inset: 0, bgcolor: alpha(m.navy, 0.06) }} />
                     )}

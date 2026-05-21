@@ -2,6 +2,8 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import FavoriteBorderRoundedIcon from "@mui/icons-material/FavoriteBorderRounded";
 import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
@@ -143,6 +145,53 @@ export default function ClientListingCard({ item, isFavorite, onToggleFavorite }
         </IconButton>
 
         {slides.length > 1 ? (
+          <>
+            <IconButton
+              aria-label="Previous image"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveSlide((i) => (i - 1 + slides.length) % slides.length);
+              }}
+              size="small"
+              sx={{
+                position: "absolute",
+                left: 8,
+                top: "50%",
+                transform: "translateY(-50%)",
+                zIndex: 2,
+                width: 30,
+                height: 30,
+                bgcolor: "rgba(255,255,255,0.9)",
+                border: `1px solid ${tokens.border}`,
+                boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
+                "&:hover": { bgcolor: "#fff" },
+              }}
+            >
+              <ChevronLeftRoundedIcon sx={{ fontSize: 18 }} />
+            </IconButton>
+            <IconButton
+              aria-label="Next image"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveSlide((i) => (i + 1) % slides.length);
+              }}
+              size="small"
+              sx={{
+                position: "absolute",
+                right: 8,
+                top: "50%",
+                transform: "translateY(-50%)",
+                zIndex: 2,
+                width: 30,
+                height: 30,
+                bgcolor: "rgba(255,255,255,0.9)",
+                border: `1px solid ${tokens.border}`,
+                boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
+                "&:hover": { bgcolor: "#fff" },
+              }}
+            >
+              <ChevronRightRoundedIcon sx={{ fontSize: 18 }} />
+            </IconButton>
           <Box
             sx={{
               position: "absolute",
@@ -176,6 +225,7 @@ export default function ClientListingCard({ item, isFavorite, onToggleFavorite }
               />
             ))}
           </Box>
+          </>
         ) : null}
       </Box>
 

@@ -44,7 +44,6 @@ import {
 } from "../finance-documents";
 import type { ClientBookingDraft } from "./types";
 import type { BusinessPublicProfilePolicySection } from "../../../data/businessPublicProfile.data";
-import { getBusinessPublicProfileByShopId } from "../../../data/businessPublicProfile.data";
 import { useSnackbar } from "../AppSnackbar";
 import StripePrepaymentDialog from "./StripePrepaymentDialog";
 
@@ -198,17 +197,16 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
   }, [draft?.total, prepaymentPercent]);
 
   const professionalBusinessOverride = React.useMemo(() => {
-    const profile = shop?.shopId ? getBusinessPublicProfileByShopId(shop.shopId) : null;
-    const fixed = profile?.fixedLocation;
+    const fixed = businessProfile?.fixedLocation;
     return {
-      legalName: fixed?.salonName ?? profile?.shopName ?? shop?.shopName ?? professional.name,
+      legalName: fixed?.salonName ?? businessProfile?.shopName ?? shop?.shopName ?? professional.name,
       address:
         shop?.addressLabel ??
         shop?.municipalityLabel ??
         fixed?.formattedAddress ??
         address,
     };
-  }, [address, professional.name, shop]);
+  }, [address, businessProfile, professional.name, shop]);
 
   const bookingTransactionRow = React.useMemo(() => {
     if (!draft?.services?.length) return null;
