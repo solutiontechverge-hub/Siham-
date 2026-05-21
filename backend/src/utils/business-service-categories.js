@@ -1,4 +1,5 @@
 import { parseJsonArray } from "./business-setup-parsers.js";
+import { isValidUuid, parseUuid } from "./uuid.js";
 
 /**
  * Service pricing and duration live on business_setups.service_categories (JSONB).
@@ -9,10 +10,10 @@ export const buildDurationByServiceId = (serviceCategories) => {
   const durationByServiceId = new Map();
 
   parseJsonArray(serviceCategories).forEach((item) => {
-    const serviceId = Number(item?.service_id);
+    const serviceId = parseUuid(item?.service_id);
     const durationLabel = String(item?.duration_label ?? "").trim();
 
-    if (Number.isInteger(serviceId) && serviceId > 0 && durationLabel) {
+    if (serviceId && durationLabel) {
       durationByServiceId.set(serviceId, durationLabel);
     }
   });
@@ -21,11 +22,11 @@ export const buildDurationByServiceId = (serviceCategories) => {
 };
 
 const mapCategoryItemToServiceDetail = (item, metaByServiceId, businessSetupId) => {
-  const serviceId = Number(item?.service_id);
-  const categoryId = Number(item?.category_id);
-  const meta = metaByServiceId.get(serviceId);
+  const serviceId = parseUuid(item?.service_id);
+  const categoryId = parseUuid(item?.category_id);
+  const meta = serviceId ? metaByServiceId.get(serviceId) : null;
 
-  if (!Number.isInteger(serviceId) || serviceId <= 0 || !meta) {
+  if (!serviceId || !meta) {
     return null;
   }
 
@@ -37,7 +38,7 @@ const mapCategoryItemToServiceDetail = (item, metaByServiceId, businessSetupId) 
     id: serviceId,
     business_setup_id: businessSetupId,
     service_id: serviceId,
-    category_id: Number.isInteger(categoryId) && categoryId > 0 ? categoryId : meta.category_id,
+    category_id: categoryId || meta.category_id,
     price,
     duration_label: durationLabel,
     service_title: meta.service_title,
@@ -47,7 +48,7 @@ const mapCategoryItemToServiceDetail = (item, metaByServiceId, businessSetupId) 
 };
 
 export const fetchServiceMetaByIds = async (serviceIds, queryFn) => {
-  const uniqueIds = [...new Set(serviceIds.filter((id) => Number.isInteger(id) && id > 0))];
+  const uniqueIds = [...new Set(serviceIds.filter((id) => isValidUuid(id)))];
 
   if (!uniqueIds.length) {
     return new Map();
@@ -61,11 +62,11 @@ export const fetchServiceMetaByIds = async (serviceIds, queryFn) => {
        c.title AS category_title
      FROM subcategories s
      INNER JOIN categories c ON c.id = s.category_id
-     WHERE s.id = ANY($1::bigint[])`,
+     WHERE s.id = ANY($1::uuid[])`,
     [uniqueIds],
   );
 
-  return new Map(result.rows.map((row) => [Number(row.service_id), row]));
+  return new Map(result.rows.map((row) => [String(row.service_id), row]));
 };
 
 export const buildServiceDetailsFromCategories = async (
@@ -79,7 +80,7 @@ export const buildServiceDetailsFromCategories = async (
     return [];
   }
 
-  const serviceIds = categories.map((item) => Number(item?.service_id));
+  const serviceIds = categories.map((item) => parseUuid(item?.service_id)).filter(Boolean);
   const metaByServiceId = await fetchServiceMetaByIds(serviceIds, queryFn);
 
   return categories
@@ -95,8 +96,8 @@ export const buildServiceDetailsMapForSetups = async (setupRows, queryFn) => {
     const categories = parseJsonArray(row.service_categories);
     categoriesBySetupId.set(row.id, categories);
     categories.forEach((item) => {
-      const serviceId = Number(item?.service_id);
-      if (Number.isInteger(serviceId) && serviceId > 0) {
+      const serviceId = parseUuid(item?.service_id);
+      if (serviceId) {
         allServiceIds.add(serviceId);
       }
     });

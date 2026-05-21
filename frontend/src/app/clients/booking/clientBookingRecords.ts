@@ -205,7 +205,10 @@ function seedDemoBookings(): ClientBookingRecord[] {
       requiresPrepayment: true,
       prepaid: false,
       prepaymentPercent: 20,
-      shop: { shopId: "1", shopName: "Ryan Harris Salon", addressLabel: "Marina-Park 50, Den Helder" },
+      shop: {
+        shopName: "Ryan Harris Salon",
+        addressLabel: "Marina-Park 50, Den Helder",
+      },
       draft: {
         selectedDateISO: fmt(future),
         selectedTime: "11:15 AM",

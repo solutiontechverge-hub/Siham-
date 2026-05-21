@@ -10,40 +10,40 @@ type ApiEnvelope<T> = {
 };
 
 export type BusinessSubcategory = {
-  id: number;
+  id: string;
   title: string;
-  category_id: number;
+  category_id: string;
   created_at: string;
 };
 
 export type BusinessCategory = {
-  id: number;
+  id: string;
   title: string;
   created_at: string;
   subcategories: BusinessSubcategory[];
 };
 
 export type BusinessServiceDetail = {
-  id: number;
-  business_setup_id: number;
-  service_id: number;
+  id: string;
+  business_setup_id: string;
+  service_id: string;
   price: string | number;
   /** From service_categories JSONB (computed on read) */
   duration_label?: string | null;
   created_at: string;
   service_title: string;
-  category_id: number;
+  category_id: string;
   category_title: string;
 };
 
 export type BusinessTeamMember = {
-  id?: number;
-  business_setup_id?: number;
+  id?: string;
+  business_setup_id?: string;
   full_name: string;
   role: string;
   profile_photo: string | null;
   assigned_services: Array<{
-    service_id: number;
+    service_id: string;
     title?: string | null;
   }>;
   display_order: number;
@@ -52,9 +52,9 @@ export type BusinessTeamMember = {
 };
 
 export type BusinessBookServiceCombination = {
-  category_id: number;
+  category_id: string;
   category_title?: string | null;
-  service_id: number;
+  service_id: string;
   service_title?: string | null;
 };
 
@@ -90,24 +90,24 @@ export type BusinessSetupListingCancellationPolicy = BusinessSetupListingPolicy 
 };
 
 export type BusinessSetupListingServiceDetail = {
-  id: number | null;
-  serviceId: number | null;
+  id: string | null;
+  serviceId: string | null;
   price: number | null;
   durationLabel: string | null;
   serviceTitle: string | null;
-  categoryId: number | null;
+  categoryId: string | null;
   categoryTitle: string | null;
   createdAt: string | null;
 };
 
 export type BusinessSetupListingTeamMember = {
-  id: number | null;
+  id: string | null;
   fullName: string | null;
   role: string;
   profilePhoto: string | null;
   assignedServices: Array<{
-    service_id?: number;
-    serviceId?: number;
+    service_id?: string;
+    serviceId?: string;
     title?: string | null;
   }>;
   displayOrder: number;
@@ -116,8 +116,8 @@ export type BusinessSetupListingTeamMember = {
 };
 
 export type BusinessSetupListing = {
-  id: number;
-  professionalProfileId: number | null;
+  id: string;
+  professionalProfileId: string | null;
   businessName: string | null;
   about: string | null;
   rating: number;
@@ -128,22 +128,22 @@ export type BusinessSetupListing = {
   fixedLocation: BusinessSetupListingLocation;
   desiredLocation: BusinessSetupListingDesiredLocation;
   serviceCategories: Array<{
-    category_id?: number;
-    categoryId?: number;
-    service_id?: number;
-    serviceId?: number;
+    category_id?: string;
+    categoryId?: string;
+    service_id?: string;
+    serviceId?: string;
     amount?: number;
     duration_label?: string | null;
     durationLabel?: string | null;
   }>;
   serviceFor: string[];
   bookServiceCombinations: Array<{
-    category_id?: number;
-    categoryId?: number;
+    category_id?: string;
+    categoryId?: string;
     category_title?: string | null;
     categoryTitle?: string | null;
-    service_id?: number;
-    serviceId?: number;
+    service_id?: string;
+    serviceId?: string;
     service_title?: string | null;
     serviceTitle?: string | null;
   }>;
@@ -163,15 +163,15 @@ export type BusinessSetupListing = {
   additionalNotes: string | null;
   notes: string | null;
   project: string | null;
-  teamMemberIds: number[];
+  teamMemberIds: string[];
   teamMembers: BusinessSetupListingTeamMember[];
   createdAt: string | null;
   updatedAt: string | null;
 };
 
 export type BusinessSetup = {
-  id: number;
-  professional_profile_id: number;
+  id: string;
+  professional_profile_id: string;
   location_mode: "fixed" | "desired" | "both";
   business_name: string | null;
   business_about: string | null;
@@ -185,15 +185,15 @@ export type BusinessSetup = {
   fixed_location_municipality: string | null;
   service_for: string[];
   service_categories: Array<{
-    category_id: number;
-    service_id: number;
+    category_id: string;
+    service_id: string;
     amount: number;
     duration_label?: string | null;
   }>;
   project: string | null;
   book_service_notes: string | null;
   book_service_combinations: BusinessBookServiceCombination[];
-  team_member_ids: number[];
+  team_member_ids: string[];
   additional_notes: string | null;
   price_range: string | null;
   prepayment_percentage: string | number | null;
@@ -223,9 +223,9 @@ export type BusinessSetup = {
 };
 
 export type CalendarEntry = {
-  id: number;
-  professional_profile_id: number;
-  team_member_id: number | null;
+  id: string;
+  professional_profile_id: string;
+  team_member_id: string | null;
   status: "requested" | "cancelled" | "completed" | "confirmed" | "blocked" | "no_show";
   title: string;
   unique_code: string;
@@ -239,7 +239,7 @@ export type CalendarEntry = {
   booking_type: "online" | "offline" | "project" | "request" | null;
   client_name: string | null;
   notes: string | null;
-  service_ids: number[];
+  service_ids: string[];
   date?: string | null;
   start?: string | null;
   end?: string | null;
@@ -248,12 +248,12 @@ export type CalendarEntry = {
 };
 
 export type CalendarBooking = {
-  id: number;
+  id: string;
   booking_date: string;
-  business_setup_id: number;
-  customer_id: number;
-  service_id: number | null;
-  team_member_id: number | null;
+  business_setup_id: string;
+  customer_id: string;
+  service_id: string | null;
+  team_member_id: string | null;
   start_time: string | null;
   end_time: string | null;
   location_type: "fixed" | "desired" | null;
@@ -270,8 +270,8 @@ export type CalendarBooking = {
 };
 
 export type CalendarSettings = {
-  id: number;
-  professional_profile_id: number;
+  id: string;
+  professional_profile_id: string;
   availability: Record<string, unknown>;
   design: Record<string, unknown>;
   created_at: string;
@@ -285,7 +285,7 @@ export type CalendarOverview = {
 };
 
 export type CreateCalendarEntryRequest = {
-  team_member_id?: number | null;
+  team_member_id?: string | null;
   status?: CalendarEntry["status"];
   title: string;
   unique_code?: string;
@@ -299,7 +299,7 @@ export type CreateCalendarEntryRequest = {
   booking_type?: CalendarEntry["booking_type"];
   client_name?: string | null;
   notes?: string | null;
-  service_ids?: number[];
+  service_ids?: string[];
 };
 
 export type UpsertCalendarSettingsRequest = {
@@ -308,12 +308,12 @@ export type UpsertCalendarSettingsRequest = {
 };
 
 export type UpdateCalendarEntryStatusRequest = {
-  id: number;
+  id: string;
   status: "requested" | "cancelled" | "completed" | "confirmed" | "no_show";
 };
 
 export type UpdateBookingStatusRequest = {
-  id: number;
+  id: string;
   status: "requested" | "cancelled" | "completed" | "confirmed" | "no_show";
 };
 
@@ -331,8 +331,8 @@ export type UpsertBusinessSetupRequest = {
   fixed_location_municipality?: string;
   service_for?: string[];
   service_categories?: Array<{
-    category_id: number;
-    service_id: number;
+    category_id: string;
+    service_id: string;
     amount: number;
     duration_label?: string | null;
   }>;

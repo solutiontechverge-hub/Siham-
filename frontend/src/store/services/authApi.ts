@@ -16,7 +16,7 @@ type LoginData = {
   access_token: string;
   refresh_token: string;
   user: {
-    id: number;
+    id: string;
     email: string;
     user_type: string;
     is_email_verified: boolean;
@@ -62,11 +62,11 @@ type VerifyOtpRequest = {
 };
 
 type VerifyOtpData = {
-  user_id: number;
+  user_id: string;
 };
 
 type ResetPasswordRequest = {
-  user_id: number;
+  user_id: string;
   new_password: string;
   confirm_password: string;
 };

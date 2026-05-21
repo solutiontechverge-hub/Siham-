@@ -1,10 +1,6 @@
 import { buildDurationByServiceId } from "./business-service-categories.js";
-import {
-  parseBigIntArray,
-  parseJsonArray,
-  parseJsonValue,
-  parseTextArray,
-} from "./business-setup-parsers.js";
+import { parseJsonArray, parseJsonValue, parseTextArray } from "./business-setup-parsers.js";
+import { parseUuid } from "./uuid.js";
 
 const LISTING_RATING = 4.8;
 const LISTING_TOTAL_REVIEWS = 120;
@@ -57,7 +53,9 @@ const mapServiceDetail = (detail, durationByServiceId = new Map()) => ({
   serviceId: detail.service_id ?? null,
   price: toNullableNumber(detail.price),
   durationLabel:
-    toNullableString(detail.duration_label) || durationByServiceId.get(Number(detail.service_id)) || null,
+    toNullableString(detail.duration_label) ||
+    durationByServiceId.get(parseUuid(detail.service_id) ?? String(detail.service_id ?? "")) ||
+    null,
   serviceTitle: toNullableString(detail.service_title),
   categoryId: detail.category_id ?? null,
   categoryTitle: toNullableString(detail.category_title),
@@ -131,7 +129,9 @@ export const transformBusinessSetupForListing = (
     additionalNotes: toNullableString(row.additional_notes),
     notes: toNullableString(row.book_service_notes),
     project: toNullableString(row.project),
-    teamMemberIds: parseBigIntArray(row.team_member_ids),
+    teamMemberIds: Array.isArray(row.team_member_ids)
+      ? row.team_member_ids.map((id) => String(id)).filter((id) => parseUuid(id))
+      : [],
     teamMembers: normalizedTeamMembers.map(mapTeamMember),
     createdAt: toIsoTimestamp(row.created_at),
     updatedAt: toIsoTimestamp(row.updated_at),

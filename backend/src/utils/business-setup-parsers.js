@@ -60,9 +60,4 @@ export const parseJsonArray = (value) => {
   }
 };
 
-export const parseBigIntArray = (value) => {
-  const items = parseTextArray(value);
-  return items
-    .map((item) => Number(item))
-    .filter((item) => Number.isInteger(item) && item > 0);
-};
+export { parseUuidArray } from "./uuid.js";
