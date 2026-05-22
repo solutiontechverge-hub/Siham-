@@ -23,7 +23,7 @@ Add at least:
 | `DB_SSL` | `true` for Supabase |
 | `JWT_SECRET` | long random string |
 | `JWT_REFRESH_SECRET` | long random string |
-| `APP_BASE_URL` | `https://mollure-frontend-backend.vercel.app` |
+| `APP_BASE_URL` | `https://mollure-frontend-backend-sw9l.vercel.app` |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | for register / forgot-password emails |
 
 Copy values from your local `backend/.env` (same Supabase project as local dev).
@@ -33,7 +33,7 @@ Then **Redeploy** the backend.
 ## Verify
 
 ```text
-GET https://mollure-frontend-backend.vercel.app/api/health
+GET https://mollure-frontend-backend-sw9l.vercel.app/api/health
 ```
 
 Should return `{ "status": "ok", "database": "connected" }`.

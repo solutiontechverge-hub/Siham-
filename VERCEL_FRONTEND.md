@@ -1,6 +1,6 @@
 # Deploy frontend on Vercel
 
-Backend (working): https://mollure-frontend-backend.vercel.app
+Backend (working): https://mollure-frontend-backend-sw9l.vercel.app
 
 ## Vercel project settings
 
@@ -23,7 +23,7 @@ Add for **Production** and **Preview**:
 
 | Name | Value |
 |------|--------|
-| `NEXT_PUBLIC_API_BASE_URL` | `https://mollure-frontend-backend.vercel.app` |
+| `NEXT_PUBLIC_API_BASE_URL` | `https://mollure-frontend-backend-sw9l.vercel.app` |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | your Stripe publishable key |
 
 Optional (for checkout API route):
