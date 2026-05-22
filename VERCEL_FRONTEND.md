@@ -38,6 +38,20 @@ Then **Redeploy** the latest deployment (or push to `main`).
 
 This means there is **no successful production deployment** yet (build failed or never ran). After fixing settings above, trigger **Deploy** from the Vercel dashboard and check **Build Logs**.
 
+## `Deployment Blocked` (Hobby + private repo)
+
+Vercel Hobby only deploys commits whose **Git author** is the **Vercel project owner** (GitHub account linked in Vercel → Account → Authentication).
+
+If a teammate merges to `main` (e.g. PR #22), production stays blocked until the owner pushes again.
+
+**Fix (pick one):**
+
+1. **Owner** pushes any commit to `main` (we use an empty chore commit), or redeploys an older deployment from the owner in the Vercel UI.
+2. **Upgrade** the Vercel team to Pro and add collaborators.
+3. **Reconnect GitHub** at https://vercel.com/account/settings/authentication if the owner’s link broke.
+
+**For teammates:** open PRs only; ask the owner to merge, or merge via GitHub using the owner account.
+
 ## Local production test
 
 ```powershell
