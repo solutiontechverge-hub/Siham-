@@ -66,7 +66,7 @@ import {
 type ServiceDetailUiItem = {
   id: string;
   categoryId: string;
-  serviceId: number;
+  serviceId: string;
   name: string;
   durationLabel?: string;
   priceLabel: string;
@@ -80,7 +80,7 @@ type ServiceDetailUiItem = {
 
 type ServiceDrawerEditBaseline = {
   categoryId: string;
-  serviceId: number;
+  serviceId: string;
   name: string;
   duration: string;
   priceType: string;
@@ -120,8 +120,8 @@ const mapServiceItemsToCategories = (items: ServiceDetailUiItem[]) =>
   items
     .filter((item) => item.serviceId && item.categoryId)
     .map((item) => ({
-      category_id: Number(item.categoryId),
-      service_id: item.serviceId,
+      category_id: String(item.categoryId),
+      service_id: String(item.serviceId),
       amount:
         (parseEuroAmountString(item.priceAmount ?? "") ??
           Number(String(item.priceLabel).replace(/[^0-9.]/g, ""))) || 0,
@@ -844,7 +844,7 @@ export default function ProfessionalFixedLocationSetup({
       .map((value) => {
         const matched = allSubcategoryOptions.find((option) => option.value === value);
         return {
-          service_id: Number(value),
+          service_id: String(value),
           title: matched?.label ?? null,
         };
       });
@@ -1397,10 +1397,10 @@ export default function ProfessionalFixedLocationSetup({
                 : businessCategories
                     .flatMap((item) => item.subcategories)
                     .find((item) => String(item.id) === combo.serviceId);
-              const categoryId = Number(combo.categoryId);
-              const serviceId = Number(combo.serviceId);
+              const categoryId = String(combo.categoryId ?? "").trim();
+              const serviceId = String(combo.serviceId ?? "").trim();
 
-              if (!Number.isInteger(categoryId) || !Number.isInteger(serviceId)) {
+              if (!categoryId || !serviceId) {
                 return null;
               }
 
@@ -1411,16 +1411,7 @@ export default function ProfessionalFixedLocationSetup({
                 service_title: service?.title ?? null,
               };
             })
-            .filter(
-              (
-                combo,
-              ): combo is {
-                category_id: number;
-                category_title: string | null;
-                service_id: number;
-                service_title: string | null;
-              } => combo !== null,
-            )
+            .filter((combo): combo is NonNullable<typeof combo> => combo !== null)
         : [],
       additional_notes: sourceBiz.notes,
       price_range: [sourceBiz.priceRangeFrom, sourceBiz.priceRangeTo].filter(Boolean).join(" - "),
@@ -1445,7 +1436,7 @@ export default function ProfessionalFixedLocationSetup({
       desired_location_province: desiredProvinceText,
       desired_location_services: serviceItems.map((item) => item.name),
       team_members: teamMembers.map((member, index) => ({
-        id: /^\d+$/.test(member.id) ? Number(member.id) : undefined,
+        id: member.id ? String(member.id) : undefined,
         full_name: member.name,
         role: member.role,
         profile_photo: member.photoSrc.startsWith("blob:") ? null : member.photoSrc,
@@ -1650,7 +1641,7 @@ export default function ProfessionalFixedLocationSetup({
   const [serviceDrawerOpen, setServiceDrawerOpen] = React.useState(false);
   const [editingServiceId, setEditingServiceId] = React.useState<string | null>(null);
   const [draftServiceCategory, setDraftServiceCategory] = React.useState<string>("");
-  const [draftServiceId, setDraftServiceId] = React.useState<number | "">("");
+  const [draftServiceId, setDraftServiceId] = React.useState("");
   const [draftServiceName, setDraftServiceName] = React.useState("");
   const [draftServiceDuration, setDraftServiceDuration] = React.useState("");
   const [draftServicePriceType, setDraftServicePriceType] = React.useState("fixed");
@@ -1740,8 +1731,8 @@ export default function ProfessionalFixedLocationSetup({
   const serviceDrawerDirty = React.useMemo(() => {
     if (!editingServiceId || !serviceDrawerEditBaseline) return false;
     const b = serviceDrawerEditBaseline;
-    const sid = draftServiceId === "" ? null : Number(draftServiceId);
-    if (sid === null || Number.isNaN(sid)) return false;
+    const sid = draftServiceId.trim();
+    if (!sid) return false;
     const discAmt = draftServiceDiscountAmount.trim();
     const bDiscAmt = b.discountAmount.trim();
     return (
@@ -1770,7 +1761,9 @@ export default function ProfessionalFixedLocationSetup({
   const saveService = React.useCallback(() => {
     if (!draftServiceCategory || !draftServiceId) return;
     const matchedCategory = businessCategories.find((category) => String(category.id) === draftServiceCategory);
-    const matchedService = matchedCategory?.subcategories.find((subcategory) => subcategory.id === Number(draftServiceId));
+    const matchedService = matchedCategory?.subcategories.find(
+      (subcategory) => String(subcategory.id) === String(draftServiceId),
+    );
     if (!matchedService) return;
 
     const name = draftServiceName.trim() || matchedService.title;
@@ -2885,10 +2878,10 @@ export default function ProfessionalFixedLocationSetup({
                 label="Service"
                 value={draftServiceId}
                 onChange={(e) => {
-                  const sid = Number(e.target.value);
+                  const sid = String(e.target.value);
                   setDraftServiceId(sid);
                   const cat = businessCategories.find((c) => String(c.id) === draftServiceCategory);
-                  const sub = cat?.subcategories.find((s) => s.id === sid);
+                  const sub = cat?.subcategories.find((s) => String(s.id) === sid);
                   if (sub) setDraftServiceName(sub.title);
                 }}
               >

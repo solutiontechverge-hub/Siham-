@@ -780,7 +780,7 @@ export default function ProfessionalFixedLocationCalendar({
           : nonMollureDraft.firstName.trim()
             ? `${nonMollureDraft.firstName.trim()} ${nonMollureDraft.lastName.trim()}`.trim()
             : "Walk-in client");
-      const teamMemberId = Number(selectedSlot.resourceId);
+      const teamMemberId = selectedSlot.resourceId?.trim() || null;
       const statusToApi: Record<typeof slotStatus, CreateCalendarEntryRequest["status"]> = {
         Confirmed: "confirmed",
         Requested: "requested",
@@ -799,7 +799,7 @@ export default function ProfessionalFixedLocationCalendar({
 
       try {
         await onCreateCalendarEntry({
-          team_member_id: Number.isInteger(teamMemberId) ? teamMemberId : null,
+          team_member_id: teamMemberId,
           status: apiStatus,
           title: `${slotBookingType} booking`,
           start_time: toDateTimeInput(selectedSlot.date, selectedSlot.start),
@@ -3461,10 +3461,10 @@ export default function ProfessionalFixedLocationCalendar({
           }
           try {
             for (const teamId of blockDraft.teamIds) {
-              const teamMemberId = Number(teamId);
+              const teamMemberId = String(teamId).trim() || null;
               for (const location of blockDraft.locations) {
                 await onCreateCalendarEntry?.({
-                  team_member_id: Number.isInteger(teamMemberId) ? teamMemberId : null,
+                  team_member_id: teamMemberId,
                   status: "blocked",
                   title: blockDraft.title || "Blocked time",
                   blocked_time_start: toDateTimeInput(blockDraft.dateFrom, blockDraft.startTime),
