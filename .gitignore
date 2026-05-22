@@ -18,3 +18,7 @@ frontend/.next/
 frontend/dist/
 frontend/build/
 frontend/.env.local
+
+# Local merge clones (must not be git submodules)
+_temp_mollure_frontend/
+_temp_siham/
