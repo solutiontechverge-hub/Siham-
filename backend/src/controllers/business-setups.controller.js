@@ -38,7 +38,7 @@ export const listAllBusinessSetups = async (_req, res) => {
            created_at,
            updated_at
          FROM business_team_members
-         WHERE business_setup_id = ANY($1::bigint[])
+         WHERE business_setup_id = ANY($1::uuid[])
          ORDER BY business_setup_id ASC, display_order ASC, id ASC`,
         [setupIds],
       ),

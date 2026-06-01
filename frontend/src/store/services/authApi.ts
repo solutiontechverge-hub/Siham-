@@ -12,6 +12,16 @@ type LoginRequest = {
   password: string;
 };
 
+type GoogleLoginRequest = {
+  id_token: string;
+};
+
+type AppleLoginRequest = {
+  id_token: string;
+  first_name?: string;
+  last_name?: string;
+};
+
 type LoginData = {
   access_token: string;
   refresh_token: string;
@@ -126,6 +136,48 @@ export const authApi = baseApi.injectEndpoints({
         return { data };
       },
     }),
+    loginWithGoogle: builder.mutation<ApiEnvelope<LoginData>, GoogleLoginRequest>({
+      async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: "/api/auth/google",
+          method: "POST",
+          body: payload,
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<LoginData>;
+
+        if (!data.success || !data.data) {
+          return { error: customError(data.message || "Google sign-in failed.") };
+        }
+
+        return { data };
+      },
+    }),
+    loginWithApple: builder.mutation<ApiEnvelope<LoginData>, AppleLoginRequest>({
+      async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: "/api/auth/apple",
+          method: "POST",
+          body: payload,
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<LoginData>;
+
+        if (!data.success || !data.data) {
+          return { error: customError(data.message || "Apple sign-in failed.") };
+        }
+
+        return { data };
+      },
+    }),
     register: builder.mutation<ApiEnvelope<unknown>, RegisterRequest>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
         const response = await fetchWithBQ({
@@ -221,6 +273,8 @@ export const authApi = baseApi.injectEndpoints({
 export const {
   useForgotPasswordMutation,
   useLoginMutation,
+  useLoginWithAppleMutation,
+  useLoginWithGoogleMutation,
   useRegisterMutation,
   useResetPasswordMutation,
   useVerifyOtpMutation,

@@ -1,6 +1,7 @@
 import { buildDurationByServiceId } from "./business-service-categories.js";
 import {
-  parseBigIntArray,
+  entityIdKey,
+  parseEntityIdArray,
   parseJsonArray,
   parseJsonValue,
   parseTextArray,
@@ -57,7 +58,9 @@ const mapServiceDetail = (detail, durationByServiceId = new Map()) => ({
   serviceId: detail.service_id ?? null,
   price: toNullableNumber(detail.price),
   durationLabel:
-    toNullableString(detail.duration_label) || durationByServiceId.get(Number(detail.service_id)) || null,
+    toNullableString(detail.duration_label) ||
+    durationByServiceId.get(entityIdKey(detail.service_id) ?? "") ||
+    null,
   serviceTitle: toNullableString(detail.service_title),
   categoryId: detail.category_id ?? null,
   categoryTitle: toNullableString(detail.category_title),
@@ -131,7 +134,7 @@ export const transformBusinessSetupForListing = (
     additionalNotes: toNullableString(row.additional_notes),
     notes: toNullableString(row.book_service_notes),
     project: toNullableString(row.project),
-    teamMemberIds: parseBigIntArray(row.team_member_ids),
+    teamMemberIds: parseEntityIdArray(row.team_member_ids),
     teamMembers: normalizedTeamMembers.map(mapTeamMember),
     createdAt: toIsoTimestamp(row.created_at),
     updatedAt: toIsoTimestamp(row.updated_at),

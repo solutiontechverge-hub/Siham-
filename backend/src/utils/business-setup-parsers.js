@@ -60,6 +60,41 @@ export const parseJsonArray = (value) => {
   }
 };
 
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export const normalizeEntityId = (value) => {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
+  const trimmed = String(value).trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (UUID_REGEX.test(trimmed)) {
+    return trimmed;
+  }
+
+  const parsed = Number(trimmed);
+  if (Number.isInteger(parsed) && parsed > 0) {
+    return parsed;
+  }
+
+  return null;
+};
+
+export const entityIdKey = (value) => {
+  const normalized = normalizeEntityId(value);
+  return normalized === null ? null : String(normalized);
+};
+
+export const parseEntityIdArray = (value) => {
+  const items = parseTextArray(value);
+  return items.map((item) => normalizeEntityId(item)).filter(Boolean);
+};
+
 export const parseBigIntArray = (value) => {
   const items = parseTextArray(value);
   return items
