@@ -7,12 +7,13 @@ import { persistAuthSession } from "../lib/auth-storage";
 import { useAppDispatch } from "../store/hooks";
 import { setAuthSession } from "../store/slices/authSlice";
 import { useSnackbar } from "../components/common/AppSnackbar";
+import { queueSnackbarFlash } from "../lib/snackbarFlash";
 
 export type AuthLoginPayload = {
   access_token: string;
   refresh_token: string;
   user: {
-    id: number;
+    id: string;
     email: string;
     user_type: string;
     is_email_verified: boolean;
@@ -40,8 +41,9 @@ export function useAuthSessionLogin() {
         user: data.user,
         remember,
       });
-      router.push(getDefaultRouteForUser(data.user.user_type));
+      queueSnackbarFlash({ severity: "success", message: "Signed in successfully." });
       showSnackbar({ severity: "success", message: "Signed in successfully." });
+      router.push(getDefaultRouteForUser(data.user.user_type));
     },
     [dispatch, router, showSnackbar],
   );
