@@ -130,8 +130,12 @@ export type BusinessSetupListing = {
   serviceCategories: Array<{
     category_id?: string;
     categoryId?: string;
+    category_title?: string | null;
+    categoryTitle?: string | null;
     service_id?: string;
     serviceId?: string;
+    service_title?: string | null;
+    serviceTitle?: string | null;
     amount?: number;
     duration_label?: string | null;
     durationLabel?: string | null;
@@ -366,7 +370,32 @@ export type UpsertBusinessSetupRequest = {
   desired_location_area?: string;
   desired_location_province?: string;
   desired_location_services?: string[];
-  team_members?: BusinessTeamMember[];
+  team_members?: Array<
+    BusinessTeamMember & {
+      photo_upload_key?: string;
+    }
+  >;
+};
+
+export type UpsertBusinessSetupPayload = UpsertBusinessSetupRequest | FormData;
+
+export const buildUpsertBusinessSetupBody = (
+  payload: UpsertBusinessSetupRequest,
+  teamPhotoFiles: Array<{ memberKey: string; file: File }> = [],
+): UpsertBusinessSetupPayload => {
+  if (!teamPhotoFiles.length) {
+    return payload;
+  }
+
+  const formData = new FormData();
+  formData.append("setup", JSON.stringify(payload));
+  formData.append("location_mode", payload.location_mode);
+
+  for (const { memberKey, file } of teamPhotoFiles) {
+    formData.append(`team_member_photo__${memberKey}`, file);
+  }
+
+  return formData;
 };
 
 type MutationError = FetchBaseQueryError;
@@ -616,13 +645,39 @@ export const businessApi = baseApi.injectEndpoints({
       },
       invalidatesTags: ["BusinessSetup", "BusinessSetupsListing"],
     }),
-    upsertBusinessSetup: builder.mutation<ApiEnvelope<BusinessSetup>, UpsertBusinessSetupRequest>({
+    createBusinessSubcategory: builder.mutation<
+      ApiEnvelope<BusinessSubcategory>,
+      { category_id: string; title: string }
+    >({
+      async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: "/api/business/subcategories",
+          method: "POST",
+          body: payload,
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<BusinessSubcategory>;
+        if (!data.success || !data.data) {
+          return { error: customError(data.message || "Unable to create catalog service.") };
+        }
+
+        return { data };
+      },
+      invalidatesTags: ["BusinessCategories"],
+    }),
+    upsertBusinessSetup: builder.mutation<ApiEnvelope<BusinessSetup>, UpsertBusinessSetupPayload>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
         console.log("[businessApi] upsertBusinessSetup payload:", payload);
 
+        const isMultipart = typeof FormData !== "undefined" && payload instanceof FormData;
+
         const response = await fetchWithBQ({
           url: "/api/business/setup",
-          method: "PUT",
+          method: isMultipart ? "POST" : "PUT",
           body: payload,
         });
 
@@ -658,5 +713,6 @@ export const {
   useUpdateBookingStatusMutation,
   useUploadBusinessMediaMutation,
   useUpdateBusinessSetupActiveMutation,
+  useCreateBusinessSubcategoryMutation,
   useUpsertBusinessSetupMutation,
 } = businessApi;

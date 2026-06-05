@@ -81,7 +81,7 @@ router.post(
   "/subcategories",
   requireProfessional,
   [
-    body("category_id").isInt({ min: 1 }).withMessage("category_id must be a valid integer."),
+    body("category_id").trim().notEmpty().withMessage("category_id is required."),
     body("title").trim().notEmpty().withMessage("title is required."),
   ],
   validateRequest,
@@ -105,13 +105,30 @@ router.post(
   uploadBusinessMedia,
 );
 
-router.put(
-  "/setup",
-  requireProfessional,
-  [
+const parseBusinessSetupBody = (req, res, next) => {
+  if (typeof req.body?.setup === "string" && req.body.setup.trim()) {
+    try {
+      const parsed = JSON.parse(req.body.setup);
+      req.body = { ...parsed, ...req.body };
+      delete req.body.setup;
+    } catch {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid setup payload.",
+        data: null,
+      });
+    }
+  }
+
+  return next();
+};
+
+const businessSetupValidators = [
     body("location_mode")
-      .trim()
-      .isIn(locationModes)
+      .custom((value) => {
+        const mode = String(value ?? "").trim();
+        return locationModes.includes(mode);
+      })
       .withMessage("location_mode must be fixed, desired, or both."),
     body("business_keywords")
       .optional({ values: "falsy" })
@@ -163,10 +180,19 @@ router.put(
       .optional({ values: "falsy" })
       .custom((value) => Array.isArray(parseArrayLike(value)))
       .withMessage("team_members must be an array."),
-  ],
+];
+
+const saveBusinessSetupHandlers = [
+  requireProfessional,
+  upload.any(),
+  parseBusinessSetupBody,
+  ...businessSetupValidators,
   validateRequest,
   upsertBusinessSetup,
-);
+];
+
+router.put("/setup", ...saveBusinessSetupHandlers);
+router.post("/setup", ...saveBusinessSetupHandlers);
 
 router.get("/calendar", requireProfessional, listCalendarEntries);
 router.get("/calendar/overview", requireProfessional, getCalendarOverview);

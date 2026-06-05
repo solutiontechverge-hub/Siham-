@@ -147,6 +147,20 @@ export async function deleteProfileMediaIfOwned(storedUrl, userId) {
   }
 }
 
+export async function uploadTeamMemberPhotoFileToS3(userId, file) {
+  if (!file?.buffer?.length) {
+    throw new Error("No image file provided.");
+  }
+
+  return uploadUserProfileAsset({
+    userId,
+    assetKind: "team_member_photo",
+    buffer: file.buffer,
+    contentType: file.mimetype,
+    originalName: file.originalname,
+  });
+}
+
 export async function uploadBusinessMediaFilesToS3(userId, files = []) {
   const urls = [];
 

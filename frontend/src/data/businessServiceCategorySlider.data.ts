@@ -77,19 +77,54 @@ export function findBusinessCategoryForCatalogEntry(
   );
 }
 
-/** Always returns All + 8 catalog categories; maps API ids when categories exist in the database. */
-export function buildServiceCategoryTabs(businessCategories: readonly BusinessCategoryLike[]): ServiceCategoryTab[] {
+export function buildCategoryTabFromRecord(category: BusinessCategoryLike): ServiceCategoryTab {
+  return {
+    id: String(category.id),
+    label: category.title,
+    iconId: resolveServiceCategorySliderIconId(category.title),
+  };
+}
+
+/** Build tabs from API/database categories, optionally limited to categories that have services. */
+export function buildDynamicServiceCategoryTabs(
+  businessCategories: readonly BusinessCategoryLike[],
+  options?: { onlyCategoryIds?: readonly string[] },
+): ServiceCategoryTab[] {
+  const onlyIds = options?.onlyCategoryIds
+    ? new Set(options.onlyCategoryIds.map((id) => String(id)))
+    : null;
+
+  const categoryTabs = businessCategories
+    .filter((category) => {
+      const id = String(category.id);
+      return id && (!onlyIds || onlyIds.has(id));
+    })
+    .map(buildCategoryTabFromRecord);
+
+  return [{ id: "all", label: "All", iconId: "all" }, ...categoryTabs];
+}
+
+function buildCatalogFallbackTabs(): ServiceCategoryTab[] {
   return [
     { id: "all", label: "All", iconId: "all" },
-    ...BUSINESS_SERVICE_CATEGORY_CATALOG.map((entry) => {
-      const apiCategory = findBusinessCategoryForCatalogEntry(businessCategories, entry);
-      return {
-        id: apiCategory ? String(apiCategory.id) : entry.key,
-        label: entry.label,
-        iconId: entry.iconId,
-      };
-    }),
+    ...BUSINESS_SERVICE_CATEGORY_CATALOG.map((entry) => ({
+      id: entry.key,
+      label: entry.label,
+      iconId: entry.iconId,
+    })),
   ];
+}
+
+/**
+ * Dynamic category tabs for business setup and listings.
+ * Uses database categories when available; falls back to the static catalog only while categories are loading.
+ */
+export function buildServiceCategoryTabs(businessCategories: readonly BusinessCategoryLike[]): ServiceCategoryTab[] {
+  if (businessCategories.length > 0) {
+    return buildDynamicServiceCategoryTabs(businessCategories);
+  }
+
+  return buildCatalogFallbackTabs();
 }
 
 export function resolveCategoryTabId(
@@ -139,6 +174,10 @@ export function serviceMatchesCategoryTab(
   if (!tab) return String(service.categoryId ?? "") === tabId;
 
   if (String(service.categoryId ?? "") === tabId) return true;
+
+  if (tab.label && service.categoryTitle) {
+    if (normalizeTitle(service.categoryTitle) === normalizeTitle(tab.label)) return true;
+  }
 
   const catalogEntry =
     BUSINESS_SERVICE_CATEGORY_CATALOG.find((e) => e.key === tabId) ??

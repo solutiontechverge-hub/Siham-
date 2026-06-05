@@ -9,6 +9,7 @@ import { resolveServiceCategorySliderIconId } from "./businessServiceCategorySli
 export type BusinessPublicProfileService = {
   id: string;
   categoryId: string;
+  categoryTitle?: string;
   name: string;
   durationLabel: string;
   priceLabel: string;

@@ -112,6 +112,12 @@ export default function BusinessServiceFormModal({
     >
       <Box sx={{ px: 2.5, py: 2, width: "100%", boxSizing: "border-box" }}>
         <Stack spacing={2} sx={{ width: "100%", alignItems: "stretch" }}>
+          {mode === "subservice" ? (
+            <Typography sx={{ fontSize: 12.5, color: alpha(m.navy, 0.62), lineHeight: 1.45 }}>
+              {businessServiceModalCopy.customServiceHint}
+            </Typography>
+          ) : null}
+
           <MollureFormField
             label={businessServiceModalCopy.nameLabel}
             value={draft.name}

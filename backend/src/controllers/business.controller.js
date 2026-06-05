@@ -2,8 +2,10 @@ import { getClient, query } from "../db/index.js";
 import {
   isS3UploadConfigured,
   uploadBusinessMediaFilesToS3,
+  uploadTeamMemberPhotoFileToS3,
 } from "../services/s3-upload.service.js";
 import { buildServiceDetailsFromCategories } from "../utils/business-service-categories.js";
+import { normalizeEntityId } from "../utils/business-setup-parsers.js";
 import {
   isValidUuid,
   parseOptionalUuid,
@@ -128,10 +130,12 @@ const normalizeServiceCategories = (value) => {
         return null;
       }
 
-      const categoryId = parseUuid(item.category_id);
-      const serviceId = parseUuid(item.service_id);
+      const categoryId = normalizeEntityId(item.category_id) ?? String(item.category_id ?? "").trim();
+      const serviceId = normalizeEntityId(item.service_id) ?? String(item.service_id ?? "").trim();
       const amount = parseOptionalNumber(item.amount);
       const durationLabel = String(item.duration_label ?? item.duration ?? "").trim() || null;
+      const categoryTitle = String(item.category_title ?? item.categoryTitle ?? "").trim() || null;
+      const serviceTitle = String(item.service_title ?? item.serviceTitle ?? "").trim() || null;
 
       if (!categoryId || !serviceId) {
         return null;
@@ -140,6 +144,8 @@ const normalizeServiceCategories = (value) => {
       return {
         category_id: categoryId,
         service_id: serviceId,
+        category_title: categoryTitle,
+        service_title: serviceTitle,
         amount: amount ?? 0,
         duration_label: durationLabel,
       };
@@ -202,8 +208,11 @@ const normalizeTeamMembers = (value) => {
         })
         .filter(Boolean);
 
+      const photoUploadKey = String(item.photo_upload_key ?? "").trim();
+
       return {
         id: id || null,
+        photo_upload_key: photoUploadKey || null,
         full_name: fullName,
         role: String(item.role ?? "Team member").trim() || "Team member",
         profile_photo: item.profile_photo ? String(item.profile_photo).trim() : null,
@@ -278,6 +287,7 @@ const getBusinessSetupDetailById = async (setupId, client = { query }) => {
     serviceCategories,
     setupId,
     client.query.bind(client),
+    { teamMembers, useTeamAssignmentsFallback: false },
   );
 
   return {
@@ -498,6 +508,49 @@ export const updateBusinessSetupActive = async (req, res) => {
 const isPersistedMediaUrl = (value) =>
   typeof value === "string" && (value.startsWith("http://") || value.startsWith("https://"));
 
+const TEAM_MEMBER_PHOTO_FIELD_PREFIX = "team_member_photo__";
+
+const mapTeamMemberPhotoFiles = (files = []) => {
+  const photoFilesByKey = new Map();
+
+  for (const file of files) {
+    if (!file?.fieldname?.startsWith(TEAM_MEMBER_PHOTO_FIELD_PREFIX)) {
+      continue;
+    }
+
+    const key = file.fieldname.slice(TEAM_MEMBER_PHOTO_FIELD_PREFIX.length);
+    if (key) {
+      photoFilesByKey.set(key, file);
+    }
+  }
+
+  return photoFilesByKey;
+};
+
+const applyTeamMemberPhotoUploads = async (teamMembers, files, userId) => {
+  const photoFilesByKey = mapTeamMemberPhotoFiles(files);
+  if (!photoFilesByKey.size) {
+    return teamMembers;
+  }
+
+  if (!isS3UploadConfigured()) {
+    throw new Error("File upload is temporarily unavailable.");
+  }
+
+  return Promise.all(
+    teamMembers.map(async (member) => {
+      const lookupKeys = [member.photo_upload_key, member.id].filter(Boolean).map(String);
+      const file = lookupKeys.map((key) => photoFilesByKey.get(key)).find(Boolean);
+      if (!file) {
+        return member;
+      }
+
+      const profilePhoto = await uploadTeamMemberPhotoFileToS3(userId, file);
+      return { ...member, profile_photo: profilePhoto };
+    }),
+  );
+};
+
 export const uploadBusinessMedia = async (req, res) => {
   try {
     if (req.user.user_type !== "professional") {
@@ -619,7 +672,9 @@ export const upsertBusinessSetup = async (req, res) => {
 
     const serviceCategories = normalizeServiceCategories(req.body.service_categories);
     const bookServiceCombinations = normalizeBookServiceCombinations(req.body.book_service_combinations);
-    const teamMembers = normalizeTeamMembers(req.body.team_members);
+    let teamMembers = normalizeTeamMembers(req.body.team_members);
+    teamMembers = await applyTeamMemberPhotoUploads(teamMembers, req.files, req.user.id);
+    teamMembers = teamMembers.map(({ photo_upload_key: _photoUploadKey, ...member }) => member);
 
     const payload = {
       location_mode: req.body.location_mode,

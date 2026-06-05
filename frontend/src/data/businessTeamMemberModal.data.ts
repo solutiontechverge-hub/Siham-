@@ -39,6 +39,7 @@ export type TeamMemberServiceGroupSelection = {
 export type TeamMemberFormDraft = {
   name: string;
   photoSrc: string;
+  pendingPhotoFile?: File | null;
   selectedGroups: TeamMemberServiceGroupSelection[];
   categoryId: string;
   serviceId: string;
@@ -134,20 +135,20 @@ export function buildTeamCategoryOptions(
     options.push({ value, label });
   };
 
-  if (businessCategories.length > 0) {
+  if (businessServices.length > 0) {
+    for (const service of businessServices) {
+      const record = resolveTeamCategoryRecord(service.categoryId, businessCategories, context);
+      if (record) {
+        pushOption(record.id, record.title);
+      }
+    }
+  } else if (businessCategories.length > 0) {
     for (const category of businessCategories) {
       pushOption(String(category.id), category.title);
     }
   } else {
     for (const entry of BUSINESS_SERVICE_CATEGORY_CATALOG) {
       pushOption(entry.key, entry.label);
-    }
-  }
-
-  for (const service of businessServices) {
-    const record = resolveTeamCategoryRecord(service.categoryId, businessCategories, context);
-    if (record) {
-      pushOption(record.id, record.title);
     }
   }
 

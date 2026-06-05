@@ -64,8 +64,9 @@ export type BusinessSubserviceUi = {
 export const businessServiceModalCopy = {
   addServiceTitle: "Add Service",
   editServiceTitle: "Edit Service",
-  addSubserviceTitle: "Add Subservice",
-  editSubserviceTitle: "Edit Subservice",
+  addSubserviceTitle: "Add Service",
+  editSubserviceTitle: "Edit Service",
+  customServiceHint: "Enter your own service name, price, and duration for this category.",
   cancelLabel: "Cancel",
   addLabel: "Add",
   saveLabel: "Save",
@@ -147,9 +148,15 @@ export function formatBusinessServicePriceLabel(
 ): string {
   const raw = priceAmount.trim().replace(",", ".").replace(/\s/g, "");
   const n = raw === "" ? Number.NaN : Number.parseFloat(raw);
-  const amountPart = Number.isFinite(n) ? `${n} €` : "25 €";
+  if (!Number.isFinite(n)) return "—";
+  const amountPart = `${n} €`;
   if (normalizeBusinessServicePriceType(priceType) === "from") return `Starting from ${amountPart}`;
   return amountPart;
+}
+
+export function isHydratedMainServiceId(mainId: string): boolean {
+  const id = String(mainId ?? "").trim();
+  return id.startsWith("main-") && id.endsWith("-hydrated");
 }
 
 export function parsePriceLabelForModal(priceLabel: string): { type: BusinessServicePriceType; amount: string } {
@@ -335,46 +342,57 @@ export function hydrateMainAndSubservicesFromDetails(
   return { mains, subs };
 }
 
-export function resolveCatalogServiceIdForSubservice(
+export function findSubcategoryIdByTitle(
+  categoryId: string,
+  title: string,
+  businessCategories: Array<{ id: string | number; title: string; subcategories: Array<{ id: string | number; title: string }> }>,
+): string | null {
+  const category = resolveBusinessCategoryRecord(categoryId, businessCategories);
+  if (!category) return null;
+
+  const normalized = title.trim().toLowerCase();
+  if (!normalized) return null;
+
+  const match = category.subcategories.find((sub) => sub.title.trim().toLowerCase() === normalized);
+  return match ? String(match.id) : null;
+}
+
+export function hasDuplicateServiceNameInCategory(
   categoryId: string,
   name: string,
-  catalogServiceId: string,
-  businessCategories: Array<{ id: string; title: string; subcategories: Array<{ id: string; title: string }> }>,
-  usedServiceIds: Set<string>,
-): string | null {
-  let category = businessCategories.find((item) => String(item.id) === String(categoryId));
+  subservices: readonly { id: string; name: string; categoryId: string }[],
+  editingSubId: string | null = null,
+): boolean {
+  const normalized = name.trim().toLowerCase();
+  if (!normalized) return false;
 
-  if (!category) {
-    const catalogEntry = BUSINESS_SERVICE_CATEGORY_CATALOG.find(
-      (entry) => entry.key === categoryId || entry.label.toLowerCase() === String(categoryId).toLowerCase(),
-    );
-    if (catalogEntry) {
-      const normalizedLabel = catalogEntry.label.toLowerCase().trim();
-      category =
-        businessCategories.find((item) => item.title.toLowerCase().trim() === normalizedLabel) ??
-        businessCategories.find(
-          (item) =>
-            item.title.toLowerCase().includes(catalogEntry.key) ||
-            catalogEntry.label.toLowerCase().includes(item.title.toLowerCase()),
-        );
-    }
-  }
+  return subservices.some(
+    (item) =>
+      item.id !== editingSubId &&
+      String(item.categoryId) === String(categoryId) &&
+      item.name.trim().toLowerCase() === normalized,
+  );
+}
 
-  if (!category || category.subcategories.length === 0) return null;
+export function resolveBusinessCategoryRecord(
+  categoryId: string,
+  businessCategories: Array<{ id: string | number; title: string; subcategories: Array<{ id: string | number; title: string }> }>,
+) {
+  const direct = businessCategories.find((item) => String(item.id) === String(categoryId));
+  if (direct) return direct;
 
-  const trimmedCatalog = String(catalogServiceId ?? "").trim();
-  if (trimmedCatalog && category.subcategories.some((sub) => String(sub.id) === trimmedCatalog)) {
-    return trimmedCatalog;
-  }
+  const catalogEntry = BUSINESS_SERVICE_CATEGORY_CATALOG.find(
+    (entry) => entry.key === categoryId || entry.label.toLowerCase() === String(categoryId).toLowerCase(),
+  );
+  if (!catalogEntry) return undefined;
 
-  const normalizedName = name.trim().toLowerCase();
-  if (normalizedName) {
-    const byName = category.subcategories.find((sub) => sub.title.trim().toLowerCase() === normalizedName);
-    if (byName) return String(byName.id);
-  }
-
-  const unused = category.subcategories.find((sub) => !usedServiceIds.has(String(sub.id)));
-  if (unused) return String(unused.id);
-
-  return category.subcategories[0] ? String(category.subcategories[0].id) : null;
+  const normalizedLabel = catalogEntry.label.toLowerCase().trim();
+  return (
+    businessCategories.find((item) => item.title.toLowerCase().trim() === normalizedLabel) ??
+    businessCategories.find(
+      (item) =>
+        item.title.toLowerCase().includes(catalogEntry.key) ||
+        catalogEntry.label.toLowerCase().includes(item.title.toLowerCase()),
+    )
+  );
 }

@@ -23,6 +23,7 @@ export type TeamMemberUi = {
   name: string;
   role: string;
   photoSrc: string;
+  pendingPhotoFile?: File | null;
   rating: number;
   reviewsLabel: string;
   services: TeamServiceSlots;
@@ -86,7 +87,13 @@ export function useBusinessTeamMemberModal({
         if (editingMemberId) {
           return withoutPreview.map((member) =>
             member.id === editingMemberId
-              ? { ...member, name: displayName, photoSrc: draftState.photoSrc, services }
+              ? {
+                  ...member,
+                  name: displayName,
+                  photoSrc: draftState.photoSrc,
+                  pendingPhotoFile: draftState.pendingPhotoFile ?? null,
+                  services,
+                }
               : member,
           );
         }
@@ -96,6 +103,7 @@ export function useBusinessTeamMemberModal({
           name: displayName,
           role: "Team member",
           photoSrc: draftState.photoSrc,
+          pendingPhotoFile: draftState.pendingPhotoFile ?? null,
           rating: 4.5,
           reviewsLabel: "(0 Reviews)",
           services,
@@ -127,6 +135,7 @@ export function useBusinessTeamMemberModal({
       setDraft({
         name: member.name,
         photoSrc: member.photoSrc,
+        pendingPhotoFile: member.pendingPhotoFile ?? null,
         selectedGroups: groupsFromTeamService(member.services, businessCategories, serviceContext),
         categoryId: "",
         serviceId: "",
@@ -174,10 +183,17 @@ export function useBusinessTeamMemberModal({
     photoInputRef.current?.click();
   }, []);
 
-  const onPhotoSelected = React.useCallback((file: File, objectUrl: string) => {
-    blobUrlsRef.current.push(objectUrl);
-    setDraft((prev) => ({ ...prev, photoSrc: objectUrl }));
-  }, []);
+  const onPhotoSelected = React.useCallback(
+    (file: File, objectUrl: string) => {
+      blobUrlsRef.current.push(objectUrl);
+      setDraft((prev) => {
+        const next = { ...prev, photoSrc: objectUrl, pendingPhotoFile: file };
+        syncDraftToMainScreen(next);
+        return next;
+      });
+    },
+    [syncDraftToMainScreen],
+  );
 
   const canSubmit = Boolean(draft.name.trim());
 
@@ -194,7 +210,14 @@ export function useBusinessTeamMemberModal({
     if (editingMemberId) {
       nextMembers = persistedMembers.map((member) =>
         member.id === editingMemberId
-          ? { ...member, name, role, photoSrc: draft.photoSrc, services }
+          ? {
+              ...member,
+              name,
+              role,
+              photoSrc: draft.photoSrc,
+              pendingPhotoFile: draft.pendingPhotoFile ?? null,
+              services,
+            }
           : member,
       );
     } else {
@@ -204,6 +227,7 @@ export function useBusinessTeamMemberModal({
           name,
           role,
           photoSrc: draft.photoSrc,
+          pendingPhotoFile: draft.pendingPhotoFile ?? null,
           rating: 4.5,
           reviewsLabel: "(0 Reviews)",
           services,
@@ -234,6 +258,7 @@ export function useBusinessTeamMemberModal({
     closeModal,
     draft.name,
     draft.photoSrc,
+    draft.pendingPhotoFile,
     draft.selectedGroups,
     editingMemberId,
     onAfterLocalSave,

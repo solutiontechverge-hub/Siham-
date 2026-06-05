@@ -20,10 +20,7 @@ import type {
   BusinessPublicProfileServiceForItem,
   BusinessPublicProfileTeamMember,
 } from "../../../data/businessPublicProfile.data";
-import {
-  buildServiceCategoryTabs,
-  resolveServiceCategorySliderIconId,
-} from "../../../data/businessServiceCategorySlider.data";
+import { buildDynamicServiceCategoryTabs } from "../../../data/businessServiceCategorySlider.data";
 import type {
   BusinessSetupListing,
   BusinessSetupListingPolicy,
@@ -80,6 +77,7 @@ function parseDurationMins(durationLabel: string) {
 }
 
 function formatPriceLabel(price: number) {
+  if (!Number.isFinite(price) || price <= 0) return "—";
   return `${Math.round(price)} €`;
 }
 
@@ -127,11 +125,11 @@ function teamLocationModes(locationMode: BusinessSetupListing["locationMode"]): 
 }
 
 function buildDurationByServiceId(setup: BusinessSetupListing) {
-  const map = new Map<number, string>();
+  const map = new Map<string, string>();
   for (const entry of setup.serviceCategories ?? []) {
-    const serviceId = Number(entry.service_id ?? entry.serviceId);
+    const serviceId = String(entry.service_id ?? entry.serviceId ?? "").trim();
     const label = String(entry.duration_label ?? entry.durationLabel ?? "").trim();
-    if (Number.isInteger(serviceId) && serviceId > 0 && label) {
+    if (serviceId && label) {
       map.set(serviceId, label);
     }
   }
@@ -194,16 +192,44 @@ function buildDesiredLocation(setup: BusinessSetupListing): BusinessPublicProfil
   };
 }
 
+function buildServicesFromTeamAssignments(setup: BusinessSetupListing): BusinessPublicProfileService[] {
+  const seen = new Set<string>();
+  const services: BusinessPublicProfileService[] = [];
+
+  for (const member of setup.teamMembers ?? []) {
+    for (const assigned of member.assignedServices ?? []) {
+      const serviceId = String(assigned.service_id ?? assigned.serviceId ?? "").trim();
+      if (!serviceId || seen.has(serviceId)) continue;
+      seen.add(serviceId);
+
+      const title = assigned.title?.trim() || "Service";
+      services.push({
+        id: serviceId,
+        categoryId: "services",
+        categoryTitle: title,
+        name: title,
+        durationLabel: "",
+        priceLabel: formatPriceLabel(0),
+        priceValue: 0,
+        durationMins: 45,
+      });
+    }
+  }
+
+  return services;
+}
+
 function buildProfileServices(setup: BusinessSetupListing): BusinessPublicProfileService[] {
   const durationByServiceId = buildDurationByServiceId(setup);
 
-  return (setup.serviceDetails ?? [])
+  const fromDetails = (setup.serviceDetails ?? [])
     .filter((detail) => detail.serviceTitle && detail.price != null)
     .map((detail, index) => {
       const categoryTitle = detail.categoryTitle?.trim() || "Services";
       const categoryId = detail.categoryId != null ? String(detail.categoryId) : slugifyCategory(categoryTitle);
+      const serviceIdKey = detail.serviceId != null ? String(detail.serviceId) : "";
       const durationLabel =
-        (detail.serviceId != null ? durationByServiceId.get(Number(detail.serviceId)) : undefined) ||
+        (serviceIdKey ? durationByServiceId.get(serviceIdKey) : undefined) ||
         detail.durationLabel?.trim() ||
         "";
       const priceValue = Number(detail.price);
@@ -211,6 +237,7 @@ function buildProfileServices(setup: BusinessSetupListing): BusinessPublicProfil
       return {
         id: detail.id != null ? String(detail.id) : `svc-${detail.serviceId ?? index}`,
         categoryId,
+        categoryTitle,
         name: detail.serviceTitle as string,
         durationLabel,
         priceLabel: formatPriceLabel(priceValue),
@@ -218,34 +245,91 @@ function buildProfileServices(setup: BusinessSetupListing): BusinessPublicProfil
         durationMins: parseDurationMins(durationLabel),
       };
     });
+
+  if (fromDetails.length > 0) {
+    return fromDetails;
+  }
+
+  return (setup.serviceCategories ?? [])
+    .map((entry, index) => {
+      const serviceId = String(entry.service_id ?? entry.serviceId ?? "").trim();
+      const categoryId = String(entry.category_id ?? entry.categoryId ?? "").trim() || "services";
+      const categoryTitle = String(
+        (entry as { category_title?: string; categoryTitle?: string }).category_title ??
+          (entry as { category_title?: string; categoryTitle?: string }).categoryTitle ??
+          "",
+      ).trim();
+      const serviceTitle = String(
+        (entry as { service_title?: string; serviceTitle?: string }).service_title ??
+          (entry as { service_title?: string; serviceTitle?: string }).serviceTitle ??
+          "",
+      ).trim();
+      const amount = Number(entry.amount);
+      if (!serviceId || !Number.isFinite(amount)) {
+        return null;
+      }
+
+      const durationLabel = durationByServiceId.get(serviceId) || String(entry.duration_label ?? entry.durationLabel ?? "").trim();
+      return {
+        id: serviceId || `svc-${index}`,
+        categoryId,
+        categoryTitle: categoryTitle || undefined,
+        name: serviceTitle || "Service",
+        durationLabel,
+        priceLabel: formatPriceLabel(amount),
+        priceValue: amount,
+        durationMins: parseDurationMins(durationLabel),
+        categoryTitle: categoryTitle || undefined,
+      };
+    })
+    .filter((service): service is BusinessPublicProfileService & { categoryTitle?: string } => service !== null)
+    .map(({ categoryTitle: _categoryTitle, ...service }) => service);
+
+  return buildServicesFromTeamAssignments(setup);
 }
 
 function buildCategoriesFromDetails(setup: BusinessSetupListing, services: BusinessPublicProfileService[]) {
-  const pseudoCategories: Array<{ id: string; title: string }> = [];
-  const seenIcons = new Set<string>();
+  const categoriesById = new Map<string, { id: string; title: string }>();
+
+  const appendCategory = (categoryId: string, title: string) => {
+    const trimmedTitle = title.trim();
+    const id = categoryId || slugifyCategory(trimmedTitle);
+    if (!trimmedTitle || !id || categoriesById.has(id)) return;
+    categoriesById.set(id, { id, title: trimmedTitle });
+  };
 
   for (const detail of setup.serviceDetails ?? []) {
     const title = detail.categoryTitle?.trim();
     if (!title) continue;
-    const iconId = resolveServiceCategorySliderIconId(title);
-    if (seenIcons.has(iconId)) continue;
-    seenIcons.add(iconId);
-    pseudoCategories.push({
-      id: detail.categoryId != null ? String(detail.categoryId) : slugifyCategory(title),
-      title,
-    });
+    appendCategory(detail.categoryId != null ? String(detail.categoryId) : slugifyCategory(title), title);
   }
 
-  if (pseudoCategories.length === 0 && services.length > 0) {
-    for (const service of services) {
-      const iconId = resolveServiceCategorySliderIconId(service.categoryId);
-      if (seenIcons.has(iconId)) continue;
-      seenIcons.add(iconId);
-      pseudoCategories.push({ id: service.categoryId, title: service.categoryId });
+  for (const entry of setup.serviceCategories ?? []) {
+    const categoryId = String(entry.category_id ?? entry.categoryId ?? "").trim();
+    const categoryTitle = String(
+      (entry as { category_title?: string; categoryTitle?: string }).category_title ??
+        (entry as { category_title?: string; categoryTitle?: string }).categoryTitle ??
+        "",
+    ).trim();
+    if (categoryTitle) {
+      appendCategory(categoryId, categoryTitle);
     }
   }
 
-  return buildServiceCategoryTabs(pseudoCategories);
+  for (const service of services) {
+    const categoryId = String(service.categoryId ?? "").trim();
+    const categoryTitle = service.categoryTitle?.trim() || categoryId;
+    if (categoryId && categoryTitle) {
+      appendCategory(categoryId, categoryTitle);
+    }
+  }
+
+  const categories = Array.from(categoriesById.values());
+  if (categories.length === 0) {
+    return [{ id: "all", label: "All", iconId: "all" as const }];
+  }
+
+  return buildDynamicServiceCategoryTabs(categories);
 }
 
 function findServiceDetail(setup: BusinessSetupListing, serviceId: number | null | undefined) {
@@ -351,10 +435,15 @@ function buildPolicySections(setup: BusinessSetupListing): BusinessPublicProfile
 
 function buildTeamMembers(setup: BusinessSetupListing, services: BusinessPublicProfileService[]): BusinessPublicProfileTeamMember[] {
   const modes = teamLocationModes(setup.locationMode);
-  const serviceNameById = new Map<number, string>();
+  const serviceNameById = new Map<string, string>();
   for (const detail of setup.serviceDetails ?? []) {
     if (detail.serviceId != null && detail.serviceTitle) {
-      serviceNameById.set(Number(detail.serviceId), detail.serviceTitle);
+      serviceNameById.set(String(detail.serviceId), detail.serviceTitle);
+    }
+  }
+  for (const service of services) {
+    if (service.id && service.name) {
+      serviceNameById.set(String(service.id), service.name);
     }
   }
 
@@ -365,7 +454,7 @@ function buildTeamMembers(setup: BusinessSetupListing, services: BusinessPublicP
     const assigned = member.assignedServices ?? [];
     const options = assigned
       .map((svc, svcIndex) => {
-        const serviceId = Number(svc.service_id ?? svc.serviceId);
+        const serviceId = String(svc.service_id ?? svc.serviceId ?? "");
         const label = svc.title?.trim() || serviceNameById.get(serviceId) || `Service ${serviceId}`;
         return {
           value: String(serviceId || svcIndex),

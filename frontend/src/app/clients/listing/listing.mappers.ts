@@ -102,12 +102,12 @@ const resolveLocationModeDefault = (
 };
 
 const buildDurationByServiceId = (setup: BusinessSetupListing) => {
-  const map = new Map<number, string>();
+  const map = new Map<string, string>();
 
   for (const entry of setup.serviceCategories ?? []) {
-    const serviceId = Number(entry.service_id ?? entry.serviceId);
+    const serviceId = String(entry.service_id ?? entry.serviceId ?? "").trim();
     const label = String(entry.duration_label ?? entry.durationLabel ?? "").trim();
-    if (Number.isInteger(serviceId) && serviceId > 0 && label) {
+    if (serviceId && label) {
       map.set(serviceId, label);
     }
   }
@@ -125,7 +125,7 @@ const buildServices = (setup: BusinessSetupListing) => {
     .map((detail) => ({
       name: detail.serviceTitle as string,
       durationLabel:
-        (detail.serviceId != null ? durationByServiceId.get(Number(detail.serviceId)) : undefined) ||
+        (detail.serviceId != null ? durationByServiceId.get(String(detail.serviceId)) : undefined) ||
         detail.durationLabel?.trim() ||
         undefined,
       priceLabel: formatPriceLabel(Number(detail.price)),

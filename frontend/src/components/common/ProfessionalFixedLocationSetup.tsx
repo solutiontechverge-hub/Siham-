@@ -24,7 +24,7 @@ import {
   Stack,
   Switch,
 } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
+import { alpha, useTheme, type Theme } from "@mui/material/styles";
 import IosShareRoundedIcon from "@mui/icons-material/IosShareRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
@@ -47,9 +47,13 @@ import type {
   BusinessCategory,
   BusinessSetup,
   BusinessTeamMember,
+  UpsertBusinessSetupPayload,
   UpsertBusinessSetupRequest,
 } from "../../store/services/businessApi";
-import { useUpdateBusinessSetupActiveMutation } from "../../store/services/businessApi";
+import {
+  buildUpsertBusinessSetupBody,
+  useUpdateBusinessSetupActiveMutation,
+} from "../../store/services/businessApi";
 import { getApiErrorMessage } from "../../lib/api-error";
 import { useSnackbar } from "./AppSnackbar";
 import MollureFormField from "./MollureFormField";
@@ -83,7 +87,9 @@ import {
   normalizeBusinessServicePriceType,
   parseEuroAmountString,
   parsePriceLabelForModal,
+  businessServiceModalCopy,
   hydrateMainAndSubservicesFromDetails,
+  isHydratedMainServiceId,
   type BusinessMainServiceUi,
   type BusinessSubserviceUi,
 } from "../../data/businessServiceModal.data";
@@ -101,12 +107,24 @@ import BusinessTeamMemberFormModal from "./BusinessTeamMemberFormModal";
 
 type ServiceDetailUiItem = BusinessSubserviceUi;
 
+type TeamServiceSlots = {
+  slot1: string;
+  slot2: string;
+  slot3: string;
+  slot4: string;
+  slot5: string;
+  slot6: string;
+  slot7: string;
+};
+
 const mapServiceItemsToCategories = (items: ServiceDetailUiItem[]) =>
   items
     .filter((item) => item.serviceId && item.categoryId)
     .map((item) => ({
       category_id: String(item.categoryId),
       service_id: String(item.serviceId),
+      category_title: item.categoryTitle?.trim() || null,
+      service_title: item.name?.trim() || null,
       amount:
         (parseEuroAmountString(item.priceAmount ?? "") ??
           Number(String(item.priceLabel).replace(/[^0-9.]/g, ""))) || 0,
@@ -184,7 +202,7 @@ export type ProfessionalFixedLocationSetupProps = {
   isBusinessSetupSaving?: boolean;
   isBusinessMediaUploading?: boolean;
   onSaveProfessionalProfile?: (payload: UpdateProfilePayload) => Promise<ProfileResponse | void>;
-  onSaveBusinessSetup?: (payload: UpsertBusinessSetupRequest) => Promise<void>;
+  onSaveBusinessSetup?: (payload: UpsertBusinessSetupPayload) => Promise<void>;
   onUploadBusinessMedia?: (files: File[]) => Promise<string[]>;
 };
 
@@ -294,7 +312,7 @@ type BusinessSetupSectionId =
   | "portfolio";
 
 /** Circular “+” add buttons — nudged left so they sit inside the container edge */
-function addSoftIconButtonSx(m: ReturnType<typeof useTheme>["palette"]["mollure"], size: number) {
+function addSoftIconButtonSx(m: Theme["palette"]["mollure"], size: number) {
   return {
     width: size,
     height: size,
@@ -555,15 +573,49 @@ export default function ProfessionalFixedLocationSetup({
     subServices: Array<{ id: string; label: string }>;
   };
 
-  const resolveCategoryDisplayTitle = React.useCallback((categoryTitle: string) => {
-    const catalog = BUSINESS_SERVICE_CATEGORY_CATALOG.find(
-      (entry) => resolveServiceCategorySliderIconId(categoryTitle) === entry.iconId,
-    );
-    return catalog?.label ?? categoryTitle;
-  }, []);
+  const resolveCategoryDisplayTitle = React.useCallback(
+    (categoryTitle: string, categoryId?: string) => {
+      const fromApi = categoryId
+        ? businessCategories.find((category) => String(category.id) === String(categoryId))?.title
+        : undefined;
+      if (fromApi) return fromApi;
+
+      const byTitle = businessCategories.find(
+        (category) => category.title.trim().toLowerCase() === categoryTitle.trim().toLowerCase(),
+      )?.title;
+      if (byTitle) return byTitle;
+
+      const catalog = BUSINESS_SERVICE_CATEGORY_CATALOG.find(
+        (entry) => resolveServiceCategorySliderIconId(categoryTitle) === entry.iconId,
+      );
+      return catalog?.label ?? categoryTitle;
+    },
+    [businessCategories],
+  );
 
   const getMemberAssignedServiceIds = React.useCallback((services: TeamService) => {
     return TEAM_SERVICE_SLOT_KEYS.map((key) => String(services[key] ?? "").trim()).filter(Boolean);
+  }, []);
+
+  const removeServiceIdFromTeamMembers = React.useCallback((serviceId: string) => {
+    const normalizedId = String(serviceId ?? "").trim();
+    if (!normalizedId) return;
+
+    setTeamMembers((prev) =>
+      prev.map((member) => {
+        const nextServices = { ...member.services };
+        let changed = false;
+
+        for (const key of TEAM_SERVICE_SLOT_KEYS) {
+          if (String(nextServices[key] ?? "") === normalizedId) {
+            nextServices[key] = "";
+            changed = true;
+          }
+        }
+
+        return changed ? { ...member, services: nextServices } : member;
+      }),
+    );
   }, []);
 
   const memberProvidesAllServices = React.useCallback(
@@ -792,6 +844,14 @@ export default function ProfessionalFixedLocationSetup({
       return next;
     });
   };
+  const ensureServicesDetailsEditing = React.useCallback(() => {
+    setEditingBusinessSections((prev) => {
+      if (prev.has("servicesDetails")) return prev;
+      const next = new Set(prev);
+      next.add("servicesDetails");
+      return next;
+    });
+  }, []);
   const isBusinessSectionEditing = (sectionId: BusinessSetupSectionId) => editingBusinessSections.has(sectionId);
   const isBusinessSectionDisabled = (sectionId: BusinessSetupSectionId) =>
     isBusinessSetupSaving || !editingBusinessSections.has(sectionId);
@@ -904,13 +964,11 @@ export default function ProfessionalFixedLocationSetup({
   );
 
   const pickSharedTemplateFields = React.useCallback(
-    (state: BusinessTemplateState): Pick<BusinessTemplateState, SharedTemplateSyncField> => {
-      const result = {} as Pick<BusinessTemplateState, SharedTemplateSyncField>;
-      for (const key of sharedTemplateSyncFields) {
-        result[key] = state[key];
-      }
-      return result;
-    },
+    (state: BusinessTemplateState): Pick<BusinessTemplateState, SharedTemplateSyncField> =>
+      Object.fromEntries(sharedTemplateSyncFields.map((key) => [key, state[key]])) as Pick<
+        BusinessTemplateState,
+        SharedTemplateSyncField
+      >,
     [sharedTemplateSyncFields],
   );
 
@@ -1019,9 +1077,7 @@ export default function ProfessionalFixedLocationSetup({
   const [desiredAreaMode, setDesiredAreaMode] = React.useState<"Specific areas only" | "All Netherlands">(
     "Specific areas only",
   );
-  const [desiredProvinceDraft, setDesiredProvinceDraft] = React.useState<(typeof desiredProvinceOptions)[number]>(
-    "Noord-Holland",
-  );
+  const [desiredProvinceDraft, setDesiredProvinceDraft] = React.useState<ProvinceKey | "">("Noord-Holland");
   const [desiredMunicipalityDraft, setDesiredMunicipalityDraft] = React.useState<string>("");
   const [desiredAreas, setDesiredAreas] = React.useState<DesiredAreaRow[]>([]);
 
@@ -1220,9 +1276,12 @@ export default function ProfessionalFixedLocationSetup({
                       Select municipality
                     </Typography>
                   </MenuItem>
-                  {(desiredMunicipalityByProvince[desiredProvinceDraft] ?? []).map((o) => (
-                    <MenuItem key={o} value={o}>
-                      {o}
+                  {(desiredProvinceDraft
+                    ? (desiredMunicipalityByProvince[desiredProvinceDraft as ProvinceKey] ?? [])
+                    : []
+                  ).map((municipality: string) => (
+                    <MenuItem key={municipality} value={municipality}>
+                      {municipality}
                     </MenuItem>
                   ))}
                 </MollureFormField>
@@ -1396,8 +1455,21 @@ export default function ProfessionalFixedLocationSetup({
         Both: "both",
       };
       const sourceBiz = businessOfferingSelect === "Desired Location" ? desiredBusiness : fixedBiz;
-      const serviceItems =
-        businessOfferingSelect === "Desired Location" ? servicesDesiredRef.current : servicesFixedRef.current;
+      const serviceItems = (() => {
+        if (businessOfferingSelect === "Desired Location") {
+          return servicesDesiredRef.current;
+        }
+        if (businessOfferingSelect === "Both") {
+          const seen = new Set<string>();
+          return [...servicesFixedRef.current, ...servicesDesiredRef.current].filter((item) => {
+            const key = String(item.serviceId ?? "");
+            if (!key || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+        }
+        return servicesFixedRef.current;
+      })();
       const desiredAreaText =
         desiredAreaMode === "All Netherlands"
           ? "All Netherlands"
@@ -1408,7 +1480,7 @@ export default function ProfessionalFixedLocationSetup({
           : Array.from(new Set(desiredAreas.map((area) => area.province).filter(Boolean))).join(", ");
 
       return {
-        location_mode: locationModeMap[businessOfferingSelect],
+        location_mode: locationModeMap[businessOfferingSelect] ?? "fixed",
         business_name: sourceBiz.profileName,
         business_about: sourceBiz.about,
         business_keywords: sourceBiz.keywords,
@@ -1472,9 +1544,14 @@ export default function ProfessionalFixedLocationSetup({
         desired_location_services: serviceItems.map((item) => item.name),
         team_members: members.map((member, index) => ({
           id: toPersistedTeamMemberId(member.id),
+          photo_upload_key: member.pendingPhotoFile ? member.id : undefined,
           full_name: member.name,
           role: member.role,
-          profile_photo: member.photoSrc.startsWith("blob:") ? null : member.photoSrc,
+          profile_photo: member.pendingPhotoFile
+            ? null
+            : isPersistedMediaUrl(member.photoSrc)
+              ? member.photoSrc
+              : null,
           assigned_services: toTeamServicePayload(member.services),
           display_order: index + 1,
         })),
@@ -1494,10 +1571,30 @@ export default function ProfessionalFixedLocationSetup({
     ],
   );
 
+  const buildBusinessSetupSaveBody = React.useCallback(
+    (members: TeamMemberUi[]): UpsertBusinessSetupPayload => {
+      const payload = buildBusinessSetupPayload(members);
+      const teamPhotoFiles = members
+        .filter((member): member is TeamMemberUi & { pendingPhotoFile: File } => Boolean(member.pendingPhotoFile))
+        .map((member) => ({
+          memberKey: member.id,
+          file: member.pendingPhotoFile,
+        }));
+
+      return buildUpsertBusinessSetupBody(payload, teamPhotoFiles);
+    },
+    [buildBusinessSetupPayload],
+  );
+
+  const clearPendingTeamMemberPhotos = React.useCallback(() => {
+    setTeamMembers((prev) => prev.map((member) => ({ ...member, pendingPhotoFile: null })));
+  }, []);
+
   const saveBusinessSetupData = React.useCallback(async () => {
     if (!onSaveBusinessSetup) return;
-    await onSaveBusinessSetup(buildBusinessSetupPayload(teamMembers));
-  }, [buildBusinessSetupPayload, onSaveBusinessSetup, teamMembers]);
+    await onSaveBusinessSetup(buildBusinessSetupSaveBody(teamMembers));
+    clearPendingTeamMemberPhotos();
+  }, [buildBusinessSetupSaveBody, clearPendingTeamMemberPhotos, onSaveBusinessSetup, teamMembers]);
 
   const onPublishBusinessSetup = React.useCallback(async () => {
     if (!onSaveBusinessSetup) {
@@ -1506,7 +1603,8 @@ export default function ProfessionalFixedLocationSetup({
     }
 
     try {
-      await onSaveBusinessSetup(buildBusinessSetupPayload(teamMembers));
+      await onSaveBusinessSetup(buildBusinessSetupSaveBody(teamMembers));
+      clearPendingTeamMemberPhotos();
       await updateBusinessSetupActive({ is_active: true }).unwrap();
       setIsBusinessPublishEnabled(false);
       setEditingBusinessSections(new Set());
@@ -1517,7 +1615,14 @@ export default function ProfessionalFixedLocationSetup({
         message: getApiErrorMessage(error, "Unable to publish changes."),
       });
     }
-  }, [buildBusinessSetupPayload, onSaveBusinessSetup, showSnackbar, teamMembers, updateBusinessSetupActive]);
+  }, [
+    buildBusinessSetupSaveBody,
+    clearPendingTeamMemberPhotos,
+    onSaveBusinessSetup,
+    showSnackbar,
+    teamMembers,
+    updateBusinessSetupActive,
+  ]);
 
   const saveBusinessSection = React.useCallback(
     async (sectionId: BusinessSetupSectionId) => {
@@ -1673,7 +1778,7 @@ export default function ProfessionalFixedLocationSetup({
     const categoryTitleById = new Map(
       businessCategories.map((category) => [String(category.id), category.title]),
     );
-    const savedServices: BusinessSubserviceUi[] = businessSetupData.service_details.map((item) => {
+    const mapDetailToSubservice = (item: (typeof businessSetupData.service_details)[number]): BusinessSubserviceUi => {
       const rawPrice = item.price;
       const priceStr =
         rawPrice !== null && rawPrice !== undefined && String(rawPrice).trim() !== ""
@@ -1696,7 +1801,9 @@ export default function ProfessionalFixedLocationSetup({
         priceLabel: priceStr,
         durationLabel: durationLabel || undefined,
       };
-    });
+    };
+
+    const savedServices: BusinessSubserviceUi[] = businessSetupData.service_details.map(mapDetailToSubservice);
     const hydratedServices = hydrateMainAndSubservicesFromDetails(savedServices, categoryTitleById);
     setMainServicesFixed(hydratedServices.mains);
     setMainServicesDesired(hydratedServices.mains);
@@ -1839,7 +1946,13 @@ export default function ProfessionalFixedLocationSetup({
     onMarkUnpublished: () => setIsBusinessPublishEnabled(true),
     onSaveBusinessSetup: onSaveBusinessSetup
       ? async (members) => {
-          await onSaveBusinessSetup(buildBusinessSetupPayload(members));
+          await onSaveBusinessSetup(buildBusinessSetupSaveBody(members));
+          setTeamMembers((prev) =>
+            prev.map((member) => ({
+              ...member,
+              pendingPhotoFile: null,
+            })),
+          );
           setIsBusinessPublishEnabled(true);
         }
       : undefined,
@@ -1860,17 +1973,104 @@ export default function ProfessionalFixedLocationSetup({
     },
   });
 
+  const handleEditSubservice = React.useCallback(
+    (service: ServiceDetailUiItem) => {
+      ensureServicesDetailsEditing();
+      serviceModal.openEditSubservice(service);
+    },
+    [ensureServicesDetailsEditing, serviceModal],
+  );
+
+  const handleDeleteSubservice = React.useCallback(
+    (service: ServiceDetailUiItem) => {
+      ensureServicesDetailsEditing();
+      serviceModal.deleteSubservice(service.id);
+      removeServiceIdFromTeamMembers(String(service.serviceId ?? service.id));
+      showSnackbar({ severity: "info", message: "Service removed. Click Save to apply changes." });
+    },
+    [ensureServicesDetailsEditing, removeServiceIdFromTeamMembers, serviceModal, showSnackbar],
+  );
+
+  const handleEditMainService = React.useCallback(
+    (main: BusinessMainServiceUi) => {
+      ensureServicesDetailsEditing();
+      serviceModal.openEditService(main);
+    },
+    [ensureServicesDetailsEditing, serviceModal],
+  );
+
+  const handleDeleteMainService = React.useCallback(
+    (mainId: string) => {
+      ensureServicesDetailsEditing();
+      const childServiceIds = (serviceModal.subservicesByParent.get(mainId) ?? []).map((item) =>
+        String(item.serviceId ?? item.id),
+      );
+      serviceModal.deleteMainService(mainId);
+      for (const serviceId of childServiceIds) {
+        removeServiceIdFromTeamMembers(serviceId);
+      }
+    },
+    [ensureServicesDetailsEditing, removeServiceIdFromTeamMembers, serviceModal],
+  );
+
+  const ensureCategoryParentMain = React.useCallback(
+    (storageId: string) => {
+      const explicitMain = activeMainServices.find(
+        (main) => !isHydratedMainServiceId(main.id) && String(main.categoryId) === storageId,
+      );
+      if (explicitMain) return explicitMain.id;
+
+      const hydratedMain = activeMainServices.find(
+        (main) => isHydratedMainServiceId(main.id) && String(main.categoryId) === storageId,
+      );
+      if (hydratedMain) return hydratedMain.id;
+
+      const categoryTitle =
+        businessCategories.find((category) => String(category.id) === storageId)?.title ?? "Services";
+      const mainId = `main-${storageId}-hydrated`;
+      const nextMain: BusinessMainServiceUi = {
+        id: mainId,
+        categoryId: storageId,
+        name: categoryTitle,
+        serviceInfo: "",
+        durationFrom: "",
+        durationTo: "",
+        priceType: "fixed",
+        priceAmount: "",
+        currency: businessServiceModalCopy.currencyCode,
+        discountType: "fixed",
+        discountAmount: "",
+        discountStartDate: "",
+        discountEndDate: "",
+        discountDescription: "",
+      };
+
+      setActiveMainServices((prev) => (prev.some((main) => main.id === mainId) ? prev : [...prev, nextMain]));
+      return mainId;
+    },
+    [activeMainServices, businessCategories, setActiveMainServices],
+  );
+
   const openAddServiceForCategory = React.useCallback(
     (categoryId: string) => {
+      ensureServicesDetailsEditing();
       const storageId = resolveServiceCategoryStorageId(
         categoryId,
         serviceCategoryTabs,
         businessCategories,
       );
       if (!storageId) return;
-      serviceModal.openAddService(storageId);
+
+      const parentMainId = ensureCategoryParentMain(storageId);
+      serviceModal.openAddSubservice(storageId, parentMainId);
     },
-    [businessCategories, serviceCategoryTabs, serviceModal],
+    [
+      businessCategories,
+      ensureCategoryParentMain,
+      ensureServicesDetailsEditing,
+      serviceCategoryTabs,
+      serviceModal,
+    ],
   );
 
   const openAddService = React.useCallback(() => {
@@ -1967,8 +2167,8 @@ export default function ProfessionalFixedLocationSetup({
                 <IconButton
                   size="small"
                   aria-label="Edit service"
-                  onClick={() => serviceModal.openEditSubservice(it)}
-                  disabled={servicesDetailsDisabled}
+                  onClick={() => handleEditSubservice(it)}
+                  disabled={isBusinessSetupSaving}
                   sx={{ width: 32, height: 32, color: alpha(m.navy, 0.45) }}
                 >
                   <EditRoundedIcon sx={{ fontSize: 20 }} />
@@ -1976,8 +2176,8 @@ export default function ProfessionalFixedLocationSetup({
                 <IconButton
                   size="small"
                   aria-label="Delete service"
-                  onClick={() => serviceModal.deleteSubservice(it.id)}
-                  disabled={servicesDetailsDisabled}
+                  onClick={() => handleDeleteSubservice(it)}
+                  disabled={isBusinessSetupSaving}
                   sx={{ width: 32, height: 32, color: alpha(m.navy, 0.45) }}
                 >
                   <DeleteOutlineRoundedIcon sx={{ fontSize: 20 }} />
@@ -2002,7 +2202,7 @@ export default function ProfessionalFixedLocationSetup({
         </Paper>
       );
     },
-    [servicesDetailsDisabled, expandedServiceDetailIds, m.navy, serviceModal, toggleServiceDetailExpand],
+    [expandedServiceDetailIds, handleDeleteSubservice, handleEditSubservice, isBusinessSetupSaving, m.navy, toggleServiceDetailExpand],
   );
 
   const renderMainServiceRow = React.useCallback(
@@ -2054,8 +2254,8 @@ export default function ProfessionalFixedLocationSetup({
                 <IconButton
                   size="small"
                   aria-label="Edit service"
-                  onClick={() => serviceModal.openEditService(main)}
-                  disabled={servicesDetailsDisabled}
+                  onClick={() => handleEditMainService(main)}
+                  disabled={isBusinessSetupSaving}
                   sx={{ width: 32, height: 32, color: alpha(m.navy, 0.45) }}
                 >
                   <EditRoundedIcon sx={{ fontSize: 20 }} />
@@ -2063,8 +2263,8 @@ export default function ProfessionalFixedLocationSetup({
                 <IconButton
                   size="small"
                   aria-label="Delete service"
-                  onClick={() => serviceModal.deleteMainService(main.id)}
-                  disabled={servicesDetailsDisabled}
+                  onClick={() => handleDeleteMainService(main.id)}
+                  disabled={isBusinessSetupSaving}
                   sx={{ width: 32, height: 32, color: alpha(m.navy, 0.45) }}
                 >
                   <DeleteOutlineRoundedIcon sx={{ fontSize: 20 }} />
@@ -2112,8 +2312,10 @@ export default function ProfessionalFixedLocationSetup({
       );
     },
     [
-      servicesDetailsDisabled,
       expandedMainServiceIds,
+      handleDeleteMainService,
+      handleEditMainService,
+      isBusinessSetupSaving,
       m,
       renderServiceDetailRow,
       serviceModal,
@@ -2541,59 +2743,114 @@ export default function ProfessionalFixedLocationSetup({
     [mediaSlides, onUploadBusinessMedia, showSnackbar],
   );
 
-  const groupedAllMainServiceSections = React.useMemo(() => {
-    const by = new Map<string, BusinessMainServiceUi[]>();
-    for (const main of activeMainServices) {
-      const key = String(main.categoryId ?? "").trim();
-      if (!key) continue;
-      const list = by.get(key) ?? [];
-      list.push(main);
-      by.set(key, list);
-    }
-
-    const titleFor = (categoryId: string) =>
+  const resolveServiceCategoryTitle = React.useCallback(
+    (categoryId: string) =>
       businessCategories.find((c) => String(c.id) === categoryId)?.title ??
       serviceCategoryTabs.find((t) => t.id === categoryId)?.label ??
-      `Category ${categoryId}`;
+      `Category ${categoryId}`,
+    [businessCategories, serviceCategoryTabs],
+  );
 
-    const sections: Array<{ categoryId: string; title: string; mains: BusinessMainServiceUi[] }> = [];
-    const seen = new Set<string>();
+  const getExplicitMainsForCategory = React.useCallback(
+    (categoryId: string) =>
+      activeMainServices.filter(
+        (main) =>
+          !isHydratedMainServiceId(main.id) &&
+          serviceMatchesCategoryTab(
+            { categoryId: main.categoryId, categoryTitle: resolveServiceCategoryTitle(String(main.categoryId)) },
+            categoryId,
+            serviceCategoryTabs,
+            businessCategories,
+          ),
+      ),
+    [activeMainServices, businessCategories, resolveServiceCategoryTitle, serviceCategoryTabs],
+  );
 
-    for (const t of serviceCategoryTabs) {
-      if (t.id === "all") continue;
-      const mains = activeMainServices.filter((main) =>
+  const getSubservicesForCategory = React.useCallback(
+    (categoryId: string) =>
+      activeServices.filter((service) =>
         serviceMatchesCategoryTab(
-          { categoryId: main.categoryId } as ServiceDetailUiItem,
-          t.id,
-          serviceCategoryTabs,
-          businessCategories,
-        ),
-      );
-      if (!mains.length) continue;
-      sections.push({ categoryId: t.id, title: titleFor(t.id), mains });
-      seen.add(t.id);
-    }
-
-    for (const [categoryId, mains] of by.entries()) {
-      if (seen.has(categoryId) || !mains.length) continue;
-      sections.push({ categoryId, title: titleFor(categoryId), mains });
-      seen.add(categoryId);
-    }
-
-    return sections;
-  }, [activeMainServices, businessCategories, serviceCategoryTabs]);
-
-  const activeCategoryMains = React.useMemo(
-    () =>
-      activeMainServices.filter((main) =>
-        serviceMatchesCategoryTab(
-          { categoryId: main.categoryId } as ServiceDetailUiItem,
-          activeServiceCategory,
+          {
+            categoryId: service.categoryId,
+            categoryTitle: service.categoryTitle ?? resolveServiceCategoryTitle(String(service.categoryId)),
+          },
+          categoryId,
           serviceCategoryTabs,
           businessCategories,
         ),
       ),
-    [activeMainServices, activeServiceCategory, businessCategories, serviceCategoryTabs],
+    [activeServices, businessCategories, resolveServiceCategoryTitle, serviceCategoryTabs],
+  );
+
+  const getFlatSubservicesForCategory = React.useCallback(
+    (categoryId: string) => {
+      const explicitMains = getExplicitMainsForCategory(categoryId);
+      const explicitMainIds = new Set(explicitMains.map((main) => main.id));
+
+      return getSubservicesForCategory(categoryId).filter((service) => {
+        const parentId = String(service.parentServiceId ?? "").trim();
+        if (!parentId || isHydratedMainServiceId(parentId)) return true;
+        return !explicitMainIds.has(parentId);
+      });
+    },
+    [getExplicitMainsForCategory, getSubservicesForCategory],
+  );
+
+  const groupedServiceSections = React.useMemo(() => {
+    const sections: Array<{
+      categoryId: string;
+      title: string;
+      explicitMains: BusinessMainServiceUi[];
+      subs: ServiceDetailUiItem[];
+    }> = [];
+    const seen = new Set<string>();
+
+    const appendSection = (categoryId: string) => {
+      if (!categoryId || seen.has(categoryId)) return;
+      const explicitMains = getExplicitMainsForCategory(categoryId);
+      const subs = getFlatSubservicesForCategory(categoryId);
+      if (explicitMains.length === 0 && subs.length === 0) return;
+      sections.push({
+        categoryId,
+        title: resolveServiceCategoryTitle(categoryId),
+        explicitMains,
+        subs,
+      });
+      seen.add(categoryId);
+    };
+
+    for (const tab of serviceCategoryTabs) {
+      if (tab.id === "all") continue;
+      appendSection(tab.id);
+    }
+
+    for (const service of activeServices) {
+      appendSection(String(service.categoryId ?? "").trim());
+    }
+
+    for (const main of activeMainServices) {
+      if (isHydratedMainServiceId(main.id)) continue;
+      appendSection(String(main.categoryId ?? "").trim());
+    }
+
+    return sections;
+  }, [
+    activeMainServices,
+    activeServices,
+    getExplicitMainsForCategory,
+    getFlatSubservicesForCategory,
+    resolveServiceCategoryTitle,
+    serviceCategoryTabs,
+  ]);
+
+  const activeCategoryExplicitMains = React.useMemo(
+    () => getExplicitMainsForCategory(activeServiceCategory),
+    [activeServiceCategory, getExplicitMainsForCategory],
+  );
+
+  const activeCategoryFlatSubservices = React.useMemo(
+    () => getFlatSubservicesForCategory(activeServiceCategory),
+    [activeServiceCategory, getFlatSubservicesForCategory],
   );
 
 
@@ -2858,10 +3115,13 @@ export default function ProfessionalFixedLocationSetup({
       title={serviceModal.modalTitle}
       draft={serviceModal.draft}
       submitLabel={serviceModal.submitLabel}
-      disabled={servicesDetailsDisabled}
+      disabled={isBusinessSetupSaving || serviceModal.isSaving}
       canSubmit={serviceModal.canSubmit}
       onClose={serviceModal.closeModal}
-      onSubmit={serviceModal.saveModal}
+      onSubmit={() => {
+        ensureServicesDetailsEditing();
+        void serviceModal.saveModal();
+      }}
       onChange={serviceModal.updateDraft}
     />
   );
@@ -3523,7 +3783,7 @@ export default function ProfessionalFixedLocationSetup({
                       <IconButton
                         size="small"
                         onClick={openAddService}
-                        disabled={servicesDetailsDisabled}
+                        disabled={isBusinessSetupSaving}
                         aria-label="Add service"
                         sx={{
                           ...addSoftIconButtonSx(m, 36),
@@ -3537,10 +3797,10 @@ export default function ProfessionalFixedLocationSetup({
 
                   {activeServiceCategory === "all" ? (
                     <Stack spacing={2}>
-                      {groupedAllMainServiceSections.length === 0 ? (
+                      {groupedServiceSections.length === 0 ? (
                         <Typography sx={{ fontSize: 13, color: alpha(m.navy, 0.55) }}>No services yet.</Typography>
                       ) : (
-                        groupedAllMainServiceSections.map((group) => (
+                        groupedServiceSections.map((group) => (
                           <Stack key={group.categoryId} spacing={1}>
                             <Paper
                               elevation={0}
@@ -3561,7 +3821,7 @@ export default function ProfessionalFixedLocationSetup({
                               <IconButton
                                 size="small"
                                 onClick={() => openAddServiceForCategory(group.categoryId)}
-                                disabled={servicesDetailsDisabled}
+                                disabled={isBusinessSetupSaving}
                                 aria-label={`Add service to ${group.title}`}
                                 sx={{
                                   ...addSoftIconButtonSx(m, 36),
@@ -3571,19 +3831,25 @@ export default function ProfessionalFixedLocationSetup({
                                 <AddRoundedIcon sx={{ fontSize: 22 }} />
                               </IconButton>
                             </Paper>
-                            <Stack spacing={1}>{group.mains.map((main) => renderMainServiceRow(main))}</Stack>
+                            <Stack spacing={1}>
+                              {group.explicitMains.map((main) => renderMainServiceRow(main))}
+                              {group.subs.map((service) => renderServiceDetailRow(service))}
+                            </Stack>
                           </Stack>
                         ))
                       )}
                     </Stack>
                   ) : (
                     <Stack spacing={1}>
-                      {activeCategoryMains.length === 0 ? (
+                      {activeCategoryExplicitMains.length === 0 && activeCategoryFlatSubservices.length === 0 ? (
                         <Typography sx={{ fontSize: 13, color: alpha(m.navy, 0.55) }}>
                           No services in this category.
                         </Typography>
                       ) : (
-                        activeCategoryMains.map((main) => renderMainServiceRow(main))
+                        <>
+                          {activeCategoryExplicitMains.map((main) => renderMainServiceRow(main))}
+                          {activeCategoryFlatSubservices.map((service) => renderServiceDetailRow(service))}
+                        </>
                       )}
                     </Stack>
                   )}
