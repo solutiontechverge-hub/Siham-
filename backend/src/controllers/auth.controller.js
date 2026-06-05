@@ -273,6 +273,15 @@ export const login = async (req, res) => {
     }
 
     const user = result.rows[0];
+
+    if (!user.password_hash) {
+      return res.status(401).json({
+        success: false,
+        message: "This account uses social login. Please continue with Google or Apple.",
+        data: null,
+      });
+    }
+
     const passwordMatches = await bcrypt.compare(password, user.password_hash);
 
     if (!passwordMatches) {

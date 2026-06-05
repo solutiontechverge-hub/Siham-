@@ -1,6 +1,11 @@
 import { buildDurationByServiceId } from "./business-service-categories.js";
-import { parseJsonArray, parseJsonValue, parseTextArray } from "./business-setup-parsers.js";
-import { parseUuid } from "./uuid.js";
+import {
+  entityIdKey,
+  parseEntityIdArray,
+  parseJsonArray,
+  parseJsonValue,
+  parseTextArray,
+} from "./business-setup-parsers.js";
 
 const LISTING_RATING = 4.8;
 const LISTING_TOTAL_REVIEWS = 120;
@@ -54,7 +59,7 @@ const mapServiceDetail = (detail, durationByServiceId = new Map()) => ({
   price: toNullableNumber(detail.price),
   durationLabel:
     toNullableString(detail.duration_label) ||
-    durationByServiceId.get(parseUuid(detail.service_id) ?? String(detail.service_id ?? "")) ||
+    durationByServiceId.get(entityIdKey(detail.service_id) ?? "") ||
     null,
   serviceTitle: toNullableString(detail.service_title),
   categoryId: detail.category_id ?? null,
@@ -129,9 +134,7 @@ export const transformBusinessSetupForListing = (
     additionalNotes: toNullableString(row.additional_notes),
     notes: toNullableString(row.book_service_notes),
     project: toNullableString(row.project),
-    teamMemberIds: Array.isArray(row.team_member_ids)
-      ? row.team_member_ids.map((id) => String(id)).filter((id) => parseUuid(id))
-      : [],
+    teamMemberIds: parseEntityIdArray(row.team_member_ids),
     teamMembers: normalizedTeamMembers.map(mapTeamMember),
     createdAt: toIsoTimestamp(row.created_at),
     updatedAt: toIsoTimestamp(row.updated_at),

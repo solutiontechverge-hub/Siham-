@@ -9,6 +9,7 @@ import {
   verifyEmail,
   verifyOtp,
 } from "../controllers/auth.controller.js";
+import { loginWithApple, loginWithGoogle } from "../controllers/oauth.controller.js";
 import { validateRequest } from "../middleware/validate.middleware.js";
 import { upload } from "../middleware/upload.middleware.js";
 import { optionalOtherLink, optionalWebsite } from "../validators/optionalWebUrl.js";
@@ -63,6 +64,24 @@ router.post(
   ],
   validateRequest,
   login,
+);
+
+router.post(
+  "/google",
+  body("id_token").isString().notEmpty().withMessage("id_token is required."),
+  validateRequest,
+  loginWithGoogle,
+);
+
+router.post(
+  "/apple",
+  [
+    body("id_token").isString().notEmpty().withMessage("id_token is required."),
+    body("first_name").optional().isString().trim(),
+    body("last_name").optional().isString().trim(),
+  ],
+  validateRequest,
+  loginWithApple,
 );
 
 router.post(
