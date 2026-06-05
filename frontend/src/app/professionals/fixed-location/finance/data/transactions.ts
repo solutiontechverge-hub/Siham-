@@ -3,7 +3,138 @@
  * Replace with API data when the backend is available.
  */
 
-export type TransactionStatus = "Paid" | "Unpaid" | "Refunded";
+export type TransactionStatus =
+  | "Paid"
+  | "Unpaid"
+  | "Refunded"
+  | "Void"
+  | "Cancelled"
+  | "Pending"
+  | "Failed"
+  | "Prepaid";
+
+/** Maps filter drawer keys to row statuses. */
+export function transactionMatchesStatusFilter(
+  status: TransactionStatus,
+  statusKeys: readonly string[],
+): boolean {
+  if (!statusKeys.length) return true;
+
+  return statusKeys.some((key) => {
+    switch (key) {
+      case "status:paid":
+        return status === "Paid";
+      case "status:pending":
+        return status === "Unpaid" || status === "Pending";
+      case "status:failed":
+        return status === "Refunded" || status === "Failed";
+      case "status:prepaid":
+        return status === "Prepaid";
+      case "status:cancelled":
+        return status === "Cancelled" || status === "Void";
+      default:
+        return false;
+    }
+  });
+}
+
+export function applyStatusToTransactionIds(
+  rows: readonly TransactionRow[],
+  ids: readonly string[],
+  status: TransactionStatus,
+): TransactionRow[] {
+  const idSet = new Set(ids);
+  return rows.map((row) => (idSet.has(row.id) ? { ...row, status } : row));
+}
+
+export function formatNetAmountEur(amount: number): string {
+  const value = Number.isFinite(amount) ? amount : 0;
+  const rounded = Math.round(value * 100) / 100;
+  const text = Number.isInteger(rounded)
+    ? rounded.toLocaleString("en-US")
+    : rounded.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `€${text}`;
+}
+
+export type ManualEntryTransactionInput = {
+  clientName: string;
+  clientEmail: string;
+  clientType: TransactionClientType;
+  lines: { name: string; quantity: number; unitPrice: number }[];
+  totalPrice: number;
+};
+
+export function buildManualEntryTransactionRow(input: ManualEntryTransactionInput): TransactionRow {
+  const today = new Date().toISOString().slice(0, 10);
+  const due = new Date();
+  due.setDate(due.getDate() + 14);
+  const dueStr = `${String(due.getDate()).padStart(2, "0")}/${String(due.getMonth() + 1).padStart(2, "0")}/${due.getFullYear()}`;
+  const entryNum = String(100 + Math.floor(Math.random() * 900));
+
+  const lineItems = input.lines.map((line) => ({
+    description: line.name,
+    quantity: String(line.quantity),
+    vat: "21%",
+    pricePerUnit: formatNetAmountEur(line.unitPrice),
+    totalPrice: formatNetAmountEur(line.quantity * line.unitPrice),
+  }));
+
+  return {
+    id: `t-manual-${Date.now()}`,
+    entryId: entryNum,
+    date: today,
+    entryLabel: "Manually",
+    clientName: input.clientName,
+    clientEmail: input.clientEmail,
+    clientType: input.clientType,
+    netAmount: formatNetAmountEur(input.totalPrice),
+    methodTitle: "Offline - Cash",
+    methodDetail: `Due Date: ${dueStr}`,
+    status: "Unpaid",
+    document: {
+      documentNumber: `INV-${entryNum}-01`,
+      serviceDate: today,
+      invoiceDate: today,
+      dueDate: due.toISOString().slice(0, 10),
+      client: {
+        legalName: input.clientName,
+        email: input.clientEmail || undefined,
+      },
+      lineItems,
+      totalPrice: formatNetAmountEur(input.totalPrice),
+    },
+  };
+}
+
+export type TransactionClientType = "mollure" | "nonMollure" | "business" | "guest";
+
+export function getTransactionClientTypeLabel(type?: TransactionClientType): string | null {
+  switch (type) {
+    case "mollure":
+      return "mollure client";
+    case "nonMollure":
+      return "non mollure";
+    case "business":
+      return "BS client";
+    default:
+      return null;
+  }
+}
+
+export function isTransactionOnlinePayment(methodTitle: string): boolean {
+  return methodTitle.trim().toLowerCase().startsWith("online");
+}
+
+/** Guests share email only for online payments; name is always shown in the table. */
+export function shouldShowTransactionClientEmail(
+  row: Pick<TransactionRow, "clientType" | "clientEmail" | "methodTitle">,
+): boolean {
+  if (!row.clientEmail?.trim()) return false;
+  if (row.clientType === "guest") {
+    return isTransactionOnlinePayment(row.methodTitle);
+  }
+  return isTransactionOnlinePayment(row.methodTitle);
+}
 
 export type TransactionDocumentParty = {
   legalName: string;
@@ -49,7 +180,7 @@ export type TransactionRow = {
   entryLabel?: string;
   clientName: string;
   clientEmail: string;
-  member?: boolean;
+  clientType: TransactionClientType;
   netAmount: string;
   methodTitle: string;
   methodDetail: string;
@@ -64,7 +195,7 @@ export const mockTransactions: TransactionRow[] = [
     date: "2023-01-01",
     clientName: "Sara Johnson",
     clientEmail: "sarajohnson@gmail.com",
-    member: true,
+    clientType: "mollure",
     netAmount: "€1,200",
     methodTitle: "Online - Direct",
     methodDetail: "Stripe",
@@ -97,7 +228,7 @@ export const mockTransactions: TransactionRow[] = [
     date: null,
     clientName: "Sara Johnson",
     clientEmail: "sarajohnson@gmail.com",
-    member: true,
+    clientType: "mollure",
     netAmount: "€300",
     methodTitle: "Online - Direct",
     methodDetail: "Stripe",
@@ -128,7 +259,7 @@ export const mockTransactions: TransactionRow[] = [
     date: "2023-01-02",
     clientName: "Alex Martin",
     clientEmail: "alexmartin@gmail.com",
-    member: true,
+    clientType: "nonMollure",
     netAmount: "€1,700",
     methodTitle: "Offline - Cash",
     methodDetail: "Due Date: 24/12/2023",
@@ -164,6 +295,7 @@ export const mockTransactions: TransactionRow[] = [
     entryLabel: "Manually",
     clientName: "Emma van Dijk",
     clientEmail: "emma.vd@gmail.com",
+    clientType: "guest",
     netAmount: "€850",
     methodTitle: "Online - Direct",
     methodDetail: "Stripe",
@@ -195,7 +327,7 @@ export const mockTransactions: TransactionRow[] = [
     date: "2023-01-04",
     clientName: "Priya Sharma",
     clientEmail: "priya.s@gmail.com",
-    member: true,
+    clientType: "business",
     netAmount: "€2,400",
     methodTitle: "Offline - Cash",
     methodDetail: "Due Date: 15/01/2024",
@@ -230,7 +362,7 @@ export const mockTransactions: TransactionRow[] = [
     date: null,
     clientName: "Priya Sharma",
     clientEmail: "priya.s@gmail.com",
-    member: true,
+    clientType: "business",
     netAmount: "€600",
     methodTitle: "Offline - Cash",
     methodDetail: "Due Date: 15/01/2024",
@@ -254,5 +386,17 @@ export const mockTransactions: TransactionRow[] = [
       ],
       totalPrice: "€600.00",
     },
+  },
+  {
+    id: "t7",
+    entryId: "789",
+    date: "2023-01-05",
+    clientName: "Jordan Lee",
+    clientEmail: "jordan.lee@email.com",
+    clientType: "guest",
+    netAmount: "€120",
+    methodTitle: "Offline - Cash",
+    methodDetail: "Due Date: 01/02/2024",
+    status: "Unpaid",
   },
 ];

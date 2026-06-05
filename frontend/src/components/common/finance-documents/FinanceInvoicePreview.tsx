@@ -4,13 +4,15 @@ import * as React from "react";
 import Image from "next/image";
 import { Box, Button, Stack, Table, TableBody, TableCell, TableHead, TableRow } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import type { TransactionRow } from "../../../app/professionals/fixed-location/finance/data/transactions";
+import type {
+  TransactionDocumentParty,
+  TransactionRow,
+} from "../../../app/professionals/fixed-location/finance/data/transactions";
 import type { ProfessionalProfile, ProfileResponse } from "../../../store/services/profileApi";
 import { useSnackbar } from "../AppSnackbar";
 import { BodyText, SubHeading } from "../../ui/typography";
 import {
   addDuration,
-  buildBookingItems,
   buildPreviewLineItems,
   formatDocumentDate,
   formatCurrencyValue,
@@ -25,6 +27,7 @@ type Props = {
   invoiceType: FinanceInvoiceTemplateType;
   profileData?: ProfileResponse | null;
   professionalBusinessOverride?: FinanceProfessionalBusinessOverride | null;
+  clientPartyOverride?: TransactionDocumentParty | null;
 };
 
 function getProfessionalProfile(profileData?: ProfileResponse | null) {
@@ -38,12 +41,12 @@ export default function FinanceInvoicePreview({
   invoiceType,
   profileData = null,
   professionalBusinessOverride = null,
+  clientPartyOverride = null,
 }: Props) {
   const m = useTheme().palette.mollure;
   const { showSnackbar } = useSnackbar();
   const professionalProfile = React.useMemo(() => getProfessionalProfile(profileData), [profileData]);
   const lineItems = React.useMemo(() => buildPreviewLineItems(settings, row), [settings, row]);
-  const bookingItems = React.useMemo(() => buildBookingItems(row, lineItems), [lineItems, row]);
   const serviceDate = formatDocumentDate(row?.document?.serviceDate || row?.date) || "12/04/2023";
   const invoiceDate = formatDocumentDate(row?.document?.invoiceDate || row?.date) || serviceDate;
   const dueDate =
@@ -70,15 +73,14 @@ export default function FinanceInvoicePreview({
   const professionalName = professionalBusinessOverride?.legalName || professionalProfile?.legal_name || "Craig Martha";
   const professionalVat = professionalBusinessOverride?.vatNumber || professionalProfile?.vat_number || "-";
   const professionalCoc = professionalBusinessOverride?.cocNumber || professionalProfile?.ccc_number || "-";
-  const clientParty = row?.document?.client;
+  const clientParty = clientPartyOverride ?? row?.document?.client;
 
   const clientLines = React.useMemo(
     () => [
       `Legal Name: ${clientParty?.legalName || row?.clientName || "Sara Johnson"}`,
       ...(clientParty?.address ? [`Client Address: ${clientParty.address}`] : []),
-      `Email: ${clientParty?.email || row?.clientEmail || "sarajohnson@gmail.com"}`,
     ],
-    [clientParty, row?.clientEmail, row?.clientName],
+    [clientParty, row?.clientName],
   );
 
   const downloadInvoicePdf = React.useCallback(async () => {
@@ -140,10 +142,6 @@ export default function FinanceInvoicePreview({
           ? [`Client VAT No: ${clientParty?.vatNumber || "-"}`, `Client COC No: ${clientParty?.cocNumber || "-"}`]
           : []),
       ]);
-      drawBlock(
-        "Booking Related Info",
-        [...bookingItems.map((item) => `${item.label}: ${item.value}`), `Total Price: ${totalPriceLabel}`],
-      );
 
       const tableTop = y + 10;
       const cols = [
@@ -183,7 +181,6 @@ export default function FinanceInvoicePreview({
       showSnackbar({ severity: "error", message: "Failed to download invoice." });
     }
   }, [
-    bookingItems,
     clientInfoTitle,
     clientLines,
     clientParty?.cocNumber,
@@ -256,18 +253,6 @@ export default function FinanceInvoicePreview({
               <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.62) }}>Client COC No: {clientParty?.cocNumber || "-"}</BodyText>
             </>
           ) : null}
-        </InfoBlock>
-        <InfoBlock title="Booking Related Info">
-          {bookingItems.map((item) => (
-            <Stack key={`${item.label}-${item.value}`} direction="row" justifyContent="space-between">
-              <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.70) }}>{item.label}</BodyText>
-              <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.70) }}>{item.value}</BodyText>
-            </Stack>
-          ))}
-          <Stack direction="row" justifyContent="space-between" sx={{ mt: 0.25 }}>
-            <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.70) }}>Total Price:</BodyText>
-            <BodyText sx={{ fontSize: 18, fontWeight: 900, color: alpha(m.navy, 0.82) }}>{totalPriceLabel}</BodyText>
-          </Stack>
         </InfoBlock>
       </Stack>
 

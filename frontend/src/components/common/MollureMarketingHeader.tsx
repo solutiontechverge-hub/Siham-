@@ -120,6 +120,8 @@ export default function MollureMarketingHeader({
   const resolvedUserName = toDisplayName(userName, userLabel);
   const userType = user?.user_type ?? persisted?.user?.user_type ?? null;
   const isProfessionalContext = userType === "professional" || isProfessionalsRoute;
+  const resolvedHomeHref =
+    homeHref === "/" && isProfessionalContext ? "/professionals" : homeHref;
   const showClientNotifications = Boolean(isAuthed && !isProfessionalContext);
   const [mounted, setMounted] = React.useState(false);
   const [profileAnchor, setProfileAnchor] = React.useState<HTMLElement | null>(null);
@@ -218,7 +220,7 @@ export default function MollureMarketingHeader({
             >
               <Box
                 component={Link}
-                href={homeHref}
+                href={resolvedHomeHref}
                 sx={{ display: "inline-flex", alignItems: "center", flexShrink: 0, minWidth: 0 }}
               >
                 <Image src={Logo} alt="Mollure" width={160} height={38} priority />

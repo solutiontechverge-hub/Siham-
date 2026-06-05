@@ -12,14 +12,16 @@ import {
   Container,
   Grid,
   MenuItem,
-  Snackbar,
   Stack,
   Typography,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   ListingFilterBox,
+  ListingFiltersDrawer,
+  MollureSnackbar,
   AppPagination,
   ClientListingCard,
   MarketingSiteFooter,
@@ -27,6 +29,7 @@ import {
   MollureTextField,
 } from "../../../components/common";
 import { listingPageData } from "./listing.data";
+import { parseListingSearchParams } from "./listingSearchParams";
 import { useClientListingState, useListingTokens, type ListingSortValue } from "./listing.use";
 import { useListingCards } from "./use-listing-cards";
 import { ListingBG, FixedLocationIcon, DesiredLocationIcon } from "../../../../images";
@@ -46,20 +49,19 @@ function toSrc(img: any) {
 
 export default function ClientListingPage() {
   const tokens = useListingTokens();
+  const searchParams = useSearchParams();
+  const searchKey = searchParams.toString();
+  const urlFilters = React.useMemo(() => parseListingSearchParams(searchParams), [searchKey]);
   const { filters: filterData, toolbar } = listingPageData;
   const { cards, isLoading, isError, error } = useListingCards();
-  const state = useClientListingState(cards);
+  const state = useClientListingState(cards, urlFilters, searchKey);
   const user = useAppSelector((s) => s.auth.user);
   const displayName =
     ((user as any)?.display_name as string | undefined) ||
     `${(user as any)?.first_name ?? ""} ${(user as any)?.last_name ?? ""}`.trim();
   const [avatarUrl, setAvatarUrl] = React.useState<string | undefined>(undefined);
   const [snackbarOpen, setSnackbarOpen] = React.useState(false);
-
-  const closeSnackbar = (_e?: unknown, reason?: string) => {
-    if (reason === "clickaway") return;
-    setSnackbarOpen(false);
-  };
+  const [filtersDrawerOpen, setFiltersDrawerOpen] = React.useState(false);
 
   React.useEffect(() => {
     try {
@@ -84,19 +86,16 @@ export default function ClientListingPage() {
         userLabel={user?.email ?? ""}
         userName={displayName}
         userAvatarSrc={avatarUrl}
-        homeHref="/clients/listing"
+        homeHref="/"
       />
 
-      <Snackbar
+      <MollureSnackbar
         open={snackbarOpen}
+        message="Added to the favourites"
+        severity="success"
         autoHideDuration={2500}
-        onClose={closeSnackbar}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-      >
-        <Alert onClose={closeSnackbar} severity="success" variant="filled" sx={{ fontWeight: 700 }}>
-          Added to the favourites
-        </Alert>
-      </Snackbar>
+        onClose={() => setSnackbarOpen(false)}
+      />
 
       {/* Hero with BG + Filter Box */}
       <Box
@@ -133,7 +132,9 @@ export default function ClientListingPage() {
                 onChange={state.setFilters}
                 categoryOptions={filterData.categoryOptions}
                 municipalityOptions={filterData.municipalityOptions}
-                onApply={state.applyFilters}
+                onApply={() => {
+                  state.applyFilters();
+                }}
               />
             </Box>
           </Box>
@@ -151,6 +152,7 @@ export default function ClientListingPage() {
           <Button
             variant="outlined"
             endIcon={<TuneRoundedIcon />}
+            onClick={() => setFiltersDrawerOpen(true)}
             sx={{
               height: 40,
               minWidth: 104,
@@ -235,6 +237,7 @@ export default function ClientListingPage() {
               <Grid item xs={12} sm={6} md={4} key={item.id}>
                 <ClientListingCard
                   item={item}
+                  visibleLocationModes={state.appliedFilters.locationModes}
                   isFavorite={Boolean(state.favorites[item.id])}
                   onToggleFavorite={() => {
                     const wasFavorite = Boolean(state.favorites[item.id]);
@@ -258,6 +261,24 @@ export default function ClientListingPage() {
           </Box>
         ) : null}
       </Container>
+
+      <ListingFiltersDrawer
+        open={filtersDrawerOpen}
+        onClose={() => {
+          state.cancelDrawerFilters();
+          setFiltersDrawerOpen(false);
+        }}
+        filters={state.drawerFilters}
+        onChange={state.setDrawerFilters}
+        onApply={(next) => {
+          state.applyDrawerFilters(next);
+          setFiltersDrawerOpen(false);
+        }}
+        onCancel={() => {
+          state.cancelDrawerFilters();
+          setFiltersDrawerOpen(false);
+        }}
+      />
 
       <MarketingSiteFooter
         columns={marketingShellFooter.columns.map((col) => ({ title: col.title, items: [...col.items] }))}

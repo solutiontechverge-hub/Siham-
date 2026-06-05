@@ -8,7 +8,6 @@ import {
   Container,
   Grid,
   PaginationItem,
-  Snackbar,
   Stack,
   Typography,
 } from "@mui/material";
@@ -21,6 +20,7 @@ import {
   ClientListingCard,
   ClientPageTabsBar,
   clientTopTabsActiveLabel,
+  MollureSnackbar,
   MarketingSiteFooter,
   MollureMarketingHeader,
 } from "../../../components/common";
@@ -40,11 +40,6 @@ export default function ClientFavouritesPage() {
   const [userName, setUserName] = React.useState<string>(fallbackDisplayName);
   const [avatarUrl, setAvatarUrl] = React.useState<string | undefined>(undefined);
   const [snackbarOpen, setSnackbarOpen] = React.useState(false);
-
-  const closeSnackbar = (_e?: unknown, reason?: string) => {
-    if (reason === "clickaway") return;
-    setSnackbarOpen(false);
-  };
 
   React.useEffect(() => {
     try {
@@ -84,19 +79,16 @@ export default function ClientFavouritesPage() {
         userLabel={user?.email ?? ""}
         userName={userName}
         userAvatarSrc={avatarUrl}
-        homeHref="/clients/listing"
+        homeHref="/"
       />
 
-      <Snackbar
+      <MollureSnackbar
         open={snackbarOpen}
+        message="Item Removed"
+        severity="info"
         autoHideDuration={2500}
-        onClose={closeSnackbar}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-      >
-        <Alert onClose={closeSnackbar} severity="info" variant="filled" sx={{ fontWeight: 700 }}>
-          Item Removed
-        </Alert>
-      </Snackbar>
+        onClose={() => setSnackbarOpen(false)}
+      />
 
       <ClientPageTabsBar activeLabel={clientTopTabsActiveLabel(pathname)} />
 

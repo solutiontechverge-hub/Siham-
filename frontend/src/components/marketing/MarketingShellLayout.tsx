@@ -47,7 +47,7 @@ export function MarketingShellLayout({
           navItems={[...h.navItems]}
           localeLabel={h.localeLabel}
           loginLabel={h.loginLabel}
-          homeHref="/clients"
+          homeHref="/"
           professionalLinkLabel={h.professionalLinkLabel}
           professionalHref={h.professionalHref}
         />

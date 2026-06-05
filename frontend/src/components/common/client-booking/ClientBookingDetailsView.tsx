@@ -329,7 +329,7 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "#EAF9FB" }}>
-      <MollureMarketingHeader navItems={[]} isAuthed userLabel={user?.email ?? ""} userName={headerName} homeHref="/clients/listing" />
+      <MollureMarketingHeader navItems={[]} isAuthed userLabel={user?.email ?? ""} userName={headerName} homeHref="/" />
 
       <ClientPageTabsBar activeLabel="Booking" />
       <Container maxWidth="lg" sx={{ px: { xs: 2, sm: 3, md: 4 }, pb: 0, pt: 1 }}>

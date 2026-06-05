@@ -17,18 +17,39 @@ import AppCard from "./AppCard";
 import type { ServiceCategorySliderIconId } from "../../data/businessServiceCategorySlider.data";
 import { mollureGradientIconSx, useMollureIconGradient } from "./MollureIconGradient";
 
-/** Fixed width for every category card (including “All”) */
+/** Fixed width for horizontal-scroll category strips */
 export const SERVICE_CATEGORY_SLIDER_CARD_WIDTH = 108;
+const SERVICE_CATEGORY_SLIDER_CARD_WIDTH_VAR = "--serviceCategoryCardWidth";
 
 export type ServiceCategorySliderCardProps = {
   label: string;
   iconId: ServiceCategorySliderIconId;
   active: boolean;
   onSelect: () => void;
+  /** When true, cards share row width equally (business setup / Figma bar) */
+  equalWidth?: boolean;
 };
 
-function CategoryIcon({ iconId, gradientFill }: { iconId: ServiceCategorySliderIconId; gradientFill: string }) {
-  const sx = mollureGradientIconSx(gradientFill);
+function CategoryIcon({
+  iconId,
+  active,
+  gradientFill,
+  mutedColor,
+  barStyle,
+  tealColor,
+}: {
+  iconId: ServiceCategorySliderIconId;
+  active: boolean;
+  gradientFill: string;
+  mutedColor: string;
+  barStyle: boolean;
+  tealColor: string;
+}) {
+  const sx = barStyle
+    ? { fontSize: 26, color: tealColor }
+    : active
+      ? mollureGradientIconSx(gradientFill)
+      : { fontSize: 26, color: mutedColor };
   switch (iconId) {
     case "all":
       return null;
@@ -54,15 +75,34 @@ function CategoryIcon({ iconId, gradientFill }: { iconId: ServiceCategorySliderI
 }
 
 const ServiceCategorySliderCard = React.forwardRef<HTMLButtonElement, ServiceCategorySliderCardProps>(
-  function ServiceCategorySliderCard({ label, iconId, active, onSelect }, ref) {
+  function ServiceCategorySliderCard({ label, iconId, active, onSelect, equalWidth = false }, ref) {
     const theme = useTheme();
     const { fill: iconGradientFill, defs: iconGradientDefs } = useMollureIconGradient();
-    const primaryMain = theme.palette.primary.main;
-    const primaryDark =
-      theme.palette.primary.dark ?? theme.palette.mollure?.tealDark ?? primaryMain;
     const m = theme.palette.mollure;
+    const teal = theme.palette.primary.main;
+    const tealDark = theme.palette.primary.dark ?? m.tealDark ?? teal;
+
+    const barStyle = equalWidth;
     const cardBg = active ? m.white : m.fxGrayF2F4F7;
-    const borderColor = active ? primaryDark : "transparent";
+    const borderColor = barStyle
+      ? active
+        ? teal
+        : alpha(m.navy, 0.08)
+      : active
+        ? teal
+        : alpha(m.navy, 0.1);
+    const borderWidth = active ? 2 : 1;
+    const labelColor = barStyle
+      ? teal
+      : active
+        ? iconId === "all"
+          ? teal
+          : m.navy
+        : iconId === "all"
+          ? alpha(teal, 0.65)
+          : alpha(m.navy, 0.42);
+    const mutedIconColor = alpha(m.navy, 0.32);
+    const cardWidth = `var(${SERVICE_CATEGORY_SLIDER_CARD_WIDTH_VAR}, ${SERVICE_CATEGORY_SLIDER_CARD_WIDTH}px)`;
 
     return (
       <Box
@@ -81,53 +121,64 @@ const ServiceCategorySliderCard = React.forwardRef<HTMLButtonElement, ServiceCat
           font: "inherit",
           display: "block",
           cursor: "pointer",
-          flex: `0 0 ${SERVICE_CATEGORY_SLIDER_CARD_WIDTH}px`,
-          width: SERVICE_CATEGORY_SLIDER_CARD_WIDTH,
+          flex: `0 0 ${cardWidth}`,
+          width: cardWidth,
+          minWidth: cardWidth,
           borderRadius: "12px",
           "&:focus-visible": {
-            outline: `2px solid ${alpha(primaryMain, 0.45)}`,
+            outline: `2px solid ${alpha(teal, 0.45)}`,
             outlineOffset: 2,
           },
         }}
       >
-        {iconId !== "all" ? iconGradientDefs : null}
+        {active && iconId !== "all" && !barStyle ? iconGradientDefs : null}
         <AppCard
           sx={{
             width: "100%",
-            minHeight: 96,
-            py: 1.25,
+            minHeight: barStyle ? 96 : equalWidth ? 92 : 96,
+            py: barStyle ? 1.25 : equalWidth ? 1.35 : 1.25,
             px: 1,
-            borderRadius: "12px",
-            boxShadow: "none",
-            border: active ? `2px solid ${borderColor}` : "none",
+            borderRadius: barStyle ? "10px" : "12px",
+            boxShadow: barStyle ? "none" : "none",
+            border: `${borderWidth}px solid ${borderColor}`,
             bgcolor: cardBg,
             textAlign: "center",
             position: "relative",
             overflow: "visible",
-            transition: theme.transitions.create(["border-color", "box-shadow", "background-color"], {
+            opacity: 1,
+            transition: theme.transitions.create(["border-color", "background-color"], {
               duration: 180,
             }),
             "&:hover": {
-              borderColor: active ? primaryDark : "transparent",
-              boxShadow: active
-                ? `0 0 0 1px ${alpha(primaryDark, 0.18)}`
-                : `0 0 0 1px ${alpha(m.navy, 0.08)}`,
+              borderColor: active ? tealDark : barStyle ? alpha(m.navy, 0.14) : alpha(m.navy, 0.16),
             },
           }}
         >
-          <Stack spacing={0.65} alignItems="center" justifyContent="center" sx={{ minHeight: 88 }}>
+          <Stack
+            spacing={iconId === "all" ? 0 : 0.75}
+            alignItems="center"
+            justifyContent="center"
+            sx={{ minHeight: barStyle ? 88 : equalWidth ? 76 : 88 }}
+          >
             {iconId !== "all" ? (
-              <CategoryIcon iconId={iconId} gradientFill={iconGradientFill} />
-            ) : (
+              <CategoryIcon
+                iconId={iconId}
+                active={active}
+                gradientFill={iconGradientFill}
+                mutedColor={mutedIconColor}
+                barStyle={barStyle}
+                tealColor={teal}
+              />
+            ) : !barStyle ? (
               <Box sx={{ height: 26, width: "100%" }} aria-hidden />
-            )}
+            ) : null}
             <Typography
               sx={{
-                fontSize: 11,
-                fontWeight: 500,
-                lineHeight: 1.2,
-                color: theme.palette.common.black,
-                px: 0.25,
+                fontSize: barStyle ? 11.5 : equalWidth ? 12 : 11,
+                fontWeight: active ? 700 : barStyle ? 600 : 500,
+                lineHeight: 1.25,
+                color: labelColor,
+                px: 0.5,
                 display: "-webkit-box",
                 WebkitLineClamp: 2,
                 WebkitBoxOrient: "vertical",
@@ -139,30 +190,32 @@ const ServiceCategorySliderCard = React.forwardRef<HTMLButtonElement, ServiceCat
             </Typography>
           </Stack>
         </AppCard>
-        <Box
-          aria-hidden
-          sx={{
-            position: "absolute",
-            top: 7,
-            left: 7,
-            zIndex: 4,
-            width: 18,
-            height: 18,
-            borderRadius: "4px",
-            border: `1.5px solid ${active ? primaryDark : alpha(m.navy, 0.22)}`,
-            bgcolor: active ? primaryDark : m.white,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            pointerEvents: "none",
-            boxShadow: active ? `0 1px 3px ${alpha(primaryDark, 0.35)}` : `inset 0 0 0 1px ${alpha(m.navy, 0.04)}`,
-            transition: theme.transitions.create(["border-color", "background-color", "box-shadow"], {
-              duration: 180,
-            }),
-          }}
-        >
-          {active ? <CheckRoundedIcon sx={{ fontSize: 17, color: "#fff" }} /> : null}
-        </Box>
+        {!equalWidth ? (
+          <Box
+            aria-hidden
+            sx={{
+              position: "absolute",
+              top: 7,
+              left: 7,
+              zIndex: 4,
+              width: 18,
+              height: 18,
+              borderRadius: "4px",
+              border: `1.5px solid ${active ? tealDark : alpha(m.navy, 0.22)}`,
+              bgcolor: active ? tealDark : m.white,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              pointerEvents: "none",
+              boxShadow: active ? `0 1px 3px ${alpha(tealDark, 0.35)}` : `inset 0 0 0 1px ${alpha(m.navy, 0.04)}`,
+              transition: theme.transitions.create(["border-color", "background-color", "box-shadow"], {
+                duration: 180,
+              }),
+            }}
+          >
+            {active ? <CheckRoundedIcon sx={{ fontSize: 17, color: "#fff" }} /> : null}
+          </Box>
+        ) : null}
       </Box>
     );
   },

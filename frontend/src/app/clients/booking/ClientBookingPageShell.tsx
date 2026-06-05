@@ -27,7 +27,7 @@ export default function ClientBookingPageShell({ activeTab, children }: Props) {
         userLabel={user?.email ?? ""}
         userName={user?.email ?? ""}
         userAvatarSrc={undefined}
-        homeHref="/clients/listing"
+        homeHref="/"
       />
       <ClientPageTabsBar activeLabel={clientTopTabsActiveLabel(pathname)} />
       <ClientBookingPillTabsBar active={activeTab} />

@@ -172,6 +172,7 @@ export type BusinessSetupListing = {
 export type BusinessSetup = {
   id: string;
   professional_profile_id: string;
+  is_active: boolean;
   location_mode: "fixed" | "desired" | "both";
   business_name: string | null;
   business_about: string | null;
@@ -315,6 +316,10 @@ export type UpdateCalendarEntryStatusRequest = {
 export type UpdateBookingStatusRequest = {
   id: string;
   status: "requested" | "cancelled" | "completed" | "confirmed" | "no_show";
+};
+
+export type UpdateBusinessSetupActiveRequest = {
+  is_active: boolean;
 };
 
 export type UpsertBusinessSetupRequest = {
@@ -590,6 +595,27 @@ export const businessApi = baseApi.injectEndpoints({
         return { data };
       },
     }),
+    updateBusinessSetupActive: builder.mutation<ApiEnvelope<BusinessSetup>, UpdateBusinessSetupActiveRequest>({
+      async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: "/api/business/setup/active",
+          method: "PATCH",
+          body: payload,
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<BusinessSetup>;
+        if (!data.success || !data.data) {
+          return { error: customError(data.message || "Unable to update business profile status.") };
+        }
+
+        return { data };
+      },
+      invalidatesTags: ["BusinessSetup", "BusinessSetupsListing"],
+    }),
     upsertBusinessSetup: builder.mutation<ApiEnvelope<BusinessSetup>, UpsertBusinessSetupRequest>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
         console.log("[businessApi] upsertBusinessSetup payload:", payload);
@@ -631,5 +657,6 @@ export const {
   useUpdateCalendarEntryStatusMutation,
   useUpdateBookingStatusMutation,
   useUploadBusinessMediaMutation,
+  useUpdateBusinessSetupActiveMutation,
   useUpsertBusinessSetupMutation,
 } = businessApi;

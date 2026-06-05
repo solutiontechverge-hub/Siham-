@@ -3,8 +3,6 @@
 import * as React from "react";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
-import KeyboardDoubleArrowLeftRoundedIcon from "@mui/icons-material/KeyboardDoubleArrowLeftRounded";
-import KeyboardDoubleArrowRightRoundedIcon from "@mui/icons-material/KeyboardDoubleArrowRightRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
@@ -21,6 +19,8 @@ import { useSnackbar } from "./AppSnackbar";
 import AppPillTabs from "./AppPillTabs";
 import MollureDrawer from "./MollureDrawer";
 import AppSearchField from "./AppSearchField";
+import AppDatePicker from "./AppDatePicker";
+import { AppCalendarPanel } from "./AppDatePicker";
 import AppTextField from "./AppTextField";
 import AppDropdown from "./AppDropdown";
 import CalendarAddMenu from "./calendar/CalendarAddMenu";
@@ -33,13 +33,11 @@ import CalendarFiltersDrawer from "./calendar/CalendarFiltersDrawer";
 import { useCalendarFilters } from "./calendar/useCalendarFilters";
 import {
   addDaysIso,
-  addMonthsIso,
   extractBookingId,
   fmtMinToTime,
   fmtTimeLabel,
   formatLongDateUtc,
   formatMdyDate,
-  formatMonthYearUtc,
   type BlockTimeDraft,
   type Interval,
   mergeIntervals,
@@ -51,7 +49,6 @@ import {
   subtractIntervals,
   sumIntervalsMins,
   toIsoLocalDate,
-  toMonthIso,
 } from "./calendar/calendar.utils";
 import type {
   CalendarBookingType,
@@ -116,10 +113,6 @@ export default function ProfessionalFixedLocationCalendar({
   const [activeDateIso, setActiveDateIso] = React.useState(defaultDateIso);
   const [selectedResourceId, setSelectedResourceId] = React.useState(data.resources[0]?.id ?? "");
   const [datePickerAnchor, setDatePickerAnchor] = React.useState<HTMLElement | null>(null);
-  const [datePickerMonth, setDatePickerMonth] = React.useState(() => {
-    const base = parseIsoDate(defaultDateIso);
-    return new Date(base.getUTCFullYear(), base.getUTCMonth(), 1);
-  });
   const [addAnchor, setAddAnchor] = React.useState<HTMLElement | null>(null);
   const [filtersOpen, setFiltersOpen] = React.useState(false);
   const [slotDrawerTab, setSlotDrawerTab] = React.useState<"booking" | "sales" | "activity">("booking");
@@ -128,7 +121,6 @@ export default function ProfessionalFixedLocationCalendar({
   const [slotStatus, setSlotStatus] = React.useState<"Confirmed" | "Requested" | "No Show" | "Completed" | "Cancelled">(
     "Confirmed",
   );
-  const [slotCalendarMonth, setSlotCalendarMonth] = React.useState(() => toMonthIso(defaultDateIso));
   const [slotClientAdded, setSlotClientAdded] = React.useState(false);
   const [slotClientSearch, setSlotClientSearch] = React.useState("");
   const [slotAddMenuAnchor, setSlotAddMenuAnchor] = React.useState<HTMLElement | null>(null);
@@ -666,7 +658,6 @@ export default function ProfessionalFixedLocationCalendar({
       setSlotDrawerTab("booking");
       setSlotBookingScreen("new-booking");
       setSlotLocation("FL");
-      setSlotCalendarMonth(toMonthIso(payload.date));
       setSlotClientAdded(false);
       setSelectedClient(null);
       setSelectedServices([]);
@@ -719,7 +710,6 @@ export default function ProfessionalFixedLocationCalendar({
       setSlotDrawerTab("booking");
       setSlotBookingScreen("new-booking");
       setSlotLocation(ev.location);
-      setSlotCalendarMonth(toMonthIso(ev.date));
       setSlotClientAdded(true);
       setSelectedClient({ name: ev.showClientName ?? "Client", email: "" });
       setSelectedServices([]);
@@ -872,13 +862,7 @@ export default function ProfessionalFixedLocationCalendar({
               <Button
                 variant="outlined"
                 startIcon={<CalendarMonthRoundedIcon sx={{ fontSize: 18 }} />}
-                onClick={(e) => {
-                  setDatePickerMonth(() => {
-                    const base = parseIsoDate(activeDateIso);
-                    return new Date(base.getUTCFullYear(), base.getUTCMonth(), 1);
-                  });
-                  setDatePickerAnchor(e.currentTarget);
-                }}
+                onClick={(e) => setDatePickerAnchor(e.currentTarget)}
                 sx={{
                   borderRadius: "8px",
                   textTransform: "none",
@@ -903,120 +887,20 @@ export default function ProfessionalFixedLocationCalendar({
                 PaperProps={{
                   sx: {
                     mt: 1,
-                    borderRadius: "12px",
+                    borderRadius: "14px",
                     border: `1px solid ${alpha(m.navy, 0.10)}`,
-                    boxShadow: "0 14px 28px rgba(16, 35, 63, 0.12)",
+                    boxShadow: "0 16px 40px rgba(16, 35, 63, 0.13)",
                     overflow: "hidden",
-                    width: 320,
                     bgcolor: "#fff",
                   },
                 }}
               >
-                <Box sx={{ p: 1.5 }}>
-                  <Stack direction="row" alignItems="center" spacing={1}>
-                    <IconButton
-                      size="small"
-                      onClick={() =>
-                        setDatePickerMonth((p) => new Date(p.getFullYear(), p.getMonth() - 1, 1))
-                      }
-                      sx={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: "8px",
-                        border: `1px solid ${alpha(m.navy, 0.12)}`,
-                        color: alpha(m.navy, 0.65),
-                        bgcolor: "#fff",
-                      }}
-                    >
-                      <ChevronLeftRoundedIcon sx={{ fontSize: 18 }} />
-                    </IconButton>
-                    <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.85), flex: 1, textAlign: "center" }}>
-                      {datePickerMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-                    </BodyText>
-                    <IconButton
-                      size="small"
-                      onClick={() =>
-                        setDatePickerMonth((p) => new Date(p.getFullYear(), p.getMonth() + 1, 1))
-                      }
-                      sx={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: "8px",
-                        border: `1px solid ${alpha(m.navy, 0.12)}`,
-                        color: alpha(m.navy, 0.65),
-                        bgcolor: "#fff",
-                      }}
-                    >
-                      <ChevronRightRoundedIcon sx={{ fontSize: 18 }} />
-                    </IconButton>
-                  </Stack>
-
-                  <Box
-                    sx={{
-                      mt: 1.25,
-                      display: "grid",
-                      gridTemplateColumns: "repeat(7, 1fr)",
-                      gap: 0.5,
-                    }}
-                  >
-                    {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-                      <BodyText
-                        key={d}
-                        sx={{
-                          fontSize: 11,
-                          fontWeight: 900,
-                          color: alpha(m.navy, 0.5),
-                          textAlign: "center",
-                          py: 0.5,
-                        }}
-                      >
-                        {d}
-                      </BodyText>
-                    ))}
-
-                    {(() => {
-                      const firstDowMon0 = (datePickerMonth.getDay() + 6) % 7; // 0=Mon..6=Sun
-                      const daysInMonth = new Date(datePickerMonth.getFullYear(), datePickerMonth.getMonth() + 1, 0).getDate();
-                      const cells: React.ReactNode[] = [];
-                      for (let i = 0; i < firstDowMon0; i++) cells.push(<Box key={`pad-${i}`} sx={{ height: 34 }} />);
-                      for (let day = 1; day <= daysInMonth; day++) {
-                        const dt = new Date(datePickerMonth.getFullYear(), datePickerMonth.getMonth(), day);
-                        const iso = toIsoLocalDate(dt);
-                        const isPast = iso < todayIso;
-                        const selected = iso === activeDateIso;
-                        cells.push(
-                          <ButtonBase
-                            key={iso}
-                            disabled={isPast}
-                            onClick={() => {
-                              setActiveDateIso(iso);
-                              setDatePickerAnchor(null);
-                            }}
-                            sx={{
-                              height: 34,
-                              borderRadius: "10px",
-                              display: "grid",
-                              placeItems: "center",
-                              fontSize: 12,
-                              fontWeight: 900,
-                              color: isPast ? alpha(m.navy, 0.24) : selected ? "#fff" : alpha(m.navy, 0.75),
-                              bgcolor: selected && !isPast ? m.teal : "transparent",
-                              cursor: isPast ? "not-allowed" : "pointer",
-                              "&.Mui-disabled": {
-                                color: alpha(m.navy, 0.24),
-                                pointerEvents: "auto",
-                              },
-                              "&:hover": { bgcolor: isPast ? "transparent" : selected ? m.tealDark : alpha(m.navy, 0.05) },
-                            }}
-                          >
-                            {day}
-                          </ButtonBase>
-                        );
-                      }
-                      return cells;
-                    })()}
-                  </Box>
-                </Box>
+                <AppCalendarPanel
+                  value={activeDateIso}
+                  onChange={setActiveDateIso}
+                  min={todayIso}
+                  onDaySelect={() => setDatePickerAnchor(null)}
+                />
               </Popover>
 
               <IconButton
@@ -2146,15 +2030,17 @@ export default function ProfessionalFixedLocationCalendar({
                       <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
                         Date of Birth
                       </BodyText>
-                      <AppTextField
-                        type="text"
+                      <AppDatePicker
                         value={nonMollureDraft.dob}
-                        onChange={(e) => setNonMollureDraft((p) => ({ ...p, dob: e.target.value }))}
+                        onChange={(iso) => setNonMollureDraft((p) => ({ ...p, dob: iso }))}
+                        max={todayIso}
                         fullWidth
-                        placeholder="mm/dd/yyyy"
-                        error={Boolean(slotErrors.nonMollureDob)}
-                        helperText={slotErrors.nonMollureDob}
                       />
+                      {slotErrors.nonMollureDob ? (
+                        <BodyText sx={{ mt: 0.5, fontSize: 11.5, fontWeight: 700, color: theme.palette.error.main }}>
+                          {slotErrors.nonMollureDob}
+                        </BodyText>
+                      ) : null}
                     </Box>
 
                     <Box>
@@ -2603,92 +2489,13 @@ export default function ProfessionalFixedLocationCalendar({
                               })}
                             </Box>
 
-                            <Stack direction="row" alignItems="center" spacing={0.5} sx={{ px: 0.3 }}>
-                              <BodyText sx={{ flex: 1, fontSize: 15, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
-                                {formatMonthYearUtc(slotCalendarMonth)}
-                              </BodyText>
-                              <IconButton
-                                size="small"
-                                onClick={() => setSlotCalendarMonth((p) => addMonthsIso(p, -12))}
-                                sx={{ width: 22, height: 22, color: m.teal }}
-                                aria-label="Previous year"
-                              >
-                                <KeyboardDoubleArrowLeftRoundedIcon sx={{ fontSize: 16 }} />
-                              </IconButton>
-                              <IconButton
-                                size="small"
-                                onClick={() => setSlotCalendarMonth((p) => addMonthsIso(p, -1))}
-                                sx={{ width: 22, height: 22, color: m.teal }}
-                                aria-label="Previous month"
-                              >
-                                <ChevronLeftRoundedIcon sx={{ fontSize: 16 }} />
-                              </IconButton>
-                              <IconButton
-                                size="small"
-                                onClick={() => setSlotCalendarMonth((p) => addMonthsIso(p, 1))}
-                                sx={{ width: 22, height: 22, color: m.teal }}
-                                aria-label="Next month"
-                              >
-                                <ChevronRightRoundedIcon sx={{ fontSize: 16 }} />
-                              </IconButton>
-                              <IconButton
-                                size="small"
-                                onClick={() => setSlotCalendarMonth((p) => addMonthsIso(p, 12))}
-                                sx={{ width: 22, height: 22, color: m.teal }}
-                                aria-label="Next year"
-                              >
-                                <KeyboardDoubleArrowRightRoundedIcon sx={{ fontSize: 16 }} />
-                              </IconButton>
-                            </Stack>
-
-                            <Box sx={{ mt: 0.9, display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", columnGap: 0.5, rowGap: 0.55 }}>
-                              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-                                <BodyText key={d} sx={{ fontSize: 9, fontWeight: 800, color: alpha(m.navy, 0.42), textAlign: "center" }}>
-                                  {d}
-                                </BodyText>
-                              ))}
-                              {(() => {
-                                const monthDate = parseIsoDate(slotCalendarMonth);
-                                const year = monthDate.getUTCFullYear();
-                                const month = monthDate.getUTCMonth();
-                                const firstDowMon0 = (monthDate.getUTCDay() + 6) % 7;
-                                const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-                                const cells: React.ReactNode[] = [];
-                                for (let i = 0; i < firstDowMon0; i++) cells.push(<Box key={`slot-pad-${i}`} sx={{ height: 28 }} />);
-                                for (let day = 1; day <= daysInMonth; day++) {
-                                  const iso = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-                                  const isPast = iso < todayIso;
-                                  const selected = iso === selectedSlot.date && !isPast;
-                                  cells.push(
-                                    <ButtonBase
-                                      key={iso}
-                                      disabled={isPast}
-                                      onClick={() => setSelectedSlot((p) => (p ? { ...p, date: iso } : p))}
-                                      sx={{
-                                        width: 28,
-                                        height: 28,
-                                        borderRadius: "999px",
-                                        display: "grid",
-                                        placeItems: "center",
-                                        justifySelf: "center",
-                                        fontSize: 11,
-                                        fontWeight: 800,
-                                        color: isPast ? alpha(m.navy, 0.24) : selected ? "#fff" : alpha(m.navy, 0.65),
-                                        bgcolor: isPast ? "transparent" : selected ? m.teal : alpha(m.navy, 0.04),
-                                        cursor: isPast ? "not-allowed" : "pointer",
-                                        "&.Mui-disabled": {
-                                          color: alpha(m.navy, 0.24),
-                                          pointerEvents: "auto",
-                                        },
-                                        "&:hover": { bgcolor: isPast ? "transparent" : selected ? m.tealDark : alpha(m.navy, 0.05) },
-                                      }}
-                                    >
-                                      {day}
-                                    </ButtonBase>,
-                                  );
-                                }
-                                return cells;
-                              })()}
+                            <Box sx={{ mt: 0.5 }}>
+                              <AppCalendarPanel
+                                compact
+                                value={selectedSlot?.date ?? defaultDateIso}
+                                onChange={(iso) => setSelectedSlot((p) => (p ? { ...p, date: iso } : p))}
+                                min={todayIso}
+                              />
                             </Box>
                           </Box>
                         </Paper>

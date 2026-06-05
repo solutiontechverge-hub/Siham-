@@ -26,7 +26,7 @@ export default function MessagingPageShell({ audience, homeHref }: MessagingPage
   const [avatarUrl, setAvatarUrl] = React.useState<string | undefined>(undefined);
 
   const resolvedHome =
-    homeHref ?? (audience === "client" ? "/clients/listing" : "/professionals/fixed-location/calendar");
+    homeHref ?? (audience === "client" ? "/" : "/professionals/fixed-location/calendar");
 
   const pageBg = audience === "client" ? profilePageData.pageBg : alpha(m.teal, 0.08);
 

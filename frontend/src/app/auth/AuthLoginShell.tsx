@@ -28,6 +28,7 @@ import GuestGuard from "../../components/common/auth/GuestGuard";
 import type { AuthStripHeaderConfig } from "../../data/marketingShell.data";
 import { BodyText, SubHeading } from "../../components/ui/typography";
 import { useSnackbar } from "../../components/common/AppSnackbar";
+import { queueSnackbarFlash } from "../../lib/snackbarFlash";
 
 function GoogleLogoIcon(props: React.ComponentProps<typeof SvgIcon>) {
   return (
@@ -94,8 +95,10 @@ export default function AuthLoginShell({ header, signupHref }: AuthLoginShellPro
         remember,
       });
 
-      router.push(getDefaultRouteForUser(result.data.user.user_type));
+      const destination = getDefaultRouteForUser(result.data.user.user_type);
+      queueSnackbarFlash({ severity: "success", message: "Signed in successfully." });
       showSnackbar({ severity: "success", message: "Signed in successfully." });
+      router.push(destination);
     } catch (error) {
       showSnackbar({
         severity: "error",

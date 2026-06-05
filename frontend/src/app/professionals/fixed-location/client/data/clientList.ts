@@ -31,7 +31,14 @@ export type ClientRecord = {
   bookingHistory: { period: string; bookings: number }[];
   /** Label for the Platform Statistics “Last booking” card */
   statsLastBooking?: string;
+  /** Blocked clients stay in the list but cannot book */
+  isBlocked?: boolean;
+  technicalNote?: string;
 };
+
+export function isClientBlocked(client: Pick<ClientRecord, "isBlocked">): boolean {
+  return Boolean(client.isBlocked);
+}
 
 export const mockClientRecords: ClientRecord[] = [
   {

@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Paper, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../ui/typography";
@@ -22,6 +23,23 @@ export default function FixedLocationTopTabs({
 }: FixedLocationTopTabsProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
+  const router = useRouter();
+  const [, startTransition] = React.useTransition();
+
+  const handleTabClick = React.useCallback(
+    (event: React.MouseEvent<HTMLAnchorElement>, href: string, isActive: boolean) => {
+      if (isActive) {
+        event.preventDefault();
+        return;
+      }
+
+      event.preventDefault();
+      startTransition(() => {
+        router.push(href, { scroll: false });
+      });
+    },
+    [router],
+  );
 
   return (
     <Paper
@@ -84,6 +102,9 @@ export default function FixedLocationTopTabs({
               key={t.href}
               component={Link}
               href={t.href}
+              prefetch
+              scroll={false}
+              onClick={(event: React.MouseEvent<HTMLAnchorElement>) => handleTabClick(event, t.href, active)}
               sx={{
                 textDecoration: "none",
                 whiteSpace: "nowrap",

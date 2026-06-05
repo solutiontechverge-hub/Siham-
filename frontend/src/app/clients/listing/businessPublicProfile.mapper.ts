@@ -20,7 +20,10 @@ import type {
   BusinessPublicProfileServiceForItem,
   BusinessPublicProfileTeamMember,
 } from "../../../data/businessPublicProfile.data";
-import { resolveServiceCategorySliderIconId } from "../../../data/businessServiceCategorySlider.data";
+import {
+  buildServiceCategoryTabs,
+  resolveServiceCategorySliderIconId,
+} from "../../../data/businessServiceCategorySlider.data";
 import type {
   BusinessSetupListing,
   BusinessSetupListingPolicy,
@@ -218,29 +221,31 @@ function buildProfileServices(setup: BusinessSetupListing): BusinessPublicProfil
 }
 
 function buildCategoriesFromDetails(setup: BusinessSetupListing, services: BusinessPublicProfileService[]) {
-  const seen = new Map<string, BusinessPublicProfileCategory>();
-  seen.set("all", { id: "all", label: "All", iconId: "all" });
+  const pseudoCategories: Array<{ id: string; title: string }> = [];
+  const seenIcons = new Set<string>();
 
   for (const detail of setup.serviceDetails ?? []) {
     const title = detail.categoryTitle?.trim();
     if (!title) continue;
-    const id = detail.categoryId != null ? String(detail.categoryId) : slugifyCategory(title);
-    if (seen.has(id)) continue;
-    seen.set(id, { id, label: title, iconId: resolveServiceCategorySliderIconId(title) });
+    const iconId = resolveServiceCategorySliderIconId(title);
+    if (seenIcons.has(iconId)) continue;
+    seenIcons.add(iconId);
+    pseudoCategories.push({
+      id: detail.categoryId != null ? String(detail.categoryId) : slugifyCategory(title),
+      title,
+    });
   }
 
-  if (seen.size === 1 && services.length > 0) {
+  if (pseudoCategories.length === 0 && services.length > 0) {
     for (const service of services) {
-      if (seen.has(service.categoryId)) continue;
-      seen.set(service.categoryId, {
-        id: service.categoryId,
-        label: service.categoryId,
-        iconId: resolveServiceCategorySliderIconId(service.categoryId),
-      });
+      const iconId = resolveServiceCategorySliderIconId(service.categoryId);
+      if (seenIcons.has(iconId)) continue;
+      seenIcons.add(iconId);
+      pseudoCategories.push({ id: service.categoryId, title: service.categoryId });
     }
   }
 
-  return Array.from(seen.values());
+  return buildServiceCategoryTabs(pseudoCategories);
 }
 
 function findServiceDetail(setup: BusinessSetupListing, serviceId: number | null | undefined) {

@@ -48,9 +48,16 @@ export type ClientListingCardProps = {
   item: ListingCardData;
   isFavorite: boolean;
   onToggleFavorite: () => void;
+  /** When set, only matching location tabs are shown on the card */
+  visibleLocationModes?: Array<"fixed" | "desired">;
 };
 
-export default function ClientListingCard({ item, isFavorite, onToggleFavorite }: ClientListingCardProps) {
+export default function ClientListingCard({
+  item,
+  isFavorite,
+  onToggleFavorite,
+  visibleLocationModes,
+}: ClientListingCardProps) {
   const tokens = useTheme().palette.mollure;
   const router = useRouter();
   const offering = resolveBusinessOfferingFlags(item.businessOffering);
@@ -60,8 +67,16 @@ export default function ClientListingCard({ item, isFavorite, onToggleFavorite }
       ? "fixed"
       : item.locationModeDefault;
   const [mode, setMode] = React.useState<"fixed" | "desired">(initialMode);
-  const canPickFixed = offering.supportsFixedLocation;
-  const canPickDesired = offering.supportsDesiredLocation;
+  const filterAllowsAll = !visibleLocationModes?.length;
+  const canPickFixed =
+    offering.supportsFixedLocation && (filterAllowsAll || visibleLocationModes.includes("fixed"));
+  const canPickDesired =
+    offering.supportsDesiredLocation && (filterAllowsAll || visibleLocationModes.includes("desired"));
+
+  React.useEffect(() => {
+    if (canPickFixed && !canPickDesired && mode !== "fixed") setMode("fixed");
+    if (canPickDesired && !canPickFixed && mode !== "desired") setMode("desired");
+  }, [canPickFixed, canPickDesired, mode]);
   const slides = React.useMemo(() => {
     if (item.media.length > 0) {
       return item.media;

@@ -1,6 +1,7 @@
 "use client";
 
 import { createTheme } from "@mui/material/styles";
+import { MOLLURE_SNACKBAR_COLORS } from "./mollureSnackbar";
 
 const theme = createTheme({
   palette: {
@@ -78,6 +79,16 @@ const theme = createTheme({
       fxSurface: "#FFFFFF",
       fxPillTrack: "#EFFDF199",
       fxPillBorder: "#DCDFE3",
+      // Shared "Add" affordance colors (icon chip / small add buttons)
+      addSoftBg: "#BAE9EB",
+      addSoftBgHover: "#A6E2E5",
+      addSoftFg: "#149CA7",
+      addSoftBorder: "rgba(20,156,167,0.18)",
+      /** Sales Volume stacked bar chart — 4-step teal gradient (Figma) */
+      salesVolumeStackDark: "#169BA1",
+      salesVolumeStackMid: "#21B8BF",
+      salesVolumeStackLight: "#62C4C8",
+      salesVolumeStackPale: "#9DD8DB",
     },
     
   },
@@ -148,6 +159,43 @@ const theme = createTheme({
           headerNav: "span",
           formLabel: "span",
         },
+      },
+    },
+    MuiAlert: {
+      defaultProps: {
+        variant: "standard",
+      },
+      styleOverrides: {
+        root: ({ ownerState }) => {
+          const severity = (ownerState.severity ?? "info") as keyof typeof MOLLURE_SNACKBAR_COLORS;
+          const colors = MOLLURE_SNACKBAR_COLORS[severity] ?? MOLLURE_SNACKBAR_COLORS.info;
+          return {
+            borderRadius: 14,
+            fontWeight: 500,
+            fontSize: "0.875rem",
+            alignItems: "center",
+            backgroundColor: colors.background,
+            color: colors.foreground,
+            "& .MuiAlert-icon": {
+              color: colors.foreground,
+              opacity: 1,
+            },
+            "& .MuiAlert-action": {
+              color: colors.foreground,
+              paddingTop: 0,
+              marginRight: 0,
+            },
+            "& .MuiAlert-message": {
+              color: colors.foreground,
+              padding: "2px 0",
+            },
+          };
+        },
+      },
+    },
+    MuiSnackbar: {
+      defaultProps: {
+        anchorOrigin: { vertical: "top", horizontal: "center" },
       },
     },
   },

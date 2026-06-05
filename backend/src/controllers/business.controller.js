@@ -428,6 +428,73 @@ export const getBusinessSetup = async (req, res) => {
   }
 };
 
+export const updateBusinessSetupActive = async (req, res) => {
+  try {
+    if (req.user.user_type !== "professional") {
+      return res.status(403).json({
+        success: false,
+        message: "Only professional users can update business setup status.",
+        data: null,
+      });
+    }
+
+    const professionalProfile = await getProfessionalProfile(req.user.id);
+
+    if (!professionalProfile) {
+      return res.status(404).json({
+        success: false,
+        message: "Professional profile not found.",
+        data: null,
+      });
+    }
+
+    const isActive = req.body.is_active === true;
+
+    const existingSetup = await getBusinessSetupByUserId(req.user.id);
+
+    if (!existingSetup) {
+      const insertResult = await query(
+        `INSERT INTO business_setups (professional_profile_id, location_mode, is_active)
+         VALUES ($1, 'fixed', $2)
+         RETURNING id`,
+        [professionalProfile.id, isActive],
+      );
+
+      const savedBusinessSetup = await getBusinessSetupDetailById(insertResult.rows[0].id);
+
+      return res.status(200).json({
+        success: true,
+        message: isActive ? "Business profile activated successfully." : "Business profile deactivated successfully.",
+        data: savedBusinessSetup,
+      });
+    }
+
+    await query(
+      `UPDATE business_setups
+       SET is_active = $2,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [existingSetup.id, isActive],
+    );
+
+    const savedBusinessSetup = await getBusinessSetupDetailById(existingSetup.id);
+
+    return res.status(200).json({
+      success: true,
+      message: isActive ? "Business profile activated successfully." : "Business profile deactivated successfully.",
+      data: savedBusinessSetup,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update business setup status.",
+      data: {
+        error: error.message,
+      },
+    });
+  }
+};
+
 const isPersistedMediaUrl = (value) =>
   typeof value === "string" && (value.startsWith("http://") || value.startsWith("https://"));
 

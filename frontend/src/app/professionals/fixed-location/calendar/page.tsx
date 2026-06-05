@@ -1,8 +1,6 @@
 "use client";
 
 import * as React from "react";
-import FixedLocationPageScaffold from "../../../../components/common/FixedLocationPageScaffold";
-import { fixedLocationTopTabs } from "../fixedLocationTopTabs";
 import ProfessionalFixedLocationCalendar from "../../../../components/common/ProfessionalFixedLocationCalendar";
 import {
   type CalendarBlock,
@@ -143,34 +141,32 @@ export default function FixedLocationCalendarPage() {
   }, [calendarOverviewData, setupData]);
 
   return (
-    <FixedLocationPageScaffold activeTopTab="Calendar" topTabs={fixedLocationTopTabs}>
-      <ProfessionalFixedLocationCalendar
-        data={calendarData}
-        isSaving={isCreatingCalendarEntry || isSavingCalendarSettings}
-        onCreateCalendarEntry={async (payload) => {
-          try {
-            await createCalendarEntry(payload).unwrap();
-          } catch (error) {
-            showSnackbar({
-              severity: "error",
-              message: getApiErrorMessage(error, "Unable to save calendar entry."),
-            });
-            throw error;
-          }
-        }}
-        onSaveCalendarSettings={async (payload) => {
-          try {
-            await upsertCalendarSettings(payload).unwrap();
-          } catch (error) {
-            showSnackbar({
-              severity: "error",
-              message: getApiErrorMessage(error, "Unable to save calendar settings."),
-            });
-            throw error;
-          }
-        }}
-      />
-    </FixedLocationPageScaffold>
+    <ProfessionalFixedLocationCalendar
+      data={calendarData}
+      isSaving={isCreatingCalendarEntry || isSavingCalendarSettings}
+      onCreateCalendarEntry={async (payload) => {
+        try {
+          await createCalendarEntry(payload).unwrap();
+        } catch (error) {
+          showSnackbar({
+            severity: "error",
+            message: getApiErrorMessage(error, "Unable to save calendar entry."),
+          });
+          throw error;
+        }
+      }}
+      onSaveCalendarSettings={async (payload) => {
+        try {
+          await upsertCalendarSettings(payload).unwrap();
+        } catch (error) {
+          showSnackbar({
+            severity: "error",
+            message: getApiErrorMessage(error, "Unable to save calendar settings."),
+          });
+          throw error;
+        }
+      }}
+    />
   );
 }
 

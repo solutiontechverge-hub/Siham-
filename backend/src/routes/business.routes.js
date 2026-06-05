@@ -10,6 +10,7 @@ import {
   createCategory,
   createSubcategory,
   getBusinessSetup,
+  updateBusinessSetupActive,
   uploadBusinessMedia,
   listBookings,
   listCalendarEntries,
@@ -88,6 +89,14 @@ router.post(
 );
 
 router.get("/setup", requireProfessional, getBusinessSetup);
+
+router.patch(
+  "/setup/active",
+  requireProfessional,
+  body("is_active").isBoolean().withMessage("is_active must be a boolean."),
+  validateRequest,
+  updateBusinessSetupActive,
+);
 
 router.post(
   "/setup/media",

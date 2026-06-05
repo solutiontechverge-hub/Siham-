@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import FixedLocationPageScaffold from "../../../../components/common/FixedLocationPageScaffold";
 import {
   Alert,
   Avatar,
@@ -14,7 +13,6 @@ import {
   MenuItem,
   Paper,
   Grid,
-  Snackbar,
   Stack,
   Table,
   TableBody,
@@ -22,23 +20,24 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Tooltip,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
-import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
-import ShowChartRoundedIcon from "@mui/icons-material/ShowChartRounded";
-import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
-import { fixedLocationTopTabs } from "../fixedLocationTopTabs";
+import StickyNote2OutlinedIcon from "@mui/icons-material/StickyNote2Outlined";
+import AppDatePicker, { normalizeDateToIso } from "../../../../components/common/AppDatePicker";
 import MollureFormField from "../../../../components/common/MollureFormField";
 import MollureModal from "../../../../components/common/MollureModal";
 import MollureDrawer from "../../../../components/common/MollureDrawer";
 import MollureListToolbar from "../../../../components/common/MollureListToolbar";
-import { ClientListDataCard, ClientListHeaderCard } from "../../../../components/common";
+import { ClientListDataCard, ClientListHeaderCard, MollureSnackbar } from "../../../../components/common";
 import { useFixedLocationClientPage } from "./useFixedLocationClientPage";
+import ClientDetailsViewPanel from "./ClientDetailsViewPanel";
+import { isClientBlocked } from "./data/clientList";
 import { Typography } from "../../../../components/ui/typography";
 
 export default function FixedLocationClientPage() {
@@ -176,23 +175,35 @@ export default function FixedLocationClientPage() {
     closeSnackbar,
     openNonMollureAddDrawer,
     closeClientDetailsDrawer,
+    openClientDetailsView,
+    focusTechnicalNoteOnOpen,
+    clearTechnicalNoteFocus,
     confirmDeleteClient,
     confirmBlockClient,
+    unblockClient,
     saveClientEdits,
+    saveClientTechnicalNote,
   } = useFixedLocationClientPage();
 
+  const rowMenuClient = useMemo(
+    () => (rowMenu?.id ? clients.find((c) => c.id === rowMenu.id) : undefined),
+    [clients, rowMenu?.id],
+  );
+
+  const rowMenuOptions = useMemo(
+    () => (rowMenuClient && isClientBlocked(rowMenuClient) ? ["View", "Unblock", "Delete"] : ["View", "Block", "Delete"]),
+    [rowMenuClient],
+  );
+
   return (
-    <FixedLocationPageScaffold activeTopTab="Client" topTabs={fixedLocationTopTabs}>
-      <Snackbar
+    <>
+      <MollureSnackbar
         open={snackbar.open}
+        message={snackbar.message}
+        severity={snackbar.severity}
         autoHideDuration={2500}
         onClose={closeSnackbar}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-      >
-        <Alert onClose={closeSnackbar} severity={snackbar.severity} variant="filled" sx={{ fontWeight: 700 }}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
+      />
 
       <Paper
         elevation={0}
@@ -360,8 +371,24 @@ export default function FixedLocationClientPage() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {filtered.map((c) => (
-                    <TableRow key={c.id} hover>
+                  {filtered.map((c) => {
+                    const blocked = isClientBlocked(c);
+                    return (
+                    <TableRow
+                      key={c.id}
+                      hover={!blocked}
+                      sx={
+                        blocked
+                          ? {
+                              bgcolor: alpha(theme.palette.error.main, 0.05),
+                              boxShadow: `inset 4px 0 0 ${theme.palette.error.main}`,
+                              "& td": {
+                                borderBottom: `1px solid ${alpha(theme.palette.error.main, 0.18)}`,
+                              },
+                            }
+                          : undefined
+                      }
+                    >
                       <TableCell sx={{ py: 1.35 }}>
                         <Stack direction="row" spacing={1.1} alignItems="center">
                           <Avatar
@@ -388,11 +415,27 @@ export default function FixedLocationClientPage() {
                                 sx={{
                                   fontWeight: 900,
                                   fontSize: 13,
-                                  color: alpha(m.navy, 0.88),
+                                  color: blocked ? alpha(theme.palette.error.main, 0.88) : alpha(m.navy, 0.88),
+                                  textDecoration: blocked ? "line-through" : "none",
                                 }}
                               >
                                 {c.name}
                               </Typography>
+                              {blocked ? (
+                                <Chip
+                                  label="Blocked"
+                                  size="small"
+                                  sx={{
+                                    height: 18,
+                                    borderRadius: "999px",
+                                    bgcolor: alpha(theme.palette.error.main, 0.12),
+                                    color: theme.palette.error.main,
+                                    fontSize: 10,
+                                    fontWeight: 800,
+                                    px: 0.5,
+                                  }}
+                                />
+                              ) : null}
                               {c.tags.includes("CC") && (
                                 <Chip
                                   label="CC Client"
@@ -423,6 +466,36 @@ export default function FixedLocationClientPage() {
                                   px: 0.5,
                                 }}
                               />
+                              {c.technicalNote?.trim() ? (
+                                <Tooltip title="View technical note" arrow>
+                                  <IconButton
+                                    size="small"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openClientDetailsView(c.id, { focusTechnicalNote: true });
+                                    }}
+                                    sx={{
+                                      width: 22,
+                                      height: 22,
+                                      p: 0,
+                                      color: c.tags.includes("Mollure")
+                                        ? theme.palette.primary.main
+                                        : alpha(m.teal, 0.95),
+                                      "&:hover": {
+                                        bgcolor: alpha(
+                                          c.tags.includes("Mollure")
+                                            ? theme.palette.primary.main
+                                            : m.teal,
+                                          0.1,
+                                        ),
+                                      },
+                                    }}
+                                    aria-label="View technical note"
+                                  >
+                                    <StickyNote2OutlinedIcon sx={{ fontSize: 16 }} />
+                                  </IconButton>
+                                </Tooltip>
+                              ) : null}
                             </Stack>
                             <Typography sx={{ fontSize: 11.5, fontWeight: 600, color: alpha(m.navy, 0.50) }}>
                               {c.email}
@@ -454,7 +527,8 @@ export default function FixedLocationClientPage() {
                         </IconButton>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </TableContainer>
@@ -476,28 +550,32 @@ export default function FixedLocationClientPage() {
             },
           }}
         >
-          {["View", "Block", "Delete"].map((opt) => (
+          {rowMenuOptions.map((opt) => (
             <MenuItem
               key={opt}
               onClick={() => {
                 const id = rowMenu?.id;
                 setRowMenu(null);
-                if (opt === "View" && id) {
+                if (!id) return;
+                if (opt === "View") {
                   setClientDetailsMode("view");
                   setViewClientId(id);
                 }
-            if (opt === "Block" && id) {
-              setBlockClientId(id);
-            }
-            if (opt === "Delete" && id) {
-              setDeleteClientId(id);
-            }
+                if (opt === "Block") {
+                  setBlockClientId(id);
+                }
+                if (opt === "Unblock") {
+                  unblockClient(id);
+                }
+                if (opt === "Delete") {
+                  setDeleteClientId(id);
+                }
               }}
               sx={{
                 borderRadius: "8px",
                 fontSize: 12.5,
                 fontWeight: 700,
-                color: alpha(m.navy, 0.75),
+                color: opt === "Delete" ? theme.palette.error.main : alpha(m.navy, 0.75),
                 my: 0.25,
               }}
             >
@@ -654,6 +732,10 @@ export default function FixedLocationClientPage() {
         onClose={closeClientDetailsDrawer}
         width={{ xs: "100%", sm: 500 }}
         title={clientDetailsMode === "edit" ? "Edit Client Details" : "Client Details"}
+        contentSx={{
+          bgcolor: alpha(m.navy, 0.03),
+          p: 0,
+        }}
         onBack={clientDetailsMode === "edit" ? () => setClientDetailsMode("view") : undefined}
         footer={
           clientDetailsMode === "edit" ? (
@@ -696,8 +778,9 @@ export default function FixedLocationClientPage() {
         }
       >
         {viewClient ? (
-          <Box sx={{ px: 2.5, py: 2 }}>
+          <>
               {clientDetailsMode === "edit" && viewClient.kind === "company" ? (
+              <Box sx={{ px: 2.5, py: 2 }}>
                 <Stack spacing={1.5}>
                   <Paper
                     elevation={0}
@@ -913,7 +996,9 @@ export default function FixedLocationClientPage() {
                     />
                   </Stack>
                 </Stack>
+              </Box>
               ) : clientDetailsMode === "edit" && viewClient.kind === "individual" ? (
+              <Box sx={{ px: 2.5, py: 2 }}>
                 <Stack spacing={1.5}>
                   <Paper
                     elevation={0}
@@ -1006,11 +1091,11 @@ export default function FixedLocationClientPage() {
                       <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
                         Date of Birth
                       </Typography>
-                      <MollureFormField
-                        placeholder="MM/DD/YY"
-                        value={editIndividualForm.dob}
-                        onChange={(e) => setEditIndividualForm((p) => ({ ...p, dob: e.target.value }))}
-                        sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                      <AppDatePicker
+                        value={normalizeDateToIso(editIndividualForm.dob)}
+                        onChange={(iso) => setEditIndividualForm((p) => ({ ...p, dob: iso }))}
+                        max={new Date().toISOString().slice(0, 10)}
+                        fullWidth
                       />
                     </Box>
                     <Box sx={{ pt: 0.25 }}>
@@ -1067,249 +1152,17 @@ export default function FixedLocationClientPage() {
                     />
                   </Stack>
                 </Stack>
+              </Box>
               ) : (
-                <>
-              <Stack direction="row" spacing={1.25} alignItems="flex-start" sx={{ mb: 2.5 }}>
-                <Avatar
-                  src={viewClient.photoSrc}
-                  sx={{
-                    width: 48,
-                    height: 48,
-                    bgcolor: alpha(m.navy, 0.08),
-                    color: alpha(m.navy, 0.78),
-                    fontWeight: 800,
-                    fontSize: 15,
-                  }}
-                >
-                  {viewClient.name
-                    .split(" ")
-                    .map((p) => p[0])
-                    .join("")
-                    .slice(0, 2)
-                    .toUpperCase()}
-                </Avatar>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 0.35 }}>
-                    <Typography sx={{ fontWeight: 900, fontSize: 14, color: alpha(m.navy, 0.88) }}>
-                      {viewClient.name}
-                    </Typography>
-                    {viewClient.tags.includes("CC") && (
-                      <Chip
-                        label="CC Client"
-                        size="small"
-                        sx={{
-                          height: 20,
-                          borderRadius: "999px",
-                          bgcolor: alpha(theme.palette.primary.main, 0.10),
-                          color: theme.palette.primary.main,
-                          fontSize: 10,
-                          fontWeight: 800,
-                        }}
-                      />
-                    )}
-                    <Chip
-                      label={viewClient.tags.includes("Mollure") ? "Mollure" : "Non-Mollure"}
-                      size="small"
-                      sx={{
-                        height: 20,
-                        borderRadius: "999px",
-                        bgcolor: viewClient.tags.includes("Mollure")
-                          ? alpha(theme.palette.primary.main, 0.10)
-                          : alpha(m.teal, 0.14),
-                        color: viewClient.tags.includes("Mollure") ? theme.palette.primary.main : alpha(m.teal, 0.95),
-                        fontSize: 10,
-                        fontWeight: 800,
-                      }}
-                    />
-                  </Stack>
-                  <Typography sx={{ fontSize: 12, fontWeight: 600, color: alpha(m.navy, 0.52) }}>
-                    {viewClient.email}
-                  </Typography>
-                </Box>
-                <IconButton
-                  size="small"
-                  aria-label="Edit client"
-                  onClick={openClientDetailsEdit}
-                  sx={{ color: alpha(m.navy, 0.45), mt: -0.25 }}
-                >
-                  <EditRoundedIcon sx={{ fontSize: 20 }} />
-                </IconButton>
-              </Stack>
-
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
-                <PersonRoundedIcon sx={{ fontSize: 20, color: alpha(m.teal, 0.85) }} />
-                <Typography sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.82) }}>
-                  Client Information
-                </Typography>
-              </Stack>
-              <Typography sx={{ fontSize: 11.5, fontWeight: 600, color: alpha(m.navy, 0.48), mb: 1.75 }}>
-                Added to the client list on {viewClient.addedOn}
-              </Typography>
-
-              <Grid container spacing={2} sx={{ mb: 3 }}>
-                {viewClient.kind === "company" ? (
-                  <>
-                    <Grid item xs={12} sm={6}>
-                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.5) }}>Legal Name</Typography>
-                      <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.84), mt: 0.35 }}>
-                        {viewClient.legalName ?? "—"}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.5) }}>COC Number</Typography>
-                      <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.84), mt: 0.35 }}>
-                        {viewClient.coc ?? "—"}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.5) }}>VAT Number</Typography>
-                      <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.84), mt: 0.35 }}>
-                        {viewClient.vat ?? "—"}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.5) }}>
-                        Contact Person Name
-                      </Typography>
-                      <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.84), mt: 0.35 }}>
-                        {viewClient.contactPersonName ?? "—"}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.5) }}>Gender</Typography>
-                      <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.84), mt: 0.35 }}>
-                        {viewClient.gender ?? "—"}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.5) }}>Contact Number</Typography>
-                      <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.84), mt: 0.35 }}>
-                        {viewClient.phone}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.5) }}>Business Address</Typography>
-                      <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.84), mt: 0.35 }}>
-                        {viewClient.businessAddress ?? "—"}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.5) }}>Email Address</Typography>
-                      <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.84), mt: 0.35 }}>
-                        {viewClient.detailEmail ?? viewClient.email}
-                      </Typography>
-                    </Grid>
-                  </>
-                ) : (
-                  <>
-                    <Grid item xs={12} sm={6}>
-                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.5) }}>Full Name</Typography>
-                      <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.84), mt: 0.35 }}>
-                        {viewClient.name}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.5) }}>Gender</Typography>
-                      <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.84), mt: 0.35 }}>
-                        {viewClient.gender ?? "—"}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.5) }}>Date of Birth</Typography>
-                      <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.84), mt: 0.35 }}>
-                        {viewClient.dateOfBirth ?? "—"}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.5) }}>Contact Number</Typography>
-                      <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.84), mt: 0.35 }}>
-                        {viewClient.phone}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.5) }}>
-                        Residential Address
-                      </Typography>
-                      <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.84), mt: 0.35 }}>
-                        {viewClient.residentialAddress ?? "—"}
-                      </Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.5) }}>Email Address</Typography>
-                      <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.84), mt: 0.35 }}>
-                        {viewClient.email}
-                      </Typography>
-                    </Grid>
-                  </>
-                )}
-              </Grid>
-
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
-                <ShowChartRoundedIcon sx={{ fontSize: 20, color: alpha(m.teal, 0.85) }} />
-                <Typography sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.82) }}>
-                  Platform Statistics
-                </Typography>
-              </Stack>
-
-              <Grid container spacing={1.25} sx={{ mb: 2 }}>
-                {[
-                  { label: "Total Sales", value: viewClient.totalSales },
-                  {
-                    label: "Last Booking",
-                    value: viewClient.statsLastBooking ?? viewClient.lastBooking,
-                  },
-                  { label: "Bookings Completed", value: String(viewClient.bookingsCompleted) },
-                  { label: "Average Booking value", value: viewClient.averageBookingValue },
-                ].map((card) => (
-                  <Grid item xs={6} key={card.label}>
-                    <Paper
-                      elevation={0}
-                      sx={{
-                        p: 1.35,
-                        borderRadius: "10px",
-                        border: `1px solid ${alpha(m.navy, 0.08)}`,
-                        bgcolor: alpha(m.navy, 0.02),
-                      }}
-                    >
-                      <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: alpha(m.navy, 0.5) }}>
-                        {card.label}
-                      </Typography>
-                      <Typography sx={{ fontSize: 14, fontWeight: 900, color: m.teal, mt: 0.5 }}>{card.value}</Typography>
-                    </Paper>
-                  </Grid>
-                ))}
-              </Grid>
-
-              <Grid container spacing={2} sx={{ mb: 2.5 }}>
-                <Grid item xs={12} sm={6}>
-                  <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: alpha(m.navy, 0.72), mb: 1 }}>
-                    Recent Services
-                  </Typography>
-                  <Stack spacing={1}>
-                    {viewClient.recentServices.map((s) => (
-                      <Stack key={s.name} direction="row" justifyContent="space-between" alignItems="baseline">
-                        <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.78) }}>{s.name}</Typography>
-                        <Typography sx={{ fontSize: 12, fontWeight: 800, color: m.teal }}>{s.price}</Typography>
-                      </Stack>
-                    ))}
-                  </Stack>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: alpha(m.navy, 0.72), mb: 1 }}>
-                    Booking History
-                  </Typography>
-                  <Stack spacing={1}>
-                    {viewClient.bookingHistory.map((b) => (
-                      <Typography key={b.period} sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.78) }}>
-                        {b.period}: {b.bookings} Booking{b.bookings === 1 ? "" : "s"}
-                      </Typography>
-                    ))}
-                  </Stack>
-                </Grid>
-              </Grid>
-                </>
+                <ClientDetailsViewPanel
+                  client={viewClient}
+                  onEdit={viewClient.tags.includes("Mollure") ? undefined : openClientDetailsEdit}
+                  onSaveTechnicalNote={saveClientTechnicalNote}
+                  focusTechnicalNote={focusTechnicalNoteOnOpen}
+                  onTechnicalNoteFocused={clearTechnicalNoteFocus}
+                />
               )}
-          </Box>
+          </>
         ) : null}
       </MollureDrawer>
 
@@ -1573,19 +1426,14 @@ export default function FixedLocationClientPage() {
                   <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
                     Date of Birth
                   </Typography>
-                  <MollureFormField
-                    type="date"
+                  <AppDatePicker
                     value={indDob}
-                    onChange={(e) => {
-                      setIndDob(e.target.value);
+                    onChange={(iso) => {
+                      setIndDob(iso);
                       setIndErrors((p) => ({ ...p, dob: undefined }));
                     }}
-                    inputProps={{
-                      max: new Date().toISOString().slice(0, 10),
-                    }}
-                    error={Boolean(indErrors.dob)}
-                    helperText={indErrors.dob}
-                    sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                    max={new Date().toISOString().slice(0, 10)}
+                    fullWidth
                   />
                 </Box>
 
@@ -1851,7 +1699,7 @@ export default function FixedLocationClientPage() {
           </Stack>
         </Box>
       </MollureDrawer>
-    </FixedLocationPageScaffold>
+    </>
   );
 }
 

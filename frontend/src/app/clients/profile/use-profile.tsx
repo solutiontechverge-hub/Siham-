@@ -9,6 +9,11 @@ import {
   PROFILE_IMAGE_INVALID_MESSAGE,
 } from "../../../lib/profileImageUpload";
 import {
+  inferReviewNameMode,
+  resolveDisplayNameFromMode,
+  type ReviewNameMode,
+} from "../../../lib/reviewNameDisplay";
+import {
   type CompanyProfile,
   type IndividualProfile,
   type ProfileResponse,
@@ -23,7 +28,7 @@ export function useProfileTokens() {
 export type ProfileFormState = {
   firstName: string;
   lastName: string;
-  reviewNameMode: "first_name" | "last_name" | "full_name";
+  reviewNameMode: ReviewNameMode;
   birthDate: string;
   gender: string;
   countryCode: string;
@@ -99,34 +104,51 @@ function writePersistedClientProfile(next: PersistedClientProfile) {
   }
 }
 
-function inferReviewNameMode(displayName: string, firstName: string, lastName: string) {
-  const fn = firstName.trim();
-  const ln = lastName.trim();
-  const full = `${fn} ${ln}`.trim();
-
-  if (displayName === ln && ln) {
-    return "last_name";
-  }
-
-  if (displayName === full && full) {
-    return "full_name";
-  }
-
-  return "first_name";
+function computedDisplayName(form: ProfileFormState): string {
+  return resolveDisplayNameFromMode(form.reviewNameMode, form.firstName, form.lastName);
 }
 
-function computedDisplayName(form: ProfileFormState): string {
-  const fn = form.firstName.trim();
-  const ln = form.lastName.trim();
+const COMPANY_FORM_KEYS = [
+  "legalName",
+  "cccNumber",
+  "vatNumber",
+  "street",
+  "streetNumber",
+  "postalCode",
+  "province",
+  "municipality",
+  "contactFirstName",
+  "contactLastName",
+  "phone",
+] as const satisfies readonly (keyof ProfileFormState)[];
 
-  switch (form.reviewNameMode) {
-    case "last_name":
-      return ln;
-    case "full_name":
-      return `${fn} ${ln}`.trim();
-    default:
-      return fn;
-  }
+const INDIVIDUAL_FORM_KEYS = [
+  "firstName",
+  "lastName",
+  "reviewNameMode",
+  "birthDate",
+  "gender",
+  "countryCode",
+  "phone",
+] as const satisfies readonly (keyof ProfileFormState)[];
+
+function normalizeFormValue(value: string) {
+  return value.trim();
+}
+
+function profileFormHasChanges(
+  current: ProfileFormState,
+  baseline: ProfileFormState,
+  isCompany: boolean,
+  hasPendingAvatar: boolean,
+) {
+  if (hasPendingAvatar) return true;
+  if (current.password.trim() || current.confirmPassword.trim()) return true;
+
+  const keys = isCompany ? COMPANY_FORM_KEYS : INDIVIDUAL_FORM_KEYS;
+  return keys.some(
+    (key) => normalizeFormValue(String(current[key] ?? "")) !== normalizeFormValue(String(baseline[key] ?? "")),
+  );
 }
 
 function mapProfileToForm(data: ProfileResponse): ProfileFormState {
@@ -273,12 +295,42 @@ export function useClientProfilePage() {
     setForm((prev) => ({ ...prev, reviewNameMode: mode }));
   };
 
+  const baselineForm = React.useMemo(
+    () => (profile ? mapProfileToForm(profile) : null),
+    [profile],
+  );
+
+  const hasProfileChanges = React.useMemo(() => {
+    if (!baselineForm) return false;
+    return profileFormHasChanges(form, baselineForm, isCompanyProfile, Boolean(pendingAvatarFile));
+  }, [form, baselineForm, isCompanyProfile, pendingAvatarFile]);
+
+  const toggleEditing = React.useCallback(() => {
+    setIsEditing((editing) => {
+      const next = !editing;
+      if (!next && profile) {
+        setForm({
+          ...mapProfileToForm(profile),
+          password: "",
+          confirmPassword: "",
+        });
+        setPendingAvatarFile(null);
+        clearMessages();
+      }
+      return next;
+    });
+  }, [profile, clearMessages]);
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     clearMessages();
 
     if (!profile) {
       setErrorMessage("Profile not found.");
+      return;
+    }
+
+    if (!hasProfileChanges) {
       return;
     }
 
@@ -383,18 +435,22 @@ export function useClientProfilePage() {
     }
   };
 
-  const registerAvatarFile = React.useCallback((file: File | null) => {
-    if (!file) {
-      setPendingAvatarFile(null);
-      return;
-    }
-    if (!isAllowedProfileImageFile(file)) {
-      setErrorMessage(PROFILE_IMAGE_INVALID_MESSAGE);
-      return;
-    }
-    setErrorMessage("");
-    setPendingAvatarFile(file);
-  }, []);
+  const registerAvatarFile = React.useCallback(
+    (file: File | null) => {
+      if (!isEditing) return;
+      if (!file) {
+        setPendingAvatarFile(null);
+        return;
+      }
+      if (!isAllowedProfileImageFile(file)) {
+        setErrorMessage(PROFILE_IMAGE_INVALID_MESSAGE);
+        return;
+      }
+      setErrorMessage("");
+      setPendingAvatarFile(file);
+    },
+    [isEditing],
+  );
 
   const fieldsDisabled = !isEditing;
 
@@ -429,6 +485,8 @@ export function useClientProfilePage() {
     isSaving,
     isEditing,
     setIsEditing,
+    toggleEditing,
+    hasProfileChanges,
     successMessage,
     errorMessage,
     clearMessages,

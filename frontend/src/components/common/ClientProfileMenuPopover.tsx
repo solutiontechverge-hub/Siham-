@@ -7,6 +7,8 @@ import { Avatar, Box, Button, Popover, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { clearPersistedAuthSession } from "../../lib/auth-storage";
 import { useAppDispatch } from "../../store/hooks";
+import { useSnackbar } from "./AppSnackbar";
+import { queueSnackbarFlash } from "../../lib/snackbarFlash";
 import { clearAuthSession } from "../../store/slices/authSlice";
 
 function getInitials(emailOrName?: string) {
@@ -40,11 +42,15 @@ export default function ClientProfileMenuPopover({
   const tokens = theme.palette.mollure;
   const router = useRouter();
   const dispatch = useAppDispatch();
+  const { showSnackbar } = useSnackbar();
 
   const handleLogout = () => {
     onClose();
     dispatch(clearAuthSession());
     clearPersistedAuthSession();
+    const logoutMessage = "Signed out successfully.";
+    queueSnackbarFlash({ severity: "success", message: logoutMessage });
+    showSnackbar({ severity: "success", message: logoutMessage });
     router.push("/auth/login");
   };
 

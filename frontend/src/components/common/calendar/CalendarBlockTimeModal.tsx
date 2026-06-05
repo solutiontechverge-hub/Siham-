@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Box, Button, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import AppDatePicker from "../AppDatePicker";
 import AppDropdown from "../AppDropdown";
 import AppSelect from "../AppSelect";
 import AppTextField from "../AppTextField";
@@ -136,22 +137,23 @@ export default function CalendarBlockTimeModal({
           />
 
           <Stack direction="row" spacing={1.25}>
-            <AppTextField
-              label="Date (from)"
-              type="date"
-              value={draft.dateFrom}
-              onChange={(e) => setDraft((p) => ({ ...p, dateFrom: e.target.value }))}
-              fullWidth
-              InputLabelProps={{ shrink: true }}
-            />
-            <AppTextField
-              label="Date (to)"
-              type="date"
-              value={draft.dateTo}
-              onChange={(e) => setDraft((p) => ({ ...p, dateTo: e.target.value }))}
-              fullWidth
-              InputLabelProps={{ shrink: true }}
-            />
+            <Box sx={{ flex: 1 }}>
+              <AppDatePicker
+                label="Date (from)"
+                value={draft.dateFrom}
+                onChange={(iso) => setDraft((p) => ({ ...p, dateFrom: iso }))}
+                fullWidth
+              />
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <AppDatePicker
+                label="Date (to)"
+                value={draft.dateTo}
+                onChange={(iso) => setDraft((p) => ({ ...p, dateTo: iso }))}
+                min={draft.dateFrom || undefined}
+                fullWidth
+              />
+            </Box>
           </Stack>
 
           <Stack direction="row" spacing={1.25}>

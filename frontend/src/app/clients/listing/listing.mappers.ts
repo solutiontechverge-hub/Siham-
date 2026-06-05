@@ -7,6 +7,7 @@ import {
   ListingImage6,
 } from "../../../../images";
 import type { BusinessSetupListing } from "../../../store/services/businessApi";
+import { resolvePriceTier } from "../../../components/common/listingDrawerFilters";
 import { resolveBusinessOffering } from "./businessPublicProfile.mapper";
 import type { ListingCardData } from "./listing.data";
 
@@ -20,6 +21,51 @@ const FALLBACK_IMAGES = [
 ];
 
 const formatPriceLabel = (price: number) => `Starting From ${Math.round(price)} EUR`;
+
+const slugifyCategoryKey = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_|_$/g, "");
+
+const buildCategoryKeys = (setup: BusinessSetupListing): string[] => {
+  const keys = new Set<string>();
+
+  const add = (raw: string | null | undefined) => {
+    const trimmed = String(raw ?? "").trim();
+    if (!trimmed) return;
+    keys.add(trimmed.toLowerCase());
+    const slug = slugifyCategoryKey(trimmed);
+    if (slug) keys.add(slug);
+  };
+
+  for (const entry of setup.serviceCategories ?? []) {
+    add(entry.category_id as string | undefined);
+    add(entry.categoryId as string | undefined);
+  }
+
+  for (const combo of setup.bookServiceCombinations ?? []) {
+    add(combo.category_id as string | undefined);
+    add(combo.categoryId as string | undefined);
+    add(combo.category_title ?? undefined);
+    add(combo.categoryTitle ?? undefined);
+    add(combo.service_title ?? undefined);
+    add(combo.serviceTitle ?? undefined);
+  }
+
+  for (const detail of setup.serviceDetails ?? []) {
+    add(detail.categoryId ?? undefined);
+    add(detail.categoryTitle ?? undefined);
+    add(detail.serviceTitle ?? undefined);
+  }
+
+  for (const keyword of setup.keywords ?? []) {
+    add(keyword);
+  }
+
+  return [...keys];
+};
 
 const parsePriceRangeMin = (priceRange: string | null | undefined): number | null => {
   if (!priceRange) return null;
@@ -159,6 +205,55 @@ export const mapBusinessSetupToListingCard = (
   const fallbackImage = FALLBACK_IMAGES[index % FALLBACK_IMAGES.length];
   const image = media[0] ?? fallbackImage;
 
+  const lowestDetailPrice = (setup.serviceDetails ?? [])
+    .map((detail) => Number(detail.price))
+    .filter((price) => Number.isFinite(price) && price > 0)
+    .sort((a, b) => a - b)[0];
+
+  const rangeMin = parsePriceRangeMin(setup.priceRange);
+  const lowestPrice = lowestDetailPrice ?? rangeMin ?? 0;
+
+  const categoryIds = new Set(
+    (setup.serviceCategories ?? [])
+      .map((entry) => String(entry.category_id ?? entry.categoryId ?? "").trim())
+      .filter(Boolean),
+  );
+  const combinationCategoryIds = new Set(
+    (setup.bookServiceCombinations ?? [])
+      .map((combo) => String(combo.category_id ?? combo.categoryId ?? "").trim())
+      .filter(Boolean),
+  );
+  const coversAllSelectedCategories =
+    categoryIds.size > 0 && [...categoryIds].every((id) => combinationCategoryIds.has(id));
+
+  const appointmentBefore = setup.appointmentBefore;
+  const hasNoMinTimeslotDl =
+    setup.locationMode === "desired" || setup.locationMode === "both"
+      ? !appointmentBefore?.hours && !appointmentBefore?.minutes
+      : undefined;
+
+  const hasDiscount = businessKeywords.some((keyword) =>
+    /discount|promo|deal|offer|sale/i.test(keyword),
+  );
+
+  const categoryKeys = buildCategoryKeys(setup);
+  const isFixedOrBoth = setup.locationMode === "fixed" || setup.locationMode === "both";
+  const isDesiredOrBoth = setup.locationMode === "desired" || setup.locationMode === "both";
+
+  const filterMeta = {
+    categoryKeys,
+    serviceFor: (setup.serviceFor ?? []).map((v) => String(v).toLowerCase()),
+    lowestPrice,
+    priceTier: resolvePriceTier({ lowestPrice }),
+    hasDiscount,
+    coversAllSelectedCategories,
+    hasNoPrepayment: setup.prepaymentPercentage == null || setup.prepaymentPercentage === 0,
+    hasNoMinTimeslotDl: isDesiredOrBoth
+      ? !appointmentBefore?.hours && !appointmentBefore?.minutes
+      : false,
+    bookSameTimeFl: isFixedOrBoth && (setup.bookServiceCombinations?.length ?? 0) > 1,
+  };
+
   return {
     id: String(setup.id),
     image,
@@ -175,6 +270,7 @@ export const mapBusinessSetupToListingCard = (
     services,
     startingFromLabel: resolveStartingFromLabel(setup, services),
     searchText,
+    ...filterMeta,
   };
 };
 

@@ -137,7 +137,7 @@ export default function ClientBusinessProfilePage() {
         isAuthed
         userLabel={user?.email ?? ""}
         userName={displayName}
-        homeHref="/clients/listing"
+        homeHref="/"
       />
 
       <Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 3.5 } }}>

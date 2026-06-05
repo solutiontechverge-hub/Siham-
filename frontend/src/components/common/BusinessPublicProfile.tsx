@@ -43,8 +43,9 @@ import {
   buildPublicProfileBookingSelection,
   type PublicProfileBookingSelection,
 } from "../../data/publicProfileBookingSelection";
-import ServiceCategorySliderCard from "./ServiceCategorySliderCard";
+import ServiceCategoryBar from "./ServiceCategoryBar";
 import AppDropdown from "./AppDropdown";
+import { serviceMatchesCategoryTab } from "../../data/businessServiceCategorySlider.data";
 
 function toImageSrc(img: unknown) {
   if (!img) return "";
@@ -587,14 +588,19 @@ export default function BusinessPublicProfile({
 
   const scheduleLabel = isDesiredLocation ? "Desired Schedule" : "Fixed Schedule";
 
+  const categoryRecords = React.useMemo(
+    () => data.categories.map((c) => ({ id: c.id, title: c.label })),
+    [data.categories],
+  );
+
   const filteredServices = React.useMemo(() => {
     const q = search.trim().toLowerCase();
     return activeServices.filter((s) => {
-      if (activeCategory !== "all" && s.categoryId !== activeCategory) return false;
+      if (!serviceMatchesCategoryTab(s, activeCategory, data.categories, categoryRecords)) return false;
       if (!q) return true;
       return s.name.toLowerCase().includes(q);
     });
-  }, [activeCategory, activeServices, search]);
+  }, [activeCategory, activeServices, categoryRecords, data.categories, search]);
 
   const selectedServices = React.useMemo(
     () => activeServices.filter((s) => selectedServiceIds[s.id]),
@@ -1021,17 +1027,13 @@ export default function BusinessPublicProfile({
             ) : null
           }
         >
-          <Stack direction="row" spacing={1} sx={{ overflowX: "auto", pb: 0.5, mb: 1.5 }}>
-            {data.categories.map((cat) => (
-              <ServiceCategorySliderCard
-                key={cat.id}
-                label={cat.label}
-                iconId={cat.iconId}
-                active={activeCategory === cat.id}
-                onSelect={() => setActiveCategory(cat.id)}
-              />
-            ))}
-          </Stack>
+          <Box sx={{ mb: 1.5 }}>
+            <ServiceCategoryBar
+              items={data.categories}
+              activeId={activeCategory}
+              onSelect={setActiveCategory}
+            />
+          </Box>
           <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
             <TextField
               size="small"
@@ -1052,9 +1054,10 @@ export default function BusinessPublicProfile({
                 height: 40,
                 flexShrink: 0,
                 borderRadius: "10px",
-                bgcolor: m.teal,
-                color: "#fff",
-                "&:hover": { bgcolor: m.tealDark },
+                bgcolor: m.addSoftBg,
+                color: m.addSoftFg,
+                border: `1px solid ${m.addSoftBorder}`,
+                "&:hover": { bgcolor: m.addSoftBgHover },
               }}
               aria-label="Add service"
             >
@@ -1091,7 +1094,15 @@ export default function BusinessPublicProfile({
                         <RemoveRoundedIcon sx={{ fontSize: 16 }} />
                       </IconButton>
                       <Typography sx={{ width: 22, textAlign: "center", fontSize: 12, fontWeight: 900 }}>{qty}</Typography>
-                      <IconButton size="small" onClick={() => adjustQty(service.id, 1)} disabled={!checked}>
+                      <IconButton
+                        size="small"
+                        onClick={() => adjustQty(service.id, 1)}
+                        disabled={!checked}
+                        sx={{
+                          "&:hover": { bgcolor: m.addSoftBgHover },
+                          "&.Mui-disabled": { color: alpha(m.navy, 0.35) },
+                        }}
+                      >
                         <AddRoundedIcon sx={{ fontSize: 16 }} />
                       </IconButton>
                     </Stack>

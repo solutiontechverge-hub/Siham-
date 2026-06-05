@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import Image from "next/image";
-import StarRoundedIcon from "@mui/icons-material/StarRounded";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Box,
   Button,
@@ -11,19 +11,19 @@ import {
   Chip,
   Container,
   Grid,
-  MenuItem,
   Stack,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Profile as AvatarImage } from "../../../images";
 import type { ClientsLandingData } from "../../app/clients/clients.data";
+import { buildListingSearchHref } from "../../app/clients/listing/listingSearchParams";
 import { clientsShellHeader, type ClientsShellHeaderConfig } from "../../data/marketingShell.data";
 import { getFeatureIcon, useClientsPageTokens } from "../../app/clients/clients.use";
 import MarketingSectionHeading from "./MarketingSectionHeading";
 import MarketingSiteFooter from "./MarketingSiteFooter";
 import MollureMarketingHeader from "./MollureMarketingHeader";
 import { BodyText as Typography } from "../ui/typography";
-import { MollureTextField } from ".";
+import AppMultiSelect from "./AppMultiSelect";
+import TestimonialsCarousel from "./TestimonialsCarousel";
 
 export type ClientsLandingOverrides = {
   header?: Partial<ClientsLandingData["header"]>;
@@ -37,6 +37,7 @@ export type ClientsLandingProps = {
 
 export default function ClientsLanding({ data, overrides }: ClientsLandingProps) {
   const tokens = useClientsPageTokens();
+  const router = useRouter();
 
   const header: ClientsShellHeaderConfig = {
     ...clientsShellHeader,
@@ -46,13 +47,29 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
   const hero = { ...data.hero, ...(overrides?.hero ?? {}) };
   const { whyChooseSection, stepsSection, testimonialsSection, professionalCta, footer } = data;
 
-  const [filterValues, setFilterValues] = React.useState<Record<string, string>>(
-    () =>
-      Object.fromEntries(hero.filters.map((f) => [f.label, ""])) as Record<
-        string,
-        string
-      >,
+  const [filterValues, setFilterValues] = React.useState<Record<string, string[]>>(
+    () => Object.fromEntries(hero.filters.map((f) => [f.label, []])) as Record<string, string[]>,
   );
+
+  const hasSearchSelection = Object.values(filterValues).some((values) => values.length > 0);
+
+  function handleSearch() {
+    if (!hasSearchSelection) return;
+    router.push(buildListingSearchHref(filterValues));
+  }
+
+  const filterFieldSx = {
+    "& .MuiOutlinedInput-root": {
+      height: 44,
+      bgcolor: "#fff",
+      borderRadius: "8px",
+      fontSize: 13,
+      color: tokens.navy,
+      "& fieldset": { borderColor: tokens.inputBorder },
+      "&:hover fieldset": { borderColor: tokens.inputBorderHover },
+      "&.Mui-focused fieldset": { borderColor: tokens.teal, borderWidth: 1 },
+    },
+  };
 
   return (
     <Box sx={{ bgcolor: "background.default", color: tokens.navy }}>
@@ -60,7 +77,7 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
         navItems={[...header.navItems]}
         localeLabel={header.localeLabel}
         loginLabel={header.loginLabel}
-        homeHref="/clients"
+        homeHref="/"
         professionalLinkLabel={header.professionalLinkLabel}
         professionalHref={header.professionalHref}
       />
@@ -118,6 +135,8 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
               {hero.description}
             </Typography>
             <Button
+              component={Link}
+              href={hero.primaryActionHref ?? "/clients/listing"}
               variant="outlined"
               disableElevation
               sx={{
@@ -163,72 +182,34 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
                     >
                       {filter.label}
                     </Typography>
-                    <MollureTextField
-                      select={!!filter.options?.length}
+                    <AppMultiSelect
                       fullWidth
                       size="small"
-                      value={filterValues[filter.label] ?? ""}
-                      onChange={(e) =>
+                      value={filterValues[filter.label] ?? []}
+                      placeholder={filter.placeholder}
+                      options={(filter.options ?? []).map((option) => ({
+                        label: option,
+                        value: option,
+                      }))}
+                      onChange={(next) =>
                         setFilterValues((prev) => ({
                           ...prev,
-                          [filter.label]: e.target.value,
+                          [filter.label]: next,
                         }))
                       }
-                      placeholder={!filter.options?.length ? filter.placeholder : undefined}
-                      SelectProps={{
-                        displayEmpty: true,
-                        MenuProps: {
-                          MenuListProps: {
-                            sx: {
-                              py: 0,
-                              "& .MuiMenuItem-root:not(:last-child)": {
-                                borderBottom: `1px solid ${tokens.border}`,
-                              },
-                            },
-                          },
-                          PaperProps: {
-                            sx: {
-                              mt: 1,
-                              borderRadius: 2,
-                              border: `1px solid ${tokens.border}`,
-                              boxShadow: "0 18px 44px rgba(16, 24, 40, 0.14)",
-                            },
-                          },
-                        },
-                      }}
-                      sx={{
-                        "& .MuiOutlinedInput-root": {
-                          height: 44,
-                          bgcolor: "#fff",
-                          borderRadius: "8px",
-                          fontSize: 13,
-                          color: tokens.navy,
-                          "& fieldset": { borderColor: tokens.inputBorder },
-                          "&:hover fieldset": { borderColor: tokens.inputBorderHover },
-                          "&.Mui-focused fieldset": { borderColor: tokens.teal, borderWidth: 1 },
-                        },
-                        "& input::placeholder": { color: tokens.placeholder, opacity: 1 },
-                      }}
-                    >
-                      {filter.options?.length ? (
-                        <MenuItem value="" sx={{ color: tokens.placeholder, fontStyle: "italic" }}>
-                          {filter.placeholder}
-                        </MenuItem>
-                      ) : null}
-                      {filter.options?.map((option) => (
-                        <MenuItem key={option} value={option}>
-                          {option}
-                        </MenuItem>
-                      ))}
-                    </MollureTextField>
+                      sx={filterFieldSx}
+                    />
                   </Grid>
                 ))}
 
                 <Grid item xs={12} sm={6} md={3}>
                   <Button
+                    type="button"
+                    onClick={handleSearch}
                     fullWidth
                     variant="contained"
                     disableElevation
+                    disabled={!hasSearchSelection}
                     sx={{
                       height: 44,
                       borderRadius: "10px",
@@ -237,6 +218,10 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
                       bgcolor: tokens.teal,
                       color: "#fff",
                       "&:hover": { bgcolor: tokens.tealDark },
+                      "&.Mui-disabled": {
+                        bgcolor: alpha(tokens.teal, 0.35),
+                        color: alpha("#fff", 0.85),
+                      },
                     }}
                   >
                     {hero.searchAction}
@@ -329,49 +314,12 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
         </Grid>
       </Container>
 
-      <Container maxWidth="lg" sx={{ py: { xs: 7, md: 9 } }}>
-        <MarketingSectionHeading title={testimonialsSection.title} mb={4} />
-        <Grid container spacing={2.5}>
-          {testimonialsSection.items.map((testimonial) => (
-            <Grid item xs={12} sm={6} md={4} lg={3} key={testimonial.id}>
-              <Card sx={{ height: "100%", borderRadius: 3, border: `1px solid ${tokens.border}`, bgcolor: "#fff", overflow: "hidden", boxShadow: "0 14px 28px rgba(16, 24, 40, 0.08)" }}>
-                <CardContent sx={{ p: 0 }}>
-                  <Box sx={{ bgcolor: "rgba(33, 184, 191, 0.10)", px: 2, pt: 2, pb: 3, position: "relative" }}>
-                    <Stack direction="row" spacing={1.5} alignItems="center">
-                      <Box sx={{ width: 56, height: 56, borderRadius: 2, bgcolor: "#fff", border: `1px solid ${tokens.border}`, overflow: "hidden", flexShrink: 0 }}>
-                        <Image src={AvatarImage} alt={testimonial.name} width={56} height={56} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      </Box>
-                      <Box sx={{ minWidth: 0 }}>
-                        <Typography sx={{ fontWeight: 800, color: tokens.navy, fontSize: 14, lineHeight: 1.2 }}>
-                          {testimonial.name}
-                        </Typography>
-                        <Typography sx={{ fontSize: 12, color: tokens.bodyText, lineHeight: 1.25 }}>
-                          {testimonial.role}
-                        </Typography>
-                        <Typography sx={{ fontSize: 12, color: tokens.slate, lineHeight: 1.25 }}>
-                          TheWebagency
-                        </Typography>
-                      </Box>
-                    </Stack>
-                    <Box sx={{ position: "absolute", bottom: -14, left: "50%", transform: "translateX(-50%)" }}>
-                      <Stack direction="row" spacing={0.3} sx={{ px: 1.5, py: 0.55, borderRadius: 999, bgcolor: "#fff", border: `1px solid ${tokens.border}`, boxShadow: "0 4px 10px rgba(0,0,0,0.08)" }}>
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <StarRoundedIcon key={i} sx={{ fontSize: 16, color: tokens.star }} />
-                        ))}
-                      </Stack>
-                    </Box>
-                  </Box>
-                  <Box sx={{ px: 2.5, pt: 3.75, pb: 2.5, textAlign: "center" }}>
-                    <Typography sx={{ fontSize: 13, color: tokens.slate, lineHeight: 1.7 }}>
-                      {testimonial.text}
-                    </Typography>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
-      </Container>
+      <Box sx={{ bgcolor: tokens.surface, py: { xs: 7, md: 9 } }}>
+        <Container maxWidth="lg">
+          <MarketingSectionHeading title={testimonialsSection.title} mb={4} />
+          <TestimonialsCarousel items={[...testimonialsSection.items]} />
+        </Container>
+      </Box>
 
       <Box sx={{ bgcolor: tokens.teal, py: { xs: 7, md: 8 } }}>
         <Container maxWidth="md">

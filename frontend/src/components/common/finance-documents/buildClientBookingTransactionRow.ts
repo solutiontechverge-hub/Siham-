@@ -1,4 +1,5 @@
 import type {
+  TransactionClientType,
   TransactionDocument,
   TransactionRow,
 } from "../../../app/professionals/fixed-location/finance/data/transactions";
@@ -38,6 +39,9 @@ export type BuildClientBookingTransactionRowInput = {
   financeSettings: FinanceInvoiceSettings;
   /** When set (e.g. prepayment receipt), document total uses this amount. */
   documentAmount?: number;
+  clientType?: TransactionClientType;
+  methodTitle?: string;
+  methodDetail?: string;
 };
 
 export function buildClientBookingTransactionRow({
@@ -47,6 +51,9 @@ export function buildClientBookingTransactionRow({
   requesterEmail,
   financeSettings,
   documentAmount,
+  clientType = "mollure",
+  methodTitle = "Online - Direct",
+  methodDetail = "Stripe",
 }: BuildClientBookingTransactionRowInput): TransactionRow {
   const serviceDate = draft.selectedDateISO || new Date().toISOString().slice(0, 10);
   const invoiceDate = new Date().toISOString().slice(0, 10);
@@ -98,9 +105,10 @@ export function buildClientBookingTransactionRow({
     entryLabel: "Booking",
     clientName: requesterName,
     clientEmail: requesterEmail ?? "",
+    clientType,
     netAmount: totalPriceLabel,
-    methodTitle: "Online Direct",
-    methodDetail: "",
+    methodTitle,
+    methodDetail,
     status: "Paid",
     document,
   };

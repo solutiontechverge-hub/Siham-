@@ -10,6 +10,7 @@ export const listAllBusinessSetups = async (_req, res) => {
     const setupsResult = await query(
       `SELECT bs.*
        FROM business_setups bs
+       WHERE bs.is_active = true
        ORDER BY bs.updated_at DESC, bs.id DESC`,
     );
 

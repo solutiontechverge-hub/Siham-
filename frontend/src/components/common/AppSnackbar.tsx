@@ -1,9 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { Alert, Snackbar } from "@mui/material";
+import { usePathname } from "next/navigation";
+import { clearSnackbarFlash, peekSnackbarFlash } from "../../lib/snackbarFlash";
+import MollureSnackbar from "./MollureSnackbar";
+import type { MollureSnackbarSeverity } from "../../theme/mollureSnackbar";
 
-export type SnackbarSeverity = "success" | "info" | "warning" | "error";
+export type SnackbarSeverity = MollureSnackbarSeverity;
 
 export type ShowSnackbarOptions = {
   message: React.ReactNode;
@@ -15,6 +18,8 @@ type SnackbarState = Required<Pick<ShowSnackbarOptions, "severity">> &
   Pick<ShowSnackbarOptions, "message"> & {
     open: boolean;
     autoHideDurationMs: number;
+    /** Bumps when a new snackbar is requested so repeat messages still show */
+    token: number;
   };
 
 type SnackbarContextValue = {
@@ -30,26 +35,57 @@ export function useSnackbar() {
   return ctx;
 }
 
+function buildSnackbarState(
+  options: ShowSnackbarOptions,
+  token: number,
+  open = true,
+): SnackbarState {
+  return {
+    open,
+    message: options.message,
+    severity: options.severity ?? "info",
+    autoHideDurationMs: options.autoHideDurationMs ?? 4000,
+    token,
+  };
+}
+
 export function AppSnackbarProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = React.useState<SnackbarState>({
-    open: false,
-    message: "",
-    severity: "info",
-    autoHideDurationMs: 4000,
-  });
+  const pathname = usePathname();
+  const tokenRef = React.useRef(0);
+  const [state, setState] = React.useState<SnackbarState>(() =>
+    buildSnackbarState({ message: "" }, 0, false),
+  );
 
   const showSnackbar = React.useCallback((options: ShowSnackbarOptions) => {
-    setState({
-      open: true,
-      message: options.message,
-      severity: options.severity ?? "info",
-      autoHideDurationMs: options.autoHideDurationMs ?? 4000,
-    });
+    tokenRef.current += 1;
+    setState(buildSnackbarState(options, tokenRef.current, true));
   }, []);
 
   const closeSnackbar = React.useCallback(() => {
     setState((s) => ({ ...s, open: false }));
   }, []);
+
+  const consumeFlash = React.useCallback(() => {
+    const flash = peekSnackbarFlash();
+    if (!flash) return;
+    showSnackbar({
+      message: flash.message,
+      severity: flash.severity,
+      autoHideDurationMs: flash.autoHideDurationMs,
+    });
+    clearSnackbarFlash();
+  }, [showSnackbar]);
+
+  // After login/logout navigation
+  React.useLayoutEffect(() => {
+    consumeFlash();
+  }, [pathname, consumeFlash]);
+
+  // First paint on destination route (covers fast navigations)
+  React.useEffect(() => {
+    const id = window.requestAnimationFrame(() => consumeFlash());
+    return () => window.cancelAnimationFrame(id);
+  }, [consumeFlash]);
 
   const value = React.useMemo<SnackbarContextValue>(
     () => ({ showSnackbar, closeSnackbar }),
@@ -59,17 +95,14 @@ export function AppSnackbarProvider({ children }: { children: React.ReactNode })
   return (
     <SnackbarContext.Provider value={value}>
       {children}
-      <Snackbar
+      <MollureSnackbar
+        key={state.token}
         open={state.open}
+        message={state.message}
+        severity={state.severity}
         onClose={closeSnackbar}
         autoHideDuration={state.autoHideDurationMs}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-      >
-        <Alert onClose={closeSnackbar} severity={state.severity} variant="filled" sx={{ width: "100%" }}>
-          {state.message}
-        </Alert>
-      </Snackbar>
+      />
     </SnackbarContext.Provider>
   );
 }
-

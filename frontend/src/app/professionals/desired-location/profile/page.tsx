@@ -62,11 +62,7 @@ export default function DesiredLocationProfilePage() {
         }}
         onSaveBusinessSetup={async (payload) => {
           try {
-            const result = await upsertBusinessSetup(payload).unwrap();
-            showSnackbar({
-              severity: "success",
-              message: result.message || "Business setup updated successfully.",
-            });
+            await upsertBusinessSetup(payload).unwrap();
           } catch (error) {
             showSnackbar({
               severity: "error",
