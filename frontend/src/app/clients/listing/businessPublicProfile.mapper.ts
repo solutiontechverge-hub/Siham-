@@ -250,8 +250,8 @@ function buildProfileServices(setup: BusinessSetupListing): BusinessPublicProfil
     return fromDetails;
   }
 
-  return (setup.serviceCategories ?? [])
-    .map((entry, index) => {
+  const fromCategories = (setup.serviceCategories ?? [])
+    .map((entry, index): BusinessPublicProfileService | null => {
       const serviceId = String(entry.service_id ?? entry.serviceId ?? "").trim();
       const categoryId = String(entry.category_id ?? entry.categoryId ?? "").trim() || "services";
       const categoryTitle = String(
@@ -279,11 +279,13 @@ function buildProfileServices(setup: BusinessSetupListing): BusinessPublicProfil
         priceLabel: formatPriceLabel(amount),
         priceValue: amount,
         durationMins: parseDurationMins(durationLabel),
-        categoryTitle: categoryTitle || undefined,
       };
     })
-    .filter((service): service is BusinessPublicProfileService & { categoryTitle?: string } => service !== null)
-    .map(({ categoryTitle: _categoryTitle, ...service }) => service);
+    .filter((service): service is BusinessPublicProfileService => service !== null);
+
+  if (fromCategories.length > 0) {
+    return fromCategories;
+  }
 
   return buildServicesFromTeamAssignments(setup);
 }
@@ -346,7 +348,7 @@ function buildBookCombos(setup: BusinessSetupListing): BusinessPublicProfileBook
       const serviceId = Number(combo.service_id ?? combo.serviceId);
       const detail = findServiceDetail(setup, serviceId);
       const durationLabel =
-        durationByServiceId.get(serviceId) || detail?.durationLabel?.trim() || "";
+        durationByServiceId.get(String(serviceId)) || detail?.durationLabel?.trim() || "";
       const priceValue = detail?.price != null ? Number(detail.price) : 0;
 
       return {

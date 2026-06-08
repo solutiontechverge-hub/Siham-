@@ -2,7 +2,7 @@ import type { TransactionRow } from "../../../app/professionals/fixed-location/f
 
 /** Registered Mollure clients — invoice client fields are read-only. */
 export function isMollureFinanceClient(row: TransactionRow | null | undefined): boolean {
-  return Boolean(row?.member);
+  return row?.clientType === "mollure";
 }
 
 export function canEditFinanceInvoiceClient(row: TransactionRow | null | undefined): boolean {

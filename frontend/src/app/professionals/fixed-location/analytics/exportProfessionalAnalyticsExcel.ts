@@ -266,25 +266,89 @@ function appendPerformanceSheets(workbook: XLSX.WorkBook, data: ProfessionalFixe
 }
 
 function appendRatingReviewSheets(workbook: XLSX.WorkBook, data: ProfessionalFixedLocationAnalyticsData) {
-  const reviews = data.ratingReview.excellentReviews;
+  const { ratingReview } = data;
 
   XLSX.utils.book_append_sheet(
     workbook,
     buildTableSheet(
-      reviews.title,
-      ["Reviewer", "When", "Rating", "Review", "Tags", "Reply Author", "Reply"],
-      reviews.reviews.map((r) => [
-        r.reviewerName,
-        r.relativeTimeLabel,
-        String(r.rating),
-        r.reviewText,
-        r.tags.map((t) => t.label).join(", "),
-        r.reply?.authorName ?? "",
-        r.reply?.message ?? "",
+      ratingReview.reviewManagementOverview.title,
+      ["Overall Rating", "Rating Out Of", "Total Reviews"],
+      [[
+        String(ratingReview.reviewManagementOverview.overallRating),
+        String(ratingReview.reviewManagementOverview.ratingOutOf),
+        String(ratingReview.reviewManagementOverview.totalReviews),
+      ]],
+    ),
+    sanitizeSheetName(ratingReview.reviewManagementOverview.title),
+  );
+
+  XLSX.utils.book_append_sheet(
+    workbook,
+    buildTableSheet(
+      ratingReview.ratingReviewAnalytics.title,
+      ["Category", "Range", "Count", "Share (%)", "Replied To"],
+      ratingReview.ratingReviewAnalytics.rows.map((r) => [
+        r.category,
+        r.range,
+        String(r.count),
+        formatPct(r.sharePct),
+        String(r.repliedTo),
       ]),
     ),
-    sanitizeSheetName(reviews.title),
+    sanitizeSheetName(ratingReview.ratingReviewAnalytics.title),
   );
+
+  XLSX.utils.book_append_sheet(
+    workbook,
+    buildTableSheet(
+      ratingReview.ratingDistributionByCategory.title,
+      ["Category", "Bad (%)", "Good (%)", "Excellent (%)", "Total Reviews"],
+      ratingReview.ratingDistributionByCategory.rows.map((r) => [
+        r.category,
+        formatPct(r.badPct),
+        formatPct(r.goodPct),
+        formatPct(r.excellentPct),
+        String(r.totalReviews),
+      ]),
+    ),
+    sanitizeSheetName(ratingReview.ratingDistributionByCategory.title),
+  );
+
+  XLSX.utils.book_append_sheet(
+    workbook,
+    buildTableSheet(
+      ratingReview.reviewSummaryByCategory.title,
+      ["Category", "Total Reviews", "Bad (%)", "Good (%)", "Excellent (%)"],
+      ratingReview.reviewSummaryByCategory.bars.map((r) => [
+        r.category,
+        String(r.totalReviews),
+        formatPct(r.badPct),
+        formatPct(r.goodPct),
+        formatPct(r.excellentPct),
+      ]),
+    ),
+    sanitizeSheetName(ratingReview.reviewSummaryByCategory.title),
+  );
+
+  for (const [category, reviews] of Object.entries(ratingReview.reviewsByCategory)) {
+    XLSX.utils.book_append_sheet(
+      workbook,
+      buildTableSheet(
+        `${category} Reviews`,
+        ["Reviewer", "When", "Rating", "Review", "Tags", "Reply Author", "Reply"],
+        reviews.map((r) => [
+          r.reviewerName,
+          r.relativeTimeLabel,
+          String(r.rating),
+          r.reviewText,
+          r.tags.map((t) => t.label).join(", "),
+          r.reply?.authorName ?? "",
+          r.reply?.message ?? "",
+        ]),
+      ),
+      sanitizeSheetName(`${category} Reviews`),
+    );
+  }
 }
 
 export function exportProfessionalAnalyticsToExcel({

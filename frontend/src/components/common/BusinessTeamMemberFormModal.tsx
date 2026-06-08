@@ -15,10 +15,10 @@ import {
   buildTeamServiceOptionsForCategory,
   businessTeamMemberModalCopy,
   formatTeamMemberGroupLabel,
-  type BusinessCategoryLike,
   type TeamMemberFormDraft,
   type TeamMemberModalServiceContext,
 } from "../../data/businessTeamMemberModal.data";
+import type { BusinessCategoryLike } from "../../data/businessServiceCategorySlider.data";
 import {
   isAllowedProfileImageFile,
   PROFILE_IMAGE_FILE_ACCEPT,
@@ -237,7 +237,7 @@ export default function BusinessTeamMemberFormModal({
                 onChange={(e) => onChange({ categoryId: String(e.target.value), serviceId: "" })}
                 disabled={disabled}
                 fullWidth
-                displayEmpty
+                SelectProps={{ displayEmpty: true }}
                 sx={fieldInputSx}
               >
                 <MenuItem value="">
@@ -260,7 +260,7 @@ export default function BusinessTeamMemberFormModal({
                 onChange={(e) => onChange({ serviceId: String(e.target.value) })}
                 disabled={disabled || !draft.categoryId}
                 fullWidth
-                displayEmpty
+                SelectProps={{ displayEmpty: true }}
                 sx={fieldInputSx}
               >
                 <MenuItem value="">

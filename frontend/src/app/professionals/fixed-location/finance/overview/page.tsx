@@ -499,7 +499,7 @@ export default function FinanceOverviewPage() {
           Export
         </ListSubheader>
         {ADD_EXPORT_ITEMS.map((opt) =>
-          opt.hasSubmenu ? (
+          "hasSubmenu" in opt && opt.hasSubmenu ? (
             <MenuItem
               key={opt.id}
               onMouseEnter={(e) => openOverviewExportMenu(e.currentTarget)}

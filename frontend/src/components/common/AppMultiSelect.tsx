@@ -55,16 +55,11 @@ export default function AppMultiSelect({
         }
         onChange([]);
       }}
-      renderValue={
-        renderValue ??
-        ((selected) =>
-          formatMultiSelectValue(
-            Array.isArray(selected) ? selected : [],
-            options,
-            placeholder,
-            maxLabelsShown,
-          ))
-      }
+      renderValue={(selected) => {
+        const values = Array.isArray(selected) ? selected : selected ? [selected] : [];
+        if (renderValue) return renderValue(values);
+        return formatMultiSelectValue(values, options, placeholder, maxLabelsShown);
+      }}
       {...props}
     />
   );
