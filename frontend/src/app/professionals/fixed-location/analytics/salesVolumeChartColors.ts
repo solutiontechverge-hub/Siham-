@@ -1,4 +1,6 @@
-import type { MollurePalette } from "../../../../theme/mui";
+import type { Palette } from "@mui/material/styles";
+
+type MollurePalette = Palette["mollure"];
 
 /** Mollure brand teal stack: dark → pale (matches Figma & theme.palette.mollure). */
 export function getSalesVolumeChartColors(m: MollurePalette): readonly string[] {

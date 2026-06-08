@@ -120,7 +120,7 @@ export default function ServiceCategoryBar({
         <Swiper
           className="service-category-swiper"
           modules={[Navigation]}
-          onBeforeInit={(swiper) => {
+          onBeforeInit={(swiper: SwiperInstance) => {
             // Swiper needs actual elements for navigation on init.
             // eslint-disable-next-line no-param-reassign
             swiper.params.navigation =
@@ -134,7 +134,7 @@ export default function ServiceCategoryBar({
             navigation.prevEl = prevRef.current;
             navigation.nextEl = nextRef.current;
           }}
-          onSwiper={(swiper) => {
+          onSwiper={(swiper: SwiperInstance) => {
             swiperRef.current = swiper;
           }}
           navigation
