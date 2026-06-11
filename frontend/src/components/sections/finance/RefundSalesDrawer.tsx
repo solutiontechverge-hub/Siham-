@@ -3,7 +3,6 @@
 import * as React from "react";
 import {
   Box,
-  Button,
   Checkbox,
   InputAdornment,
   Stack,
@@ -12,7 +11,8 @@ import {
 import { alpha, useTheme } from "@mui/material/styles";
 import type { TransactionRow } from "../../../app/professionals/fixed-location/finance/data/transactions";
 import AppSegmentTabs from "../../common/AppSegmentTabs";
-import MollureDrawer from "../../common/MollureDrawer";
+import FinanceDrawer from "../../common/FinanceDrawer";
+import { FinanceDrawerActionsFooter } from "../../common/FinanceDrawerFooter";
 import MollureFormField from "../../common/MollureFormField";
 import { BodyText } from "../../ui/typography";
 import {
@@ -117,57 +117,21 @@ export default function RefundSalesDrawer({ open, onClose, transactions, onSave 
     setSelectedItemIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
-  const footer = (
-    <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ px: 2.5, py: 2 }}>
-      <Button
-        onClick={onClose}
-        variant="outlined"
-        sx={{
-          borderRadius: "8px",
-          textTransform: "none",
-          fontWeight: 800,
-          borderColor: alpha(m.navy, 0.14),
-          color: alpha(m.navy, 0.72),
-          bgcolor: "#fff",
-          height: 36,
-          px: 2.25,
-          minWidth: 92,
-        }}
-      >
-        Cancel
-      </Button>
-      <Button
-        variant="contained"
-        disableElevation
-        onClick={() => {
-          onSave?.();
-          onClose();
-        }}
-        sx={{
-          borderRadius: "8px",
-          textTransform: "none",
-          fontWeight: 900,
-          bgcolor: m.teal,
-          "&:hover": { bgcolor: m.tealDark },
-          height: 36,
-          px: 2.25,
-          minWidth: 92,
-        }}
-      >
-        Save
-      </Button>
-    </Stack>
-  );
-
   return (
-    <MollureDrawer
-      anchor="right"
+    <FinanceDrawer
       open={open}
       onClose={onClose}
       title="Refund Sales"
-      width={{ xs: "100%", sm: 500 }}
-      contentSx={{ bgcolor: alpha(m.navy, 0.03), px: 2.25, py: 2 }}
-      footer={footer}
+      footer={
+        <FinanceDrawerActionsFooter
+          onCancel={onClose}
+          primaryLabel="Save"
+          onPrimary={() => {
+            onSave?.();
+            onClose();
+          }}
+        />
+      }
     >
       <Stack spacing={2}>
         <AppSegmentTabs
@@ -289,6 +253,6 @@ export default function RefundSalesDrawer({ open, onClose, transactions, onSave 
           </Stack>
         )}
       </Stack>
-    </MollureDrawer>
+    </FinanceDrawer>
   );
 }

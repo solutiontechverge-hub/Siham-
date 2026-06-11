@@ -8,10 +8,11 @@ import { BodyText } from "../ui/typography";
 import {
   exportProfessionalAnalyticsToExcel,
   validateAnalyticsExportDates,
-  type ProfessionalAnalyticsExportScope,
+  type ProfessionalAnalyticsExportSelection,
 } from "../../app/professionals/fixed-location/analytics/exportProfessionalAnalyticsExcel";
+import AnalyticsSectionExplanation from "./AnalyticsSectionExplanation";
 import MollureCardHeader from "./MollureCardHeader";
-import ExportMenuPopover from "./ExportMenuPopover";
+import ExportMenuPopover, { type ExportMenuOption } from "./ExportMenuPopover";
 import AppDatePicker from "./AppDatePicker";
 import ProfessionalFixedLocationSalesVolumeAnalytics from "./ProfessionalFixedLocationSalesVolumeAnalytics";
 import ProfessionalFixedLocationPerformanceAnalytics from "./ProfessionalFixedLocationPerformanceAnalytics";
@@ -19,12 +20,10 @@ import ProfessionalFixedLocationRatingReviewAnalytics from "./ProfessionalFixedL
 import type {
   AttendanceNoShowRow,
   BookingByServiceCategoryRow,
-  BookingByClientTypeRow,
   BookingOriginRow,
   BookingStatusSummaryRow,
   ProfessionalAnalyticsSubTab,
   ProfessionalFixedLocationAnalyticsData,
-  ReschedulingSummaryRow,
 } from "../../app/professionals/fixed-location/analytics/analytics.data";
 import { useSnackbar } from "./AppSnackbar";
 
@@ -353,148 +352,6 @@ function AttendanceNoShowAnalyticsTable({ rows }: { rows: readonly AttendanceNoS
   );
 }
 
-function ReschedulingSummaryTable({ rows }: { rows: readonly ReschedulingSummaryRow[] }) {
-  const theme = useTheme();
-  const m = theme.palette.mollure;
-
-  const headers = ["Category", "Count"] as const;
-
-  return (
-    <TableContainer
-      component={Paper}
-      elevation={0}
-      sx={{
-        borderRadius: "10px",
-        border: `1px solid ${alpha(m.navy, 0.1)}`,
-        overflow: "hidden",
-      }}
-    >
-      <Table size="small">
-        <TableHead>
-          <TableRow sx={{ bgcolor: alpha(m.navy, 0.03) }}>
-            {headers.map((h) => (
-              <TableCell
-                key={h}
-                sx={{
-                  py: 1.2,
-                  borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
-                }}
-              >
-                <BodyText component="span" sx={{ fontSize: 11.5, fontWeight: 800, color: alpha(m.navy, 0.62) }}>
-                  {h}
-                </BodyText>
-              </TableCell>
-            ))}
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {rows.map((r) => {
-            const isTotal = Boolean(r.isTotal);
-            const cellSx = {
-              borderBottom: `1px solid ${alpha(m.navy, 0.06)}`,
-              py: 1.1,
-            } as const;
-            const textSx = {
-              fontSize: 12.5,
-              fontWeight: isTotal ? 900 : 700,
-              color: alpha(m.navy, isTotal ? 0.78 : 0.7),
-            } as const;
-
-            return (
-              <TableRow key={r.category} hover sx={{ "& td": { borderBottom: `1px solid ${alpha(m.navy, 0.06)}` } }}>
-                <TableCell sx={cellSx}>
-                  <BodyText component="span" sx={textSx}>
-                    {r.category}
-                  </BodyText>
-                </TableCell>
-                <TableCell sx={cellSx}>
-                  <BodyText component="span" sx={textSx}>
-                    {r.count}
-                  </BodyText>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </TableContainer>
-  );
-}
-
-function BookingByClientTypeTable({ rows }: { rows: readonly BookingByClientTypeRow[] }) {
-  const theme = useTheme();
-  const m = theme.palette.mollure;
-
-  const headers = ["Client Type", "Count", "Share (%)"] as const;
-
-  return (
-    <TableContainer
-      component={Paper}
-      elevation={0}
-      sx={{
-        borderRadius: "10px",
-        border: `1px solid ${alpha(m.navy, 0.1)}`,
-        overflow: "hidden",
-      }}
-    >
-      <Table size="small">
-        <TableHead>
-          <TableRow sx={{ bgcolor: alpha(m.navy, 0.03) }}>
-            {headers.map((h) => (
-              <TableCell
-                key={h}
-                sx={{
-                  py: 1.2,
-                  borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
-                }}
-              >
-                <BodyText component="span" sx={{ fontSize: 11.5, fontWeight: 800, color: alpha(m.navy, 0.62) }}>
-                  {h}
-                </BodyText>
-              </TableCell>
-            ))}
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {rows.map((r) => {
-            const isTotal = Boolean(r.isTotal);
-            const cellSx = {
-              borderBottom: `1px solid ${alpha(m.navy, 0.06)}`,
-              py: 1.1,
-            } as const;
-            const textSx = {
-              fontSize: 12.5,
-              fontWeight: isTotal ? 900 : 700,
-              color: alpha(m.navy, isTotal ? 0.78 : 0.7),
-              whiteSpace: "normal",
-            } as const;
-
-            return (
-              <TableRow key={r.clientType} hover sx={{ "& td": { borderBottom: `1px solid ${alpha(m.navy, 0.06)}` } }}>
-                <TableCell sx={cellSx}>
-                  <BodyText component="span" sx={textSx}>
-                    {r.clientType}
-                  </BodyText>
-                </TableCell>
-                <TableCell sx={cellSx}>
-                  <BodyText component="span" sx={textSx}>
-                    {r.count}
-                  </BodyText>
-                </TableCell>
-                <TableCell sx={cellSx}>
-                  <BodyText component="span" sx={textSx}>
-                    {r.sharePct.toFixed(1)}%
-                  </BodyText>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </TableContainer>
-  );
-}
-
 function BookingByServiceCategoryTable({ rows }: { rows: readonly BookingByServiceCategoryRow[] }) {
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -577,6 +434,7 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
   const [fromDate, setFromDate] = React.useState("");
   const [toDate, setToDate] = React.useState("");
   const [exportAnchor, setExportAnchor] = React.useState<HTMLElement | null>(null);
+  const [exportSelection, setExportSelection] = React.useState<ProfessionalAnalyticsExportSelection>("all");
   const exportMenuOpen = Boolean(exportAnchor);
 
   const router = useRouter();
@@ -604,21 +462,24 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
   const section11 = data.sections.bookingOriginAndType;
   const section12 = data.sections.bookingStatusSummary;
   const section13 = data.sections.attendanceNoShowAnalytics;
-  const section14 = data.sections.reschedulingSummary;
-  const section15 = data.sections.bookingByClientType;
   const section16 = data.sections.bookingByServiceCategory;
 
   const exportExcel = React.useCallback(
-    (scope: ProfessionalAnalyticsExportScope) => {
+    (scope: ProfessionalAnalyticsExportSelection) => {
       const validation = validateAnalyticsExportDates(fromDate, toDate, todayIso);
       if (!validation.ok) {
         showSnackbar({ severity: "warning", message: validation.message });
         return;
       }
 
+      if (Array.isArray(scope) && scope.length === 0) {
+        showSnackbar({ severity: "warning", message: "Please select at least one analytics page to export." });
+        return;
+      }
+
       try {
         exportProfessionalAnalyticsToExcel({ data, scope, fromDate, toDate });
-        const label = scope === "all" ? "all analytics" : scope;
+        const label = scope === "all" ? "all analytics" : Array.isArray(scope) ? `${scope.length} analytics pages` : scope;
         showSnackbar({
           severity: "success",
           message: `Downloaded ${label} as Excel.`,
@@ -632,14 +493,43 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
 
   const exportOptions = React.useMemo(
     () => [
-      { id: "all", label: "All" },
-      { id: "Booking and Operational Analytics", label: "Booking and Operational Analytics" },
-      { id: "Sales Volume Analytics", label: "Sales Volume Analytics" },
-      { id: "Performance Analytics", label: "Performance Analytics" },
-      { id: "Rating and Review Analytics", label: "Rating and Review Analytics" },
+      { id: "Booking and Operational Analytics", label: "Booking and Operational" },
+      { id: "Sales Volume Analytics", label: "Sales Volume" },
+      { id: "Performance Analytics", label: "Performance" },
+      { id: "Rating and Review Analytics", label: "Rating and Review" },
     ] as const,
     [],
   );
+
+  const selectedExportIds = React.useMemo(
+    () => (Array.isArray(exportSelection) ? exportSelection : []),
+    [exportSelection],
+  );
+  const allExportSelected = exportSelection === "all";
+
+  function selectAllExports() {
+    setExportSelection("all");
+    setExportAnchor(null);
+    exportExcel("all");
+  }
+
+  function toggleExportOption(opt: ExportMenuOption) {
+    const scope = opt.id as ProfessionalAnalyticsSubTab;
+    setExportSelection((current) => {
+      if (current === "all") {
+        return [scope];
+      }
+      const currentScopes = Array.isArray(current) ? current : [current];
+      return currentScopes.includes(scope)
+        ? currentScopes.filter((item: ProfessionalAnalyticsSubTab) => item !== scope)
+        : [...currentScopes, scope];
+    });
+  }
+
+  function downloadSelectedExports() {
+    setExportAnchor(null);
+    exportExcel(exportSelection);
+  }
 
   return (
     <Paper
@@ -717,10 +607,11 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
               open={exportMenuOpen}
               onClose={() => setExportAnchor(null)}
               options={exportOptions}
-              onSelect={(opt) => {
-                setExportAnchor(null);
-                exportExcel(opt.id as ProfessionalAnalyticsExportScope);
-              }}
+              selectedIds={selectedExportIds}
+              allSelected={allExportSelected}
+              onSelectAll={selectAllExports}
+              onToggle={toggleExportOption}
+              onDownloadSelected={downloadSelectedExports}
             />
           </Stack>
         </Paper>
@@ -748,28 +639,12 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
           <Box sx={{ px: 2.25, pb: 2.25 }}>
             <BookingOriginAndTypeTable rows={section11.rows} />
 
-            <BodyText
-              component="button"
-              type="button"
-              onClick={() => {
-                // placeholder for explanation dialog/drawer
-                void 0;
-              }}
-              sx={{
-                mt: 1.75,
-                p: 0,
-                border: 0,
-                bgcolor: "transparent",
-                cursor: "pointer",
-                color: m.teal,
-                fontSize: 12.5,
-                fontWeight: 800,
-                textDecoration: "underline",
-                "&:hover": { color: m.tealDark },
-              }}
-            >
-              {section11.explanationLabel}
-            </BodyText>
+            {section11.explanationContent ? (
+              <AnalyticsSectionExplanation
+                label={section11.explanationLabel}
+                content={section11.explanationContent}
+              />
+            ) : null}
           </Box>
 
           <Box sx={{ px: 2.25, pb: 2.25 }}>
@@ -779,27 +654,12 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
 
             <BookingStatusSummaryTable rows={section12.rows} />
 
-            <BodyText
-              component="button"
-              type="button"
-              onClick={() => {
-                void 0;
-              }}
-              sx={{
-                mt: 1.75,
-                p: 0,
-                border: 0,
-                bgcolor: "transparent",
-                cursor: "pointer",
-                color: m.teal,
-                fontSize: 12.5,
-                fontWeight: 800,
-                textDecoration: "underline",
-                "&:hover": { color: m.tealDark },
-              }}
-            >
-              {section12.explanationLabel}
-            </BodyText>
+            {section12.explanationContent ? (
+              <AnalyticsSectionExplanation
+                label={section12.explanationLabel}
+                content={section12.explanationContent}
+              />
+            ) : null}
           </Box>
 
           <Box sx={{ px: 2.25, pb: 2.25 }}>
@@ -809,87 +669,12 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
 
             <AttendanceNoShowAnalyticsTable rows={section13.rows} />
 
-            <BodyText
-              component="button"
-              type="button"
-              onClick={() => {
-                void 0;
-              }}
-              sx={{
-                mt: 1.75,
-                p: 0,
-                border: 0,
-                bgcolor: "transparent",
-                cursor: "pointer",
-                color: m.teal,
-                fontSize: 12.5,
-                fontWeight: 800,
-                textDecoration: "underline",
-                "&:hover": { color: m.tealDark },
-              }}
-            >
-              {section13.explanationLabel}
-            </BodyText>
-          </Box>
-
-          <Box sx={{ px: 2.25, pb: 2.25 }}>
-            <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88), mb: 1.6 }}>
-              {section14.title}
-            </BodyText>
-
-            <ReschedulingSummaryTable rows={section14.rows} />
-
-            <BodyText
-              component="button"
-              type="button"
-              onClick={() => {
-                void 0;
-              }}
-              sx={{
-                mt: 1.75,
-                p: 0,
-                border: 0,
-                bgcolor: "transparent",
-                cursor: "pointer",
-                color: m.teal,
-                fontSize: 12.5,
-                fontWeight: 800,
-                textDecoration: "underline",
-                "&:hover": { color: m.tealDark },
-              }}
-            >
-              {section14.explanationLabel}
-            </BodyText>
-          </Box>
-
-          <Box sx={{ px: 2.25, pb: 2.25 }}>
-            <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88), mb: 1.6 }}>
-              {section15.title}
-            </BodyText>
-
-            <BookingByClientTypeTable rows={section15.rows} />
-
-            <BodyText
-              component="button"
-              type="button"
-              onClick={() => {
-                void 0;
-              }}
-              sx={{
-                mt: 1.75,
-                p: 0,
-                border: 0,
-                bgcolor: "transparent",
-                cursor: "pointer",
-                color: m.teal,
-                fontSize: 12.5,
-                fontWeight: 800,
-                textDecoration: "underline",
-                "&:hover": { color: m.tealDark },
-              }}
-            >
-              {section15.explanationLabel}
-            </BodyText>
+            {section13.explanationContent ? (
+              <AnalyticsSectionExplanation
+                label={section13.explanationLabel}
+                content={section13.explanationContent}
+              />
+            ) : null}
           </Box>
 
           <Box sx={{ px: 2.25, pb: 2.25 }}>
@@ -899,27 +684,12 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
 
             <BookingByServiceCategoryTable rows={section16.rows} />
 
-            <BodyText
-              component="button"
-              type="button"
-              onClick={() => {
-                void 0;
-              }}
-              sx={{
-                mt: 1.75,
-                p: 0,
-                border: 0,
-                bgcolor: "transparent",
-                cursor: "pointer",
-                color: m.teal,
-                fontSize: 12.5,
-                fontWeight: 800,
-                textDecoration: "underline",
-                "&:hover": { color: m.tealDark },
-              }}
-            >
-              {section16.explanationLabel}
-            </BodyText>
+            {section16.explanationContent ? (
+              <AnalyticsSectionExplanation
+                label={section16.explanationLabel}
+                content={section16.explanationContent}
+              />
+            ) : null}
           </Box>
         </>
       ) : isSalesVolume ? (

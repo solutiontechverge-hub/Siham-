@@ -130,7 +130,7 @@ export default function ClientListingCard({
       onClick={onOpenProfile}
     >
       <Box sx={{ position: "relative" }}>
-        <Box sx={{ position: "relative", height: 170 }}>
+        <Box sx={{ position: "relative", height: { xs: 220, sm: 240, md: 260 } }}>
           <ListingCardImage image={currentImage} alt={item.title} />
         </Box>
 

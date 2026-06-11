@@ -1,10 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { Box, Collapse, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from "@mui/material";
+import { Box, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../ui/typography";
 import type { ProfessionalFixedLocationPerformanceAnalyticsData } from "../../app/professionals/fixed-location/analytics/performanceAnalytics.data";
+import AnalyticsSectionExplanation from "./AnalyticsSectionExplanation";
 
 export type ProfessionalFixedLocationPerformanceAnalyticsProps = {
   data: ProfessionalFixedLocationPerformanceAnalyticsData;
@@ -23,7 +24,6 @@ export default function ProfessionalFixedLocationPerformanceAnalytics({ data }: 
   const m = theme.palette.mollure;
 
   const section = data.productivityAndEfficiency;
-  const [open, setOpen] = React.useState(false);
 
   const headers = [
     "Team Member",
@@ -134,38 +134,9 @@ export default function ProfessionalFixedLocationPerformanceAnalytics({ data }: 
         </Table>
       </TableContainer>
 
-      <BodyText
-        component="button"
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        sx={{
-          mt: 1.6,
-          p: 0,
-          border: 0,
-          bgcolor: "transparent",
-          cursor: "pointer",
-          color: m.teal,
-          fontSize: 12.5,
-          fontWeight: 800,
-          textDecoration: "underline",
-          "&:hover": { color: m.tealDark },
-          "&:focus-visible": {
-            outline: "none",
-            boxShadow: `0 0 0 3px ${alpha(m.teal, 0.25)}`,
-            borderRadius: "6px",
-          },
-        }}
-      >
-        {section.explanationLabel}
-      </BodyText>
-
-      <Collapse in={open} timeout={180}>
-        <Box sx={{ pt: 1.25, maxWidth: 880 }}>
-          <BodyText sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.55), lineHeight: 1.6 }}>
-            {section.explanationText}
-          </BodyText>
-        </Box>
-      </Collapse>
+      {section.explanationContent ? (
+        <AnalyticsSectionExplanation label={section.explanationLabel} content={section.explanationContent} />
+      ) : null}
     </Box>
   );
 }

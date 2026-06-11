@@ -62,6 +62,7 @@ export type ManualEntryTransactionInput = {
   clientType: TransactionClientType;
   lines: { name: string; quantity: number; unitPrice: number }[];
   totalPrice: number;
+  discountAmount?: number;
 };
 
 export function buildManualEntryTransactionRow(input: ManualEntryTransactionInput): TransactionRow {
@@ -79,11 +80,21 @@ export function buildManualEntryTransactionRow(input: ManualEntryTransactionInpu
     totalPrice: formatNetAmountEur(line.quantity * line.unitPrice),
   }));
 
+  if (input.discountAmount && input.discountAmount > 0) {
+    lineItems.push({
+      description: "Discount",
+      quantity: "1",
+      vat: "0%",
+      pricePerUnit: formatNetAmountEur(-input.discountAmount),
+      totalPrice: formatNetAmountEur(-input.discountAmount),
+    });
+  }
+
   return {
     id: `t-manual-${Date.now()}`,
     entryId: entryNum,
     date: today,
-    entryLabel: "Manually",
+    entryLabel: "New sale",
     clientName: input.clientName,
     clientEmail: input.clientEmail,
     clientType: input.clientType,
@@ -176,7 +187,7 @@ export type TransactionRow = {
   entryId: string | null;
   /** YYYY-MM-DD or null when grouped under a parent row */
   date: string | null;
-  /** Optional label instead of/alongside entry id (e.g. "Manually") */
+  /** Optional label instead of/alongside entry id (e.g. "New sale") */
   entryLabel?: string;
   clientName: string;
   clientEmail: string;
@@ -186,6 +197,8 @@ export type TransactionRow = {
   methodDetail: string;
   status: TransactionStatus;
   document?: TransactionDocument;
+  /** Internal note attached to this transaction entry */
+  note?: string;
 };
 
 export const mockTransactions: TransactionRow[] = [
@@ -292,7 +305,7 @@ export const mockTransactions: TransactionRow[] = [
     id: "t4",
     entryId: "111",
     date: "2023-01-03",
-    entryLabel: "Manually",
+    entryLabel: "New sale",
     clientName: "Emma van Dijk",
     clientEmail: "emma.vd@gmail.com",
     clientType: "guest",

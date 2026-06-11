@@ -1,5 +1,21 @@
 import * as React from "react";
-import { Box, Button, Checkbox, Chip, Link as MuiLink, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from "@mui/material";
+import StickyNote2OutlinedIcon from "@mui/icons-material/StickyNote2Outlined";
+import {
+  Box,
+  Button,
+  Checkbox,
+  Chip,
+  IconButton,
+  Link as MuiLink,
+  Paper,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+} from "@mui/material";
 import { alpha, type Theme } from "@mui/material/styles";
 import {
   getTransactionClientTypeLabel,
@@ -41,6 +57,7 @@ export type TransactionsTableProps = {
   onToggleOne: (id: string) => void;
   onToggleAll: (checked: boolean) => void;
   onOpenDocument: (row: TransactionRow, documentType: "invoice" | "receipt") => void;
+  onOpenNote?: (row: TransactionRow) => void;
   disableDocumentLinks?: boolean;
   canLoadMore: boolean;
   onLoadMore?: () => void;
@@ -54,6 +71,7 @@ export default function TransactionsTable({
   onToggleOne,
   onToggleAll,
   onOpenDocument,
+  onOpenNote,
   disableDocumentLinks = false,
   canLoadMore,
   onLoadMore,
@@ -119,9 +137,26 @@ export default function TransactionsTable({
                   <Checkbox size="small" checked={Boolean(selected[row.id])} onChange={() => onToggleOne(row.id)} sx={{ p: 0.5 }} />
                 </TableCell>
                 <TableCell sx={{ verticalAlign: "top" }}>
-                  <BodyText component="span" sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.78) }}>
-                    {row.entryLabel ?? row.entryId ?? ""}
-                  </BodyText>
+                  <Stack direction="row" alignItems="center" spacing={0.5} useFlexGap flexWrap="wrap">
+                    <BodyText component="span" sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.78) }}>
+                      {row.entryLabel ?? row.entryId ?? ""}
+                    </BodyText>
+                    {row.note?.trim() ? (
+                      <IconButton
+                        size="small"
+                        aria-label={`Open note for entry ${row.entryId ?? row.id}`}
+                        onClick={() => onOpenNote?.(row)}
+                        sx={{
+                          width: 24,
+                          height: 24,
+                          color: m.teal,
+                          "&:hover": { bgcolor: alpha(m.teal, 0.08) },
+                        }}
+                      >
+                        <StickyNote2OutlinedIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    ) : null}
+                  </Stack>
                 </TableCell>
                 <TableCell sx={{ verticalAlign: "top" }}>
                   <BodyText component="span" sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.75) }}>

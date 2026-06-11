@@ -9,6 +9,7 @@ import {
 import type { BusinessSetupListing } from "../../../store/services/businessApi";
 import { resolvePriceTier } from "../../../components/common/listingDrawerFilters";
 import { resolveBusinessOffering } from "./businessPublicProfile.mapper";
+import { normalizeServiceDurationLabel } from "../../../utils/serviceDuration";
 import type { ListingCardData } from "./listing.data";
 
 const FALLBACK_IMAGES = [
@@ -122,14 +123,19 @@ const buildServices = (setup: BusinessSetupListing) => {
     .filter((detail) => detail.price != null && detail.serviceTitle)
     .sort((a, b) => Number(a.price) - Number(b.price))
     .slice(0, 3)
-    .map((detail) => ({
-      name: detail.serviceTitle as string,
-      durationLabel:
+    .map((detail) => {
+      const rawDuration =
         (detail.serviceId != null ? durationByServiceId.get(String(detail.serviceId)) : undefined) ||
         detail.durationLabel?.trim() ||
-        undefined,
-      priceLabel: formatPriceLabel(Number(detail.price)),
-    }));
+        "";
+      return {
+        name: detail.serviceTitle as string,
+        durationLabel: rawDuration
+          ? normalizeServiceDurationLabel(rawDuration)
+          : undefined,
+        priceLabel: formatPriceLabel(Number(detail.price)),
+      };
+    });
 
   if (fromDetails.length > 0) {
     return fromDetails;

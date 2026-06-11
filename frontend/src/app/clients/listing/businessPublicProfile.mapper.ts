@@ -21,6 +21,7 @@ import type {
   BusinessPublicProfileTeamMember,
 } from "../../../data/businessPublicProfile.data";
 import { buildDynamicServiceCategoryTabs } from "../../../data/businessServiceCategorySlider.data";
+import { normalizeServiceDurationLabel } from "../../../utils/serviceDuration";
 import type {
   BusinessSetupListing,
   BusinessSetupListingPolicy,
@@ -228,10 +229,12 @@ function buildProfileServices(setup: BusinessSetupListing): BusinessPublicProfil
       const categoryTitle = detail.categoryTitle?.trim() || "Services";
       const categoryId = detail.categoryId != null ? String(detail.categoryId) : slugifyCategory(categoryTitle);
       const serviceIdKey = detail.serviceId != null ? String(detail.serviceId) : "";
-      const durationLabel =
+      const rawDuration =
         (serviceIdKey ? durationByServiceId.get(serviceIdKey) : undefined) ||
         detail.durationLabel?.trim() ||
         "";
+      const durationMins = parseDurationMins(rawDuration);
+      const durationLabel = normalizeServiceDurationLabel(rawDuration, durationMins);
       const priceValue = Number(detail.price);
 
       return {
@@ -242,7 +245,7 @@ function buildProfileServices(setup: BusinessSetupListing): BusinessPublicProfil
         durationLabel,
         priceLabel: formatPriceLabel(priceValue),
         priceValue,
-        durationMins: parseDurationMins(durationLabel),
+        durationMins,
       };
     });
 
@@ -269,7 +272,10 @@ function buildProfileServices(setup: BusinessSetupListing): BusinessPublicProfil
         return null;
       }
 
-      const durationLabel = durationByServiceId.get(serviceId) || String(entry.duration_label ?? entry.durationLabel ?? "").trim();
+      const rawDuration =
+        durationByServiceId.get(serviceId) || String(entry.duration_label ?? entry.durationLabel ?? "").trim();
+      const durationMins = parseDurationMins(rawDuration);
+      const durationLabel = normalizeServiceDurationLabel(rawDuration, durationMins);
       return {
         id: serviceId || `svc-${index}`,
         categoryId,
@@ -278,7 +284,7 @@ function buildProfileServices(setup: BusinessSetupListing): BusinessPublicProfil
         durationLabel,
         priceLabel: formatPriceLabel(amount),
         priceValue: amount,
-        durationMins: parseDurationMins(durationLabel),
+        durationMins,
       };
     })
     .filter((service): service is BusinessPublicProfileService => service !== null);
@@ -347,8 +353,10 @@ function buildBookCombos(setup: BusinessSetupListing): BusinessPublicProfileBook
     .map((combo, index) => {
       const serviceId = Number(combo.service_id ?? combo.serviceId);
       const detail = findServiceDetail(setup, serviceId);
-      const durationLabel =
+      const rawDuration =
         durationByServiceId.get(String(serviceId)) || detail?.durationLabel?.trim() || "";
+      const durationMins = parseDurationMins(rawDuration);
+      const durationLabel = normalizeServiceDurationLabel(rawDuration, durationMins);
       const priceValue = detail?.price != null ? Number(detail.price) : 0;
 
       return {
@@ -358,7 +366,7 @@ function buildBookCombos(setup: BusinessSetupListing): BusinessPublicProfileBook
         durationLabel: durationLabel || "—",
         priceLabel: priceValue > 0 ? formatPriceLabel(priceValue) : setup.priceRange ? `${setup.priceRange} EUR` : "Price on request",
         priceValue,
-        durationMins: parseDurationMins(durationLabel),
+        durationMins,
       };
     });
 }

@@ -1,7 +1,8 @@
 import * as React from "react";
-import { Box, Button, Checkbox, Divider, FormControlLabel, Stack } from "@mui/material";
+import { Box, Checkbox, Divider, FormControlLabel, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import MollureDrawer from "../../common/MollureDrawer";
+import FinanceDrawer from "../../common/FinanceDrawer";
+import { FinanceDrawerFiltersFooter } from "../../common/FinanceDrawerFooter";
 import { BodyText, CardTitle } from "../../ui/typography";
 
 type Option = { key: string; label: string };
@@ -25,7 +26,7 @@ const DEFAULT_SECTIONS: readonly FinanceFiltersSection[] = [
     options: [
       { key: "entry:onlineBooking", label: "Online booking" },
       { key: "entry:offlineBooking", label: "Offline booking" },
-      { key: "entry:manualEntry", label: "Manual entry" },
+      { key: "entry:newSale", label: "New sale" },
     ],
   },
   {
@@ -77,73 +78,28 @@ export default function FinanceFiltersDrawerView({
     if (open) setDraft(value);
   }, [open, value]);
 
-  const footer = (
-    <Box sx={{ px: 2, py: 1.5 }}>
-      <Stack direction="row" spacing={1.25}>
-        <Button
-          fullWidth
-          variant="outlined"
-          onClick={() => {
+  return (
+    <FinanceDrawer
+      open={open}
+      onClose={onClose}
+      title="Filters"
+      footer={
+        <FinanceDrawerFiltersFooter
+          onCancel={() => {
             setDraft(value);
             onCancel();
           }}
-          sx={{
-            borderRadius: "10px",
-            textTransform: "none",
-            fontWeight: 800,
-            height: 38,
-            borderColor: alpha(m.navy, 0.14),
-            color: alpha(m.navy, 0.72),
-            bgcolor: "#fff",
-          }}
-        >
-          Cancel
-        </Button>
-        <Button
-          fullWidth
-          variant="outlined"
-          onClick={() => {
+          onReset={() => {
             setDraft({});
             onChange({});
           }}
-          sx={{
-            borderRadius: "10px",
-            textTransform: "none",
-            fontWeight: 800,
-            height: 38,
-            borderColor: alpha(m.navy, 0.14),
-            color: alpha(m.navy, 0.72),
-            bgcolor: "#fff",
-          }}
-        >
-          Reset
-        </Button>
-        <Button
-          fullWidth
-          variant="contained"
-          disableElevation
-          onClick={() => {
+          onApply={() => {
             onChange(draft);
             onApply();
           }}
-          sx={{
-            borderRadius: "10px",
-            textTransform: "none",
-            fontWeight: 800,
-            height: 38,
-            bgcolor: m.teal,
-            "&:hover": { bgcolor: m.tealDark },
-          }}
-        >
-          Apply
-        </Button>
-      </Stack>
-    </Box>
-  );
-
-  return (
-    <MollureDrawer anchor="right" open={open} onClose={onClose} title="Filters" width={{ xs: "100%", sm: 500 }} footer={footer}>
-      <Box sx={{ px: 2, py: 1.5 }}>
+        />
+      }
+    >
         <Stack spacing={2}>
           {sections.map((section, idx) => (
             <Box key={section.title}>
@@ -168,8 +124,7 @@ export default function FinanceFiltersDrawerView({
             </Box>
           ))}
         </Stack>
-      </Box>
-    </MollureDrawer>
+    </FinanceDrawer>
   );
 }
 

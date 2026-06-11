@@ -9,8 +9,10 @@ export type BusinessServiceDiscountType = "fixed" | "percent";
 export type BusinessServiceFormDraft = {
   name: string;
   info: string;
-  durationFrom: string;
-  durationTo: string;
+  durationFromHours: string;
+  durationFromMinutes: string;
+  durationToHours: string;
+  durationToMinutes: string;
   priceType: BusinessServicePriceType;
   priceAmount: string;
   currency: string;
@@ -73,11 +75,16 @@ export const businessServiceModalCopy = {
   updateLabel: "Update",
   nameLabel: "Name",
   serviceInfoLabel: "Service Info",
-  subserviceInfoLabel: "Discount Info",
+  subserviceInfoLabel: "Service Info",
   serviceInfoPlaceholder: "Enter a description...",
   durationFromLabel: "Duration from",
   durationToLabel: "Duration to",
-  durationPlaceholder: "00:00",
+  durationHoursLabel: "Hours",
+  durationMinutesLabel: "Minutes",
+  durationHoursPlaceholder: "0",
+  durationMinutesPlaceholder: "0",
+  durationHoursSuffix: "H",
+  durationMinutesSuffix: "M",
   priceTypeLabel: "Select starting price or fixed price",
   priceLabel: "Price",
   offerDiscountTitle: "Offer Discount",
@@ -102,8 +109,10 @@ export const businessServiceModalDiscountTypes: { value: BusinessServiceDiscount
 export const createEmptyBusinessServiceFormDraft = (): BusinessServiceFormDraft => ({
   name: "",
   info: "",
-  durationFrom: "",
-  durationTo: "",
+  durationFromHours: "",
+  durationFromMinutes: "",
+  durationToHours: "",
+  durationToMinutes: "",
   priceType: "fixed",
   priceAmount: "",
   currency: businessServiceModalCopy.currencyCode,
@@ -133,13 +142,60 @@ export function normalizeBusinessServiceDiscountType(t: string | undefined): Bus
   return t === "percent" ? "percent" : "fixed";
 }
 
-export function formatDurationRangeLabel(durationFrom: string, durationTo: string): string {
-  const from = String(durationFrom ?? "").trim();
-  const to = String(durationTo ?? "").trim();
+export function sanitizeDurationHours(value: string): string {
+  return value.replace(/\D/g, "").slice(0, 2);
+}
+
+export function sanitizeDurationMinutes(value: string): string {
+  const digits = value.replace(/\D/g, "");
+  if (!digits) return "";
+  return String(Math.min(Number.parseInt(digits, 10), 59));
+}
+
+export function formatDurationPart(hours: string, minutes: string): string {
+  const h = Number.parseInt(hours, 10) || 0;
+  const m = Number.parseInt(minutes, 10) || 0;
+  if (h <= 0 && m <= 0) return "";
+  const parts: string[] = [];
+  if (h > 0) parts.push(`${h} h`);
+  if (m > 0) parts.push(`${m} min`);
+  return parts.join(" ");
+}
+
+export function formatDurationRangeLabel(
+  fromHours: string,
+  fromMinutes: string,
+  toHours: string,
+  toMinutes: string,
+): string {
+  const from = formatDurationPart(fromHours, fromMinutes);
+  const to = formatDurationPart(toHours, toMinutes);
   if (from && to) return `${from} - ${to}`;
   if (from) return from;
   if (to) return to;
   return "";
+}
+
+export function parseDurationPartLabel(label: string): { hours: string; minutes: string } {
+  const raw = String(label ?? "").trim();
+  if (!raw) return { hours: "", minutes: "" };
+
+  if (/\d{1,2}:\d{2}/.test(raw) && /(am|pm)/i.test(raw)) {
+    return { hours: "", minutes: "" };
+  }
+
+  const normalized = raw.toLowerCase();
+  const hours = normalized.match(/(\d+)\s*h(?:our|rs?)?\b/)?.[1] ?? "";
+  const minutes = normalized.match(/(\d+)\s*m(?:in(?:ute)?s?)?\b/)?.[1] ?? "";
+  if (hours || minutes) return { hours, minutes };
+
+  const onlyNumber = normalized.match(/^(\d+)$/);
+  if (onlyNumber) return { hours: "", minutes: onlyNumber[1] };
+
+  const firstNumber = normalized.match(/(\d+)/);
+  if (firstNumber) return { hours: "", minutes: firstNumber[1] };
+
+  return { hours: "", minutes: "" };
 }
 
 export function formatBusinessServicePriceLabel(
@@ -175,22 +231,46 @@ export function parsePriceLabelForModal(priceLabel: string): { type: BusinessSer
   return { type: "fixed", amount: n?.[0] ?? "" };
 }
 
-export function parseDurationRangeForModal(durationLabel?: string): { from: string; to: string } {
+export function parseDurationRangeForModal(durationLabel?: string): {
+  fromHours: string;
+  fromMinutes: string;
+  toHours: string;
+  toMinutes: string;
+} {
   const raw = String(durationLabel ?? "").trim();
-  if (!raw) return { from: "", to: "" };
+  if (!raw) {
+    return { fromHours: "", fromMinutes: "", toHours: "", toMinutes: "" };
+  }
   const parts = raw.split(/\s*-\s*/);
   if (parts.length >= 2) {
-    return { from: parts[0].trim(), to: parts.slice(1).join("-").trim() };
+    const from = parseDurationPartLabel(parts[0]);
+    const to = parseDurationPartLabel(parts.slice(1).join("-"));
+    return {
+      fromHours: from.hours,
+      fromMinutes: from.minutes,
+      toHours: to.hours,
+      toMinutes: to.minutes,
+    };
   }
-  return { from: raw, to: "" };
+  const from = parseDurationPartLabel(raw);
+  return {
+    fromHours: from.hours,
+    fromMinutes: from.minutes,
+    toHours: "",
+    toMinutes: "",
+  };
 }
 
 export function draftFromMainService(main: BusinessMainServiceUi): BusinessServiceFormDraft {
+  const from = parseDurationPartLabel(main.durationFrom);
+  const to = parseDurationPartLabel(main.durationTo);
   return {
     name: main.name,
     info: main.serviceInfo,
-    durationFrom: main.durationFrom,
-    durationTo: main.durationTo,
+    durationFromHours: from.hours,
+    durationFromMinutes: from.minutes,
+    durationToHours: to.hours,
+    durationToMinutes: to.minutes,
     priceType: normalizeBusinessServicePriceType(main.priceType),
     priceAmount: main.priceAmount,
     currency: main.currency || businessServiceModalCopy.currencyCode,
@@ -206,11 +286,15 @@ export function draftFromMainService(main: BusinessMainServiceUi): BusinessServi
 export function draftFromSubservice(sub: BusinessSubserviceUi): BusinessServiceFormDraft {
   const parsed = parsePriceLabelForModal(sub.priceLabel);
   const duration = parseDurationRangeForModal(sub.durationLabel);
+  const from = sub.durationFrom ? parseDurationPartLabel(sub.durationFrom) : { hours: duration.fromHours, minutes: duration.fromMinutes };
+  const to = sub.durationTo ? parseDurationPartLabel(sub.durationTo) : { hours: duration.toHours, minutes: duration.toMinutes };
   return {
     name: sub.name,
     info: sub.discountInfo,
-    durationFrom: sub.durationFrom || duration.from,
-    durationTo: sub.durationTo || duration.to,
+    durationFromHours: from.hours,
+    durationFromMinutes: from.minutes,
+    durationToHours: to.hours,
+    durationToMinutes: to.minutes,
     priceType: normalizeBusinessServicePriceType(sub.priceType ?? parsed.type),
     priceAmount: sub.priceAmount ?? parsed.amount,
     currency: businessServiceModalCopy.currencyCode,
@@ -228,13 +312,15 @@ export function mainServiceFromDraft(
   id: string,
   categoryId: string,
 ): BusinessMainServiceUi {
+  const durationFrom = formatDurationPart(draft.durationFromHours, draft.durationFromMinutes);
+  const durationTo = formatDurationPart(draft.durationToHours, draft.durationToMinutes);
   return {
     id,
     categoryId,
     name: draft.name.trim(),
     serviceInfo: draft.info.trim(),
-    durationFrom: draft.durationFrom.trim(),
-    durationTo: draft.durationTo.trim(),
+    durationFrom,
+    durationTo,
     priceType: normalizeBusinessServicePriceType(draft.priceType),
     priceAmount: draft.priceAmount.trim(),
     currency: draft.currency,
@@ -271,9 +357,14 @@ export function subserviceFromDraft(
     serviceId,
     name: draft.name.trim(),
     discountInfo: draft.info.trim(),
-    durationFrom: draft.durationFrom.trim(),
-    durationTo: draft.durationTo.trim(),
-    durationLabel: formatDurationRangeLabel(draft.durationFrom, draft.durationTo),
+    durationFrom: formatDurationPart(draft.durationFromHours, draft.durationFromMinutes),
+    durationTo: formatDurationPart(draft.durationToHours, draft.durationToMinutes),
+    durationLabel: formatDurationRangeLabel(
+      draft.durationFromHours,
+      draft.durationFromMinutes,
+      draft.durationToHours,
+      draft.durationToMinutes,
+    ),
     priceLabel: formatBusinessServicePriceLabel(priceType, draft.priceAmount),
     categoryTitle,
     priceType,

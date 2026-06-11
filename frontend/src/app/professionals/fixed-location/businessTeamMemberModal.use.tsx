@@ -158,20 +158,17 @@ export function useBusinessTeamMemberModal({
     [syncDraftToMainScreen],
   );
 
-  const addServiceSelection = React.useCallback(() => {
-    setDraft((prev) => {
-      const next = addTeamMemberServiceSelection(prev, businessCategories, serviceContext);
-      if (next !== prev) {
-        syncDraftToMainScreen(next);
-      }
-      return next;
-    });
-  }, [businessCategories, serviceContext, syncDraftToMainScreen]);
+  const pickService = React.useCallback((categoryId: string, serviceId: string) => {
+    setDraft((prev) => ({ ...prev, categoryId, serviceId }));
+  }, []);
 
   const removeServiceGroup = React.useCallback(
     (categoryId: string) => {
       setDraft((prev) => {
-        const next = removeTeamMemberServiceGroup(prev, categoryId);
+        let next = removeTeamMemberServiceGroup(prev, categoryId);
+        if (prev.categoryId === categoryId) {
+          next = { ...next, serviceId: "" };
+        }
         syncDraftToMainScreen(next);
         return next;
       });
@@ -195,13 +192,20 @@ export function useBusinessTeamMemberModal({
     [syncDraftToMainScreen],
   );
 
-  const canSubmit = Boolean(draft.name.trim());
+  const canSubmit =
+    draft.selectedGroups.some((group) => group.subServiceIds.length > 0) ||
+    Boolean(draft.categoryId && draft.serviceId);
 
   const saveModal = React.useCallback(async () => {
-    const name = draft.name.trim();
-    if (!name) return;
+    let effectiveDraft = draft;
+    if (draft.categoryId && draft.serviceId) {
+      effectiveDraft = addTeamMemberServiceSelection(draft, businessCategories, serviceContext);
+    }
 
-    const services = groupsToTeamService(draft.selectedGroups);
+    if (!effectiveDraft.selectedGroups.some((group) => group.subServiceIds.length > 0)) return;
+
+    const name = effectiveDraft.name.trim() || "New team member";
+    const services = groupsToTeamService(effectiveDraft.selectedGroups);
     const role = "Team member";
     let nextMembers: TeamMemberUi[];
 
@@ -214,8 +218,8 @@ export function useBusinessTeamMemberModal({
               ...member,
               name,
               role,
-              photoSrc: draft.photoSrc,
-              pendingPhotoFile: draft.pendingPhotoFile ?? null,
+              photoSrc: effectiveDraft.photoSrc,
+              pendingPhotoFile: effectiveDraft.pendingPhotoFile ?? null,
               services,
             }
           : member,
@@ -226,8 +230,8 @@ export function useBusinessTeamMemberModal({
           id: `tm-${Date.now()}`,
           name,
           role,
-          photoSrc: draft.photoSrc,
-          pendingPhotoFile: draft.pendingPhotoFile ?? null,
+          photoSrc: effectiveDraft.photoSrc,
+          pendingPhotoFile: effectiveDraft.pendingPhotoFile ?? null,
           rating: 4.5,
           reviewsLabel: "(0 Reviews)",
           services,
@@ -255,12 +259,11 @@ export function useBusinessTeamMemberModal({
       onMarkUnpublished?.();
     }
   }, [
+    businessCategories,
     closeModal,
-    draft.name,
-    draft.photoSrc,
-    draft.pendingPhotoFile,
-    draft.selectedGroups,
+    draft,
     editingMemberId,
+    serviceContext,
     onAfterLocalSave,
     onMarkUnpublished,
     onSaveBusinessSetup,
@@ -289,7 +292,7 @@ export function useBusinessTeamMemberModal({
     openAdd,
     openEdit,
     updateDraft,
-    addServiceSelection,
+    pickService,
     removeServiceGroup,
     choosePhoto,
     onPhotoSelected,

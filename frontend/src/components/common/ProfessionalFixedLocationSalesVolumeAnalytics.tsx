@@ -5,6 +5,7 @@ import { Box, ButtonBase, Paper, Table, TableBody, TableCell, TableContainer, Ta
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../ui/typography";
 import type { ProfessionalFixedLocationSalesVolumeAnalyticsData } from "../../app/professionals/fixed-location/analytics/salesVolumeAnalytics.data";
+import AnalyticsSectionExplanation from "./AnalyticsSectionExplanation";
 import SalesByCategoriesServicesTable from "./SalesByCategoriesServicesTable";
 import SalesVolumeStackedBarChart from "./SalesVolumeStackedBarChart";
 
@@ -263,6 +264,13 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({ data }: 
         legend={section21.legend}
       />
 
+      {section21.explanationContent ? (
+        <AnalyticsSectionExplanation
+          label={section21.explanationLabel}
+          content={section21.explanationContent}
+        />
+      ) : null}
+
       {/* 2.2 Product Sales */}
       <Box sx={{ pt: 2.7, pb: 1.4 }}>
         <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}>{section22.title}</BodyText>
@@ -337,6 +345,13 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({ data }: 
         xLabel="Sales€"
       />
 
+      {section22.explanationContent ? (
+        <AnalyticsSectionExplanation
+          label={section22.explanationLabel}
+          content={section22.explanationContent}
+        />
+      ) : null}
+
       <Box sx={{ pt: 2.7, pb: 1.4 }}>
         <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}>{section23.title}</BodyText>
       </Box>
@@ -406,27 +421,12 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({ data }: 
         </Table>
       </TableContainer>
 
-      {section23.explanationLabel && (
-        <Box sx={{ pt: 1.2, pb: 0.5 }}>
-          <BodyText
-            component="button"
-            type="button"
-            sx={{
-              p: 0,
-              border: 0,
-              bgcolor: "transparent",
-              cursor: "pointer",
-              fontSize: 12.5,
-              fontWeight: 800,
-              color: m.teal,
-              textDecoration: "underline",
-              "&:hover": { color: m.tealDark },
-            }}
-          >
-            {section23.explanationLabel}
-          </BodyText>
-        </Box>
-      )}
+      {section23.explanationContent ? (
+        <AnalyticsSectionExplanation
+          label={section23.explanationLabel}
+          content={section23.explanationContent}
+        />
+      ) : null}
 
       <Box sx={{ pt: 2.7, pb: 1.4 }}>
         <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}>{section25.title}</BodyText>
@@ -496,6 +496,13 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({ data }: 
           </TableBody>
         </Table>
       </TableContainer>
+
+      {section25.explanationContent ? (
+        <AnalyticsSectionExplanation
+          label={section25.explanationLabel}
+          content={section25.explanationContent}
+        />
+      ) : null}
 
     </Box>
   );

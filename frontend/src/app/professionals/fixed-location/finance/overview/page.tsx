@@ -4,9 +4,7 @@ import * as React from "react";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import {
   Box,
-  Divider,
   ListItemText,
-  ListSubheader,
   Menu,
   MenuItem,
   Paper,
@@ -24,6 +22,7 @@ import { manualEntryClientFields } from "../../../../../components/sections/fina
 import CancelPendingPaymentModal from "../../../../../components/sections/finance/CancelPendingPaymentModal";
 import ManualEntryDrawer from "../../../../../components/sections/finance/ManualEntryDrawer";
 import RefundSalesDrawer from "../../../../../components/sections/finance/RefundSalesDrawer";
+import TransactionNoteModal from "../../../../../components/sections/finance/TransactionNoteModal";
 import FinanceFiltersDrawerView, { type FinanceFiltersValue } from "../../../../../components/sections/finance/FinanceFiltersDrawerView";
 import FinanceDocumentPreviewDrawer from "../../../../../components/sections/finance/FinanceDocumentPreviewDrawer";
 import TransactionsHeader from "../../../../../components/sections/finance/TransactionsHeader";
@@ -37,25 +36,26 @@ import { useGetProfileQuery } from "../../../../../store/services/profileApi";
 
 const INITIAL_VISIBLE = 4;
 
-const ADD_ACTION_ITEMS = [
-  { id: "voidSales", label: "Void Sales", requiresSelection: true },
-  { id: "refund", label: "Refund", requiresSelection: true },
-  { id: "manualEntry", label: "Manual entry" },
+const ADD_MENU_ITEMS = [
+  { id: "newSale", label: "New Sale" },
+  { id: "addNote", label: "Add Note" },
 ] as const;
 
-const ADD_EXPORT_ITEMS = [
+function isNewSaleEntry(entryLabel?: string | null) {
+  const label = (entryLabel ?? "").toLowerCase();
+  return label.includes("new sale") || label.includes("manual");
+}
+
+const ACTION_MENU_ITEMS = [
+  { id: "refund", label: "Refund", requiresSelection: true },
+  { id: "voidSales", label: "Void Sales", requiresSelection: true },
+  { id: "export", label: "Export", hasSubmenu: true },
+] as const;
+
+const ACTION_EXPORT_ITEMS = [
   { id: "exportInvoiceReceipt", label: "Export Invoice/Receipt" },
   { id: "exportOverview", label: "Export Overview", hasSubmenu: true },
 ] as const;
-
-const MORE_MENU_OPTIONS = [
-  "Void Sales",
-  "Refund",
-  "Export Invoice/Receipt",
-  "Export Overview",
-] as const;
-
-const MORE_EXPORT_OPTIONS = new Set<string>(["Export Invoice/Receipt", "Export Overview"]);
 
 const OVERVIEW_EXPORT_OPTIONS = ["Export PDF", "Export Excel"] as const;
 
@@ -78,6 +78,7 @@ export default function FinanceOverviewPage() {
   const [selected, setSelected] = React.useState<Record<string, boolean>>({});
   const [addAnchor, setAddAnchor] = React.useState<null | HTMLElement>(null);
   const [moreAnchor, setMoreAnchor] = React.useState<null | HTMLElement>(null);
+  const [actionExportAnchor, setActionExportAnchor] = React.useState<null | HTMLElement>(null);
   const [overviewExportAnchor, setOverviewExportAnchor] = React.useState<null | HTMLElement>(null);
   const [filtersOpen, setFiltersOpen] = React.useState(false);
   const [filtersValue, setFiltersValue] = React.useState<FinanceFiltersValue>({});
@@ -92,6 +93,7 @@ export default function FinanceOverviewPage() {
   const [voidPaymentModalOpen, setVoidPaymentModalOpen] = React.useState(false);
   const [refundDrawerOpen, setRefundDrawerOpen] = React.useState(false);
   const [manualEntryDrawerOpen, setManualEntryDrawerOpen] = React.useState(false);
+  const [noteModalTransactionId, setNoteModalTransactionId] = React.useState<string | null>(null);
   const [transactions, setTransactions] = React.useState<TransactionRow[]>(() => [...mockTransactions]);
 
   React.useEffect(() => {
@@ -143,11 +145,11 @@ export default function FinanceOverviewPage() {
 
       // Entry ID group
       if (entryKeys.length) {
-        const isManual = (r.entryLabel ?? "").toLowerCase().includes("manual");
+        const isNewSale = isNewSaleEntry(r.entryLabel);
         const isOnline = method.startsWith("online");
         const isOffline = method.startsWith("offline");
         const ok =
-          (entryKeys.includes("entry:manualEntry") && isManual) ||
+          (entryKeys.includes("entry:newSale") && isNewSale) ||
           (entryKeys.includes("entry:onlineBooking") && isOnline) ||
           (entryKeys.includes("entry:offlineBooking") && isOffline);
         if (!ok) return false;
@@ -224,6 +226,8 @@ export default function FinanceOverviewPage() {
 
   const closeMoreMenus = React.useCallback(() => {
     setMoreAnchor(null);
+    setActionExportAnchor(null);
+    setOverviewExportAnchor(null);
   }, []);
 
   const rowsToExport = React.useMemo(
@@ -279,6 +283,39 @@ export default function FinanceOverviewPage() {
     setManualEntryDrawerOpen(true);
   }, [closeAddMenus, closeMoreMenus]);
 
+  const noteModalTransaction = React.useMemo(
+    () => transactions.find((row) => row.id === noteModalTransactionId) ?? null,
+    [noteModalTransactionId, transactions],
+  );
+
+  const openNoteModal = React.useCallback(
+    (transactionId: string) => {
+      closeAddMenus();
+      closeMoreMenus();
+      setNoteModalTransactionId(transactionId);
+    },
+    [closeAddMenus, closeMoreMenus],
+  );
+
+  const saveTransactionNote = React.useCallback(
+    (note: string) => {
+      if (!noteModalTransactionId) return;
+      setTransactions((prev) =>
+        prev.map((row) => (row.id === noteModalTransactionId ? { ...row, note } : row)),
+      );
+      showSnackbar({ severity: "success", message: "Note saved." });
+    },
+    [noteModalTransactionId, showSnackbar],
+  );
+
+  const deleteTransactionNote = React.useCallback(() => {
+    if (!noteModalTransactionId) return;
+    setTransactions((prev) =>
+      prev.map((row) => (row.id === noteModalTransactionId ? { ...row, note: undefined } : row)),
+    );
+    showSnackbar({ severity: "success", message: "Note deleted." });
+  }, [noteModalTransactionId, showSnackbar]);
+
   const confirmManualEntry = React.useCallback((payload: ManualEntrySavePayload) => {
     const client = manualEntryClientFields(payload.clientSelection);
     const row = buildManualEntryTransactionRow({
@@ -289,46 +326,62 @@ export default function FinanceOverviewPage() {
         unitPrice: line.unitPrice,
       })),
       totalPrice: payload.totalPrice,
+      discountAmount: payload.discountAmount,
     });
     setTransactions((prev) => [row, ...prev]);
     setManualEntryDrawerOpen(false);
+    setFromDate(null);
+    setToDate(null);
+    setVisibleCount(INITIAL_VISIBLE);
+    setSelected({});
     showSnackbar({
       severity: "success",
-      message: `Manual entry added for ${client.clientName} (${row.status}).`,
+      message: `New sale saved for ${client.clientName} — ${row.netAmount} added to transactions.`,
     });
   }, [showSnackbar]);
 
-  const handleMoreMenuAction = React.useCallback(
-    (opt: (typeof MORE_MENU_OPTIONS)[number]) => {
-      if (opt === "Void Sales") {
+  const exportInvoiceReceipt = React.useCallback(() => {
+    closeMoreMenus();
+    if (rowsToExport.length === 0) {
+      showSnackbar({ severity: "warning", message: "No transactions to export." });
+      return;
+    }
+    const ok = exportTransactionsToExcel(rowsToExport, "transactions-invoice-receipt");
+    if (ok) {
+      showSnackbar({
+        severity: "success",
+        message: `Exported ${rowsToExport.length} transaction${rowsToExport.length === 1 ? "" : "s"} (invoice/receipt) to Excel.`,
+      });
+    }
+  }, [closeMoreMenus, rowsToExport, showSnackbar]);
+
+  const handleActionMenuAction = React.useCallback(
+    (actionId: string) => {
+      if (actionId === "export") return;
+
+      closeMoreMenus();
+
+      if (actionId === "voidSales") {
         openVoidPaymentModal();
         return;
       }
 
-      closeMoreMenus();
-
-      if (opt === "Refund") {
+      if (actionId === "refund") {
         openRefundDrawer();
-        return;
-      }
-
-      if (rowsToExport.length === 0) {
-        showSnackbar({ severity: "warning", message: "No transactions to export." });
-        return;
-      }
-
-      const filenamePrefix =
-        opt === "Export Invoice/Receipt" ? "transactions-invoice-receipt" : "transactions-overview";
-      const ok = exportTransactionsToExcel(rowsToExport, filenamePrefix);
-      if (ok) {
-        const exportLabel = opt === "Export Invoice/Receipt" ? "invoice/receipt" : "overview";
-        showSnackbar({
-          severity: "success",
-          message: `Exported ${rowsToExport.length} transaction${rowsToExport.length === 1 ? "" : "s"} (${exportLabel}) to Excel.`,
-        });
       }
     },
-    [closeMoreMenus, openRefundDrawer, openVoidPaymentModal, rowsToExport, selectedCount, showSnackbar],
+    [closeMoreMenus, openRefundDrawer, openVoidPaymentModal],
+  );
+
+  const handleActionExportAction = React.useCallback(
+    (actionId: string) => {
+      if (actionId === "exportOverview") return;
+
+      if (actionId === "exportInvoiceReceipt") {
+        exportInvoiceReceipt();
+      }
+    },
+    [exportInvoiceReceipt],
   );
 
   const addMenuItemSx = React.useMemo(
@@ -342,57 +395,29 @@ export default function FinanceOverviewPage() {
     [m.navy],
   );
 
-  const addMenuHeadingSx = React.useMemo(
-    () => ({
-      lineHeight: 1.3,
-      fontSize: 10.5,
-      fontWeight: 800,
-      letterSpacing: "0.06em",
-      textTransform: "uppercase" as const,
-      color: alpha(m.navy, 0.42),
-      bgcolor: "transparent",
-      pointerEvents: "none" as const,
-    }),
-    [m.navy],
-  );
-
   const handleAddMenuAction = React.useCallback(
     (actionId: string) => {
-      if (actionId === "exportOverview") return;
-
       closeAddMenus();
 
-      if (actionId === "voidSales") {
-        openVoidPaymentModal();
-        return;
-      }
-
-      if (actionId === "refund") {
-        openRefundDrawer();
-        return;
-      }
-
-      if (actionId === "manualEntry") {
+      if (actionId === "newSale") {
         openManualEntryDrawer();
         return;
       }
 
-      if (actionId === "exportInvoiceReceipt") {
-        if (rowsToExport.length === 0) {
-          showSnackbar({ severity: "warning", message: "No transactions to export." });
+      if (actionId === "addNote") {
+        if (selectedCount === 0) {
+          showSnackbar({ severity: "warning", message: "Select a transaction to add a note." });
           return;
         }
-        const ok = exportTransactionsToExcel(rowsToExport, "transactions-invoice-receipt");
-        if (ok) {
-          showSnackbar({
-            severity: "success",
-            message: `Exported ${rowsToExport.length} transaction${rowsToExport.length === 1 ? "" : "s"} (invoice/receipt) to Excel.`,
-          });
-        }
+        openNoteModal(selectedRows[0].id);
       }
     },
-    [closeAddMenus, openManualEntryDrawer, openRefundDrawer, openVoidPaymentModal, rowsToExport, selectedCount, showSnackbar],
+    [closeAddMenus, openManualEntryDrawer, openNoteModal, selectedCount, selectedRows, showSnackbar],
   );
+
+  const openActionExportMenu = React.useCallback((el: HTMLElement) => {
+    setActionExportAnchor(el);
+  }, []);
 
   const openOverviewExportMenu = React.useCallback((el: HTMLElement) => {
     setOverviewExportAnchor(el);
@@ -481,45 +506,16 @@ export default function FinanceOverviewPage() {
           },
         }}
       >
-        <ListSubheader disableSticky sx={addMenuHeadingSx}>
-          Actions
-        </ListSubheader>
-        {ADD_ACTION_ITEMS.map((opt) => (
+        {ADD_MENU_ITEMS.map((opt) => (
           <MenuItem
             key={opt.id}
-            disabled={multipleSelected && "requiresSelection" in opt && opt.requiresSelection}
+            disabled={opt.id === "addNote" && selectedCount === 0}
             onClick={() => handleAddMenuAction(opt.id)}
             sx={addMenuItemSx}
           >
             {opt.label}
           </MenuItem>
         ))}
-        <Divider sx={{ my: 0.5, borderColor: alpha(m.navy, 0.08) }} />
-        <ListSubheader disableSticky sx={addMenuHeadingSx}>
-          Export
-        </ListSubheader>
-        {ADD_EXPORT_ITEMS.map((opt) =>
-          "hasSubmenu" in opt && opt.hasSubmenu ? (
-            <MenuItem
-              key={opt.id}
-              onMouseEnter={(e) => openOverviewExportMenu(e.currentTarget)}
-              onClick={(e) => openOverviewExportMenu(e.currentTarget)}
-              sx={{
-                ...addMenuItemSx,
-                display: "flex",
-                justifyContent: "space-between",
-                gap: 1,
-              }}
-            >
-              {opt.label}
-              <ChevronRightRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.45) }} />
-            </MenuItem>
-          ) : (
-            <MenuItem key={opt.id} onClick={() => handleAddMenuAction(opt.id)} sx={addMenuItemSx}>
-              {opt.label}
-            </MenuItem>
-          ),
-        )}
       </Menu>
 
       <Menu
@@ -537,16 +533,88 @@ export default function FinanceOverviewPage() {
           },
         }}
       >
-        {MORE_MENU_OPTIONS.map((opt) => (
-          <MenuItem
-            key={opt}
-            disabled={multipleSelected && !MORE_EXPORT_OPTIONS.has(opt)}
-            onClick={() => handleMoreMenuAction(opt)}
-            sx={{ borderRadius: "8px", fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.75), my: 0.25 }}
-          >
-            {opt}
-          </MenuItem>
-        ))}
+        {ACTION_MENU_ITEMS.map((opt) =>
+          "hasSubmenu" in opt && opt.hasSubmenu ? (
+            <MenuItem
+              key={opt.id}
+              onMouseEnter={(e) => openActionExportMenu(e.currentTarget)}
+              onClick={(e) => openActionExportMenu(e.currentTarget)}
+              sx={{
+                borderRadius: "8px",
+                fontSize: 12.5,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.75),
+                my: 0.25,
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 1,
+              }}
+            >
+              {opt.label}
+              <ChevronRightRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.45) }} />
+            </MenuItem>
+          ) : (
+            <MenuItem
+              key={opt.id}
+              disabled={"requiresSelection" in opt && opt.requiresSelection && selectedCount === 0}
+              onClick={() => handleActionMenuAction(opt.id)}
+              sx={{ borderRadius: "8px", fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.75), my: 0.25 }}
+            >
+              {opt.label}
+            </MenuItem>
+          ),
+        )}
+      </Menu>
+
+      <Menu
+        anchorEl={actionExportAnchor}
+        open={Boolean(actionExportAnchor)}
+        onClose={() => setActionExportAnchor(null)}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "left" }}
+        MenuListProps={{ sx: { py: 0.5 } }}
+        disableAutoFocusItem
+        PaperProps={{
+          sx: {
+            borderRadius: "10px",
+            border: `1px solid ${alpha(m.navy, 0.10)}`,
+            boxShadow: "0 14px 30px rgba(16,35,63,0.12)",
+            ml: 0.25,
+            minWidth: 200,
+            p: 0.5,
+          },
+        }}
+      >
+        {ACTION_EXPORT_ITEMS.map((opt) =>
+          "hasSubmenu" in opt && opt.hasSubmenu ? (
+            <MenuItem
+              key={opt.id}
+              onMouseEnter={(e) => openOverviewExportMenu(e.currentTarget)}
+              onClick={(e) => openOverviewExportMenu(e.currentTarget)}
+              sx={{
+                borderRadius: "8px",
+                fontSize: 12.5,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.75),
+                my: 0.25,
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 1,
+              }}
+            >
+              {opt.label}
+              <ChevronRightRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.45) }} />
+            </MenuItem>
+          ) : (
+            <MenuItem
+              key={opt.id}
+              onClick={() => handleActionExportAction(opt.id)}
+              sx={{ borderRadius: "8px", fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.75), my: 0.25 }}
+            >
+              {opt.label}
+            </MenuItem>
+          ),
+        )}
       </Menu>
 
       <Menu
@@ -589,6 +657,7 @@ export default function FinanceOverviewPage() {
         onToggleOne={toggleOne}
         onToggleAll={toggleAll}
         onOpenDocument={(row, documentType) => setActiveDocument({ row, documentType })}
+        onOpenNote={(row) => openNoteModal(row.id)}
         canLoadMore={canLoadMore}
         onLoadMore={
           canLoadMore
@@ -626,6 +695,14 @@ export default function FinanceOverviewPage() {
         open={manualEntryDrawerOpen}
         onClose={() => setManualEntryDrawerOpen(false)}
         onSave={confirmManualEntry}
+      />
+
+      <TransactionNoteModal
+        open={Boolean(noteModalTransactionId)}
+        initialNote={noteModalTransaction?.note ?? ""}
+        onClose={() => setNoteModalTransactionId(null)}
+        onSave={saveTransactionNote}
+        onDelete={noteModalTransaction?.note?.trim() ? deleteTransactionNote : undefined}
       />
     </Paper>
   );

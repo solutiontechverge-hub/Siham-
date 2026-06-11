@@ -56,7 +56,9 @@ import {
 } from "../../store/services/businessApi";
 import { getApiErrorMessage } from "../../lib/api-error";
 import { useSnackbar } from "./AppSnackbar";
+import AppMultiSelect from "./AppMultiSelect";
 import MollureFormField from "./MollureFormField";
+import MollureModal from "./MollureModal";
 import {
   MollureLabeledField,
   MollureLabeledPasswordField,
@@ -207,6 +209,20 @@ export type ProfessionalFixedLocationSetupProps = {
 };
 
 const PROFESSIONAL_COUNTRY = "Netherlands";
+const MAX_BUSINESS_KEYWORDS = 5;
+
+function parseFixedLocationMunicipalities(value: string | null | undefined): string[] {
+  const raw = String(value ?? "").trim();
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function formatFixedLocationMunicipalities(values: readonly string[]): string {
+  return values.map((entry) => entry.trim()).filter(Boolean).join(", ");
+}
 
 const MUNICIPALITY_OPTIONS = [
   "Amsterdam",
@@ -331,6 +347,15 @@ function addSoftIconButtonSx(m: Theme["palette"]["mollure"], size: number) {
   } as const;
 }
 
+const setupSectionPaperSx = (m: Theme["palette"]["mollure"]) =>
+  ({
+    borderRadius: "10px",
+    border: `1px solid ${alpha(m.navy, 0.08)}`,
+    boxShadow: "0 10px 22px rgba(16, 35, 63, 0.05)",
+    overflow: "hidden",
+    bgcolor: "#fff",
+  }) as const;
+
 function SectionShell({
   title,
   action,
@@ -343,16 +368,7 @@ function SectionShell({
   const theme = useTheme();
   const m = theme.palette.mollure;
   return (
-    <Paper
-      elevation={0}
-      sx={{
-        borderRadius: "10px",
-        border: `1px solid ${alpha(m.navy, 0.08)}`,
-        boxShadow: "0 10px 22px rgba(16, 35, 63, 0.05)",
-        overflow: "hidden",
-        bgcolor: "#fff",
-      }}
-    >
+    <Paper elevation={0} sx={setupSectionPaperSx(m)}>
       <Box
         sx={{
           px: 2.25,
@@ -374,6 +390,55 @@ function SectionShell({
       </Box>
       <Divider />
       <Box sx={{ px: 2.25, py: 2.1 }}>{children}</Box>
+    </Paper>
+  );
+}
+
+function SetupSubSection({
+  title,
+  action,
+  children,
+}: {
+  title: React.ReactNode;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const theme = useTheme();
+  const m = theme.palette.mollure;
+  return (
+    <Box>
+      <Box
+        sx={{
+          px: 2.25,
+          py: 1.6,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 2,
+        }}
+      >
+        {typeof title === "string" ? (
+          <Typography sx={{ fontWeight: 800, color: alpha(m.navy, 0.85), fontSize: 14 }}>
+            {title}
+          </Typography>
+        ) : (
+          title
+        )}
+        {action}
+      </Box>
+      <Box sx={{ px: 2.25, pt: 0 }}>{children}</Box>
+    </Box>
+  );
+}
+
+function SetupSectionsGroup({ children }: { children: React.ReactNode }) {
+  const theme = useTheme();
+  const m = theme.palette.mollure;
+  return (
+    <Paper elevation={0} sx={setupSectionPaperSx(m)}>
+      <Stack spacing={2} sx={{ pt: 2, pb: 2.1 }}>
+        {children}
+      </Stack>
     </Paper>
   );
 }
@@ -425,6 +490,7 @@ export default function ProfessionalFixedLocationSetup({
   const [updateBusinessSetupActive, { isLoading: isBusinessProfileStatusSaving }] =
     useUpdateBusinessSetupActiveMutation();
   const [businessProfileMenuAnchor, setBusinessProfileMenuAnchor] = React.useState<null | HTMLElement>(null);
+  const [permanentDeactivateConfirmOpen, setPermanentDeactivateConfirmOpen] = React.useState(false);
 
   const isBusinessProfileActive = businessSetupData?.is_active !== false;
   type ProfileValidationField =
@@ -914,7 +980,7 @@ export default function ProfessionalFixedLocationSetup({
     | "streetNumber"
     | "postalCode"
     | "province"
-    | "municipality"
+    | "municipalities"
     | "serviceFor"
     | "amenities"
     | "projectEnabled"
@@ -950,7 +1016,7 @@ export default function ProfessionalFixedLocationSetup({
         "streetNumber",
         "postalCode",
         "province",
-        "municipality",
+        "municipalities",
       ] as const,
     [],
   );
@@ -998,7 +1064,7 @@ export default function ProfessionalFixedLocationSetup({
       streetNumber: values.streetNumber,
       postalCode: values.postalCode,
       province: values.province,
-      municipality: values.municipality,
+      municipalities: values.municipalities,
       serviceFor: values.serviceFor,
       amenities: values.amenities,
       projectEnabled: values.projectEnabled,
@@ -1078,7 +1144,7 @@ export default function ProfessionalFixedLocationSetup({
     "Specific areas only",
   );
   const [desiredProvinceDraft, setDesiredProvinceDraft] = React.useState<ProvinceKey | "">("Noord-Holland");
-  const [desiredMunicipalityDraft, setDesiredMunicipalityDraft] = React.useState<string>("");
+  const [desiredMunicipalityDraft, setDesiredMunicipalityDraft] = React.useState<string[]>([]);
   const [desiredAreas, setDesiredAreas] = React.useState<DesiredAreaRow[]>([]);
 
   const desiredAreasByProvince = React.useMemo(() => {
@@ -1102,20 +1168,24 @@ export default function ProfessionalFixedLocationSetup({
   }, [desiredAreas]);
 
   const addDesiredArea = React.useCallback(() => {
-    if (!desiredProvinceDraft || !desiredMunicipalityDraft.trim()) return;
-    const exists = desiredAreas.some(
-      (r) => r.province === desiredProvinceDraft && r.municipality === desiredMunicipalityDraft,
+    if (!desiredProvinceDraft || !desiredMunicipalityDraft.length) return;
+    const municipalitiesToAdd = desiredMunicipalityDraft.filter(
+      (municipality) =>
+        !desiredAreas.some(
+          (row) => row.province === desiredProvinceDraft && row.municipality === municipality,
+        ),
     );
-    if (exists) return;
+    if (!municipalitiesToAdd.length) return;
     setIsBusinessPublishEnabled(true);
     setDesiredAreas((prev) => [
       ...prev,
-      {
+      ...municipalitiesToAdd.map((municipality) => ({
         id: `dl-${Date.now()}-${Math.random().toString(16).slice(2)}`,
         province: desiredProvinceDraft,
-        municipality: desiredMunicipalityDraft,
-      },
+        municipality,
+      })),
     ]);
+    setDesiredMunicipalityDraft([]);
   }, [desiredAreas, desiredMunicipalityDraft, desiredProvinceDraft]);
 
   const removeDesiredProvinceGroup = React.useCallback((province: DesiredProvince) => {
@@ -1178,10 +1248,23 @@ export default function ProfessionalFixedLocationSetup({
           select
           label="Province"
           value={fixedBiz.province}
-          onChange={(e) => setFixedBizField("province", e.target.value)}
+          onChange={(e) => {
+            const province = e.target.value;
+            const allowed = new Set(
+              ((desiredMunicipalityByProvince as Record<string, string[]>)[province || "Noord-Holland"] ?? []),
+            );
+            setFixedBizField("province", province);
+            setFixedBizField(
+              "municipalities",
+              fixedBiz.municipalities.filter((entry) => allowed.has(entry)),
+            );
+          }}
           disabled={locationDisabled}
+          SelectProps={{ displayEmpty: true }}
         >
-          <MenuItem value="">Province</MenuItem>
+          <MenuItem value="">
+            <em>Select province</em>
+          </MenuItem>
           {desiredProvinceOptions.map((p) => (
             <MenuItem key={p} value={p}>
               {p}
@@ -1190,20 +1273,21 @@ export default function ProfessionalFixedLocationSetup({
         </MollureFormField>
       </Grid>
       <Grid item xs={12} sm={4}>
-        <MollureFormField
-          select
+        <AppMultiSelect
           label="Municipality"
-          value={fixedBiz.municipality}
-          onChange={(e) => setFixedBizField("municipality", e.target.value)}
-          disabled={locationDisabled}
-        >
-          <MenuItem value="">Municipality</MenuItem>
-          {((desiredMunicipalityByProvince as Record<string, string[]>)[fixedBiz.province || "Noord-Holland"] ?? []).map((o: string) => (
-            <MenuItem key={o} value={o}>
-              {o}
-            </MenuItem>
-          ))}
-        </MollureFormField>
+          placeholder="Select municipalities"
+          value={fixedBiz.municipalities}
+          onChange={(municipalities) => setFixedBizField("municipalities", municipalities)}
+          disabled={locationDisabled || !fixedBiz.province}
+          options={(
+            (desiredMunicipalityByProvince as Record<string, string[]>)[fixedBiz.province || "Noord-Holland"] ?? []
+          ).map((option) => ({
+            value: option,
+            label: option,
+          }))}
+          fullWidth
+          sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" } }}
+        />
       </Grid>
     </Grid>
   );
@@ -1222,7 +1306,7 @@ export default function ProfessionalFixedLocationSetup({
             setDesiredAreaMode(mode);
             if (mode === "All Netherlands") {
               setDesiredProvinceDraft("");
-              setDesiredMunicipalityDraft("");
+              setDesiredMunicipalityDraft([]);
             }
           }}
           disabled={locationDisabled}
@@ -1245,7 +1329,7 @@ export default function ProfessionalFixedLocationSetup({
               onChange={(e) => {
                 const p = e.target.value as (typeof desiredProvinceOptions)[number];
                 setDesiredProvinceDraft(p);
-                setDesiredMunicipalityDraft("");
+                setDesiredMunicipalityDraft([]);
               }}
               disabled={locationDisabled}
               sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
@@ -1264,31 +1348,25 @@ export default function ProfessionalFixedLocationSetup({
                 <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.6 }}>
                   Municipality
                 </Typography>
-                <MollureFormField
-                  select
+                <AppMultiSelect
+                  placeholder="Select municipalities"
                   value={desiredMunicipalityDraft}
-                  onChange={(e) => setDesiredMunicipalityDraft(e.target.value)}
-                  disabled={locationDisabled}
-                  sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                >
-                  <MenuItem value="">
-                    <Typography component="span" sx={{ fontSize: 13, color: alpha(m.navy, 0.45) }}>
-                      Select municipality
-                    </Typography>
-                  </MenuItem>
-                  {(desiredProvinceDraft
+                  onChange={setDesiredMunicipalityDraft}
+                  disabled={locationDisabled || !desiredProvinceDraft}
+                  options={(desiredProvinceDraft
                     ? (desiredMunicipalityByProvince[desiredProvinceDraft as ProvinceKey] ?? [])
                     : []
-                  ).map((municipality: string) => (
-                    <MenuItem key={municipality} value={municipality}>
-                      {municipality}
-                    </MenuItem>
-                  ))}
-                </MollureFormField>
+                  ).map((municipality) => ({
+                    value: municipality,
+                    label: municipality,
+                  }))}
+                  fullWidth
+                  sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" } }}
+                />
               </Box>
               <IconButton
                 onClick={addDesiredArea}
-                disabled={locationDisabled || !desiredMunicipalityDraft.trim()}
+                disabled={locationDisabled || !desiredMunicipalityDraft.length}
                 sx={addSoftIconButtonSx(m, 36)}
                 aria-label="Add desired area"
               >
@@ -1387,15 +1465,18 @@ export default function ProfessionalFixedLocationSetup({
   );
 
   const addBizKeyword = React.useCallback(() => {
+    if (biz.keywords.length >= MAX_BUSINESS_KEYWORDS) return;
     const next = biz.keywordDraft.trim();
     if (!next) return;
     if (biz.keywords.includes(next)) {
       setBizField("keywordDraft", "");
       return;
     }
-    setBizField("keywords", [...biz.keywords, next].slice(0, 3));
+    setBizField("keywords", [...biz.keywords, next].slice(0, MAX_BUSINESS_KEYWORDS));
     setBizField("keywordDraft", "");
   }, [biz.keywordDraft, biz.keywords, setBizField]);
+
+  const keywordsAtMax = biz.keywords.length >= MAX_BUSINESS_KEYWORDS;
 
   const removeBizKeyword = React.useCallback(
     (k: string) => {
@@ -1418,25 +1499,45 @@ export default function ProfessionalFixedLocationSetup({
   const servicesFixedRef = React.useRef<ServiceDetailUiItem[]>([]);
   const servicesDesiredRef = React.useRef<ServiceDetailUiItem[]>([]);
 
-  const onToggleBusinessProfileActive = React.useCallback(async () => {
-    const nextActive = !isBusinessProfileActive;
-    setBusinessProfileMenuAnchor(null);
+  const setBusinessProfileActive = React.useCallback(
+    async (nextActive: boolean, successMessage?: string) => {
+      setBusinessProfileMenuAnchor(null);
 
-    try {
-      const result = await updateBusinessSetupActive({ is_active: nextActive }).unwrap();
-      showSnackbar({
-        severity: "success",
-        message:
-          result.message ||
-          (nextActive ? "Business profile activated successfully." : "Business profile deactivated successfully."),
-      });
-    } catch (error) {
-      showSnackbar({
-        severity: "error",
-        message: getApiErrorMessage(error, "Unable to update business profile status."),
-      });
-    }
-  }, [isBusinessProfileActive, showSnackbar, updateBusinessSetupActive]);
+      try {
+        const result = await updateBusinessSetupActive({ is_active: nextActive }).unwrap();
+        showSnackbar({
+          severity: "success",
+          message:
+            successMessage ||
+            result.message ||
+            (nextActive ? "Business profile activated successfully." : "Business profile deactivated successfully."),
+        });
+      } catch (error) {
+        showSnackbar({
+          severity: "error",
+          message: getApiErrorMessage(error, "Unable to update business profile status."),
+        });
+      }
+    },
+    [showSnackbar, updateBusinessSetupActive],
+  );
+
+  const onActivateBusinessProfile = React.useCallback(() => {
+    void setBusinessProfileActive(true);
+  }, [setBusinessProfileActive]);
+
+  const onTemporarilyDeactivateBusinessProfile = React.useCallback(() => {
+    void setBusinessProfileActive(false, "Business profile temporarily deactivated.");
+  }, [setBusinessProfileActive]);
+
+  const onConfirmPermanentDeactivate = React.useCallback(() => {
+    setPermanentDeactivateConfirmOpen(false);
+    void setBusinessProfileActive(false, "Business profile permanently deactivated.");
+  }, [setBusinessProfileActive]);
+
+  const onToggleBusinessProfileActive = React.useCallback(async () => {
+    await setBusinessProfileActive(!isBusinessProfileActive);
+  }, [isBusinessProfileActive, setBusinessProfileActive]);
 
   const toPersistedTeamMemberId = React.useCallback((id: string) => {
     const normalized = String(id ?? "").trim();
@@ -1490,7 +1591,7 @@ export default function ProfessionalFixedLocationSetup({
         fixed_location_street_number: fixedBiz.streetNumber,
         fixed_location_postal_code: fixedBiz.postalCode,
         fixed_location_province: fixedBiz.province,
-        fixed_location_municipality: fixedBiz.municipality,
+        fixed_location_municipality: formatFixedLocationMunicipalities(fixedBiz.municipalities),
         service_for: Object.entries(sourceBiz.serviceFor)
           .filter(([, enabled]) => enabled)
           .map(([key]) => key),
@@ -1717,7 +1818,7 @@ export default function ProfessionalFixedLocationSetup({
       streetNumber: businessSetupData.fixed_location_street_number || "",
       postalCode: businessSetupData.fixed_location_postal_code || "",
       province: businessSetupData.fixed_location_province || "",
-      municipality: businessSetupData.fixed_location_municipality || "",
+      municipalities: parseFixedLocationMunicipalities(businessSetupData.fixed_location_municipality),
       serviceFor: {
         men: (businessSetupData.service_for || []).includes("men"),
         women: (businessSetupData.service_for || []).includes("women"),
@@ -2078,6 +2179,23 @@ export default function ProfessionalFixedLocationSetup({
     openAddServiceForCategory(activeServiceCategory);
   }, [activeServiceCategory, openAddServiceForCategory]);
 
+  const openAddSubserviceForItem = React.useCallback(
+    (item: ServiceDetailUiItem) => {
+      ensureServicesDetailsEditing();
+      const storageId = resolveServiceCategoryStorageId(item.categoryId, serviceCategoryTabs, businessCategories);
+      if (!storageId) return;
+      const parentMainId = item.parentServiceId?.trim() || ensureCategoryParentMain(storageId);
+      serviceModal.openAddSubservice(storageId, parentMainId);
+    },
+    [
+      businessCategories,
+      ensureCategoryParentMain,
+      ensureServicesDetailsEditing,
+      serviceCategoryTabs,
+      serviceModal,
+    ],
+  );
+
   const toggleServiceDetailExpand = React.useCallback((id: string) => {
     setExpandedServiceDetailIds((prev) => ({ ...prev, [id]: !prev[id] }));
   }, []);
@@ -2166,6 +2284,15 @@ export default function ProfessionalFixedLocationSetup({
               <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexShrink: 0 }}>
                 <IconButton
                   size="small"
+                  aria-label="Add subservice"
+                  onClick={() => openAddSubserviceForItem(it)}
+                  disabled={isBusinessSetupSaving || servicesDetailsDisabled}
+                  sx={addSoftIconButtonSx(m, 32)}
+                >
+                  <AddRoundedIcon sx={{ fontSize: 18 }} />
+                </IconButton>
+                <IconButton
+                  size="small"
                   aria-label="Edit service"
                   onClick={() => handleEditSubservice(it)}
                   disabled={isBusinessSetupSaving}
@@ -2202,7 +2329,16 @@ export default function ProfessionalFixedLocationSetup({
         </Paper>
       );
     },
-    [expandedServiceDetailIds, handleDeleteSubservice, handleEditSubservice, isBusinessSetupSaving, m.navy, toggleServiceDetailExpand],
+    [
+      expandedServiceDetailIds,
+      handleDeleteSubservice,
+      handleEditSubservice,
+      isBusinessSetupSaving,
+      m.navy,
+      openAddSubserviceForItem,
+      servicesDetailsDisabled,
+      toggleServiceDetailExpand,
+    ],
   );
 
   const renderMainServiceRow = React.useCallback(
@@ -3101,7 +3237,7 @@ export default function ProfessionalFixedLocationSetup({
       onClose={teamMemberModal.closeModal}
       onSubmit={() => void teamMemberModal.saveModal()}
       onChange={teamMemberModal.updateDraft}
-      onAddServiceSelection={teamMemberModal.addServiceSelection}
+      onPickService={teamMemberModal.pickService}
       onRemoveServiceGroup={teamMemberModal.removeServiceGroup}
       onChoosePhoto={teamMemberModal.choosePhoto}
       onPhotoSelected={teamMemberModal.onPhotoSelected}
@@ -3454,20 +3590,106 @@ export default function ProfessionalFixedLocationSetup({
             },
           }}
         >
-          <MenuItem
-            onClick={onToggleBusinessProfileActive}
-            disabled={isBusinessProfileStatusSaving}
-            sx={{
-              borderRadius: "8px",
-              fontSize: 13,
-              fontWeight: 700,
-              color: alpha(m.navy, 0.82),
-              my: 0.25,
-            }}
-          >
-            {isBusinessProfileActive ? "Deactivate" : "Activate"}
-          </MenuItem>
+          {isBusinessProfileActive ? (
+            <>
+              <MenuItem
+                onClick={onTemporarilyDeactivateBusinessProfile}
+                disabled={isBusinessProfileStatusSaving}
+                sx={{
+                  borderRadius: "8px",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: alpha(m.navy, 0.82),
+                  my: 0.25,
+                }}
+              >
+                Temporarily Deactivate
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  setBusinessProfileMenuAnchor(null);
+                  setPermanentDeactivateConfirmOpen(true);
+                }}
+                disabled={isBusinessProfileStatusSaving}
+                sx={{
+                  borderRadius: "8px",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: alpha(m.navy, 0.82),
+                  my: 0.25,
+                }}
+              >
+                Permanently Deactivate
+              </MenuItem>
+            </>
+          ) : (
+            <MenuItem
+              onClick={onActivateBusinessProfile}
+              disabled={isBusinessProfileStatusSaving}
+              sx={{
+                borderRadius: "8px",
+                fontSize: 13,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.82),
+                my: 0.25,
+              }}
+            >
+              Activate
+            </MenuItem>
+          )}
         </Menu>
+
+        <MollureModal
+          open={permanentDeactivateConfirmOpen}
+          onClose={() => setPermanentDeactivateConfirmOpen(false)}
+          title="Permanently deactivate profile?"
+          maxWidth="xs"
+          fullWidth
+          footer={
+            <Stack direction="row" spacing={1.25} justifyContent="flex-end" sx={{ px: 2.5, py: 1.75 }}>
+              <Button
+                variant="outlined"
+                onClick={() => setPermanentDeactivateConfirmOpen(false)}
+                disabled={isBusinessProfileStatusSaving}
+                sx={{
+                  borderRadius: "10px",
+                  textTransform: "none",
+                  fontWeight: 800,
+                  height: 36,
+                  px: 3,
+                  borderColor: alpha(m.navy, 0.16),
+                  color: alpha(m.navy, 0.65),
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="contained"
+                disableElevation
+                onClick={onConfirmPermanentDeactivate}
+                disabled={isBusinessProfileStatusSaving}
+                sx={{
+                  borderRadius: "10px",
+                  textTransform: "none",
+                  fontWeight: 900,
+                  height: 36,
+                  px: 3,
+                  bgcolor: m.teal,
+                  color: "#fff",
+                  "&:hover": { bgcolor: m.tealDark },
+                }}
+              >
+                Permanently Deactivate
+              </Button>
+            </Stack>
+          }
+        >
+          <Box sx={{ px: 2.5, py: 2 }}>
+            <Typography sx={{ fontSize: 13, color: alpha(m.navy, 0.68), lineHeight: 1.55 }}>
+              Your public profile will be removed from listings. You can still reactivate later by publishing again.
+            </Typography>
+          </Box>
+        </MollureModal>
       </Stack>
 
       <SectionShell title={data.profile.title} action={renderSectionEditAction("profile")}>
@@ -3616,7 +3838,7 @@ export default function ProfessionalFixedLocationSetup({
               />
               <MollureFormField
                 label={data.profile.keywordsLabel}
-                placeholder={data.profile.keywordPlaceholder}
+                placeholder={keywordsAtMax ? `Maximum ${MAX_BUSINESS_KEYWORDS} keywords added` : data.profile.keywordPlaceholder}
                 value={biz.keywordDraft}
                 onChange={(e) => setBizField("keywordDraft", e.target.value)}
                 onKeyDown={(e) => {
@@ -3625,7 +3847,7 @@ export default function ProfessionalFixedLocationSetup({
                     addBizKeyword();
                   }
                 }}
-                disabled={profileDisabled}
+                disabled={profileDisabled || keywordsAtMax}
               />
               <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
                 {biz.keywords.map((k) => (
@@ -4542,26 +4764,27 @@ export default function ProfessionalFixedLocationSetup({
         </Popover>
       </SectionShell>
 
-      <SectionShell title={data.generalNotes.title} action={renderSectionEditAction("generalNotes")}>
-        <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
-          {data.generalNotes.notesLabel}
-        </Typography>
-        <MollureFormField
-          placeholder={data.generalNotes.placeholder}
-          value={values.notes}
-          onChange={(e) => setField("notes", e.target.value)}
-          multiline
-          minRows={4}
-          disabled={generalNotesDisabled}
-          sx={{
-            "& .MuiOutlinedInput-root": {
-              bgcolor: alpha(m.navy, 0.01),
-            },
-          }}
-        />
-      </SectionShell>
+      <SetupSectionsGroup>
+        <SetupSubSection title={data.generalNotes.title} action={renderSectionEditAction("generalNotes")}>
+          <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
+            {data.generalNotes.notesLabel}
+          </Typography>
+          <MollureFormField
+            placeholder={data.generalNotes.placeholder}
+            value={values.notes}
+            onChange={(e) => setField("notes", e.target.value)}
+            multiline
+            minRows={4}
+            disabled={generalNotesDisabled}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                bgcolor: alpha(m.navy, 0.01),
+              },
+            }}
+          />
+        </SetupSubSection>
 
-      <SectionShell title="Price" action={renderSectionEditAction("price")}>
+        <SetupSubSection title="Price" action={renderSectionEditAction("price")}>
         <Stack spacing={2}>
           <Box>
             <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
@@ -4660,9 +4883,9 @@ export default function ProfessionalFixedLocationSetup({
             </Box>
           ) : null}
         </Stack>
-      </SectionShell>
+        </SetupSubSection>
 
-      <SectionShell title="Policy Section" action={renderSectionEditAction("policy")}>
+        <SetupSubSection title="Policy Section" action={renderSectionEditAction("policy")}>
           <Stack spacing={1.6}>
             <Box>
               <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
@@ -4708,9 +4931,9 @@ export default function ProfessionalFixedLocationSetup({
               sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
             />
           </Stack>
-      </SectionShell>
+        </SetupSubSection>
 
-      <SectionShell title="Rescheduling Policy" action={renderSectionEditAction("reschedulingPolicy")}>
+        <SetupSubSection title="Rescheduling Policy" action={renderSectionEditAction("reschedulingPolicy")}>
           <Stack spacing={1.6}>
             <Box>
               <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
@@ -4773,9 +4996,9 @@ export default function ProfessionalFixedLocationSetup({
               sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
             />
           </Stack>
-      </SectionShell>
+        </SetupSubSection>
 
-      <SectionShell title="Cancellation Policy" action={renderSectionEditAction("cancellationPolicy")}>
+        <SetupSubSection title="Cancellation Policy" action={renderSectionEditAction("cancellationPolicy")}>
           <Stack spacing={1.6}>
             <Box>
               <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
@@ -4838,9 +5061,9 @@ export default function ProfessionalFixedLocationSetup({
               sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
             />
           </Stack>
-      </SectionShell>
+        </SetupSubSection>
 
-      <SectionShell title="No Show Policy" action={renderSectionEditAction("noShowPolicy")}>
+        <SetupSubSection title="No Show Policy" action={renderSectionEditAction("noShowPolicy")}>
           <Stack spacing={1.6}>
             <Box>
               <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
@@ -4869,7 +5092,8 @@ export default function ProfessionalFixedLocationSetup({
               sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
             />
           </Stack>
-      </SectionShell>
+        </SetupSubSection>
+      </SetupSectionsGroup>
 
       <SectionShell
         title="Portfolio"

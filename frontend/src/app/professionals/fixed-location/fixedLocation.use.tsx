@@ -14,7 +14,7 @@ export type FixedLocationFormState = {
   streetNumber: string;
   postalCode: string;
   province: string;
-  municipality: string;
+  municipalities: string[];
 
   serviceFor: {
     men: boolean;
@@ -106,7 +106,7 @@ const initialState: FixedLocationFormState = {
   streetNumber: "",
   postalCode: "",
   province: "",
-  municipality: "",
+  municipalities: [],
 
   serviceFor: { men: true, women: true, kids: false },
   amenities: { parking: true, wifi: false, wheelchair: false, pets: false },
@@ -198,6 +198,7 @@ export function useFixedLocationForm() {
   );
 
   const addKeyword = React.useCallback(() => {
+    if (values.keywords.length >= 5) return;
     const next = values.keywordDraft.trim();
     if (!next) return;
     if (values.keywords.includes(next)) {
@@ -206,7 +207,7 @@ export function useFixedLocationForm() {
     }
     setValues((prev) => ({
       ...prev,
-      keywords: [...prev.keywords, next].slice(0, 3),
+      keywords: [...prev.keywords, next].slice(0, 5),
       keywordDraft: "",
     }));
   }, [values.keywordDraft, values.keywords]);

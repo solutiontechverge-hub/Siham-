@@ -1,3 +1,5 @@
+import type { AnalyticsExplanationContent } from "./analytics.data";
+
 export type ReviewTag = {
   label: string;
 };
@@ -20,6 +22,8 @@ export type ProfessionalReviewItem = {
 export type ReviewManagementOverview = {
   title: string;
   description: string;
+  explanationLabel: string;
+  explanationContent?: AnalyticsExplanationContent;
   overallRating: number;
   ratingOutOf: number;
   totalReviews: number;
@@ -37,6 +41,8 @@ export type RatingAnalyticsRow = {
 export type RatingReviewAnalytics = {
   title: string;
   description: string;
+  explanationLabel: string;
+  explanationContent?: AnalyticsExplanationContent;
   rows: readonly RatingAnalyticsRow[];
 };
 
@@ -52,6 +58,8 @@ export type RatingDistributionRow = {
 export type RatingDistributionByCategory = {
   title: string;
   description: string;
+  explanationLabel: string;
+  explanationContent?: AnalyticsExplanationContent;
   rows: readonly RatingDistributionRow[];
 };
 
@@ -82,6 +90,17 @@ export const professionalFixedLocationRatingReviewAnalyticsData: ProfessionalFix
   reviewManagementOverview: {
     title: "4.1 Review Management Overview",
     description: "Summarises your overall reputation based on the average star rating and total number of client reviews.",
+    explanationLabel: "View Explanation",
+    explanationContent: {
+      blocks: [
+        {
+          title: "",
+          paragraphs: [
+            "Exp: Summarises your overall reputation based on the average star rating and total number of client reviews.",
+          ],
+        },
+      ],
+    },
     overallRating: 4.5,
     ratingOutOf: 5.0,
     totalReviews: 54,
@@ -89,6 +108,17 @@ export const professionalFixedLocationRatingReviewAnalyticsData: ProfessionalFix
   ratingReviewAnalytics: {
     title: "4.2 Rating & Review Analytics",
     description: "Groups all reviews into bad, good, and excellent bands so you can see how feedback is distributed and which reviews still need a reply.",
+    explanationLabel: "View Explanation",
+    explanationContent: {
+      blocks: [
+        {
+          title: "",
+          paragraphs: [
+            "Exp: Groups all reviews into bad, good, and excellent bands so you can see how feedback is distributed and which reviews still need a reply.",
+          ],
+        },
+      ],
+    },
     rows: [
       { category: "Bad",          range: "1.0 – 3.0", count: 30, sharePct: 10, repliedTo: 90 },
       { category: "Good",         range: "3.5 – 4.0", count: 20, sharePct: 5,  repliedTo: 60 },
@@ -99,6 +129,18 @@ export const professionalFixedLocationRatingReviewAnalyticsData: ProfessionalFix
   ratingDistributionByCategory: {
     title: "4.3 Rating Distribution by Category",
     description: "Shows how each service category is rated across bad, good, and excellent reviews so you can quickly spot strong areas and categories that may need improvement.",
+    explanationLabel: "View Explanation",
+    explanationContent: {
+      blocks: [
+        {
+          title: "",
+          paragraphs: [
+            "Exp: Shows how each service category is rated across bad, good, and excellent reviews so you can quickly spot strong areas and categories that may need improvement.",
+            "Calculation: Share (%) = (Category Review Count ÷ Total Reviews) × 100. Actions depend on reply status: 'View / Reply' if unreplied, 'View' if all replied, or 'View / Edit' if edits are allowed.",
+          ],
+        },
+      ],
+    },
     rows: [
       { category: "Hair",      badPct: 30, goodPct: 30, excellentPct: 10, totalReviews: 90 },
       { category: "Nails",     badPct: 20, goodPct: 20, excellentPct: 5,  totalReviews: 60 },

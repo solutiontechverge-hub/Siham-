@@ -10,8 +10,10 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
+import EventSeatRoundedIcon from "@mui/icons-material/EventSeatRounded";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
+import PersonPinCircleRoundedIcon from "@mui/icons-material/PersonPinCircleRounded";
 import RemoveRoundedIcon from "@mui/icons-material/RemoveRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import ChildCareRoundedIcon from "@mui/icons-material/ChildCareRounded";
@@ -35,6 +37,7 @@ import {
 } from "@mui/material";
 import type { BusinessPublicProfileData } from "../../data/businessPublicProfile.data";
 import {
+  buildDesiredMunicipalityList,
   buildDesiredProvinceDisplays,
   getServicesForLocationMode,
   getTeamForLocationMode,
@@ -295,48 +298,40 @@ export type BusinessPublicProfileProps = {
   publicProfileTitle?: string;
 };
 
-function DesiredProvinceChip({ label }: { label: string }) {
-  const m = useTheme().palette.mollure;
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 1,
-        minHeight: 36,
-        minWidth: { xs: "100%", sm: 200 },
-        px: 1.25,
-        py: 0.5,
-        borderRadius: "10px",
-        bgcolor: "#fff",
-        border: `1px solid ${alpha(m.navy, 0.12)}`,
-        pointerEvents: "none",
-        userSelect: "none",
-      }}
-    >
-      <Typography sx={{ fontSize: 12.5, fontWeight: 500, color: alpha(m.navy, 0.78) }} noWrap>
-        {label}
-      </Typography>
-      <KeyboardArrowDownRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.35), flexShrink: 0 }} />
-    </Box>
-  );
-}
+type DesiredLocationView = "areas" | "municipalities";
 
 function ProfileLocationSection({
   data,
-  showFixed,
-  showDesired,
+  locationMode,
+  supportsFixed,
+  supportsDesired,
 }: {
   data: BusinessPublicProfileData;
-  showFixed: boolean;
-  showDesired: boolean;
+  locationMode: "fixed" | "desired";
+  supportsFixed: boolean;
+  supportsDesired: boolean;
 }) {
+  const showFixed = supportsFixed && (!supportsDesired || locationMode === "fixed");
+  const showDesired = supportsDesired && (!supportsFixed || locationMode === "desired");
   const m = useTheme().palette.mollure;
+  const [viewMode, setViewMode] = React.useState<DesiredLocationView>("areas");
+  const [listOpen, setListOpen] = React.useState(false);
+  const listAnchorRef = React.useRef<HTMLButtonElement>(null);
+
   const provinceDisplays = React.useMemo(
     () => buildDesiredProvinceDisplays(data.desiredLocation),
     [data.desiredLocation],
   );
+  const municipalityList = React.useMemo(
+    () => buildDesiredMunicipalityList(data.desiredLocation),
+    [data.desiredLocation],
+  );
+
+  const activeItems = viewMode === "areas" ? provinceDisplays.map((item) => item.label) : municipalityList;
+  const dropdownLabel =
+    viewMode === "areas"
+      ? `Service areas(${provinceDisplays.length})`
+      : `Municipalities(${municipalityList.length})`;
 
   return (
     <Stack spacing={2}>
@@ -360,26 +355,122 @@ function ProfileLocationSection({
           <Typography sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.62), mb: 1 }}>
             Specific Provinces
           </Typography>
+
           {data.desiredLocation.areaMode === "All Netherlands" ? (
             <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: alpha(m.navy, 0.55) }}>
               Services available across the Netherlands.
             </Typography>
           ) : (
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: {
-                  xs: "1fr",
-                  sm: "repeat(2, minmax(0, 1fr))",
-                  md: "repeat(4, minmax(0, 1fr))",
-                },
-                gap: 1,
-              }}
-            >
-              {provinceDisplays.map((item) => (
-                <DesiredProvinceChip key={item.id} label={item.label} />
-              ))}
-            </Box>
+            <>
+              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, mb: 1.25 }}>
+                {(
+                  [
+                    { label: "Service areas", value: "areas" },
+                    { label: "Municipalities", value: "municipalities" },
+                  ] as const
+                ).map((option) => {
+                  const active = viewMode === option.value;
+                  return (
+                    <ButtonBase
+                      key={option.value}
+                      onClick={() => {
+                        setViewMode(option.value);
+                        setListOpen(false);
+                      }}
+                      sx={{
+                        textTransform: "none",
+                        fontWeight: 700,
+                        fontSize: 12,
+                        borderRadius: "999px",
+                        px: 1.75,
+                        py: 0.75,
+                        color: active ? "#fff" : alpha(m.navy, 0.72),
+                        bgcolor: active ? m.teal : alpha(m.navy, 0.06),
+                        border: `1px solid ${active ? m.teal : alpha(m.navy, 0.08)}`,
+                        "&:hover": { bgcolor: active ? m.tealDark : alpha(m.teal, 0.1) },
+                      }}
+                    >
+                      {option.label}
+                    </ButtonBase>
+                  );
+                })}
+              </Box>
+
+              <ButtonBase
+                ref={listAnchorRef}
+                onClick={() => setListOpen((open) => !open)}
+                sx={{
+                  width: "100%",
+                  maxWidth: 360,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 1,
+                  minHeight: 40,
+                  px: 1.25,
+                  py: 0.75,
+                  borderRadius: "10px",
+                  bgcolor: "#fff",
+                  border: `1px solid ${alpha(m.navy, 0.12)}`,
+                  textAlign: "left",
+                }}
+              >
+                <Typography sx={{ fontSize: 12.5, fontWeight: 500, color: alpha(m.navy, 0.78) }}>
+                  {dropdownLabel}
+                </Typography>
+                <KeyboardArrowDownRoundedIcon
+                  sx={{
+                    fontSize: 18,
+                    color: alpha(m.navy, 0.35),
+                    flexShrink: 0,
+                    transform: listOpen ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "transform 150ms ease",
+                  }}
+                />
+              </ButtonBase>
+
+              <Popper
+                open={listOpen}
+                anchorEl={listAnchorRef.current}
+                placement="bottom-start"
+                modifiers={[{ name: "offset", options: { offset: [0, 6] } }]}
+                sx={{ zIndex: (theme) => theme.zIndex.modal, width: listAnchorRef.current?.offsetWidth }}
+              >
+                <ClickAwayListener onClickAway={() => setListOpen(false)}>
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      mt: 0.25,
+                      width: "100%",
+                      maxHeight: 220,
+                      overflowY: "auto",
+                      borderRadius: "10px",
+                      border: `1px solid ${alpha(m.navy, 0.1)}`,
+                      boxShadow: "0 12px 28px rgba(16, 24, 40, 0.12)",
+                      p: 0.75,
+                    }}
+                  >
+                    <Stack spacing={0.5}>
+                      {activeItems.map((label) => (
+                        <Box
+                          key={label}
+                          sx={{
+                            px: 1.1,
+                            py: 0.85,
+                            borderRadius: "8px",
+                            bgcolor: alpha(m.navy, 0.02),
+                          }}
+                        >
+                          <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: alpha(m.navy, 0.78) }}>
+                            {label}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Stack>
+                  </Paper>
+                </ClickAwayListener>
+              </Popper>
+            </>
           )}
         </Box>
       ) : null}
@@ -419,7 +510,64 @@ function PublicProfileTopBar({ title }: { title: string }) {
   );
 }
 
-function ProfileLocationToggle({
+function ProfileLocationChoiceCard({
+  mode,
+  active,
+  canSwitch,
+  onSelect,
+}: {
+  mode: "fixed" | "desired";
+  active: boolean;
+  canSwitch: boolean;
+  onSelect?: () => void;
+}) {
+  const m = useTheme().palette.mollure;
+  const Icon = mode === "fixed" ? EventSeatRoundedIcon : PersonPinCircleRoundedIcon;
+  const label = mode === "fixed" ? "Fixed Location" : "Desired Location";
+
+  return (
+    <ButtonBase
+      onClick={() => {
+        if (canSwitch) onSelect?.();
+      }}
+      sx={{
+        flex: "1 1 0",
+        minWidth: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 1,
+        px: 1.5,
+        py: 1.15,
+        borderRadius: "10px",
+        bgcolor: m.fxGrayF2F4F7,
+        border: `1px solid ${active ? alpha(m.teal, 0.35) : alpha(m.navy, 0.08)}`,
+        textAlign: "left",
+        cursor: canSwitch ? "pointer" : "default",
+      }}
+    >
+      <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
+        <Icon sx={{ fontSize: 20, color: alpha(m.navy, 0.55), flexShrink: 0 }} />
+        <Typography sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.78) }} noWrap>
+          {label}
+        </Typography>
+      </Stack>
+      <Checkbox
+        checked={active}
+        size="small"
+        tabIndex={-1}
+        disableRipple
+        sx={{
+          p: 0.25,
+          color: alpha(m.navy, 0.28),
+          "&.Mui-checked": { color: m.teal },
+        }}
+      />
+    </ButtonBase>
+  );
+}
+
+function ProfileLocationChoiceCards({
   locationMode,
   supportsFixed,
   supportsDesired,
@@ -430,71 +578,39 @@ function ProfileLocationToggle({
   supportsDesired: boolean;
   onChange?: (mode: "fixed" | "desired") => void;
 }) {
-  const m = useTheme().palette.mollure;
   const canSwitch = supportsFixed && supportsDesired;
-  const fixedActive = locationMode === "fixed";
-  const desiredActive = locationMode === "desired";
 
-  const segmentSx = (side: "left" | "right", active: boolean) => ({
-    flex: 1,
-    minWidth: { xs: 108, sm: 128 },
-    py: 1.05,
-    px: { xs: 1.25, sm: 1.75 },
-    minHeight: 40,
-    textTransform: "none" as const,
-    fontWeight: active ? 700 : 600,
-    fontSize: { xs: 13, sm: 14 },
-    lineHeight: 1.2,
-    boxShadow: "none",
-    borderRadius: side === "left" ? "7px 0 0 7px" : "0 7px 7px 0",
-    color: active ? "#fff" : alpha(m.navy, 0.55),
-    bgcolor: active ? m.teal : "#fff",
-    border: "none",
-    transition: "background-color 160ms ease, color 160ms ease",
-    "&:hover": {
-      boxShadow: "none",
-      bgcolor: !canSwitch ? (active ? m.teal : "#fff") : active ? m.tealDark : alpha(m.teal, 0.07),
-    },
-    "&.Mui-disabled": {
-      color: active ? "#fff" : alpha(m.navy, 0.32),
-      bgcolor: active ? m.teal : "#fff",
-    },
-  });
+  if (!supportsFixed && !supportsDesired) return null;
 
   return (
     <Box
       sx={{
-        display: "inline-flex",
-        alignItems: "stretch",
-        border: `1px solid ${alpha(m.navy, 0.14)}`,
-        borderRadius: "8px",
-        overflow: "hidden",
-        bgcolor: "#fff",
-        flexShrink: 0,
+        display: "flex",
+        flexDirection: { xs: "column", sm: "row" },
+        gap: 1,
+        width: { xs: "100%", sm: "auto" },
+        minWidth: { sm: canSwitch ? 420 : 210 },
+        maxWidth: "100%",
       }}
       role="group"
       aria-label="Location type"
     >
-      <Button
-        disableElevation
-        disabled={!canSwitch || !supportsFixed}
-        onClick={() => {
-          if (canSwitch) onChange?.("fixed");
-        }}
-        sx={segmentSx("left", fixedActive)}
-      >
-        Fixed Location
-      </Button>
-      <Button
-        disableElevation
-        disabled={!canSwitch || !supportsDesired}
-        onClick={() => {
-          if (canSwitch) onChange?.("desired");
-        }}
-        sx={segmentSx("right", desiredActive)}
-      >
-        Desired Location
-      </Button>
+      {supportsFixed ? (
+        <ProfileLocationChoiceCard
+          mode="fixed"
+          active={locationMode === "fixed"}
+          canSwitch={canSwitch}
+          onSelect={() => onChange?.("fixed")}
+        />
+      ) : null}
+      {supportsDesired ? (
+        <ProfileLocationChoiceCard
+          mode="desired"
+          active={locationMode === "desired"}
+          canSwitch={canSwitch}
+          onSelect={() => onChange?.("desired")}
+        />
+      ) : null}
     </Box>
   );
 }
@@ -769,7 +885,7 @@ export default function BusinessPublicProfile({
           >
             {pageTitle}
           </Typography>
-          <ProfileLocationToggle
+          <ProfileLocationChoiceCards
             locationMode={effectiveLocationMode}
             supportsFixed={data.supportsFixedLocation}
             supportsDesired={data.supportsDesiredLocation}
@@ -955,8 +1071,9 @@ export default function BusinessPublicProfile({
           <SectionCard title="Location">
             <ProfileLocationSection
               data={data}
-              showFixed={data.supportsFixedLocation}
-              showDesired={data.supportsDesiredLocation}
+              locationMode={effectiveLocationMode}
+              supportsFixed={data.supportsFixedLocation}
+              supportsDesired={data.supportsDesiredLocation}
             />
           </SectionCard>
         ) : null}

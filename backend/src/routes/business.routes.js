@@ -134,9 +134,9 @@ const businessSetupValidators = [
       .optional({ values: "falsy" })
       .custom((value) => {
         const parsed = parseArrayLike(value);
-        return Array.isArray(parsed) && parsed.length <= 3;
+        return Array.isArray(parsed) && parsed.length <= 5;
       })
-      .withMessage("business_keywords can contain up to 3 items."),
+      .withMessage("business_keywords can contain up to 5 items."),
     body("business_media")
       .optional({ values: "falsy" })
       .custom((value) => {

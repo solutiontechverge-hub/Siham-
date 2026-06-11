@@ -2,15 +2,15 @@
 
 import * as React from "react";
 import Image from "next/image";
-import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import { Box, Button, IconButton, MenuItem, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import MollureFormField from "./MollureFormField";
-import MollureModal from "./MollureModal";
+import MollureDrawer from "./MollureDrawer";
 import {
+  addTeamMemberServiceSelection,
   buildTeamCategoryOptions,
   buildTeamServiceOptionsForCategory,
   businessTeamMemberModalCopy,
@@ -39,7 +39,7 @@ type BusinessTeamMemberFormModalProps = {
   onClose: () => void;
   onSubmit: () => void;
   onChange: (patch: Partial<TeamMemberFormDraft>) => void;
-  onAddServiceSelection: () => void;
+  onPickService: (categoryId: string, serviceId: string) => void;
   onRemoveServiceGroup: (categoryId: string) => void;
   onChoosePhoto: () => void;
   onPhotoSelected: (file: File, objectUrl: string) => void;
@@ -58,7 +58,7 @@ export default function BusinessTeamMemberFormModal({
   onClose,
   onSubmit,
   onChange,
-  onAddServiceSelection,
+  onPickService,
   onRemoveServiceGroup,
   onChoosePhoto,
   onPhotoSelected,
@@ -73,20 +73,29 @@ export default function BusinessTeamMemberFormModal({
     [businessCategories, serviceContext],
   );
 
+  const activeCategoryId = draft.categoryId;
+
+  React.useEffect(() => {
+    if (!open || categoryOptions.length === 0) return;
+    if (!draft.categoryId || !categoryOptions.some((option) => option.value === draft.categoryId)) {
+      onChange({ categoryId: categoryOptions[0].value, serviceId: "" });
+    }
+  }, [open, categoryOptions, draft.categoryId, onChange]);
+
   const serviceOptions = React.useMemo(
-    () => buildTeamServiceOptionsForCategory(draft.categoryId, businessCategories, serviceContext),
-    [businessCategories, draft.categoryId, serviceContext],
+    () => buildTeamServiceOptionsForCategory(activeCategoryId, businessCategories, serviceContext),
+    [activeCategoryId, businessCategories, serviceContext],
   );
 
-  const pickerRowSx = {
-    display: "flex",
-    flexDirection: { xs: "column", sm: "row" },
-    gap: 1.5,
-    width: "100%",
-    alignItems: { xs: "stretch", sm: "flex-end" },
-  } as const;
+  const selectableServices = React.useMemo(
+    () => serviceOptions.filter((option) => option.value),
+    [serviceOptions],
+  );
 
-  const pickerCellSx = { flex: 1, minWidth: 0, width: "100%" } as const;
+  const displaySelectedGroups = React.useMemo(() => {
+    if (!draft.categoryId || !draft.serviceId) return draft.selectedGroups;
+    return addTeamMemberServiceSelection(draft, businessCategories, serviceContext).selectedGroups;
+  }, [businessCategories, draft, serviceContext]);
 
   const footer = (
     <Stack direction="row" spacing={1.25} justifyContent="flex-end" sx={{ px: 2.5, py: 1.75 }}>
@@ -121,6 +130,10 @@ export default function BusinessTeamMemberFormModal({
           bgcolor: m.teal,
           color: "#fff",
           "&:hover": { bgcolor: m.tealDark },
+          "&.Mui-disabled": {
+            bgcolor: alpha(m.navy, 0.12),
+            color: alpha(m.navy, 0.35),
+          },
         }}
       >
         {submitLabel}
@@ -129,13 +142,11 @@ export default function BusinessTeamMemberFormModal({
   );
 
   return (
-    <MollureModal
+    <MollureDrawer
       open={open}
       onClose={onClose}
       title={title}
-      maxWidth="sm"
-      fullWidth
-      PaperProps={{ sx: { maxWidth: { xs: "min(560px, 92vw)", sm: 560 } } }}
+      panelWidth={{ xs: "100vw", sm: 520 }}
       footer={footer}
     >
       <Box sx={{ px: 2.5, py: 2, width: "100%", boxSizing: "border-box" }}>
@@ -228,73 +239,83 @@ export default function BusinessTeamMemberFormModal({
             sx={fieldInputSx}
           />
 
-          <Box sx={pickerRowSx}>
-            <Box sx={pickerCellSx}>
-              <MollureFormField
-                select
-                label={businessTeamMemberModalCopy.selectCategoryLabel}
-                value={draft.categoryId}
-                onChange={(e) => onChange({ categoryId: String(e.target.value), serviceId: "" })}
-                disabled={disabled}
-                fullWidth
-                SelectProps={{ displayEmpty: true }}
-                sx={fieldInputSx}
-              >
-                <MenuItem value="">
-                  <Typography sx={{ color: alpha(m.navy, 0.45) }}>
-                    {businessTeamMemberModalCopy.selectCategoryPlaceholder}
-                  </Typography>
-                </MenuItem>
-                {categoryOptions.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </MollureFormField>
-            </Box>
-            <Box sx={pickerCellSx}>
-              <MollureFormField
-                select
-                label={businessTeamMemberModalCopy.selectServicesLabel}
-                value={draft.serviceId}
-                onChange={(e) => onChange({ serviceId: String(e.target.value) })}
-                disabled={disabled || !draft.categoryId}
-                fullWidth
-                SelectProps={{ displayEmpty: true }}
-                sx={fieldInputSx}
-              >
-                <MenuItem value="">
-                  <Typography sx={{ color: alpha(m.navy, 0.45) }}>
-                    {businessTeamMemberModalCopy.selectServicePlaceholder}
-                  </Typography>
-                </MenuItem>
-                {serviceOptions.map((option) => (
-                  <MenuItem key={option.value} value={option.value}>
-                    {option.label}
-                  </MenuItem>
-                ))}
-              </MollureFormField>
-            </Box>
-            <IconButton
-              onClick={onAddServiceSelection}
-              disabled={disabled || !draft.categoryId || !draft.serviceId}
-              aria-label="Add selected service"
-              sx={{
-                width: 40,
-                height: 40,
-                flexShrink: 0,
-                borderRadius: "999px",
-                bgcolor: m.addSoftBg,
-                color: m.addSoftFg,
-                border: `1px solid ${m.addSoftBorder}`,
-                alignSelf: { xs: "flex-start", sm: "flex-end" },
-                mb: { sm: 0.25 },
-                "&:hover": { bgcolor: m.addSoftBgHover },
-              }}
+          {categoryOptions.length > 0 ? (
+            <MollureFormField
+              label={businessTeamMemberModalCopy.selectCategoryLabel}
+              select
+              value={draft.categoryId}
+              onChange={(e) => onChange({ categoryId: e.target.value, serviceId: "" })}
+              disabled={disabled}
+              fullWidth
+              sx={fieldInputSx}
+              SelectProps={{ displayEmpty: true }}
             >
-              <AddRoundedIcon />
-            </IconButton>
-          </Box>
+              <MenuItem value="">
+                <em>{businessTeamMemberModalCopy.selectCategoryPlaceholder}</em>
+              </MenuItem>
+              {categoryOptions.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </MollureFormField>
+          ) : (
+            <Typography sx={{ fontSize: 13, color: alpha(m.navy, 0.5) }}>
+              {businessTeamMemberModalCopy.noCategories}
+            </Typography>
+          )}
+
+          {activeCategoryId ? (
+            <Box sx={{ width: "100%" }}>
+              <Typography sx={{ fontWeight: 800, fontSize: 14, color: alpha(m.navy, 0.88), mb: 1.25 }}>
+                {businessTeamMemberModalCopy.selectServicesLabel}
+              </Typography>
+              {selectableServices.length === 0 ? (
+                <Typography sx={{ fontSize: 13, color: alpha(m.navy, 0.5) }}>
+                  {businessTeamMemberModalCopy.noServicesInCategory}
+                </Typography>
+              ) : (
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 1,
+                  }}
+                >
+                  {selectableServices.map((option) => {
+                    const isSelected =
+                      draft.categoryId === activeCategoryId && draft.serviceId === option.value;
+
+                    return (
+                      <Button
+                        key={option.value}
+                        variant="outlined"
+                        disabled={disabled}
+                        onClick={() => onPickService(activeCategoryId, option.value)}
+                        sx={{
+                          borderRadius: "10px",
+                          textTransform: "none",
+                          fontWeight: 700,
+                          fontSize: 13,
+                          px: 1.75,
+                          py: 0.75,
+                          borderColor: isSelected ? m.teal : alpha(m.navy, 0.14),
+                          color: isSelected ? m.teal : alpha(m.navy, 0.78),
+                          bgcolor: isSelected ? alpha(m.teal, 0.08) : "#fff",
+                          "&:hover": {
+                            borderColor: m.teal,
+                            bgcolor: alpha(m.teal, 0.06),
+                          },
+                        }}
+                      >
+                        {option.label}
+                      </Button>
+                    );
+                  })}
+                </Box>
+              )}
+            </Box>
+          ) : null}
 
           <Box
             sx={{
@@ -310,7 +331,7 @@ export default function BusinessTeamMemberFormModal({
               {businessTeamMemberModalCopy.selectedHeading}
             </Typography>
 
-            {draft.selectedGroups.length === 0 ? (
+            {displaySelectedGroups.length === 0 ? (
               <Typography sx={{ fontSize: 13, color: alpha(m.navy, 0.5) }}>
                 {businessTeamMemberModalCopy.noSelections}
               </Typography>
@@ -322,7 +343,7 @@ export default function BusinessTeamMemberFormModal({
                   gap: 1.25,
                 }}
               >
-                {draft.selectedGroups.map((group) => (
+                {displaySelectedGroups.map((group) => (
                   <Box
                     key={group.categoryId}
                     sx={{
@@ -368,6 +389,6 @@ export default function BusinessTeamMemberFormModal({
           </Box>
         </Stack>
       </Box>
-    </MollureModal>
+    </MollureDrawer>
   );
 }

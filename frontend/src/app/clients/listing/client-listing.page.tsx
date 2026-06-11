@@ -32,7 +32,7 @@ import { listingPageData } from "./listing.data";
 import { parseListingSearchParams } from "./listingSearchParams";
 import { useClientListingState, useListingTokens, type ListingSortValue } from "./listing.use";
 import { useListingCards } from "./use-listing-cards";
-import { ListingBG, FixedLocationIcon, DesiredLocationIcon } from "../../../../images";
+import { ListingBG } from "../../../../images";
 import { useAppSelector } from "../../../store/hooks";
 import { marketingShellFooter } from "../../../data/marketingShell.data";
 
