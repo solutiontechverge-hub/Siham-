@@ -60,6 +60,8 @@ export const businessTeamMemberModalCopy = {
   selectCategoryPlaceholder: "Select category",
   selectServicePlaceholder: "Select service",
   noSelections: "No services selected yet.",
+  noCategories: "No categories available yet. Add services first.",
+  noServicesInCategory: "No services in this category yet.",
 } as const;
 
 export const createEmptyTeamMemberFormDraft = (): TeamMemberFormDraft => ({

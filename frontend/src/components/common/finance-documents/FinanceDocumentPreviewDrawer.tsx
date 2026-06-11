@@ -8,7 +8,7 @@ import type {
   TransactionRow,
 } from "../../../app/professionals/fixed-location/finance/data/transactions";
 import type { ProfileResponse } from "../../../store/services/profileApi";
-import MollureDrawer from "../MollureDrawer";
+import FinanceDrawer from "../FinanceDrawer";
 import MollureFormField from "../MollureFormField";
 import { BodyText } from "../../ui/typography";
 import FinanceInvoicePreview from "./FinanceInvoicePreview";
@@ -71,13 +71,13 @@ export default function FinanceDocumentPreviewDrawer({
   const fieldSx = { "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" } } as const;
 
   return (
-    <MollureDrawer
-      anchor="right"
+    <FinanceDrawer
       open={open}
       onClose={onClose}
       title={`View ${titleLabel}`}
-      width={{ xs: "100%", sm: 560 }}
-      contentSx={{ p: 2.25 }}
+      size="wide"
+      plain
+      contentSx={{ px: 2.25, py: 2 }}
     >
       <Stack spacing={2}>
         {documentType === "receipt" ? (
@@ -168,6 +168,6 @@ export default function FinanceDocumentPreviewDrawer({
           </>
         )}
       </Stack>
-    </MollureDrawer>
+    </FinanceDrawer>
   );
 }

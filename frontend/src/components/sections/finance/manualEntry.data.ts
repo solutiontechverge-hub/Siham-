@@ -65,11 +65,49 @@ export function formatEurAmount(amount: number, suffix = "EUR"): string {
   return `${text} ${suffix}`;
 }
 
+export type ManualEntryDiscountType = "fixed" | "percentage";
+
+export type ManualEntryDiscount = {
+  type: ManualEntryDiscountType;
+  amount: number;
+};
+
+export type ManualEntryCatalogOption = {
+  id: string;
+  label: string;
+  unitPrice: number;
+};
+
+export function parseFinancePrice(price: string): number {
+  const normalized = price.replace(/[^\d.,-]/g, "").replace(",", ".");
+  const value = Number.parseFloat(normalized);
+  return Number.isFinite(value) ? value : 0;
+}
+
+export function calculateManualEntryDiscountAmount(
+  subtotal: number,
+  discount: ManualEntryDiscount | null,
+): number {
+  if (!discount || discount.amount <= 0 || subtotal <= 0) return 0;
+  if (discount.type === "percentage") {
+    return Math.min(subtotal, (subtotal * discount.amount) / 100);
+  }
+  return Math.min(subtotal, discount.amount);
+}
+
+export function formatManualEntryDiscountLabel(discount: ManualEntryDiscount): string {
+  if (discount.type === "percentage") {
+    return `${discount.amount}%`;
+  }
+  return formatEurAmount(discount.amount);
+}
+
 export type ManualEntrySavePayload = {
   clientSelection: ManualEntryClientSelection;
   lines: readonly ManualEntryLine[];
   totalPrice: number;
-  discount: number;
+  discount: ManualEntryDiscount | null;
+  discountAmount: number;
 };
 
 export function manualEntryClientFields(
@@ -109,5 +147,18 @@ export function createManualEntryLine(
     name,
     quantity: base.quantity,
     unitPrice: base.unitPrice,
+  };
+}
+
+export function createManualEntryLineFromOption(
+  kind: ManualEntryLineKind,
+  option: ManualEntryCatalogOption,
+): ManualEntryLine {
+  return {
+    id: `${kind}-${option.id}-${Date.now()}`,
+    kind,
+    name: option.label,
+    quantity: 1,
+    unitPrice: option.unitPrice,
   };
 }

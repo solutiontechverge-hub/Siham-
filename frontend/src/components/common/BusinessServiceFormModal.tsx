@@ -5,12 +5,14 @@ import { Box, Button, InputAdornment, MenuItem, Stack, Typography } from "@mui/m
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDatePicker from "./AppDatePicker";
 import MollureFormField from "./MollureFormField";
-import MollureModal from "./MollureModal";
+import MollureDrawer from "./MollureDrawer";
 import {
   businessServiceModalCopy,
   businessServiceModalDiscountTypes,
   businessServiceModalPriceTypes,
   normalizeBusinessServiceDiscountType,
+  sanitizeDurationHours,
+  sanitizeDurationMinutes,
   type BusinessServiceFormDraft,
   type BusinessServiceModalMode,
 } from "../../data/businessServiceModal.data";
@@ -101,13 +103,11 @@ export default function BusinessServiceFormModal({
   );
 
   return (
-    <MollureModal
+    <MollureDrawer
       open={open}
       onClose={onClose}
       title={title}
-      maxWidth="sm"
-      fullWidth
-      PaperProps={{ sx: { maxWidth: { xs: "min(560px, 92vw)", sm: 560 } } }}
+      panelWidth={{ xs: "100vw", sm: 520 }}
       footer={footer}
     >
       <Box sx={{ px: 2.5, py: 2, width: "100%", boxSizing: "border-box" }}>
@@ -141,26 +141,94 @@ export default function BusinessServiceFormModal({
 
           <Box sx={twoColumnRowSx}>
             <Box sx={twoColumnCellSx}>
-              <MollureFormField
-                label={businessServiceModalCopy.durationFromLabel}
-                placeholder={businessServiceModalCopy.durationPlaceholder}
-                value={draft.durationFrom}
-                onChange={(e) => onChange({ durationFrom: e.target.value })}
-                disabled={disabled}
-                fullWidth
-                sx={fieldInputSx}
-              />
+              <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.72), mb: 0.75 }}>
+                {businessServiceModalCopy.durationFromLabel}
+              </Typography>
+              <Box sx={{ display: "flex", gap: 1 }}>
+                <MollureFormField
+                  label={businessServiceModalCopy.durationHoursLabel}
+                  placeholder={businessServiceModalCopy.durationHoursPlaceholder}
+                  value={draft.durationFromHours}
+                  onChange={(e) => onChange({ durationFromHours: sanitizeDurationHours(e.target.value) })}
+                  disabled={disabled}
+                  fullWidth
+                  sx={fieldInputSx}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <Typography sx={{ fontSize: 11, fontWeight: 600, color: alpha(m.navy, 0.5) }}>
+                          {businessServiceModalCopy.durationHoursSuffix}
+                        </Typography>
+                      </InputAdornment>
+                    ),
+                    inputMode: "numeric",
+                  }}
+                />
+                <MollureFormField
+                  label={businessServiceModalCopy.durationMinutesLabel}
+                  placeholder={businessServiceModalCopy.durationMinutesPlaceholder}
+                  value={draft.durationFromMinutes}
+                  onChange={(e) => onChange({ durationFromMinutes: sanitizeDurationMinutes(e.target.value) })}
+                  disabled={disabled}
+                  fullWidth
+                  sx={fieldInputSx}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <Typography sx={{ fontSize: 11, fontWeight: 600, color: alpha(m.navy, 0.5) }}>
+                          {businessServiceModalCopy.durationMinutesSuffix}
+                        </Typography>
+                      </InputAdornment>
+                    ),
+                    inputMode: "numeric",
+                  }}
+                />
+              </Box>
             </Box>
             <Box sx={twoColumnCellSx}>
-              <MollureFormField
-                label={businessServiceModalCopy.durationToLabel}
-                placeholder={businessServiceModalCopy.durationPlaceholder}
-                value={draft.durationTo}
-                onChange={(e) => onChange({ durationTo: e.target.value })}
-                disabled={disabled}
-                fullWidth
-                sx={fieldInputSx}
-              />
+              <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.72), mb: 0.75 }}>
+                {businessServiceModalCopy.durationToLabel}
+              </Typography>
+              <Box sx={{ display: "flex", gap: 1 }}>
+                <MollureFormField
+                  label={businessServiceModalCopy.durationHoursLabel}
+                  placeholder={businessServiceModalCopy.durationHoursPlaceholder}
+                  value={draft.durationToHours}
+                  onChange={(e) => onChange({ durationToHours: sanitizeDurationHours(e.target.value) })}
+                  disabled={disabled}
+                  fullWidth
+                  sx={fieldInputSx}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <Typography sx={{ fontSize: 11, fontWeight: 600, color: alpha(m.navy, 0.5) }}>
+                          {businessServiceModalCopy.durationHoursSuffix}
+                        </Typography>
+                      </InputAdornment>
+                    ),
+                    inputMode: "numeric",
+                  }}
+                />
+                <MollureFormField
+                  label={businessServiceModalCopy.durationMinutesLabel}
+                  placeholder={businessServiceModalCopy.durationMinutesPlaceholder}
+                  value={draft.durationToMinutes}
+                  onChange={(e) => onChange({ durationToMinutes: sanitizeDurationMinutes(e.target.value) })}
+                  disabled={disabled}
+                  fullWidth
+                  sx={fieldInputSx}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <Typography sx={{ fontSize: 11, fontWeight: 600, color: alpha(m.navy, 0.5) }}>
+                          {businessServiceModalCopy.durationMinutesSuffix}
+                        </Typography>
+                      </InputAdornment>
+                    ),
+                    inputMode: "numeric",
+                  }}
+                />
+              </Box>
             </Box>
           </Box>
 
@@ -323,6 +391,6 @@ export default function BusinessServiceFormModal({
           </Box>
         </Stack>
       </Box>
-    </MollureModal>
+    </MollureDrawer>
   );
 }

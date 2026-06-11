@@ -7,6 +7,7 @@ import { alpha, useTheme } from "@mui/material/styles";
 import { useRouter } from "next/navigation";
 import type { ProfessionalFixedLocationRatingReviewAnalyticsData } from "../../app/professionals/fixed-location/analytics/ratingReviewAnalytics.data";
 import { ratingReviewReviewsHref } from "../../app/professionals/fixed-location/analytics/ratingReviewRoutes";
+import AnalyticsSectionExplanation from "./AnalyticsSectionExplanation";
 import ReviewSummaryByCategoryChart from "./ReviewSummaryByCategoryChart";
 import { BodyText } from "../ui/typography";
 
@@ -26,36 +27,6 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({ data }:
 
   function openReviewsPage(category: string) {
     router.push(ratingReviewReviewsHref(category));
-  }
-
-  function ExplanationBlock({ description, category }: { description: string; category: string }) {
-    return (
-      <Box sx={{ pt: 1.2, pb: 0.25 }}>
-        <BodyText
-          component="button"
-          type="button"
-          onClick={() => openReviewsPage(category)}
-          sx={{
-            p: 0,
-            border: 0,
-            bgcolor: "transparent",
-            cursor: "pointer",
-            fontSize: 12.5,
-            fontWeight: 800,
-            color: m.teal,
-            textDecoration: "underline",
-            display: "block",
-            mb: 0.6,
-            "&:hover": { color: m.tealDark },
-          }}
-        >
-          View Explanation
-        </BodyText>
-        <BodyText sx={{ fontSize: 12, fontWeight: 600, color: alpha(m.navy, 0.5), lineHeight: 1.6 }}>
-          {description}
-        </BodyText>
-      </Box>
-    );
   }
 
   return (
@@ -78,6 +49,9 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({ data }:
       >
         <Stack direction="row" divider={<Divider orientation="vertical" flexItem />}>
           <Box
+            component="button"
+            type="button"
+            onClick={() => openReviewsPage("Excellent")}
             sx={{
               flex: 1,
               display: "flex",
@@ -87,6 +61,11 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({ data }:
               py: 2.5,
               px: 2,
               gap: 0.5,
+              border: 0,
+              bgcolor: "transparent",
+              cursor: "pointer",
+              font: "inherit",
+              "&:hover": { bgcolor: alpha(m.teal, 0.04) },
             }}
           >
             <BodyText sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.55), mb: 0.5 }}>
@@ -122,7 +101,9 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({ data }:
         </Stack>
       </Paper>
 
-      <ExplanationBlock description={overview.description} category="Excellent" />
+      {overview.explanationContent ? (
+        <AnalyticsSectionExplanation label={overview.explanationLabel} content={overview.explanationContent} />
+      ) : null}
 
       <Box sx={{ pt: 2.7, pb: 1.4 }}>
         <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}>
@@ -213,7 +194,9 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({ data }:
         </Table>
       </TableContainer>
 
-      <ExplanationBlock description={analytics42.description} category="Total Review" />
+      {analytics42.explanationContent ? (
+        <AnalyticsSectionExplanation label={analytics42.explanationLabel} content={analytics42.explanationContent} />
+      ) : null}
 
       <Box sx={{ pt: 2.7, pb: 1.4 }}>
         <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}>
@@ -281,7 +264,9 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({ data }:
         </Table>
       </TableContainer>
 
-      <ExplanationBlock description={analytics43.description} category="Total Review" />
+      {analytics43.explanationContent ? (
+        <AnalyticsSectionExplanation label={analytics43.explanationLabel} content={analytics43.explanationContent} />
+      ) : null}
 
       <ReviewSummaryByCategoryChart
         title={analytics44.title}

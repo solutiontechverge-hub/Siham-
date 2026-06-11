@@ -345,6 +345,25 @@ export function buildDesiredProvinceDisplays(
   });
 }
 
+export function buildDesiredMunicipalityList(desired: BusinessPublicProfileDesiredLocation): string[] {
+  if (desired.areaMode === "All Netherlands") {
+    return ["All Netherlands"];
+  }
+
+  const municipalities: string[] = [];
+  for (const area of desired.areas) {
+    if (area.allMunicipalities) {
+      municipalities.push(`${area.province} (All municipalities)`);
+      continue;
+    }
+    for (const municipality of area.municipalities) {
+      if (municipality.trim()) municipalities.push(municipality.trim());
+    }
+  }
+
+  return municipalities;
+}
+
 export function resolveBusinessOfferingFlags(offering: ListingCardData["businessOffering"]) {
   return {
     supportsFixedLocation: offering === "fixed" || offering === "both",

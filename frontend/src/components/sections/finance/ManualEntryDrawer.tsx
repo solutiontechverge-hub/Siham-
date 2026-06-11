@@ -1,27 +1,36 @@
 "use client";
 
 import * as React from "react";
-import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import { Box, Button, Chip, Paper, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import MollureDrawer from "../../common/MollureDrawer";
+import FinanceDrawer from "../../common/FinanceDrawer";
+import { FinanceDrawerActionsFooter } from "../../common/FinanceDrawerFooter";
 import MollureFormField from "../../common/MollureFormField";
 import { BodyText } from "../../ui/typography";
+import { useGetBusinessSetupQuery } from "../../../store/services/businessApi";
+import { useFinanceInvoiceSettings } from "./useFinanceInvoiceSettings";
 import {
-  createManualEntryLine,
+  calculateManualEntryDiscountAmount,
+  createManualEntryLineFromOption,
   filterClientsByName,
   filterMollureByEmail,
   formatEurAmount,
+  formatManualEntryDiscountLabel,
   lineTotal,
+  parseFinancePrice,
   selectionLabel,
+  type ManualEntryCatalogOption,
   type ManualEntryClientMode,
   type ManualEntryClientSelection,
+  type ManualEntryDiscount,
   type ManualEntryLine,
   type ManualEntryLineKind,
   type ManualEntrySavePayload,
 } from "./manualEntry.data";
+import ManualEntryCatalogPicker from "./ManualEntryCatalogPicker";
+import ManualEntryDiscountModal from "./ManualEntryDiscountModal";
 import ManualEntryLineCard from "./ManualEntryLineCard";
 import ManualEntryLineEditModal from "./ManualEntryLineEditModal";
 
@@ -31,49 +40,20 @@ export type ManualEntryDrawerProps = {
   onSave?: (payload: ManualEntrySavePayload) => void;
 };
 
-function ManualEntryAddButton({
-  label,
-  onClick,
-}: {
-  label: string;
-  onClick: () => void;
-}) {
-  const m = useTheme().palette.mollure;
-  return (
-    <Button
-      fullWidth
-      variant="outlined"
-      onClick={onClick}
-      startIcon={<AddRoundedIcon sx={{ fontSize: 18, color: m.teal }} />}
-      sx={{
-        borderRadius: "10px",
-        textTransform: "none",
-        fontWeight: 800,
-        fontSize: 12.5,
-        justifyContent: "flex-start",
-        borderColor: alpha(m.navy, 0.1),
-        color: alpha(m.navy, 0.78),
-        bgcolor: "#fff",
-        height: 42,
-        px: 1.5,
-      }}
-    >
-      {label}
-    </Button>
-  );
-}
-
 export default function ManualEntryDrawer({ open, onClose, onSave }: ManualEntryDrawerProps) {
   const m = useTheme().palette.mollure;
   const rootRef = React.useRef<HTMLDivElement | null>(null);
+  const { settings } = useFinanceInvoiceSettings();
+  const { data: businessSetupResponse } = useGetBusinessSetupQuery(undefined, { skip: !open });
+  const businessSetup = businessSetupResponse?.data ?? null;
 
   const [clientOpen, setClientOpen] = React.useState(false);
   const [clientMode, setClientMode] = React.useState<ManualEntryClientMode | null>(null);
   const [clientQuery, setClientQuery] = React.useState("");
   const [clientSelection, setClientSelection] = React.useState<ManualEntryClientSelection | null>(null);
   const [lines, setLines] = React.useState<ManualEntryLine[]>([]);
-  const [discount, setDiscount] = React.useState(0);
-  const [discountOpen, setDiscountOpen] = React.useState(false);
+  const [discount, setDiscount] = React.useState<ManualEntryDiscount | null>(null);
+  const [discountModalOpen, setDiscountModalOpen] = React.useState(false);
   const [editingLine, setEditingLine] = React.useState<ManualEntryLine | null>(null);
 
   React.useEffect(() => {
@@ -83,15 +63,46 @@ export default function ManualEntryDrawer({ open, onClose, onSave }: ManualEntry
     setClientQuery("");
     setClientSelection(null);
     setLines([]);
-    setDiscount(0);
-    setDiscountOpen(false);
+    setDiscount(null);
+    setDiscountModalOpen(false);
     setEditingLine(null);
   }, [open]);
+
+  const productOptions = React.useMemo<ManualEntryCatalogOption[]>(
+    () =>
+      settings.products.map((product) => ({
+        id: product.id,
+        label: product.name,
+        unitPrice: parseFinancePrice(product.price),
+      })),
+    [settings.products],
+  );
+
+  const itemOptions = React.useMemo<ManualEntryCatalogOption[]>(() => {
+    const setupServices = businessSetup?.service_details ?? [];
+    if (setupServices.length > 0) {
+      return setupServices.map((service) => ({
+        id: service.id,
+        label: service.service_title || service.category_title || "Service",
+        unitPrice: parseFinancePrice(String(service.price ?? "")),
+      }));
+    }
+
+    return settings.services.map((service) => ({
+      id: service.id,
+      label: service.service ? `${service.category} - ${service.service}` : service.category,
+      unitPrice: 0,
+    }));
+  }, [businessSetup?.service_details, settings.services]);
 
   const productLines = React.useMemo(() => lines.filter((l) => l.kind === "product"), [lines]);
   const itemLines = React.useMemo(() => lines.filter((l) => l.kind === "item"), [lines]);
   const subtotal = React.useMemo(() => lines.reduce((sum, line) => sum + lineTotal(line), 0), [lines]);
-  const totalPrice = Math.max(0, subtotal - discount);
+  const discountAmount = React.useMemo(
+    () => calculateManualEntryDiscountAmount(subtotal, discount),
+    [discount, subtotal],
+  );
+  const totalPrice = Math.max(0, subtotal - discountAmount);
   const hasItems = lines.length > 0;
 
   React.useEffect(() => {
@@ -130,11 +141,8 @@ export default function ManualEntryDrawer({ open, onClose, onSave }: ManualEntry
     setClientQuery("");
   };
 
-  const addLine = (kind: ManualEntryLineKind) => {
-    setLines((prev) => {
-      const index = prev.filter((l) => l.kind === kind).length;
-      return [...prev, createManualEntryLine(kind, index)];
-    });
+  const addLineFromCatalog = (kind: ManualEntryLineKind, option: ManualEntryCatalogOption) => {
+    setLines((prev) => [...prev, createManualEntryLineFromOption(kind, option)]);
   };
 
   const removeLine = (id: string) => {
@@ -144,55 +152,6 @@ export default function ManualEntryDrawer({ open, onClose, onSave }: ManualEntry
   const updateLine = (next: ManualEntryLine) => {
     setLines((prev) => prev.map((l) => (l.id === next.id ? next : l)));
   };
-
-  const footer = (
-    <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ px: 2.5, py: 2 }}>
-      <Button
-        onClick={onClose}
-        variant="outlined"
-        sx={{
-          borderRadius: "8px",
-          textTransform: "none",
-          fontWeight: 800,
-          borderColor: alpha(m.navy, 0.14),
-          color: alpha(m.navy, 0.72),
-          bgcolor: "#fff",
-          height: 36,
-          px: 2.25,
-          minWidth: 92,
-        }}
-      >
-        Cancel
-      </Button>
-      <Button
-        variant="contained"
-        disableElevation
-        disabled={!clientSelection || !hasItems}
-        onClick={() => {
-          if (!clientSelection) return;
-          onSave?.({
-            clientSelection,
-            lines,
-            totalPrice,
-            discount,
-          });
-          onClose();
-        }}
-        sx={{
-          borderRadius: "8px",
-          textTransform: "none",
-          fontWeight: 900,
-          bgcolor: m.teal,
-          "&:hover": { bgcolor: m.tealDark },
-          height: 36,
-          px: 2.25,
-          minWidth: 92,
-        }}
-      >
-        Next
-      </Button>
-    </Stack>
-  );
 
   const modeRowSx = (active: boolean) => ({
     display: "flex",
@@ -207,14 +166,27 @@ export default function ManualEntryDrawer({ open, onClose, onSave }: ManualEntry
   });
 
   return (
-    <MollureDrawer
-      anchor="right"
+    <FinanceDrawer
       open={open}
       onClose={onClose}
-      title="Manual Entry"
-      width={{ xs: "100%", sm: 500 }}
-      contentSx={{ bgcolor: alpha(m.navy, 0.03), px: 2.25, py: 2 }}
-      footer={footer}
+      title="New Sale"
+      footer={
+        <FinanceDrawerActionsFooter
+          onCancel={onClose}
+          primaryLabel="Save"
+          primaryDisabled={!clientSelection || !hasItems}
+          onPrimary={() => {
+            if (!clientSelection || !hasItems) return;
+            onSave?.({
+              clientSelection,
+              lines,
+              totalPrice,
+              discount,
+              discountAmount,
+            });
+          }}
+        />
+      }
     >
       <Stack spacing={2.5}>
         <Box ref={rootRef}>
@@ -449,7 +421,12 @@ export default function ManualEntryDrawer({ open, onClose, onSave }: ManualEntry
                     onDelete={() => removeLine(line.id)}
                   />
                 ))}
-                <ManualEntryAddButton label="Product" onClick={() => addLine("product")} />
+                <ManualEntryCatalogPicker
+                  label="Product"
+                  options={productOptions}
+                  emptyLabel="No products configured yet."
+                  onSelect={(option) => addLineFromCatalog("product", option)}
+                />
               </Stack>
             </Box>
 
@@ -466,37 +443,44 @@ export default function ManualEntryDrawer({ open, onClose, onSave }: ManualEntry
                     onDelete={() => removeLine(line.id)}
                   />
                 ))}
-                <ManualEntryAddButton label="Item" onClick={() => addLine("item")} />
+                <ManualEntryCatalogPicker
+                  label="Item"
+                  options={itemOptions}
+                  emptyLabel="No services configured yet."
+                  onSelect={(option) => addLineFromCatalog("item", option)}
+                />
               </Stack>
             </Box>
 
             {hasItems ? (
               <Box sx={{ pt: 0.5 }}>
-                <Stack direction="row" alignItems="baseline" justifyContent="space-between" spacing={1}>
-                  <Typography sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.55) }}>
-                    Total Price:
-                  </Typography>
-                  <Typography sx={{ fontSize: 18, fontWeight: 900, color: alpha(m.navy, 0.88) }}>
-                    {formatEurAmount(totalPrice)}
-                  </Typography>
-                </Stack>
-                {discountOpen ? (
-                  <Box sx={{ mt: 1 }}>
-                    <MollureFormField
-                      label="Discount (€)"
-                      type="number"
-                      value={discount === 0 ? "" : String(discount)}
-                      onChange={(e) => setDiscount(Math.max(0, Number.parseFloat(e.target.value) || 0))}
-                      size="small"
-                      sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" } }}
-                    />
-                  </Box>
-                ) : (
+                <Stack spacing={1}>
+                  <Stack direction="row" alignItems="baseline" justifyContent="space-between" spacing={1}>
+                    <Typography sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.55) }}>
+                      Subtotal:
+                    </Typography>
+                    <Typography sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.78) }}>
+                      {formatEurAmount(subtotal)}
+                    </Typography>
+                  </Stack>
+
+                  {discount && discount.amount > 0 ? (
+                    <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+                      <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.55) }}>
+                        Discount ({discount.type === "fixed" ? "Fixed" : "Percentage"}):{" "}
+                        {formatManualEntryDiscountLabel(discount)}
+                      </Typography>
+                      <Typography sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.78) }}>
+                        -{formatEurAmount(discountAmount)}
+                      </Typography>
+                    </Stack>
+                  ) : null}
+
                   <Button
                     variant="text"
-                    onClick={() => setDiscountOpen(true)}
+                    onClick={() => setDiscountModalOpen(true)}
                     sx={{
-                      mt: 0.5,
+                      alignSelf: "flex-start",
                       p: 0,
                       minWidth: 0,
                       textTransform: "none",
@@ -507,9 +491,24 @@ export default function ManualEntryDrawer({ open, onClose, onSave }: ManualEntry
                       "&:hover": { bgcolor: "transparent", textDecoration: "underline" },
                     }}
                   >
-                    + Discount
+                    {discount && discount.amount > 0 ? "Edit Discount" : "+ Discount"}
                   </Button>
-                )}
+
+                  <Stack
+                    direction="row"
+                    alignItems="baseline"
+                    justifyContent="space-between"
+                    spacing={1}
+                    sx={{ pt: 0.25 }}
+                  >
+                    <Typography sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.55) }}>
+                      Final Price:
+                    </Typography>
+                    <Typography sx={{ fontSize: 18, fontWeight: 900, color: alpha(m.navy, 0.88) }}>
+                      {formatEurAmount(totalPrice)}
+                    </Typography>
+                  </Stack>
+                </Stack>
               </Box>
             ) : null}
           </Stack>
@@ -522,6 +521,13 @@ export default function ManualEntryDrawer({ open, onClose, onSave }: ManualEntry
         onClose={() => setEditingLine(null)}
         onSave={updateLine}
       />
-    </MollureDrawer>
+
+      <ManualEntryDiscountModal
+        open={discountModalOpen}
+        initialValue={discount}
+        onClose={() => setDiscountModalOpen(false)}
+        onApply={setDiscount}
+      />
+    </FinanceDrawer>
   );
 }

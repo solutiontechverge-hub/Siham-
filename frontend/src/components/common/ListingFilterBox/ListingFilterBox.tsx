@@ -3,7 +3,8 @@
 import * as React from "react";
 import { Box, Button, Grid, MenuItem, Paper, type PaperProps } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import CalendarPopover, { type CalendarPopoverValue } from "./CalendarPopover";
+import CalendarPopover, { formatListingDateTimeDisplay, type CalendarPopoverValue } from "./CalendarPopover";
+import ListingLocationModeCards from "./ListingLocationModeCards";
 import Image from "next/image";
 import { ArrowDown } from "../../../../images";
 import { KeywordTagsInput, MollureTextField } from "..";
@@ -87,32 +88,7 @@ export default function ListingFilterBox({
 
   const set = (patch: Partial<ListingFilterValues>) => onChange({ ...values, ...patch });
 
-  type LocationOfferingValue = "" | "fixed" | "desired" | "both";
-
-  const locationOfferingValue: LocationOfferingValue = React.useMemo(() => {
-    const modes = values.locationModes;
-    if (modes.includes("fixed") && modes.includes("desired")) return "both";
-    if (modes.includes("fixed")) return "fixed";
-    if (modes.includes("desired")) return "desired";
-    return "";
-  }, [values.locationModes]);
-
-  const setLocationOffering = (next: LocationOfferingValue) => {
-    if (next === "both") set({ locationModes: ["fixed", "desired"] });
-    else if (next === "fixed") set({ locationModes: ["fixed"] });
-    else if (next === "desired") set({ locationModes: ["desired"] });
-    else set({ locationModes: [] });
-  };
-
-  const dateTimeDisplay = values.dateTime
-    ? values.dateTime.toLocaleString(undefined, {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "";
+  const dateTimeDisplay = formatListingDateTimeDisplay(values.dateTime);
 
   return (
     <Paper
@@ -198,46 +174,10 @@ export default function ListingFilterBox({
         </Grid>
 
         <Grid item xs={12}>
-          <MollureTextField
-            select
-            value={locationOfferingValue}
-            onChange={(e) => setLocationOffering(e.target.value as LocationOfferingValue)}
-            InputProps={{
-              endAdornment: (
-                <Box sx={{ display: "flex", alignItems: "center", pr: 0.25 }}>
-                  <Image src={ArrowDown} alt="" width={16} height={16} />
-                </Box>
-              ),
-            }}
-            sx={lineFieldSx}
-            SelectProps={{
-              displayEmpty: true,
-              IconComponent: () => null,
-              renderValue: (selected) => {
-                const v = String(selected ?? "") as LocationOfferingValue;
-                const labels: Record<LocationOfferingValue, string> = {
-                  "": "Select service location",
-                  fixed: "Fixed Location",
-                  desired: "Desired Location",
-                  both: "Fixed & Desired Location",
-                };
-                return v ? (
-                  labels[v]
-                ) : (
-                  <BodyText sx={{ color: alpha(tokens.navy, 0.55), fontSize: "1.05rem", fontWeight: 500 }}>
-                    {labels[""]}
-                  </BodyText>
-                );
-              },
-            }}
-          >
-            <MenuItem value="">
-              <BodyText sx={{ color: tokens.placeholder, fontSize: 13 }}>All locations</BodyText>
-            </MenuItem>
-            <MenuItem value="fixed">Fixed Location</MenuItem>
-            <MenuItem value="desired">Desired Location</MenuItem>
-            <MenuItem value="both">Fixed & Desired Location</MenuItem>
-          </MollureTextField>
+          <ListingLocationModeCards
+            value={values.locationModes}
+            onChange={(locationModes) => set({ locationModes })}
+          />
         </Grid>
 
         <Grid item xs={12}>
