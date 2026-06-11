@@ -56,7 +56,7 @@ export default function AuthLoginShell({ header, signupHref }: AuthLoginShellPro
       showSnackbar({
         severity: "error",
         message: getApiErrorMessage(error, "Login failed. Please check your credentials."),
-      });
+      }); 
     }
   };
 
