@@ -109,7 +109,7 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
       weekly: everyDayAvailability("08:30", "16:30"),
     },
   ],
-  timeGrid: { startHour: 8, endHour: 10, stepMinutes: 15 },
+  timeGrid: { startHour: 8, endHour: 22, stepMinutes: 15 },
   events: [
     // Today's mock activities
     {
