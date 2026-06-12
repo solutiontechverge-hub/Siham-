@@ -2,8 +2,16 @@ import { getClient, query } from "../db/index.js";
 import {
   isS3UploadConfigured,
   uploadBusinessMediaFilesToS3,
+  uploadTeamMemberPhotoFileToS3,
 } from "../services/s3-upload.service.js";
 import { buildServiceDetailsFromCategories } from "../utils/business-service-categories.js";
+import { normalizeEntityId } from "../utils/business-setup-parsers.js";
+import {
+  isValidUuid,
+  parseOptionalUuid,
+  parseUuid,
+  parseUuidArray,
+} from "../utils/uuid.js";
 
 const parseJsonValue = (value, fallback) => {
   if (value === undefined || value === null || value === "") {
@@ -44,13 +52,6 @@ const parseTextArray = (value) => {
   }
 
   return [];
-};
-
-const parseBigIntArray = (value) => {
-  const items = parseTextArray(value);
-  return items
-    .map((item) => Number(item))
-    .filter((item) => Number.isInteger(item) && item > 0);
 };
 
 const parseJsonArray = (value) => {
@@ -129,22 +130,22 @@ const normalizeServiceCategories = (value) => {
         return null;
       }
 
-      const categoryId = Number(item.category_id);
-      const serviceId = Number(item.service_id);
+      const categoryId = normalizeEntityId(item.category_id) ?? String(item.category_id ?? "").trim();
+      const serviceId = normalizeEntityId(item.service_id) ?? String(item.service_id ?? "").trim();
       const amount = parseOptionalNumber(item.amount);
       const durationLabel = String(item.duration_label ?? item.duration ?? "").trim() || null;
+      const categoryTitle = String(item.category_title ?? item.categoryTitle ?? "").trim() || null;
+      const serviceTitle = String(item.service_title ?? item.serviceTitle ?? "").trim() || null;
 
-      if (!Number.isInteger(categoryId) || categoryId <= 0) {
-        return null;
-      }
-
-      if (!Number.isInteger(serviceId) || serviceId <= 0) {
+      if (!categoryId || !serviceId) {
         return null;
       }
 
       return {
         category_id: categoryId,
         service_id: serviceId,
+        category_title: categoryTitle,
+        service_title: serviceTitle,
         amount: amount ?? 0,
         duration_label: durationLabel,
       };
@@ -159,14 +160,10 @@ const normalizeBookServiceCombinations = (value) => {
         return null;
       }
 
-      const categoryId = Number(item.category_id);
-      const serviceId = Number(item.service_id);
+      const categoryId = parseUuid(item.category_id);
+      const serviceId = parseUuid(item.service_id);
 
-      if (!Number.isInteger(categoryId) || categoryId <= 0) {
-        return null;
-      }
-
-      if (!Number.isInteger(serviceId) || serviceId <= 0) {
+      if (!categoryId || !serviceId) {
         return null;
       }
 
@@ -192,15 +189,15 @@ const normalizeTeamMembers = (value) => {
         return null;
       }
 
-      const id = Number(item.id);
+      const id = parseUuid(item.id);
       const normalizedAssignedServices = parseJsonArray(item.assigned_services)
         .map((service) => {
           if (!service || typeof service !== "object") {
             return null;
           }
 
-          const serviceId = Number(service.service_id);
-          if (!Number.isInteger(serviceId) || serviceId <= 0) {
+          const serviceId = parseUuid(service.service_id);
+          if (!serviceId) {
             return null;
           }
 
@@ -211,8 +208,11 @@ const normalizeTeamMembers = (value) => {
         })
         .filter(Boolean);
 
+      const photoUploadKey = String(item.photo_upload_key ?? "").trim();
+
       return {
-        id: Number.isInteger(id) && id > 0 ? id : null,
+        id: id || null,
+        photo_upload_key: photoUploadKey || null,
         full_name: fullName,
         role: String(item.role ?? "Team member").trim() || "Team member",
         profile_photo: item.profile_photo ? String(item.profile_photo).trim() : null,
@@ -287,6 +287,7 @@ const getBusinessSetupDetailById = async (setupId, client = { query }) => {
     serviceCategories,
     setupId,
     client.query.bind(client),
+    { teamMembers, useTeamAssignmentsFallback: false },
   );
 
   return {
@@ -437,8 +438,118 @@ export const getBusinessSetup = async (req, res) => {
   }
 };
 
+export const updateBusinessSetupActive = async (req, res) => {
+  try {
+    if (req.user.user_type !== "professional") {
+      return res.status(403).json({
+        success: false,
+        message: "Only professional users can update business setup status.",
+        data: null,
+      });
+    }
+
+    const professionalProfile = await getProfessionalProfile(req.user.id);
+
+    if (!professionalProfile) {
+      return res.status(404).json({
+        success: false,
+        message: "Professional profile not found.",
+        data: null,
+      });
+    }
+
+    const isActive = req.body.is_active === true;
+
+    const existingSetup = await getBusinessSetupByUserId(req.user.id);
+
+    if (!existingSetup) {
+      const insertResult = await query(
+        `INSERT INTO business_setups (professional_profile_id, location_mode, is_active)
+         VALUES ($1, 'fixed', $2)
+         RETURNING id`,
+        [professionalProfile.id, isActive],
+      );
+
+      const savedBusinessSetup = await getBusinessSetupDetailById(insertResult.rows[0].id);
+
+      return res.status(200).json({
+        success: true,
+        message: isActive ? "Business profile activated successfully." : "Business profile deactivated successfully.",
+        data: savedBusinessSetup,
+      });
+    }
+
+    await query(
+      `UPDATE business_setups
+       SET is_active = $2,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [existingSetup.id, isActive],
+    );
+
+    const savedBusinessSetup = await getBusinessSetupDetailById(existingSetup.id);
+
+    return res.status(200).json({
+      success: true,
+      message: isActive ? "Business profile activated successfully." : "Business profile deactivated successfully.",
+      data: savedBusinessSetup,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update business setup status.",
+      data: {
+        error: error.message,
+      },
+    });
+  }
+};
+
 const isPersistedMediaUrl = (value) =>
   typeof value === "string" && (value.startsWith("http://") || value.startsWith("https://"));
+
+const TEAM_MEMBER_PHOTO_FIELD_PREFIX = "team_member_photo__";
+
+const mapTeamMemberPhotoFiles = (files = []) => {
+  const photoFilesByKey = new Map();
+
+  for (const file of files) {
+    if (!file?.fieldname?.startsWith(TEAM_MEMBER_PHOTO_FIELD_PREFIX)) {
+      continue;
+    }
+
+    const key = file.fieldname.slice(TEAM_MEMBER_PHOTO_FIELD_PREFIX.length);
+    if (key) {
+      photoFilesByKey.set(key, file);
+    }
+  }
+
+  return photoFilesByKey;
+};
+
+const applyTeamMemberPhotoUploads = async (teamMembers, files, userId) => {
+  const photoFilesByKey = mapTeamMemberPhotoFiles(files);
+  if (!photoFilesByKey.size) {
+    return teamMembers;
+  }
+
+  if (!isS3UploadConfigured()) {
+    throw new Error("File upload is temporarily unavailable.");
+  }
+
+  return Promise.all(
+    teamMembers.map(async (member) => {
+      const lookupKeys = [member.photo_upload_key, member.id].filter(Boolean).map(String);
+      const file = lookupKeys.map((key) => photoFilesByKey.get(key)).find(Boolean);
+      if (!file) {
+        return member;
+      }
+
+      const profilePhoto = await uploadTeamMemberPhotoFileToS3(userId, file);
+      return { ...member, profile_photo: profilePhoto };
+    }),
+  );
+};
 
 export const uploadBusinessMedia = async (req, res) => {
   try {
@@ -561,7 +672,9 @@ export const upsertBusinessSetup = async (req, res) => {
 
     const serviceCategories = normalizeServiceCategories(req.body.service_categories);
     const bookServiceCombinations = normalizeBookServiceCombinations(req.body.book_service_combinations);
-    const teamMembers = normalizeTeamMembers(req.body.team_members);
+    let teamMembers = normalizeTeamMembers(req.body.team_members);
+    teamMembers = await applyTeamMemberPhotoUploads(teamMembers, req.files, req.user.id);
+    teamMembers = teamMembers.map(({ photo_upload_key: _photoUploadKey, ...member }) => member);
 
     const payload = {
       location_mode: req.body.location_mode,
@@ -714,7 +827,7 @@ export const upsertBusinessSetup = async (req, res) => {
         await client.query(
           `DELETE FROM business_team_members
            WHERE business_setup_id = $1
-             AND NOT (id = ANY($2::bigint[]))`,
+             AND NOT (id = ANY($2::uuid[]))`,
           [businessSetup.id, syncedTeamMemberIds],
         );
       } else {
@@ -727,7 +840,7 @@ export const upsertBusinessSetup = async (req, res) => {
       await client.query(
         `UPDATE business_setups
          SET
-           team_member_ids = $2::bigint[],
+           team_member_ids = $2::uuid[],
            updated_at = NOW()
          WHERE id = $1`,
         [businessSetup.id, syncedTeamMemberIds],
@@ -870,7 +983,7 @@ export const createCalendarEntry = async (req, res) => {
        RETURNING *`,
       [
         professionalProfile.id,
-        parseOptionalInteger(req.body.team_member_id),
+        parseOptionalUuid(req.body.team_member_id),
         normalizedStatus,
         req.body.title || (normalizedStatus === "blocked" ? "Blocked time" : "Offline booking"),
         req.body.unique_code || makeCalendarCode(codePrefix),
@@ -884,7 +997,7 @@ export const createCalendarEntry = async (req, res) => {
         normalizedBookingType,
         req.body.client_name ?? null,
         req.body.notes ?? null,
-        parseBigIntArray(req.body.service_ids),
+        parseUuidArray(req.body.service_ids),
       ],
     );
 
@@ -1189,8 +1302,8 @@ export const updateCalendarEntryStatus = async (req, res) => {
       });
     }
 
-    const entryId = Number.parseInt(req.params.id, 10);
-    if (!Number.isInteger(entryId) || entryId <= 0) {
+    const entryId = parseUuid(req.params.id);
+    if (!entryId) {
       return res.status(400).json({
         success: false,
         message: "Invalid calendar entry id.",
@@ -1260,8 +1373,8 @@ export const updateBookingStatus = async (req, res) => {
       });
     }
 
-    const bookingId = Number.parseInt(req.params.id, 10);
-    if (!Number.isInteger(bookingId) || bookingId <= 0) {
+    const bookingId = parseUuid(req.params.id);
+    if (!bookingId) {
       return res.status(400).json({
         success: false,
         message: "Invalid booking id.",

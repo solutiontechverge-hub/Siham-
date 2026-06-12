@@ -24,20 +24,33 @@ import { getApiErrorMessage } from "../../../../lib/api-error";
 import { getPasswordStrength } from "../../../../lib/passwordStrength";
 import { useRegisterMutation } from "../../../../store/services/authApi";
 import {
+  AppDatePicker,
   MarketingSiteHeader,
   MollureAuthLabeledField,
   MollureAuthLabeledPasswordField,
   PasswordStrengthBar,
 } from "../../../../components/common";
 import { authSignupHeaderClient } from "../../../../data/marketingShell.data";
+import {
+  COUNTRY_DIAL_CODES,
+  countryDialOptionValue,
+  countryFlagEmoji,
+  findCountryDialCode,
+} from "../../../../data/countryDialCodes";
 import { BodyText } from "../../../../components/ui/typography";
 import { useSnackbar } from "../../../../components/common/AppSnackbar";
+import {
+  REVIEW_NAME_MODES,
+  resolveDisplayNameFromMode,
+  reviewNameOptionLabel,
+  type ReviewNameMode,
+} from "../../../../lib/reviewNameDisplay";
 import { SignupBg, SignupLs, SignupRs } from "../../../../../images";
 
 type FormState = {
   firstName: string;
   lastName: string;
-  displayName: string;
+  reviewNameMode: "" | ReviewNameMode;
   birthDate: string;
   gender: string;
   countryCode: string;
@@ -51,7 +64,7 @@ type FormState = {
 const initialForm: FormState = {
   firstName: "",
   lastName: "",
-  displayName: "",
+  reviewNameMode: "",
   birthDate: "",
   gender: "",
   countryCode: "",
@@ -61,8 +74,6 @@ const initialForm: FormState = {
   confirmPassword: "",
   acceptTerms: false,
 };
-
-const COUNTRY_CODES = ["+1", "+44", "+61", "+92", "+971", "+33", "+49", "+81", "+86", "+34"] as const;
 
 export default function IndividualSignupPage() {
   const theme = useTheme();
@@ -84,16 +95,14 @@ export default function IndividualSignupPage() {
     return `${yyyy}-${mm}-${dd}`;
   }, []);
 
-  const displayNameOptions = React.useMemo(() => {
-    const full = `${form.firstName} ${form.lastName}`.trim();
-    const opts: { value: string; label: string }[] = [];
-    if (full) opts.push({ value: full, label: full });
-    const f = form.firstName.trim();
-    const l = form.lastName.trim();
-    if (f && full !== f) opts.push({ value: f, label: `${f} (first name)` });
-    if (l && full !== l) opts.push({ value: l, label: `${l} (last name)` });
-    return opts;
-  }, [form.firstName, form.lastName]);
+  const reviewNameOptions = React.useMemo(
+    () =>
+      REVIEW_NAME_MODES.map((mode) => ({
+        value: mode,
+        label: reviewNameOptionLabel(mode, form.firstName, form.lastName),
+      })),
+    [form.firstName, form.lastName],
+  );
 
   const handleChange = (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
@@ -165,10 +174,12 @@ export default function IndividualSignupPage() {
         confirm_password: form.confirmPassword,
         first_name: form.firstName.trim(),
         last_name: form.lastName.trim(),
-        display_name: form.displayName.trim() || undefined,
+        display_name:
+          resolveDisplayNameFromMode(form.reviewNameMode, form.firstName, form.lastName) || undefined,
         date_of_birth: form.birthDate || undefined,
         gender: form.gender || undefined,
-        country_code: form.countryCode.trim() || undefined,
+        country_code:
+          (findCountryDialCode(form.countryCode)?.dialCode ?? form.countryCode.trim()) || undefined,
         phone: form.phone.trim() || undefined,
       }).unwrap();
 
@@ -179,10 +190,12 @@ export default function IndividualSignupPage() {
           JSON.stringify({
             first_name: form.firstName.trim(),
             last_name: form.lastName.trim(),
-            display_name: form.displayName.trim() || undefined,
+            display_name:
+          resolveDisplayNameFromMode(form.reviewNameMode, form.firstName, form.lastName) || undefined,
             date_of_birth: form.birthDate || undefined,
             gender: form.gender || undefined,
-            country_code: form.countryCode.trim() || undefined,
+            country_code:
+          (findCountryDialCode(form.countryCode)?.dialCode ?? form.countryCode.trim()) || undefined,
             phone: form.phone.trim() || undefined,
             email: form.email.trim().toLowerCase(),
             avatar_url: null,
@@ -385,16 +398,15 @@ export default function IndividualSignupPage() {
                           <MollureAuthLabeledField
                             fieldLabel="Select name for rating/review"
                             select
-                            name="displayName"
-                            value={form.displayName}
+                            name="reviewNameMode"
+                            value={form.reviewNameMode}
                             onChange={handleChange}
-                            disabled={displayNameOptions.length === 0}
                             SelectProps={{ displayEmpty: true }}
                           >
                             <MenuItem value="">
                               <em>Select name for rating/review</em>
                             </MenuItem>
-                            {displayNameOptions.map((opt) => (
+                            {reviewNameOptions.map((opt) => (
                               <MenuItem key={opt.value} value={opt.value}>
                                 {opt.label}
                               </MenuItem>
@@ -402,14 +414,18 @@ export default function IndividualSignupPage() {
                           </MollureAuthLabeledField>
                         </Grid>
                         <Grid item xs={12} sm={6}>
-                          <MollureAuthLabeledField
-                            type="date"
-                            fieldLabel="Birth date"
-                            name="birthDate"
-                            value={form.birthDate}
-                            onChange={handleChange}
-                            inputProps={{ max: maxDob }}
-                          />
+                          <Stack spacing={0.75}>
+                            <Typography sx={{ fontSize: 12, fontWeight: 700, color: "text.secondary" }}>
+                              Birth date
+                            </Typography>
+                            <AppDatePicker
+                              name="birthDate"
+                              value={form.birthDate}
+                              onChange={(iso) => handleChange({ target: { name: "birthDate", value: iso } } as React.ChangeEvent<HTMLInputElement>)}
+                              max={maxDob}
+                              fullWidth
+                            />
+                          </Stack>
                         </Grid>
                         <Grid item xs={12} sm={6}>
                           <MollureAuthLabeledField
@@ -424,7 +440,6 @@ export default function IndividualSignupPage() {
                             </MenuItem>
                             <MenuItem value="female">Female</MenuItem>
                             <MenuItem value="male">Male</MenuItem>
-                            <MenuItem value="other">Other</MenuItem>
                           </MollureAuthLabeledField>
                         </Grid>
                       </Grid>
@@ -449,14 +464,54 @@ export default function IndividualSignupPage() {
                             name="countryCode"
                             value={form.countryCode}
                             onChange={handleChange}
-                            SelectProps={{ displayEmpty: true }}
+                            SelectProps={{
+                              displayEmpty: true,
+                              MenuProps: { PaperProps: { sx: { maxHeight: 280 } } },
+                              renderValue: (selected) => {
+                                if (!selected) {
+                                  return <em style={{ fontStyle: "italic", opacity: 0.72 }}>Country Code</em>;
+                                }
+                                const entry = findCountryDialCode(String(selected));
+                                if (!entry) return String(selected);
+                                return (
+                                  <Stack direction="row" spacing={0.75} alignItems="center" component="span">
+                                    <Box component="span" sx={{ fontSize: 16, lineHeight: 1 }}>
+                                      {countryFlagEmoji(entry.iso)}
+                                    </Box>
+                                    <Box component="span">{entry.dialCode}</Box>
+                                  </Stack>
+                                );
+                              },
+                            }}
                           >
                             <MenuItem value="">
                               <em>Country Code</em>
                             </MenuItem>
-                            {COUNTRY_CODES.map((code) => (
-                              <MenuItem key={code} value={code}>
-                                {code}
+                            {COUNTRY_DIAL_CODES.map((entry) => (
+                              <MenuItem key={countryDialOptionValue(entry)} value={countryDialOptionValue(entry)}>
+                                <Stack direction="row" spacing={1} alignItems="center" sx={{ width: "100%", minWidth: 0 }}>
+                                  <Box
+                                    component="span"
+                                    sx={{ fontSize: 18, lineHeight: 1, width: 22, textAlign: "center", flexShrink: 0 }}
+                                  >
+                                    {countryFlagEmoji(entry.iso)}
+                                  </Box>
+                                  <Typography component="span" sx={{ fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
+                                    {entry.dialCode}
+                                  </Typography>
+                                  <Typography
+                                    component="span"
+                                    sx={{
+                                      fontSize: 12,
+                                      color: "text.secondary",
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    {entry.name}
+                                  </Typography>
+                                </Stack>
                               </MenuItem>
                             ))}
                           </MollureAuthLabeledField>
@@ -528,7 +583,7 @@ export default function IndividualSignupPage() {
                       }
                       label={
                         <BodyText component="span" sx={{ fontSize: "0.875rem", color: alpha(m.navy, 0.55) }}>
-                          Accept our{" "}
+                          Accept{" "}
                           <Link
                             href="/terms"
                             style={{
@@ -537,7 +592,18 @@ export default function IndividualSignupPage() {
                               textDecoration: "underline",
                             }}
                           >
-                            Terms & Conditions
+                            terms and conditions
+                          </Link>
+                          {" & "}
+                          <Link
+                            href="/policies"
+                            style={{
+                              color: m.teal,
+                              fontWeight: 600,
+                              textDecoration: "underline",
+                            }}
+                          >
+                            Policies
                           </Link>
                           <Typography component="span" sx={{ color: "error.main", fontWeight: 600 }}>
                             *

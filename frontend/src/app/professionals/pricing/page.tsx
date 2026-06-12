@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
 import { Box, Container, Divider, Grid, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import Link from "next/link";
@@ -12,6 +12,71 @@ import {
 } from "../../../data/marketingShell.data";
 
 const MARKETING_CARD_SHADOW = "0 10px 28px rgba(16, 35, 63, 0.10)";
+
+function FeatureCheckIcon({ color }: { color: string }) {
+  return (
+    <CheckCircleOutlineRoundedIcon
+      sx={{
+        fontSize: 18,
+        color,
+        flexShrink: 0,
+      }}
+    />
+  );
+}
+
+function StripeFeeRadioIcon({ color }: { color: string }) {
+  return (
+    <Box
+      sx={{
+        width: 14,
+        height: 14,
+        borderRadius: "50%",
+        border: `2px solid ${color}`,
+        bgcolor: "#fff",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        boxSizing: "border-box",
+      }}
+    >
+      <Box
+        sx={{
+          width: 6,
+          height: 6,
+          borderRadius: "50%",
+          bgcolor: color,
+        }}
+      />
+    </Box>
+  );
+}
+
+function BulletRow({
+  children,
+  dotColor,
+}: {
+  children: React.ReactNode;
+  dotColor: string;
+}) {
+  return (
+    <Stack direction="row" spacing={1.1} alignItems="center">
+      <Box
+        sx={{
+          width: 5,
+          height: 5,
+          borderRadius: "50%",
+          bgcolor: dotColor,
+          flexShrink: 0,
+        }}
+      />
+      <Typography sx={{ fontSize: 12.5, color: "inherit", lineHeight: 1.65, flex: 1 }}>
+        {children}
+      </Typography>
+    </Stack>
+  );
+}
 
 export default function PricingPage() {
   const tokens = useTheme().palette.mollure;
@@ -98,8 +163,8 @@ export default function PricingPage() {
               <Grid item xs={12} md={6}>
                 <Stack spacing={1.5}>
                   {featureItems.map((t) => (
-                    <Stack key={t} direction="row" spacing={1.25} alignItems="flex-start">
-                      <CheckCircleRoundedIcon sx={{ mt: "2px", fontSize: 18, color: tokens.teal }} />
+                    <Stack key={t} direction="row" spacing={1.25} alignItems="center">
+                      <FeatureCheckIcon color={tokens.teal} />
                       <Typography sx={{ fontSize: 13.5, color: alpha(tokens.navy, 0.7), lineHeight: 1.6 }}>
                         {t}
                       </Typography>
@@ -150,15 +215,14 @@ export default function PricingPage() {
                   <Typography sx={{ color: alpha(tokens.navy, 0.62), fontSize: 12.5, lineHeight: 1.65 }}>
                     For each online transaction:
                   </Typography>
-                  <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ pl: 1 }}>
-                    <Box sx={{ mt: "7px", width: 5, height: 5, borderRadius: 99, bgcolor: alpha(tokens.navy, 0.35) }} />
-                    <Typography sx={{ color: alpha(tokens.navy, 0.7), fontSize: 12.5, lineHeight: 1.65 }}>
+                  <Box sx={{ pl: 1, color: alpha(tokens.navy, 0.7) }}>
+                    <BulletRow dotColor={alpha(tokens.navy, 0.35)}>
                       <Box component="span" sx={{ fontWeight: 900, color: alpha(tokens.navy, 0.82) }}>
                         Stripe processing fee (based on payment method)
                       </Box>{" "}
                       + 1% Mollure fee (Excluding VAT)
-                    </Typography>
-                  </Stack>
+                    </BulletRow>
+                  </Box>
                   <Typography sx={{ color: alpha(tokens.navy, 0.62), fontSize: 12.5, lineHeight: 1.65 }}>
                     All funds go directly to your own Stripe account. Mollure never holds, processes, or delays your money.
                   </Typography>
@@ -213,22 +277,16 @@ export default function PricingPage() {
                 "Apple Pay / Google Pay",
               ].map((label) => (
                 <Grid key={label} item xs={12} sm={6} md={4}>
-                  <Stack direction="row" spacing={1.1} alignItems="center">
-                    <Box
+                  <Stack direction="row" spacing={1.25} alignItems="center">
+                    <StripeFeeRadioIcon color={tokens.star} />
+                    <Typography
                       sx={{
-                        width: 12,
-                        height: 12,
-                        borderRadius: 999,
-                        border: `1.5px solid ${tokens.star}`,
-                        bgcolor: "#fff",
-                        display: "grid",
-                        placeItems: "center",
-                        flexShrink: 0,
+                        fontSize: 13.5,
+                        color: alpha(tokens.navy, 0.75),
+                        fontWeight: 600,
+                        lineHeight: 1.4,
                       }}
                     >
-                      <Box sx={{ width: 4, height: 4, borderRadius: 999, bgcolor: tokens.star }} />
-                    </Box>
-                    <Typography sx={{ fontSize: 13.5, color: alpha(tokens.navy, 0.75), fontWeight: 600 }}>
                       {label}
                     </Typography>
                   </Stack>
@@ -362,12 +420,9 @@ export default function PricingPage() {
                     "Disputes and chargebacks are managed directly in Stripe",
                     "MOLLURE does not access or hold your funds",
                   ].map((t) => (
-                    <Stack key={t} direction="row" spacing={1.1} alignItems="flex-start">
-                      <Box sx={{ mt: "7px", width: 5, height: 5, borderRadius: 999, bgcolor: alpha(tokens.navy, 0.35) }} />
-                      <Typography sx={{ fontSize: 12.5, color: alpha(tokens.navy, 0.62), lineHeight: 1.65 }}>
-                        {t}
-                      </Typography>
-                    </Stack>
+                    <Box key={t} sx={{ color: alpha(tokens.navy, 0.62) }}>
+                      <BulletRow dotColor={alpha(tokens.navy, 0.35)}>{t}</BulletRow>
+                    </Box>
                   ))}
                 </Stack>
               </Box>
@@ -389,12 +444,9 @@ export default function PricingPage() {
                     "Enable or disable payment methods",
                     "Provide additional business information if requested by Stripe",
                   ].map((t) => (
-                    <Stack key={t} direction="row" spacing={1.1} alignItems="flex-start">
-                      <Box sx={{ mt: "7px", width: 5, height: 5, borderRadius: 999, bgcolor: alpha(tokens.navy, 0.35) }} />
-                      <Typography sx={{ fontSize: 12.5, color: alpha(tokens.navy, 0.62), lineHeight: 1.65 }}>
-                        {t}
-                      </Typography>
-                    </Stack>
+                    <Box key={t} sx={{ color: alpha(tokens.navy, 0.62) }}>
+                      <BulletRow dotColor={alpha(tokens.navy, 0.35)}>{t}</BulletRow>
+                    </Box>
                   ))}
                 </Stack>
 

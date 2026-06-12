@@ -51,7 +51,7 @@ export default function NewPasswordPage() {
 
     try {
       await resetPassword({
-        user_id: Number(userId),
+        user_id: userId,
         new_password: password,
         confirm_password: confirmPassword,
       }).unwrap();

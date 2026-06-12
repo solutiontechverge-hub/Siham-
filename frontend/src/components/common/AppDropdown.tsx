@@ -21,6 +21,18 @@ type AppDropdownProps = Omit<TextFieldProps, "select" | "onChange" | "children" 
   ) => void;
 };
 
+function normalizeSelectValue(
+  raw: unknown,
+  multiple?: boolean,
+): string | readonly string[] {
+  if (multiple) {
+    if (Array.isArray(raw)) return raw.map(String);
+    if (typeof raw === "string") return raw === "" ? [] : raw.split(",");
+    return [];
+  }
+  return typeof raw === "string" ? raw : String(raw ?? "");
+}
+
 export default function AppDropdown({
   onChange,
   options,
@@ -34,7 +46,7 @@ export default function AppDropdown({
     <AppTextField
       select
       value={value}
-      onChange={(event) => onChange(event.target.value, event)}
+      onChange={(event) => onChange(normalizeSelectValue(event.target.value, multiple), event)}
       SelectProps={{
         IconComponent: ExpandMoreRoundedIcon,
         multiple: Boolean(multiple),

@@ -1,11 +1,12 @@
 import * as React from "react";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
-import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
+import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import { Box, Button, IconButton, Popover, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useSnackbar } from "../../common/AppSnackbar";
+import AppDatePicker from "../../common/AppDatePicker";
 import MollureFormField from "../../common/MollureFormField";
 import { BodyText } from "../../ui/typography";
 
@@ -15,6 +16,7 @@ export type TransactionsToolbarProps = {
   onAddClick: (el: HTMLElement) => void;
   onMoreClick: (el: HTMLElement) => void;
   onFiltersClick?: () => void;
+  disableAdd?: boolean;
   fromDate?: string | null;
   toDate?: string | null;
   onFromDateChange?: (next: string | null) => void;
@@ -28,6 +30,7 @@ export default function TransactionsToolbar({
   onAddClick,
   onMoreClick,
   onFiltersClick,
+  disableAdd = false,
   fromDate,
   toDate,
   onFromDateChange,
@@ -47,6 +50,16 @@ export default function TransactionsToolbar({
   React.useEffect(() => setToDraft(toDate ?? ""), [toDate]);
 
   const today = React.useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const hasAppliedDateRange = Boolean(fromDate && toDate);
+
+  const handleResetDateRange = React.useCallback(() => {
+    onFromDateChange?.(null);
+    onToDateChange?.(null);
+    setFromDraft("");
+    setToDraft("");
+    setFromAnchor(null);
+    setToAnchor(null);
+  }, [onFromDateChange, onToDateChange]);
 
   const commonBtnSx = {
     borderRadius: "6px",
@@ -102,6 +115,11 @@ export default function TransactionsToolbar({
           >
             {toDate ? `To: ${toDate}` : "to date"}
           </Button>
+          {hasAppliedDateRange ? (
+            <Button variant="outlined" onClick={handleResetDateRange} sx={commonBtnSx}>
+              Reset
+            </Button>
+          ) : null}
           <Button
             variant="outlined"
             startIcon={<TuneRoundedIcon sx={{ fontSize: 18 }} />}
@@ -123,6 +141,7 @@ export default function TransactionsToolbar({
           <Button
             variant="contained"
             disableElevation
+            disabled={disableAdd}
             onClick={(e) => onAddClick(e.currentTarget)}
             endIcon={<KeyboardArrowDownRoundedIcon />}
             sx={{
@@ -140,16 +159,21 @@ export default function TransactionsToolbar({
           </Button>
           <IconButton
             size="small"
+            aria-label="More actions"
+            aria-haspopup="menu"
             onClick={(e) => onMoreClick(e.currentTarget)}
             sx={{
               width: 34,
               height: 34,
+              flexShrink: 0,
               borderRadius: "8px",
-              border: `1px solid ${alpha(m.navy, 0.14)}`,
-              color: alpha(m.navy, 0.55),
+              border: `1px solid ${alpha(m.navy, 0.12)}`,
+              bgcolor: "#fff",
+              color: alpha(m.navy, 0.72),
+              "&:hover": { bgcolor: alpha(m.navy, 0.03) },
             }}
           >
-            <MoreHorizRoundedIcon sx={{ fontSize: 20 }} />
+            <MoreVertRoundedIcon sx={{ fontSize: 20 }} />
           </IconButton>
         </Stack>
       </Stack>
@@ -176,14 +200,11 @@ export default function TransactionsToolbar({
         <BodyText sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.75), mb: 1 }}>
           From date
         </BodyText>
-        <MollureFormField
-          type="date"
+        <AppDatePicker
           value={fromDraft}
-          onChange={(e) => setFromDraft(e.target.value)}
-          InputLabelProps={{ shrink: true }}
-          inputProps={{
-            max: toDate && toDate < today ? toDate : today,
-          }}
+          onChange={(iso) => setFromDraft(iso)}
+          max={toDate && toDate < today ? toDate : today}
+          fullWidth
         />
         <Stack direction="row" spacing={1} sx={{ mt: 1.25 }}>
           <Button
@@ -245,15 +266,12 @@ export default function TransactionsToolbar({
         <BodyText sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.75), mb: 1 }}>
           To date
         </BodyText>
-        <MollureFormField
-          type="date"
+        <AppDatePicker
           value={toDraft}
-          onChange={(e) => setToDraft(e.target.value)}
-          InputLabelProps={{ shrink: true }}
-          inputProps={{
-            min: fromDate ?? undefined,
-            max: today,
-          }}
+          onChange={(iso) => setToDraft(iso)}
+          min={fromDate ?? undefined}
+          max={today}
+          fullWidth
         />
         <Stack direction="row" spacing={1} sx={{ mt: 1.25 }}>
           <Button

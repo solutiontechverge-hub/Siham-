@@ -74,6 +74,7 @@ export function useFixedLocationClientPage() {
   const [blockClientId, setBlockClientId] = React.useState<string | null>(null);
   const [deleteClientId, setDeleteClientId] = React.useState<string | null>(null);
   const [viewClientId, setViewClientId] = React.useState<string | null>(null);
+  const [focusTechnicalNoteOnOpen, setFocusTechnicalNoteOnOpen] = React.useState(false);
   const [clientDetailsMode, setClientDetailsMode] = React.useState<"view" | "edit">("view");
   const [editCompanyForm, setEditCompanyForm] = React.useState<EditCompanyFormState>(emptyEditCompanyForm);
   const [editIndividualForm, setEditIndividualForm] = React.useState<EditIndividualFormState>(emptyEditIndividualForm);
@@ -252,6 +253,14 @@ export function useFixedLocationClientPage() {
 
   const openClientDetailsEdit = React.useCallback(() => {
     if (!viewClient) return;
+    if (viewClient.tags.includes("Mollure")) {
+      setSnackbar({
+        open: true,
+        severity: "info",
+        message: "Mollure clients manage their own profile. Client details cannot be edited here.",
+      });
+      return;
+    }
     const dialCodes = ["+971", "+92", "+91", "+49", "+44", "+1", "+81", "+61", "+31"];
     const splitPhone = (raw: string) => {
       for (const code of dialCodes) {
@@ -280,7 +289,7 @@ export function useFixedLocationClientPage() {
         province: "",
         municipality: "",
         email: c.detailEmail ?? c.email,
-        technicalNote: "",
+        technicalNote: c.technicalNote ?? "",
       });
     } else {
       const c = viewClient;
@@ -295,7 +304,7 @@ export function useFixedLocationClientPage() {
         phone,
         email: c.email,
         residentialAddress: c.residentialAddress ?? "",
-        technicalNote: "",
+        technicalNote: c.technicalNote ?? "",
       });
     }
     setClientDetailsMode("edit");
@@ -504,9 +513,23 @@ export function useFixedLocationClientPage() {
     setAddNonMollureOpen(true);
   }, [resetNonMollureAddForm]);
 
+  const openClientDetailsView = React.useCallback(
+    (id: string, options?: { focusTechnicalNote?: boolean }) => {
+      setClientDetailsMode("view");
+      setViewClientId(id);
+      setFocusTechnicalNoteOnOpen(Boolean(options?.focusTechnicalNote));
+    },
+    [],
+  );
+
+  const clearTechnicalNoteFocus = React.useCallback(() => {
+    setFocusTechnicalNoteOnOpen(false);
+  }, []);
+
   const closeClientDetailsDrawer = React.useCallback(() => {
     setViewClientId(null);
     setClientDetailsMode("view");
+    setFocusTechnicalNoteOnOpen(false);
   }, []);
 
   const confirmDeleteClient = React.useCallback(() => {
@@ -525,15 +548,16 @@ export function useFixedLocationClientPage() {
   const confirmBlockClient = React.useCallback(() => {
     if (!blockClientId) return;
     const id = blockClientId;
-    setClients((prev) => prev.filter((c) => c.id !== id));
+    setClients((prev) => prev.map((c) => (c.id === id ? { ...c, isBlocked: true } : c)));
     setBlockClientId(null);
-    if (viewClientId === id) {
-      setViewClientId(null);
-      setClientDetailsMode("view");
-    }
     if (deleteClientId === id) setDeleteClientId(null);
-    setSnackbar({ open: true, message: "Client Blocked", severity: "error" });
-  }, [blockClientId, deleteClientId, viewClientId]);
+    setSnackbar({ open: true, message: "Client blocked", severity: "error" });
+  }, [blockClientId, deleteClientId]);
+
+  const unblockClient = React.useCallback((id: string) => {
+    setClients((prev) => prev.map((c) => (c.id === id ? { ...c, isBlocked: false } : c)));
+    setSnackbar({ open: true, message: "Client unblocked", severity: "success" });
+  }, []);
 
   const saveClientEdits = React.useCallback(() => {
     if (!viewClientId) return false;
@@ -568,6 +592,7 @@ export function useFixedLocationClientPage() {
             email: email || c.email,
             detailEmail: email || c.detailEmail,
             businessAddress: businessAddress || undefined,
+            technicalNote: editCompanyForm.technicalNote.trim() || undefined,
           };
         }
 
@@ -582,15 +607,29 @@ export function useFixedLocationClientPage() {
           phone: `${editIndividualForm.countryCode} ${editIndividualForm.phone}`.trim(),
           email: email || c.email,
           residentialAddress: editIndividualForm.residentialAddress.trim() || undefined,
+          technicalNote: editIndividualForm.technicalNote.trim() || undefined,
         };
       }),
     );
 
     setClientDetailsMode("view");
-    setViewClientId(null);
     setSnackbar({ open: true, message: "Client Updated", severity: "success" });
     return true;
   }, [editCompanyForm, editIndividualForm, viewClientId]);
+
+  const saveClientTechnicalNote = React.useCallback(
+    (note: string) => {
+      if (!viewClientId) return;
+      const trimmed = note.trim();
+      setClients((prev) =>
+        prev.map((c) =>
+          c.id === viewClientId ? { ...c, technicalNote: trimmed || undefined } : c,
+        ),
+      );
+      setSnackbar({ open: true, message: "Technical note saved", severity: "success" });
+    },
+    [viewClientId],
+  );
 
   return {
     clients,
@@ -692,8 +731,13 @@ export function useFixedLocationClientPage() {
     resetNonMollureAddForm,
     openNonMollureAddDrawer,
     closeClientDetailsDrawer,
+    openClientDetailsView,
+    focusTechnicalNoteOnOpen,
+    clearTechnicalNoteFocus,
     confirmDeleteClient,
     confirmBlockClient,
+    unblockClient,
     saveClientEdits,
+    saveClientTechnicalNote,
   };
 }

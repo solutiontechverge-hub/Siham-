@@ -1,5 +1,6 @@
 import { alpha } from "@mui/material/styles";
 import type {
+  CalendarBlock,
   CalendarBookingLocation,
   CalendarBookingStatus,
   CalendarBookingType,
@@ -168,4 +169,48 @@ export function fmtMinToTime(min: number) {
 
 export function sumIntervalsMins(intervals: readonly Interval[]) {
   return intervals.reduce((acc, it) => acc + Math.max(0, it.endMin - it.startMin), 0);
+}
+
+const blockDayNameToDow: Record<BlockTimeDraft["dayFrom"], number> = {
+  Sunday: 0,
+  Monday: 1,
+  Tuesday: 2,
+  Wednesday: 3,
+  Thursday: 4,
+  Friday: 5,
+  Saturday: 6,
+};
+
+const isBlockDayAllowed = (dow: number, dayFrom: BlockTimeDraft["dayFrom"], dayTo: BlockTimeDraft["dayTo"]) => {
+  const fromDow = blockDayNameToDow[dayFrom];
+  const toDow = blockDayNameToDow[dayTo];
+  if (fromDow <= toDow) return dow >= fromDow && dow <= toDow;
+  return dow >= fromDow || dow <= toDow;
+};
+
+export function buildBlocksFromDraft(draft: BlockTimeDraft, teamIds: readonly string[]): CalendarBlock[] {
+  const endDate = draft.dateTo || draft.dateFrom;
+  const singleDay = draft.dateFrom === endDate;
+  const blocks: CalendarBlock[] = [];
+  let cursor = draft.dateFrom;
+
+  while (cursor <= endDate) {
+    const dow = parseIsoDate(cursor).getUTCDay();
+    if (singleDay || isBlockDayAllowed(dow, draft.dayFrom, draft.dayTo)) {
+      for (const teamId of teamIds) {
+        blocks.push({
+          id: `blk-local-${teamId}-${cursor}-${draft.startTime}-${draft.endTime}-${blocks.length}`,
+          resourceId: teamId,
+          date: cursor,
+          start: draft.startTime,
+          end: draft.endTime,
+          title: draft.title,
+          kind: "unavailable",
+        });
+      }
+    }
+    cursor = addDaysIso(cursor, 1);
+  }
+
+  return blocks;
 }

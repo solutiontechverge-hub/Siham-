@@ -8,7 +8,6 @@ import {
   Container,
   Grid,
   PaginationItem,
-  Snackbar,
   Stack,
   Typography,
 } from "@mui/material";
@@ -19,7 +18,9 @@ import {
   AppCard,
   AppPagination,
   ClientListingCard,
-  ClientTopTabs,
+  ClientPageTabsBar,
+  clientTopTabsActiveLabel,
+  MollureSnackbar,
   MarketingSiteFooter,
   MollureMarketingHeader,
 } from "../../../components/common";
@@ -27,12 +28,6 @@ import { favouritesPageData } from "./data-favourites";
 import { useClientFavouritesPage } from "./use-favourites";
 import { profilePageData } from "../profile/data-profile";
 import { marketingShellFooter } from "../../../data/marketingShell.data";
-
-const clientTopTabs = [
-  { label: "Booking", href: "/clients/booking" },
-  { label: "Favorites", href: "/clients/favourites" },
-  { label: "Profile", href: "/clients/profile" },
-] as const;
 
 export default function ClientFavouritesPage() {
   const pathname = usePathname();
@@ -45,11 +40,6 @@ export default function ClientFavouritesPage() {
   const [userName, setUserName] = React.useState<string>(fallbackDisplayName);
   const [avatarUrl, setAvatarUrl] = React.useState<string | undefined>(undefined);
   const [snackbarOpen, setSnackbarOpen] = React.useState(false);
-
-  const closeSnackbar = (_e?: unknown, reason?: string) => {
-    if (reason === "clickaway") return;
-    setSnackbarOpen(false);
-  };
 
   React.useEffect(() => {
     try {
@@ -89,34 +79,18 @@ export default function ClientFavouritesPage() {
         userLabel={user?.email ?? ""}
         userName={userName}
         userAvatarSrc={avatarUrl}
-        homeHref="/clients/listing"
+        homeHref="/"
       />
 
-      <Snackbar
+      <MollureSnackbar
         open={snackbarOpen}
+        message="Item Removed"
+        severity="info"
         autoHideDuration={2500}
-        onClose={closeSnackbar}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-      >
-        <Alert onClose={closeSnackbar} severity="info" variant="filled" sx={{ fontWeight: 700 }}>
-          Item Removed
-        </Alert>
-      </Snackbar>
+        onClose={() => setSnackbarOpen(false)}
+      />
 
-      <Box sx={{ mt: 2, bgcolor: "transparent" }}>
-        <Container maxWidth="lg" sx={{ px: { xs: 2, sm: 3, md: 4 }, py: 1.5 }}>
-          <ClientTopTabs
-            tabs={clientTopTabs}
-            activeLabel={
-              pathname?.includes("/clients/booking")
-                ? "Booking"
-                : pathname?.includes("/clients/favourites")
-                  ? "Favorites"
-                  : "Profile"
-            }
-          />
-        </Container>
-      </Box>
+      <ClientPageTabsBar activeLabel={clientTopTabsActiveLabel(pathname)} />
 
       <Container maxWidth="lg" sx={{ py: { xs: 3, md: 4 } }}>
         {totalCount === 0 ? (

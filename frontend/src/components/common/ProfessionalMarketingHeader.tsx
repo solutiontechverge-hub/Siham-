@@ -43,6 +43,7 @@ export default function ProfessionalMarketingHeader(props: MarketingSiteHeaderPr
   return (
     <MarketingSiteHeader
       {...props}
+      homeHref={props.homeHref ?? "/professionals"}
       isAuthed={props.isAuthed ?? true}
       userAvatarSrc={userAvatarSrc}
       userName={userName}

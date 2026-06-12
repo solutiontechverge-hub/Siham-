@@ -39,6 +39,7 @@ import {
   type FinanceInvoiceSettings,
 } from "../../../../../components/sections/finance/useFinanceInvoiceSettings";
 import { useGetProfileQuery } from "../../../../../store/services/profileApi";
+import { useProfessionalStripeStatus } from "../useProfessionalStripeStatus";
 
 type SettingsTab = "stripe" | "transaction" | "invoice";
 
@@ -81,10 +82,15 @@ function TabButton({
 function StripeSettings() {
   const theme = useTheme();
   const m = theme.palette.mollure;
-
-  // Replace these with real API-driven values when available.
-  const subscriptionActive = false;
-  const paymentsConnected = false;
+  const { showSnackbar } = useSnackbar();
+  const {
+    hydrated,
+    subscriptionActive,
+    paymentsConnected,
+    activateSubscription,
+    deactivateSubscription,
+    markPaymentsConnected,
+  } = useProfessionalStripeStatus();
 
   const cardSx = {
     borderRadius: "10px",
@@ -143,7 +149,7 @@ function StripeSettings() {
   ] as const;
 
   const payoutBullets = [
-    "Instant payout (typically 7–10 business days)",
+    "First payout typically 7–10 business days",
     "Future payouts follow your selected payout schedule",
     "Your payouts may pause only if Stripe requires additional verification",
   ] as const;
@@ -153,10 +159,13 @@ function StripeSettings() {
     "Edit statement descriptor",
     "Update business contact details",
     "Review payout history",
-    "Check balances and payments",
-    "Complete any verification tasks required by Stripe",
-    "And more (disputes, fraud checks, settings, etc.)",
+    "Check balances and payouts",
+    "Comply with any verification tasks required by Stripe",
   ] as const;
+
+  if (!hydrated) {
+    return null;
+  }
 
   return (
     <Stack spacing={2}>
@@ -200,7 +209,20 @@ function StripeSettings() {
             Your 15 EUR/month is billed securely via Stripe Billing. A valid credit card is required
           </BodyText>
           <Box sx={{ mt: 1.25 }}>
-            <Button variant="contained" disableElevation sx={actionBtnSx}>
+            <Button
+              variant="contained"
+              disableElevation
+              sx={actionBtnSx}
+              onClick={() => {
+                if (subscriptionActive) {
+                  deactivateSubscription();
+                  showSnackbar({ severity: "info", message: "Mollure subscription deactivated." });
+                  return;
+                }
+                activateSubscription();
+                showSnackbar({ severity: "success", message: "Mollure subscription is now active." });
+              }}
+            >
               {subscriptionActive ? "Deactivate Subscription" : "Activate Subscription"}
             </Button>
           </Box>
@@ -229,7 +251,26 @@ function StripeSettings() {
           </BodyText>
 
           <Box sx={{ mt: 1.1 }}>
-            <Button variant="contained" disableElevation sx={actionBtnSx}>
+            <Button
+              variant="contained"
+              disableElevation
+              sx={actionBtnSx}
+              onClick={() => {
+                if (!subscriptionActive) {
+                  showSnackbar({
+                    severity: "warning",
+                    message: "Activate your Mollure subscription before connecting Stripe payments.",
+                  });
+                  return;
+                }
+                if (paymentsConnected) {
+                  window.open("https://dashboard.stripe.com/", "_blank", "noopener,noreferrer");
+                  return;
+                }
+                markPaymentsConnected();
+                showSnackbar({ severity: "success", message: "Stripe account connected." });
+              }}
+            >
               {paymentsConnected ? "Stripe Dashboard" : "Start Onboarding"}
             </Button>
           </Box>
@@ -268,7 +309,7 @@ function StripeSettings() {
                 ))}
               </Stack>
             </Box>
-          ) : (
+          ) : paymentsConnected ? (
             <Box sx={{ mt: 2 }}>
               <CardTitle sx={{ color: alpha(m.navy, 0.86) }}>Payout</CardTitle>
               <Stack spacing={0.5} sx={{ mt: 0.75, pl: 1.5 }}>
@@ -290,7 +331,14 @@ function StripeSettings() {
                   </BodyText>
                 ))}
               </Stack>
+              <BodyText sx={{ mt: 1.25, fontSize: 11.5, color: alpha(m.navy, 0.48) }}>
+                (Note: Stripe handles KYC, AML, etc.)
+              </BodyText>
             </Box>
+          ) : (
+            <BodyText sx={{ mt: 1.5, fontSize: 12.5, color: alpha(m.navy, 0.58) }}>
+              Your subscription is active. Complete Stripe onboarding to accept online payments and view payout details.
+            </BodyText>
           )}
         </Box>
       </Paper>
@@ -869,8 +917,8 @@ function InvoiceSettings() {
                               width: 22,
                               height: 22,
                               borderRadius: "8px",
-                              bgcolor: alpha(m.teal, 0.14),
-                              color: m.teal,
+                              bgcolor: m.addSoftBg,
+                              color: m.addSoftFg,
                               display: "grid",
                               placeItems: "center",
                               flex: "0 0 auto",

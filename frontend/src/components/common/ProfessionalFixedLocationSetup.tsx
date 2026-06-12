@@ -7,23 +7,24 @@ import {
   Box,
   Button,
   CircularProgress,
-  Drawer,
   Fade,
   Checkbox,
   Chip,
   Container,
   Divider,
+  Popover,
   InputAdornment,
   FormControlLabel,
   Grid,
   IconButton,
+  Menu,
   MenuItem,
   Paper,
   Rating,
   Stack,
   Switch,
 } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
+import { alpha, useTheme, type Theme } from "@mui/material/styles";
 import IosShareRoundedIcon from "@mui/icons-material/IosShareRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
@@ -33,6 +34,8 @@ import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
+import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
+import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 import type { FixedLocationPageData } from "../../app/professionals/fixed-location/fixedLocation.data";
 import { useFixedLocationForm, type FixedLocationFormState } from "../../app/professionals/fixed-location/fixedLocation.use";
 import type {
@@ -44,11 +47,24 @@ import type {
   BusinessCategory,
   BusinessSetup,
   BusinessTeamMember,
+  UpsertBusinessSetupPayload,
   UpsertBusinessSetupRequest,
 } from "../../store/services/businessApi";
+import {
+  buildUpsertBusinessSetupBody,
+  useUpdateBusinessSetupActiveMutation,
+} from "../../store/services/businessApi";
+import { getApiErrorMessage } from "../../lib/api-error";
 import { useSnackbar } from "./AppSnackbar";
+import AppMultiSelect from "./AppMultiSelect";
 import MollureFormField from "./MollureFormField";
-import ServiceCategorySliderCard, { SERVICE_CATEGORY_SLIDER_CARD_WIDTH } from "./ServiceCategorySliderCard";
+import MollureModal from "./MollureModal";
+import {
+  MollureLabeledField,
+  MollureLabeledPasswordField,
+  MollureTextField,
+} from "./MollureLabeledFields";
+import ServiceCategoryBar from "./ServiceCategoryBar";
 import {
   BUSINESS_MEDIA_MAX_COUNT,
   filterAllowedProfileImageFiles,
@@ -59,106 +75,70 @@ import {
 } from "../../lib/profileImageUpload";
 import { Typography } from "../ui/typography";
 import {
+  BUSINESS_SERVICE_CATEGORY_CATALOG,
+  buildServiceCategoryTabs,
+  resolveCategoryTabId,
+  resolveServiceCategoryStorageId,
   resolveServiceCategorySliderIconId,
+  serviceMatchesCategoryTab,
   type ServiceCategorySliderIconId,
 } from "../../data/businessServiceCategorySlider.data";
+import {
+  formatBusinessServicePriceLabel,
+  normalizeBusinessServiceDiscountType,
+  normalizeBusinessServicePriceType,
+  parseEuroAmountString,
+  parsePriceLabelForModal,
+  businessServiceModalCopy,
+  hydrateMainAndSubservicesFromDetails,
+  isHydratedMainServiceId,
+  type BusinessMainServiceUi,
+  type BusinessSubserviceUi,
+} from "../../data/businessServiceModal.data";
+import { useBusinessServiceModal } from "../../app/professionals/fixed-location/businessServiceModal.use";
+import {
+  useBusinessTeamMemberModal,
+  type TeamMemberUi,
+} from "../../app/professionals/fixed-location/businessTeamMemberModal.use";
+import {
+  buildTeamBusinessServiceRefs,
+  TEAM_MEMBER_DRAFT_PREVIEW_ID,
+} from "../../data/businessTeamMemberModal.data";
+import BusinessServiceFormModal from "./BusinessServiceFormModal";
+import BusinessTeamMemberFormModal from "./BusinessTeamMemberFormModal";
 
-type ServiceDetailUiItem = {
-  id: string;
-  categoryId: string;
-  serviceId: number;
-  name: string;
-  durationLabel?: string;
-  priceLabel: string;
-  /** From API — used for “All” grouping when category tabs are missing or ids differ */
-  categoryTitle?: string;
-  priceType?: string;
-  priceAmount?: string;
-  discountType?: string;
-  discountAmount?: string;
+type ServiceDetailUiItem = BusinessSubserviceUi;
+
+type TeamServiceSlots = {
+  slot1: string;
+  slot2: string;
+  slot3: string;
+  slot4: string;
+  slot5: string;
+  slot6: string;
+  slot7: string;
 };
-
-type ServiceDrawerEditBaseline = {
-  categoryId: string;
-  serviceId: number;
-  name: string;
-  duration: string;
-  priceType: string;
-  priceAmount: string;
-  discountType: string;
-  discountAmount: string;
-};
-
-const SERVICE_DRAWER_PRICE_TYPES: { value: string; label: string }[] = [
-  { value: "fixed", label: "Fixed price" },
-  { value: "from", label: "Starting from" },
-];
-
-const SERVICE_DRAWER_DISCOUNT_TYPES: { value: string; label: string }[] = [
-  { value: "fixed", label: "Fixed discount" },
-  { value: "percent", label: "Percentage discount" },
-];
-
-function parseEuroAmountString(s: string): number | null {
-  const raw = String(s ?? "")
-    .trim()
-    .replace(",", ".")
-    .replace(/\s/g, "");
-  if (raw === "") return null;
-  const n = Number.parseFloat(raw);
-  return Number.isFinite(n) && n >= 0 ? n : null;
-}
-
-function normalizeDurationLabel(value: string) {
-  const trimmed = String(value ?? "").trim();
-  if (!trimmed) return "";
-  if (/^\d+$/.test(trimmed)) return `${trimmed} min`;
-  return trimmed;
-}
 
 const mapServiceItemsToCategories = (items: ServiceDetailUiItem[]) =>
   items
     .filter((item) => item.serviceId && item.categoryId)
     .map((item) => ({
-      category_id: Number(item.categoryId),
-      service_id: item.serviceId,
+      category_id: String(item.categoryId),
+      service_id: String(item.serviceId),
+      category_title: item.categoryTitle?.trim() || null,
+      service_title: item.name?.trim() || null,
       amount:
         (parseEuroAmountString(item.priceAmount ?? "") ??
           Number(String(item.priceLabel).replace(/[^0-9.]/g, ""))) || 0,
-      duration_label: normalizeDurationLabel(item.durationLabel ?? "") || null,
+      duration_label: (item.durationLabel ?? "").trim() || null,
     }));
 
 function normalizePriceType(type: string | undefined): "fixed" | "from" {
-  if (type === "from") return "from";
-  return "fixed";
-}
-
-function parsePriceLabelForDrawer(priceLabel: string): { type: string; amount: string } {
-  const t = priceLabel.trim().toLowerCase();
-  if (!t || t === "—" || t === "-") return { type: "fixed", amount: "" };
-  if (t.includes("free")) return { type: "fixed", amount: "0" };
-  if (t.startsWith("starting from")) {
-    const n = t.replace(/^starting from\s*/i, "").replace(/[€$eur,\s]/gi, "").match(/[\d.]+/);
-    return { type: "from", amount: n?.[0] ?? "" };
-  }
-  if (t.startsWith("from")) {
-    const n = t.replace(/^from\s*/i, "").replace(/[€$eur,\s]/gi, "").match(/[\d.]+/);
-    return { type: "from", amount: n?.[0] ?? "" };
-  }
-  const n = t.replace(/[€$eur,\s]/gi, "").match(/[\d.]+/);
-  return { type: "fixed", amount: n?.[0] ?? "" };
-}
-
-function formatServicePriceLabel(priceType: string, priceAmount: string): string {
-  const raw = priceAmount.trim().replace(",", ".").replace(/\s/g, "");
-  const n = raw === "" ? Number.NaN : Number.parseFloat(raw);
-  const amountPart = Number.isFinite(n) ? `${n} €` : "25 €";
-  if (normalizePriceType(priceType) === "from") return `Starting from ${amountPart}`;
-  return amountPart;
+  return normalizeBusinessServicePriceType(type);
 }
 
 function normalizeDiscountType(t: string | undefined): "fixed" | "percent" {
-  return t === "percent" ? "percent" : "fixed";
+  return normalizeBusinessServiceDiscountType(t);
 }
 
 function hasServiceDiscount(it: ServiceDetailUiItem): boolean {
@@ -172,7 +152,7 @@ function hasServiceDiscount(it: ServiceDetailUiItem): boolean {
 function getServiceBaseAmountNumber(it: ServiceDetailUiItem): number | null {
   const fromField = parseEuroAmountString(it.priceAmount ?? "");
   if (fromField !== null) return fromField;
-  const parsed = parsePriceLabelForDrawer(it.priceLabel);
+  const parsed = parsePriceLabelForModal(it.priceLabel);
   return parseEuroAmountString(parsed.amount);
 }
 
@@ -199,7 +179,7 @@ function formatPriceForCard(priceType: string, amount: number): string {
 
 /** Primary = price after discount when applicable; optional strikethrough = pre-discount. */
 function getServiceCardPriceParts(it: ServiceDetailUiItem): { primary: string; strikethrough?: string } {
-  const parsed = parsePriceLabelForDrawer(it.priceLabel);
+  const parsed = parsePriceLabelForModal(it.priceLabel);
   const pt = normalizePriceType(it.priceType ?? parsed.type);
   const base = getServiceBaseAmountNumber(it);
   if (base === null) {
@@ -224,9 +204,54 @@ export type ProfessionalFixedLocationSetupProps = {
   isBusinessSetupSaving?: boolean;
   isBusinessMediaUploading?: boolean;
   onSaveProfessionalProfile?: (payload: UpdateProfilePayload) => Promise<ProfileResponse | void>;
-  onSaveBusinessSetup?: (payload: UpsertBusinessSetupRequest) => Promise<void>;
+  onSaveBusinessSetup?: (payload: UpsertBusinessSetupPayload) => Promise<void>;
   onUploadBusinessMedia?: (files: File[]) => Promise<string[]>;
 };
+
+const PROFESSIONAL_COUNTRY = "Netherlands";
+const MAX_BUSINESS_KEYWORDS = 5;
+
+function parseFixedLocationMunicipalities(value: string | null | undefined): string[] {
+  const raw = String(value ?? "").trim();
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function formatFixedLocationMunicipalities(values: readonly string[]): string {
+  return values.map((entry) => entry.trim()).filter(Boolean).join(", ");
+}
+
+const MUNICIPALITY_OPTIONS = [
+  "Amsterdam",
+  "Rotterdam",
+  "The Hague",
+  "Utrecht",
+  "Eindhoven",
+  "Groningen",
+  "Tilburg",
+  "Almere",
+  "Breda",
+  "Nijmegen",
+  "Haarlem",
+  "Arnhem",
+  "Zaanstad",
+  "Amersfoort",
+  "Apeldoorn",
+  "Den Bosch",
+  "Hoofddorp",
+  "Maastricht",
+  "Leiden",
+  "Dordrecht",
+] as const;
+
+const BUSINESS_TYPE_OPTIONS = [
+  { value: "salonOwner", label: "Salon Owner" },
+  { value: "freelancer", label: "Freelancer" },
+  { value: "other", label: "Other" },
+] as const;
 
 const professionalEditableFieldKeys = [
   "companyLegalName",
@@ -288,6 +313,49 @@ function getProfessionalPhotoSrcFromProfile(profileData: ProfileResponse | null)
   return getProfessionalProfileRecord(profileData)?.profile_picture || "/professionals/hero.png";
 }
 
+type BusinessSetupSectionId =
+  | "profile"
+  | "location"
+  | "serviceFor"
+  | "servicesDetails"
+  | "manageTeam"
+  | "generalNotes"
+  | "price"
+  | "policy"
+  | "reschedulingPolicy"
+  | "cancellationPolicy"
+  | "noShowPolicy"
+  | "portfolio";
+
+/** Circular “+” add buttons — nudged left so they sit inside the container edge */
+function addSoftIconButtonSx(m: Theme["palette"]["mollure"], size: number) {
+  return {
+    width: size,
+    height: size,
+    borderRadius: "999px",
+    bgcolor: m.addSoftBg,
+    color: m.addSoftFg,
+    border: `1px solid ${m.addSoftBorder}`,
+    mr: 0.75,
+    "&:hover": { bgcolor: m.addSoftBgHover },
+    "&.Mui-disabled": {
+      bgcolor: m.addSoftBg,
+      color: alpha(m.addSoftFg, 0.5),
+      border: `1px solid ${alpha(m.addSoftFg, 0.22)}`,
+      opacity: 1,
+    },
+  } as const;
+}
+
+const setupSectionPaperSx = (m: Theme["palette"]["mollure"]) =>
+  ({
+    borderRadius: "10px",
+    border: `1px solid ${alpha(m.navy, 0.08)}`,
+    boxShadow: "0 10px 22px rgba(16, 35, 63, 0.05)",
+    overflow: "hidden",
+    bgcolor: "#fff",
+  }) as const;
+
 function SectionShell({
   title,
   action,
@@ -300,16 +368,7 @@ function SectionShell({
   const theme = useTheme();
   const m = theme.palette.mollure;
   return (
-    <Paper
-      elevation={0}
-      sx={{
-        borderRadius: "10px",
-        border: `1px solid ${alpha(m.navy, 0.08)}`,
-        boxShadow: "0 10px 22px rgba(16, 35, 63, 0.05)",
-        overflow: "hidden",
-        bgcolor: "#fff",
-      }}
-    >
+    <Paper elevation={0} sx={setupSectionPaperSx(m)}>
       <Box
         sx={{
           px: 2.25,
@@ -331,6 +390,55 @@ function SectionShell({
       </Box>
       <Divider />
       <Box sx={{ px: 2.25, py: 2.1 }}>{children}</Box>
+    </Paper>
+  );
+}
+
+function SetupSubSection({
+  title,
+  action,
+  children,
+}: {
+  title: React.ReactNode;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const theme = useTheme();
+  const m = theme.palette.mollure;
+  return (
+    <Box>
+      <Box
+        sx={{
+          px: 2.25,
+          py: 1.6,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 2,
+        }}
+      >
+        {typeof title === "string" ? (
+          <Typography sx={{ fontWeight: 800, color: alpha(m.navy, 0.85), fontSize: 14 }}>
+            {title}
+          </Typography>
+        ) : (
+          title
+        )}
+        {action}
+      </Box>
+      <Box sx={{ px: 2.25, pt: 0 }}>{children}</Box>
+    </Box>
+  );
+}
+
+function SetupSectionsGroup({ children }: { children: React.ReactNode }) {
+  const theme = useTheme();
+  const m = theme.palette.mollure;
+  return (
+    <Paper elevation={0} sx={setupSectionPaperSx(m)}>
+      <Stack spacing={2} sx={{ pt: 2, pb: 2.1 }}>
+        {children}
+      </Stack>
     </Paper>
   );
 }
@@ -379,6 +487,12 @@ export default function ProfessionalFixedLocationSetup({
   const theme = useTheme();
   const m = theme.palette.mollure;
   const { showSnackbar } = useSnackbar();
+  const [updateBusinessSetupActive, { isLoading: isBusinessProfileStatusSaving }] =
+    useUpdateBusinessSetupActiveMutation();
+  const [businessProfileMenuAnchor, setBusinessProfileMenuAnchor] = React.useState<null | HTMLElement>(null);
+  const [permanentDeactivateConfirmOpen, setPermanentDeactivateConfirmOpen] = React.useState(false);
+
+  const isBusinessProfileActive = businessSetupData?.is_active !== false;
   type ProfileValidationField =
     | "companyLegalName"
     | "contactFirstName"
@@ -489,16 +603,6 @@ export default function ProfessionalFixedLocationSetup({
     slot6: string;
     slot7: string;
   };
-  type TeamMemberUi = {
-    id: string;
-    name: string;
-    role: string;
-    photoSrc: string;
-    rating: number;
-    reviewsLabel: string;
-    services: TeamService;
-  };
-
   const TEAM_SERVICE_SLOT_KEYS: (keyof TeamService)[] = [
     "slot1",
     "slot2",
@@ -508,17 +612,6 @@ export default function ProfessionalFixedLocationSetup({
     "slot6",
     "slot7",
   ];
-
-  /** At least one slot shown; always one trailing empty slot after the last filled (up to 7). */
-  function getVisibleTeamServiceSlotKeys(services: TeamService): (keyof TeamService)[] {
-    let lastFilled = -1;
-    for (let i = 0; i < TEAM_SERVICE_SLOT_KEYS.length; i++) {
-      const k = TEAM_SERVICE_SLOT_KEYS[i];
-      if (String(services[k] ?? "").trim()) lastFilled = i;
-    }
-    const count = Math.min(7, Math.max(1, lastFilled + 2));
-    return TEAM_SERVICE_SLOT_KEYS.slice(0, count);
-  }
 
   const allSubcategoryOptions = React.useMemo(
     () =>
@@ -540,33 +633,70 @@ export default function ProfessionalFixedLocationSetup({
     [allSubcategoryOptions],
   );
 
-  /** Category title + subcategory count (e.g. team card field labels). */
-  const getTeamServiceSelectLabel = React.useCallback(
-    (serviceId: string) => {
-      const sid = String(serviceId ?? "").trim();
-      if (!sid) return "Service";
-      for (const cat of businessCategories) {
-        const sub = cat.subcategories.find((s) => String(s.id) === sid);
-        if (sub) {
-          return `${cat.title}(${cat.subcategories.length})`;
-        }
-      }
-      return getSubcategoryLabel(sid);
+  type TeamMemberServiceGroup = {
+    categoryId: string;
+    categoryTitle: string;
+    subServices: Array<{ id: string; label: string }>;
+  };
+
+  const resolveCategoryDisplayTitle = React.useCallback(
+    (categoryTitle: string, categoryId?: string) => {
+      const fromApi = categoryId
+        ? businessCategories.find((category) => String(category.id) === String(categoryId))?.title
+        : undefined;
+      if (fromApi) return fromApi;
+
+      const byTitle = businessCategories.find(
+        (category) => category.title.trim().toLowerCase() === categoryTitle.trim().toLowerCase(),
+      )?.title;
+      if (byTitle) return byTitle;
+
+      const catalog = BUSINESS_SERVICE_CATEGORY_CATALOG.find(
+        (entry) => resolveServiceCategorySliderIconId(categoryTitle) === entry.iconId,
+      );
+      return catalog?.label ?? categoryTitle;
     },
-    [businessCategories, getSubcategoryLabel],
+    [businessCategories],
   );
 
-  const blankTeamServices = React.useMemo<TeamService>(
-    () => ({
-      slot1: "",
-      slot2: "",
-      slot3: "",
-      slot4: "",
-      slot5: "",
-      slot6: "",
-      slot7: "",
-    }),
-    [],
+  const getMemberAssignedServiceIds = React.useCallback((services: TeamService) => {
+    return TEAM_SERVICE_SLOT_KEYS.map((key) => String(services[key] ?? "").trim()).filter(Boolean);
+  }, []);
+
+  const removeServiceIdFromTeamMembers = React.useCallback((serviceId: string) => {
+    const normalizedId = String(serviceId ?? "").trim();
+    if (!normalizedId) return;
+
+    setTeamMembers((prev) =>
+      prev.map((member) => {
+        const nextServices = { ...member.services };
+        let changed = false;
+
+        for (const key of TEAM_SERVICE_SLOT_KEYS) {
+          if (String(nextServices[key] ?? "") === normalizedId) {
+            nextServices[key] = "";
+            changed = true;
+          }
+        }
+
+        return changed ? { ...member, services: nextServices } : member;
+      }),
+    );
+  }, []);
+
+  const memberProvidesAllServices = React.useCallback(
+    (services: TeamService) => {
+      const allSubcategoryIds = businessCategories.flatMap((category) =>
+        category.subcategories.map((sub) => String(sub.id)),
+      );
+      if (allSubcategoryIds.length === 0) return false;
+
+      const assigned = new Set(getMemberAssignedServiceIds(services));
+      if (assigned.size !== allSubcategoryIds.length) return false;
+
+      return allSubcategoryIds.every((id) => assigned.has(id));
+    },
+    [businessCategories, getMemberAssignedServiceIds],
   );
 
   const defaultServices = React.useCallback(
@@ -587,94 +717,14 @@ export default function ProfessionalFixedLocationSetup({
   );
 
   const [teamMembers, setTeamMembers] = React.useState<TeamMemberUi[]>([]);
+  const [teamServiceMenu, setTeamServiceMenu] = React.useState<{
+    anchorEl: HTMLElement;
+    menuKey: string;
+    groups?: Array<{ categoryTitle: string; items: Array<{ id: string; label: string }> }>;
+    items?: Array<{ id: string; label: string }>;
+  } | null>(null);
 
   const [featureTeamPublic, setFeatureTeamPublic] = React.useState(true);
-  const [teamDrawerOpen, setTeamDrawerOpen] = React.useState(false);
-  const [editingMemberId, setEditingMemberId] = React.useState<string | null>(null);
-  const [draftTeamName, setDraftTeamName] = React.useState("");
-  const [draftTeamRole, setDraftTeamRole] = React.useState("");
-  const [draftPhotoSrc, setDraftPhotoSrc] = React.useState<string>("/professionals/hero.png");
-  const teamPhotoInputRef = React.useRef<HTMLInputElement | null>(null);
-  const [draftServices, setDraftServices] = React.useState<TeamService>(() => ({ ...blankTeamServices }));
-
-  const openAddDrawer = React.useCallback(() => {
-    setEditingMemberId(null);
-    setDraftTeamName("");
-    setDraftTeamRole("");
-    setDraftPhotoSrc("/professionals/hero.png");
-    setDraftServices({ ...blankTeamServices });
-    setTeamDrawerOpen(true);
-  }, [blankTeamServices]);
-
-  const openEditDrawer = React.useCallback((mem: TeamMemberUi) => {
-    setEditingMemberId(mem.id);
-    setDraftTeamName(mem.name);
-    setDraftTeamRole(mem.role);
-    setDraftPhotoSrc(mem.photoSrc);
-    setDraftServices({ ...mem.services });
-    setTeamDrawerOpen(true);
-  }, []);
-
-  const closeTeamDrawer = React.useCallback(() => setTeamDrawerOpen(false), []);
-
-  const saveTeamMember = React.useCallback(() => {
-    const name = draftTeamName.trim();
-    const role = draftTeamRole.trim() || "Team member";
-    if (!name) return;
-    if (editingMemberId) {
-      setTeamMembers((prev) =>
-        prev.map((m) =>
-          m.id === editingMemberId ? { ...m, name, role, photoSrc: draftPhotoSrc, services: draftServices } : m,
-        ),
-      );
-    } else {
-      const id = `tm-${Date.now()}`;
-      setTeamMembers((prev) => [
-        { id, name, role, photoSrc: draftPhotoSrc, rating: 4.5, reviewsLabel: "(0 Reviews)", services: draftServices },
-        ...prev,
-      ]);
-    }
-    setTeamDrawerOpen(false);
-  }, [draftTeamName, draftTeamRole, draftPhotoSrc, draftServices, editingMemberId]);
-
-  const teamBlobUrlsRef = React.useRef<string[]>([]);
-  React.useEffect(() => {
-    return () => {
-      for (const url of teamBlobUrlsRef.current) URL.revokeObjectURL(url);
-      teamBlobUrlsRef.current = [];
-    };
-  }, []);
-
-  const onChooseTeamPhoto = React.useCallback(() => {
-    teamPhotoInputRef.current?.click();
-  }, []);
-
-  const onTeamPhotoSelected = React.useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      if (!isAllowedProfileImageFile(file)) {
-        showSnackbar({ severity: "error", message: PROFILE_IMAGE_INVALID_MESSAGE });
-        e.target.value = "";
-        return;
-      }
-      const url = URL.createObjectURL(file);
-      teamBlobUrlsRef.current.push(url);
-      setDraftPhotoSrc(url);
-      e.target.value = "";
-    },
-    [showSnackbar],
-  );
-
-  const removeTeamMember = React.useCallback((id: string) => {
-    setTeamMembers((prev) => prev.filter((m) => m.id !== id));
-  }, []);
-
-  const updateMemberService = React.useCallback((id: string, key: keyof TeamService, value: string) => {
-    setTeamMembers((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, services: { ...m.services, [key]: value } } : m)),
-    );
-  }, []);
 
   const addedBlobUrlsRef = React.useRef<string[]>([]);
   React.useEffect(() => {
@@ -844,13 +894,46 @@ export default function ProfessionalFixedLocationSetup({
       .map((value) => {
         const matched = allSubcategoryOptions.find((option) => option.value === value);
         return {
-          service_id: Number(value),
+          service_id: String(value),
           title: matched?.label ?? null,
         };
       });
   }, [allSubcategoryOptions]);
   const [isBusinessPublishEnabled, setIsBusinessPublishEnabled] = React.useState(false);
+  const [editingBusinessSections, setEditingBusinessSections] = React.useState<Set<BusinessSetupSectionId>>(
+    () => new Set(),
+  );
+  const startBusinessSectionEdit = (sectionId: BusinessSetupSectionId) => {
+    setEditingBusinessSections((prev) => {
+      const next = new Set(prev);
+      next.add(sectionId);
+      return next;
+    });
+  };
+  const ensureServicesDetailsEditing = React.useCallback(() => {
+    setEditingBusinessSections((prev) => {
+      if (prev.has("servicesDetails")) return prev;
+      const next = new Set(prev);
+      next.add("servicesDetails");
+      return next;
+    });
+  }, []);
+  const isBusinessSectionEditing = (sectionId: BusinessSetupSectionId) => editingBusinessSections.has(sectionId);
+  const isBusinessSectionDisabled = (sectionId: BusinessSetupSectionId) =>
+    isBusinessSetupSaving || !editingBusinessSections.has(sectionId);
   const businessFormDisabled = isBusinessSetupSaving;
+  const locationDisabled = isBusinessSectionDisabled("location");
+  const profileDisabled = isBusinessSectionDisabled("profile");
+  const serviceForDisabled = isBusinessSectionDisabled("serviceFor");
+  const servicesDetailsDisabled = isBusinessSectionDisabled("servicesDetails");
+  const manageTeamDisabled = isBusinessSectionDisabled("manageTeam");
+  const generalNotesDisabled = isBusinessSectionDisabled("generalNotes");
+  const priceDisabled = isBusinessSectionDisabled("price");
+  const policyDisabled = isBusinessSectionDisabled("policy");
+  const reschedulingPolicyDisabled = isBusinessSectionDisabled("reschedulingPolicy");
+  const cancellationPolicyDisabled = isBusinessSectionDisabled("cancellationPolicy");
+  const noShowPolicyDisabled = isBusinessSectionDisabled("noShowPolicy");
+  const portfolioDisabled = isBusinessSectionDisabled("portfolio");
   const templateOptions = React.useMemo(() => ["Fixed Location", "Desired Location"] as const, []);
   type OfferingOption = (typeof templateOptions)[number];
   type OfferingSelectOption = OfferingOption | "Both";
@@ -860,23 +943,31 @@ export default function ProfessionalFixedLocationSetup({
   );
   const [businessOfferingSelect, setBusinessOfferingSelect] =
     React.useState<OfferingSelectOption>("Fixed Location");
-  const businessOffering = React.useMemo<OfferingOption[]>(
-    () => (businessOfferingSelect === "Both" ? ["Fixed Location", "Desired Location"] : [businessOfferingSelect]),
-    [businessOfferingSelect],
-  );
-  const useSameBusinessInfo = businessOfferingSelect === "Both";
   const [activeBusinessTemplate, setActiveBusinessTemplate] = React.useState<OfferingOption>("Fixed Location");
+  const [useSameInfoForBothTemplates, setUseSameInfoForBothTemplates] = React.useState(false);
+  const isBothOffering = businessOfferingSelect === "Both";
+  const isFixedTemplateView =
+    businessOfferingSelect === "Fixed Location" || (isBothOffering && activeBusinessTemplate === "Fixed Location");
+  const isDesiredTemplateView =
+    businessOfferingSelect === "Desired Location" || (isBothOffering && activeBusinessTemplate === "Desired Location");
 
-  const showFixedLocationSection = businessOfferingSelect === "Fixed Location" || businessOfferingSelect === "Both";
-  const showDesiredLocationSection =
-    businessOfferingSelect === "Desired Location" || businessOfferingSelect === "Both";
-  const showKilometerAllowance = businessOfferingSelect !== "Fixed Location";
+  const showFixedLocationSection = isFixedTemplateView;
+  const showDesiredLocationSection = isDesiredTemplateView;
+  const showKilometerAllowance = isDesiredTemplateView;
+  const showBookServices = isFixedTemplateView;
+  const showProjectSection = isDesiredTemplateView;
 
   const locationSectionTitle = React.useMemo(() => {
     if (businessOfferingSelect === "Desired Location") return "Desired Location";
     if (businessOfferingSelect === "Fixed Location") return "Fixed Location";
     return data.location.title;
   }, [businessOfferingSelect, data.location.title]);
+
+  const visibleLocationCards = React.useMemo((): OfferingOption[] => {
+    if (businessOfferingSelect === "Both") return ["Fixed Location", "Desired Location"];
+    if (businessOfferingSelect === "Fixed Location") return ["Fixed Location"];
+    return ["Desired Location"];
+  }, [businessOfferingSelect]);
 
   type BusinessTemplateState = Pick<
     typeof values,
@@ -889,7 +980,7 @@ export default function ProfessionalFixedLocationSetup({
     | "streetNumber"
     | "postalCode"
     | "province"
-    | "municipality"
+    | "municipalities"
     | "serviceFor"
     | "amenities"
     | "projectEnabled"
@@ -911,6 +1002,56 @@ export default function ProfessionalFixedLocationSetup({
     | "kilometerAllowanceInstructions"
   >;
 
+  const sharedTemplateSyncFields = React.useMemo(
+    () =>
+      [
+        "profileName",
+        "about",
+        "keywordDraft",
+        "keywords",
+        "serviceFor",
+        "amenities",
+        "salonName",
+        "streetAddress",
+        "streetNumber",
+        "postalCode",
+        "province",
+        "municipalities",
+      ] as const,
+    [],
+  );
+
+  type SharedTemplateSyncField = (typeof sharedTemplateSyncFields)[number];
+
+  const isSharedTemplateSyncField = React.useCallback(
+    (key: keyof BusinessTemplateState): key is SharedTemplateSyncField =>
+      (sharedTemplateSyncFields as readonly string[]).includes(key),
+    [sharedTemplateSyncFields],
+  );
+
+  const pickSharedTemplateFields = React.useCallback(
+    (state: BusinessTemplateState): Pick<BusinessTemplateState, SharedTemplateSyncField> =>
+      Object.fromEntries(sharedTemplateSyncFields.map((key) => [key, state[key]])) as Pick<
+        BusinessTemplateState,
+        SharedTemplateSyncField
+      >,
+    [sharedTemplateSyncFields],
+  );
+
+  const syncOtherTemplateFromSource = React.useCallback(
+    (source: BusinessTemplateState, sourceTemplate: OfferingOption) => {
+      const patch = pickSharedTemplateFields(source);
+      if (sourceTemplate === "Fixed Location") {
+        setDesiredBusiness((prev) => ({ ...prev, ...patch }));
+      } else {
+        for (const key of sharedTemplateSyncFields) {
+          setField(key as keyof FixedLocationFormState, patch[key] as never);
+        }
+      }
+    },
+    [pickSharedTemplateFields, setField, sharedTemplateSyncFields],
+  );
+
   const getCurrentBusinessState = React.useCallback((): BusinessTemplateState => {
     // fixed template is backed by the main form `values`
     return {
@@ -923,7 +1064,7 @@ export default function ProfessionalFixedLocationSetup({
       streetNumber: values.streetNumber,
       postalCode: values.postalCode,
       province: values.province,
-      municipality: values.municipality,
+      municipalities: values.municipalities,
       serviceFor: values.serviceFor,
       amenities: values.amenities,
       projectEnabled: values.projectEnabled,
@@ -948,12 +1089,6 @@ export default function ProfessionalFixedLocationSetup({
 
   const [desiredBusiness, setDesiredBusiness] = React.useState<BusinessTemplateState>(() => getCurrentBusinessState());
 
-  // If "same info" is enabled, keep Desired synced to Fixed.
-  React.useEffect(() => {
-    if (!useSameBusinessInfo) return;
-    setDesiredBusiness(getCurrentBusinessState());
-  }, [getCurrentBusinessState, useSameBusinessInfo]);
-
   const biz = activeBusinessTemplate === "Fixed Location" ? getCurrentBusinessState() : desiredBusiness;
 
   const fixedBiz = getCurrentBusinessState();
@@ -961,9 +1096,11 @@ export default function ProfessionalFixedLocationSetup({
     <K extends keyof BusinessTemplateState>(key: K, value: BusinessTemplateState[K]) => {
       setIsBusinessPublishEnabled(true);
       setField(key as any, value as any);
-      if (useSameBusinessInfo) setDesiredBusiness((p) => ({ ...p, [key]: value }));
+      if (useSameInfoForBothTemplates && isBothOffering && isSharedTemplateSyncField(key)) {
+        setDesiredBusiness((prev) => ({ ...prev, [key]: value }));
+      }
     },
-    [setField, useSameBusinessInfo],
+    [isBothOffering, isSharedTemplateSyncField, setField, useSameInfoForBothTemplates],
   );
 
   const desiredProvinceOptions = React.useMemo(
@@ -1006,10 +1143,8 @@ export default function ProfessionalFixedLocationSetup({
   const [desiredAreaMode, setDesiredAreaMode] = React.useState<"Specific areas only" | "All Netherlands">(
     "Specific areas only",
   );
-  const [desiredProvinceDraft, setDesiredProvinceDraft] = React.useState<(typeof desiredProvinceOptions)[number]>(
-    "Noord-Holland",
-  );
-  const [desiredMunicipalityDraft, setDesiredMunicipalityDraft] = React.useState<string>("");
+  const [desiredProvinceDraft, setDesiredProvinceDraft] = React.useState<ProvinceKey | "">("Noord-Holland");
+  const [desiredMunicipalityDraft, setDesiredMunicipalityDraft] = React.useState<string[]>([]);
   const [desiredAreas, setDesiredAreas] = React.useState<DesiredAreaRow[]>([]);
 
   const desiredAreasByProvince = React.useMemo(() => {
@@ -1033,20 +1168,24 @@ export default function ProfessionalFixedLocationSetup({
   }, [desiredAreas]);
 
   const addDesiredArea = React.useCallback(() => {
-    if (!desiredProvinceDraft || !desiredMunicipalityDraft.trim()) return;
-    const exists = desiredAreas.some(
-      (r) => r.province === desiredProvinceDraft && r.municipality === desiredMunicipalityDraft,
+    if (!desiredProvinceDraft || !desiredMunicipalityDraft.length) return;
+    const municipalitiesToAdd = desiredMunicipalityDraft.filter(
+      (municipality) =>
+        !desiredAreas.some(
+          (row) => row.province === desiredProvinceDraft && row.municipality === municipality,
+        ),
     );
-    if (exists) return;
+    if (!municipalitiesToAdd.length) return;
     setIsBusinessPublishEnabled(true);
     setDesiredAreas((prev) => [
       ...prev,
-      {
+      ...municipalitiesToAdd.map((municipality) => ({
         id: `dl-${Date.now()}-${Math.random().toString(16).slice(2)}`,
         province: desiredProvinceDraft,
-        municipality: desiredMunicipalityDraft,
-      },
+        municipality,
+      })),
     ]);
+    setDesiredMunicipalityDraft([]);
   }, [desiredAreas, desiredMunicipalityDraft, desiredProvinceDraft]);
 
   const removeDesiredProvinceGroup = React.useCallback((province: DesiredProvince) => {
@@ -1069,7 +1208,7 @@ export default function ProfessionalFixedLocationSetup({
           placeholder="Makelush"
           value={fixedBiz.salonName}
           onChange={(e) => setFixedBizField("salonName", e.target.value)}
-          disabled={businessFormDisabled}
+          disabled={locationDisabled}
         />
       </Grid>
       <Grid item xs={12}>
@@ -1083,7 +1222,7 @@ export default function ProfessionalFixedLocationSetup({
           placeholder="Street Address"
           value={fixedBiz.streetAddress}
           onChange={(e) => setFixedBizField("streetAddress", e.target.value)}
-          disabled={businessFormDisabled}
+          disabled={locationDisabled}
         />
       </Grid>
       <Grid item xs={12} sm={6}>
@@ -1092,7 +1231,7 @@ export default function ProfessionalFixedLocationSetup({
           placeholder="Street Number"
           value={fixedBiz.streetNumber}
           onChange={(e) => setFixedBizField("streetNumber", e.target.value)}
-          disabled={businessFormDisabled}
+          disabled={locationDisabled}
         />
       </Grid>
       <Grid item xs={12} sm={4}>
@@ -1101,7 +1240,7 @@ export default function ProfessionalFixedLocationSetup({
           placeholder="Postal code"
           value={fixedBiz.postalCode}
           onChange={(e) => setFixedBizField("postalCode", e.target.value)}
-          disabled={businessFormDisabled}
+          disabled={locationDisabled}
         />
       </Grid>
       <Grid item xs={12} sm={4}>
@@ -1109,10 +1248,23 @@ export default function ProfessionalFixedLocationSetup({
           select
           label="Province"
           value={fixedBiz.province}
-          onChange={(e) => setFixedBizField("province", e.target.value)}
-          disabled={businessFormDisabled}
+          onChange={(e) => {
+            const province = e.target.value;
+            const allowed = new Set(
+              ((desiredMunicipalityByProvince as Record<string, string[]>)[province || "Noord-Holland"] ?? []),
+            );
+            setFixedBizField("province", province);
+            setFixedBizField(
+              "municipalities",
+              fixedBiz.municipalities.filter((entry) => allowed.has(entry)),
+            );
+          }}
+          disabled={locationDisabled}
+          SelectProps={{ displayEmpty: true }}
         >
-          <MenuItem value="">Province</MenuItem>
+          <MenuItem value="">
+            <em>Select province</em>
+          </MenuItem>
           {desiredProvinceOptions.map((p) => (
             <MenuItem key={p} value={p}>
               {p}
@@ -1121,20 +1273,21 @@ export default function ProfessionalFixedLocationSetup({
         </MollureFormField>
       </Grid>
       <Grid item xs={12} sm={4}>
-        <MollureFormField
-          select
+        <AppMultiSelect
           label="Municipality"
-          value={fixedBiz.municipality}
-          onChange={(e) => setFixedBizField("municipality", e.target.value)}
-          disabled={businessFormDisabled}
-        >
-          <MenuItem value="">Municipality</MenuItem>
-          {((desiredMunicipalityByProvince as Record<string, string[]>)[fixedBiz.province || "Noord-Holland"] ?? []).map((o: string) => (
-            <MenuItem key={o} value={o}>
-              {o}
-            </MenuItem>
-          ))}
-        </MollureFormField>
+          placeholder="Select municipalities"
+          value={fixedBiz.municipalities}
+          onChange={(municipalities) => setFixedBizField("municipalities", municipalities)}
+          disabled={locationDisabled || !fixedBiz.province}
+          options={(
+            (desiredMunicipalityByProvince as Record<string, string[]>)[fixedBiz.province || "Noord-Holland"] ?? []
+          ).map((option) => ({
+            value: option,
+            label: option,
+          }))}
+          fullWidth
+          sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" } }}
+        />
       </Grid>
     </Grid>
   );
@@ -1148,8 +1301,15 @@ export default function ProfessionalFixedLocationSetup({
         <MollureFormField
           select
           value={desiredAreaMode}
-          onChange={(e) => setDesiredAreaMode(e.target.value as any)}
-          disabled={businessFormDisabled}
+          onChange={(e) => {
+            const mode = e.target.value as "Specific areas only" | "All Netherlands";
+            setDesiredAreaMode(mode);
+            if (mode === "All Netherlands") {
+              setDesiredProvinceDraft("");
+              setDesiredMunicipalityDraft([]);
+            }
+          }}
+          disabled={locationDisabled}
           sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
         >
           <MenuItem value="Specific areas only">Specific areas only</MenuItem>
@@ -1157,76 +1317,65 @@ export default function ProfessionalFixedLocationSetup({
         </MollureFormField>
       </Grid>
 
-      <Grid item xs={12} sm={6}>
-        <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.6 }}>
-          Province
-        </Typography>
-        <MollureFormField
-          select
-          value={desiredProvinceDraft}
-          onChange={(e) => {
-            const p = e.target.value as any;
-            setDesiredProvinceDraft(p);
-            setDesiredMunicipalityDraft("");
-          }}
-          disabled={businessFormDisabled || desiredAreaMode !== "Specific areas only"}
-          sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-        >
-          {desiredProvinceOptions.map((p) => (
-            <MenuItem key={p} value={p}>
-              {p}
-            </MenuItem>
-          ))}
-        </MollureFormField>
-      </Grid>
-
-      <Grid item xs={12} sm={6}>
-        <Stack direction="row" spacing={1} alignItems="flex-end">
-          <Box sx={{ flex: 1 }}>
+      {desiredAreaMode === "Specific areas only" ? (
+        <>
+          <Grid item xs={12} sm={6}>
             <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.6 }}>
-              Municipality
+              Province
             </Typography>
             <MollureFormField
               select
-              value={desiredMunicipalityDraft}
-              onChange={(e) => setDesiredMunicipalityDraft(e.target.value)}
-              disabled={businessFormDisabled || desiredAreaMode !== "Specific areas only"}
+              value={desiredProvinceDraft}
+              onChange={(e) => {
+                const p = e.target.value as (typeof desiredProvinceOptions)[number];
+                setDesiredProvinceDraft(p);
+                setDesiredMunicipalityDraft([]);
+              }}
+              disabled={locationDisabled}
               sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
             >
-              <MenuItem value="">
-                <Typography component="span" sx={{ fontSize: 13, color: alpha(m.navy, 0.45) }}>
-                  Select municipality
-                </Typography>
-              </MenuItem>
-              {(desiredMunicipalityByProvince[desiredProvinceDraft] ?? []).map((o) => (
-                <MenuItem key={o} value={o}>
-                  {o}
+              {desiredProvinceOptions.map((p) => (
+                <MenuItem key={p} value={p}>
+                  {p}
                 </MenuItem>
               ))}
             </MollureFormField>
-          </Box>
-          <IconButton
-            onClick={addDesiredArea}
-            disabled={
-              businessFormDisabled ||
-              desiredAreaMode !== "Specific areas only" ||
-              !desiredMunicipalityDraft.trim()
-            }
-            sx={{
-              width: 36,
-              height: 36,
-              borderRadius: "999px",
-              bgcolor: alpha(m.teal, 0.18),
-              color: m.tealDark,
-              border: `1px solid ${alpha(m.tealDark, 0.12)}`,
-              "&:hover": { bgcolor: alpha(m.teal, 0.26) },
-            }}
-            aria-label="Add desired area"
-          >
-            <AddRoundedIcon />
-          </IconButton>
-        </Stack>
-      </Grid>
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <Stack direction="row" spacing={1} alignItems="flex-end">
+              <Box sx={{ flex: 1 }}>
+                <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.6 }}>
+                  Municipality
+                </Typography>
+                <AppMultiSelect
+                  placeholder="Select municipalities"
+                  value={desiredMunicipalityDraft}
+                  onChange={setDesiredMunicipalityDraft}
+                  disabled={locationDisabled || !desiredProvinceDraft}
+                  options={(desiredProvinceDraft
+                    ? (desiredMunicipalityByProvince[desiredProvinceDraft as ProvinceKey] ?? [])
+                    : []
+                  ).map((municipality) => ({
+                    value: municipality,
+                    label: municipality,
+                  }))}
+                  fullWidth
+                  sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" } }}
+                />
+              </Box>
+              <IconButton
+                onClick={addDesiredArea}
+                disabled={locationDisabled || !desiredMunicipalityDraft.length}
+                sx={addSoftIconButtonSx(m, 36)}
+                aria-label="Add desired area"
+              >
+                <AddRoundedIcon />
+              </IconButton>
+            </Stack>
+          </Grid>
+        </>
+      ) : null}
 
       {desiredAreaMode === "Specific areas only" ? (
         <Grid item xs={12}>
@@ -1276,7 +1425,7 @@ export default function ProfessionalFixedLocationSetup({
                   </Box>
                   <IconButton
                     onClick={() => removeDesiredProvinceGroup(province)}
-                    disabled={businessFormDisabled}
+                    disabled={locationDisabled}
                     sx={{
                       width: 34,
                       height: 34,
@@ -1300,31 +1449,34 @@ export default function ProfessionalFixedLocationSetup({
     <K extends keyof BusinessTemplateState>(key: K, value: BusinessTemplateState[K]) => {
       setIsBusinessPublishEnabled(true);
 
-      const writeFixed = () => setField(key as any, value as any);
-      const writeDesired = () => setDesiredBusiness((p) => ({ ...p, [key]: value }));
-
-      if (useSameBusinessInfo) {
-        writeFixed();
-        writeDesired();
-        return;
+      if (activeBusinessTemplate === "Fixed Location") {
+        setField(key as any, value as any);
+        if (useSameInfoForBothTemplates && isBothOffering && isSharedTemplateSyncField(key)) {
+          setDesiredBusiness((prev) => ({ ...prev, [key]: value }));
+        }
+      } else {
+        setDesiredBusiness((p) => ({ ...p, [key]: value }));
+        if (useSameInfoForBothTemplates && isBothOffering && isSharedTemplateSyncField(key)) {
+          setField(key as any, value as any);
+        }
       }
-
-      if (activeBusinessTemplate === "Fixed Location") writeFixed();
-      else writeDesired();
     },
-    [activeBusinessTemplate, setField, useSameBusinessInfo],
+    [activeBusinessTemplate, isBothOffering, isSharedTemplateSyncField, setField, useSameInfoForBothTemplates],
   );
 
   const addBizKeyword = React.useCallback(() => {
+    if (biz.keywords.length >= MAX_BUSINESS_KEYWORDS) return;
     const next = biz.keywordDraft.trim();
     if (!next) return;
     if (biz.keywords.includes(next)) {
       setBizField("keywordDraft", "");
       return;
     }
-    setBizField("keywords", [...biz.keywords, next].slice(0, 3));
+    setBizField("keywords", [...biz.keywords, next].slice(0, MAX_BUSINESS_KEYWORDS));
     setBizField("keywordDraft", "");
   }, [biz.keywordDraft, biz.keywords, setBizField]);
+
+  const keywordsAtMax = biz.keywords.length >= MAX_BUSINESS_KEYWORDS;
 
   const removeBizKeyword = React.useCallback(
     (k: string) => {
@@ -1347,131 +1499,271 @@ export default function ProfessionalFixedLocationSetup({
   const servicesFixedRef = React.useRef<ServiceDetailUiItem[]>([]);
   const servicesDesiredRef = React.useRef<ServiceDetailUiItem[]>([]);
 
+  const setBusinessProfileActive = React.useCallback(
+    async (nextActive: boolean, successMessage?: string) => {
+      setBusinessProfileMenuAnchor(null);
+
+      try {
+        const result = await updateBusinessSetupActive({ is_active: nextActive }).unwrap();
+        showSnackbar({
+          severity: "success",
+          message:
+            successMessage ||
+            result.message ||
+            (nextActive ? "Business profile activated successfully." : "Business profile deactivated successfully."),
+        });
+      } catch (error) {
+        showSnackbar({
+          severity: "error",
+          message: getApiErrorMessage(error, "Unable to update business profile status."),
+        });
+      }
+    },
+    [showSnackbar, updateBusinessSetupActive],
+  );
+
+  const onActivateBusinessProfile = React.useCallback(() => {
+    void setBusinessProfileActive(true);
+  }, [setBusinessProfileActive]);
+
+  const onTemporarilyDeactivateBusinessProfile = React.useCallback(() => {
+    void setBusinessProfileActive(false, "Business profile temporarily deactivated.");
+  }, [setBusinessProfileActive]);
+
+  const onConfirmPermanentDeactivate = React.useCallback(() => {
+    setPermanentDeactivateConfirmOpen(false);
+    void setBusinessProfileActive(false, "Business profile permanently deactivated.");
+  }, [setBusinessProfileActive]);
+
+  const onToggleBusinessProfileActive = React.useCallback(async () => {
+    await setBusinessProfileActive(!isBusinessProfileActive);
+  }, [isBusinessProfileActive, setBusinessProfileActive]);
+
+  const toPersistedTeamMemberId = React.useCallback((id: string) => {
+    const normalized = String(id ?? "").trim();
+    if (!normalized || normalized.startsWith("tm-")) {
+      return undefined;
+    }
+
+    return normalized;
+  }, []);
+
+  const buildBusinessSetupPayload = React.useCallback(
+    (members: TeamMemberUi[]): UpsertBusinessSetupRequest => {
+      const locationModeMap: Record<OfferingSelectOption, UpsertBusinessSetupRequest["location_mode"]> = {
+        "Fixed Location": "fixed",
+        "Desired Location": "desired",
+        Both: "both",
+      };
+      const sourceBiz = businessOfferingSelect === "Desired Location" ? desiredBusiness : fixedBiz;
+      const serviceItems = (() => {
+        if (businessOfferingSelect === "Desired Location") {
+          return servicesDesiredRef.current;
+        }
+        if (businessOfferingSelect === "Both") {
+          const seen = new Set<string>();
+          return [...servicesFixedRef.current, ...servicesDesiredRef.current].filter((item) => {
+            const key = String(item.serviceId ?? "");
+            if (!key || seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          });
+        }
+        return servicesFixedRef.current;
+      })();
+      const desiredAreaText =
+        desiredAreaMode === "All Netherlands"
+          ? "All Netherlands"
+          : desiredAreas.map((area) => area.municipality).filter(Boolean).join(", ");
+      const desiredProvinceText =
+        desiredAreaMode === "All Netherlands"
+          ? "All Netherlands"
+          : Array.from(new Set(desiredAreas.map((area) => area.province).filter(Boolean))).join(", ");
+
+      return {
+        location_mode: locationModeMap[businessOfferingSelect] ?? "fixed",
+        business_name: sourceBiz.profileName,
+        business_about: sourceBiz.about,
+        business_keywords: sourceBiz.keywords,
+        business_media: mediaSlides.filter(isPersistedMediaUrl).slice(0, BUSINESS_MEDIA_MAX_COUNT),
+        salon_name: fixedBiz.salonName,
+        fixed_location_address: fixedBiz.streetAddress,
+        fixed_location_street_number: fixedBiz.streetNumber,
+        fixed_location_postal_code: fixedBiz.postalCode,
+        fixed_location_province: fixedBiz.province,
+        fixed_location_municipality: formatFixedLocationMunicipalities(fixedBiz.municipalities),
+        service_for: Object.entries(sourceBiz.serviceFor)
+          .filter(([, enabled]) => enabled)
+          .map(([key]) => key),
+        service_categories: mapServiceItemsToCategories(serviceItems),
+        project: sourceBiz.projectEnabled ? sourceBiz.projectInstructions : "",
+        book_service_notes: sourceBiz.bookComboInstructions,
+        book_service_combinations: sourceBiz.bookCombos
+          .map((combo) => {
+            const category = businessCategories.find((item) => String(item.id) === combo.categoryId);
+            const service = category
+              ? category.subcategories.find((item) => String(item.id) === combo.serviceId)
+              : businessCategories
+                  .flatMap((item) => item.subcategories)
+                  .find((item) => String(item.id) === combo.serviceId);
+            const categoryId = String(combo.categoryId ?? "").trim();
+            const serviceId = String(combo.serviceId ?? "").trim();
+
+            if (!categoryId || !serviceId) {
+              return null;
+            }
+
+            return {
+              category_id: categoryId,
+              category_title: category?.title ?? null,
+              service_id: serviceId,
+              service_title: service?.title ?? null,
+            };
+          })
+          .filter((combo): combo is NonNullable<typeof combo> => combo !== null),
+        additional_notes: sourceBiz.notes,
+        price_range: [sourceBiz.priceRangeFrom, sourceBiz.priceRangeTo].filter(Boolean).join(" - "),
+        prepayment_percentage: Number(sourceBiz.prepaymentPercent) || null,
+        prepayment_instruction: sourceBiz.prepaymentInstructions,
+        kilometer_allowance: Number(sourceBiz.kilometerAllowance) || null,
+        kilometer_allowance_instruction: sourceBiz.kilometerAllowanceInstructions,
+        response_time_hours: Number(values.policyResponseHours) || null,
+        response_time_minutes: Number(values.policyResponseMinutes) || null,
+        policy_custom_instruction: values.policyInstructions,
+        appointment_before_hours: Number(values.rescheduleMinimumHours) || null,
+        appointment_before_minutes: Number(values.rescheduleMinimumMinutes) || null,
+        late_reschedule_fee_percentage: Number(values.rescheduleLateFeePercent) || null,
+        late_reschedule_policy_instruction: values.rescheduleInstructions,
+        cancellation_before_hours: Number(values.cancelMinimumHours) || null,
+        cancellation_before_minutes: Number(values.cancelMinimumMinutes) || null,
+        late_cancellation_fee_percentage: Number(values.cancelLateFeePercent) || null,
+        cancellation_policy_instruction: values.cancelInstructions,
+        no_show_fee_percentage: Number(values.noShowFeePercent) || null,
+        no_show_fee_instruction: values.noShowInstructions,
+        desired_location_area: desiredAreaText,
+        desired_location_province: desiredProvinceText,
+        desired_location_services: serviceItems.map((item) => item.name),
+        team_members: members.map((member, index) => ({
+          id: toPersistedTeamMemberId(member.id),
+          photo_upload_key: member.pendingPhotoFile ? member.id : undefined,
+          full_name: member.name,
+          role: member.role,
+          profile_photo: member.pendingPhotoFile
+            ? null
+            : isPersistedMediaUrl(member.photoSrc)
+              ? member.photoSrc
+              : null,
+          assigned_services: toTeamServicePayload(member.services),
+          display_order: index + 1,
+        })),
+      };
+    },
+    [
+      businessOfferingSelect,
+      businessCategories,
+      desiredAreaMode,
+      desiredAreas,
+      desiredBusiness,
+      fixedBiz,
+      mediaSlides,
+      toPersistedTeamMemberId,
+      toTeamServicePayload,
+      values,
+    ],
+  );
+
+  const buildBusinessSetupSaveBody = React.useCallback(
+    (members: TeamMemberUi[]): UpsertBusinessSetupPayload => {
+      const payload = buildBusinessSetupPayload(members);
+      const teamPhotoFiles = members
+        .filter((member): member is TeamMemberUi & { pendingPhotoFile: File } => Boolean(member.pendingPhotoFile))
+        .map((member) => ({
+          memberKey: member.id,
+          file: member.pendingPhotoFile,
+        }));
+
+      return buildUpsertBusinessSetupBody(payload, teamPhotoFiles);
+    },
+    [buildBusinessSetupPayload],
+  );
+
+  const clearPendingTeamMemberPhotos = React.useCallback(() => {
+    setTeamMembers((prev) => prev.map((member) => ({ ...member, pendingPhotoFile: null })));
+  }, []);
+
+  const saveBusinessSetupData = React.useCallback(async () => {
+    if (!onSaveBusinessSetup) return;
+    await onSaveBusinessSetup(buildBusinessSetupSaveBody(teamMembers));
+    clearPendingTeamMemberPhotos();
+  }, [buildBusinessSetupSaveBody, clearPendingTeamMemberPhotos, onSaveBusinessSetup, teamMembers]);
+
   const onPublishBusinessSetup = React.useCallback(async () => {
     if (!onSaveBusinessSetup) {
       setIsBusinessPublishEnabled(false);
       return;
     }
 
-    const locationModeMap: Record<OfferingSelectOption, UpsertBusinessSetupRequest["location_mode"]> = {
-      "Fixed Location": "fixed",
-      "Desired Location": "desired",
-      Both: "both",
-    };
-    const sourceBiz = businessOfferingSelect === "Desired Location" ? desiredBusiness : fixedBiz;
-    const serviceItems =
-      businessOfferingSelect === "Desired Location" ? servicesDesiredRef.current : servicesFixedRef.current;
-    const desiredAreaText =
-      desiredAreaMode === "All Netherlands"
-        ? "All Netherlands"
-        : desiredAreas.map((area) => area.municipality).filter(Boolean).join(", ");
-    const desiredProvinceText =
-      desiredAreaMode === "All Netherlands"
-        ? "All Netherlands"
-        : Array.from(new Set(desiredAreas.map((area) => area.province).filter(Boolean))).join(", ");
-
-    await onSaveBusinessSetup({
-      location_mode: locationModeMap[businessOfferingSelect],
-      business_name: sourceBiz.profileName,
-      business_about: sourceBiz.about,
-      business_keywords: sourceBiz.keywords,
-      business_media: mediaSlides.filter(isPersistedMediaUrl).slice(0, BUSINESS_MEDIA_MAX_COUNT),
-      salon_name: fixedBiz.salonName,
-      fixed_location_address: fixedBiz.streetAddress,
-      fixed_location_street_number: fixedBiz.streetNumber,
-      fixed_location_postal_code: fixedBiz.postalCode,
-      fixed_location_province: fixedBiz.province,
-      fixed_location_municipality: fixedBiz.municipality,
-      service_for: Object.entries(sourceBiz.serviceFor)
-        .filter(([, enabled]) => enabled)
-        .map(([key]) => key),
-      service_categories: mapServiceItemsToCategories(serviceItems),
-      project: sourceBiz.projectEnabled ? sourceBiz.projectInstructions : "",
-      book_service_notes: sourceBiz.bookComboInstructions,
-      book_service_combinations: sourceBiz.projectEnabled
-        ? sourceBiz.bookCombos
-            .map((combo) => {
-              const category = businessCategories.find((item) => String(item.id) === combo.categoryId);
-              const service = category
-                ? category.subcategories.find((item) => String(item.id) === combo.serviceId)
-                : businessCategories
-                    .flatMap((item) => item.subcategories)
-                    .find((item) => String(item.id) === combo.serviceId);
-              const categoryId = Number(combo.categoryId);
-              const serviceId = Number(combo.serviceId);
-
-              if (!Number.isInteger(categoryId) || !Number.isInteger(serviceId)) {
-                return null;
-              }
-
-              return {
-                category_id: categoryId,
-                category_title: category?.title ?? null,
-                service_id: serviceId,
-                service_title: service?.title ?? null,
-              };
-            })
-            .filter(
-              (
-                combo,
-              ): combo is {
-                category_id: number;
-                category_title: string | null;
-                service_id: number;
-                service_title: string | null;
-              } => combo !== null,
-            )
-        : [],
-      additional_notes: sourceBiz.notes,
-      price_range: [sourceBiz.priceRangeFrom, sourceBiz.priceRangeTo].filter(Boolean).join(" - "),
-      prepayment_percentage: Number(sourceBiz.prepaymentPercent) || null,
-      prepayment_instruction: sourceBiz.prepaymentInstructions,
-      kilometer_allowance: Number(sourceBiz.kilometerAllowance) || null,
-      kilometer_allowance_instruction: sourceBiz.kilometerAllowanceInstructions,
-      response_time_hours: Number(values.policyResponseHours) || null,
-      response_time_minutes: Number(values.policyResponseMinutes) || null,
-      policy_custom_instruction: values.policyInstructions,
-      appointment_before_hours: Number(values.rescheduleMinimumHours) || null,
-      appointment_before_minutes: Number(values.rescheduleMinimumMinutes) || null,
-      late_reschedule_fee_percentage: Number(values.rescheduleLateFeePercent) || null,
-      late_reschedule_policy_instruction: values.rescheduleInstructions,
-      cancellation_before_hours: Number(values.cancelMinimumHours) || null,
-      cancellation_before_minutes: Number(values.cancelMinimumMinutes) || null,
-      late_cancellation_fee_percentage: Number(values.cancelLateFeePercent) || null,
-      cancellation_policy_instruction: values.cancelInstructions,
-      no_show_fee_percentage: Number(values.noShowFeePercent) || null,
-      no_show_fee_instruction: values.noShowInstructions,
-      desired_location_area: desiredAreaText,
-      desired_location_province: desiredProvinceText,
-      desired_location_services: serviceItems.map((item) => item.name),
-      team_members: teamMembers.map((member, index) => ({
-        id: /^\d+$/.test(member.id) ? Number(member.id) : undefined,
-        full_name: member.name,
-        role: member.role,
-        profile_photo: member.photoSrc.startsWith("blob:") ? null : member.photoSrc,
-        assigned_services: toTeamServicePayload(member.services),
-        display_order: index + 1,
-      })),
-    });
-
-    setIsBusinessPublishEnabled(false);
+    try {
+      await onSaveBusinessSetup(buildBusinessSetupSaveBody(teamMembers));
+      clearPendingTeamMemberPhotos();
+      await updateBusinessSetupActive({ is_active: true }).unwrap();
+      setIsBusinessPublishEnabled(false);
+      setEditingBusinessSections(new Set());
+      showSnackbar({ severity: "success", message: "Changes published and are now live." });
+    } catch (error) {
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Unable to publish changes."),
+      });
+    }
   }, [
-    businessOfferingSelect,
-    businessCategories,
-    desiredAreaMode,
-    desiredAreas,
-    desiredBusiness,
-    fixedBiz,
-    mediaSlides,
+    buildBusinessSetupSaveBody,
+    clearPendingTeamMemberPhotos,
     onSaveBusinessSetup,
+    showSnackbar,
     teamMembers,
-    toTeamServicePayload,
-    values,
+    updateBusinessSetupActive,
   ]);
 
-  const onSwitchActiveBusinessTemplate = React.useCallback((opt: OfferingOption) => {
-    setActiveBusinessTemplate(opt);
-  }, []);
+  const saveBusinessSection = React.useCallback(
+    async (sectionId: BusinessSetupSectionId) => {
+      if (!onSaveBusinessSetup) {
+        setEditingBusinessSections((prev) => {
+          const next = new Set(prev);
+          next.delete(sectionId);
+          return next;
+        });
+        return;
+      }
+
+      try {
+        await saveBusinessSetupData();
+        setEditingBusinessSections((prev) => {
+          const next = new Set(prev);
+          next.delete(sectionId);
+          return next;
+        });
+        setIsBusinessPublishEnabled(true);
+        showSnackbar({ severity: "success", message: "Changes saved." });
+      } catch (error) {
+        showSnackbar({
+          severity: "error",
+          message: getApiErrorMessage(error, "Unable to save changes."),
+        });
+      }
+    },
+    [onSaveBusinessSetup, saveBusinessSetupData, showSnackbar],
+  );
+
+  const onSwitchActiveBusinessTemplate = React.useCallback(
+    (opt: OfferingOption) => {
+      if (!isBusinessProfileActive) {
+        void onToggleBusinessProfileActive();
+      }
+      setActiveBusinessTemplate(opt);
+    },
+    [isBusinessProfileActive, onToggleBusinessProfileActive],
+  );
 
   // ── Services (template-aware) + drawer ────────────────────────────────────
   const initialServiceItems = React.useMemo(
@@ -1480,17 +1772,14 @@ export default function ProfessionalFixedLocationSetup({
   );
   const [servicesFixed, setServicesFixed] = React.useState<ServiceDetailUiItem[]>(() => initialServiceItems);
   const [servicesDesired, setServicesDesired] = React.useState<ServiceDetailUiItem[]>(() => initialServiceItems);
+  const [mainServicesFixed, setMainServicesFixed] = React.useState<BusinessMainServiceUi[]>([]);
+  const [mainServicesDesired, setMainServicesDesired] = React.useState<BusinessMainServiceUi[]>([]);
   servicesFixedRef.current = servicesFixed;
   servicesDesiredRef.current = servicesDesired;
   React.useEffect(() => {
     setServicesFixed(initialServiceItems);
     setServicesDesired(initialServiceItems);
   }, [initialServiceItems]);
-
-  React.useEffect(() => {
-    if (!useSameBusinessInfo) return;
-    setServicesDesired(servicesFixed);
-  }, [servicesFixed, useSameBusinessInfo]);
 
   const hydratedBusinessRef = React.useRef<string | null>(null);
 
@@ -1529,7 +1818,7 @@ export default function ProfessionalFixedLocationSetup({
       streetNumber: businessSetupData.fixed_location_street_number || "",
       postalCode: businessSetupData.fixed_location_postal_code || "",
       province: businessSetupData.fixed_location_province || "",
-      municipality: businessSetupData.fixed_location_municipality || "",
+      municipalities: parseFixedLocationMunicipalities(businessSetupData.fixed_location_municipality),
       serviceFor: {
         men: (businessSetupData.service_for || []).includes("men"),
         women: (businessSetupData.service_for || []).includes("women"),
@@ -1587,7 +1876,10 @@ export default function ProfessionalFixedLocationSetup({
       ]),
     );
 
-    const savedServices = businessSetupData.service_details.map((item) => {
+    const categoryTitleById = new Map(
+      businessCategories.map((category) => [String(category.id), category.title]),
+    );
+    const mapDetailToSubservice = (item: (typeof businessSetupData.service_details)[number]): BusinessSubserviceUi => {
       const rawPrice = item.price;
       const priceStr =
         rawPrice !== null && rawPrice !== undefined && String(rawPrice).trim() !== ""
@@ -1599,16 +1891,25 @@ export default function ProfessionalFixedLocationSetup({
       const durationLabel = categoryDurationByServiceId.get(item.service_id) || "";
       return {
         id: String(item.service_id),
+        parentServiceId: "",
         categoryId: String(item.category_id),
         serviceId: item.service_id,
         name: item.service_title || "",
+        discountInfo: "",
+        durationFrom: "",
+        durationTo: "",
         categoryTitle: item.category_title || undefined,
         priceLabel: priceStr,
         durationLabel: durationLabel || undefined,
       };
-    });
-    setServicesFixed(savedServices);
-    setServicesDesired(savedServices);
+    };
+
+    const savedServices: BusinessSubserviceUi[] = businessSetupData.service_details.map(mapDetailToSubservice);
+    const hydratedServices = hydrateMainAndSubservicesFromDetails(savedServices, categoryTitleById);
+    setMainServicesFixed(hydratedServices.mains);
+    setMainServicesDesired(hydratedServices.mains);
+    setServicesFixed(hydratedServices.subs);
+    setServicesDesired(hydratedServices.subs);
 
     if (businessSetupData.team_members.length > 0) {
       setTeamMembers(
@@ -1627,218 +1928,281 @@ export default function ProfessionalFixedLocationSetup({
     }
 
     hydratedBusinessRef.current = hydrationKey;
-  }, [businessSetupData, defaultServices, setField, toDisplayNumber, values.amenities, values.depositEnabled, values.depositValue, values.discountEnabled, values.discountValue]);
+  }, [
+    businessCategories,
+    businessSetupData,
+    defaultServices,
+    setField,
+    toDisplayNumber,
+    values.amenities,
+    values.depositEnabled,
+    values.depositValue,
+    values.discountEnabled,
+    values.discountValue,
+  ]);
 
   const activeServices = activeBusinessTemplate === "Fixed Location" ? servicesFixed : servicesDesired;
+  const activeMainServices = activeBusinessTemplate === "Fixed Location" ? mainServicesFixed : mainServicesDesired;
   const setActiveServices = React.useCallback(
-    (updater: (prev: ServiceDetailUiItem[]) => ServiceDetailUiItem[]) => {
+    (value: React.SetStateAction<ServiceDetailUiItem[]>) => {
       setIsBusinessPublishEnabled(true);
-      if (useSameBusinessInfo) {
-        setServicesFixed((p) => {
-          const next = updater(p);
-          setServicesDesired(next);
-          return next;
-        });
-        return;
-      }
-      if (activeBusinessTemplate === "Fixed Location") setServicesFixed(updater);
-      else setServicesDesired(updater);
+      if (activeBusinessTemplate === "Fixed Location") setServicesFixed(value);
+      else setServicesDesired(value);
     },
-    [activeBusinessTemplate, useSameBusinessInfo],
+    [activeBusinessTemplate],
+  );
+  const setActiveMainServices = React.useCallback(
+    (value: React.SetStateAction<BusinessMainServiceUi[]>) => {
+      setIsBusinessPublishEnabled(true);
+      if (activeBusinessTemplate === "Fixed Location") setMainServicesFixed(value);
+      else setMainServicesDesired(value);
+    },
+    [activeBusinessTemplate],
   );
 
-  const [serviceDrawerOpen, setServiceDrawerOpen] = React.useState(false);
-  const [editingServiceId, setEditingServiceId] = React.useState<string | null>(null);
-  const [draftServiceCategory, setDraftServiceCategory] = React.useState<string>("");
-  const [draftServiceId, setDraftServiceId] = React.useState<number | "">("");
-  const [draftServiceName, setDraftServiceName] = React.useState("");
-  const [draftServiceDuration, setDraftServiceDuration] = React.useState("");
-  const [draftServicePriceType, setDraftServicePriceType] = React.useState("fixed");
-  const [draftServicePriceAmount, setDraftServicePriceAmount] = React.useState("");
-  const [draftServiceDiscountType, setDraftServiceDiscountType] = React.useState("fixed");
-  const [draftServiceDiscountAmount, setDraftServiceDiscountAmount] = React.useState("");
-  const [serviceDrawerEditBaseline, setServiceDrawerEditBaseline] = React.useState<ServiceDrawerEditBaseline | null>(
-    null,
-  );
-  const [expandedServiceDetailIds, setExpandedServiceDetailIds] = React.useState<Record<string, boolean>>({});
-  const openAddServiceDrawerForCategory = React.useCallback(
-    (categoryId: string) => {
-      setEditingServiceId(null);
-      setServiceDrawerEditBaseline(null);
-      const valid =
-        categoryId && businessCategories.some((c) => String(c.id) === categoryId)
-          ? categoryId
-          : businessCategories[0]
-            ? String(businessCategories[0].id)
-            : "";
-      setDraftServiceCategory(valid);
-      setDraftServiceId("");
-      setDraftServiceName("");
-      setDraftServiceDuration("");
-      setDraftServicePriceType("fixed");
-      setDraftServicePriceAmount("");
-      setDraftServiceDiscountType("fixed");
-      setDraftServiceDiscountAmount("");
-      setServiceDrawerOpen(true);
-    },
+  const serviceCategoryTabs = React.useMemo(
+    () => buildServiceCategoryTabs(businessCategories),
     [businessCategories],
   );
 
-  const openAddServiceDrawer = React.useCallback(() => {
-    const cat =
-      activeServiceCategory &&
-      activeServiceCategory !== "all" &&
-      businessCategories.some((c) => String(c.id) === activeServiceCategory)
-        ? activeServiceCategory
-        : businessCategories[0]
-          ? String(businessCategories[0].id)
-          : "";
-    openAddServiceDrawerForCategory(cat);
-  }, [activeServiceCategory, businessCategories, openAddServiceDrawerForCategory]);
+  const teamBusinessServices = React.useMemo(
+    () => buildTeamBusinessServiceRefs(activeServices),
+    [activeServices],
+  );
+
+  const buildTeamMemberServiceGroups = React.useCallback(
+    (services: TeamService): TeamMemberServiceGroup[] => {
+      const groups = new Map<string, TeamMemberServiceGroup>();
+
+      const appendToGroup = (categoryId: string, categoryTitle: string, serviceId: string, label: string) => {
+        const existing = groups.get(categoryId);
+        if (existing) {
+          if (!existing.subServices.some((item) => item.id === serviceId)) {
+            existing.subServices.push({ id: serviceId, label });
+          }
+          return;
+        }
+        groups.set(categoryId, {
+          categoryId,
+          categoryTitle: resolveCategoryDisplayTitle(categoryTitle),
+          subServices: [{ id: serviceId, label }],
+        });
+      };
+
+      for (const serviceId of getMemberAssignedServiceIds(services)) {
+        let matched = false;
+
+        for (const category of businessCategories) {
+          const subcategory = category.subcategories.find((sub) => String(sub.id) === serviceId);
+          if (!subcategory) continue;
+          appendToGroup(String(category.id), category.title, serviceId, subcategory.title);
+          matched = true;
+          break;
+        }
+
+        if (!matched) {
+          const setupService = activeServices.find((item) => String(item.serviceId) === serviceId);
+          if (setupService) {
+            const categoryTitle =
+              businessCategories.find((c) => String(c.id) === String(setupService.categoryId))?.title ??
+              setupService.categoryTitle ??
+              String(setupService.categoryId);
+            appendToGroup(String(setupService.categoryId), categoryTitle, serviceId, setupService.name);
+            matched = true;
+          }
+        }
+
+        if (!matched) {
+          const option = allSubcategoryOptions.find((item) => item.value === serviceId);
+          if (option) {
+            for (const category of businessCategories) {
+              const subcategory = category.subcategories.find((sub) => String(sub.id) === serviceId);
+              if (!subcategory) continue;
+              appendToGroup(String(category.id), category.title, serviceId, option.label);
+              matched = true;
+              break;
+            }
+          }
+        }
+      }
+
+      return Array.from(groups.values());
+    },
+    [
+      activeServices,
+      allSubcategoryOptions,
+      businessCategories,
+      getMemberAssignedServiceIds,
+      resolveCategoryDisplayTitle,
+    ],
+  );
+
+  const teamMemberModal = useBusinessTeamMemberModal({
+    businessCategories,
+    businessServices: teamBusinessServices,
+    categoryTabs: serviceCategoryTabs,
+    teamMembers,
+    setTeamMembers,
+    onAfterLocalSave: () => setTeamServiceMenu(null),
+    onMarkUnpublished: () => setIsBusinessPublishEnabled(true),
+    onSaveBusinessSetup: onSaveBusinessSetup
+      ? async (members) => {
+          await onSaveBusinessSetup(buildBusinessSetupSaveBody(members));
+          setTeamMembers((prev) =>
+            prev.map((member) => ({
+              ...member,
+              pendingPhotoFile: null,
+            })),
+          );
+          setIsBusinessPublishEnabled(true);
+        }
+      : undefined,
+  });
+
+  const [expandedServiceDetailIds, setExpandedServiceDetailIds] = React.useState<Record<string, boolean>>({});
+  const [expandedMainServiceIds, setExpandedMainServiceIds] = React.useState<Record<string, boolean>>({});
+
+  const serviceModal = useBusinessServiceModal({
+    businessCategories,
+    mainServices: activeMainServices,
+    subservices: activeServices,
+    setMainServices: setActiveMainServices,
+    setSubservices: setActiveServices,
+    onPersistChange: () => setIsBusinessPublishEnabled(true),
+    onMainServiceCreated: (mainId) => {
+      setExpandedMainServiceIds((prev) => ({ ...prev, [mainId]: true }));
+    },
+  });
+
+  const handleEditSubservice = React.useCallback(
+    (service: ServiceDetailUiItem) => {
+      ensureServicesDetailsEditing();
+      serviceModal.openEditSubservice(service);
+    },
+    [ensureServicesDetailsEditing, serviceModal],
+  );
+
+  const handleDeleteSubservice = React.useCallback(
+    (service: ServiceDetailUiItem) => {
+      ensureServicesDetailsEditing();
+      serviceModal.deleteSubservice(service.id);
+      removeServiceIdFromTeamMembers(String(service.serviceId ?? service.id));
+      showSnackbar({ severity: "info", message: "Service removed. Click Save to apply changes." });
+    },
+    [ensureServicesDetailsEditing, removeServiceIdFromTeamMembers, serviceModal, showSnackbar],
+  );
+
+  const handleEditMainService = React.useCallback(
+    (main: BusinessMainServiceUi) => {
+      ensureServicesDetailsEditing();
+      serviceModal.openEditService(main);
+    },
+    [ensureServicesDetailsEditing, serviceModal],
+  );
+
+  const handleDeleteMainService = React.useCallback(
+    (mainId: string) => {
+      ensureServicesDetailsEditing();
+      const childServiceIds = (serviceModal.subservicesByParent.get(mainId) ?? []).map((item) =>
+        String(item.serviceId ?? item.id),
+      );
+      serviceModal.deleteMainService(mainId);
+      for (const serviceId of childServiceIds) {
+        removeServiceIdFromTeamMembers(serviceId);
+      }
+    },
+    [ensureServicesDetailsEditing, removeServiceIdFromTeamMembers, serviceModal],
+  );
+
+  const ensureCategoryParentMain = React.useCallback(
+    (storageId: string) => {
+      const explicitMain = activeMainServices.find(
+        (main) => !isHydratedMainServiceId(main.id) && String(main.categoryId) === storageId,
+      );
+      if (explicitMain) return explicitMain.id;
+
+      const hydratedMain = activeMainServices.find(
+        (main) => isHydratedMainServiceId(main.id) && String(main.categoryId) === storageId,
+      );
+      if (hydratedMain) return hydratedMain.id;
+
+      const categoryTitle =
+        businessCategories.find((category) => String(category.id) === storageId)?.title ?? "Services";
+      const mainId = `main-${storageId}-hydrated`;
+      const nextMain: BusinessMainServiceUi = {
+        id: mainId,
+        categoryId: storageId,
+        name: categoryTitle,
+        serviceInfo: "",
+        durationFrom: "",
+        durationTo: "",
+        priceType: "fixed",
+        priceAmount: "",
+        currency: businessServiceModalCopy.currencyCode,
+        discountType: "fixed",
+        discountAmount: "",
+        discountStartDate: "",
+        discountEndDate: "",
+        discountDescription: "",
+      };
+
+      setActiveMainServices((prev) => (prev.some((main) => main.id === mainId) ? prev : [...prev, nextMain]));
+      return mainId;
+    },
+    [activeMainServices, businessCategories, setActiveMainServices],
+  );
+
+  const openAddServiceForCategory = React.useCallback(
+    (categoryId: string) => {
+      ensureServicesDetailsEditing();
+      const storageId = resolveServiceCategoryStorageId(
+        categoryId,
+        serviceCategoryTabs,
+        businessCategories,
+      );
+      if (!storageId) return;
+
+      const parentMainId = ensureCategoryParentMain(storageId);
+      serviceModal.openAddSubservice(storageId, parentMainId);
+    },
+    [
+      businessCategories,
+      ensureCategoryParentMain,
+      ensureServicesDetailsEditing,
+      serviceCategoryTabs,
+      serviceModal,
+    ],
+  );
+
+  const openAddService = React.useCallback(() => {
+    if (!activeServiceCategory || activeServiceCategory === "all") return;
+    openAddServiceForCategory(activeServiceCategory);
+  }, [activeServiceCategory, openAddServiceForCategory]);
+
+  const openAddSubserviceForItem = React.useCallback(
+    (item: ServiceDetailUiItem) => {
+      ensureServicesDetailsEditing();
+      const storageId = resolveServiceCategoryStorageId(item.categoryId, serviceCategoryTabs, businessCategories);
+      if (!storageId) return;
+      const parentMainId = item.parentServiceId?.trim() || ensureCategoryParentMain(storageId);
+      serviceModal.openAddSubservice(storageId, parentMainId);
+    },
+    [
+      businessCategories,
+      ensureCategoryParentMain,
+      ensureServicesDetailsEditing,
+      serviceCategoryTabs,
+      serviceModal,
+    ],
+  );
 
   const toggleServiceDetailExpand = React.useCallback((id: string) => {
     setExpandedServiceDetailIds((prev) => ({ ...prev, [id]: !prev[id] }));
   }, []);
 
-  const openEditServiceDrawer = React.useCallback((it: ServiceDetailUiItem) => {
-    setEditingServiceId(it.id);
-    setDraftServiceCategory(it.categoryId);
-    setDraftServiceId(it.serviceId);
-    setDraftServiceName(it.name);
-    setDraftServiceDuration(it.durationLabel || "");
-    const parsed = parsePriceLabelForDrawer(it.priceLabel);
-    const pt = normalizePriceType(it.priceType ?? parsed.type);
-    const pa = it.priceAmount ?? parsed.amount;
-    setDraftServicePriceType(pt);
-    setDraftServicePriceAmount(pa);
-    const dType = normalizeDiscountType(it.discountType);
-    setDraftServiceDiscountType(dType);
-    setDraftServiceDiscountAmount((it.discountAmount ?? "").trim());
-    setServiceDrawerEditBaseline({
-      categoryId: String(it.categoryId),
-      serviceId: it.serviceId,
-      name: it.name,
-      duration: it.durationLabel || "",
-      priceType: pt,
-      priceAmount: pa,
-      discountType: dType,
-      discountAmount: (it.discountAmount ?? "").trim(),
-    });
-    setServiceDrawerOpen(true);
+  const toggleMainServiceExpand = React.useCallback((id: string) => {
+    setExpandedMainServiceIds((prev) => ({ ...prev, [id]: !prev[id] }));
   }, []);
-
-  const closeServiceDrawer = React.useCallback(() => {
-    setServiceDrawerOpen(false);
-    setEditingServiceId(null);
-    setServiceDrawerEditBaseline(null);
-    setDraftServicePriceType("fixed");
-    setDraftServicePriceAmount("");
-    setDraftServiceDiscountType("fixed");
-    setDraftServiceDiscountAmount("");
-  }, []);
-
-  const serviceDrawerDirty = React.useMemo(() => {
-    if (!editingServiceId || !serviceDrawerEditBaseline) return false;
-    const b = serviceDrawerEditBaseline;
-    const sid = draftServiceId === "" ? null : Number(draftServiceId);
-    if (sid === null || Number.isNaN(sid)) return false;
-    const discAmt = draftServiceDiscountAmount.trim();
-    const bDiscAmt = b.discountAmount.trim();
-    return (
-      b.categoryId !== draftServiceCategory ||
-      b.serviceId !== sid ||
-      b.name !== draftServiceName ||
-      b.duration !== draftServiceDuration ||
-      b.priceType !== draftServicePriceType ||
-      b.priceAmount !== draftServicePriceAmount ||
-      b.discountType !== draftServiceDiscountType ||
-      bDiscAmt !== discAmt
-    );
-  }, [
-    draftServiceCategory,
-    draftServiceDiscountAmount,
-    draftServiceDiscountType,
-    draftServiceDuration,
-    draftServiceId,
-    draftServiceName,
-    draftServicePriceAmount,
-    draftServicePriceType,
-    editingServiceId,
-    serviceDrawerEditBaseline,
-  ]);
-
-  const saveService = React.useCallback(() => {
-    if (!draftServiceCategory || !draftServiceId) return;
-    const matchedCategory = businessCategories.find((category) => String(category.id) === draftServiceCategory);
-    const matchedService = matchedCategory?.subcategories.find((subcategory) => subcategory.id === Number(draftServiceId));
-    if (!matchedService) return;
-
-    const name = draftServiceName.trim() || matchedService.title;
-    const durationLabel = normalizeDurationLabel(draftServiceDuration);
-
-    const priceLabel = formatServicePriceLabel(draftServicePriceType, draftServicePriceAmount);
-    const discountTypeSaved = normalizeDiscountType(draftServiceDiscountType);
-    const rawDisc = draftServiceDiscountAmount.trim();
-    const discVal = parseEuroAmountString(rawDisc);
-    let discountAmount = "";
-    if (discVal !== null && discVal > 0) {
-      if (discountTypeSaved === "percent" && discVal > 100) discountAmount = "";
-      else discountAmount = rawDisc;
-    }
-    const categoryId = draftServiceCategory;
-    const categoryTitle = matchedCategory?.title;
-
-    const servicePayload = {
-      name,
-      durationLabel,
-      priceLabel,
-      categoryId,
-      serviceId: matchedService.id,
-      categoryTitle,
-      priceType: normalizePriceType(draftServicePriceType),
-      priceAmount: draftServicePriceAmount,
-      discountType: discountTypeSaved,
-      discountAmount,
-    };
-
-    if (editingServiceId) {
-      setActiveServices((prev) =>
-        prev.map((s) => (s.id === editingServiceId ? { ...s, ...servicePayload } : s)),
-      );
-    } else {
-      const id = String(matchedService.id);
-      setActiveServices((prev) => [
-        { id, ...servicePayload },
-        ...prev.filter((item) => item.serviceId !== matchedService.id),
-      ]);
-    }
-    setEditingServiceId(null);
-    setServiceDrawerEditBaseline(null);
-    setServiceDrawerOpen(false);
-    setDraftServicePriceType("fixed");
-    setDraftServicePriceAmount("");
-    setDraftServiceDiscountType("fixed");
-    setDraftServiceDiscountAmount("");
-  }, [
-    businessCategories,
-    draftServiceCategory,
-    draftServiceDiscountAmount,
-    draftServiceDiscountType,
-    draftServiceDuration,
-    draftServiceId,
-    draftServiceName,
-    draftServicePriceAmount,
-    draftServicePriceType,
-    editingServiceId,
-    setActiveServices,
-  ]);
-
-  const deleteService = React.useCallback(
-    (id: string) => {
-      setActiveServices((prev) => prev.filter((s) => s.id !== id));
-    },
-    [setActiveServices],
-  );
 
   const renderServiceDetailRow = React.useCallback(
     (it: ServiceDetailUiItem) => {
@@ -1869,7 +2233,7 @@ export default function ProfessionalFixedLocationSetup({
                 ) : null}
                 <Typography
                   component="button"
-                  onClick={() => openEditServiceDrawer(it)}
+                  onClick={() => serviceModal.openEditSubservice(it)}
                   sx={{
                     border: "none",
                     background: "none",
@@ -1920,9 +2284,18 @@ export default function ProfessionalFixedLocationSetup({
               <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexShrink: 0 }}>
                 <IconButton
                   size="small"
+                  aria-label="Add subservice"
+                  onClick={() => openAddSubserviceForItem(it)}
+                  disabled={isBusinessSetupSaving || servicesDetailsDisabled}
+                  sx={addSoftIconButtonSx(m, 32)}
+                >
+                  <AddRoundedIcon sx={{ fontSize: 18 }} />
+                </IconButton>
+                <IconButton
+                  size="small"
                   aria-label="Edit service"
-                  onClick={() => openEditServiceDrawer(it)}
-                  disabled={businessFormDisabled}
+                  onClick={() => handleEditSubservice(it)}
+                  disabled={isBusinessSetupSaving}
                   sx={{ width: 32, height: 32, color: alpha(m.navy, 0.45) }}
                 >
                   <EditRoundedIcon sx={{ fontSize: 20 }} />
@@ -1930,8 +2303,8 @@ export default function ProfessionalFixedLocationSetup({
                 <IconButton
                   size="small"
                   aria-label="Delete service"
-                  onClick={() => deleteService(it.id)}
-                  disabled={businessFormDisabled}
+                  onClick={() => handleDeleteSubservice(it)}
+                  disabled={isBusinessSetupSaving}
                   sx={{ width: 32, height: 32, color: alpha(m.navy, 0.45) }}
                 >
                   <DeleteOutlineRoundedIcon sx={{ fontSize: 20 }} />
@@ -1956,7 +2329,134 @@ export default function ProfessionalFixedLocationSetup({
         </Paper>
       );
     },
-    [businessFormDisabled, deleteService, expandedServiceDetailIds, m.navy, openEditServiceDrawer, toggleServiceDetailExpand],
+    [
+      expandedServiceDetailIds,
+      handleDeleteSubservice,
+      handleEditSubservice,
+      isBusinessSetupSaving,
+      m.navy,
+      openAddSubserviceForItem,
+      servicesDetailsDisabled,
+      toggleServiceDetailExpand,
+    ],
+  );
+
+  const renderMainServiceRow = React.useCallback(
+    (main: BusinessMainServiceUi) => {
+      const expanded = Boolean(expandedMainServiceIds[main.id]);
+      const childSubs = serviceModal.subservicesByParent.get(main.id) ?? [];
+      const cardPrice = getServiceCardPriceParts({
+        id: main.id,
+        parentServiceId: "",
+        categoryId: main.categoryId,
+        serviceId: "",
+        name: main.name,
+        discountInfo: "",
+        durationFrom: "",
+        durationTo: "",
+        priceLabel: formatBusinessServicePriceLabel(main.priceType, main.priceAmount),
+        priceType: main.priceType,
+        priceAmount: main.priceAmount,
+        discountType: main.discountType,
+        discountAmount: main.discountAmount,
+      });
+
+      return (
+        <Paper
+          key={main.id}
+          elevation={0}
+          sx={{
+            borderRadius: "12px",
+            border: `1px solid ${alpha(m.navy, 0.10)}`,
+            bgcolor: "#fff",
+            px: 1.75,
+            py: 1.35,
+          }}
+        >
+          <Stack spacing={1.25}>
+            <Stack direction="row" alignItems="center" spacing={1.5} sx={{ flexWrap: { xs: "wrap", sm: "nowrap" } }}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography sx={{ fontWeight: 800, fontSize: 14, color: alpha(m.navy, 0.92), lineHeight: 1.25 }}>
+                  {main.name?.trim() ? main.name : "Untitled service"}
+                </Typography>
+                {main.serviceInfo ? (
+                  <Typography sx={{ fontSize: 12, fontWeight: 500, color: alpha(m.navy, 0.55), mt: 0.35 }}>
+                    {main.serviceInfo}
+                  </Typography>
+                ) : null}
+              </Box>
+              <Stack direction="row" alignItems="center" spacing={1.25} sx={{ ml: { xs: 0, sm: "auto" } }}>
+                <Typography sx={{ fontSize: 14, fontWeight: 800, color: alpha(m.navy, 0.92) }}>{cardPrice.primary}</Typography>
+                <IconButton
+                  size="small"
+                  aria-label="Edit service"
+                  onClick={() => handleEditMainService(main)}
+                  disabled={isBusinessSetupSaving}
+                  sx={{ width: 32, height: 32, color: alpha(m.navy, 0.45) }}
+                >
+                  <EditRoundedIcon sx={{ fontSize: 20 }} />
+                </IconButton>
+                <IconButton
+                  size="small"
+                  aria-label="Delete service"
+                  onClick={() => handleDeleteMainService(main.id)}
+                  disabled={isBusinessSetupSaving}
+                  sx={{ width: 32, height: 32, color: alpha(m.navy, 0.45) }}
+                >
+                  <DeleteOutlineRoundedIcon sx={{ fontSize: 20 }} />
+                </IconButton>
+                <IconButton
+                  size="small"
+                  aria-label={expanded ? "Collapse subservices" : "Expand subservices"}
+                  onClick={() => toggleMainServiceExpand(main.id)}
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    color: alpha(m.navy, 0.45),
+                    transform: expanded ? "rotate(180deg)" : "none",
+                    transition: "transform 0.2s ease",
+                  }}
+                >
+                  <KeyboardArrowDownRoundedIcon sx={{ fontSize: 22 }} />
+                </IconButton>
+              </Stack>
+            </Stack>
+
+            {expanded ? (
+              <Stack spacing={1} sx={{ pl: { xs: 0, sm: 1 }, pt: 0.5 }}>
+                <Stack direction="row" alignItems="center" justifyContent="space-between">
+                  <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.62) }}>Subservices</Typography>
+                  <IconButton
+                    size="small"
+                    onClick={() => serviceModal.openAddSubservice(main.categoryId, main.id)}
+                    disabled={servicesDetailsDisabled}
+                    aria-label="Add subservice"
+                    sx={addSoftIconButtonSx(m, 32)}
+                  >
+                    <AddRoundedIcon sx={{ fontSize: 18 }} />
+                  </IconButton>
+                </Stack>
+                {childSubs.length === 0 ? (
+                  <Typography sx={{ fontSize: 12.5, color: alpha(m.navy, 0.5) }}>No subservices yet.</Typography>
+                ) : (
+                  childSubs.map((sub) => renderServiceDetailRow(sub))
+                )}
+              </Stack>
+            ) : null}
+          </Stack>
+        </Paper>
+      );
+    },
+    [
+      expandedMainServiceIds,
+      handleDeleteMainService,
+      handleEditMainService,
+      isBusinessSetupSaving,
+      m,
+      renderServiceDetailRow,
+      serviceModal,
+      toggleMainServiceExpand,
+    ],
   );
 
   const professionalForm = (
@@ -2054,9 +2554,10 @@ export default function ProfessionalFixedLocationSetup({
         <Divider sx={{ mb: 1.5, borderColor: alpha(m.navy, 0.10) }} />
         <Grid container spacing={1.5}>
           <Grid item xs={12}>
-            <MollureFormField
-              label="Legal Name*"
-              placeholder="e.g Jane"
+            <MollureLabeledField
+              fieldLabel="Legal Name"
+              labelPlacement="inCell"
+              placeholder="e.g. Jane"
               value={values.companyLegalName}
               onChange={(e) => {
                 setField("companyLegalName", e.target.value);
@@ -2065,22 +2566,29 @@ export default function ProfessionalFixedLocationSetup({
               disabled={professionalFieldsDisabled}
               error={Boolean(profileErrors.companyLegalName)}
               helperText={profileErrors.companyLegalName}
+              required
             />
           </Grid>
           <Grid item xs={12} md={6}>
-            <MollureFormField
-              label="COC number*"
+            <MollureLabeledField
+              fieldLabel="COC number"
+              labelPlacement="inCell"
+              placeholder="12345678"
               value={values.companyCocNumber}
               onChange={(e) => setField("companyCocNumber", e.target.value)}
               disabled={professionalFieldsDisabled}
+              required
             />
           </Grid>
           <Grid item xs={12} md={6}>
-            <MollureFormField
-              label="VAT number*"
+            <MollureLabeledField
+              fieldLabel="VAT number"
+              labelPlacement="inCell"
+              placeholder="NL123456789B01"
               value={values.companyVatNumber}
               onChange={(e) => setField("companyVatNumber", e.target.value)}
               disabled={professionalFieldsDisabled}
+              required
             />
           </Grid>
 
@@ -2089,74 +2597,83 @@ export default function ProfessionalFixedLocationSetup({
               Business Address
             </Typography>
           </Grid>
+          <Grid item xs={12}>
+            <MollureLabeledField
+              fieldLabel="Country"
+              labelPlacement="inCell"
+              value={PROFESSIONAL_COUNTRY}
+              disabled
+            />
+          </Grid>
           <Grid item xs={12} md={6}>
-            <MollureFormField
-              placeholder="Street"
+            <MollureLabeledField
+              fieldLabel="Street"
+              labelPlacement="inCell"
+              placeholder="e.g. Damrak"
               value={values.companyStreet}
               onChange={(e) => setField("companyStreet", e.target.value)}
               disabled={professionalFieldsDisabled}
             />
           </Grid>
           <Grid item xs={12} md={6}>
-            <MollureFormField
-              placeholder="Number"
+            <MollureLabeledField
+              fieldLabel="Number"
+              labelPlacement="inCell"
+              placeholder="e.g. 1"
               value={values.companyStreetNumber}
               onChange={(e) => setField("companyStreetNumber", e.target.value)}
               disabled={professionalFieldsDisabled}
             />
           </Grid>
-          <Grid item xs={12} md={4}>
-            <MollureFormField
-              placeholder="Postal Code"
+          <Grid item xs={12} md={6}>
+            <MollureLabeledField
+              fieldLabel="Postal Code"
+              labelPlacement="inCell"
+              placeholder="e.g. 1012 LG"
               value={values.companyPostalCode}
               onChange={(e) => setField("companyPostalCode", e.target.value)}
               disabled={professionalFieldsDisabled}
             />
           </Grid>
-          <Grid item xs={12} md={4}>
-            <MollureFormField
+          <Grid item xs={12} md={6}>
+            <MollureLabeledField
+              fieldLabel="Municipality"
+              labelPlacement="inCell"
               select
-              placeholder="Province"
-              value={values.companyProvince || "Province"}
-              onChange={(e) => setField("companyProvince", e.target.value)}
-              disabled={professionalFieldsDisabled}
-            >
-              {["Province", "North Holland", "South Holland"].map((o) => (
-                <MenuItem key={o} value={o}>
-                  {o}
-                </MenuItem>
-              ))}
-            </MollureFormField>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <MollureFormField
-              select
-              placeholder="Municipality"
-              value={values.companyMunicipality || "Municipality"}
+              value={values.companyMunicipality}
               onChange={(e) => setField("companyMunicipality", e.target.value)}
               disabled={professionalFieldsDisabled}
+              SelectProps={{ displayEmpty: true }}
             >
-              {["Municipality", "Amsterdam", "Rotterdam"].map((o) => (
-                <MenuItem key={o} value={o}>
-                  {o}
+              <MenuItem value="">
+                <em>Select Municipality</em>
+              </MenuItem>
+              {MUNICIPALITY_OPTIONS.map((option) => (
+                <MenuItem key={option} value={option}>
+                  {option}
                 </MenuItem>
               ))}
-            </MollureFormField>
+            </MollureLabeledField>
           </Grid>
           <Grid item xs={12}>
-            <MollureFormField
+            <MollureLabeledField
+              fieldLabel="Select Business Type"
+              labelPlacement="inCell"
               select
-              placeholder="Select Business Type"
-              value={values.companyBusinessType || "Select Business Type"}
+              value={values.companyBusinessType}
               onChange={(e) => setField("companyBusinessType", e.target.value)}
               disabled={professionalFieldsDisabled}
+              SelectProps={{ displayEmpty: true }}
             >
-              {["Select Business Type", "Salon Owner", "Freelancer"].map((o) => (
-                <MenuItem key={o} value={o}>
-                  {o}
+              <MenuItem value="">
+                <em>Select Business Type</em>
+              </MenuItem>
+              {BUSINESS_TYPE_OPTIONS.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
                 </MenuItem>
               ))}
-            </MollureFormField>
+            </MollureLabeledField>
           </Grid>
         </Grid>
       </Box>
@@ -2168,7 +2685,7 @@ export default function ProfessionalFixedLocationSetup({
         <Divider sx={{ mb: 1.5, borderColor: alpha(m.navy, 0.10) }} />
         <Grid container spacing={1.5}>
           <Grid item xs={12} md={4}>
-            <MollureFormField
+            <MollureTextField
               placeholder="Website"
               value={values.companyWebsite}
               onChange={(e) => setField("companyWebsite", e.target.value)}
@@ -2176,7 +2693,7 @@ export default function ProfessionalFixedLocationSetup({
             />
           </Grid>
           <Grid item xs={12} md={4}>
-            <MollureFormField
+            <MollureTextField
               placeholder="Instagram"
               value={values.socialInstagram}
               onChange={(e) => setField("socialInstagram", e.target.value)}
@@ -2184,7 +2701,7 @@ export default function ProfessionalFixedLocationSetup({
             />
           </Grid>
           <Grid item xs={12} md={4}>
-            <MollureFormField
+            <MollureTextField
               placeholder="Other"
               value={values.socialOther}
               onChange={(e) => setField("socialOther", e.target.value)}
@@ -2201,9 +2718,10 @@ export default function ProfessionalFixedLocationSetup({
         <Divider sx={{ mb: 1.5, borderColor: alpha(m.navy, 0.10) }} />
         <Grid container spacing={1.5}>
           <Grid item xs={12} md={6}>
-            <MollureFormField
-              label="First Name*"
-              placeholder="e.g Jane"
+            <MollureLabeledField
+              fieldLabel="First Name"
+              labelPlacement="inCell"
+              placeholder="e.g. Jane"
               value={values.contactFirstName}
               onChange={(e) => {
                 setField("contactFirstName", e.target.value);
@@ -2212,12 +2730,14 @@ export default function ProfessionalFixedLocationSetup({
               disabled={professionalFieldsDisabled}
               error={Boolean(profileErrors.contactFirstName)}
               helperText={profileErrors.contactFirstName}
+              required
             />
           </Grid>
           <Grid item xs={12} md={6}>
-            <MollureFormField
-              label="Last Name*"
-              placeholder="e.g Doe"
+            <MollureLabeledField
+              fieldLabel="Last Name"
+              labelPlacement="inCell"
+              placeholder="e.g. Doe"
               value={values.contactLastName}
               onChange={(e) => {
                 setField("contactLastName", e.target.value);
@@ -2226,32 +2746,38 @@ export default function ProfessionalFixedLocationSetup({
               disabled={professionalFieldsDisabled}
               error={Boolean(profileErrors.contactLastName)}
               helperText={profileErrors.contactLastName}
+              required
             />
           </Grid>
           <Grid item xs={12} md={6}>
-            <MollureFormField
-              label="Email*"
-              placeholder="Your@gmail.com"
+            <MollureLabeledField
+              fieldLabel="Email"
+              labelPlacement="inCell"
+              placeholder="you@gmail.com"
               value={values.contactEmail}
               inputProps={{ readOnly: true }}
               disabled={professionalFieldsDisabled}
               error={Boolean(profileErrors.contactEmail)}
               helperText={profileErrors.contactEmail}
+              required
             />
           </Grid>
           <Grid item xs={12} md={6}>
-            <MollureFormField
-              label="Phone number*"
+            <MollureLabeledField
+              fieldLabel="Phone number"
+              labelPlacement="inCell"
+              placeholder="Enter phone number"
               value={values.contactPhone}
               onChange={(e) => setField("contactPhone", e.target.value)}
               disabled={professionalFieldsDisabled}
+              required
             />
           </Grid>
           <Grid item xs={12} md={6}>
-            <MollureFormField
-              label="Password*"
-              type="password"
-              placeholder="Enter Password"
+            <MollureLabeledPasswordField
+              fieldLabel="Password"
+              labelPlacement="inCell"
+              placeholder="Enter password"
               value={values.contactPassword}
               onChange={(e) => {
                 setField("contactPassword", e.target.value);
@@ -2260,13 +2786,14 @@ export default function ProfessionalFixedLocationSetup({
               disabled={professionalFieldsDisabled}
               error={Boolean(profileErrors.contactPassword)}
               helperText={profileErrors.contactPassword}
+              required
             />
           </Grid>
           <Grid item xs={12} md={6}>
-            <MollureFormField
-              label="Repeat password*"
-              type="password"
-              placeholder="Confirm Password"
+            <MollureLabeledPasswordField
+              fieldLabel="Repeat password"
+              labelPlacement="inCell"
+              placeholder="Confirm password"
               value={values.contactRepeatPassword}
               onChange={(e) => {
                 setField("contactRepeatPassword", e.target.value);
@@ -2277,6 +2804,7 @@ export default function ProfessionalFixedLocationSetup({
               disabled={professionalFieldsDisabled}
               error={Boolean(profileErrors.contactRepeatPassword)}
               helperText={profileErrors.contactRepeatPassword}
+              required
             />
           </Grid>
         </Grid>
@@ -2351,103 +2879,116 @@ export default function ProfessionalFixedLocationSetup({
     [mediaSlides, onUploadBusinessMedia, showSnackbar],
   );
 
-  const serviceCategoryTabs = React.useMemo<
-    Array<{ id: string; label: string; iconId: ServiceCategorySliderIconId }>
-  >(
-    () => [
-      { id: "all", label: "All", iconId: "all" },
-      ...businessCategories.map((category) => ({
-        id: String(category.id),
-        label: category.title,
-        iconId: resolveServiceCategorySliderIconId(category.title),
-      })),
-    ],
-    [businessCategories],
-  );
-
-  const groupedAllServiceSections = React.useMemo(() => {
-    const by = new Map<string, ServiceDetailUiItem[]>();
-    for (const s of activeServices) {
-      const key = String(s.categoryId ?? "").trim();
-      if (!key) continue;
-      const list = by.get(key) ?? [];
-      list.push(s);
-      by.set(key, list);
-    }
-
-    const titleFor = (categoryId: string, items: ServiceDetailUiItem[]) =>
+  const resolveServiceCategoryTitle = React.useCallback(
+    (categoryId: string) =>
       businessCategories.find((c) => String(c.id) === categoryId)?.title ??
       serviceCategoryTabs.find((t) => t.id === categoryId)?.label ??
-      items[0]?.categoryTitle ??
-      `Category ${categoryId}`;
+      `Category ${categoryId}`,
+    [businessCategories, serviceCategoryTabs],
+  );
 
-    const sections: Array<{ categoryId: string; title: string; items: ServiceDetailUiItem[] }> = [];
+  const getExplicitMainsForCategory = React.useCallback(
+    (categoryId: string) =>
+      activeMainServices.filter(
+        (main) =>
+          !isHydratedMainServiceId(main.id) &&
+          serviceMatchesCategoryTab(
+            { categoryId: main.categoryId, categoryTitle: resolveServiceCategoryTitle(String(main.categoryId)) },
+            categoryId,
+            serviceCategoryTabs,
+            businessCategories,
+          ),
+      ),
+    [activeMainServices, businessCategories, resolveServiceCategoryTitle, serviceCategoryTabs],
+  );
+
+  const getSubservicesForCategory = React.useCallback(
+    (categoryId: string) =>
+      activeServices.filter((service) =>
+        serviceMatchesCategoryTab(
+          {
+            categoryId: service.categoryId,
+            categoryTitle: service.categoryTitle ?? resolveServiceCategoryTitle(String(service.categoryId)),
+          },
+          categoryId,
+          serviceCategoryTabs,
+          businessCategories,
+        ),
+      ),
+    [activeServices, businessCategories, resolveServiceCategoryTitle, serviceCategoryTabs],
+  );
+
+  const getFlatSubservicesForCategory = React.useCallback(
+    (categoryId: string) => {
+      const explicitMains = getExplicitMainsForCategory(categoryId);
+      const explicitMainIds = new Set(explicitMains.map((main) => main.id));
+
+      return getSubservicesForCategory(categoryId).filter((service) => {
+        const parentId = String(service.parentServiceId ?? "").trim();
+        if (!parentId || isHydratedMainServiceId(parentId)) return true;
+        return !explicitMainIds.has(parentId);
+      });
+    },
+    [getExplicitMainsForCategory, getSubservicesForCategory],
+  );
+
+  const groupedServiceSections = React.useMemo(() => {
+    const sections: Array<{
+      categoryId: string;
+      title: string;
+      explicitMains: BusinessMainServiceUi[];
+      subs: ServiceDetailUiItem[];
+    }> = [];
     const seen = new Set<string>();
 
-    for (const t of serviceCategoryTabs) {
-      if (t.id === "all") continue;
-      const items = by.get(t.id);
-      if (!items?.length) continue;
-      sections.push({ categoryId: t.id, title: titleFor(t.id, items), items });
-      seen.add(t.id);
+    const appendSection = (categoryId: string) => {
+      if (!categoryId || seen.has(categoryId)) return;
+      const explicitMains = getExplicitMainsForCategory(categoryId);
+      const subs = getFlatSubservicesForCategory(categoryId);
+      if (explicitMains.length === 0 && subs.length === 0) return;
+      sections.push({
+        categoryId,
+        title: resolveServiceCategoryTitle(categoryId),
+        explicitMains,
+        subs,
+      });
+      seen.add(categoryId);
+    };
+
+    for (const tab of serviceCategoryTabs) {
+      if (tab.id === "all") continue;
+      appendSection(tab.id);
     }
 
-    for (const [categoryId, items] of by.entries()) {
-      if (seen.has(categoryId) || !items.length) continue;
-      sections.push({ categoryId, title: titleFor(categoryId, items), items });
-      seen.add(categoryId);
+    for (const service of activeServices) {
+      appendSection(String(service.categoryId ?? "").trim());
+    }
+
+    for (const main of activeMainServices) {
+      if (isHydratedMainServiceId(main.id)) continue;
+      appendSection(String(main.categoryId ?? "").trim());
     }
 
     return sections;
-  }, [activeServices, businessCategories, serviceCategoryTabs]);
+  }, [
+    activeMainServices,
+    activeServices,
+    getExplicitMainsForCategory,
+    getFlatSubservicesForCategory,
+    resolveServiceCategoryTitle,
+    serviceCategoryTabs,
+  ]);
 
-  const activeCategoryServices = React.useMemo(
-    () =>
-      activeServices.filter((it) => String(it.categoryId ?? "").trim() === String(activeServiceCategory ?? "").trim()),
-    [activeServiceCategory, activeServices],
+  const activeCategoryExplicitMains = React.useMemo(
+    () => getExplicitMainsForCategory(activeServiceCategory),
+    [activeServiceCategory, getExplicitMainsForCategory],
   );
 
-  const serviceCategoryTabsScrollRef = React.useRef<HTMLDivElement | null>(null);
-  const activeServiceCategoryTabRef = React.useRef<HTMLButtonElement | null>(null);
-  const [tabScrollState, setTabScrollState] = React.useState({ canLeft: false, canRight: false });
-
-  const updateTabScrollState = React.useCallback(() => {
-    const el = serviceCategoryTabsScrollRef.current;
-    if (!el) return;
-    const { scrollLeft, scrollWidth, clientWidth } = el;
-    setTabScrollState({
-      canLeft: scrollLeft > 2,
-      canRight: scrollLeft + clientWidth < scrollWidth - 2,
-    });
-  }, []);
-
-  React.useEffect(() => {
-    updateTabScrollState();
-    const el = serviceCategoryTabsScrollRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(() => updateTabScrollState());
-    ro.observe(el);
-    el.addEventListener("scroll", updateTabScrollState, { passive: true });
-    return () => {
-      ro.disconnect();
-      el.removeEventListener("scroll", updateTabScrollState);
-    };
-  }, [updateTabScrollState, serviceCategoryTabs.length, activeServices.length]);
-
-  React.useLayoutEffect(() => {
-    activeServiceCategoryTabRef.current?.scrollIntoView({ behavior: "smooth", inline: "nearest", block: "nearest" });
-    updateTabScrollState();
-  }, [activeServiceCategory, updateTabScrollState]);
-
-  const scrollServiceCategoryTabs = React.useCallback(
-    (delta: number) => {
-      const el = serviceCategoryTabsScrollRef.current;
-      if (!el) return;
-      el.scrollBy({ left: delta, behavior: "smooth" });
-      window.setTimeout(() => updateTabScrollState(), 320);
-    },
-    [updateTabScrollState],
+  const activeCategoryFlatSubservices = React.useMemo(
+    () => getFlatSubservicesForCategory(activeServiceCategory),
+    [activeServiceCategory, getFlatSubservicesForCategory],
   );
+
 
   const bookingCategoryOptions = React.useMemo(
     () =>
@@ -2477,25 +3018,53 @@ export default function ProfessionalFixedLocationSetup({
   );
 
   const bookingServiceOptions = React.useMemo(
-    () => getBookingServiceOptions(biz.bookCategory),
-    [biz.bookCategory, getBookingServiceOptions],
+    () => getBookingServiceOptions(fixedBiz.bookCategory),
+    [fixedBiz.bookCategory, getBookingServiceOptions],
+  );
+
+  const resolveBookingComboLabels = React.useCallback(
+    (categoryId: string, serviceId: string) => {
+      const categoryLabel =
+        bookingCategoryOptions.find((option) => option.value === categoryId)?.label ?? "Category";
+      const serviceLabel =
+        getBookingServiceOptions(categoryId).find((option) => option.value === serviceId)?.label ?? "Service";
+      return { categoryLabel, serviceLabel };
+    },
+    [bookingCategoryOptions, getBookingServiceOptions],
   );
 
   const addBookingCombo = React.useCallback(() => {
-    const categoryId = biz.bookCategory || bookingCategoryOptions[0]?.value || "";
+    const categoryId = fixedBiz.bookCategory || bookingCategoryOptions[0]?.value || "";
     const serviceOptions = getBookingServiceOptions(categoryId);
-    const serviceId = biz.bookService || serviceOptions[0]?.value || "";
+    const serviceId = fixedBiz.bookService || serviceOptions[0]?.value || "";
     if (!categoryId || !serviceId) return;
 
+    const alreadyExists = fixedBiz.bookCombos.some(
+      (combo) => combo.categoryId === categoryId && combo.serviceId === serviceId,
+    );
+    if (alreadyExists) {
+      showSnackbar({ severity: "info", message: "This service combination is already added." });
+      return;
+    }
+
     const id = `combo-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    setBizField("bookCombos", [...biz.bookCombos, { id, categoryId, serviceId }]);
-  }, [biz.bookCategory, biz.bookCombos, biz.bookService, bookingCategoryOptions, getBookingServiceOptions, setBizField]);
+    setBookingComboEditId(null);
+    setFixedBizField("bookCombos", [...fixedBiz.bookCombos, { id, categoryId, serviceId }]);
+  }, [
+    fixedBiz.bookCategory,
+    fixedBiz.bookCombos,
+    fixedBiz.bookService,
+    bookingCategoryOptions,
+    getBookingServiceOptions,
+    setFixedBizField,
+    showSnackbar,
+  ]);
 
   const updateBookingCombo = React.useCallback(
     (id: string, patch: Partial<{ categoryId: string; serviceId: string }>) => {
-      setBizField(
+      setFixedBizField(
         "bookCombos",
-        biz.bookCombos.map((combo) => {
+        fixedBiz.bookCombos.map((combo) => {
           if (combo.id !== id) return combo;
 
           const next = { ...combo, ...patch };
@@ -2510,18 +3079,18 @@ export default function ProfessionalFixedLocationSetup({
         }),
       );
     },
-    [biz.bookCombos, getBookingServiceOptions, setBizField],
+    [fixedBiz.bookCombos, getBookingServiceOptions, setFixedBizField],
   );
 
   const deleteBookingCombo = React.useCallback(
     (id: string) => {
       setBookingComboEditId((prev) => (prev === id ? null : prev));
-      setBizField(
+      setFixedBizField(
         "bookCombos",
-        biz.bookCombos.filter((c) => c.id !== id),
+        fixedBiz.bookCombos.filter((c) => c.id !== id),
       );
     },
-    [biz.bookCombos, setBizField],
+    [fixedBiz.bookCombos, setFixedBizField],
   );
   const goPrevMedia = React.useCallback(() => {
     setMediaIdx((i) => (i - 1 + mediaSlides.length) % mediaSlides.length);
@@ -2535,8 +3104,8 @@ export default function ProfessionalFixedLocationSetup({
       <Stack spacing={2.1}>
         {professionalForm}
 
-        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ mt: 0.5 }}>
-          {isProfessionalEditing ? (
+        {isProfessionalEditing ? (
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ mt: 0.5 }}>
             <Button
               fullWidth
               variant="outlined"
@@ -2554,12 +3123,11 @@ export default function ProfessionalFixedLocationSetup({
             >
               Cancel
             </Button>
-          ) : null}
-          <Button
-            fullWidth
-            variant="contained"
-            disableElevation
-            onClick={async () => {
+            <Button
+              fullWidth
+              variant="contained"
+              disableElevation
+              onClick={async () => {
               if (!onSaveProfessionalProfile) {
                 setIsProfessionalEditing(false);
                 return;
@@ -2596,7 +3164,6 @@ export default function ProfessionalFixedLocationSetup({
                 street: values.companyStreet,
                 street_number: values.companyStreetNumber,
                 postal_code: values.companyPostalCode,
-                province: values.companyProvince,
                 municipality: values.companyMunicipality,
                 business_type: values.companyBusinessType,
                 website: values.companyWebsite,
@@ -2637,463 +3204,107 @@ export default function ProfessionalFixedLocationSetup({
               setProfileErrors({});
               setIsProfessionalEditing(false);
             }}
-            disabled={!isProfessionalEditing || !isProfessionalDirty || isProfileSaving}
-            sx={{
-              borderRadius: "6px",
-              textTransform: "none",
-              fontWeight: 900,
-              bgcolor: m.teal,
-              color: "#fff",
-              "&:hover": { bgcolor: m.tealDark },
-              minHeight: 44,
-            }}
-          >
-            {isProfileSaving ? <CircularProgress size={20} color="inherit" /> : "Update"}
-          </Button>
-        </Stack>
+              disabled={!isProfessionalDirty || isProfileSaving}
+              sx={{
+                borderRadius: "6px",
+                textTransform: "none",
+                fontWeight: 900,
+                bgcolor: m.teal,
+                color: "#fff",
+                "&:hover": { bgcolor: m.tealDark },
+                minHeight: 44,
+              }}
+            >
+              {isProfileSaving ? <CircularProgress size={20} color="inherit" /> : "Update"}
+            </Button>
+          </Stack>
+        ) : null}
       </Stack>
     </Box>
   );
 
-  const visibleTeamDrawerSlots = React.useMemo(
-    () => getVisibleTeamServiceSlotKeys(draftServices),
-    [draftServices],
+  const teamMemberFormModal = (
+    <BusinessTeamMemberFormModal
+      open={teamMemberModal.open}
+      title={teamMemberModal.modalTitle}
+      draft={teamMemberModal.draft}
+      submitLabel={teamMemberModal.submitLabel}
+      disabled={manageTeamDisabled}
+      canSubmit={teamMemberModal.canSubmit}
+      businessCategories={businessCategories}
+      serviceContext={teamMemberModal.serviceContext}
+      photoInputRef={teamMemberModal.photoInputRef}
+      onClose={teamMemberModal.closeModal}
+      onSubmit={() => void teamMemberModal.saveModal()}
+      onChange={teamMemberModal.updateDraft}
+      onPickService={teamMemberModal.pickService}
+      onRemoveServiceGroup={teamMemberModal.removeServiceGroup}
+      onChoosePhoto={teamMemberModal.choosePhoto}
+      onPhotoSelected={teamMemberModal.onPhotoSelected}
+    />
   );
 
-  const teamDrawer = (
-    <Drawer
-      anchor="right"
-      open={teamDrawerOpen}
-      onClose={closeTeamDrawer}
-      PaperProps={{
-        sx: {
-          width: { xs: "100%", sm: 460 },
-          p: 2.5,
-          borderTopLeftRadius: { sm: 12 },
-          borderBottomLeftRadius: { sm: 12 },
-        },
+  const serviceFormModal = (
+    <BusinessServiceFormModal
+      open={serviceModal.open}
+      mode={serviceModal.mode}
+      title={serviceModal.modalTitle}
+      draft={serviceModal.draft}
+      submitLabel={serviceModal.submitLabel}
+      disabled={isBusinessSetupSaving || serviceModal.isSaving}
+      canSubmit={serviceModal.canSubmit}
+      onClose={serviceModal.closeModal}
+      onSubmit={() => {
+        ensureServicesDetailsEditing();
+        void serviceModal.saveModal();
       }}
-    >
-      <Stack spacing={2.25} sx={{ height: "100%", overflowY: "auto" }}>
-        <Stack spacing={0.75}>
-          <Typography sx={{ fontWeight: 900, fontSize: 18, color: alpha(m.navy, 0.9), letterSpacing: "-0.02em" }}>
-            {editingMemberId ? "Edit team member" : "Add team member"}
-          </Typography>
-          <Typography sx={{ fontSize: 13, fontWeight: 500, color: alpha(m.navy, 0.52), lineHeight: 1.45 }}>
-            {editingMemberId
-              ? "Update their profile, photo, and assigned services."
-              : "Add their name and role, then assign one or more services."}
-          </Typography>
-        </Stack>
-
-        <Stack spacing={1.75}>
-          <MollureFormField
-            label="Full name"
-            placeholder="e.g. Craig Martha"
-            value={draftTeamName}
-            onChange={(e) => setDraftTeamName(e.target.value)}
-            sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" } }}
-          />
-          <MollureFormField
-            label="Role"
-            placeholder="e.g. Stylist"
-            value={draftTeamRole}
-            onChange={(e) => setDraftTeamRole(e.target.value)}
-            sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" } }}
-          />
-        </Stack>
-
-        <Box
-          sx={{
-            borderRadius: "10px",
-            border: `1px solid ${alpha(m.navy, 0.08)}`,
-            bgcolor: alpha(m.navy, 0.03),
-            p: 2,
-          }}
-        >
-          <Typography sx={{ fontWeight: 800, fontSize: 13, color: alpha(m.navy, 0.78), mb: 1.5 }}>
-            Profile photo
-          </Typography>
-          <Stack direction="row" spacing={1.5} alignItems="center">
-            <Box
-              sx={{
-                width: 64,
-                height: 64,
-                borderRadius: "999px",
-                overflow: "hidden",
-                bgcolor: "#fff",
-                border: `1px solid ${alpha(m.navy, 0.10)}`,
-                flex: "0 0 auto",
-                boxShadow: `0 4px 14px ${alpha(m.navy, 0.06)}`,
-              }}
-            >
-              <Image
-                src={draftPhotoSrc}
-                alt="Team member photo"
-                width={64}
-                height={64}
-                unoptimized
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-              />
-            </Box>
-            <Stack spacing={0.75} sx={{ minWidth: 0 }}>
-              <Button
-                onClick={onChooseTeamPhoto}
-                variant="outlined"
-                sx={{
-                  alignSelf: "flex-start",
-                  borderRadius: "8px",
-                  textTransform: "none",
-                  fontWeight: 800,
-                  borderColor: alpha(m.navy, 0.14),
-                  color: alpha(m.navy, 0.78),
-                  bgcolor: "#fff",
-                }}
-              >
-                Upload photo
-              </Button>
-              <Typography sx={{ fontSize: 11, fontWeight: 500, color: alpha(m.navy, 0.45) }}>
-                JPG, JPEG, PNG, or WebP (max 5 MB).
-              </Typography>
-            </Stack>
-            <input ref={teamPhotoInputRef} type="file" accept={PROFILE_IMAGE_FILE_ACCEPT} hidden onChange={onTeamPhotoSelected} />
-          </Stack>
-        </Box>
-
-        <Box
-          sx={{
-            borderRadius: "10px",
-            border: `1px solid ${alpha(m.navy, 0.08)}`,
-            bgcolor: alpha(m.navy, 0.03),
-            p: 2,
-          }}
-        >
-          <Typography sx={{ fontWeight: 800, fontSize: 13, color: alpha(m.navy, 0.78), mb: 0.5 }}>
-            Assigned services
-          </Typography>
-          <Typography sx={{ fontSize: 11, fontWeight: 500, color: alpha(m.navy, 0.45), mb: 1.5 }}>
-            Only the fields you need are shown. Pick a service to reveal the next slot (up to seven).
-          </Typography>
-          <Grid container spacing={1.5}>
-            {visibleTeamDrawerSlots.map((key) => {
-              const n = TEAM_SERVICE_SLOT_KEYS.indexOf(key) + 1;
-              return (
-                <Grid key={key} item xs={12} sm={6}>
-                  <MollureFormField
-                    select
-                    label={`Service ${n}`}
-                    value={draftServices[key]}
-                    onChange={(e) => setDraftServices((p) => ({ ...p, [key]: e.target.value }))}
-                    sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" } }}
-                  >
-                    <MenuItem value="">
-                      <Typography sx={{ color: alpha(m.navy, 0.45) }}>Select service</Typography>
-                    </MenuItem>
-                    {allSubcategoryOptions.map((option) => (
-                      <MenuItem key={option.value} value={option.value}>
-                        {option.label}
-                      </MenuItem>
-                    ))}
-                  </MollureFormField>
-                </Grid>
-              );
-            })}
-          </Grid>
-        </Box>
-
-        <Box sx={{ flex: 1, minHeight: 8 }} />
-        <Stack direction="row" spacing={1} justifyContent="flex-end" flexWrap="wrap">
-          <Button
-            onClick={closeTeamDrawer}
-            variant="outlined"
-            sx={{
-              borderRadius: "8px",
-              textTransform: "none",
-              fontWeight: 700,
-              borderColor: alpha(m.navy, 0.14),
-              color: alpha(m.navy, 0.72),
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={saveTeamMember}
-            variant="contained"
-            disableElevation
-            disabled={!draftTeamName.trim()}
-            sx={{
-              borderRadius: "8px",
-              textTransform: "none",
-              fontWeight: 800,
-              bgcolor: "primary.main",
-              "&:hover": { bgcolor: "mollure.tealDark" },
-            }}
-          >
-            Save
-          </Button>
-        </Stack>
-      </Stack>
-    </Drawer>
+      onChange={serviceModal.updateDraft}
+    />
   );
 
-  const serviceDrawerFormDisabled = businessFormDisabled;
-
-  const serviceDrawer = (
-    <Drawer
-      anchor="right"
-      open={serviceDrawerOpen}
-      onClose={closeServiceDrawer}
-      PaperProps={{
-        sx: {
-          width: { xs: "100%", sm: 460 },
-          p: 2.5,
-          borderTopLeftRadius: { sm: 12 },
-          borderBottomLeftRadius: { sm: 12 },
-        },
-      }}
-    >
-      <Stack spacing={2.25} sx={{ height: "100%", overflowY: "auto" }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-          <Typography sx={{ fontWeight: 900, fontSize: 18, color: alpha(m.navy, 0.9), letterSpacing: "-0.02em" }}>
-            {editingServiceId ? "Edit Service" : "Add service"}
-          </Typography>
-        </Stack>
-
-        <Stack spacing={2}>
-          {!editingServiceId ? (
-            <>
-              <MollureFormField
-                select
-                disabled={serviceDrawerFormDisabled}
-                label="Category"
-                value={draftServiceCategory}
-                onChange={(e) => {
-                  setDraftServiceCategory(String(e.target.value));
-                  setDraftServiceId("");
-                  setDraftServiceName("");
-                }}
-              >
-                {businessCategories.map((category) => (
-                  <MenuItem key={category.id} value={String(category.id)}>
-                    {category.title}
-                  </MenuItem>
-                ))}
-              </MollureFormField>
-              <MollureFormField
-                select
-                disabled={serviceDrawerFormDisabled}
-                label="Service"
-                value={draftServiceId}
-                onChange={(e) => {
-                  const sid = Number(e.target.value);
-                  setDraftServiceId(sid);
-                  const cat = businessCategories.find((c) => String(c.id) === draftServiceCategory);
-                  const sub = cat?.subcategories.find((s) => s.id === sid);
-                  if (sub) setDraftServiceName(sub.title);
-                }}
-              >
-                {(businessCategories.find((category) => String(category.id) === draftServiceCategory)?.subcategories ?? []).map(
-                  (subcategory) => (
-                    <MenuItem key={subcategory.id} value={subcategory.id}>
-                      {subcategory.title}
-                    </MenuItem>
-                  ),
-                )}
-              </MollureFormField>
-            </>
-          ) : null}
-
-          <MollureFormField
-            disabled={serviceDrawerFormDisabled}
-            label="Service name"
-            placeholder="Service name"
-            value={draftServiceName}
-            onChange={(e) => setDraftServiceName(e.target.value)}
-          />
-
-          <MollureFormField
-            disabled={serviceDrawerFormDisabled}
-            label="Duration"
-            placeholder="e.g. 45 min"
-            value={draftServiceDuration}
-            onChange={(e) => setDraftServiceDuration(e.target.value)}
-          />
-
-          <Box>
-            <Typography
-              component="span"
-              sx={{
-                fontSize: "0.75rem",
-                fontWeight: 500,
-                color: alpha(m.navy, 0.62),
-                mb: 0.75,
-                display: "block",
-              }}
-            >
-              Price
-            </Typography>
-            <Stack direction="row" spacing={1} alignItems="flex-start">
-              <MollureFormField
-                select
-                disabled={serviceDrawerFormDisabled}
-                value={draftServicePriceType}
-                onChange={(e) => {
-                  const v = String(e.target.value);
-                  setDraftServicePriceType(v);
-                }}
-                sx={{ flex: "0 0 42%", minWidth: 0 }}
-                inputProps={{ "aria-label": "Price type" }}
-              >
-                {SERVICE_DRAWER_PRICE_TYPES.map((opt) => (
-                  <MenuItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </MenuItem>
-                ))}
-              </MollureFormField>
-              <MollureFormField
-                disabled={serviceDrawerFormDisabled}
-                placeholder="0"
-                value={draftServicePriceAmount}
-                onChange={(e) => setDraftServicePriceAmount(e.target.value.replace(/[^\d.,]/g, ""))}
-                sx={{ flex: 1, minWidth: 0 }}
-                inputProps={{ "aria-label": "Price amount" }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Typography sx={{ fontSize: 14, fontWeight: 600, color: alpha(m.navy, 0.55) }}>€</Typography>
-                    </InputAdornment>
-                  ),
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <Typography sx={{ fontSize: 11, fontWeight: 600, color: alpha(m.navy, 0.5) }}>EUR</Typography>
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Stack>
-          </Box>
-
-          <Box
-            sx={{
-              borderRadius: "10px",
-              bgcolor: alpha(m.navy, 0.045),
-              border: `1px solid ${alpha(m.navy, 0.08)}`,
-              p: 2,
-            }}
-          >
-            <Typography sx={{ fontWeight: 700, fontSize: 14, color: alpha(m.navy, 0.88), mb: 1.75 }}>
-              Add Discount (Optional)
-            </Typography>
-            <Stack spacing={1.5}>
-              <MollureFormField
-                select
-                disabled={serviceDrawerFormDisabled}
-                label="Discount type"
-                value={draftServiceDiscountType}
-                onChange={(e) => setDraftServiceDiscountType(String(e.target.value))}
-              >
-                {SERVICE_DRAWER_DISCOUNT_TYPES.map((opt) => (
-                  <MenuItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </MenuItem>
-                ))}
-              </MollureFormField>
-              <MollureFormField
-                disabled={serviceDrawerFormDisabled}
-                label="Discount amount"
-                placeholder="0"
-                value={draftServiceDiscountAmount}
-                onChange={(e) => {
-                  const raw = e.target.value;
-                  if (draftServiceDiscountType === "percent") {
-                    const v = raw.replace(/[^\d.]/g, "");
-                    const dot = v.indexOf(".");
-                    if (dot === -1) setDraftServiceDiscountAmount(v);
-                    else setDraftServiceDiscountAmount(v.slice(0, dot + 1) + v.slice(dot + 1).replace(/\./g, ""));
-                  } else {
-                    setDraftServiceDiscountAmount(raw.replace(/[^\d.,]/g, ""));
-                  }
-                }}
-                InputProps={
-                  draftServiceDiscountType === "percent"
-                    ? {
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <Typography sx={{ fontSize: 11, fontWeight: 600, color: alpha(m.navy, 0.5) }}>%</Typography>
-                          </InputAdornment>
-                        ),
-                      }
-                    : {
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <Typography sx={{ fontSize: 14, fontWeight: 600, color: alpha(m.navy, 0.55) }}>€</Typography>
-                          </InputAdornment>
-                        ),
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <Typography sx={{ fontSize: 11, fontWeight: 600, color: alpha(m.navy, 0.5) }}>EUR</Typography>
-                          </InputAdornment>
-                        ),
-                      }
-                }
-              />
-            </Stack>
-          </Box>
-        </Stack>
-
-        <Box sx={{ flex: 1, minHeight: 8 }} />
-        <Stack direction="row" spacing={1} justifyContent="flex-end" flexWrap="wrap">
-          <Button
-            onClick={closeServiceDrawer}
-            variant="outlined"
-            sx={{
-              borderRadius: "8px",
-              textTransform: "none",
-              fontWeight: 700,
-              borderColor: alpha(m.navy, 0.14),
-              color: alpha(m.navy, 0.72),
-            }}
-          >
-            Cancel
-          </Button>
-          {editingServiceId ? (
-            serviceDrawerDirty ? (
-              <Button
-                onClick={saveService}
-                variant="contained"
-                disableElevation
-                disabled={!draftServiceCategory || !draftServiceId}
-                sx={{
-                  borderRadius: "8px",
-                  textTransform: "none",
-                  fontWeight: 800,
-                  bgcolor: "primary.main",
-                  "&:hover": { bgcolor: "mollure.tealDark" },
-                }}
-              >
-                Save
-              </Button>
-            ) : null
-          ) : (
-            <Button
-              onClick={saveService}
-              variant="contained"
-              disableElevation
-              disabled={!draftServiceCategory || !draftServiceId}
-              sx={{
-                borderRadius: "8px",
-                textTransform: "none",
-                fontWeight: 800,
-                bgcolor: "primary.main",
-                "&:hover": { bgcolor: "mollure.tealDark" },
-              }}
-            >
-              Save
-            </Button>
-          )}
-        </Stack>
-      </Stack>
-    </Drawer>
+  const renderSectionEditAction = (
+    sectionId: BusinessSetupSectionId,
+    extra?: React.ReactNode,
+  ) => (
+    <Stack direction="row" spacing={1} alignItems="center">
+      {extra}
+      {isBusinessSectionEditing(sectionId) ? (
+        <Button
+          variant="contained"
+          disableElevation
+          onClick={() => void saveBusinessSection(sectionId)}
+          disabled={isBusinessSetupSaving}
+          sx={{
+            borderRadius: "6px",
+            textTransform: "none",
+            fontWeight: 700,
+            fontSize: 12,
+            minHeight: 30,
+            px: 2,
+            bgcolor: "primary.main",
+            "&:hover": { bgcolor: "mollure.tealDark" },
+          }}
+        >
+          {isBusinessSetupSaving ? "Saving..." : "Save"}
+        </Button>
+      ) : (
+        <IconButton
+          size="small"
+          onClick={() => startBusinessSectionEdit(sectionId)}
+          disabled={isBusinessSetupSaving}
+          aria-label="Edit section"
+          sx={{
+            width: 28,
+            height: 28,
+            borderRadius: "999px",
+            bgcolor: alpha(m.navy, 0.06),
+            "&:hover": { bgcolor: alpha(m.navy, 0.09) },
+          }}
+        >
+          <EditRoundedIcon sx={{ fontSize: 15, color: alpha(m.navy, 0.55) }} />
+        </IconButton>
+      )}
+    </Stack>
   );
 
   const businessSetupContent = (
@@ -3117,34 +3328,144 @@ export default function ProfessionalFixedLocationSetup({
           <Typography sx={{ fontSize: 11, fontWeight: 600, color: theme.palette.text.secondary, mb: 0.75 }}>
             {data.offeringLabel}
           </Typography>
-          <MollureFormField
-            select
-            value={businessOfferingSelect}
-            onChange={(e) => {
-              const v = String(e.target.value) as OfferingSelectOption;
-              setBusinessOfferingSelect(v);
-              if (v !== "Both") onSwitchActiveBusinessTemplate(v);
-              else onSwitchActiveBusinessTemplate("Fixed Location");
-              setIsBusinessPublishEnabled(true);
-            }}
-            disabled={businessFormDisabled}
-            sx={{
-              "& .MuiOutlinedInput-root": {
-                bgcolor: "#fff",
-              },
-            }}
-            SelectProps={{
-              renderValue: (selected) => {
-                return String(selected);
-              },
-            }}
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1.5}
+            alignItems={{ xs: "stretch", sm: "center" }}
+            sx={{ width: "100%" }}
           >
-            {offeringSelectOptions.map((opt) => (
-              <MenuItem key={opt} value={opt}>
-                {opt}
-              </MenuItem>
-            ))}
-          </MollureFormField>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <MollureFormField
+                select
+                value={businessOfferingSelect}
+                onChange={(e) => {
+                  const v = String(e.target.value) as OfferingSelectOption;
+                  setBusinessOfferingSelect(v);
+                  if (v !== "Both") {
+                    setUseSameInfoForBothTemplates(false);
+                    onSwitchActiveBusinessTemplate(v);
+                  } else {
+                    onSwitchActiveBusinessTemplate("Fixed Location");
+                  }
+                  setIsBusinessPublishEnabled(true);
+                }}
+                disabled={businessFormDisabled}
+                sx={{
+                  "& .MuiOutlinedInput-root": {
+                    bgcolor: "#fff",
+                  },
+                }}
+                SelectProps={{
+                  renderValue: (selected) => {
+                    if (selected === "Both") return "Fixed and Desired location";
+                    return String(selected);
+                  },
+                }}
+              >
+                {offeringSelectOptions.map((opt) => (
+                  <MenuItem key={opt} value={opt}>
+                    {opt === "Both" ? "Fixed and Desired location" : opt}
+                  </MenuItem>
+                ))}
+              </MollureFormField>
+            </Box>
+
+            {isBothOffering ? (
+              <FormControlLabel
+                sx={{ m: 0, flexShrink: 0, alignItems: "center" }}
+                control={
+                  <Checkbox
+                    checked={useSameInfoForBothTemplates}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUseSameInfoForBothTemplates(checked);
+                      setIsBusinessPublishEnabled(true);
+                      if (checked) {
+                        syncOtherTemplateFromSource(
+                          activeBusinessTemplate === "Fixed Location"
+                            ? getCurrentBusinessState()
+                            : desiredBusiness,
+                          activeBusinessTemplate,
+                        );
+                      }
+                    }}
+                    disabled={businessFormDisabled}
+                    sx={{
+                      color: alpha(m.navy, 0.28),
+                      "&.Mui-checked": { color: "primary.main" },
+                    }}
+                  />
+                }
+                label={
+                  <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: alpha(m.navy, 0.72), lineHeight: 1.35 }}>
+                    Use same information for both templates
+                  </Typography>
+                }
+              />
+            ) : null}
+          </Stack>
+
+          {isBothOffering ? (
+            <Box
+              sx={{
+                mt: 1.25,
+                p: 0.5,
+                borderRadius: "12px",
+                bgcolor: alpha(m.navy, 0.06),
+                display: "flex",
+                gap: 0.5,
+                width: "100%",
+              }}
+            >
+              {visibleLocationCards.map((opt) => {
+                const isActive = activeBusinessTemplate === opt;
+
+                return (
+                  <Box
+                    key={opt}
+                    component="button"
+                    type="button"
+                    onClick={() => onSwitchActiveBusinessTemplate(opt)}
+                    disabled={businessFormDisabled}
+                    sx={{
+                      flex: 1,
+                      minWidth: 0,
+                      minHeight: 40,
+                      px: 2,
+                      py: 0.85,
+                      borderRadius: "10px",
+                      border: "none",
+                      bgcolor: isActive ? alpha(m.navy, 0.1) : "#fff",
+                      boxShadow: isActive ? "none" : "0 1px 2px rgba(16, 35, 63, 0.06)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      transition: "background-color 0.18s ease, box-shadow 0.18s ease",
+                      outline: "none",
+                      font: "inherit",
+                      "&:hover": {
+                        bgcolor: isActive ? alpha(m.navy, 0.12) : alpha(m.navy, 0.02),
+                      },
+                      "&:focus-visible": { boxShadow: `0 0 0 3px ${alpha(m.teal, 0.22)}` },
+                    }}
+                  >
+                    <Typography
+                      sx={{
+                        fontSize: 14,
+                        fontWeight: 700,
+                        color: isActive ? alpha(m.navy, 0.88) : alpha(m.navy, 0.55),
+                        lineHeight: 1.2,
+                        textAlign: "center",
+                      }}
+                    >
+                      {opt}
+                    </Typography>
+                  </Box>
+                );
+              })}
+            </Box>
+          ) : null}
         </Box>
         <Button
           variant="contained"
@@ -3167,51 +3488,211 @@ export default function ProfessionalFixedLocationSetup({
         </Button>
       </Stack>
 
-      <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
-        <Box
+      {!isBusinessProfileActive ? (
+        <Paper
+          elevation={0}
           sx={{
-            display: "inline-flex",
-            p: 0.4,
             borderRadius: "10px",
-            border: `1px solid ${alpha(m.navy, 0.10)}`,
-            bgcolor: "#fff",
-            gap: 0.4,
+            bgcolor: alpha("#E53935", 0.06),
+            border: `1px solid ${alpha("#E53935", 0.18)}`,
+            px: 2,
+            py: 1.35,
+            display: "flex",
+            alignItems: "center",
+            gap: 1.5,
+            flexWrap: "wrap",
           }}
         >
-          {templateOptions.map((opt) => {
-            const selected = businessOffering.includes(opt);
-            const active = activeBusinessTemplate === opt;
-            return (
-              <Button
-                key={opt}
-                onClick={() => onSwitchActiveBusinessTemplate(opt)}
-                disableElevation
-                disabled={!useSameBusinessInfo && !selected}
+          <Box
+            sx={{
+              width: 28,
+              height: 28,
+              borderRadius: "50%",
+              bgcolor: "#E53935",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <ErrorOutlineRoundedIcon sx={{ color: "#fff", fontSize: 18 }} />
+          </Box>
+          <Typography
+            sx={{
+              flex: 1,
+              minWidth: 200,
+              fontWeight: 600,
+              fontSize: 13,
+              color: "#C62828",
+            }}
+          >
+            Template Has Temporarily Been Deactivated
+          </Typography>
+          <Button
+            variant="contained"
+            disableElevation
+            onClick={() => void onToggleBusinessProfileActive()}
+            disabled={isBusinessProfileStatusSaving}
+            sx={{
+              borderRadius: "999px",
+              textTransform: "none",
+              fontWeight: 700,
+              fontSize: 12.5,
+              minHeight: 34,
+              px: 2.25,
+              bgcolor: alpha(m.navy, 0.12),
+              color: alpha(m.navy, 0.82),
+              boxShadow: "none",
+              "&:hover": { bgcolor: alpha(m.navy, 0.18), boxShadow: "none" },
+            }}
+          >
+            {isBusinessProfileStatusSaving ? "Saving..." : "Reactivate"}
+          </Button>
+        </Paper>
+      ) : null}
+
+      <Stack direction="row" spacing={1} alignItems="center" justifyContent="flex-end">
+        <IconButton
+          size="small"
+          aria-label="Business profile options"
+          aria-haspopup="menu"
+          aria-expanded={Boolean(businessProfileMenuAnchor)}
+          disabled={isBusinessProfileStatusSaving}
+          onClick={(e) => setBusinessProfileMenuAnchor(e.currentTarget)}
+          sx={{
+            width: 34,
+            height: 34,
+            flexShrink: 0,
+            borderRadius: "8px",
+            border: `1px solid ${alpha(m.navy, 0.12)}`,
+            bgcolor: "#fff",
+            color: alpha(m.navy, 0.72),
+            "&:hover": { bgcolor: alpha(m.navy, 0.03) },
+          }}
+        >
+          <MoreVertRoundedIcon sx={{ fontSize: 20 }} />
+        </IconButton>
+
+        <Menu
+          anchorEl={businessProfileMenuAnchor}
+          open={Boolean(businessProfileMenuAnchor)}
+          onClose={() => setBusinessProfileMenuAnchor(null)}
+          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+          transformOrigin={{ vertical: "top", horizontal: "right" }}
+          PaperProps={{
+            sx: {
+              borderRadius: "10px",
+              border: `1px solid ${alpha(m.navy, 0.10)}`,
+              boxShadow: "0 14px 30px rgba(16,35,63,0.12)",
+              mt: 0.75,
+              minWidth: 160,
+              p: 0.5,
+            },
+          }}
+        >
+          {isBusinessProfileActive ? (
+            <>
+              <MenuItem
+                onClick={onTemporarilyDeactivateBusinessProfile}
+                disabled={isBusinessProfileStatusSaving}
                 sx={{
-                  minHeight: 30,
-                  px: 2,
                   borderRadius: "8px",
-                  textTransform: "none",
-                  fontWeight: active ? 700 : 600,
-                  fontSize: 12,
-                  bgcolor: active ? alpha(m.navy, 0.06) : "transparent",
-                  color: alpha(m.navy, selected ? 0.7 : 0.35),
-                  "&:hover": {
-                    bgcolor: active ? alpha(m.navy, 0.08) : alpha(m.navy, 0.04),
-                  },
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: alpha(m.navy, 0.82),
+                  my: 0.25,
                 }}
               >
-                {opt}
+                Temporarily Deactivate
+              </MenuItem>
+              <MenuItem
+                onClick={() => {
+                  setBusinessProfileMenuAnchor(null);
+                  setPermanentDeactivateConfirmOpen(true);
+                }}
+                disabled={isBusinessProfileStatusSaving}
+                sx={{
+                  borderRadius: "8px",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: alpha(m.navy, 0.82),
+                  my: 0.25,
+                }}
+              >
+                Permanently Deactivate
+              </MenuItem>
+            </>
+          ) : (
+            <MenuItem
+              onClick={onActivateBusinessProfile}
+              disabled={isBusinessProfileStatusSaving}
+              sx={{
+                borderRadius: "8px",
+                fontSize: 13,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.82),
+                my: 0.25,
+              }}
+            >
+              Activate
+            </MenuItem>
+          )}
+        </Menu>
+
+        <MollureModal
+          open={permanentDeactivateConfirmOpen}
+          onClose={() => setPermanentDeactivateConfirmOpen(false)}
+          title="Permanently deactivate profile?"
+          maxWidth="xs"
+          fullWidth
+          footer={
+            <Stack direction="row" spacing={1.25} justifyContent="flex-end" sx={{ px: 2.5, py: 1.75 }}>
+              <Button
+                variant="outlined"
+                onClick={() => setPermanentDeactivateConfirmOpen(false)}
+                disabled={isBusinessProfileStatusSaving}
+                sx={{
+                  borderRadius: "10px",
+                  textTransform: "none",
+                  fontWeight: 800,
+                  height: 36,
+                  px: 3,
+                  borderColor: alpha(m.navy, 0.16),
+                  color: alpha(m.navy, 0.65),
+                }}
+              >
+                Cancel
               </Button>
-            );
-          })}
-        </Box>
+              <Button
+                variant="contained"
+                disableElevation
+                onClick={onConfirmPermanentDeactivate}
+                disabled={isBusinessProfileStatusSaving}
+                sx={{
+                  borderRadius: "10px",
+                  textTransform: "none",
+                  fontWeight: 900,
+                  height: 36,
+                  px: 3,
+                  bgcolor: m.teal,
+                  color: "#fff",
+                  "&:hover": { bgcolor: m.tealDark },
+                }}
+              >
+                Permanently Deactivate
+              </Button>
+            </Stack>
+          }
+        >
+          <Box sx={{ px: 2.5, py: 2 }}>
+            <Typography sx={{ fontSize: 13, color: alpha(m.navy, 0.68), lineHeight: 1.55 }}>
+              Your public profile will be removed from listings. You can still reactivate later by publishing again.
+            </Typography>
+          </Box>
+        </MollureModal>
       </Stack>
 
-      <SectionShell
-        title={data.profile.title}
-        action={<PrimaryMiniButton onClick={onSaveBusinessProfile}>{data.profile.saveLabel}</PrimaryMiniButton>}
-      >
+      <SectionShell title={data.profile.title} action={renderSectionEditAction("profile")}>
         <Grid container spacing={2.25}>
           <Grid item xs={12} md={6}>
             <Paper
@@ -3323,7 +3804,7 @@ export default function ProfessionalFixedLocationSetup({
                     isBusinessMediaUploading ? <CircularProgress size={18} color="inherit" /> : <IosShareRoundedIcon />
                   }
                   onClick={onUploadMedia}
-                  disabled={isBusinessMediaUploading || businessFormDisabled}
+                  disabled={isBusinessMediaUploading || profileDisabled}
                   sx={{
                     borderRadius: "8px",
                     textTransform: "none",
@@ -3345,7 +3826,7 @@ export default function ProfessionalFixedLocationSetup({
                 label={data.profile.nameLabel}
                 value={biz.profileName}
                 onChange={(e) => setBizField("profileName", e.target.value)}
-                disabled={businessFormDisabled}
+                disabled={profileDisabled}
               />
               <MollureFormField
                 label={data.profile.aboutLabel}
@@ -3353,11 +3834,11 @@ export default function ProfessionalFixedLocationSetup({
                 onChange={(e) => setBizField("about", e.target.value)}
                 multiline
                 minRows={4}
-                disabled={businessFormDisabled}
+                disabled={profileDisabled}
               />
               <MollureFormField
                 label={data.profile.keywordsLabel}
-                placeholder={data.profile.keywordPlaceholder}
+                placeholder={keywordsAtMax ? `Maximum ${MAX_BUSINESS_KEYWORDS} keywords added` : data.profile.keywordPlaceholder}
                 value={biz.keywordDraft}
                 onChange={(e) => setBizField("keywordDraft", e.target.value)}
                 onKeyDown={(e) => {
@@ -3366,14 +3847,14 @@ export default function ProfessionalFixedLocationSetup({
                     addBizKeyword();
                   }
                 }}
-                disabled={businessFormDisabled}
+                disabled={profileDisabled || keywordsAtMax}
               />
               <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
                 {biz.keywords.map((k) => (
                   <Chip
                     key={k}
                     label={k}
-                    onDelete={businessFormDisabled ? undefined : () => removeBizKeyword(k)}
+                    onDelete={profileDisabled ? undefined : () => removeBizKeyword(k)}
                     sx={{
                       borderRadius: "8px",
                       bgcolor: alpha(m.navy, 0.06),
@@ -3388,29 +3869,15 @@ export default function ProfessionalFixedLocationSetup({
         </Grid>
       </SectionShell>
 
-      {(() => {
-        if (businessOfferingSelect === "Both") {
-          return (
-            <Stack spacing={2}>
-              <SectionShell title="Fixed Location">
-                {fixedLocationForm}
-              </SectionShell>
-              <SectionShell title="Desired Location">
-                {desiredLocationForm}
-              </SectionShell>
-            </Stack>
-          );
-        }
+      <SectionShell
+        title={isBothOffering ? activeBusinessTemplate : locationSectionTitle}
+        action={renderSectionEditAction("location")}
+      >
+        {showFixedLocationSection ? fixedLocationForm : null}
+        {showDesiredLocationSection ? desiredLocationForm : null}
+      </SectionShell>
 
-        return (
-          <SectionShell title={locationSectionTitle}>
-            {showFixedLocationSection ? fixedLocationForm : null}
-            {showDesiredLocationSection ? desiredLocationForm : null}
-          </SectionShell>
-        );
-      })()}
-
-      <SectionShell title="Service For">
+      <SectionShell title="Service For" action={renderSectionEditAction("serviceFor")}>
           {(() => {
           const allChecked = biz.serviceFor.men && biz.serviceFor.women && biz.serviceFor.kids;
           const anyChecked = biz.serviceFor.men || biz.serviceFor.women || biz.serviceFor.kids;
@@ -3428,6 +3895,7 @@ export default function ProfessionalFixedLocationSetup({
                     <Checkbox
                       checked={allChecked}
                       indeterminate={allIndeterminate}
+                      disabled={serviceForDisabled}
                       onChange={(e) => {
                         const checked = e.target.checked;
                         setBizServiceFor("men", checked);
@@ -3446,6 +3914,7 @@ export default function ProfessionalFixedLocationSetup({
                   control={
                     <Checkbox
                       checked={biz.serviceFor.men}
+                      disabled={serviceForDisabled}
                       onChange={(e) => setBizServiceFor("men", e.target.checked)}
                       sx={{
                         color: alpha(m.navy, 0.28),
@@ -3459,6 +3928,7 @@ export default function ProfessionalFixedLocationSetup({
                   control={
                     <Checkbox
                       checked={biz.serviceFor.women}
+                      disabled={serviceForDisabled}
                       onChange={(e) => setBizServiceFor("women", e.target.checked)}
                       sx={{
                         color: alpha(m.navy, 0.28),
@@ -3472,6 +3942,7 @@ export default function ProfessionalFixedLocationSetup({
                   control={
                     <Checkbox
                       checked={biz.serviceFor.kids}
+                      disabled={serviceForDisabled}
                       onChange={(e) => setBizServiceFor("kids", e.target.checked)}
                       sx={{
                         color: alpha(m.navy, 0.28),
@@ -3487,71 +3958,16 @@ export default function ProfessionalFixedLocationSetup({
           })()}
       </SectionShell>
 
-      <SectionShell title={data.servicesDetails.title}>
+      <SectionShell
+        title={data.servicesDetails.title}
+        action={renderSectionEditAction("servicesDetails")}
+      >
         <Stack spacing={1.5}>
-          <Stack
-            direction="row"
-            alignItems="center"
-            spacing={0.75}
-            sx={{ pointerEvents: "auto", width: "100%", minWidth: 0 }}
-          >
-            <IconButton
-              type="button"
-              size="small"
-              aria-label="Scroll categories left"
-              disabled={!tabScrollState.canLeft}
-              onClick={() => scrollServiceCategoryTabs(-SERVICE_CATEGORY_SLIDER_CARD_WIDTH * 2)}
-              sx={{
-                flex: "0 0 auto",
-                border: `1px solid ${alpha(m.navy, 0.12)}`,
-                bgcolor: "#fff",
-              }}
-            >
-              <ChevronLeftRoundedIcon />
-            </IconButton>
-            <Stack
-              ref={serviceCategoryTabsScrollRef}
-              direction="row"
-              spacing={1.25}
-              role="tablist"
-              aria-label="Service categories"
-              sx={{
-                flex: 1,
-                minWidth: 0,
-                overflowX: "auto",
-                pb: 0.25,
-                scrollBehavior: "smooth",
-                scrollbarWidth: "none",
-                msOverflowStyle: "none",
-                "&::-webkit-scrollbar": { display: "none" },
-              }}
-            >
-              {serviceCategoryTabs.map((c) => (
-                <ServiceCategorySliderCard
-                  key={c.id}
-                  ref={c.id === activeServiceCategory ? activeServiceCategoryTabRef : undefined}
-                  label={c.label}
-                  iconId={c.iconId}
-                  active={c.id === activeServiceCategory}
-                  onSelect={() => setActiveServiceCategory(c.id)}
-                />
-              ))}
-            </Stack>
-            <IconButton
-              type="button"
-              size="small"
-              aria-label="Scroll categories right"
-              disabled={!tabScrollState.canRight}
-              onClick={() => scrollServiceCategoryTabs(SERVICE_CATEGORY_SLIDER_CARD_WIDTH * 2)}
-              sx={{
-                flex: "0 0 auto",
-                border: `1px solid ${alpha(m.navy, 0.12)}`,
-                bgcolor: "#fff",
-              }}
-            >
-              <ChevronRightRoundedIcon />
-            </IconButton>
-          </Stack>
+          <ServiceCategoryBar
+            items={serviceCategoryTabs}
+            activeId={activeServiceCategory}
+            onSelect={setActiveServiceCategory}
+          />
 
             <Stack spacing={1.5}>
               {activeServiceCategory === "" ? (
@@ -3588,17 +4004,12 @@ export default function ProfessionalFixedLocationSetup({
                       </Typography>
                       <IconButton
                         size="small"
-                        onClick={openAddServiceDrawer}
-                        disabled={businessFormDisabled}
+                        onClick={openAddService}
+                        disabled={isBusinessSetupSaving}
                         aria-label="Add service"
                         sx={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: "999px",
-                          bgcolor: "primary.main",
-                          color: "#fff",
-                          "&:hover": { bgcolor: "primary.dark" },
-                          "&.Mui-disabled": { bgcolor: alpha(m.navy, 0.12), color: alpha(m.navy, 0.35) },
+                          ...addSoftIconButtonSx(m, 36),
+                          "&.Mui-disabled": { bgcolor: alpha(m.navy, 0.12), color: alpha(m.navy, 0.35), opacity: 1 },
                         }}
                       >
                         <AddRoundedIcon sx={{ fontSize: 22 }} />
@@ -3608,10 +4019,10 @@ export default function ProfessionalFixedLocationSetup({
 
                   {activeServiceCategory === "all" ? (
                     <Stack spacing={2}>
-                      {groupedAllServiceSections.length === 0 ? (
+                      {groupedServiceSections.length === 0 ? (
                         <Typography sx={{ fontSize: 13, color: alpha(m.navy, 0.55) }}>No services yet.</Typography>
                       ) : (
-                        groupedAllServiceSections.map((group) => (
+                        groupedServiceSections.map((group) => (
                           <Stack key={group.categoryId} spacing={1}>
                             <Paper
                               elevation={0}
@@ -3631,35 +4042,36 @@ export default function ProfessionalFixedLocationSetup({
                               </Typography>
                               <IconButton
                                 size="small"
-                                onClick={() => openAddServiceDrawerForCategory(group.categoryId)}
-                                disabled={businessFormDisabled}
+                                onClick={() => openAddServiceForCategory(group.categoryId)}
+                                disabled={isBusinessSetupSaving}
                                 aria-label={`Add service to ${group.title}`}
                                 sx={{
-                                  width: 36,
-                                  height: 36,
-                                  borderRadius: "999px",
-                                  bgcolor: "primary.main",
-                                  color: "#fff",
-                                  "&:hover": { bgcolor: "primary.dark" },
-                                  "&.Mui-disabled": { bgcolor: alpha(m.navy, 0.12), color: alpha(m.navy, 0.35) },
+                                  ...addSoftIconButtonSx(m, 36),
+                                  "&.Mui-disabled": { bgcolor: alpha(m.navy, 0.12), color: alpha(m.navy, 0.35), opacity: 1 },
                                 }}
                               >
                                 <AddRoundedIcon sx={{ fontSize: 22 }} />
                               </IconButton>
                             </Paper>
-                            <Stack spacing={1}>{group.items.map((it) => renderServiceDetailRow(it))}</Stack>
+                            <Stack spacing={1}>
+                              {group.explicitMains.map((main) => renderMainServiceRow(main))}
+                              {group.subs.map((service) => renderServiceDetailRow(service))}
+                            </Stack>
                           </Stack>
                         ))
                       )}
                     </Stack>
                   ) : (
                     <Stack spacing={1}>
-                      {activeCategoryServices.length === 0 ? (
+                      {activeCategoryExplicitMains.length === 0 && activeCategoryFlatSubservices.length === 0 ? (
                         <Typography sx={{ fontSize: 13, color: alpha(m.navy, 0.55) }}>
                           No services in this category.
                         </Typography>
                       ) : (
-                        activeCategoryServices.map((it) => renderServiceDetailRow(it))
+                        <>
+                          {activeCategoryExplicitMains.map((main) => renderMainServiceRow(main))}
+                          {activeCategoryFlatSubservices.map((service) => renderServiceDetailRow(service))}
+                        </>
                       )}
                     </Stack>
                   )}
@@ -3667,6 +4079,7 @@ export default function ProfessionalFixedLocationSetup({
               )}
             </Stack>
 
+          {showProjectSection ? (
           <Paper
             elevation={0}
             sx={{
@@ -3684,6 +4097,7 @@ export default function ProfessionalFixedLocationSetup({
                 control={
                   <Checkbox
                     checked={biz.projectEnabled}
+                    disabled={servicesDetailsDisabled}
                     onChange={(e) => setBizField("projectEnabled", e.target.checked)}
                     sx={{
                       color: alpha(m.navy, 0.28),
@@ -3706,7 +4120,7 @@ export default function ProfessionalFixedLocationSetup({
                 onChange={(e) => setBizField("projectInstructions", e.target.value)}
                 multiline
                 minRows={3}
-                disabled={businessFormDisabled || !biz.projectEnabled}
+                disabled={servicesDetailsDisabled || !biz.projectEnabled}
                 sx={{
                   "& .MuiOutlinedInput-root": {
                     bgcolor: "#fff",
@@ -3715,10 +4129,16 @@ export default function ProfessionalFixedLocationSetup({
               />
             </Stack>
           </Paper>
+          ) : null}
 
+          {showBookServices ? (
+          <>
           <Box sx={{ mt: 0.75 }}>
             <Typography sx={{ fontWeight: 800, color: alpha(m.navy, 0.84), fontSize: 13 }}>
               Book Services
+            </Typography>
+            <Typography sx={{ mt: 0.35, color: alpha(m.navy, 0.55), fontSize: 12, lineHeight: 1.45 }}>
+              Pick a category and service, then tap + to create a combo card you can edit or delete.
             </Typography>
           </Box>
 
@@ -3740,20 +4160,20 @@ export default function ProfessionalFixedLocationSetup({
                   </Typography>
                   <MollureFormField
                     select
-                    value={biz.bookCategory}
+                    value={fixedBiz.bookCategory}
                     onChange={(e) => {
                       const categoryId = e.target.value;
-                      setBizField("bookCategory", categoryId);
+                      setFixedBizField("bookCategory", categoryId);
                       const nextServices = getBookingServiceOptions(categoryId);
-                      setBizField(
+                      setFixedBizField(
                         "bookService",
-                        nextServices.some((option) => option.value === biz.bookService)
-                          ? biz.bookService
+                        nextServices.some((option) => option.value === fixedBiz.bookService)
+                          ? fixedBiz.bookService
                           : nextServices[0]?.value || "",
                       );
                     }}
                     sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                    disabled={businessFormDisabled || !biz.projectEnabled}
+                    disabled={servicesDetailsDisabled}
                   >
                     <MenuItem value="">Select category</MenuItem>
                     {bookingCategoryOptions.map((opt) => (
@@ -3769,10 +4189,10 @@ export default function ProfessionalFixedLocationSetup({
                   </Typography>
                   <MollureFormField
                     select
-                    value={biz.bookService}
-                    onChange={(e) => setBizField("bookService", e.target.value)}
+                    value={fixedBiz.bookService}
+                    onChange={(e) => setFixedBizField("bookService", e.target.value)}
                     sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                    disabled={businessFormDisabled || !biz.projectEnabled}
+                    disabled={servicesDetailsDisabled}
                   >
                     <MenuItem value="">Select service</MenuItem>
                     {bookingServiceOptions.map((opt) => (
@@ -3782,18 +4202,11 @@ export default function ProfessionalFixedLocationSetup({
                     ))}
                   </MollureFormField>
                 </Grid>
-                <Grid item xs={12} md={2} sx={{ display: "flex", justifyContent: { md: "flex-end" } }}>
+                <Grid item xs={12} md={2} sx={{ display: "flex", justifyContent: { md: "flex-end" }, pr: { md: 0.5 } }}>
                   <IconButton
                     onClick={addBookingCombo}
-                    disabled={businessFormDisabled || !biz.projectEnabled || !biz.bookCategory || !biz.bookService}
-                    sx={{
-                      width: 34,
-                      height: 34,
-                      borderRadius: "999px",
-                      bgcolor: alpha(theme.palette.primary.main, 0.14),
-                      color: theme.palette.primary.main,
-                      "&:hover": { bgcolor: alpha(theme.palette.primary.main, 0.18) },
-                    }}
+                    disabled={servicesDetailsDisabled || !fixedBiz.bookCategory || !fixedBiz.bookService}
+                    sx={addSoftIconButtonSx(m, 34)}
                   >
                     <AddRoundedIcon />
                   </IconButton>
@@ -3814,118 +4227,191 @@ export default function ProfessionalFixedLocationSetup({
                   <Typography sx={{ fontWeight: 800, fontSize: 12.5, color: alpha(m.navy, 0.78) }}>
                     Available Combinations
                   </Typography>
-                  <Stack direction="row" spacing={1.25} sx={{ overflowX: "auto", pb: 0.25 }}>
-                    {biz.bookCombos.map((c) => {
-                      const comboServiceOptions = getBookingServiceOptions(c.categoryId);
-                      const comboFieldsLocked = bookingComboEditId !== c.id;
-                      const comboFieldsDisabled =
-                        businessFormDisabled || !biz.projectEnabled || comboFieldsLocked;
+                  {fixedBiz.bookCombos.length === 0 ? (
+                    <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: alpha(m.navy, 0.5), py: 0.5 }}>
+                      Select a category and service above, then tap + to add a combination.
+                    </Typography>
+                  ) : (
+                    <Stack
+                      direction="row"
+                      spacing={1.25}
+                      useFlexGap
+                      flexWrap="wrap"
+                      sx={{ pb: 0.25 }}
+                    >
+                      {fixedBiz.bookCombos.map((c) => {
+                        const isEditing = bookingComboEditId === c.id;
+                        const comboServiceOptions = getBookingServiceOptions(c.categoryId);
+                        const { categoryLabel, serviceLabel } = resolveBookingComboLabels(c.categoryId, c.serviceId);
+                        const comboFieldsDisabled = servicesDetailsDisabled;
 
-                      return (
-                      <Stack
-                        key={c.id}
-                        direction="row"
-                        spacing={0.75}
-                        alignItems="center"
-                        sx={{
-                          flex: "0 0 auto",
-                          borderRadius: "10px",
-                          border: `1px solid ${alpha(m.navy, 0.10)}`,
-                          px: 1,
-                          py: 0.65,
-                          bgcolor: alpha(m.navy, 0.01),
-                        }}
-                      >
-                        <MollureFormField
-                          select
-                          value={c.categoryId}
-                          onChange={(e) => updateBookingCombo(c.id, { categoryId: e.target.value })}
-                          disabled={comboFieldsDisabled}
-                          sx={{
-                            width: 170,
-                            "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" },
-                          }}
-                        >
-                          {bookingCategoryOptions.map((opt) => (
-                            <MenuItem key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </MenuItem>
-                          ))}
-                        </MollureFormField>
-                        <Typography sx={{ fontWeight: 800, color: alpha(m.navy, 0.45) }}>+</Typography>
-                        <MollureFormField
-                          select
-                          value={c.serviceId}
-                          onChange={(e) => updateBookingCombo(c.id, { serviceId: e.target.value })}
-                          disabled={comboFieldsDisabled}
-                          sx={{
-                            width: 170,
-                            "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" },
-                          }}
-                        >
-                          {comboServiceOptions.map((opt) => (
-                            <MenuItem key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </MenuItem>
-                          ))}
-                        </MollureFormField>
-                        <IconButton
-                          size="small"
-                          disabled={businessFormDisabled || !biz.projectEnabled}
-                          onClick={() => deleteBookingCombo(c.id)}
-                        >
-                          <DeleteOutlineRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.55) }} />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          disabled={businessFormDisabled || !biz.projectEnabled}
-                          onClick={() => setBookingComboEditId((prev) => (prev === c.id ? null : c.id))}
-                          aria-label={bookingComboEditId === c.id ? "Done editing combination" : "Edit combination"}
-                          sx={
-                            bookingComboEditId === c.id
-                              ? { bgcolor: alpha(theme.palette.primary.main, 0.1) }
-                              : undefined
-                          }
-                        >
-                          <EditRoundedIcon
+                        return (
+                          <Paper
+                            key={c.id}
+                            elevation={0}
                             sx={{
-                              fontSize: 18,
-                              color: bookingComboEditId === c.id ? "primary.main" : alpha(m.navy, 0.55),
+                              flex: { xs: "1 1 100%", sm: "1 1 calc(50% - 8px)", md: "1 1 calc(33.333% - 9px)" },
+                              minWidth: { xs: "100%", sm: 260 },
+                              maxWidth: { md: 360 },
+                              borderRadius: "10px",
+                              border: `1px solid ${isEditing ? alpha(m.teal, 0.35) : alpha(m.navy, 0.10)}`,
+                              px: 1.25,
+                              py: 1,
+                              bgcolor: isEditing ? alpha(m.addSoftBg, 0.35) : alpha(m.navy, 0.02),
                             }}
-                          />
-                        </IconButton>
-                      </Stack>
-                    );
-                    })}
-                  </Stack>
+                          >
+                            {isEditing ? (
+                              <Stack spacing={1}>
+                                <Stack
+                                  direction={{ xs: "column", sm: "row" }}
+                                  spacing={1}
+                                  alignItems={{ xs: "stretch", sm: "center" }}
+                                >
+                                  <MollureFormField
+                                    select
+                                    value={c.categoryId}
+                                    onChange={(e) => updateBookingCombo(c.id, { categoryId: e.target.value })}
+                                    disabled={comboFieldsDisabled}
+                                    sx={{
+                                      flex: 1,
+                                      minWidth: 0,
+                                      "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" },
+                                    }}
+                                  >
+                                    {bookingCategoryOptions.map((opt) => (
+                                      <MenuItem key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                      </MenuItem>
+                                    ))}
+                                  </MollureFormField>
+                                  <Typography
+                                    sx={{
+                                      fontWeight: 800,
+                                      color: alpha(m.navy, 0.45),
+                                      textAlign: "center",
+                                      flexShrink: 0,
+                                    }}
+                                  >
+                                    +
+                                  </Typography>
+                                  <MollureFormField
+                                    select
+                                    value={c.serviceId}
+                                    onChange={(e) => updateBookingCombo(c.id, { serviceId: e.target.value })}
+                                    disabled={comboFieldsDisabled}
+                                    sx={{
+                                      flex: 1,
+                                      minWidth: 0,
+                                      "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" },
+                                    }}
+                                  >
+                                    {comboServiceOptions.map((opt) => (
+                                      <MenuItem key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                      </MenuItem>
+                                    ))}
+                                  </MollureFormField>
+                                </Stack>
+                                <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                                  <IconButton
+                                    size="small"
+                                    disabled={comboFieldsDisabled}
+                                    onClick={() => setBookingComboEditId(null)}
+                                    aria-label="Done editing combination"
+                                    sx={{
+                                      bgcolor: m.addSoftBg,
+                                      border: `1px solid ${m.addSoftBorder}`,
+                                      "&:hover": { bgcolor: m.addSoftBgHover },
+                                    }}
+                                  >
+                                    <CheckRoundedIcon sx={{ fontSize: 18, color: m.addSoftFg }} />
+                                  </IconButton>
+                                </Stack>
+                              </Stack>
+                            ) : (
+                              <Stack direction="row" alignItems="center" spacing={1}>
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                  <Typography
+                                    sx={{
+                                      fontSize: 13,
+                                      fontWeight: 800,
+                                      color: alpha(m.navy, 0.86),
+                                      lineHeight: 1.35,
+                                    }}
+                                  >
+                                    {categoryLabel} + {serviceLabel}
+                                  </Typography>
+                                </Box>
+                                <IconButton
+                                  size="small"
+                                  disabled={comboFieldsDisabled}
+                                  onClick={() => setBookingComboEditId(c.id)}
+                                  aria-label="Edit combination"
+                                  sx={{
+                                    width: 32,
+                                    height: 32,
+                                    borderRadius: "999px",
+                                    bgcolor: alpha(m.navy, 0.05),
+                                    border: `1px solid ${alpha(m.navy, 0.1)}`,
+                                    "&:hover": { bgcolor: alpha(m.navy, 0.09) },
+                                  }}
+                                >
+                                  <EditRoundedIcon sx={{ fontSize: 17, color: alpha(m.navy, 0.5) }} />
+                                </IconButton>
+                                <IconButton
+                                  size="small"
+                                  disabled={comboFieldsDisabled}
+                                  onClick={() => deleteBookingCombo(c.id)}
+                                  aria-label="Delete combination"
+                                  sx={{
+                                    width: 32,
+                                    height: 32,
+                                    borderRadius: "999px",
+                                    bgcolor: alpha(m.navy, 0.05),
+                                    border: `1px solid ${alpha(m.navy, 0.1)}`,
+                                    "&:hover": { bgcolor: alpha(m.navy, 0.09) },
+                                  }}
+                                >
+                                  <DeleteOutlineRoundedIcon sx={{ fontSize: 17, color: alpha(m.navy, 0.5) }} />
+                                </IconButton>
+                              </Stack>
+                            )}
+                          </Paper>
+                        );
+                      })}
+                    </Stack>
+                  )}
                 </Stack>
               </Paper>
 
               <MollureFormField
                 placeholder="Custom instructions for combo Service"
-                value={biz.bookComboInstructions}
-                onChange={(e) => setBizField("bookComboInstructions", e.target.value)}
+                value={fixedBiz.bookComboInstructions}
+                onChange={(e) => setFixedBizField("bookComboInstructions", e.target.value)}
                 multiline
                 minRows={4}
-                disabled={businessFormDisabled || !biz.projectEnabled}
+                disabled={servicesDetailsDisabled}
                 sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
               />
             </Stack>
           </Paper>
+          </>
+          ) : null}
         </Stack>
       </SectionShell>
 
       <SectionShell
         title={data.manageTeam.title}
-        action={
-          <Stack direction="row" spacing={1} alignItems="center">
+        action={renderSectionEditAction(
+          "manageTeam",
+          <>
             <FormControlLabel
               sx={{ m: 0 }}
               control={
                 <Checkbox
                   checked={featureTeamPublic}
                   onChange={(e) => setFeatureTeamPublic(e.target.checked)}
-                  disabled={businessFormDisabled}
+                  disabled={manageTeamDisabled}
                   sx={{ color: alpha(m.navy, 0.28), "&.Mui-checked": { color: "primary.main" } }}
                 />
               }
@@ -3936,20 +4422,15 @@ export default function ProfessionalFixedLocationSetup({
               }
             />
             <IconButton
-              onClick={openAddDrawer}
+              onClick={teamMemberModal.openAdd}
               size="small"
-              disabled={businessFormDisabled}
-              sx={{
-                width: 32, height: 32, borderRadius: "999px",
-                bgcolor: theme.palette.primary.main,
-                color: "#fff",
-                "&:hover": { bgcolor: "mollure.tealDark" },
-              }}
+              disabled={manageTeamDisabled}
+              sx={addSoftIconButtonSx(m, 32)}
             >
               <AddRoundedIcon sx={{ fontSize: 18 }} />
             </IconButton>
-          </Stack>
-        }
+          </>,
+        )}
       >
         <Stack spacing={1.5}>
           {teamMembers.map((mem) => (
@@ -4017,7 +4498,7 @@ export default function ProfessionalFixedLocationSetup({
                   </Box>
                 </Stack>
 
-                {/* Middle – assigned services as compact selects */}
+                {/* Middle – assigned services grouped by category */}
                 <Box
                   sx={{
                     flex: 1,
@@ -4028,59 +4509,152 @@ export default function ProfessionalFixedLocationSetup({
                     alignSelf: "center",
                   }}
                 >
-                  {TEAM_SERVICE_SLOT_KEYS.some((key) => String(mem.services[key] ?? "").trim()) ? (
-                    <Grid container spacing={1}>
-                      {TEAM_SERVICE_SLOT_KEYS.filter((key) => String(mem.services[key] ?? "").trim()).map((key) => (
-                        <Grid key={key} item xs={12} sm={6} md={4}>
+                  {(() => {
+                    const assignedIds = getMemberAssignedServiceIds(mem.services);
+                    if (assignedIds.length === 0) {
+                      return (
+                        <Typography sx={{ fontSize: 12, fontWeight: 500, color: alpha(m.navy, 0.42) }}>
+                          No services assigned
+                        </Typography>
+                      );
+                    }
+
+                    const showsAllServices = memberProvidesAllServices(mem.services);
+                    const serviceGroups = buildTeamMemberServiceGroups(mem.services);
+
+                    const renderServiceChip = (
+                      label: string,
+                      menuKey: string,
+                      count: number | undefined,
+                      onOpen: (anchorEl: HTMLElement) => void,
+                    ) => {
+                      const isOpen = teamServiceMenu?.menuKey === menuKey;
+                      const displayLabel = count != null ? `${label}(${count})` : label;
+                      const chipDisabled = manageTeamDisabled;
+                      return (
+                        <Box
+                          key={menuKey}
+                          component="button"
+                          type="button"
+                          disabled={chipDisabled}
+                          onClick={(e) => {
+                            if (chipDisabled) return;
+                            onOpen(e.currentTarget);
+                          }}
+                          sx={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 0.75,
+                            width: { xs: "100%", sm: 220 },
+                            minWidth: { xs: 0, sm: 220 },
+                            maxWidth: { xs: "100%", sm: 220 },
+                            minHeight: 46,
+                            height: 46,
+                            px: 1.75,
+                            py: 0,
+                            borderRadius: "10px",
+                            border: `1.5px solid ${
+                              chipDisabled
+                                ? alpha(m.navy, 0.1)
+                                : isOpen
+                                  ? alpha(m.teal, 0.45)
+                                  : alpha(m.teal, 0.22)
+                            }`,
+                            bgcolor: chipDisabled ? alpha(m.navy, 0.02) : "#fff",
+                            cursor: chipDisabled ? "not-allowed" : "pointer",
+                            font: "inherit",
+                            color: chipDisabled ? alpha(m.navy, 0.38) : alpha(m.navy, 0.82),
+                            whiteSpace: "nowrap",
+                            flex: "0 0 auto",
+                            boxSizing: "border-box",
+                            boxShadow: chipDisabled
+                              ? "none"
+                              : isOpen
+                                ? `0 8px 20px ${alpha(m.teal, 0.14)}`
+                                : "0 2px 8px rgba(16, 35, 63, 0.06)",
+                            opacity: chipDisabled ? 0.72 : 1,
+                            "&:hover": chipDisabled
+                              ? undefined
+                              : {
+                                  borderColor: alpha(m.teal, 0.42),
+                                  bgcolor: alpha(m.teal, 0.03),
+                                },
+                          }}
+                        >
                           <Typography
-                            sx={{ fontSize: 10.5, fontWeight: 600, color: alpha(m.navy, 0.52), mb: 0.35, lineHeight: 1.2 }}
-                          >
-                            {getTeamServiceSelectLabel(mem.services[key])}
-                          </Typography>
-                          <MollureFormField
-                            select
-                            value={mem.services[key]}
-                            onChange={(e) => updateMemberService(mem.id, key, e.target.value)}
-                            disabled={businessFormDisabled}
+                            component="span"
                             sx={{
-                              "& .MuiOutlinedInput-root": {
-                                minHeight: 36,
-                                borderRadius: "8px",
-                                bgcolor: "#fff",
-                                "& fieldset": { borderColor: alpha(m.navy, 0.12) },
-                              },
-                              "& .MuiSelect-select": {
-                                fontSize: 12,
-                                fontWeight: 500,
-                                py: "7px",
-                                color: alpha(m.navy, 0.72),
-                              },
-                              "& .MuiSvgIcon-root": { fontSize: 18, color: alpha(m.navy, 0.40) },
+                              fontSize: 12,
+                              fontWeight: 500,
+                              lineHeight: 1,
+                              color: "inherit",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
                             }}
                           >
-                            <MenuItem value="">Select</MenuItem>
-                            {allSubcategoryOptions.map((option) => (
-                              <MenuItem key={option.value} value={option.value} sx={{ fontSize: 12 }}>
-                                {option.label}
-                              </MenuItem>
-                            ))}
-                          </MollureFormField>
-                        </Grid>
-                      ))}
-                    </Grid>
-                  ) : (
-                    <Typography sx={{ fontSize: 12, fontWeight: 500, color: alpha(m.navy, 0.42) }}>
-                      No services assigned
-                    </Typography>
-                  )}
+                            {displayLabel}
+                          </Typography>
+                          <KeyboardArrowDownRoundedIcon
+                            sx={{
+                              fontSize: 18,
+                              color: alpha(m.navy, 0.4),
+                              flexShrink: 0,
+                              transform: isOpen ? "rotate(180deg)" : "none",
+                              transition: "transform 0.2s ease",
+                            }}
+                          />
+                        </Box>
+                      );
+                    };
+
+                    return (
+                      <Box
+                        sx={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          alignItems: "center",
+                          gap: 1,
+                          width: "100%",
+                        }}
+                      >
+                        {showsAllServices ? (
+                          renderServiceChip("All services", `${mem.id}:all`, undefined, (anchorEl) =>
+                            setTeamServiceMenu({
+                              anchorEl,
+                              menuKey: `${mem.id}:all`,
+                              groups: serviceGroups.map((group) => ({
+                                categoryTitle: group.categoryTitle,
+                                items: group.subServices.map((sub) => ({ id: sub.id, label: sub.label })),
+                              })),
+                            }),
+                          )
+                        ) : (
+                          serviceGroups.map((group) =>
+                            renderServiceChip(
+                              group.categoryTitle,
+                              `${mem.id}:${group.categoryId}`,
+                              group.subServices.length,
+                              (anchorEl) =>
+                                setTeamServiceMenu({
+                                  anchorEl,
+                                  menuKey: `${mem.id}:${group.categoryId}`,
+                                  items: group.subServices.map((sub) => ({ id: sub.id, label: sub.label })),
+                                }),
+                            ),
+                          )
+                        )}
+                      </Box>
+                    );
+                  })()}
                 </Box>
 
                 {/* Right – actions */}
                 <Stack spacing={1} alignItems="center" justifyContent="flex-start" sx={{ flex: "0 0 auto", pl: 1.5, pr: 0.5, pt: 0.5 }}>
                   <IconButton
                     size="small"
-                    onClick={() => openEditDrawer(mem)}
-                    disabled={businessFormDisabled}
+                    onClick={() => teamMemberModal.openEdit(mem)}
+                    disabled={manageTeamDisabled || mem.id === TEAM_MEMBER_DRAFT_PREVIEW_ID}
                     sx={{
                       width: 36,
                       height: 36,
@@ -4094,8 +4668,8 @@ export default function ProfessionalFixedLocationSetup({
                   </IconButton>
                   <IconButton
                     size="small"
-                    onClick={() => removeTeamMember(mem.id)}
-                    disabled={businessFormDisabled}
+                    onClick={() => teamMemberModal.deleteMember(mem.id)}
+                    disabled={manageTeamDisabled}
                     sx={{
                       width: 36,
                       height: 36,
@@ -4112,28 +4686,105 @@ export default function ProfessionalFixedLocationSetup({
             </Paper>
           ))}
         </Stack>
-      </SectionShell>
 
-      <SectionShell title={data.generalNotes.title}>
-        <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
-          {data.generalNotes.notesLabel}
-        </Typography>
-        <MollureFormField
-          placeholder={data.generalNotes.placeholder}
-          value={values.notes}
-          onChange={(e) => setField("notes", e.target.value)}
-          multiline
-          minRows={4}
-          disabled={businessFormDisabled}
-          sx={{
-            "& .MuiOutlinedInput-root": {
-              bgcolor: alpha(m.navy, 0.01),
+        <Popover
+          anchorEl={teamServiceMenu?.anchorEl}
+          open={Boolean(teamServiceMenu)}
+          onClose={() => setTeamServiceMenu(null)}
+          anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+          transformOrigin={{ vertical: "top", horizontal: "left" }}
+          slotProps={{
+            paper: {
+              sx: {
+                mt: 0.75,
+                p: 1,
+                borderRadius: "12px",
+                border: `1px solid ${alpha(m.teal, 0.18)}`,
+                boxShadow: "0 14px 32px rgba(16, 35, 63, 0.14)",
+                minWidth: 200,
+                maxWidth: 300,
+              },
             },
           }}
-        />
+        >
+          <Stack spacing={0.75}>
+            {teamServiceMenu?.groups
+              ? teamServiceMenu.groups.map((group) => (
+                  <Box key={group.categoryTitle}>
+                    <Typography
+                      sx={{
+                        fontSize: 10.5,
+                        fontWeight: 800,
+                        color: alpha(m.navy, 0.48),
+                        px: 0.5,
+                        mb: 0.5,
+                      }}
+                    >
+                      {group.categoryTitle}
+                    </Typography>
+                    <Stack spacing={0.65}>
+                      {group.items.map((item) => (
+                        <Box
+                          key={item.id}
+                          sx={{
+                            px: 1.35,
+                            py: 1,
+                            borderRadius: "10px",
+                            bgcolor: "#fff",
+                            border: `1px solid ${alpha(m.navy, 0.1)}`,
+                            boxShadow: "0 4px 14px rgba(16, 35, 63, 0.08)",
+                          }}
+                        >
+                          <Typography sx={{ fontSize: 13, fontWeight: 600, color: alpha(m.navy, 0.55) }}>
+                            {item.label}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Stack>
+                  </Box>
+                ))
+              : teamServiceMenu?.items?.map((item) => (
+                  <Box
+                    key={item.id}
+                    sx={{
+                      px: 1.35,
+                      py: 1,
+                      borderRadius: "10px",
+                      bgcolor: "#fff",
+                      border: `1px solid ${alpha(m.navy, 0.1)}`,
+                      boxShadow: "0 4px 14px rgba(16, 35, 63, 0.08)",
+                    }}
+                  >
+                    <Typography sx={{ fontSize: 13, fontWeight: 600, color: alpha(m.navy, 0.55) }}>
+                      {item.label}
+                    </Typography>
+                  </Box>
+                ))}
+          </Stack>
+        </Popover>
       </SectionShell>
 
-      <SectionShell title="Price">
+      <SetupSectionsGroup>
+        <SetupSubSection title={data.generalNotes.title} action={renderSectionEditAction("generalNotes")}>
+          <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
+            {data.generalNotes.notesLabel}
+          </Typography>
+          <MollureFormField
+            placeholder={data.generalNotes.placeholder}
+            value={values.notes}
+            onChange={(e) => setField("notes", e.target.value)}
+            multiline
+            minRows={4}
+            disabled={generalNotesDisabled}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                bgcolor: alpha(m.navy, 0.01),
+              },
+            }}
+          />
+        </SetupSubSection>
+
+        <SetupSubSection title="Price" action={renderSectionEditAction("price")}>
         <Stack spacing={2}>
           <Box>
             <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
@@ -4145,6 +4796,7 @@ export default function ProfessionalFixedLocationSetup({
                   select
                   value={values.priceRangeFrom}
                   onChange={(e) => setField("priceRangeFrom", e.target.value)}
+                  disabled={priceDisabled}
                   sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                 >
                   {["Low", "Medium", "High"].map((o) => (
@@ -4159,6 +4811,7 @@ export default function ProfessionalFixedLocationSetup({
                   select
                   value={values.priceRangeTo}
                   onChange={(e) => setField("priceRangeTo", e.target.value)}
+                  disabled={priceDisabled}
                   sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                 >
                   {["Low", "Medium", "High"].map((o) => (
@@ -4179,7 +4832,7 @@ export default function ProfessionalFixedLocationSetup({
               value={values.prepaymentPercent}
               onChange={(e) => setField("prepaymentPercent", e.target.value)}
               placeholder="0"
-              disabled={businessFormDisabled}
+              disabled={priceDisabled}
               sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
               InputProps={{
                 endAdornment: <InputAdornment position="end">%</InputAdornment>,
@@ -4193,7 +4846,7 @@ export default function ProfessionalFixedLocationSetup({
                 onChange={(e) => setField("prepaymentInstructions", e.target.value)}
                 multiline
                 minRows={3}
-                disabled={businessFormDisabled}
+                disabled={priceDisabled}
                 sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
               />
             </Box>
@@ -4208,7 +4861,7 @@ export default function ProfessionalFixedLocationSetup({
                 value={values.kilometerAllowance}
                 onChange={(e) => setField("kilometerAllowance", e.target.value)}
                 placeholder="€ 0"
-                disabled={businessFormDisabled}
+                disabled={priceDisabled}
                 sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                 InputProps={{
                   startAdornment: <InputAdornment position="start">€</InputAdornment>,
@@ -4223,16 +4876,16 @@ export default function ProfessionalFixedLocationSetup({
                   onChange={(e) => setField("kilometerAllowanceInstructions", e.target.value)}
                   multiline
                   minRows={3}
-                  disabled={businessFormDisabled}
+                  disabled={priceDisabled}
                   sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                 />
               </Box>
             </Box>
           ) : null}
         </Stack>
-      </SectionShell>
+        </SetupSubSection>
 
-      <SectionShell title="Policy Section">
+        <SetupSubSection title="Policy Section" action={renderSectionEditAction("policy")}>
           <Stack spacing={1.6}>
             <Box>
               <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
@@ -4244,7 +4897,7 @@ export default function ProfessionalFixedLocationSetup({
                     placeholder="Hour"
                     value={values.policyResponseHours}
                     onChange={(e) => setField("policyResponseHours", e.target.value)}
-                    disabled={businessFormDisabled}
+                    disabled={policyDisabled}
                     sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     InputProps={{
                       endAdornment: <InputAdornment position="end">H</InputAdornment>,
@@ -4257,7 +4910,7 @@ export default function ProfessionalFixedLocationSetup({
                     placeholder="Minutes"
                     value={values.policyResponseMinutes}
                     onChange={(e) => setField("policyResponseMinutes", e.target.value)}
-                    disabled={businessFormDisabled}
+                    disabled={policyDisabled}
                     sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     InputProps={{
                       endAdornment: <InputAdornment position="end">Min</InputAdornment>,
@@ -4274,13 +4927,13 @@ export default function ProfessionalFixedLocationSetup({
               onChange={(e) => setField("policyInstructions", e.target.value)}
               multiline
               minRows={3}
-              disabled={businessFormDisabled}
+              disabled={policyDisabled}
               sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
             />
           </Stack>
-      </SectionShell>
+        </SetupSubSection>
 
-      <SectionShell title="Rescheduling Policy">
+        <SetupSubSection title="Rescheduling Policy" action={renderSectionEditAction("reschedulingPolicy")}>
           <Stack spacing={1.6}>
             <Box>
               <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
@@ -4292,7 +4945,7 @@ export default function ProfessionalFixedLocationSetup({
                     placeholder="Hour"
                     value={values.rescheduleMinimumHours}
                     onChange={(e) => setField("rescheduleMinimumHours", e.target.value)}
-                    disabled={businessFormDisabled}
+                    disabled={reschedulingPolicyDisabled}
                     sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     InputProps={{
                       endAdornment: <InputAdornment position="end">H</InputAdornment>,
@@ -4305,7 +4958,7 @@ export default function ProfessionalFixedLocationSetup({
                     placeholder="Minutes"
                     value={values.rescheduleMinimumMinutes}
                     onChange={(e) => setField("rescheduleMinimumMinutes", e.target.value)}
-                    disabled={businessFormDisabled}
+                    disabled={reschedulingPolicyDisabled}
                     sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     InputProps={{
                       endAdornment: <InputAdornment position="end">Min</InputAdornment>,
@@ -4324,7 +4977,7 @@ export default function ProfessionalFixedLocationSetup({
                 placeholder="0"
                 value={values.rescheduleLateFeePercent}
                 onChange={(e) => setField("rescheduleLateFeePercent", e.target.value)}
-                disabled={businessFormDisabled}
+                disabled={reschedulingPolicyDisabled}
                 sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                 InputProps={{
                   endAdornment: <InputAdornment position="end">%</InputAdornment>,
@@ -4339,13 +4992,13 @@ export default function ProfessionalFixedLocationSetup({
               onChange={(e) => setField("rescheduleInstructions", e.target.value)}
               multiline
               minRows={3}
-              disabled={businessFormDisabled}
+              disabled={reschedulingPolicyDisabled}
               sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
             />
           </Stack>
-      </SectionShell>
+        </SetupSubSection>
 
-      <SectionShell title="Cancellation Policy">
+        <SetupSubSection title="Cancellation Policy" action={renderSectionEditAction("cancellationPolicy")}>
           <Stack spacing={1.6}>
             <Box>
               <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
@@ -4357,7 +5010,7 @@ export default function ProfessionalFixedLocationSetup({
                     placeholder="Hour"
                     value={values.cancelMinimumHours}
                     onChange={(e) => setField("cancelMinimumHours", e.target.value)}
-                    disabled={businessFormDisabled}
+                    disabled={cancellationPolicyDisabled}
                     sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     InputProps={{
                       endAdornment: <InputAdornment position="end">H</InputAdornment>,
@@ -4370,7 +5023,7 @@ export default function ProfessionalFixedLocationSetup({
                     placeholder="Minutes"
                     value={values.cancelMinimumMinutes}
                     onChange={(e) => setField("cancelMinimumMinutes", e.target.value)}
-                    disabled={businessFormDisabled}
+                    disabled={cancellationPolicyDisabled}
                     sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     InputProps={{
                       endAdornment: <InputAdornment position="end">Min</InputAdornment>,
@@ -4389,7 +5042,7 @@ export default function ProfessionalFixedLocationSetup({
                 placeholder="0"
                 value={values.cancelLateFeePercent}
                 onChange={(e) => setField("cancelLateFeePercent", e.target.value)}
-                disabled={businessFormDisabled}
+                disabled={cancellationPolicyDisabled}
                 sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                 InputProps={{
                   endAdornment: <InputAdornment position="end">%</InputAdornment>,
@@ -4404,13 +5057,13 @@ export default function ProfessionalFixedLocationSetup({
               onChange={(e) => setField("cancelInstructions", e.target.value)}
               multiline
               minRows={3}
-              disabled={businessFormDisabled}
+              disabled={cancellationPolicyDisabled}
               sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
             />
           </Stack>
-      </SectionShell>
+        </SetupSubSection>
 
-      <SectionShell title="No Show Policy">
+        <SetupSubSection title="No Show Policy" action={renderSectionEditAction("noShowPolicy")}>
           <Stack spacing={1.6}>
             <Box>
               <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
@@ -4420,7 +5073,7 @@ export default function ProfessionalFixedLocationSetup({
                 placeholder="0"
                 value={values.noShowFeePercent}
                 onChange={(e) => setField("noShowFeePercent", e.target.value)}
-                disabled={businessFormDisabled}
+                disabled={noShowPolicyDisabled}
                 sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                 InputProps={{
                   endAdornment: <InputAdornment position="end">%</InputAdornment>,
@@ -4435,22 +5088,22 @@ export default function ProfessionalFixedLocationSetup({
               onChange={(e) => setField("noShowInstructions", e.target.value)}
               multiline
               minRows={3}
-              disabled={businessFormDisabled}
+              disabled={noShowPolicyDisabled}
               sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
             />
           </Stack>
-      </SectionShell>
+        </SetupSubSection>
+      </SetupSectionsGroup>
 
       <SectionShell
         title="Portfolio"
-        action={
-          <Stack direction="row" spacing={1} alignItems="center">
+        action={renderSectionEditAction(
+          "portfolio",
+          <>
             <IconButton
               size="small"
               onClick={deleteSelectedPortfolio}
-              disabled={
-                businessFormDisabled || !Object.values(selectedPortfolioIds).some(Boolean)
-              }
+              disabled={portfolioDisabled || !Object.values(selectedPortfolioIds).some(Boolean)}
               sx={{
                 width: 30,
                 height: 30,
@@ -4464,7 +5117,7 @@ export default function ProfessionalFixedLocationSetup({
             <IconButton
               size="small"
               onClick={onUploadPortfolio}
-              disabled={businessFormDisabled}
+              disabled={portfolioDisabled}
               sx={{
                 width: 30,
                 height: 30,
@@ -4483,8 +5136,8 @@ export default function ProfessionalFixedLocationSetup({
               hidden
               onChange={onPortfolioFilesSelected}
             />
-          </Stack>
-        }
+          </>,
+        )}
       >
         <Box
           sx={{
@@ -4501,8 +5154,11 @@ export default function ProfessionalFixedLocationSetup({
                 role="checkbox"
                 aria-checked={checked}
                 tabIndex={0}
-                onClick={() => togglePortfolio(it.id)}
+                onClick={() => {
+                  if (!portfolioDisabled) togglePortfolio(it.id);
+                }}
                 onKeyDown={(e) => {
+                  if (portfolioDisabled) return;
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
                     togglePortfolio(it.id);
@@ -4512,7 +5168,8 @@ export default function ProfessionalFixedLocationSetup({
                   position: "relative",
                   borderRadius: "10px",
                   overflow: "hidden",
-                  cursor: "pointer",
+                  cursor: portfolioDisabled ? "default" : "pointer",
+                  opacity: portfolioDisabled ? 0.72 : 1,
                   border: checked ? `2px solid ${theme.palette.primary.main}` : `1px solid ${alpha(m.navy, 0.10)}`,
                   outline: "none",
                   "&:focus-visible": { boxShadow: `0 0 0 3px ${alpha(theme.palette.primary.main, 0.25)}` },
@@ -4679,15 +5336,15 @@ export default function ProfessionalFixedLocationSetup({
   const innerWithDrawer = (
     <>
       {inner}
-      {teamDrawer}
-      {serviceDrawer}
+      {teamMemberFormModal}
+      {serviceFormModal}
     </>
   );
 
   if (!chrome) return innerWithDrawer;
 
   return (
-    <Box sx={{ bgcolor: alpha(m.teal, 0.08), minHeight: "100vh" }}>
+    <Box sx={{ bgcolor: "#fff", minHeight: "100vh" }}>
       <Container maxWidth="lg" sx={{ py: 2.5 }}>
         <Stack spacing={2}>{innerWithDrawer}</Stack>
       </Container>

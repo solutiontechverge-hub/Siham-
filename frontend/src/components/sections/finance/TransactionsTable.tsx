@@ -1,16 +1,51 @@
 import * as React from "react";
-import { Box, Button, Checkbox, Chip, Link as MuiLink, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from "@mui/material";
+import StickyNote2OutlinedIcon from "@mui/icons-material/StickyNote2Outlined";
+import {
+  Box,
+  Button,
+  Checkbox,
+  Chip,
+  IconButton,
+  Link as MuiLink,
+  Paper,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+} from "@mui/material";
 import { alpha, type Theme } from "@mui/material/styles";
-import type { TransactionRow, TransactionStatus } from "../../../app/professionals/fixed-location/finance/data/transactions";
+import {
+  getTransactionClientTypeLabel,
+  shouldShowTransactionClientEmail,
+  type TransactionRow,
+  type TransactionStatus,
+} from "../../../app/professionals/fixed-location/finance/data/transactions";
 import { BodyText } from "../../ui/typography";
+
+function clientTypeChipSx(theme: Theme) {
+  return {
+    bgcolor: alpha(theme.palette.primary.main, 0.1),
+    color: theme.palette.primary.main,
+  };
+}
 
 function statusChipSx(status: TransactionStatus, m: { navy: string; teal: string }) {
   switch (status) {
     case "Paid":
+    case "Prepaid":
       return { bgcolor: alpha("#2E7D32", 0.12), color: "#2E7D32" };
     case "Unpaid":
+    case "Pending":
       return { bgcolor: alpha("#C62828", 0.1), color: "#C62828" };
     case "Refunded":
+    case "Failed":
+      return { bgcolor: alpha(m.navy, 0.1), color: alpha(m.navy, 0.65) };
+    case "Void":
+    case "Cancelled":
+      return { bgcolor: alpha("#6B7280", 0.12), color: "#4B5563" };
     default:
       return { bgcolor: alpha(m.navy, 0.08), color: alpha(m.navy, 0.62) };
   }
@@ -22,6 +57,8 @@ export type TransactionsTableProps = {
   onToggleOne: (id: string) => void;
   onToggleAll: (checked: boolean) => void;
   onOpenDocument: (row: TransactionRow, documentType: "invoice" | "receipt") => void;
+  onOpenNote?: (row: TransactionRow) => void;
+  disableDocumentLinks?: boolean;
   canLoadMore: boolean;
   onLoadMore?: () => void;
   theme: Theme;
@@ -34,6 +71,8 @@ export default function TransactionsTable({
   onToggleOne,
   onToggleAll,
   onOpenDocument,
+  onOpenNote,
+  disableDocumentLinks = false,
   canLoadMore,
   onLoadMore,
   theme,
@@ -88,15 +127,36 @@ export default function TransactionsTable({
             </TableRow>
           </TableHead>
           <TableBody>
-            {rows.map((row) => (
+            {rows.map((row) => {
+              const clientTypeLabel = getTransactionClientTypeLabel(row.clientType);
+              const showClientEmail = shouldShowTransactionClientEmail(row);
+
+              return (
               <TableRow key={row.id} hover sx={{ "& td": { borderBottom: `1px solid ${alpha(m.navy, 0.06)}` } }}>
                 <TableCell padding="checkbox">
                   <Checkbox size="small" checked={Boolean(selected[row.id])} onChange={() => onToggleOne(row.id)} sx={{ p: 0.5 }} />
                 </TableCell>
                 <TableCell sx={{ verticalAlign: "top" }}>
-                  <BodyText component="span" sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.78) }}>
-                    {row.entryLabel ?? row.entryId ?? ""}
-                  </BodyText>
+                  <Stack direction="row" alignItems="center" spacing={0.5} useFlexGap flexWrap="wrap">
+                    <BodyText component="span" sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.78) }}>
+                      {row.entryLabel ?? row.entryId ?? ""}
+                    </BodyText>
+                    {row.note?.trim() ? (
+                      <IconButton
+                        size="small"
+                        aria-label={`Open note for entry ${row.entryId ?? row.id}`}
+                        onClick={() => onOpenNote?.(row)}
+                        sx={{
+                          width: 24,
+                          height: 24,
+                          color: m.teal,
+                          "&:hover": { bgcolor: alpha(m.teal, 0.08) },
+                        }}
+                      >
+                        <StickyNote2OutlinedIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    ) : null}
+                  </Stack>
                 </TableCell>
                 <TableCell sx={{ verticalAlign: "top" }}>
                   <BodyText component="span" sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.75) }}>
@@ -109,25 +169,27 @@ export default function TransactionsTable({
                       <BodyText component="span" sx={{ fontWeight: 900, fontSize: 12.5, color: alpha(m.navy, 0.86) }}>
                         {row.clientName}
                       </BodyText>
-                      {row.member ? (
+                      {clientTypeLabel ? (
                         <Chip
-                          label="MEMBER"
+                          label={clientTypeLabel}
                           size="small"
                           sx={{
                             height: 18,
                             borderRadius: "999px",
-                            bgcolor: alpha(theme.palette.primary.main, 0.1),
-                            color: theme.palette.primary.main,
                             fontSize: 9,
                             fontWeight: 900,
                             px: 0.25,
+                            textTransform: "none",
+                            ...clientTypeChipSx(theme),
                           }}
                         />
                       ) : null}
                     </Stack>
-                    <BodyText component="span" sx={{ fontSize: 11.5, fontWeight: 600, color: alpha(m.navy, 0.5) }}>
-                      {row.clientEmail}
-                    </BodyText>
+                    {showClientEmail ? (
+                      <BodyText component="span" sx={{ fontSize: 11.5, fontWeight: 600, color: alpha(m.navy, 0.5) }}>
+                        {row.clientEmail}
+                      </BodyText>
+                    ) : null}
                   </Stack>
                 </TableCell>
                 <TableCell sx={{ verticalAlign: "top" }}>
@@ -163,16 +225,18 @@ export default function TransactionsTable({
                         key={label}
                         component="button"
                         type="button"
+                        disabled={disableDocumentLinks}
                         onClick={() => onOpenDocument(row, label.toLowerCase() as "invoice" | "receipt")}
                         underline="hover"
                         sx={{
                           fontSize: 12,
                           fontWeight: 800,
-                          color: theme.palette.primary.main,
-                          cursor: "pointer",
+                          color: disableDocumentLinks ? alpha(m.navy, 0.28) : theme.palette.primary.main,
+                          cursor: disableDocumentLinks ? "not-allowed" : "pointer",
                           border: 0,
                           bgcolor: "transparent",
                           p: 0,
+                          pointerEvents: disableDocumentLinks ? "none" : "auto",
                         }}
                       >
                         {label}
@@ -181,7 +245,8 @@ export default function TransactionsTable({
                   </Stack>
                 </TableCell>
               </TableRow>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
       </TableContainer>

@@ -4,6 +4,7 @@ import cors from "cors";
 import express from "express";
 import { fileURLToPath } from "url";
 import { getUploadsDir } from "./config/uploads-dir.js";
+import { query } from "./db/index.js";
 import authRoutes from "./routes/auth.routes.js";
 import businessRoutes from "./routes/business.routes.js";
 import businessSetupsRoutes from "./routes/business-setups.routes.js";
@@ -25,8 +26,17 @@ app.get("/", (_req, res) => {
   res.status(200).type("text/plain").send("ok");
 });
 
-app.get("/api/health", (_req, res) => {
-  res.status(200).json({ status: "ok" });
+app.get("/api/health", async (_req, res) => {
+  try {
+    await query("SELECT 1");
+    return res.status(200).json({ status: "ok", database: "connected" });
+  } catch (error) {
+    return res.status(503).json({
+      status: "degraded",
+      database: "unavailable",
+      error: error.message,
+    });
+  }
 });
 
 app.use("/api/auth", authRoutes);

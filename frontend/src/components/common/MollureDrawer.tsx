@@ -3,20 +3,19 @@
 import * as React from "react";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
-import { Box, Divider, Drawer, IconButton, Stack, type DrawerProps } from "@mui/material";
-import { alpha, useTheme, type SxProps, type Theme } from "@mui/material/styles";
+import { Box, Divider, Drawer, IconButton, Stack, type DrawerProps, type SxProps, type Theme } from "@mui/material";
+import { alpha, useTheme } from "@mui/material/styles";
 import { SubHeading } from "../ui/typography";
 
-type MollureDrawerProps = Omit<DrawerProps, "children"> & {
+type MollureDrawerProps = Omit<DrawerProps, "children" | "title"> & {
   title: React.ReactNode;
   children: React.ReactNode;
   footer?: React.ReactNode;
-  onBack?: () => void;
-  width?: number | { xs?: any; sm?: any; md?: any; lg?: any; xl?: any };
-  headerSx?: SxProps<Theme>;
-  titleSx?: SxProps<Theme>;
+  panelWidth?: number | { xs?: number | string; sm?: number | string };
+  /** @deprecated Use panelWidth */
+  width?: number | { xs?: number | string; sm?: number | string };
   contentSx?: SxProps<Theme>;
-  footerSx?: SxProps<Theme>;
+  onBack?: () => void;
   hideDividers?: boolean;
 };
 
@@ -24,52 +23,37 @@ export default function MollureDrawer({
   title,
   children,
   footer,
-  onBack,
-  width = { xs: "100%", sm: 500 },
-  onClose,
-  PaperProps: paperProps,
-  headerSx,
-  titleSx,
+  panelWidth,
+  width,
   contentSx,
-  footerSx,
-  hideDividers,
+  onBack,
+  hideDividers = false,
+  onClose,
+  anchor = "right",
   ...props
 }: MollureDrawerProps) {
+  const resolvedWidth = panelWidth ?? width ?? { xs: "100vw", sm: 480 };
   const theme = useTheme();
   const m = theme.palette.mollure;
 
-  const basePaperSx: SxProps<Theme> = {
-    width,
-    maxWidth: "100%",
-    height: "100%",
-    borderTopLeftRadius: "12px",
-    borderBottomLeftRadius: "12px",
-  };
-
   return (
-    <Drawer
-      onClose={onClose}
-      PaperProps={{
-        ...paperProps,
-        sx: {
-          ...(basePaperSx as any),
-          ...(paperProps?.sx as any),
-        },
-      }}
-      {...props}
-    >
-      <Stack sx={{ height: "100%" }}>
-        <Stack
-          direction="row"
-          alignItems="center"
-          justifyContent="space-between"
-          sx={{ px: 2.5, py: 2, ...((headerSx as any) ?? {}) }}
-        >
-          <Stack direction="row" spacing={1} alignItems="center">
+    <Drawer anchor={anchor} onClose={onClose} {...props}>
+      <Box
+        sx={{
+          width: resolvedWidth,
+          height: "100%",
+          display: "flex",
+          flexDirection: "column",
+          bgcolor: "#fff",
+        }}
+      >
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 2.5, py: 2, flexShrink: 0 }}>
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
             {onBack ? (
               <IconButton
                 size="small"
                 onClick={onBack}
+                aria-label="Back"
                 sx={{
                   width: 30,
                   height: 30,
@@ -81,9 +65,7 @@ export default function MollureDrawer({
                 <ArrowBackRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.55) }} />
               </IconButton>
             ) : null}
-            <SubHeading sx={{ fontSize: 16, color: alpha(m.navy, 0.88), ...((titleSx as any) ?? {}) }}>
-              {title}
-            </SubHeading>
+            <SubHeading sx={{ fontSize: 16, color: alpha(m.navy, 0.88) }}>{title}</SubHeading>
           </Stack>
           <IconButton
             size="small"
@@ -101,16 +83,15 @@ export default function MollureDrawer({
         </Stack>
         {hideDividers ? null : <Divider sx={{ borderColor: alpha(m.navy, 0.08) }} />}
 
-        <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", ...((contentSx as any) ?? {}) }}>{children}</Box>
+        <Box sx={{ flex: 1, overflow: "auto", ...contentSx }}>{children}</Box>
 
         {footer ? (
           <>
             {hideDividers ? null : <Divider sx={{ borderColor: alpha(m.navy, 0.08) }} />}
-            <Box sx={footerSx}>{footer}</Box>
+            <Box sx={{ flexShrink: 0 }}>{footer}</Box>
           </>
         ) : null}
-      </Stack>
+      </Box>
     </Drawer>
   );
 }
-

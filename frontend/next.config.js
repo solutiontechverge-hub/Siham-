@@ -22,6 +22,18 @@ const nextConfig = {
     "@emotion/react",
     "@emotion/styled",
   ],
+  experimental: {
+    serverComponentsExternalPackages: ["stripe"],
+  },
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "mollure-staging-uploads.s3.us-east-1.amazonaws.com",
+        pathname: "/**",
+      },
+    ],
+  },
 };
 
 module.exports = nextConfig;

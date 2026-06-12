@@ -1,21 +1,13 @@
 "use client";
 
 import * as React from "react";
-import {
-  Box,
-  Button,
-  Checkbox,
-  Grid,
-  MenuItem,
-  Paper,
-  Stack,
-  type PaperProps,
-} from "@mui/material";
+import { Box, Button, Grid, MenuItem, Paper, type PaperProps } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import CalendarPopover, { type CalendarPopoverValue } from "./CalendarPopover";
+import CalendarPopover, { formatListingDateTimeDisplay, type CalendarPopoverValue } from "./CalendarPopover";
+import ListingLocationModeCards from "./ListingLocationModeCards";
 import Image from "next/image";
-import { ArrowDown, ListingBG, DesiredLocationIcon, FixedLocationIcon } from "../../../../images";
-import { MollureTextField } from "..";
+import { ArrowDown } from "../../../../images";
+import { KeywordTagsInput, MollureTextField } from "..";
 import { BodyText } from "../../ui/typography";
 
 function assetUrl(asset: any) {
@@ -34,9 +26,11 @@ export type ListingFilterOption = { label: string; value: string };
 export type ListingFilterValues = {
   dateTime: CalendarPopoverValue;
   category: string;
+  categories: string[];
   municipality: string;
-  keyword: string;
-  locationMode: "fixed" | "desired";
+  municipalities: string[];
+  keywords: string[];
+  locationModes: Array<"fixed" | "desired">;
 };
 
 export type ListingFilterBoxProps = Omit<PaperProps, "onChange"> & {
@@ -94,62 +88,7 @@ export default function ListingFilterBox({
 
   const set = (patch: Partial<ListingFilterValues>) => onChange({ ...values, ...patch });
 
-  const dateTimeDisplay = values.dateTime
-    ? values.dateTime.toLocaleString(undefined, {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : "";
-
-  const LocationPill = ({
-    icon,
-    label,
-    checked,
-    onClick,
-  }: {
-    icon: any;
-    label: string;
-    checked: boolean;
-    onClick: () => void;
-  }) => (
-    <Button
-      onClick={onClick}
-      variant="text"
-      disableRipple
-      sx={{
-        justifyContent: "space-between",
-        textTransform: "none",
-        px: 1.5,
-        py: 1.05,
-        borderRadius: "12px",
-        bgcolor: alpha(tokens.navy, 0.03),
-        color: tokens.navy,
-        fontWeight: 600,
-        "&:hover": { bgcolor: alpha(tokens.teal, 0.06) },
-      }}
-      fullWidth
-    >
-      <Stack direction="row" spacing={1.1} alignItems="center">
-        <Image src={icon} alt={label} width={18} height={18} />
-        <BodyText sx={{ fontSize: 14, fontWeight: 500, color: tokens.navy }}>
-          {label}
-        </BodyText>
-      </Stack>
-      <Checkbox
-        checked={checked}
-        onChange={onClick}
-        sx={{
-          p: 0,
-          ml: 1,
-          color: tokens.teal,
-          "&.Mui-checked": { color: tokens.teal },
-        }}
-      />
-    </Button>
-  );
+  const dateTimeDisplay = formatListingDateTimeDisplay(values.dateTime);
 
   return (
     <Paper
@@ -198,7 +137,10 @@ export default function ListingFilterBox({
           <MollureTextField
             select
             value={values.category}
-            onChange={(e) => set({ category: e.target.value })}
+            onChange={(e) => {
+              const next = e.target.value;
+              set({ category: next, categories: next ? [next] : [] });
+            }}
             InputProps={{
               endAdornment: (
                 <Box sx={{ display: "flex", alignItems: "center", pr: 0.25 }}>
@@ -232,31 +174,20 @@ export default function ListingFilterBox({
         </Grid>
 
         <Grid item xs={12}>
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
-              <LocationPill
-                icon={FixedLocationIcon}
-                label="Fixed Location"
-                checked={values.locationMode === "fixed"}
-                onClick={() => set({ locationMode: "fixed" })}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <LocationPill
-                icon={DesiredLocationIcon}
-                label="Desired Location"
-                checked={values.locationMode === "desired"}
-                onClick={() => set({ locationMode: "desired" })}
-              />
-            </Grid>
-          </Grid>
+          <ListingLocationModeCards
+            value={values.locationModes}
+            onChange={(locationModes) => set({ locationModes })}
+          />
         </Grid>
 
         <Grid item xs={12}>
           <MollureTextField
             select
             value={values.municipality}
-            onChange={(e) => set({ municipality: e.target.value })}
+            onChange={(e) => {
+              const next = e.target.value;
+              set({ municipality: next, municipalities: next ? [next] : [] });
+            }}
             InputProps={{
               endAdornment: (
                 <Box sx={{ display: "flex", alignItems: "center", pr: 0.25 }}>
@@ -290,9 +221,10 @@ export default function ListingFilterBox({
         </Grid>
 
         <Grid item xs={12}>
-          <MollureTextField
-            value={values.keyword}
-            onChange={(e) => set({ keyword: e.target.value })}
+          <KeywordTagsInput
+            value={values.keywords}
+            onChange={(keywords) => set({ keywords })}
+            maxKeywords={3}
             placeholder="Search Keyword"
             sx={lineFieldSx}
           />

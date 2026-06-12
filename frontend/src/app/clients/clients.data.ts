@@ -39,6 +39,32 @@ export type ClientFilter = {
   options?: string[];
 };
 
+export const clientHomeServiceCategories = [
+  "Hair",
+  "Make up",
+  "Eyebrows",
+  "Eyelashes",
+  "Nails",
+  "Hair removal",
+  "Face treatment",
+  "Body treatment",
+] as const;
+
+export const netherlandsProvinces = [
+  "Drenthe",
+  "Flevoland",
+  "Friesland",
+  "Gelderland",
+  "Groningen",
+  "Limburg",
+  "Noord-Brabant",
+  "Noord-Holland",
+  "Overijssel",
+  "Utrecht",
+  "Zeeland",
+  "Zuid-Holland",
+] as const;
+
 export const clientsPageData = {
   header: clientsShellHeader,
   hero: {
@@ -47,10 +73,19 @@ export const clientsPageData = {
     description:
       "Find verified professionals for salon or on-location services. Review, confirm, and manage bookings in one place for personal or business needs.",
     primaryAction: "Browse Professionals",
+    primaryActionHref: "/clients/listing",
     filters: [
-      { label: "Select Category", placeholder: "Hair stylist", options: ['Fixed Location','Desired Location']},
-      { label: "Location", placeholder: "Select city", options: ['Fixed','Desired Location'] },
-      { label: "Select Municipality", placeholder: "Select municipality", options: ['Fixed Location','Desired Location'] },
+      {
+        label: "Select Category",
+        placeholder: "Select category",
+        options: [...clientHomeServiceCategories],
+      },
+      { label: "Location", placeholder: "Select city", options: ["Fixed Location", "Desired Location"] },
+      {
+        label: "Select Municipality",
+        placeholder: "Select municipality",
+        options: [...netherlandsProvinces],
+      },
     ] satisfies ClientFilter[],
     searchAction: "Search",
   },

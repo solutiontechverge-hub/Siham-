@@ -1,4 +1,6 @@
 import type { ListingFilterOption } from "../../../components/common";
+import { clientHomeServiceCategories, netherlandsProvinces } from "../clients.data";
+import type { ListingPriceTier } from "../../../components/common/listingDrawerFilters";
 import {
   ListingImage1,
   ListingImage2,
@@ -28,10 +30,23 @@ export type ListingCardData = {
   rating: number; // 0..5
   reviewsCount: number;
   locationModeDefault: "fixed" | "desired";
+  /** Professional offering: Fixed Location, Desired Location, or Both */
+  businessOffering: "fixed" | "desired" | "both";
   services: ListingCardService[];
   startingFromLabel: string;
   /** Used for client-side keyword filtering */
   searchText?: string;
+  /** Lowercase category ids/slugs for hero category filter */
+  categoryKeys?: string[];
+  /** Drawer filter metadata */
+  serviceFor?: string[];
+  lowestPrice?: number;
+  priceTier?: ListingPriceTier;
+  hasDiscount?: boolean;
+  coversAllSelectedCategories?: boolean;
+  hasNoPrepayment?: boolean;
+  hasNoMinTimeslotDl?: boolean;
+  bookSameTimeFl?: boolean;
 };
 
 export const listingPageData = {
@@ -41,20 +56,14 @@ export const listingPageData = {
     professionalLinkLabel: "for professional",
   },
   filters: {
-    categoryOptions: [
-      { label: "Hair Stylist", value: "hair_stylist" },
-      { label: "Makeup Artist", value: "makeup_artist" },
-      { label: "Barber", value: "barber" },
-      { label: "Nail Technician", value: "nail_technician" },
-      { label: "Skincare", value: "skincare" },
-    ] satisfies ListingFilterOption[],
-    municipalityOptions: [
-      { label: "Noord-Holland", value: "noord_holland" },
-      { label: "Amsterdam", value: "amsterdam" },
-      { label: "Rotterdam", value: "rotterdam" },
-      { label: "Utrecht", value: "utrecht" },
-      { label: "Den Haag", value: "den_haag" },
-    ] satisfies ListingFilterOption[],
+    categoryOptions: clientHomeServiceCategories.map((category) => ({
+      label: category,
+      value: category,
+    })) satisfies ListingFilterOption[],
+    municipalityOptions: netherlandsProvinces.map((province) => ({
+      label: province,
+      value: province,
+    })) satisfies ListingFilterOption[],
   },
   toolbar: {
     filterLabel: "Filter",
@@ -79,6 +88,7 @@ export const listingPageData = {
       rating: 5,
       reviewsCount: 134,
       locationModeDefault: "fixed",
+      businessOffering: "fixed",
       services: [
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
@@ -98,6 +108,7 @@ export const listingPageData = {
       rating: 5,
       reviewsCount: 134,
       locationModeDefault: "desired",
+      businessOffering: "desired",
       services: [
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
@@ -117,6 +128,7 @@ export const listingPageData = {
       rating: 5,
       reviewsCount: 134,
       locationModeDefault: "fixed",
+      businessOffering: "both",
       services: [
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
@@ -136,6 +148,7 @@ export const listingPageData = {
       rating: 5,
       reviewsCount: 134,
       locationModeDefault: "fixed",
+      businessOffering: "fixed",
       services: [
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
@@ -155,6 +168,7 @@ export const listingPageData = {
       rating: 5,
       reviewsCount: 134,
       locationModeDefault: "desired",
+      businessOffering: "both",
       services: [
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
@@ -174,6 +188,7 @@ export const listingPageData = {
       rating: 5,
       reviewsCount: 134,
       locationModeDefault: "fixed",
+      businessOffering: "desired",
       services: [
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },
         { name: "Service", durationLabel: "30-40 Min", priceLabel: "Starting From 23 EUR" },

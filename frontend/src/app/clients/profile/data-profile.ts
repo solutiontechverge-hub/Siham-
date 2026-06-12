@@ -32,9 +32,9 @@ export const profilePageData = {
     repeatPassword: { label: "Repeat password*", placeholder: "Confirm Password" },
   },
   reviewNameOptions: [
-    { value: "first_name", label: "First Name" },
-    { value: "last_name", label: "Last Name" },
-    { value: "full_name", label: "Full Name" },
+    { value: "first_name", label: "First Name (e.g., John)" },
+    { value: "full_name", label: "Full Name (e.g., John Smith)" },
+    { value: "initials", label: "Initials/Abbreviation (e.g., JS)" },
   ],
   genderOptions: [
     { value: "female", label: "Female" },

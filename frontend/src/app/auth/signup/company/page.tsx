@@ -381,18 +381,20 @@ export default function CompanySignupPage() {
                         <Grid item xs={12}>
                           <MollureAuthLabeledField
                             fieldLabel="Legal Name"
+                            labelPlacement="inCell"
                             name="legalName"
                             value={form.legalName}
                             onChange={handleChange}
                             error={Boolean(errors.legalName)}
                             helperText={errors.legalName}
                             required
-                            placeholder="e.g Jane"
+                            placeholder="e.g. Jane"
                           />
                         </Grid>
                         <Grid item xs={12} sm={6}>
                           <MollureAuthLabeledField
                             fieldLabel="COC number"
+                            labelPlacement="inCell"
                             name="cccNumber"
                             value={form.cccNumber}
                             onChange={handleChange}
@@ -403,6 +405,7 @@ export default function CompanySignupPage() {
                         <Grid item xs={12} sm={6}>
                           <MollureAuthLabeledField
                             fieldLabel="VAT number"
+                            labelPlacement="inCell"
                             name="vatNumber"
                             value={form.vatNumber}
                             onChange={handleChange}
@@ -427,30 +430,37 @@ export default function CompanySignupPage() {
                         <Grid item xs={12} sm={8}>
                           <MollureAuthLabeledField
                             fieldLabel="Street"
+                            labelPlacement="inCell"
                             name="street"
                             value={form.street}
                             onChange={handleChange}
+                            placeholder="e.g. Damrak"
                           />
                         </Grid>
                         <Grid item xs={12} sm={4}>
                           <MollureAuthLabeledField
                             fieldLabel="Number"
+                            labelPlacement="inCell"
                             name="number"
                             value={form.number}
                             onChange={handleChange}
+                            placeholder="e.g. 1"
                           />
                         </Grid>
                         <Grid item xs={12} sm={6}>
                           <MollureAuthLabeledField
                             fieldLabel="Postal Code"
+                            labelPlacement="inCell"
                             name="postalCode"
                             value={form.postalCode}
                             onChange={handleChange}
+                            placeholder="e.g. 1012 LG"
                           />
                         </Grid>
                         <Grid item xs={12} sm={6}>
                           <MollureAuthLabeledField
                             fieldLabel="Province"
+                            labelPlacement="inCell"
                             select
                             name="province"
                             value={form.province}
@@ -470,6 +480,7 @@ export default function CompanySignupPage() {
                         <Grid item xs={12}>
                           <MollureAuthLabeledField
                             fieldLabel="Municipality"
+                            labelPlacement="inCell"
                             select
                             name="municipality"
                             value={form.municipality}
@@ -504,31 +515,34 @@ export default function CompanySignupPage() {
                         <Grid item xs={12} sm={6}>
                           <MollureAuthLabeledField
                             fieldLabel="First Name"
+                            labelPlacement="inCell"
                             name="contactFirstName"
                             value={form.contactFirstName}
                             onChange={handleChange}
                             error={Boolean(errors.contactFirstName)}
                             helperText={errors.contactFirstName}
                             required
-                            placeholder="e.g Jane"
+                            placeholder="e.g. Jane"
                           />
                         </Grid>
                         <Grid item xs={12} sm={6}>
                           <MollureAuthLabeledField
                             fieldLabel="Last Name"
+                            labelPlacement="inCell"
                             name="contactLastName"
                             value={form.contactLastName}
                             onChange={handleChange}
                             error={Boolean(errors.contactLastName)}
                             helperText={errors.contactLastName}
                             required
-                            placeholder="e.g Doe"
+                            placeholder="e.g. Doe"
                           />
                         </Grid>
                         <Grid item xs={12}>
                           <MollureAuthLabeledField
                             type="email"
                             fieldLabel="Email"
+                            labelPlacement="inCell"
                             name="contactEmail"
                             value={form.contactEmail}
                             onChange={handleChange}
@@ -536,12 +550,13 @@ export default function CompanySignupPage() {
                             helperText={errors.contactEmail}
                             required
                             autoComplete="email"
-                            placeholder="You@gmail.com"
+                            placeholder="you@gmail.com"
                           />
                         </Grid>
                         <Grid item xs={12} sm={6}>
                           <MollureAuthLabeledPasswordField
                             fieldLabel="Password"
+                            labelPlacement="inCell"
                             name="password"
                             value={form.password}
                             onChange={handleChange}
@@ -549,12 +564,13 @@ export default function CompanySignupPage() {
                             helperText={errors.password}
                             required
                             autoComplete="new-password"
-                            placeholder="Enter Password"
+                            placeholder="Enter password"
                           />
                         </Grid>
                         <Grid item xs={12} sm={6}>
                           <MollureAuthLabeledPasswordField
                             fieldLabel="Repeat password"
+                            labelPlacement="inCell"
                             name="confirmPassword"
                             value={form.confirmPassword}
                             onChange={handleChange}
@@ -562,7 +578,7 @@ export default function CompanySignupPage() {
                             helperText={errors.confirmPassword}
                             required
                             autoComplete="new-password"
-                            placeholder="Confirm Password"
+                            placeholder="Confirm password"
                           />
                         </Grid>
                         <Grid item xs={12}>

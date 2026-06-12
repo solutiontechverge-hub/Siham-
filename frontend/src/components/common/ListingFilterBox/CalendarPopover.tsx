@@ -1,57 +1,17 @@
 "use client";
 
 import * as React from "react";
-import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
-import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
-import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
-import EventRoundedIcon from "@mui/icons-material/EventRounded";
+import { Box, Button, ButtonBase, Popover, Stack, Typography } from "@mui/material";
+import { alpha, useTheme } from "@mui/material/styles";
+import { AppTimePanel, formatTimeDisplay } from "../AppTimePicker";
+import { AppCalendarPanel } from "../AppDatePicker";
 import {
-  Box,
-  Button,
-  ButtonBase,
-  Divider,
-  IconButton,
-  Popover,
-  Stack,
-  Typography,
-} from "@mui/material";
-import { useTheme } from "@mui/material/styles";
-
-function startOfMonth(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), 1);
-}
-
-function endOfMonth(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth() + 1, 0);
-}
-
-function isSameDay(a: Date, b: Date) {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
-}
-
-function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
-}
-
-function pad2(n: number) {
-  return String(n).padStart(2, "0");
-}
-
-function formatDisplay(value: Date | null) {
-  if (!value) return "";
-  const y = value.getFullYear();
-  const m = pad2(value.getMonth() + 1);
-  const d = pad2(value.getDate());
-  const hh = pad2(value.getHours());
-  const mm = pad2(value.getMinutes());
-  return `${y}-${m}-${d} ${hh}:${mm}`;
-}
-
-export type CalendarPopoverValue = Date | null;
+  defaultListingDateTimeFilter,
+  todayIsoDate,
+  type CalendarPopoverValue,
+  type ListingDateTimeFilter,
+  type ListingTimePreset,
+} from "./listingDateTime";
 
 type CalendarPopoverProps = {
   anchorEl: HTMLElement | null;
@@ -61,6 +21,27 @@ type CalendarPopoverProps = {
   onChange: (next: CalendarPopoverValue) => void;
 };
 
+const DATE_MODE_OPTIONS = [
+  { label: "today", value: "today" as const },
+  { label: "any date", value: "any" as const },
+];
+
+const TIME_PRESET_ROWS: Array<Array<{ label: string; value: ListingTimePreset }>> = [
+  [
+    { label: "any time", value: "any" },
+    { label: "morning", value: "morning" },
+    { label: "noon", value: "noon" },
+  ],
+  [
+    { label: "afternoon", value: "afternoon" },
+    { label: "evening", value: "evening" },
+  ],
+];
+
+function mergeDraft(value: CalendarPopoverValue): ListingDateTimeFilter {
+  return value ? { ...value } : defaultListingDateTimeFilter();
+}
+
 export default function CalendarPopover({
   anchorEl,
   open,
@@ -69,49 +50,92 @@ export default function CalendarPopover({
   onChange,
 }: CalendarPopoverProps) {
   const tokens = useTheme().palette.mollure;
-  const [viewDate, setViewDate] = React.useState<Date>(() => startOfMonth(value ?? new Date()));
+  const today = React.useMemo(() => todayIsoDate(), []);
+  const [draft, setDraft] = React.useState<ListingDateTimeFilter>(() => mergeDraft(value));
+  const [activeTimeField, setActiveTimeField] = React.useState<"timeFrom" | "timeTo" | null>(null);
 
   React.useEffect(() => {
-    if (open) setViewDate(startOfMonth(value ?? new Date()));
+    if (open) {
+      setDraft(mergeDraft(value));
+      setActiveTimeField(null);
+    }
   }, [open, value]);
 
-  const monthStart = startOfMonth(viewDate);
-  const monthEnd = endOfMonth(viewDate);
-  const firstWeekday = monthStart.getDay(); // 0=Sun
-  const daysInMonth = monthEnd.getDate();
-
-  const selected = value;
-  const selectedDay = selected ? new Date(selected) : null;
-  const selectedHour = selected ? selected.getHours() : 9;
-  const selectedMinute = selected ? selected.getMinutes() : 0;
-
-  const dayCells: Array<Date | null> = [];
-  for (let i = 0; i < firstWeekday; i++) dayCells.push(null);
-  for (let day = 1; day <= daysInMonth; day++) {
-    dayCells.push(new Date(viewDate.getFullYear(), viewDate.getMonth(), day));
-  }
-  while (dayCells.length % 7 !== 0) dayCells.push(null);
-
-  const setDay = (day: Date) => {
-    const next = new Date(day);
-    next.setHours(clamp(selectedHour, 0, 23));
-    next.setMinutes(clamp(selectedMinute, 0, 59));
-    next.setSeconds(0);
-    next.setMilliseconds(0);
-    onChange(next);
+  const patchDraft = (patch: Partial<ListingDateTimeFilter>) => {
+    setDraft((prev) => ({ ...prev, ...patch }));
   };
 
-  const setTime = (hour: number, minute: number) => {
-    const base = value ? new Date(value) : new Date();
-    base.setHours(clamp(hour, 0, 23));
-    base.setMinutes(clamp(minute, 0, 59));
-    base.setSeconds(0);
-    base.setMilliseconds(0);
-    onChange(base);
+  const setDateMode = (mode: ListingDateTimeFilter["dateMode"]) => {
+    if (mode === "today") {
+      patchDraft({ dateMode: "today", date: today });
+      return;
+    }
+    patchDraft({
+      dateMode: "any",
+      date: draft.date < today ? today : draft.date,
+    });
   };
 
-  const hours = Array.from({ length: 24 }, (_, i) => i);
-  const minutes = [0, 15, 30, 45];
+  const setTimePreset = (preset: ListingTimePreset) => {
+    setActiveTimeField(null);
+    patchDraft({ timePreset: preset, timeFrom: "", timeTo: "" });
+  };
+
+  const setCustomTime = (field: "timeFrom" | "timeTo", next: string) => {
+    patchDraft({
+      [field]: next,
+      timePreset: "any",
+    });
+  };
+
+  const timeFieldSx = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "flex-start",
+    width: "100%",
+    minHeight: 44,
+    px: 1.5,
+    py: 1.1,
+    borderRadius: "10px",
+    border: `1px solid ${alpha(tokens.navy, 0.14)}`,
+    bgcolor: "#fff",
+    textAlign: "left" as const,
+    transition: "border-color 0.15s",
+    "&:hover": { borderColor: tokens.teal },
+  };
+
+  const apply = () => {
+    onChange({ ...draft });
+    onClose();
+  };
+
+  const clear = () => {
+    onChange(null);
+    onClose();
+  };
+
+  const pillSx = (active: boolean) => ({
+    width: "100%",
+    textTransform: "none" as const,
+    fontWeight: 700,
+    fontSize: 12.5,
+    borderRadius: "999px",
+    px: 1.5,
+    py: 0.9,
+    minHeight: 36,
+    color: active ? "#fff" : alpha(tokens.navy, 0.72),
+    bgcolor: active ? tokens.teal : alpha(tokens.navy, 0.06),
+    border: `1px solid ${active ? tokens.teal : alpha(tokens.navy, 0.08)}`,
+    "&:hover": {
+      bgcolor: active ? tokens.tealDark : alpha(tokens.teal, 0.1),
+    },
+  });
+
+  const isPresetActive = (preset: ListingTimePreset) =>
+    !draft.timeFrom && !draft.timeTo && draft.timePreset === preset;
+
+  const calendarMin = draft.dateMode === "today" ? today : today;
+  const calendarMax = draft.dateMode === "today" ? today : undefined;
 
   return (
     <Popover
@@ -122,184 +146,167 @@ export default function CalendarPopover({
       transformOrigin={{ vertical: "top", horizontal: "left" }}
       PaperProps={{
         sx: {
-          width: 320,
+          width: { xs: "min(360px, calc(100vw - 32px))", sm: 360 },
           borderRadius: 3,
           border: `1px solid ${tokens.border}`,
           boxShadow: "0 18px 45px rgba(16, 24, 40, 0.14)",
           overflow: "hidden",
+          bgcolor: "#fff",
         },
       }}
     >
-      <Box sx={{ px: 2, py: 1.5, bgcolor: "#fff" }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: 0 }}>
-            <EventRoundedIcon sx={{ color: tokens.teal, fontSize: 18 }} />
-            <Typography sx={{ fontWeight: 800, color: tokens.navy, fontSize: 13 }}>
-              {monthStart.toLocaleString(undefined, { month: "long", year: "numeric" })}
-            </Typography>
-          </Stack>
-          <Stack direction="row" spacing={0.5}>
-            <IconButton
-              size="small"
-              onClick={() =>
-                setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1))
-              }
-              aria-label="Previous month"
-            >
-              <ChevronLeftRoundedIcon fontSize="small" />
-            </IconButton>
-            <IconButton
-              size="small"
-              onClick={() =>
-                setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1))
-              }
-              aria-label="Next month"
-            >
-              <ChevronRightRoundedIcon fontSize="small" />
-            </IconButton>
-          </Stack>
-        </Stack>
-      </Box>
+      <Box sx={{ px: 2, py: 2 }}>
+        <Typography sx={{ fontWeight: 800, color: alpha(tokens.navy, 0.55), fontSize: 13, mb: 1.25 }}>
+          Select Date
+        </Typography>
 
-      <Divider sx={{ borderColor: tokens.border }} />
-
-      <Box sx={{ px: 2, py: 1.5, bgcolor: "#fff" }}>
-        <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
-          {["S", "M", "T", "W", "T", "F", "S"].map((d) => (
-            <Typography
-              key={d}
+        <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, mb: 1.5 }}>
+          {DATE_MODE_OPTIONS.map((option) => (
+            <ButtonBase
+              key={option.value}
+              onClick={() => setDateMode(option.value)}
               sx={{
-                width: 36,
-                textAlign: "center",
-                fontSize: 11,
-                fontWeight: 800,
-                color: tokens.slate,
+                ...pillSx(draft.dateMode === option.value),
+                width: "auto",
+                px: 2.25,
               }}
             >
-              {d}
-            </Typography>
+              {option.label}
+            </ButtonBase>
           ))}
-        </Stack>
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: "repeat(7, 1fr)",
-            gap: 0.75,
+        </Box>
+
+        <AppCalendarPanel
+          compact
+          value={draft.dateMode === "today" ? today : draft.date}
+          min={calendarMin}
+          max={calendarMax}
+          onChange={(iso) => {
+            if (draft.dateMode === "today") {
+              patchDraft({ date: today });
+              return;
+            }
+            patchDraft({ date: iso });
           }}
-        >
-          {dayCells.map((cell, idx) => {
-            const isSelected = cell && selectedDay ? isSameDay(cell, selectedDay) : false;
-            return (
+        />
+      </Box>
+
+      <Box
+        sx={{
+          px: 2,
+          py: 2,
+          borderTop: `1px solid ${alpha(tokens.navy, 0.08)}`,
+        }}
+      >
+        <Typography sx={{ fontWeight: 800, color: alpha(tokens.navy, 0.55), fontSize: 13, mb: 1.25 }}>
+          Select Time
+        </Typography>
+
+        <Stack spacing={0.75}>
+          <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 0.75 }}>
+            {TIME_PRESET_ROWS[0].map((option) => (
               <ButtonBase
-                key={idx}
-                disabled={!cell}
-                onClick={() => cell && setDay(cell)}
+                key={option.value}
+                onClick={() => setTimePreset(option.value)}
+                sx={pillSx(isPresetActive(option.value))}
+              >
+                {option.label}
+              </ButtonBase>
+            ))}
+          </Box>
+          <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 0.75 }}>
+            {TIME_PRESET_ROWS[1].map((option) => (
+              <ButtonBase
+                key={option.value}
+                onClick={() => setTimePreset(option.value)}
+                sx={pillSx(isPresetActive(option.value))}
+              >
+                {option.label}
+              </ButtonBase>
+            ))}
+            <Box />
+          </Box>
+        </Stack>
+
+        <Stack spacing={1.25} sx={{ mt: 1.5 }}>
+          <Box>
+            <ButtonBase
+              onClick={() => setActiveTimeField((prev) => (prev === "timeFrom" ? null : "timeFrom"))}
+              sx={{
+                ...timeFieldSx,
+                borderColor: activeTimeField === "timeFrom" ? tokens.teal : alpha(tokens.navy, 0.14),
+              }}
+            >
+              <Typography
                 sx={{
-                  width: 36,
-                  height: 34,
-                  borderRadius: 2,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  color: isSelected ? "#fff" : tokens.navy,
-                  bgcolor: isSelected ? tokens.teal : "transparent",
-                  border: `1px solid ${isSelected ? tokens.teal : "transparent"}`,
-                  "&:hover": cell
-                    ? {
-                        bgcolor: isSelected ? tokens.tealDark : "rgba(33, 184, 191, 0.10)",
-                      }
-                    : undefined,
+                  fontSize: 13,
+                  fontWeight: draft.timeFrom ? 700 : 500,
+                  color: draft.timeFrom ? alpha(tokens.navy, 0.78) : alpha(tokens.navy, 0.42),
                 }}
               >
-                {cell ? cell.getDate() : ""}
-              </ButtonBase>
-            );
-          })}
-        </Box>
-      </Box>
+                {draft.timeFrom ? formatTimeDisplay(draft.timeFrom) : "From"}
+              </Typography>
+            </ButtonBase>
+            {activeTimeField === "timeFrom" ? (
+              <Box
+                sx={{
+                  mt: 0.75,
+                  borderRadius: "12px",
+                  border: `1px solid ${alpha(tokens.navy, 0.1)}`,
+                  overflow: "hidden",
+                }}
+              >
+                <AppTimePanel
+                  compact
+                  value={draft.timeFrom}
+                  onChange={(next) => setCustomTime("timeFrom", next)}
+                  onDone={() => setActiveTimeField(null)}
+                />
+              </Box>
+            ) : null}
+          </Box>
 
-      <Divider sx={{ borderColor: tokens.border }} />
-
-      <Box sx={{ px: 2, py: 1.5, bgcolor: "#fff" }}>
-        <Stack direction="row" spacing={1.1} alignItems="center" sx={{ mb: 1 }}>
-          <AccessTimeRoundedIcon sx={{ color: tokens.teal, fontSize: 18 }} />
-          <Typography sx={{ fontWeight: 800, color: tokens.navy, fontSize: 13 }}>
-            Time
-          </Typography>
-          <Typography sx={{ ml: "auto", fontSize: 12, color: tokens.slate }}>
-            {formatDisplay(value)}
-          </Typography>
-        </Stack>
-        <Stack direction="row" spacing={1}>
-          <Box sx={{ flex: 1 }}>
-            <Typography sx={{ fontSize: 11, fontWeight: 800, color: tokens.slate, mb: 0.75 }}>
-              Hour
-            </Typography>
-            <Box
+          <Box>
+            <ButtonBase
+              onClick={() => setActiveTimeField((prev) => (prev === "timeTo" ? null : "timeTo"))}
               sx={{
-                display: "grid",
-                gridTemplateColumns: "repeat(6, 1fr)",
-                gap: 0.75,
+                ...timeFieldSx,
+                borderColor: activeTimeField === "timeTo" ? tokens.teal : alpha(tokens.navy, 0.14),
               }}
             >
-              {hours.map((h) => {
-                const active = selectedHour === h;
-                return (
-                  <ButtonBase
-                    key={h}
-                    onClick={() => setTime(h, selectedMinute)}
-                    sx={{
-                      height: 30,
-                      borderRadius: 2,
-                      fontSize: 12,
-                      fontWeight: 800,
-                      color: active ? "#fff" : tokens.navy,
-                      bgcolor: active ? tokens.teal : "rgba(52, 74, 102, 0.04)",
-                      border: `1px solid ${active ? tokens.teal : "rgba(52, 74, 102, 0.06)"}`,
-                      "&:hover": { bgcolor: active ? tokens.tealDark : "rgba(33, 184, 191, 0.10)" },
-                    }}
-                  >
-                    {pad2(h)}
-                  </ButtonBase>
-                );
-              })}
-            </Box>
-          </Box>
-          <Box sx={{ width: 92 }}>
-            <Typography sx={{ fontSize: 11, fontWeight: 800, color: tokens.slate, mb: 0.75 }}>
-              Min
-            </Typography>
-            <Stack spacing={0.75}>
-              {minutes.map((m) => {
-                const active = selectedMinute === m;
-                return (
-                  <ButtonBase
-                    key={m}
-                    onClick={() => setTime(selectedHour, m)}
-                    sx={{
-                      height: 30,
-                      borderRadius: 2,
-                      fontSize: 12,
-                      fontWeight: 800,
-                      color: active ? "#fff" : tokens.navy,
-                      bgcolor: active ? tokens.teal : "rgba(52, 74, 102, 0.04)",
-                      border: `1px solid ${active ? tokens.teal : "rgba(52, 74, 102, 0.06)"}`,
-                      "&:hover": { bgcolor: active ? tokens.tealDark : "rgba(33, 184, 191, 0.10)" },
-                    }}
-                  >
-                    {pad2(m)}
-                  </ButtonBase>
-                );
-              })}
-            </Stack>
+              <Typography
+                sx={{
+                  fontSize: 13,
+                  fontWeight: draft.timeTo ? 700 : 500,
+                  color: draft.timeTo ? alpha(tokens.navy, 0.78) : alpha(tokens.navy, 0.42),
+                }}
+              >
+                {draft.timeTo ? formatTimeDisplay(draft.timeTo) : "To"}
+              </Typography>
+            </ButtonBase>
+            {activeTimeField === "timeTo" ? (
+              <Box
+                sx={{
+                  mt: 0.75,
+                  borderRadius: "12px",
+                  border: `1px solid ${alpha(tokens.navy, 0.1)}`,
+                  overflow: "hidden",
+                }}
+              >
+                <AppTimePanel
+                  compact
+                  value={draft.timeTo}
+                  onChange={(next) => setCustomTime("timeTo", next)}
+                  onDone={() => setActiveTimeField(null)}
+                />
+              </Box>
+            ) : null}
           </Box>
         </Stack>
 
-        <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
+        <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
           <Button
-            onClick={() => {
-              onChange(null);
-              onClose();
-            }}
+            onClick={clear}
             variant="outlined"
             sx={{
               flex: 1,
@@ -314,7 +321,7 @@ export default function CalendarPopover({
             Clear
           </Button>
           <Button
-            onClick={onClose}
+            onClick={apply}
             variant="contained"
             disableElevation
             sx={{
@@ -334,3 +341,5 @@ export default function CalendarPopover({
   );
 }
 
+export type { CalendarPopoverValue, ListingDateTimeFilter, ListingDateMode, ListingTimePreset } from "./listingDateTime";
+export { formatListingDateTimeDisplay, defaultListingDateTimeFilter, timePresetRange } from "./listingDateTime";

@@ -3,6 +3,9 @@
 import * as React from "react";
 import { useTheme } from "@mui/material/styles";
 import type { ListingFilterValues } from "../../../components/common";
+import { defaultListingDrawerFilters, type ListingDrawerFilters } from "../../../components/common/listingDrawerFilters";
+import { cardMatchesListingFilters } from "./listing.filters";
+import { hasListingSearchParams } from "./listingSearchParams";
 import type { ListingCardData } from "./listing.data";
 
 export type ListingSortValue = "recommended" | "rating" | "price_asc" | "price_desc";
@@ -10,17 +13,42 @@ export type ListingSortValue = "recommended" | "rating" | "price_asc" | "price_d
 const initialFilters: ListingFilterValues = {
   dateTime: null,
   category: "",
+  categories: [],
   municipality: "",
-  keyword: "",
-  locationMode: "fixed",
+  municipalities: [],
+  keywords: [],
+  locationModes: [],
 };
+
+function mergeListingFilters(patch?: Partial<ListingFilterValues>): ListingFilterValues {
+  return {
+    ...initialFilters,
+    ...patch,
+    categories: patch?.categories ?? initialFilters.categories,
+    municipalities: patch?.municipalities ?? initialFilters.municipalities,
+    keywords: patch?.keywords ?? initialFilters.keywords,
+    locationModes: patch?.locationModes ?? initialFilters.locationModes,
+  };
+}
 
 export function useListingTokens() {
   return useTheme().palette.mollure;
 }
 
-export function useClientListingState(cards: ListingCardData[]) {
-  const [filters, setFilters] = React.useState<ListingFilterValues>(initialFilters);
+export function useClientListingState(
+  cards: ListingCardData[],
+  urlFilters?: Partial<ListingFilterValues>,
+  searchKey = "",
+) {
+  const [draftFilters, setDraftFilters] = React.useState<ListingFilterValues>(() =>
+    mergeListingFilters(urlFilters),
+  );
+  const [appliedFilters, setAppliedFilters] = React.useState<ListingFilterValues>(() =>
+    mergeListingFilters(urlFilters),
+  );
+  const [drawerFilters, setDrawerFilters] = React.useState<ListingDrawerFilters>(defaultListingDrawerFilters);
+  const [appliedDrawerFilters, setAppliedDrawerFilters] =
+    React.useState<ListingDrawerFilters>(defaultListingDrawerFilters);
   const [sort, setSort] = React.useState<ListingSortValue>("recommended");
   const [page, setPage] = React.useState(1);
   const [favorites, setFavorites] = React.useState<Record<string, boolean>>(() => {
@@ -35,6 +63,14 @@ export function useClientListingState(cards: ListingCardData[]) {
 
   const pageSize = 6;
 
+  React.useEffect(() => {
+    if (!searchKey || !urlFilters || !hasListingSearchParams(urlFilters)) return;
+    const merged = mergeListingFilters(urlFilters);
+    setDraftFilters(merged);
+    setAppliedFilters(merged);
+    setPage(1);
+  }, [searchKey, urlFilters]);
+
   const toggleFavorite = React.useCallback((id: string) => {
     setFavorites((prev) => ({ ...prev, [id]: !prev[id] }));
   }, []);
@@ -48,21 +84,8 @@ export function useClientListingState(cards: ListingCardData[]) {
   }, [favorites]);
 
   const filtered = React.useMemo(() => {
-    const keyword = filters.keyword.trim().toLowerCase();
-    return cards.filter((card) => {
-      if (filters.municipality && filters.municipality !== "noord_holland") {
-        // demo matching - map value to label where possible
-        const m = filters.municipality.replaceAll("_", " ").toLowerCase();
-        if (!card.municipalityLabel.toLowerCase().includes(m)) return false;
-      }
-      if (keyword) {
-        const hay =
-          card.searchText ?? `${card.title} ${card.subtitle} ${card.municipalityLabel}`.toLowerCase();
-        if (!hay.includes(keyword)) return false;
-      }
-      return true;
-    });
-  }, [cards, filters.keyword, filters.municipality]);
+    return cards.filter((card) => cardMatchesListingFilters(card, appliedFilters, appliedDrawerFilters));
+  }, [cards, appliedDrawerFilters, appliedFilters]);
 
   const sorted = React.useMemo(() => {
     if (sort === "recommended") return filtered;
@@ -93,13 +116,29 @@ export function useClientListingState(cards: ListingCardData[]) {
   }, [page, sorted]);
 
   const applyFilters = React.useCallback(() => {
+    setAppliedFilters(draftFilters);
+    setPage(1);
+  }, [draftFilters]);
+
+  const applyDrawerFilters = React.useCallback((next: ListingDrawerFilters) => {
+    setDrawerFilters(next);
+    setAppliedDrawerFilters(next);
     setPage(1);
   }, []);
 
+  const cancelDrawerFilters = React.useCallback(() => {
+    setDrawerFilters(appliedDrawerFilters);
+  }, [appliedDrawerFilters]);
+
   return {
-    filters,
-    setFilters,
+    filters: draftFilters,
+    appliedFilters,
+    setFilters: setDraftFilters,
     applyFilters,
+    drawerFilters,
+    setDrawerFilters,
+    applyDrawerFilters,
+    cancelDrawerFilters,
     sort,
     setSort,
     page,

@@ -132,7 +132,7 @@ export const desiredLocationPageData = {
     saveLabel: "Save",
     nameLabel: "Name",
     aboutLabel: "About",
-    keywordsLabel: "Add keywords(You can add up to 3 keywords)",
+    keywordsLabel: "Add keywords(You can add up to 5 keywords)",
     keywordPlaceholder: "e.g Hair Specialist",
     uploadMediaLabel: "Upload Media",
   },

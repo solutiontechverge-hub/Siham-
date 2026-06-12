@@ -3,16 +3,11 @@
 import * as React from "react";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
-import KeyboardDoubleArrowLeftRoundedIcon from "@mui/icons-material/KeyboardDoubleArrowLeftRounded";
-import KeyboardDoubleArrowRightRoundedIcon from "@mui/icons-material/KeyboardDoubleArrowRightRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
-import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
-import LocationOnRoundedIcon from "@mui/icons-material/LocationOnRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
-import StickyNote2OutlinedIcon from "@mui/icons-material/StickyNote2Outlined";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import { Avatar, Box, Button, ButtonBase, Chip, IconButton, Paper, Popover, Stack, Tooltip } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
@@ -21,9 +16,12 @@ import { useSnackbar } from "./AppSnackbar";
 import AppPillTabs from "./AppPillTabs";
 import MollureDrawer from "./MollureDrawer";
 import AppSearchField from "./AppSearchField";
+import AppDatePicker from "./AppDatePicker";
+import { AppCalendarPanel } from "./AppDatePicker";
 import AppTextField from "./AppTextField";
 import AppDropdown from "./AppDropdown";
 import CalendarAddMenu from "./calendar/CalendarAddMenu";
+import CalendarBookingCard from "./calendar/CalendarBookingCard";
 import CalendarBlockTimeModal from "./calendar/CalendarBlockTimeModal";
 import CalendarDesignModal, { type CalendarDesignDraft } from "./calendar/CalendarDesignModal";
 import CalendarPublicBusinessHoursModal, {
@@ -40,6 +38,7 @@ import {
   formatLongDateUtc,
   formatMdyDate,
   formatMonthYearUtc,
+  buildBlocksFromDraft,
   type BlockTimeDraft,
   type Interval,
   mergeIntervals,
@@ -47,13 +46,13 @@ import {
   parseIsoDate,
   type SelectedSlot,
   startOfWeekIso,
-  statusChipSx,
   subtractIntervals,
   sumIntervalsMins,
-  toIsoLocalDate,
   toMonthIso,
+  toIsoLocalDate,
 } from "./calendar/calendar.utils";
 import type {
+  CalendarBlock,
   CalendarBookingType,
   CalendarBookingLocation,
   CalendarEvent,
@@ -72,6 +71,10 @@ export type ProfessionalFixedLocationCalendarProps = {
 
 const toDateTimeInput = (date: string, time: string) => `${date}T${time}:00`;
 const locationToApi = (location: CalendarBookingLocation) => (location === "DL" ? "desired" : "fixed");
+const formatWeekDayName = (iso: string) =>
+  parseIsoDate(iso).toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" });
+const formatWeekDayDate = (iso: string) =>
+  parseIsoDate(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
 export default function ProfessionalFixedLocationCalendar({
   data,
@@ -86,6 +89,21 @@ export default function ProfessionalFixedLocationCalendar({
   const [events, setEvents] = React.useState<readonly CalendarEvent[]>(() => [...data.events]);
   const [editingEventId, setEditingEventId] = React.useState<string | null>(null);
   const [isEditingExisting, setIsEditingExisting] = React.useState(false);
+
+  React.useEffect(() => {
+    setEvents([...data.events]);
+  }, [data.events]);
+
+  const [blocks, setBlocks] = React.useState<readonly CalendarBlock[]>(() => [...data.blocks]);
+  React.useEffect(() => {
+    setBlocks((prev) => {
+      const apiKeys = new Set(data.blocks.map((block) => `${block.resourceId}-${block.date}-${block.start}-${block.end}`));
+      const localBlocks = prev.filter(
+        (block) => block.id.startsWith("blk-local-") && !apiKeys.has(`${block.resourceId}-${block.date}-${block.start}-${block.end}`),
+      );
+      return [...data.blocks, ...localBlocks];
+    });
+  }, [data.blocks]);
 
   const isViewingExisting = Boolean(editingEventId) && !isEditingExisting;
   const addMenuButtonRef = React.useRef<HTMLButtonElement | null>(null);
@@ -113,13 +131,10 @@ export default function ProfessionalFixedLocationCalendar({
   const defaultDateIso = React.useMemo(() => toIsoLocalDate(new Date()), []);
   const [activeSubTab, setActiveSubTab] = React.useState<CalendarSubTab>(data.initialSubTab);
   const [viewMode, setViewMode] = React.useState<CalendarViewMode>(data.initialView);
-  const [activeDateIso, setActiveDateIso] = React.useState(defaultDateIso);
-  const [selectedResourceId, setSelectedResourceId] = React.useState(data.resources[0]?.id ?? "");
+  const [activeDateIso, setActiveDateIso] = React.useState(data.initialDate || defaultDateIso);
+  const [selectedResourceId, setSelectedResourceId] = React.useState("");
+  const [resourceMenuAnchor, setResourceMenuAnchor] = React.useState<HTMLElement | null>(null);
   const [datePickerAnchor, setDatePickerAnchor] = React.useState<HTMLElement | null>(null);
-  const [datePickerMonth, setDatePickerMonth] = React.useState(() => {
-    const base = parseIsoDate(defaultDateIso);
-    return new Date(base.getUTCFullYear(), base.getUTCMonth(), 1);
-  });
   const [addAnchor, setAddAnchor] = React.useState<HTMLElement | null>(null);
   const [filtersOpen, setFiltersOpen] = React.useState(false);
   const [slotDrawerTab, setSlotDrawerTab] = React.useState<"booking" | "sales" | "activity">("booking");
@@ -128,7 +143,6 @@ export default function ProfessionalFixedLocationCalendar({
   const [slotStatus, setSlotStatus] = React.useState<"Confirmed" | "Requested" | "No Show" | "Completed" | "Cancelled">(
     "Confirmed",
   );
-  const [slotCalendarMonth, setSlotCalendarMonth] = React.useState(() => toMonthIso(defaultDateIso));
   const [slotClientAdded, setSlotClientAdded] = React.useState(false);
   const [slotClientSearch, setSlotClientSearch] = React.useState("");
   const [slotAddMenuAnchor, setSlotAddMenuAnchor] = React.useState<HTMLElement | null>(null);
@@ -367,13 +381,39 @@ export default function ProfessionalFixedLocationCalendar({
     });
     return map;
   }, [data.resources]);
+  const resourceNameById = React.useMemo(() => {
+    const map = new Map<string, string>();
+    data.resources.forEach((r) => map.set(r.id, r.name));
+    return map;
+  }, [data.resources]);
 
   const grid = data.timeGrid;
-  const startMin = grid.startHour * 60;
-  const endMin = grid.endHour * 60;
+  const { startMin, endMin } = React.useMemo(() => {
+    const defaultStart = grid.startHour * 60;
+    const defaultEnd = grid.endHour * 60;
+    const step = grid.stepMinutes;
+    const mins: number[] = [];
+    for (const event of events) {
+      mins.push(minutesSinceMidnight(event.start), minutesSinceMidnight(event.end));
+    }
+    for (const block of blocks) {
+      mins.push(minutesSinceMidnight(block.start), minutesSinceMidnight(block.end));
+    }
+    if (!mins.length) {
+      return { startMin: defaultStart, endMin: defaultEnd };
+    }
+    const minT = Math.min(defaultStart, ...mins);
+    const maxT = Math.max(defaultEnd, ...mins);
+    return {
+      startMin: Math.floor(minT / step) * step,
+      endMin: Math.ceil(maxT / step) * step,
+    };
+  }, [blocks, events, grid.endHour, grid.startHour, grid.stepMinutes]);
   const rows = Math.floor((endMin - startMin) / grid.stepMinutes) + 1;
-  const rowPx = 48;
-  const laneHeaderPx = 44;
+  const rowPx = 78;
+  const laneHeaderPx = 48;
+  const timelineHeaderRows = viewMode === "week" ? 2 : 1;
+  const timelineHeaderPx = laneHeaderPx * timelineHeaderRows;
 
   const slotLines = React.useMemo(() => {
     const out: number[] = [];
@@ -391,12 +431,26 @@ export default function ProfessionalFixedLocationCalendar({
     return [activeDateIso];
   }, [activeDateIso, viewMode]);
 
+  React.useEffect(() => {
+    if (filteredResources.length === 0) {
+      setSelectedResourceId("");
+      return;
+    }
+    const stillValid = filteredResources.some((r) => r.id === selectedResourceId);
+    if (!stillValid) {
+      setSelectedResourceId(filteredResources[0].id);
+    }
+  }, [filteredResources, selectedResourceId]);
+
   const activeResource = React.useMemo(
     () => filteredResources.find((r) => r.id === selectedResourceId) ?? filteredResources[0],
     [filteredResources, selectedResourceId],
   );
   const displayedResources = React.useMemo(
-    () => (viewMode === "week" ? (activeResource ? [activeResource] : []) : filteredResources),
+    () => {
+      if (viewMode === "week" || viewMode === "day") return activeResource ? [activeResource] : [];
+      return filteredResources;
+    },
     [activeResource, filteredResources, viewMode],
   );
 
@@ -428,16 +482,85 @@ export default function ProfessionalFixedLocationCalendar({
       visibleDates,
     ],
   );
+  const todayIso = defaultDateIso;
+  const [nowMin, setNowMin] = React.useState(() => {
+    const now = new Date();
+    return now.getHours() * 60 + now.getMinutes();
+  });
+  React.useEffect(() => {
+    const tick = () => {
+      const now = new Date();
+      setNowMin(now.getHours() * 60 + now.getMinutes());
+    };
+    tick();
+    const id = window.setInterval(tick, 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+  const showNowLine = activeDateIso === todayIso && nowMin >= startMin && nowMin <= endMin;
+  const nowLineTop = ((nowMin - startMin) / grid.stepMinutes) * rowPx;
+  const activeMonthIso = React.useMemo(() => toMonthIso(activeDateIso), [activeDateIso]);
+  const monthEvents = React.useMemo(
+    () => {
+      const base = events.filter((e) => toMonthIso(e.date) === activeMonthIso);
+      const byTeam = appliedFilters.teamAll
+        ? base
+        : base.filter((e) => appliedFilters.teamIds[e.resourceId]);
+      const byLocation = appliedFilters.locationAll
+        ? byTeam
+        : byTeam.filter((e) => appliedFilters.locations[e.location]);
+      const byBooking = appliedFilters.bookingAll
+        ? byLocation
+        : byLocation.filter((e) => {
+            const bt = (e.bookingType ?? (e.status === "Requested" ? "Requests" : "Online")) as CalendarBookingType;
+            return appliedFilters.booking[bt];
+          });
+      return byBooking;
+    },
+    [
+      activeMonthIso,
+      appliedFilters.booking,
+      appliedFilters.bookingAll,
+      appliedFilters.locationAll,
+      appliedFilters.locations,
+      appliedFilters.teamAll,
+      appliedFilters.teamIds,
+      events,
+    ],
+  );
+  const monthCells = React.useMemo(() => {
+    const first = parseIsoDate(activeMonthIso);
+    const year = first.getUTCFullYear();
+    const monthIndex = first.getUTCMonth();
+    const gridStartIso = startOfWeekIso(activeMonthIso);
+
+    return Array.from({ length: 42 }, (_, idx) => {
+      const iso = addDaysIso(gridStartIso, idx);
+      const dayDate = parseIsoDate(iso);
+      const inMonth = dayDate.getUTCMonth() === monthIndex;
+      const dayEvents = monthEvents
+        .filter((event) => event.date === iso)
+        .sort((a, b) => `${a.start}-${a.resourceId}`.localeCompare(`${b.start}-${b.resourceId}`));
+
+      return {
+        iso,
+        dateNumber: dayDate.getUTCDate(),
+        inMonth,
+        isToday: iso === todayIso,
+        isSelected: iso === activeDateIso,
+        isPast: iso < todayIso,
+        dayEvents,
+        hiddenCount: Math.max(0, dayEvents.length - 3),
+      };
+    });
+  }, [activeDateIso, activeMonthIso, monthEvents, todayIso]);
   const blocksInRange = React.useMemo(
     () => {
-      const base = data.blocks.filter((b) => visibleDates.includes(b.date));
+      const base = blocks.filter((b) => visibleDates.includes(b.date));
       if (appliedFilters.teamAll) return base;
       return base.filter((b) => appliedFilters.teamIds[b.resourceId]);
     },
-    [appliedFilters.teamAll, appliedFilters.teamIds, data.blocks, visibleDates],
+    [appliedFilters.teamAll, appliedFilters.teamIds, blocks, visibleDates],
   );
-
-  const todayIso = defaultDateIso;
 
   const slotValidation = React.useMemo(() => {
     const isBlank = (v: string) => v.trim().length === 0;
@@ -601,14 +724,16 @@ export default function ProfessionalFixedLocationCalendar({
 
   const prevCandidateIso = React.useMemo(() => {
     if (viewMode === "week") return addDaysIso(activeDateIso, -7);
-    if (viewMode === "month") return addDaysIso(activeDateIso, -30);
+    if (viewMode === "month") return addMonthsIso(activeMonthIso, -1);
     return addDaysIso(activeDateIso, -1);
-  }, [activeDateIso, viewMode]);
+  }, [activeDateIso, activeMonthIso, viewMode]);
 
   const canGoPrev = prevCandidateIso >= todayIso;
 
   const onToday = () => {
     setActiveDateIso(todayIso);
+    setViewMode("day");
+    setSelectedResourceId("");
   };
 
   const onPrev = () => {
@@ -617,7 +742,7 @@ export default function ProfessionalFixedLocationCalendar({
 
   const onNext = () => {
     if (viewMode === "week") setActiveDateIso(addDaysIso(activeDateIso, 7));
-    else if (viewMode === "month") setActiveDateIso(addDaysIso(activeDateIso, 30));
+    else if (viewMode === "month") setActiveDateIso(addMonthsIso(activeMonthIso, 1));
     else setActiveDateIso(addDaysIso(activeDateIso, 1));
   };
 
@@ -639,13 +764,13 @@ export default function ProfessionalFixedLocationCalendar({
         if (e.resourceId !== resourceId || e.date !== iso) continue;
         busy.push({ startMin: minutesSinceMidnight(e.start), endMin: minutesSinceMidnight(e.end) });
       }
-      for (const b of data.blocks) {
+      for (const b of blocks) {
         if (b.resourceId !== resourceId || b.date !== iso) continue;
         busy.push({ startMin: minutesSinceMidnight(b.start), endMin: minutesSinceMidnight(b.end) });
       }
       return busy;
     },
-    [data.blocks, events],
+    [blocks, events],
   );
 
   const getDailyBookingRatio = React.useCallback(
@@ -660,13 +785,196 @@ export default function ProfessionalFixedLocationCalendar({
     [getAvailabilityFor, getBusyFor],
   );
 
+  const renderTeamCapacityBar = (resourceId: string) => {
+    const bookedPct = Math.round(getDailyBookingRatio(resourceId, activeDateIso) * 100);
+    return (
+      <Box
+        sx={{
+          mt: 0.35,
+          height: 3,
+          width: 76,
+          borderRadius: "999px",
+          bgcolor: m.fxGrayF2F4F7,
+          overflow: "hidden",
+        }}
+      >
+        <Box
+          sx={{
+            height: "100%",
+            width: `${bookedPct}%`,
+            bgcolor: m.teal,
+            borderRadius: "999px",
+            transition: "width 0.2s ease",
+          }}
+        />
+      </Box>
+    );
+  };
+
+  const renderTeamMemberHeader = () => (
+    <>
+      <Box
+        sx={{
+          minHeight: laneHeaderPx,
+          display: "flex",
+          alignItems: "center",
+          px: 1.5,
+          gap: 2.5,
+          bgcolor: "#fff",
+          borderBottom: `1px solid ${alpha(m.navy, 0.07)}`,
+          overflowX: "auto",
+          flexWrap: "nowrap",
+        }}
+      >
+        {filteredResources.map((resource) => {
+          const isActive = resource.id === activeResource?.id;
+          const teamAvatarSx = {
+            width: 22,
+            height: 22,
+            bgcolor: alpha(m.teal, 0.14),
+            color: m.teal,
+            fontWeight: 700,
+            fontSize: 9.5,
+            flexShrink: 0,
+          };
+          const teamNameSx = {
+            fontWeight: 600,
+            fontSize: 11.5,
+            color: alpha(m.navy, 0.78),
+            lineHeight: 1.2,
+            whiteSpace: "nowrap" as const,
+          };
+
+          if (isActive) {
+            return (
+              <Box
+                key={resource.id}
+                role="button"
+                tabIndex={0}
+                onClick={(e) => setResourceMenuAnchor(e.currentTarget)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") setResourceMenuAnchor(e.currentTarget);
+                }}
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.65,
+                  px: 1.15,
+                  py: 0.5,
+                  borderRadius: "999px",
+                  bgcolor: alpha(m.navy, 0.04),
+                  cursor: "pointer",
+                  flexShrink: 0,
+                  "&:hover": { bgcolor: alpha(m.teal, 0.06) },
+                }}
+              >
+                <Avatar sx={teamAvatarSx}>{resource.avatarText}</Avatar>
+                <Box sx={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                  <Stack direction="row" alignItems="center" spacing={0.2} sx={{ minWidth: 0 }}>
+                    <BodyText sx={teamNameSx}>{resource.name}</BodyText>
+                    <KeyboardArrowDownRoundedIcon sx={{ fontSize: 15, color: alpha(m.navy, 0.45), flexShrink: 0 }} />
+                  </Stack>
+                  {renderTeamCapacityBar(resource.id)}
+                </Box>
+              </Box>
+            );
+          }
+
+          return (
+            <ButtonBase
+              key={resource.id}
+              onClick={() => setSelectedResourceId(resource.id)}
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 0.65,
+                flexShrink: 0,
+                borderRadius: "4px",
+                px: 0.25,
+                py: 0.35,
+              }}
+            >
+              <Avatar sx={teamAvatarSx}>{resource.avatarText}</Avatar>
+              <Box sx={{ display: "flex", flexDirection: "column", minWidth: 0, alignItems: "flex-start" }}>
+                <BodyText sx={teamNameSx}>{resource.name}</BodyText>
+                {renderTeamCapacityBar(resource.id)}
+              </Box>
+            </ButtonBase>
+          );
+        })}
+      </Box>
+      <Popover
+        open={Boolean(resourceMenuAnchor)}
+        anchorEl={resourceMenuAnchor}
+        onClose={() => setResourceMenuAnchor(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+        transformOrigin={{ vertical: "top", horizontal: "left" }}
+        PaperProps={{
+          sx: {
+            mt: 0.75,
+            borderRadius: "10px",
+            border: `1px solid ${alpha(m.navy, 0.10)}`,
+            boxShadow: "0 8px 24px rgba(16, 35, 63, 0.12)",
+            minWidth: 200,
+            py: 0.75,
+            px: 0.5,
+          },
+        }}
+      >
+        {filteredResources.map((resource) => {
+          const isActive = resource.id === activeResource?.id;
+          return (
+            <ButtonBase
+              key={resource.id}
+              onClick={() => {
+                setSelectedResourceId(resource.id);
+                setResourceMenuAnchor(null);
+              }}
+              sx={{
+                width: "100%",
+                px: 1,
+                py: 0.65,
+                display: "flex",
+                alignItems: "center",
+                gap: 0.75,
+                justifyContent: "flex-start",
+                borderRadius: "8px",
+                bgcolor: isActive ? alpha(m.teal, 0.06) : "transparent",
+                "&:hover": { bgcolor: alpha(m.teal, 0.04) },
+              }}
+            >
+              <Avatar
+                sx={{
+                  width: 22,
+                  height: 22,
+                  bgcolor: alpha(m.teal, 0.14),
+                  color: m.teal,
+                  fontWeight: 700,
+                  fontSize: 9.5,
+                }}
+              >
+                {resource.avatarText}
+              </Avatar>
+              {isActive ? (
+                <BodyText sx={{ fontWeight: 600, fontSize: 11.5, color: alpha(m.navy, 0.78) }}>{resource.name}</BodyText>
+              ) : (
+                <Box sx={{ borderBottom: `1px solid ${alpha(m.navy, 0.2)}`, pb: 0.15 }}>
+                  <BodyText sx={{ fontWeight: 600, fontSize: 11.5, color: alpha(m.navy, 0.78) }}>{resource.name}</BodyText>
+                </Box>
+              )}
+            </ButtonBase>
+          );
+        })}
+      </Popover>
+    </>
+  );
+
   const openBookingDrawer = React.useCallback(
     (payload: SelectedSlot) => {
       setSelectedSlot(payload);
       setSlotDrawerTab("booking");
       setSlotBookingScreen("new-booking");
       setSlotLocation("FL");
-      setSlotCalendarMonth(toMonthIso(payload.date));
       setSlotClientAdded(false);
       setSelectedClient(null);
       setSelectedServices([]);
@@ -719,7 +1027,6 @@ export default function ProfessionalFixedLocationCalendar({
       setSlotDrawerTab("booking");
       setSlotBookingScreen("new-booking");
       setSlotLocation(ev.location);
-      setSlotCalendarMonth(toMonthIso(ev.date));
       setSlotClientAdded(true);
       setSelectedClient({ name: ev.showClientName ?? "Client", email: "" });
       setSelectedServices([]);
@@ -780,7 +1087,7 @@ export default function ProfessionalFixedLocationCalendar({
           : nonMollureDraft.firstName.trim()
             ? `${nonMollureDraft.firstName.trim()} ${nonMollureDraft.lastName.trim()}`.trim()
             : "Walk-in client");
-      const teamMemberId = Number(selectedSlot.resourceId);
+      const teamMemberId = selectedSlot.resourceId?.trim() || null;
       const statusToApi: Record<typeof slotStatus, CreateCalendarEntryRequest["status"]> = {
         Confirmed: "confirmed",
         Requested: "requested",
@@ -799,7 +1106,7 @@ export default function ProfessionalFixedLocationCalendar({
 
       try {
         await onCreateCalendarEntry({
-          team_member_id: Number.isInteger(teamMemberId) ? teamMemberId : null,
+          team_member_id: teamMemberId,
           status: apiStatus,
           title: `${slotBookingType} booking`,
           start_time: toDateTimeInput(selectedSlot.date, selectedSlot.start),
@@ -831,25 +1138,34 @@ export default function ProfessionalFixedLocationCalendar({
   );
 
   return (
-    <Stack spacing={2}>
+    <Stack
+      spacing={1.5}
+      sx={{
+        bgcolor: alpha(m.teal, 0.12),
+        px: { xs: 1.25, md: 3 },
+        py: { xs: 1.5, md: 2.5 },
+        borderRadius: "2px",
+      }}
+    >
       <AppPillTabs
         tabs={data.subTabs.map((label) => ({ label }))}
         active={activeSubTab}
         onChange={(next) => setActiveSubTab(next as CalendarSubTab)}
+        alignStart={false}
       />
 
       <Paper
         elevation={0}
         sx={{
-          borderRadius: "4px",
+          borderRadius: "2px",
           border: 0,
-          boxShadow: "0 12px 28px rgba(16, 35, 63, 0.04)",
-          bgcolor: theme.palette.background.paper,
+          boxShadow: "none",
+          bgcolor: "#fff",
           overflow: "hidden",
         }}
       >
         {/* Toolbar */}
-        <Box sx={{ px: 1.5, py: 1.1, bgcolor: "#fff" }}>
+        <Box sx={{ px: 2, py: 1.25, bgcolor: "#fff" }}>
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
             <Stack direction="row" spacing={0.75} alignItems="center">
               <IconButton
@@ -857,40 +1173,35 @@ export default function ProfessionalFixedLocationCalendar({
                 onClick={onPrev}
                 disabled={!canGoPrev}
                 sx={{
-                  width: 26,
-                  height: 26,
-                  borderRadius: "6px",
-                  border: `1px solid ${alpha(m.navy, 0.14)}`,
+                  width: 22,
+                  height: 22,
+                  borderRadius: "5px",
+                  border: `1px solid ${alpha(m.navy, 0.12)}`,
                   color: alpha(m.navy, 0.6),
                   bgcolor: "#fff",
                 }}
               >
-                <ChevronLeftRoundedIcon sx={{ fontSize: 18 }} />
+                <ChevronLeftRoundedIcon sx={{ fontSize: 15 }} />
               </IconButton>
 
               <Button
                 variant="outlined"
                 startIcon={<CalendarMonthRoundedIcon sx={{ fontSize: 18 }} />}
-                onClick={(e) => {
-                  setDatePickerMonth(() => {
-                    const base = parseIsoDate(activeDateIso);
-                    return new Date(base.getUTCFullYear(), base.getUTCMonth(), 1);
-                  });
-                  setDatePickerAnchor(e.currentTarget);
-                }}
+                onClick={(e) => setDatePickerAnchor(e.currentTarget)}
                 sx={{
-                  borderRadius: "8px",
+                  borderRadius: "6px",
                   textTransform: "none",
-                  fontWeight: 800,
-                  fontSize: 12,
-                  borderColor: alpha(m.navy, 0.14),
+                  fontWeight: 700,
+                  fontSize: 10.5,
+                  borderColor: alpha(m.navy, 0.12),
                   color: alpha(m.navy, 0.78),
                   bgcolor: "#fff",
-                  height: 30,
-                  px: 1.25,
+                  height: 24,
+                  px: 1,
+                  "& .MuiButton-startIcon": { mr: 0.45 },
                 }}
               >
-                {formatLongDateUtc(activeDateIso)}
+                {viewMode === "month" ? formatMonthYearUtc(activeMonthIso) : formatLongDateUtc(activeDateIso)}
               </Button>
 
               <Popover
@@ -902,135 +1213,35 @@ export default function ProfessionalFixedLocationCalendar({
                 PaperProps={{
                   sx: {
                     mt: 1,
-                    borderRadius: "12px",
+                    borderRadius: "14px",
                     border: `1px solid ${alpha(m.navy, 0.10)}`,
-                    boxShadow: "0 14px 28px rgba(16, 35, 63, 0.12)",
+                    boxShadow: "0 16px 40px rgba(16, 35, 63, 0.13)",
                     overflow: "hidden",
-                    width: 320,
                     bgcolor: "#fff",
                   },
                 }}
               >
-                <Box sx={{ p: 1.5 }}>
-                  <Stack direction="row" alignItems="center" spacing={1}>
-                    <IconButton
-                      size="small"
-                      onClick={() =>
-                        setDatePickerMonth((p) => new Date(p.getFullYear(), p.getMonth() - 1, 1))
-                      }
-                      sx={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: "8px",
-                        border: `1px solid ${alpha(m.navy, 0.12)}`,
-                        color: alpha(m.navy, 0.65),
-                        bgcolor: "#fff",
-                      }}
-                    >
-                      <ChevronLeftRoundedIcon sx={{ fontSize: 18 }} />
-                    </IconButton>
-                    <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.85), flex: 1, textAlign: "center" }}>
-                      {datePickerMonth.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-                    </BodyText>
-                    <IconButton
-                      size="small"
-                      onClick={() =>
-                        setDatePickerMonth((p) => new Date(p.getFullYear(), p.getMonth() + 1, 1))
-                      }
-                      sx={{
-                        width: 28,
-                        height: 28,
-                        borderRadius: "8px",
-                        border: `1px solid ${alpha(m.navy, 0.12)}`,
-                        color: alpha(m.navy, 0.65),
-                        bgcolor: "#fff",
-                      }}
-                    >
-                      <ChevronRightRoundedIcon sx={{ fontSize: 18 }} />
-                    </IconButton>
-                  </Stack>
-
-                  <Box
-                    sx={{
-                      mt: 1.25,
-                      display: "grid",
-                      gridTemplateColumns: "repeat(7, 1fr)",
-                      gap: 0.5,
-                    }}
-                  >
-                    {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-                      <BodyText
-                        key={d}
-                        sx={{
-                          fontSize: 11,
-                          fontWeight: 900,
-                          color: alpha(m.navy, 0.5),
-                          textAlign: "center",
-                          py: 0.5,
-                        }}
-                      >
-                        {d}
-                      </BodyText>
-                    ))}
-
-                    {(() => {
-                      const firstDowMon0 = (datePickerMonth.getDay() + 6) % 7; // 0=Mon..6=Sun
-                      const daysInMonth = new Date(datePickerMonth.getFullYear(), datePickerMonth.getMonth() + 1, 0).getDate();
-                      const cells: React.ReactNode[] = [];
-                      for (let i = 0; i < firstDowMon0; i++) cells.push(<Box key={`pad-${i}`} sx={{ height: 34 }} />);
-                      for (let day = 1; day <= daysInMonth; day++) {
-                        const dt = new Date(datePickerMonth.getFullYear(), datePickerMonth.getMonth(), day);
-                        const iso = toIsoLocalDate(dt);
-                        const isPast = iso < todayIso;
-                        const selected = iso === activeDateIso;
-                        cells.push(
-                          <ButtonBase
-                            key={iso}
-                            disabled={isPast}
-                            onClick={() => {
-                              setActiveDateIso(iso);
-                              setDatePickerAnchor(null);
-                            }}
-                            sx={{
-                              height: 34,
-                              borderRadius: "10px",
-                              display: "grid",
-                              placeItems: "center",
-                              fontSize: 12,
-                              fontWeight: 900,
-                              color: isPast ? alpha(m.navy, 0.24) : selected ? "#fff" : alpha(m.navy, 0.75),
-                              bgcolor: selected && !isPast ? m.teal : "transparent",
-                              cursor: isPast ? "not-allowed" : "pointer",
-                              "&.Mui-disabled": {
-                                color: alpha(m.navy, 0.24),
-                                pointerEvents: "auto",
-                              },
-                              "&:hover": { bgcolor: isPast ? "transparent" : selected ? m.tealDark : alpha(m.navy, 0.05) },
-                            }}
-                          >
-                            {day}
-                          </ButtonBase>
-                        );
-                      }
-                      return cells;
-                    })()}
-                  </Box>
-                </Box>
+                <AppCalendarPanel
+                  value={activeDateIso}
+                  onChange={setActiveDateIso}
+                  min={todayIso}
+                  onDaySelect={() => setDatePickerAnchor(null)}
+                />
               </Popover>
 
               <IconButton
                 size="small"
                 onClick={onNext}
                 sx={{
-                  width: 26,
-                  height: 26,
-                  borderRadius: "6px",
-                  border: `1px solid ${alpha(m.navy, 0.14)}`,
+                  width: 22,
+                  height: 22,
+                  borderRadius: "5px",
+                  border: `1px solid ${alpha(m.navy, 0.12)}`,
                   color: alpha(m.navy, 0.6),
                   bgcolor: "#fff",
                 }}
               >
-                <ChevronRightRoundedIcon sx={{ fontSize: 18 }} />
+                <ChevronRightRoundedIcon sx={{ fontSize: 15 }} />
               </IconButton>
             </Stack>
 
@@ -1040,15 +1251,15 @@ export default function ProfessionalFixedLocationCalendar({
               variant="outlined"
               onClick={onToday}
               sx={{
-                borderRadius: "6px",
+                borderRadius: "5px",
                 textTransform: "none",
-                fontWeight: 800,
-                fontSize: 12,
-                borderColor: alpha(m.navy, 0.14),
+                fontWeight: 700,
+                fontSize: 10.5,
+                borderColor: alpha(m.navy, 0.12),
                 color: alpha(m.navy, 0.78),
                 bgcolor: "#fff",
-                height: 30,
-                px: 1.25,
+                height: 24,
+                px: 1,
               }}
             >
               Today
@@ -1057,30 +1268,33 @@ export default function ProfessionalFixedLocationCalendar({
             <Box
               sx={{
                 display: "flex",
-                borderRadius: "8px",
+                borderRadius: "5px",
                 overflow: "hidden",
-                border: `1px solid ${alpha(m.navy, 0.14)}`,
+                border: `1px solid ${alpha(m.navy, 0.12)}`,
                 bgcolor: "#fff",
               }}
             >
-              {(["day", "week", "month"] as const).map((v) => {
+              {(["day", "week"] as const).map((v) => {
                 const active = v === viewMode;
                 return (
                   <Button
                     key={v}
-                    onClick={() => setViewMode(v)}
+                    onClick={() => {
+                      setViewMode(v);
+                      if (v === "day") setSelectedResourceId("");
+                    }}
                     sx={{
                       borderRadius: 0,
-                      minWidth: 44,
-                      height: 28,
+                      minWidth: 38,
+                      height: 22,
                       textTransform: "none",
-                      fontWeight: 800,
-                      fontSize: 12,
-                      bgcolor: active ? alpha(m.navy, 0.04) : "#fff",
+                      fontWeight: 700,
+                      fontSize: 10.5,
+                      bgcolor: active ? alpha(m.teal, 0.08) : "#fff",
                       color: alpha(m.navy, 0.78),
                     }}
                   >
-                    {v === "day" ? "Day" : v === "week" ? "Week" : "Month"}
+                    {v === "day" ? "Day" : "Week"}
                   </Button>
                 );
               })}
@@ -1091,15 +1305,16 @@ export default function ProfessionalFixedLocationCalendar({
               startIcon={<FilterListRoundedIcon sx={{ fontSize: 18 }} />}
               onClick={() => setFiltersOpen(true)}
               sx={{
-                borderRadius: "6px",
+                borderRadius: "5px",
                 textTransform: "none",
-                fontWeight: 800,
-                fontSize: 12,
-                borderColor: alpha(m.navy, 0.14),
+                fontWeight: 700,
+                fontSize: 10.5,
+                borderColor: alpha(m.navy, 0.12),
                 color: alpha(m.navy, 0.78),
                 bgcolor: "#fff",
-                height: 30,
-                px: 1.25,
+                height: 24,
+                px: 1,
+                "& .MuiButton-startIcon": { mr: 0.45 },
               }}
             >
               Filters
@@ -1111,12 +1326,12 @@ export default function ProfessionalFixedLocationCalendar({
               endIcon={<KeyboardArrowDownRoundedIcon />}
               onClick={(e) => setAddAnchor(e.currentTarget)}
               sx={{
-                borderRadius: "8px",
+                borderRadius: "5px",
                 textTransform: "none",
-                fontWeight: 800,
-                fontSize: 12,
-                height: 30,
-                px: 1.5,
+                fontWeight: 700,
+                fontSize: 10.5,
+                height: 24,
+                px: 1.1,
                 bgcolor: m.teal,
                 "&:hover": { bgcolor: m.tealDark },
               }}
@@ -1125,7 +1340,15 @@ export default function ProfessionalFixedLocationCalendar({
             </Button>
             <CalendarAddMenu
               anchorEl={addAnchor}
-              onBlockedTime={() => setBlockTimeOpen(true)}
+              onBlockedTime={() => {
+                setBlockDraft((prev) => ({
+                  ...prev,
+                  dateFrom: activeDateIso,
+                  dateTo: activeDateIso,
+                  teamIds: activeResource ? [activeResource.id] : prev.teamIds,
+                }));
+                setBlockTimeOpen(true);
+              }}
               onBooking={() => {
                 const bookingDate = activeDateIso < todayIso ? todayIso : activeDateIso;
                 const resourceId = activeResource?.id ?? selectedResourceId ?? data.resources[0]?.id ?? "";
@@ -1153,52 +1376,259 @@ export default function ProfessionalFixedLocationCalendar({
         </Box>
 
         {/* Timeline grid */}
-        <Box sx={{ px: 1.5, pb: 1.5, bgcolor: "#fff" }}>
+        <Box sx={{ px: 2, pb: 2, bgcolor: "#fff" }}>
           {viewMode === "month" ? (
             <Paper
               elevation={0}
               sx={{
-                borderRadius: "10px",
+                borderRadius: "6px",
                 border: `1px solid ${alpha(m.navy, 0.08)}`,
                 overflow: "hidden",
               }}
             >
-              <Box sx={{ p: 2 }}>
-                <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.85) }}>
-                  Month view (summary)
-                </BodyText>
-                <BodyText sx={{ mt: 0.5, color: alpha(m.navy, 0.6), fontSize: 12.5 }}>
-                  Weekly/day timeline is already functional. Next we can render a full month grid with per-day counts per team member.
-                </BodyText>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(7, minmax(118px, 1fr))",
+                  borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
+                  bgcolor: alpha(m.navy, 0.02),
+                }}
+              >
+                {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
+                  <Box
+                    key={day}
+                    sx={{
+                      px: 1.25,
+                      py: 1,
+                      borderLeft: day !== "Mon" ? `1px solid ${alpha(m.navy, 0.07)}` : undefined,
+                    }}
+                  >
+                    <BodyText sx={{ fontSize: 11, fontWeight: 900, color: alpha(m.navy, 0.58), lineHeight: 1 }}>
+                      {day}
+                    </BodyText>
+                  </Box>
+                ))}
+              </Box>
+
+              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(118px, 1fr))" }}>
+                {monthCells.map((cell, idx) => {
+                  const hasBookings = cell.dayEvents.length > 0;
+
+                  return (
+                    <ButtonBase
+                      key={cell.iso}
+                      onClick={() => {
+                        setActiveDateIso(cell.iso);
+                        setSelectedResourceId("");
+                        setViewMode("day");
+                      }}
+                      sx={{
+                        minHeight: 132,
+                        alignItems: "stretch",
+                        justifyContent: "stretch",
+                        textAlign: "left",
+                        borderLeft: idx % 7 === 0 ? undefined : `1px solid ${alpha(m.navy, 0.07)}`,
+                        borderTop: idx < 7 ? undefined : `1px solid ${alpha(m.navy, 0.07)}`,
+                        bgcolor: cell.isSelected
+                          ? alpha(m.teal, 0.055)
+                          : cell.inMonth
+                            ? "#fff"
+                            : alpha(m.navy, 0.018),
+                        opacity: cell.isPast ? 0.66 : cell.inMonth ? 1 : 0.72,
+                        cursor: "pointer",
+                        "&:hover": {
+                          bgcolor: hasBookings ? alpha(m.teal, 0.045) : alpha(m.navy, 0.025),
+                        },
+                      }}
+                    >
+                      <Box sx={{ width: "100%", minWidth: 0, p: 1, display: "flex", flexDirection: "column", gap: 0.75 }}>
+                        <Stack direction="row" alignItems="center" spacing={0.75}>
+                          <Box
+                            sx={{
+                              width: 24,
+                              height: 24,
+                              borderRadius: "999px",
+                              display: "grid",
+                              placeItems: "center",
+                              fontSize: 11,
+                              fontWeight: 900,
+                              color: cell.isToday ? "#fff" : alpha(m.navy, cell.inMonth ? 0.82 : 0.42),
+                              bgcolor: cell.isToday ? m.teal : "transparent",
+                              border: cell.isSelected && !cell.isToday ? `1px solid ${alpha(m.teal, 0.45)}` : "1px solid transparent",
+                            }}
+                          >
+                            {cell.dateNumber}
+                          </Box>
+                          {hasBookings ? (
+                            <Chip
+                              size="small"
+                              label={`${cell.dayEvents.length} booking${cell.dayEvents.length === 1 ? "" : "s"}`}
+                              sx={{
+                                height: 20,
+                                borderRadius: "999px",
+                                fontSize: 9.5,
+                                fontWeight: 900,
+                                color: m.tealDark,
+                                bgcolor: alpha(m.teal, 0.1),
+                                border: `1px solid ${alpha(m.teal, 0.18)}`,
+                                "& .MuiChip-label": { px: 0.85 },
+                              }}
+                            />
+                          ) : null}
+                        </Stack>
+
+                        <Stack spacing={0.45} sx={{ minWidth: 0 }}>
+                          {cell.dayEvents.slice(0, 3).map((event) => {
+                            const resourceName = resourceNameById.get(event.resourceId) ?? "Team member";
+                            const eventAccent =
+                              event.status === "Requested"
+                                ? "#F4A100"
+                                : event.status === "Cancelled"
+                                  ? "#EF4444"
+                                  : event.status === "Confirmed"
+                                    ? "#22B573"
+                                    : "#74839A";
+
+                            return (
+                              <Box
+                                key={event.id}
+                                sx={{
+                                  minWidth: 0,
+                                  borderRadius: "4px",
+                                  border: `1px solid ${alpha(eventAccent, 0.2)}`,
+                                  borderLeft: `3px solid ${eventAccent}`,
+                                  bgcolor: alpha(eventAccent, 0.055),
+                                  px: 0.75,
+                                  py: 0.55,
+                                }}
+                              >
+                                <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
+                                  <BodyText
+                                    sx={{
+                                      fontSize: 10,
+                                      fontWeight: 900,
+                                      color: alpha(m.navy, 0.78),
+                                      lineHeight: 1,
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    {event.start}
+                                  </BodyText>
+                                  <Chip
+                                    size="small"
+                                    label={event.location}
+                                    sx={{
+                                      height: 15,
+                                      borderRadius: "4px",
+                                      fontSize: 8,
+                                      fontWeight: 900,
+                                      color: alpha(m.navy, 0.65),
+                                      bgcolor: alpha("#fff", 0.72),
+                                      border: `1px solid ${alpha(m.navy, 0.1)}`,
+                                      "& .MuiChip-label": { px: 0.55 },
+                                    }}
+                                  />
+                                </Stack>
+                                <BodyText
+                                  sx={{
+                                    mt: 0.25,
+                                    fontSize: 10.5,
+                                    fontWeight: 800,
+                                    color: alpha(m.navy, 0.8),
+                                    lineHeight: 1.15,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {event.title}
+                                </BodyText>
+                                <BodyText
+                                  sx={{
+                                    mt: 0.2,
+                                    fontSize: 9.5,
+                                    fontWeight: 700,
+                                    color: alpha(m.navy, 0.54),
+                                    lineHeight: 1,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {resourceName} - ID: {extractBookingId(event.id)}
+                                </BodyText>
+                              </Box>
+                            );
+                          })}
+                          {cell.hiddenCount > 0 ? (
+                            <BodyText sx={{ fontSize: 10.5, fontWeight: 900, color: alpha(m.tealDark, 0.9), px: 0.3 }}>
+                              +{cell.hiddenCount} more
+                            </BodyText>
+                          ) : null}
+                        </Stack>
+                      </Box>
+                    </ButtonBase>
+                  );
+                })}
               </Box>
             </Paper>
           ) : (
             <Box
               sx={{
-                borderRadius: "2px",
-                border: `1px solid ${alpha(m.navy, 0.10)}`,
+                borderRadius: "1px",
+                border: `1px solid ${alpha(m.navy, 0.08)}`,
                 overflow: "hidden",
                 bgcolor: "#fff",
               }}
             >
-              <Box sx={{ display: "grid", gridTemplateColumns: "58px 1fr", bgcolor: m.fxSurface }}>
+              <Box sx={{ display: "grid", gridTemplateColumns: "48px 1fr", bgcolor: m.fxSurface, position: "relative" }}>
+                {showNowLine ? (
+                  <>
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        left: 36,
+                        top: timelineHeaderPx + nowLineTop - 4,
+                        width: 8,
+                        height: 8,
+                        borderRadius: "999px",
+                        bgcolor: "#FF2F64",
+                        border: "1px solid #fff",
+                        zIndex: 6,
+                        pointerEvents: "none",
+                      }}
+                    />
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        left: 48,
+                        right: 0,
+                        top: timelineHeaderPx + nowLineTop,
+                        height: 2,
+                        bgcolor: "#FF2F64",
+                        zIndex: 5,
+                        pointerEvents: "none",
+                      }}
+                    />
+                  </>
+                ) : null}
                 {/* Time column */}
                 <Box sx={{ bgcolor: "#fff" }}>
-                  <Box sx={{ height: laneHeaderPx, borderBottom: `1px solid ${alpha(m.navy, 0.08)}` }} />
+                  <Box sx={{ height: timelineHeaderPx, borderBottom: `1px solid ${alpha(m.navy, 0.07)}` }} />
                   {slotLines.map((t, idx) => (
                     <Box
                       key={t}
                       sx={{
                         height: rowPx,
-                        px: 1,
+                        px: 0.45,
                         display: "flex",
                         alignItems: "flex-start",
                         justifyContent: "flex-end",
                         pt: idx === 0 ? 1.15 : 1,
-                        borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
+                        borderBottom: `1px solid ${alpha(m.navy, 0.07)}`,
                       }}
                     >
-                      <BodyText sx={{ fontSize: 10, fontWeight: 800, color: alpha(m.navy, 0.5) }}>
+                      <BodyText sx={{ fontSize: 9.5, fontWeight: 600, color: alpha(m.navy, 0.58), lineHeight: 1 }}>
                         {fmtTimeLabel(t)}
                       </BodyText>
                     </Box>
@@ -1216,6 +1646,11 @@ export default function ProfessionalFixedLocationCalendar({
                 >
                   {displayedResources.map((res, laneIdx) => {
                     const laneDates = viewMode === "week" ? visibleDates : [activeDateIso];
+                    const laneColumns = viewMode === "day"
+                      ? activeResource
+                        ? [{ key: activeResource.id, resource: activeResource, date: activeDateIso }]
+                        : []
+                      : laneDates.map((date) => ({ key: date, resource: res, date }));
                     return (
                       <Box
                         key={res.id}
@@ -1224,107 +1659,59 @@ export default function ProfessionalFixedLocationCalendar({
                         }}
                       >
                         {/* Lane header */}
-                        <Box
-                          sx={{
-                            height: laneHeaderPx,
-                            px: 1.1,
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 0.8,
-                            bgcolor: "#fff",
-                            borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
-                          }}
-                        >
-                          <Stack direction="row" alignItems="center" spacing={2} sx={{ minWidth: 0, overflowX: "auto", py: 0.25 }}>
-                            {filteredResources.map((member) => {
-                              const isActiveMember = member.id === res.id;
-                              const ratio = Math.round(
-                                (viewMode === "week"
-                                  ? laneDates.reduce((acc, iso) => acc + getDailyBookingRatio(member.id, iso), 0) / Math.max(1, laneDates.length)
-                                  : getDailyBookingRatio(member.id, activeDateIso)) * 100,
-                              );
+                        {renderTeamMemberHeader()}
+                        {viewMode === "week" ? (
+                          <Box
+                            sx={{
+                              height: laneHeaderPx,
+                              display: "grid",
+                              gridTemplateColumns: "repeat(7, minmax(110px, 1fr))",
+                              bgcolor: "#fff",
+                              borderBottom: `1px solid ${alpha(m.navy, 0.07)}`,
+                              overflow: "hidden",
+                            }}
+                          >
+                            {laneDates.map((date, colIdx) => {
+                              const isActiveDay = date === activeDateIso;
+                              const ratio = Math.round(getDailyBookingRatio(res.id, date) * 100);
 
                               return (
                                 <Box
-                                  key={member.id}
-                                  role="button"
-                                  tabIndex={0}
-                                  onClick={() => setSelectedResourceId(member.id)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter" || e.key === " ") setSelectedResourceId(member.id);
-                                  }}
+                                  key={`week-day-${date}`}
                                   sx={{
+                                    minWidth: 110,
+                                    px: 1,
                                     display: "flex",
                                     alignItems: "center",
-                                    gap: 0.8,
-                                    minWidth: 126,
-                                    cursor: "pointer",
-                                    borderRadius: "8px",
-                                    px: 0.4,
-                                    py: 0.35,
-                                    bgcolor: isActiveMember ? alpha(m.teal, 0.04) : "transparent",
-                                    "&:hover": { bgcolor: alpha(m.teal, 0.06) },
+                                    justifyContent: "center",
+                                    flexDirection: "column",
+                                    borderLeft: colIdx > 0 ? `1px solid ${alpha(m.navy, 0.07)}` : undefined,
+                                    bgcolor: isActiveDay ? alpha(m.teal, 0.035) : "#fff",
                                   }}
                                 >
-                                  <Avatar
+                                  <BodyText sx={{ fontSize: 11, fontWeight: 900, color: alpha(m.navy, 0.78), lineHeight: 1.1 }}>
+                                    {formatWeekDayName(date)}
+                                  </BodyText>
+                                  <BodyText sx={{ mt: 0.3, fontSize: 10, fontWeight: 700, color: alpha(m.navy, 0.5), lineHeight: 1 }}>
+                                    {formatWeekDayDate(date)}
+                                  </BodyText>
+                                  <Box
                                     sx={{
-                                      width: 24,
-                                      height: 24,
-                                      bgcolor: alpha(m.teal, isActiveMember ? 0.2 : 0.12),
-                                      color: m.teal,
-                                      fontWeight: 900,
-                                      fontSize: 11,
+                                      mt: 0.45,
+                                      height: 3,
+                                      width: 58,
+                                      borderRadius: "999px",
+                                      bgcolor: m.fxGrayF2F4F7,
+                                      overflow: "hidden",
                                     }}
                                   >
-                                    {member.avatarText}
-                                  </Avatar>
-                                  <Box sx={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-                                    <BodyText
-                                      sx={{
-                                        fontWeight: 900,
-                                        color: isActiveMember ? alpha(m.navy, 0.82) : alpha(m.navy, 0.58),
-                                        lineHeight: 1.1,
-                                        fontSize: 12,
-                                        whiteSpace: "nowrap",
-                                      }}
-                                    >
-                                      {member.name}
-                                    </BodyText>
-                                    <Box
-                                      sx={{
-                                        mt: 0.45,
-                                        height: 3,
-                                        width: 72,
-                                        borderRadius: "999px",
-                                        bgcolor: m.fxGrayF2F4F7,
-                                        overflow: "hidden",
-                                      }}
-                                    >
-                                      <Box sx={{ height: "100%", width: `${ratio}%`, bgcolor: isActiveMember ? m.teal : alpha(m.navy, 0.24) }} />
-                                    </Box>
+                                    <Box sx={{ height: "100%", width: `${ratio}%`, bgcolor: isActiveDay ? m.teal : alpha(m.navy, 0.24) }} />
                                   </Box>
                                 </Box>
                               );
                             })}
-                          </Stack>
-                          <Box sx={{ flex: 1 }} />
-                          <Tooltip title="Team notes" placement="left">
-                            <IconButton
-                              size="small"
-                              onClick={() => showSnackbar({ severity: "info", message: `Notes for ${res.name}` })}
-                              sx={{
-                                width: 24,
-                                height: 24,
-                                borderRadius: "6px",
-                                color: alpha(m.navy, 0.46),
-                                "&:hover": { bgcolor: alpha(m.navy, 0.06), color: alpha(m.navy, 0.72) },
-                              }}
-                            >
-                              <StickyNote2OutlinedIcon sx={{ fontSize: 16 }} />
-                            </IconButton>
-                          </Tooltip>
-                          <KeyboardArrowDownRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.42) }} />
-                        </Box>
+                          </Box>
+                        ) : null}
 
                         {/* Lane body */}
                         <Box
@@ -1335,22 +1722,21 @@ export default function ProfessionalFixedLocationCalendar({
                             bgcolor: "#fff",
                           }}
                         >
-                          {laneDates.map((iso, colIdx) => {
-                            const laneEvents = eventsInRange.filter((e) => e.resourceId === res.id && e.date === iso);
-                            const laneBlocks = blocksInRange.filter((b) => b.resourceId === res.id && b.date === iso);
+                          {laneColumns.map(({ key, resource, date }, colIdx) => {
+                            const laneEvents = eventsInRange.filter((e) => e.resourceId === resource.id && e.date === date);
+                            const laneBlocks = blocksInRange.filter((b) => b.resourceId === resource.id && b.date === date);
 
                             // Unavailable overlay (everything outside availability windows)
-                            const availability = getAvailabilityFor(res.id, iso);
+                            const availability = getAvailabilityFor(resource.id, date);
 
                             return (
                               <Box
-                                key={`${res.id}-${iso}`}
+                                key={key}
                                 sx={{
                                   position: "relative",
-                                  borderLeft: viewMode === "week" && colIdx > 0 ? `1px solid ${alpha(m.navy, 0.08)}` : undefined,
+                                  borderLeft: colIdx > 0 ? `1px solid ${alpha(m.navy, 0.07)}` : undefined,
                                   height: rows * rowPx,
                                   bgcolor: "#fff",
-                                  backgroundColor: "#fff",
                                 }}
                               >
                                 {/* Click layer */}
@@ -1359,7 +1745,7 @@ export default function ProfessionalFixedLocationCalendar({
                                     const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
                                     const y = e.clientY - rect.top;
                                     const minutes = startMin + Math.floor(y / rowPx) * grid.stepMinutes;
-                                    onEmptyClick(res.id, iso, minutes);
+                                    onEmptyClick(resource.id, date, minutes);
                                   }}
                                   sx={{ position: "absolute", inset: 0, cursor: "pointer" }}
                                 />
@@ -1376,7 +1762,6 @@ export default function ProfessionalFixedLocationCalendar({
                                           right: 0,
                                           top: 0,
                                           height: ((Math.min(...availability.map((a) => a.startMin)) - startMin) / grid.stepMinutes) * rowPx,
-                                          // Free slot background should stay white everywhere.
                                           bgcolor: "#fff",
                                           pointerEvents: "none",
                                         }}
@@ -1391,7 +1776,6 @@ export default function ProfessionalFixedLocationCalendar({
                                           right: 0,
                                           top: ((Math.max(...availability.map((a) => a.endMin)) - startMin) / grid.stepMinutes) * rowPx,
                                           height: ((endMin - Math.max(...availability.map((a) => a.endMin))) / grid.stepMinutes) * rowPx,
-                                          // Free slot background should stay white everywhere.
                                           bgcolor: "#fff",
                                           pointerEvents: "none",
                                         }}
@@ -1405,14 +1789,14 @@ export default function ProfessionalFixedLocationCalendar({
                                 {/* Horizontal grid lines */}
                                 {slotLines.map((t) => (
                                   <Box
-                                    key={`line-${res.id}-${iso}-${t}`}
+                                    key={`line-${resource.id}-${date}-${t}`}
                                     sx={{
                                       position: "absolute",
                                       left: 0,
                                       right: 0,
                                       top: ((t - startMin) / grid.stepMinutes) * rowPx,
                                       height: 1,
-                                      bgcolor: alpha(m.navy, 0.08),
+                                      bgcolor: alpha(m.navy, 0.065),
                                       pointerEvents: "none",
                                     }}
                                   />
@@ -1421,12 +1805,78 @@ export default function ProfessionalFixedLocationCalendar({
                                 {/* Blocks */}
                                 {laneBlocks.map((b) => {
                                   const top = ((minutesSinceMidnight(b.start) - startMin) / grid.stepMinutes) * rowPx;
-                                  const height = ((minutesSinceMidnight(b.end) - minutesSinceMidnight(b.start)) / grid.stepMinutes) * rowPx;
-                                  const isUnavail = b.kind === "unavailable";
+                                  const height = Math.max(
+                                    2,
+                                    ((minutesSinceMidnight(b.end) - minutesSinceMidnight(b.start)) / grid.stepMinutes) * rowPx,
+                                  );
+                                  const isBlockedTime = b.kind === "unavailable";
+
+                                  if (isBlockedTime) {
+                                    return (
+                                      <Box
+                                        key={b.id}
+                                        sx={{
+                                          position: "absolute",
+                                          left: 0,
+                                          right: 0,
+                                          top,
+                                          height,
+                                          pointerEvents: "none",
+                                          zIndex: 3,
+                                        }}
+                                      >
+                                        <Box
+                                          sx={{
+                                            position: "absolute",
+                                            left: 0,
+                                            right: 0,
+                                            top: 0,
+                                            height: 2,
+                                            bgcolor: "#FF2F64",
+                                          }}
+                                        />
+                                        {height > 2 ? (
+                                          <Box
+                                            sx={{
+                                              position: "absolute",
+                                              left: 0,
+                                              right: 0,
+                                              top: 0,
+                                              height,
+                                              bgcolor: alpha("#FF2F64", 0.05),
+                                            }}
+                                          />
+                                        ) : null}
+                                        <Box
+                                          sx={{
+                                            position: "absolute",
+                                            left: -4,
+                                            top: -3,
+                                            width: 8,
+                                            height: 8,
+                                            borderRadius: "999px",
+                                            bgcolor: "#FF2F64",
+                                            border: "1px solid #fff",
+                                            zIndex: 4,
+                                          }}
+                                        />
+                                        {height >= 40 ? (
+                                          <Box sx={{ position: "absolute", left: 8, top: 6, pointerEvents: "none" }}>
+                                            <BodyText sx={{ fontWeight: 900, fontSize: 10, color: alpha(m.navy, 0.62), lineHeight: 1.1 }}>
+                                              {b.start} to {b.end}
+                                            </BodyText>
+                                            <BodyText sx={{ fontSize: 10.5, fontWeight: 800, color: alpha(m.navy, 0.58), lineHeight: 1.1 }}>
+                                              {b.title}
+                                            </BodyText>
+                                          </Box>
+                                        ) : null}
+                                      </Box>
+                                    );
+                                  }
+
                                   return (
-                                    <Paper
+                                    <Box
                                       key={b.id}
-                                      elevation={0}
                                       sx={{
                                         position: "absolute",
                                         left: 0,
@@ -1434,22 +1884,26 @@ export default function ProfessionalFixedLocationCalendar({
                                         top,
                                         height,
                                         borderRadius: 0,
-                                        bgcolor: isUnavail ? alpha(m.navy, 0.035) : alpha(m.navy, 0.025),
-                                        border: 0,
-                                        borderTop: `1px solid ${alpha(m.navy, 0.04)}`,
-                                        borderBottom: `1px solid ${alpha(m.navy, 0.04)}`,
+                                        bgcolor: alpha(m.navy, 0.03),
+                                        borderTop: `1px solid ${alpha(m.navy, 0.12)}`,
+                                        borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
                                         px: 1.2,
-                                        py: 0.75,
+                                        py: 0.55,
                                         pointerEvents: "none",
+                                        zIndex: 2,
                                       }}
                                     >
-                                      <BodyText sx={{ fontWeight: 900, fontSize: 10, color: alpha(m.navy, 0.6), lineHeight: 1.1 }}>
-                                        {b.start} to {b.end}
-                                      </BodyText>
-                                      <BodyText sx={{ fontSize: 10.5, fontWeight: 800, color: alpha(m.navy, 0.58), lineHeight: 1.1 }}>
-                                        {b.title}
-                                      </BodyText>
-                                    </Paper>
+                                      {height >= 34 ? (
+                                        <>
+                                          <BodyText sx={{ fontWeight: 900, fontSize: 10, color: alpha(m.navy, 0.62), lineHeight: 1.1 }}>
+                                            {b.start} to {b.end}
+                                          </BodyText>
+                                          <BodyText sx={{ fontSize: 10.5, fontWeight: 800, color: alpha(m.navy, 0.58), lineHeight: 1.1 }}>
+                                            {b.title}
+                                          </BodyText>
+                                        </>
+                                      ) : null}
+                                    </Box>
                                   );
                                 })}
 
@@ -1457,8 +1911,8 @@ export default function ProfessionalFixedLocationCalendar({
                                 {laneEvents.map((ev, idx) => {
                                   const evStart = minutesSinceMidnight(ev.start);
                                   const evEnd = minutesSinceMidnight(ev.end);
-                                  const top = ((evStart - startMin) / grid.stepMinutes) * rowPx + 1;
-                                  const height = Math.max(44, ((evEnd - evStart) / grid.stepMinutes) * rowPx - 2);
+                                  const top = ((evStart - startMin) / grid.stepMinutes) * rowPx + 0.15;
+                                  const height = Math.max(78, ((evEnd - evStart) / grid.stepMinutes) * rowPx - 0.3);
                                   const overlapping = laneEvents
                                     .filter((other) => {
                                       const otherStart = minutesSinceMidnight(other.start);
@@ -1470,188 +1924,25 @@ export default function ProfessionalFixedLocationCalendar({
                                   const overlapCount = Math.max(1, overlapping.length);
                                   const isSplit = overlapCount > 1;
                                   const widthPct = 100 / overlapCount;
-                                  const left = isSplit ? `calc(${overlapIndex * widthPct}% + 4px)` : 4;
-                                  const right = isSplit ? `calc(${(overlapCount - overlapIndex - 1) * widthPct}% + 4px)` : 4;
-
-                                  const statusTone =
-                                    ev.status === "Requested"
-                                      ? { bar: "#FFA800", bg: "linear-gradient(90deg, rgba(255,168,0,0.11) 0%, rgba(255,168,0,0.035) 48%, rgba(33,184,191,0.045) 100%)" }
-                                      : ev.status === "Cancelled"
-                                        ? { bar: "#FF6B6B", bg: "#F0F2F5" }
-                                        : ev.status === "Confirmed"
-                                          ? { bar: "#2EAD73", bg: alpha(m.teal, 0.10) }
-                                          : ev.status === "Completed"
-                                            ? { bar: "#7C8AA0", bg: "#F0F2F5" }
-                                            : { bar: "#5D7FA5", bg: "#F0F2F5" };
-
-                                  const RAIL_W = 78;
-                                  const serviceCategory = getServiceCategory(ev.title);
-                                  const serviceColor = serviceCategory ? appliedDesign.colorsByCategory[serviceCategory] : undefined;
-                                  const serviceBg = serviceColor ? alpha(serviceColor, 0.14) : undefined;
-                                  const serviceBorder = serviceColor ? alpha(serviceColor, 0.35) : undefined;
+                                  const left = isSplit ? `calc(${overlapIndex * widthPct}% + 2px)` : 0;
+                                  const right = isSplit ? `calc(${(overlapCount - overlapIndex - 1) * widthPct}% + 2px)` : 0;
+                                  const cardServiceCategory = getServiceCategory(ev.title);
+                                  const cardServiceColor = cardServiceCategory ? appliedDesign.colorsByCategory[cardServiceCategory] : undefined;
 
                                   return (
-                                    <Box
+                                    <CalendarBookingCard
                                       key={ev.id}
-                                      onClick={() => openExistingBooking(ev)}
-                                      sx={{
-                                        position: "absolute",
-                                        top,
-                                        left,
-                                        right,
-                                        height,
-                                        borderRadius: "2px",
-                                        background: serviceBg ?? statusTone.bg,
-                                        border: `1px solid ${serviceBorder ?? alpha(m.navy, 0.08)}`,
-                                        overflow: "hidden",
-                                        display: "flex",
-                                        flexDirection: "row",
-                                        // left accent bar via box-shadow so we avoid pseudo-element clipping issues
-                                        boxShadow: `inset 4px 0 0 0 ${statusTone.bar}`,
-                                        zIndex: 4,
-                                        cursor: "pointer",
-                                      }}
-                                    >
-                                      {/* ── LEFT content (non-interactive) ── */}
-                                      <Box
-                                        sx={{
-                                          flex: 1,
-                                          minWidth: 0,
-                                          pl: 1.3,
-                                          pr: 0.5,
-                                          py: 0.35,
-                                          pointerEvents: "none",
-                                          overflow: "hidden",
-                                        }}
-                                      >
-                                        <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.35 }}>
-                                          <BodyText sx={{ fontSize: 10.5, fontWeight: 500, color: alpha(m.navy, 0.78), lineHeight: 1 }}>
-                                            ID: {extractBookingId(ev.id)}
-                                          </BodyText>
-                                          <Chip
-                                            size="small"
-                                            label={ev.status}
-                                            sx={{
-                                              height: 16,
-                                              borderRadius: "7px",
-                                              fontSize: 8.5,
-                                              fontWeight: 800,
-                                              border: "1px solid",
-                                              "& .MuiChip-label": { px: 0.9 },
-                                              ...statusChipSx(ev.status, m),
-                                            }}
-                                          />
-                                        </Stack>
-                                        <BodyText
-                                          sx={{
-                                            fontSize: 10.5,
-                                            fontWeight: 500,
-                                            color: alpha(m.navy, 0.82),
-                                            lineHeight: 1.1,
-                                            overflow: "hidden",
-                                            display: "-webkit-box",
-                                            WebkitLineClamp: 2,
-                                            WebkitBoxOrient: "vertical",
-                                          }}
-                                        >
-                                          {ev.title}
-                                        </BodyText>
-                                        <BodyText sx={{ fontSize: 10.5, color: alpha(m.navy, 0.74), mt: 0.15, lineHeight: 1.05 }}>
-                                          ({ev.start} to {ev.end})
-                                        </BodyText>
-                                        <Stack direction="row" spacing={0.25} alignItems="center" sx={{ mt: 0.15 }}>
-                                          <LocationOnRoundedIcon sx={{ fontSize: 15, color: alpha(m.navy, 0.62), flexShrink: 0 }} />
-                                          <BodyText sx={{ fontSize: 10.5, fontWeight: 500, color: alpha(m.navy, 0.68), lineHeight: 1 }}>
-                                            {ev.location}
-                                          </BodyText>
-                                        </Stack>
-                                      </Box>
-
-                                      {/* ── RIGHT rail (clickable icons) ── */}
-                                      <Box
-                                        sx={{
-                                          width: RAIL_W,
-                                          flexShrink: 0,
-                                          bgcolor: "transparent",
-                                          borderLeft: `1px solid ${alpha(m.navy, 0.06)}`,
-                                          display: "grid",
-                                          gridTemplateRows: "15px 15px 1fr",
-                                          justifyItems: "center",
-                                          alignItems: "center",
-                                          py: 0.2,
-                                        }}
-                                      >
-                                        <Tooltip title="Open calendar" placement="left">
-                                          <IconButton
-                                            size="small"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              showSnackbar({ severity: "info", message: `Calendar for booking ${extractBookingId(ev.id)}` });
-                                            }}
-                                            sx={{ p: 0.1, borderRadius: "5px", color: alpha(m.navy, 0.58), "&:hover": { bgcolor: alpha(m.navy, 0.06), color: m.navy } }}
-                                          >
-                                            <CalendarMonthRoundedIcon sx={{ fontSize: 14 }} />
-                                          </IconButton>
-                                        </Tooltip>
-                                        <Tooltip title="Open notes" placement="left">
-                                          <IconButton
-                                            size="small"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              showSnackbar({ severity: "info", message: `Notes for booking ${extractBookingId(ev.id)}` });
-                                            }}
-                                            sx={{
-                                              p: 0.1,
-                                              borderRadius: "5px",
-                                              color: alpha(m.navy, 0.58),
-                                              "&:hover": { bgcolor: alpha(m.navy, 0.06), color: m.navy },
-                                            }}
-                                          >
-                                            <StickyNote2OutlinedIcon sx={{ fontSize: 14 }} />
-                                          </IconButton>
-                                        </Tooltip>
-
-                                        {/* Person + name */}
-                                        <Tooltip title={`Open profile: ${ev.showClientName ?? "Client"}`} placement="left">
-                                          <Box
-                                            component="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              showSnackbar({ severity: "info", message: `Client drawer: ${ev.showClientName ?? "Client"}` });
-                                            }}
-                                            sx={{
-                                              all: "unset",
-                                              cursor: "pointer",
-                                              display: "flex",
-                                              flexDirection: "column",
-                                              alignItems: "center",
-                                              gap: 0.1,
-                                              px: 0,
-                                              py: 0.2,
-                                              borderRadius: "5px",
-                                              "&:hover": { bgcolor: alpha(m.navy, 0.06) },
-                                            }}
-                                          >
-                                            <PersonOutlineRoundedIcon sx={{ fontSize: 13, color: alpha(m.navy, 0.58) }} />
-                                            <BodyText
-                                              sx={{
-                                                fontSize: 8.5,
-                                                fontWeight: 700,
-                                                color: alpha(m.navy, 0.62),
-                                                lineHeight: 1,
-                                                maxWidth: RAIL_W - 8,
-                                                textAlign: "center",
-                                                whiteSpace: "nowrap",
-                                                overflow: "hidden",
-                                                textOverflow: "ellipsis",
-                                              }}
-                                            >
-                                              {ev.showClientName ?? "Client"}
-                                            </BodyText>
-                                          </Box>
-                                        </Tooltip>
-                                      </Box>
-                                    </Box>
+                                      event={ev}
+                                      top={top}
+                                      height={height}
+                                      left={left}
+                                      right={right}
+                                      serviceColor={cardServiceColor}
+                                      onOpen={() => openExistingBooking(ev)}
+                                      onOpenCalendar={() => showSnackbar({ severity: "info", message: `Calendar for booking ${extractBookingId(ev.id)}` })}
+                                      onOpenNotes={() => showSnackbar({ severity: "info", message: `Notes for booking ${extractBookingId(ev.id)}` })}
+                                      onOpenClient={() => showSnackbar({ severity: "info", message: `Client drawer: ${ev.showClientName ?? "Client"}` })}
+                                    />
                                   );
                                 })}
                               </Box>
@@ -2145,15 +2436,17 @@ export default function ProfessionalFixedLocationCalendar({
                       <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
                         Date of Birth
                       </BodyText>
-                      <AppTextField
-                        type="text"
+                      <AppDatePicker
                         value={nonMollureDraft.dob}
-                        onChange={(e) => setNonMollureDraft((p) => ({ ...p, dob: e.target.value }))}
+                        onChange={(iso) => setNonMollureDraft((p) => ({ ...p, dob: iso }))}
+                        max={todayIso}
                         fullWidth
-                        placeholder="mm/dd/yyyy"
-                        error={Boolean(slotErrors.nonMollureDob)}
-                        helperText={slotErrors.nonMollureDob}
                       />
+                      {slotErrors.nonMollureDob ? (
+                        <BodyText sx={{ mt: 0.5, fontSize: 11.5, fontWeight: 700, color: theme.palette.error.main }}>
+                          {slotErrors.nonMollureDob}
+                        </BodyText>
+                      ) : null}
                     </Box>
 
                     <Box>
@@ -2602,92 +2895,13 @@ export default function ProfessionalFixedLocationCalendar({
                               })}
                             </Box>
 
-                            <Stack direction="row" alignItems="center" spacing={0.5} sx={{ px: 0.3 }}>
-                              <BodyText sx={{ flex: 1, fontSize: 15, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
-                                {formatMonthYearUtc(slotCalendarMonth)}
-                              </BodyText>
-                              <IconButton
-                                size="small"
-                                onClick={() => setSlotCalendarMonth((p) => addMonthsIso(p, -12))}
-                                sx={{ width: 22, height: 22, color: m.teal }}
-                                aria-label="Previous year"
-                              >
-                                <KeyboardDoubleArrowLeftRoundedIcon sx={{ fontSize: 16 }} />
-                              </IconButton>
-                              <IconButton
-                                size="small"
-                                onClick={() => setSlotCalendarMonth((p) => addMonthsIso(p, -1))}
-                                sx={{ width: 22, height: 22, color: m.teal }}
-                                aria-label="Previous month"
-                              >
-                                <ChevronLeftRoundedIcon sx={{ fontSize: 16 }} />
-                              </IconButton>
-                              <IconButton
-                                size="small"
-                                onClick={() => setSlotCalendarMonth((p) => addMonthsIso(p, 1))}
-                                sx={{ width: 22, height: 22, color: m.teal }}
-                                aria-label="Next month"
-                              >
-                                <ChevronRightRoundedIcon sx={{ fontSize: 16 }} />
-                              </IconButton>
-                              <IconButton
-                                size="small"
-                                onClick={() => setSlotCalendarMonth((p) => addMonthsIso(p, 12))}
-                                sx={{ width: 22, height: 22, color: m.teal }}
-                                aria-label="Next year"
-                              >
-                                <KeyboardDoubleArrowRightRoundedIcon sx={{ fontSize: 16 }} />
-                              </IconButton>
-                            </Stack>
-
-                            <Box sx={{ mt: 0.9, display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", columnGap: 0.5, rowGap: 0.55 }}>
-                              {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-                                <BodyText key={d} sx={{ fontSize: 9, fontWeight: 800, color: alpha(m.navy, 0.42), textAlign: "center" }}>
-                                  {d}
-                                </BodyText>
-                              ))}
-                              {(() => {
-                                const monthDate = parseIsoDate(slotCalendarMonth);
-                                const year = monthDate.getUTCFullYear();
-                                const month = monthDate.getUTCMonth();
-                                const firstDowMon0 = (monthDate.getUTCDay() + 6) % 7;
-                                const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-                                const cells: React.ReactNode[] = [];
-                                for (let i = 0; i < firstDowMon0; i++) cells.push(<Box key={`slot-pad-${i}`} sx={{ height: 28 }} />);
-                                for (let day = 1; day <= daysInMonth; day++) {
-                                  const iso = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-                                  const isPast = iso < todayIso;
-                                  const selected = iso === selectedSlot.date && !isPast;
-                                  cells.push(
-                                    <ButtonBase
-                                      key={iso}
-                                      disabled={isPast}
-                                      onClick={() => setSelectedSlot((p) => (p ? { ...p, date: iso } : p))}
-                                      sx={{
-                                        width: 28,
-                                        height: 28,
-                                        borderRadius: "999px",
-                                        display: "grid",
-                                        placeItems: "center",
-                                        justifySelf: "center",
-                                        fontSize: 11,
-                                        fontWeight: 800,
-                                        color: isPast ? alpha(m.navy, 0.24) : selected ? "#fff" : alpha(m.navy, 0.65),
-                                        bgcolor: isPast ? "transparent" : selected ? m.teal : alpha(m.navy, 0.04),
-                                        cursor: isPast ? "not-allowed" : "pointer",
-                                        "&.Mui-disabled": {
-                                          color: alpha(m.navy, 0.24),
-                                          pointerEvents: "auto",
-                                        },
-                                        "&:hover": { bgcolor: isPast ? "transparent" : selected ? m.tealDark : alpha(m.navy, 0.05) },
-                                      }}
-                                    >
-                                      {day}
-                                    </ButtonBase>,
-                                  );
-                                }
-                                return cells;
-                              })()}
+                            <Box sx={{ mt: 0.5 }}>
+                              <AppCalendarPanel
+                                compact
+                                value={selectedSlot?.date ?? defaultDateIso}
+                                onChange={(iso) => setSelectedSlot((p) => (p ? { ...p, date: iso } : p))}
+                                min={todayIso}
+                              />
                             </Box>
                           </Box>
                         </Paper>
@@ -3458,12 +3672,40 @@ export default function ProfessionalFixedLocationCalendar({
             showSnackbar({ severity: "warning", message: "Select team member and location." });
             return;
           }
+          const nextBlocks = buildBlocksFromDraft(blockDraft, blockDraft.teamIds);
+          if (!nextBlocks.length) {
+            showSnackbar({
+              severity: "warning",
+              message: "No dates matched your selection. Check the date range and day filters.",
+            });
+            return;
+          }
+
+          setBlocks((prev) => {
+            const seen = new Set(prev.map((block) => `${block.resourceId}-${block.date}-${block.start}-${block.end}`));
+            const unique = nextBlocks.filter((block) => {
+              const key = `${block.resourceId}-${block.date}-${block.start}-${block.end}`;
+              if (seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            });
+            return [...prev, ...unique];
+          });
+          setActiveDateIso(blockDraft.dateFrom);
+          if (blockDraft.teamIds.length === 1) {
+            setSelectedResourceId(blockDraft.teamIds[0]);
+          }
+          setBlockTimeOpen(false);
+          showSnackbar({ severity: "success", message: "Blocked time added." });
+
+          if (!onCreateCalendarEntry) return;
+
           try {
             for (const teamId of blockDraft.teamIds) {
-              const teamMemberId = Number(teamId);
+              const teamMemberId = String(teamId).trim() || null;
               for (const location of blockDraft.locations) {
-                await onCreateCalendarEntry?.({
-                  team_member_id: Number.isInteger(teamMemberId) ? teamMemberId : null,
+                await onCreateCalendarEntry({
+                  team_member_id: teamMemberId,
                   status: "blocked",
                   title: blockDraft.title || "Blocked time",
                   blocked_time_start: toDateTimeInput(blockDraft.dateFrom, blockDraft.startTime),
@@ -3475,10 +3717,11 @@ export default function ProfessionalFixedLocationCalendar({
                 });
               }
             }
-            showSnackbar({ severity: "success", message: "Blocked time added." });
-            setBlockTimeOpen(false);
           } catch {
-            showSnackbar({ severity: "error", message: "Unable to add blocked time." });
+            showSnackbar({
+              severity: "warning",
+              message: "Blocked time shown on calendar, but it could not be saved to the server.",
+            });
           }
         }}
         onClose={() => setBlockTimeOpen(false)}

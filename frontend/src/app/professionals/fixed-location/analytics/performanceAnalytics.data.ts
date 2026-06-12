@@ -15,7 +15,7 @@ export type ProfessionalFixedLocationPerformanceAnalyticsData = {
     title: string;
     rows: readonly ProductivityEfficiencyRow[];
     explanationLabel: string;
-    explanationText: string;
+    explanationContent?: import("./analytics.data").AnalyticsExplanationContent;
   };
 };
 
@@ -66,8 +66,16 @@ export const professionalFixedLocationPerformanceAnalyticsData: ProfessionalFixe
       },
     ],
     explanationLabel: "View Explanation",
-    explanationText:
-      "Productivity shows how much revenue each team member generates per hour worked, while efficiency reflects how consistently they complete the bookings they handle. This helps you identify top performers and potential improvement areas.",
+    explanationContent: {
+      blocks: [
+        {
+          title: "",
+          paragraphs: [
+            "Productivity shows how much revenue each team member generates per hour worked, while efficiency reflects how consistently they complete the bookings they handle. This helps you identify top performers and potential improvement areas.",
+          ],
+        },
+      ],
+    },
   },
 };
 

@@ -15,6 +15,14 @@ const getMigrationPriority = (filename) => {
     return 0;
   }
 
+  if (normalized.includes("migrate_to_uuid") || normalized.includes("uuid_schema")) {
+    return 2;
+  }
+
+  if (normalized.includes("seed")) {
+    return 3;
+  }
+
   return 1;
 };
 

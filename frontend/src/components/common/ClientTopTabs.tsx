@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Paper, Stack } from "@mui/material";
+import { Box, Container, Paper, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../ui/typography";
 
@@ -11,12 +11,40 @@ export type ClientTopTab = {
   href: string;
 };
 
+export const CLIENT_TOP_TABS: readonly ClientTopTab[] = [
+  { label: "Profile", href: "/clients/profile" },
+  { label: "Booking", href: "/clients/booking" },
+  { label: "Favorites", href: "/clients/favourites" },
+];
+
+export function clientTopTabsActiveLabel(pathname: string | null | undefined): string {
+  if (pathname?.includes("/clients/favourites")) return "Favorites";
+  if (pathname?.includes("/clients/booking")) return "Booking";
+  return "Profile";
+}
+
 export type ClientTopTabsProps = {
-  tabs: readonly ClientTopTab[];
+  tabs?: readonly ClientTopTab[];
   activeLabel: string;
 };
 
-export default function ClientTopTabs({ tabs, activeLabel }: ClientTopTabsProps) {
+export function ClientPageTabsBar({
+  activeLabel,
+  tabs = CLIENT_TOP_TABS,
+}: {
+  activeLabel: string;
+  tabs?: readonly ClientTopTab[];
+}) {
+  return (
+    <Box sx={{ mt: 2, bgcolor: "transparent" }}>
+      <Container maxWidth="lg" sx={{ px: { xs: 2, sm: 3, md: 4 }, py: 1.5 }}>
+        <ClientTopTabs tabs={tabs} activeLabel={activeLabel} />
+      </Container>
+    </Box>
+  );
+}
+
+export default function ClientTopTabs({ tabs = CLIENT_TOP_TABS, activeLabel }: ClientTopTabsProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
 

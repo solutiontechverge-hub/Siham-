@@ -25,7 +25,6 @@ import {
   MenuItem,
   Popover,
   Paper,
-  Snackbar,
   Stack,
   Typography,
 } from "@mui/material";
@@ -35,22 +34,19 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo, Profile as AvatarPlaceholder } from "../../../../images";
 import { PROFILE_IMAGE_FILE_ACCEPT } from "../../../lib/profileImageUpload";
+import { REVIEW_NAME_MODES, reviewNameOptionLabel } from "../../../lib/reviewNameDisplay";
 import { profilePageData } from "./data-profile";
 import { useClientProfilePage } from "./use-profile";
-import { ClientTopTabs, MollureMarketingHeader } from "../../../components/common";
+import { ClientPageTabsBar, clientTopTabsActiveLabel, MollureMarketingHeader } from "../../../components/common";
 import { MarketingSiteFooter } from "../../../components/common";
 import { marketingShellFooter } from "../../../data/marketingShell.data";
 import {
+  AppDatePicker,
   MollureLabeledField,
   MollureLabeledPasswordField,
+  MollureSnackbar,
   PasswordStrengthBar,
 } from "../../../components/common";
-
-const clientTopTabs = [
-  { label: "Booking", href: "/clients/booking" },
-  { label: "Favorites", href: "/clients/favourites" },
-  { label: "Profile", href: "/clients/profile" },
-] as const;
 
 function imgSrc(img: unknown): string {
   if (!img) return "";
@@ -78,7 +74,8 @@ export default function ClientProfilePage() {
     loadError,
     isSaving,
     isEditing,
-    setIsEditing,
+    toggleEditing,
+    hasProfileChanges,
     successMessage,
     errorMessage,
     clearMessages,
@@ -100,6 +97,7 @@ export default function ClientProfilePage() {
   } = useClientProfilePage();
 
   const handleAvatarPick = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!isEditing) return;
     const file = event.target.files?.[0];
     if (!file) return;
     registerAvatarFile(file);
@@ -137,17 +135,10 @@ export default function ClientProfilePage() {
         userLabel={profile?.email || form.email}
         userName={displayName}
         userAvatarSrc={avatarUrl || undefined}
-        homeHref="/clients/listing"
+        homeHref="/"
       />
 
-      <Box sx={{ mt: 2, bgcolor: "transparent" }}>
-        <Container maxWidth="lg" sx={{ px: { xs: 2, sm: 3, md: 4 }, py: 1.5 }}>
-          <ClientTopTabs
-            tabs={clientTopTabs}
-            activeLabel={pathname?.includes("/clients/booking") ? "Booking" : pathname?.includes("/clients/favourites") ? "Favorites" : "Profile"}
-          />
-        </Container>
-      </Box>
+      <ClientPageTabsBar activeLabel={clientTopTabsActiveLabel(pathname)} />
 
       <Popover
         open={Boolean(profileMenuAnchor)}
@@ -389,7 +380,7 @@ export default function ClientProfilePage() {
               {profilePageData.card.title}
             </Typography>
             <IconButton
-              onClick={() => setIsEditing((v) => !v)}
+              onClick={toggleEditing}
               sx={{
                 width: 32,
                 height: 32,
@@ -407,11 +398,25 @@ export default function ClientProfilePage() {
 
           <Box sx={{ px: { xs: 2.5, sm: 3.5 }, pt: 3, pb: { xs: 2.5, sm: 3.5 } }}>
             <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 3 }}>
-              <Box component="label" sx={{ cursor: "pointer", display: "inline-flex" }}>
-                <input type="file" accept={PROFILE_IMAGE_FILE_ACCEPT} hidden onChange={handleAvatarPick} />
+              <Box
+                component={isEditing ? "label" : "div"}
+                sx={{
+                  display: "inline-flex",
+                  cursor: isEditing ? "pointer" : "default",
+                  borderRadius: "50%",
+                }}
+              >
+                {isEditing ? (
+                  <input type="file" accept={PROFILE_IMAGE_FILE_ACCEPT} hidden onChange={handleAvatarPick} />
+                ) : null}
                 <Avatar
                   src={avatarUrl || imgSrc(AvatarPlaceholder)}
-                  sx={{ width: 72, height: 72, bgcolor: tokens.avatarBg }}
+                  sx={{
+                    width: 72,
+                    height: 72,
+                    bgcolor: tokens.avatarBg,
+                    opacity: isEditing ? 1 : 0.92,
+                  }}
                 />
               </Box>
               <Typography sx={{ fontWeight: 700, color: tokens.navy, fontSize: 16 }}>
@@ -421,16 +426,13 @@ export default function ClientProfilePage() {
 
             <Box component="form" onSubmit={handleSubmit}>
             {errorMessage ? <Alert severity="error" sx={{ mb: 2 }}>{errorMessage}</Alert> : null}
-            <Snackbar
+            <MollureSnackbar
               open={Boolean(successMessage)}
+              message={successMessage || "Profile Edited"}
+              severity="success"
               autoHideDuration={3000}
               onClose={clearMessages}
-              anchorOrigin={{ vertical: "top", horizontal: "center" }}
-            >
-              <Alert onClose={clearMessages} severity="success" variant="filled" sx={{ fontWeight: 700 }}>
-                {successMessage || "Profile Updated"}
-              </Alert>
-            </Snackbar>
+            />
 
             <Typography sx={{ fontWeight: 800, color: tokens.navy, mb: 1 }}>
               {isCompanyProfile ? "Company Information" : profilePageData.sections.personal}
@@ -467,22 +469,26 @@ export default function ClientProfilePage() {
                     onChange={(e) => setReviewNameMode(e.target.value as typeof form.reviewNameMode)}
                     disabled={fieldsDisabled}
                   >
-                    {profilePageData.reviewNameOptions.map((opt) => (
-                      <MenuItem key={opt.value} value={opt.value}>
-                        {opt.label}
+                    {REVIEW_NAME_MODES.map((mode) => (
+                      <MenuItem key={mode} value={mode}>
+                        {reviewNameOptionLabel(mode, form.firstName, form.lastName)}
                       </MenuItem>
                     ))}
                   </MollureLabeledField>
                 </Grid>
                 <Grid item xs={12} sm={6}>
-                  <MollureLabeledField
-                    name="birthDate"
-                    type="date"
-                    fieldLabel={profilePageData.fields.birthDate.label}
-                    value={form.birthDate}
-                    onChange={handleChange}
-                    disabled={fieldsDisabled}
-                  />
+                  <Stack spacing={0.75}>
+                    <Typography sx={{ fontSize: 12, fontWeight: 700, color: "text.secondary" }}>
+                      {profilePageData.fields.birthDate.label}
+                    </Typography>
+                    <AppDatePicker
+                      name="birthDate"
+                      value={form.birthDate}
+                      onChange={(iso) => handleChange({ target: { name: "birthDate", value: iso } } as React.ChangeEvent<HTMLInputElement>)}
+                      disabled={fieldsDisabled}
+                      fullWidth
+                    />
+                  </Stack>
                 </Grid>
                 <Grid item xs={12} sm={6}>
                   <MollureLabeledField
@@ -709,26 +715,32 @@ export default function ClientProfilePage() {
               </Typography>
             </Box>
 
-            <Button
-              type="submit"
-              fullWidth
-              disabled={isSaving || fieldsDisabled}
-              variant="contained"
-              disableElevation
-              sx={{
-                mt: 3,
-                py: 1.35,
-                borderRadius: "12px",
-                textTransform: "none",
-                fontWeight: 600,
-                fontSize: 16,
-                color: "#fff",
-                bgcolor: tokens.teal,
-                "&:hover": { bgcolor: tokens.tealDark },
-              }}
-            >
-              {isSaving ? <CircularProgress size={22} color="inherit" /> : profilePageData.actions.update}
-            </Button>
+            {isEditing ? (
+              <Button
+                type="submit"
+                fullWidth
+                disabled={isSaving || !hasProfileChanges}
+                variant="contained"
+                disableElevation
+                sx={{
+                  mt: 3,
+                  py: 1.35,
+                  borderRadius: "12px",
+                  textTransform: "none",
+                  fontWeight: 600,
+                  fontSize: 16,
+                  color: "#fff",
+                  bgcolor: tokens.teal,
+                  "&:hover": { bgcolor: tokens.tealDark },
+                  "&.Mui-disabled": {
+                    bgcolor: alpha(tokens.teal, 0.35),
+                    color: alpha("#fff", 0.9),
+                  },
+                }}
+              >
+                {isSaving ? <CircularProgress size={22} color="inherit" /> : profilePageData.actions.update}
+              </Button>
+            ) : null}
             </Box>
           </Box>
         </Paper>

@@ -24,6 +24,8 @@ declare module "@mui/material/styles" {
   interface MollurePalette {
     teal: string;
     tealDark: string;
+    success: string;
+    successDark: string;
     navy: string;
     slate: string;
     surface: string;
@@ -68,6 +70,14 @@ declare module "@mui/material/styles" {
     fxSurface: string;
     fxPillTrack: string;
     fxPillBorder: string;
+    addSoftBg: string;
+    addSoftBgHover: string;
+    addSoftFg: string;
+    addSoftBorder: string;
+    salesVolumeStackDark: string;
+    salesVolumeStackMid: string;
+    salesVolumeStackLight: string;
+    salesVolumeStackPale: string;
   }
 
   interface Palette {

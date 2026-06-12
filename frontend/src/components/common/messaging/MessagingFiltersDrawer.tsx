@@ -1,0 +1,114 @@
+"use client";
+
+import * as React from "react";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import { Box, Button, Drawer, IconButton, Stack, Typography } from "@mui/material";
+import { alpha, useTheme } from "@mui/material/styles";
+import MessagingFilterCheckboxList from "./MessagingFilterCheckboxList";
+import type { MessagingDrawerFilters, MessagingBookingStatus } from "./messagingTypes";
+
+const SEARCH_OPTIONS: { key: MessagingDrawerFilters["searchFor"]; label: string; info?: boolean }[] = [
+  { key: "all", label: "All" },
+  { key: "completed", label: "Completed" },
+  { key: "confirmed", label: "Confirmed" },
+  { key: "requested", label: "Requests", info: true },
+  { key: "cancelled", label: "Cancelled" },
+  { key: "invalid", label: "Invalid" },
+  { key: "no_show", label: "No Show" },
+];
+
+type Props = {
+  open: boolean;
+  onClose: () => void;
+  filters: MessagingDrawerFilters;
+  onChange: (next: MessagingDrawerFilters) => void;
+  onApply: () => void;
+  onCancel: () => void;
+};
+
+export default function MessagingFiltersDrawer({ open, onClose, filters, onChange, onApply, onCancel }: Props) {
+  const m = useTheme().palette.mollure;
+
+  const searchChecked = SEARCH_OPTIONS.reduce(
+    (acc, opt) => {
+      acc[opt.key] = filters.searchFor === opt.key;
+      return acc;
+    },
+    {} as Record<string, boolean>,
+  );
+
+  return (
+    <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: { xs: "100%", sm: 360 }, borderRadius: "12px 0 0 12px" } }}>
+      <Box sx={{ p: 2.5, height: "100%", display: "flex", flexDirection: "column" }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+          <Typography sx={{ fontWeight: 900, fontSize: 16, color: alpha(m.navy, 0.88) }}>Filters</Typography>
+          <IconButton size="small" onClick={onClose} aria-label="Close filters">
+            <CloseRoundedIcon sx={{ color: alpha(m.navy, 0.45) }} />
+          </IconButton>
+        </Stack>
+
+        <Box sx={{ flex: 1, overflowY: "auto" }}>
+          <MessagingFilterCheckboxList
+            title="Search for"
+            options={SEARCH_OPTIONS}
+            checked={searchChecked}
+            singleSelect
+            onToggle={(key, value) => {
+              if (!value) return;
+              onChange({ ...filters, searchFor: key as MessagingBookingStatus | "all" });
+            }}
+          />
+          <Box sx={{ mt: 2.5 }}>
+            <MessagingFilterCheckboxList
+              title="Location"
+              options={[
+                { key: "fixed", label: "Fixed location" },
+                { key: "desired", label: "Desired location" },
+              ]}
+              checked={{ fixed: filters.locationFixed, desired: filters.locationDesired }}
+              onToggle={(key, value) =>
+                onChange({
+                  ...filters,
+                  locationFixed: key === "fixed" ? value : filters.locationFixed,
+                  locationDesired: key === "desired" ? value : filters.locationDesired,
+                })
+              }
+            />
+          </Box>
+        </Box>
+
+        <Stack direction="row" spacing={1.5} sx={{ mt: 2, pt: 2 }}>
+          <Button
+            fullWidth
+            variant="outlined"
+            onClick={onCancel}
+            sx={{
+              textTransform: "none",
+              fontWeight: 800,
+              borderRadius: "10px",
+              borderColor: alpha(m.navy, 0.18),
+              color: alpha(m.navy, 0.7),
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            fullWidth
+            variant="contained"
+            disableElevation
+            onClick={onApply}
+            sx={{
+              textTransform: "none",
+              fontWeight: 800,
+              borderRadius: "10px",
+              bgcolor: m.teal,
+              "&:hover": { bgcolor: m.tealDark },
+            }}
+          >
+            Apply
+          </Button>
+        </Stack>
+      </Box>
+    </Drawer>
+  );
+}

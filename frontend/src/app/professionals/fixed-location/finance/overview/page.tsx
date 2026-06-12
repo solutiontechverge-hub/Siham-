@@ -1,23 +1,63 @@
 "use client";
 
 import * as React from "react";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import {
   Box,
+  ListItemText,
   Menu,
   MenuItem,
   Paper,
 } from "@mui/material";
 import { alpha, useTheme, type Theme } from "@mui/material/styles";
-import { mockTransactions, type TransactionRow } from "../data/transactions";
+import {
+  applyStatusToTransactionIds,
+  buildManualEntryTransactionRow,
+  mockTransactions,
+  transactionMatchesStatusFilter,
+  type TransactionRow,
+} from "../data/transactions";
+import type { ManualEntrySavePayload } from "../../../../../components/sections/finance/manualEntry.data";
+import { manualEntryClientFields } from "../../../../../components/sections/finance/manualEntry.data";
+import CancelPendingPaymentModal from "../../../../../components/sections/finance/CancelPendingPaymentModal";
+import ManualEntryDrawer from "../../../../../components/sections/finance/ManualEntryDrawer";
+import RefundSalesDrawer from "../../../../../components/sections/finance/RefundSalesDrawer";
+import TransactionNoteModal from "../../../../../components/sections/finance/TransactionNoteModal";
 import FinanceFiltersDrawerView, { type FinanceFiltersValue } from "../../../../../components/sections/finance/FinanceFiltersDrawerView";
 import FinanceDocumentPreviewDrawer from "../../../../../components/sections/finance/FinanceDocumentPreviewDrawer";
 import TransactionsHeader from "../../../../../components/sections/finance/TransactionsHeader";
 import TransactionsTable from "../../../../../components/sections/finance/TransactionsTable";
 import TransactionsToolbar from "../../../../../components/sections/finance/TransactionsToolbar";
+import { useSnackbar } from "../../../../../components/common/AppSnackbar";
+import { exportTransactionsToExcel } from "../../../../../components/sections/finance/exportTransactionsExcel";
+import { downloadTransactionsOverview } from "../../../../../components/sections/finance/downloadTransactionsOverview";
 import { useFinanceInvoiceSettings } from "../../../../../components/sections/finance/useFinanceInvoiceSettings";
 import { useGetProfileQuery } from "../../../../../store/services/profileApi";
 
 const INITIAL_VISIBLE = 4;
+
+const ADD_MENU_ITEMS = [
+  { id: "newSale", label: "New Sale" },
+  { id: "addNote", label: "Add Note" },
+] as const;
+
+function isNewSaleEntry(entryLabel?: string | null) {
+  const label = (entryLabel ?? "").toLowerCase();
+  return label.includes("new sale") || label.includes("manual");
+}
+
+const ACTION_MENU_ITEMS = [
+  { id: "refund", label: "Refund", requiresSelection: true },
+  { id: "voidSales", label: "Void Sales", requiresSelection: true },
+  { id: "export", label: "Export", hasSubmenu: true },
+] as const;
+
+const ACTION_EXPORT_ITEMS = [
+  { id: "exportInvoiceReceipt", label: "Export Invoice/Receipt" },
+  { id: "exportOverview", label: "Export Overview", hasSubmenu: true },
+] as const;
+
+const OVERVIEW_EXPORT_OPTIONS = ["Export PDF", "Export Excel"] as const;
 
 function selectedKeys(value: FinanceFiltersValue, prefix: string) {
   return Object.keys(value).filter((k) => k.startsWith(prefix) && value[k]);
@@ -32,11 +72,14 @@ export default function FinanceOverviewPage() {
   const m = theme.palette.mollure;
   const { settings } = useFinanceInvoiceSettings();
   const { data: profileResponse } = useGetProfileQuery();
+  const { showSnackbar } = useSnackbar();
 
   const [query, setQuery] = React.useState("");
   const [selected, setSelected] = React.useState<Record<string, boolean>>({});
   const [addAnchor, setAddAnchor] = React.useState<null | HTMLElement>(null);
   const [moreAnchor, setMoreAnchor] = React.useState<null | HTMLElement>(null);
+  const [actionExportAnchor, setActionExportAnchor] = React.useState<null | HTMLElement>(null);
+  const [overviewExportAnchor, setOverviewExportAnchor] = React.useState<null | HTMLElement>(null);
   const [filtersOpen, setFiltersOpen] = React.useState(false);
   const [filtersValue, setFiltersValue] = React.useState<FinanceFiltersValue>({});
   const [fromDate, setFromDate] = React.useState<string | null>(null);
@@ -47,6 +90,11 @@ export default function FinanceOverviewPage() {
     row: TransactionRow;
     documentType: "invoice" | "receipt";
   } | null>(null);
+  const [voidPaymentModalOpen, setVoidPaymentModalOpen] = React.useState(false);
+  const [refundDrawerOpen, setRefundDrawerOpen] = React.useState(false);
+  const [manualEntryDrawerOpen, setManualEntryDrawerOpen] = React.useState(false);
+  const [noteModalTransactionId, setNoteModalTransactionId] = React.useState<string | null>(null);
+  const [transactions, setTransactions] = React.useState<TransactionRow[]>(() => [...mockTransactions]);
 
   React.useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE);
@@ -79,7 +127,7 @@ export default function FinanceOverviewPage() {
     // Some rows are grouped under a "parent" and have date=null; inherit previous date.
     let lastDate: string | null = null;
 
-    return mockTransactions.filter((r) => {
+    return transactions.filter((r) => {
       const effectiveDate = r.date ?? lastDate;
       if (r.date) lastDate = r.date;
 
@@ -97,25 +145,23 @@ export default function FinanceOverviewPage() {
 
       // Entry ID group
       if (entryKeys.length) {
-        const isManual = (r.entryLabel ?? "").toLowerCase().includes("manual");
+        const isNewSale = isNewSaleEntry(r.entryLabel);
         const isOnline = method.startsWith("online");
         const isOffline = method.startsWith("offline");
         const ok =
-          (entryKeys.includes("entry:manualEntry") && isManual) ||
+          (entryKeys.includes("entry:newSale") && isNewSale) ||
           (entryKeys.includes("entry:onlineBooking") && isOnline) ||
           (entryKeys.includes("entry:offlineBooking") && isOffline);
         if (!ok) return false;
       }
 
-      // Client type group (mock data only has `member`)
       if (clientKeys.length) {
-        const isMollure = Boolean(r.member);
-        const isNonMollure = !isMollure;
+        const type = r.clientType;
         const ok =
-          (clientKeys.includes("client:mollure") && isMollure) ||
-          (clientKeys.includes("client:nonMollure") && isNonMollure) ||
-          // Fallback: treat IC/CC as non-mollure until we have real type
-          ((clientKeys.includes("client:ic") || clientKeys.includes("client:cc")) && isNonMollure);
+          (clientKeys.includes("client:mollure") && type === "mollure") ||
+          (clientKeys.includes("client:nonMollure") && type === "nonMollure") ||
+          (clientKeys.includes("client:ic") && type === "nonMollure") ||
+          (clientKeys.includes("client:cc") && type === "business");
         if (!ok) return false;
       }
 
@@ -133,20 +179,13 @@ export default function FinanceOverviewPage() {
         if (!ok) return false;
       }
 
-      // Payment status group (map to our mock statuses)
-      if (statusKeys.length) {
-        const ok =
-          (statusKeys.includes("status:paid") && r.status === "Paid") ||
-          (statusKeys.includes("status:pending") && r.status === "Unpaid") ||
-          (statusKeys.includes("status:failed") && r.status === "Refunded") ||
-          // Reasonable fallback for "Prepaid" with current mock data
-          (statusKeys.includes("status:prepaid") && r.status === "Paid");
-        if (!ok) return false;
+      if (statusKeys.length && !transactionMatchesStatusFilter(r.status, statusKeys)) {
+        return false;
       }
 
       return true;
     });
-  }, [query, filtersValue, fromDate, toDate]);
+  }, [query, filtersValue, fromDate, toDate, transactions]);
 
   const visibleRows = filtered.slice(0, visibleCount);
   const canLoadMore = visibleCount < filtered.length;
@@ -169,7 +208,249 @@ export default function FinanceOverviewPage() {
 
   const allVisibleSelected =
     visibleRows.length > 0 && visibleRows.every((r) => selected[r.id]);
-  const someVisibleSelected = visibleRows.some((r) => selected[r.id]);
+  const selectedCount = React.useMemo(
+    () => visibleRows.filter((r) => selected[r.id]).length,
+    [visibleRows, selected],
+  );
+  const multipleSelected = selectedCount >= 2;
+
+  const selectedRows = React.useMemo(
+    () => filtered.filter((r) => selected[r.id]),
+    [filtered, selected],
+  );
+
+  const closeAddMenus = React.useCallback(() => {
+    setAddAnchor(null);
+    setOverviewExportAnchor(null);
+  }, []);
+
+  const closeMoreMenus = React.useCallback(() => {
+    setMoreAnchor(null);
+    setActionExportAnchor(null);
+    setOverviewExportAnchor(null);
+  }, []);
+
+  const rowsToExport = React.useMemo(
+    () => (selectedCount > 0 ? selectedRows : filtered),
+    [filtered, selectedCount, selectedRows],
+  );
+
+  const openVoidPaymentModal = React.useCallback(() => {
+    if (selectedCount === 0) {
+      showSnackbar({ severity: "warning", message: "Select at least one transaction first." });
+      return;
+    }
+    closeAddMenus();
+    closeMoreMenus();
+    setVoidPaymentModalOpen(true);
+  }, [closeAddMenus, closeMoreMenus, selectedCount, showSnackbar]);
+
+  const confirmVoidPayment = React.useCallback(() => {
+    const ids = selectedRows.map((r) => r.id);
+    setTransactions((prev) => applyStatusToTransactionIds(prev, ids, "Void"));
+    setVoidPaymentModalOpen(false);
+    setSelected({});
+    showSnackbar({
+      severity: "success",
+      message: `Voided ${ids.length} transaction${ids.length === 1 ? "" : "s"}.`,
+    });
+  }, [selectedRows, showSnackbar]);
+
+  const openRefundDrawer = React.useCallback(() => {
+    if (selectedCount === 0) {
+      showSnackbar({ severity: "warning", message: "Select at least one transaction first." });
+      return;
+    }
+    closeAddMenus();
+    closeMoreMenus();
+    setRefundDrawerOpen(true);
+  }, [closeAddMenus, closeMoreMenus, selectedCount, showSnackbar]);
+
+  const confirmRefund = React.useCallback(() => {
+    const ids = selectedRows.map((r) => r.id);
+    setTransactions((prev) => applyStatusToTransactionIds(prev, ids, "Refunded"));
+    setRefundDrawerOpen(false);
+    setSelected({});
+    showSnackbar({
+      severity: "success",
+      message: `Refunded ${ids.length} transaction${ids.length === 1 ? "" : "s"}.`,
+    });
+  }, [selectedRows, showSnackbar]);
+
+  const openManualEntryDrawer = React.useCallback(() => {
+    closeAddMenus();
+    closeMoreMenus();
+    setManualEntryDrawerOpen(true);
+  }, [closeAddMenus, closeMoreMenus]);
+
+  const noteModalTransaction = React.useMemo(
+    () => transactions.find((row) => row.id === noteModalTransactionId) ?? null,
+    [noteModalTransactionId, transactions],
+  );
+
+  const openNoteModal = React.useCallback(
+    (transactionId: string) => {
+      closeAddMenus();
+      closeMoreMenus();
+      setNoteModalTransactionId(transactionId);
+    },
+    [closeAddMenus, closeMoreMenus],
+  );
+
+  const saveTransactionNote = React.useCallback(
+    (note: string) => {
+      if (!noteModalTransactionId) return;
+      setTransactions((prev) =>
+        prev.map((row) => (row.id === noteModalTransactionId ? { ...row, note } : row)),
+      );
+      showSnackbar({ severity: "success", message: "Note saved." });
+    },
+    [noteModalTransactionId, showSnackbar],
+  );
+
+  const deleteTransactionNote = React.useCallback(() => {
+    if (!noteModalTransactionId) return;
+    setTransactions((prev) =>
+      prev.map((row) => (row.id === noteModalTransactionId ? { ...row, note: undefined } : row)),
+    );
+    showSnackbar({ severity: "success", message: "Note deleted." });
+  }, [noteModalTransactionId, showSnackbar]);
+
+  const confirmManualEntry = React.useCallback((payload: ManualEntrySavePayload) => {
+    const client = manualEntryClientFields(payload.clientSelection);
+    const row = buildManualEntryTransactionRow({
+      ...client,
+      lines: payload.lines.map((line) => ({
+        name: line.name,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+      })),
+      totalPrice: payload.totalPrice,
+      discountAmount: payload.discountAmount,
+    });
+    setTransactions((prev) => [row, ...prev]);
+    setManualEntryDrawerOpen(false);
+    setFromDate(null);
+    setToDate(null);
+    setVisibleCount(INITIAL_VISIBLE);
+    setSelected({});
+    showSnackbar({
+      severity: "success",
+      message: `New sale saved for ${client.clientName} — ${row.netAmount} added to transactions.`,
+    });
+  }, [showSnackbar]);
+
+  const exportInvoiceReceipt = React.useCallback(() => {
+    closeMoreMenus();
+    if (rowsToExport.length === 0) {
+      showSnackbar({ severity: "warning", message: "No transactions to export." });
+      return;
+    }
+    const ok = exportTransactionsToExcel(rowsToExport, "transactions-invoice-receipt");
+    if (ok) {
+      showSnackbar({
+        severity: "success",
+        message: `Exported ${rowsToExport.length} transaction${rowsToExport.length === 1 ? "" : "s"} (invoice/receipt) to Excel.`,
+      });
+    }
+  }, [closeMoreMenus, rowsToExport, showSnackbar]);
+
+  const handleActionMenuAction = React.useCallback(
+    (actionId: string) => {
+      if (actionId === "export") return;
+
+      closeMoreMenus();
+
+      if (actionId === "voidSales") {
+        openVoidPaymentModal();
+        return;
+      }
+
+      if (actionId === "refund") {
+        openRefundDrawer();
+      }
+    },
+    [closeMoreMenus, openRefundDrawer, openVoidPaymentModal],
+  );
+
+  const handleActionExportAction = React.useCallback(
+    (actionId: string) => {
+      if (actionId === "exportOverview") return;
+
+      if (actionId === "exportInvoiceReceipt") {
+        exportInvoiceReceipt();
+      }
+    },
+    [exportInvoiceReceipt],
+  );
+
+  const addMenuItemSx = React.useMemo(
+    () => ({
+      borderRadius: "8px",
+      fontSize: 12.5,
+      fontWeight: 700,
+      color: alpha(m.navy, 0.75),
+      my: 0.25,
+    }),
+    [m.navy],
+  );
+
+  const handleAddMenuAction = React.useCallback(
+    (actionId: string) => {
+      closeAddMenus();
+
+      if (actionId === "newSale") {
+        openManualEntryDrawer();
+        return;
+      }
+
+      if (actionId === "addNote") {
+        if (selectedCount === 0) {
+          showSnackbar({ severity: "warning", message: "Select a transaction to add a note." });
+          return;
+        }
+        openNoteModal(selectedRows[0].id);
+      }
+    },
+    [closeAddMenus, openManualEntryDrawer, openNoteModal, selectedCount, selectedRows, showSnackbar],
+  );
+
+  const openActionExportMenu = React.useCallback((el: HTMLElement) => {
+    setActionExportAnchor(el);
+  }, []);
+
+  const openOverviewExportMenu = React.useCallback((el: HTMLElement) => {
+    setOverviewExportAnchor(el);
+  }, []);
+
+  const handleOverviewExport = React.useCallback(
+    async (format: (typeof OVERVIEW_EXPORT_OPTIONS)[number]) => {
+      if (rowsToExport.length === 0) {
+        closeAddMenus();
+        showSnackbar({ severity: "warning", message: "No transactions to export." });
+        return;
+      }
+
+      const exportFormat = format === "Export Excel" ? "excel" : "pdf";
+
+      try {
+        const ok = await downloadTransactionsOverview(rowsToExport, exportFormat);
+        closeAddMenus();
+        if (ok) {
+          showSnackbar({
+            severity: "success",
+            message: `Downloaded ${rowsToExport.length} transaction${rowsToExport.length === 1 ? "" : "s"} as ${exportFormat === "excel" ? "Excel" : "PDF"}.`,
+          });
+          return;
+        }
+        showSnackbar({ severity: "error", message: "Export failed. Please try again." });
+      } catch {
+        closeAddMenus();
+        showSnackbar({ severity: "error", message: `Failed to download ${exportFormat === "excel" ? "Excel" : "PDF"} file.` });
+      }
+    },
+    [closeAddMenus, rowsToExport, showSnackbar],
+  );
 
   return (
     <Paper
@@ -213,25 +494,26 @@ export default function FinanceOverviewPage() {
       <Menu
         anchorEl={addAnchor}
         open={Boolean(addAnchor)}
-        onClose={() => setAddAnchor(null)}
+        onClose={closeAddMenus}
         PaperProps={{
           sx: {
             borderRadius: "10px",
             border: `1px solid ${alpha(m.navy, 0.10)}`,
             boxShadow: "0 14px 30px rgba(16,35,63,0.12)",
             mt: 0.75,
-            minWidth: 180,
+            minWidth: 220,
             p: 0.5,
           },
         }}
       >
-        {["Record payment", "Manual entry", "Import"].map((opt) => (
+        {ADD_MENU_ITEMS.map((opt) => (
           <MenuItem
-            key={opt}
-            onClick={() => setAddAnchor(null)}
-            sx={{ borderRadius: "8px", fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.75), my: 0.25 }}
+            key={opt.id}
+            disabled={opt.id === "addNote" && selectedCount === 0}
+            onClick={() => handleAddMenuAction(opt.id)}
+            sx={addMenuItemSx}
           >
-            {opt}
+            {opt.label}
           </MenuItem>
         ))}
       </Menu>
@@ -239,25 +521,131 @@ export default function FinanceOverviewPage() {
       <Menu
         anchorEl={moreAnchor}
         open={Boolean(moreAnchor)}
-        onClose={() => setMoreAnchor(null)}
+        onClose={closeMoreMenus}
         PaperProps={{
           sx: {
             borderRadius: "10px",
             border: `1px solid ${alpha(m.navy, 0.10)}`,
             boxShadow: "0 14px 30px rgba(16,35,63,0.12)",
             mt: 0.75,
-            minWidth: 160,
+            minWidth: 220,
             p: 0.5,
           },
         }}
       >
-        {["Export", "Print summary"].map((opt) => (
+        {ACTION_MENU_ITEMS.map((opt) =>
+          "hasSubmenu" in opt && opt.hasSubmenu ? (
+            <MenuItem
+              key={opt.id}
+              onMouseEnter={(e) => openActionExportMenu(e.currentTarget)}
+              onClick={(e) => openActionExportMenu(e.currentTarget)}
+              sx={{
+                borderRadius: "8px",
+                fontSize: 12.5,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.75),
+                my: 0.25,
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 1,
+              }}
+            >
+              {opt.label}
+              <ChevronRightRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.45) }} />
+            </MenuItem>
+          ) : (
+            <MenuItem
+              key={opt.id}
+              disabled={"requiresSelection" in opt && opt.requiresSelection && selectedCount === 0}
+              onClick={() => handleActionMenuAction(opt.id)}
+              sx={{ borderRadius: "8px", fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.75), my: 0.25 }}
+            >
+              {opt.label}
+            </MenuItem>
+          ),
+        )}
+      </Menu>
+
+      <Menu
+        anchorEl={actionExportAnchor}
+        open={Boolean(actionExportAnchor)}
+        onClose={() => setActionExportAnchor(null)}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "left" }}
+        MenuListProps={{ sx: { py: 0.5 } }}
+        disableAutoFocusItem
+        PaperProps={{
+          sx: {
+            borderRadius: "10px",
+            border: `1px solid ${alpha(m.navy, 0.10)}`,
+            boxShadow: "0 14px 30px rgba(16,35,63,0.12)",
+            ml: 0.25,
+            minWidth: 200,
+            p: 0.5,
+          },
+        }}
+      >
+        {ACTION_EXPORT_ITEMS.map((opt) =>
+          "hasSubmenu" in opt && opt.hasSubmenu ? (
+            <MenuItem
+              key={opt.id}
+              onMouseEnter={(e) => openOverviewExportMenu(e.currentTarget)}
+              onClick={(e) => openOverviewExportMenu(e.currentTarget)}
+              sx={{
+                borderRadius: "8px",
+                fontSize: 12.5,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.75),
+                my: 0.25,
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 1,
+              }}
+            >
+              {opt.label}
+              <ChevronRightRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.45) }} />
+            </MenuItem>
+          ) : (
+            <MenuItem
+              key={opt.id}
+              onClick={() => handleActionExportAction(opt.id)}
+              sx={{ borderRadius: "8px", fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.75), my: 0.25 }}
+            >
+              {opt.label}
+            </MenuItem>
+          ),
+        )}
+      </Menu>
+
+      <Menu
+        anchorEl={overviewExportAnchor}
+        open={Boolean(overviewExportAnchor)}
+        onClose={() => setOverviewExportAnchor(null)}
+        anchorOrigin={{ vertical: "top", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "left" }}
+        MenuListProps={{ sx: { py: 0.5 } }}
+        disableAutoFocusItem
+        PaperProps={{
+          sx: {
+            borderRadius: "10px",
+            border: `1px solid ${alpha(m.navy, 0.10)}`,
+            boxShadow: "0 14px 30px rgba(16,35,63,0.12)",
+            ml: 0.25,
+            minWidth: 168,
+            p: 0.5,
+          },
+        }}
+      >
+        {OVERVIEW_EXPORT_OPTIONS.map((opt) => (
           <MenuItem
             key={opt}
-            onClick={() => setMoreAnchor(null)}
+            onClick={(e) => {
+              e.stopPropagation();
+              void handleOverviewExport(opt);
+            }}
             sx={{ borderRadius: "8px", fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.75), my: 0.25 }}
           >
-            {opt}
+            <ListItemText primary={opt} />
           </MenuItem>
         ))}
       </Menu>
@@ -265,9 +653,11 @@ export default function FinanceOverviewPage() {
       <TransactionsTable
         rows={visibleRows}
         selected={selected}
+        disableDocumentLinks={multipleSelected}
         onToggleOne={toggleOne}
         onToggleAll={toggleAll}
         onOpenDocument={(row, documentType) => setActiveDocument({ row, documentType })}
+        onOpenNote={(row) => openNoteModal(row.id)}
         canLoadMore={canLoadMore}
         onLoadMore={
           canLoadMore
@@ -286,6 +676,33 @@ export default function FinanceOverviewPage() {
         settings={settings}
         row={activeDocument?.row ?? null}
         profileData={profileResponse?.data ?? null}
+      />
+
+      <CancelPendingPaymentModal
+        open={voidPaymentModalOpen}
+        onClose={() => setVoidPaymentModalOpen(false)}
+        onConfirm={confirmVoidPayment}
+      />
+
+      <RefundSalesDrawer
+        open={refundDrawerOpen}
+        onClose={() => setRefundDrawerOpen(false)}
+        transactions={selectedRows}
+        onSave={() => confirmRefund()}
+      />
+
+      <ManualEntryDrawer
+        open={manualEntryDrawerOpen}
+        onClose={() => setManualEntryDrawerOpen(false)}
+        onSave={confirmManualEntry}
+      />
+
+      <TransactionNoteModal
+        open={Boolean(noteModalTransactionId)}
+        initialNote={noteModalTransaction?.note ?? ""}
+        onClose={() => setNoteModalTransactionId(null)}
+        onSave={saveTransactionNote}
+        onDelete={noteModalTransaction?.note?.trim() ? deleteTransactionNote : undefined}
       />
     </Paper>
   );

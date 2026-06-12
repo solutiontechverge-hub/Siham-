@@ -160,6 +160,7 @@ export function useDesiredLocationForm() {
   );
 
   const addKeyword = React.useCallback(() => {
+    if (values.keywords.length >= 5) return;
     const next = values.keywordDraft.trim();
     if (!next) return;
     if (values.keywords.includes(next)) {
@@ -168,7 +169,7 @@ export function useDesiredLocationForm() {
     }
     setValues((prev) => ({
       ...prev,
-      keywords: [...prev.keywords, next].slice(0, 3),
+      keywords: [...prev.keywords, next].slice(0, 5),
       keywordDraft: "",
     }));
   }, [values.keywordDraft, values.keywords]);

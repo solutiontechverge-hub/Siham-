@@ -25,6 +25,7 @@ import {
   MarketingSiteHeader,
   MollureAuthLabeledField,
   MollureAuthLabeledPasswordField,
+  MollureAuthTextField,
   PasswordStrengthBar,
 } from "../../../../components/common";
 import { authSignupHeaderProfessional } from "../../../../data/marketingShell.data";
@@ -39,7 +40,6 @@ type FormState = {
   street: string;
   number: string;
   postalCode: string;
-  province: string;
   municipality: string;
   businessType: string;
   website: string;
@@ -60,7 +60,6 @@ const initialForm: FormState = {
   street: "",
   number: "",
   postalCode: "",
-  province: "",
   municipality: "",
   businessType: "",
   website: "",
@@ -74,31 +73,7 @@ const initialForm: FormState = {
   acceptTerms: false,
 };
 
-const PROVINCE_OPTIONS = [
-  "Drenthe",
-  "Flevoland",
-  "Friesland",
-  "Gelderland",
-  "Groningen",
-  "Limburg",
-  "North Brabant",
-  "North Holland",
-  "Overijssel",
-  "South Holland",
-  "Utrecht",
-  "Zeeland",
-  "Antwerp",
-  "East Flanders",
-  "Flemish Brabant",
-  "Hainaut",
-  "Liège",
-  "Limburg (BE)",
-  "Luxembourg (BE)",
-  "Namur",
-  "Walloon Brabant",
-  "West Flanders",
-  "Brussels-Capital Region",
-] as const;
+const PROFESSIONAL_COUNTRY = "Netherlands";
 
 const MUNICIPALITY_OPTIONS = [
   "Amsterdam",
@@ -111,17 +86,20 @@ const MUNICIPALITY_OPTIONS = [
   "Almere",
   "Breda",
   "Nijmegen",
-  "Antwerp",
-  "Ghent",
-  "Charleroi",
-  "Brussels",
-  "Liège",
-  "Schaerbeek",
-  "Anderlecht",
-  "Bruges",
-  "Namur",
-  "Leuven",
+  "Haarlem",
+  "Arnhem",
+  "Zaanstad",
+  "Amersfoort",
+  "Apeldoorn",
+  "Den Bosch",
+  "Hoofddorp",
+  "Maastricht",
+  "Leiden",
+  "Dordrecht",
 ] as const;
+
+const COC_NUMBER_REGEX = /^\d{8}$/;
+const VAT_NUMBER_REGEX = /^NL\d{9}B\d{2}$/i;
 
 const BUSINESS_TYPE_OPTIONS = [
   { value: "salonOwner", label: "Salon Owner" },
@@ -179,6 +157,21 @@ export default function ProfessionalSignupPage() {
 
     if (!form.acceptTerms) nextErrors.acceptTerms = "Please accept the terms and conditions.";
 
+    if (!form.cccNumber.trim()) nextErrors.cccNumber = "COC number is required.";
+    else if (!COC_NUMBER_REGEX.test(form.cccNumber.trim())) {
+      nextErrors.cccNumber = "COC number must be exactly 8 digits.";
+    }
+
+    if (!form.vatNumber.trim()) nextErrors.vatNumber = "VAT number is required.";
+    else if (!VAT_NUMBER_REGEX.test(form.vatNumber.trim())) {
+      nextErrors.vatNumber = "VAT number must match NL123456789B01 format.";
+    }
+
+    const hasPortfolioLink = [form.website, form.instagram, form.otherLink].some((link) => link.trim());
+    if (!hasPortfolioLink) {
+      nextErrors.website = "At least one portfolio link is required.";
+    }
+
     if (Object.keys(nextErrors).length) {
       setErrors(nextErrors);
       const firstMessage = Object.values(nextErrors).find(Boolean);
@@ -212,11 +205,10 @@ export default function ProfessionalSignupPage() {
         confirm_password: form.confirmPassword,
         legal_name: form.legalName.trim(),
         ccc_number: form.cccNumber.trim(),
-        vat_number: form.vatNumber.trim(),
+        vat_number: form.vatNumber.trim().toUpperCase(),
         street: form.street.trim() || undefined,
         street_number: form.number.trim() || undefined,
         postal_code: form.postalCode.trim() || undefined,
-        province: form.province.trim() || undefined,
         municipality: form.municipality.trim() || undefined,
         business_type: form.businessType || undefined,
         website: form.website.trim() || undefined,
@@ -397,33 +389,41 @@ export default function ProfessionalSignupPage() {
                         <Grid item xs={12}>
                           <MollureAuthLabeledField
                             fieldLabel="Legal Name"
+                            labelPlacement="inCell"
                             name="legalName"
                             value={form.legalName}
                             onChange={handleChange}
                             error={Boolean(errors.legalName)}
                             helperText={errors.legalName}
                             required
-                            placeholder="e.g Jane"
+                            placeholder="e.g. Jane"
                           />
                         </Grid>
                         <Grid item xs={12} sm={6}>
                           <MollureAuthLabeledField
                             fieldLabel="COC number"
+                            labelPlacement="inCell"
                             name="cccNumber"
                             value={form.cccNumber}
                             onChange={handleChange}
+                            error={Boolean(errors.cccNumber)}
+                            helperText={errors.cccNumber}
                             required
-                            placeholder="676537"
+                            placeholder="12345678"
+                            inputProps={{ inputMode: "numeric", maxLength: 8 }}
                           />
                         </Grid>
                         <Grid item xs={12} sm={6}>
                           <MollureAuthLabeledField
                             fieldLabel="VAT number"
+                            labelPlacement="inCell"
                             name="vatNumber"
                             value={form.vatNumber}
                             onChange={handleChange}
+                            error={Boolean(errors.vatNumber)}
+                            helperText={errors.vatNumber}
                             required
-                            placeholder="27354323456789"
+                            placeholder="NL123456789B01"
                           />
                         </Grid>
 
@@ -440,52 +440,48 @@ export default function ProfessionalSignupPage() {
                             Business Address
                           </Typography>
                         </Grid>
-                        <Grid item xs={12} sm={8}>
+                        <Grid item xs={12}>
+                          <MollureAuthLabeledField
+                            fieldLabel="Country"
+                            labelPlacement="inCell"
+                            value={PROFESSIONAL_COUNTRY}
+                            disabled
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
                           <MollureAuthLabeledField
                             fieldLabel="Street"
+                            labelPlacement="inCell"
                             name="street"
                             value={form.street}
                             onChange={handleChange}
+                            placeholder="e.g. Damrak"
                           />
                         </Grid>
-                        <Grid item xs={12} sm={4}>
+                        <Grid item xs={12} sm={6}>
                           <MollureAuthLabeledField
                             fieldLabel="Number"
+                            labelPlacement="inCell"
                             name="number"
                             value={form.number}
                             onChange={handleChange}
+                            placeholder="e.g. 1"
                           />
                         </Grid>
                         <Grid item xs={12} sm={6}>
                           <MollureAuthLabeledField
                             fieldLabel="Postal Code"
+                            labelPlacement="inCell"
                             name="postalCode"
                             value={form.postalCode}
                             onChange={handleChange}
+                            placeholder="e.g. 1012 LG"
                           />
                         </Grid>
                         <Grid item xs={12} sm={6}>
                           <MollureAuthLabeledField
-                            fieldLabel="Province"
-                            select
-                            name="province"
-                            value={form.province}
-                            onChange={handleChange}
-                            SelectProps={{ displayEmpty: true }}
-                          >
-                            <MenuItem value="">
-                              <em>Select Province</em>
-                            </MenuItem>
-                            {PROVINCE_OPTIONS.map((p) => (
-                              <MenuItem key={p} value={p}>
-                                {p}
-                              </MenuItem>
-                            ))}
-                          </MollureAuthLabeledField>
-                        </Grid>
-                        <Grid item xs={12}>
-                          <MollureAuthLabeledField
                             fieldLabel="Municipality"
+                            labelPlacement="inCell"
                             select
                             name="municipality"
                             value={form.municipality}
@@ -506,6 +502,7 @@ export default function ProfessionalSignupPage() {
                         <Grid item xs={12}>
                           <MollureAuthLabeledField
                             fieldLabel="Select Business Type"
+                            labelPlacement="inCell"
                             select
                             name="businessType"
                             value={form.businessType}
@@ -535,27 +532,33 @@ export default function ProfessionalSignupPage() {
                           >
                             Portfolio links
                           </Typography>
+                          {errors.website ? (
+                            <Typography sx={{ fontSize: 12, color: "error.main", mb: 0.5 }}>
+                              {errors.website}
+                            </Typography>
+                          ) : null}
                         </Grid>
                         <Grid item xs={12} md={4}>
-                          <MollureAuthLabeledField
-                            fieldLabel="Website"
+                          <MollureAuthTextField
                             name="website"
+                            placeholder="Website"
                             value={form.website}
                             onChange={handleChange}
+                            error={Boolean(errors.website)}
                           />
                         </Grid>
                         <Grid item xs={12} md={4}>
-                          <MollureAuthLabeledField
-                            fieldLabel="Instagram"
+                          <MollureAuthTextField
                             name="instagram"
+                            placeholder="Instagram"
                             value={form.instagram}
                             onChange={handleChange}
                           />
                         </Grid>
                         <Grid item xs={12} md={4}>
-                          <MollureAuthLabeledField
-                            fieldLabel="Other"
+                          <MollureAuthTextField
                             name="otherLink"
+                            placeholder="Other"
                             value={form.otherLink}
                             onChange={handleChange}
                           />
@@ -578,31 +581,34 @@ export default function ProfessionalSignupPage() {
                         <Grid item xs={12} sm={6}>
                           <MollureAuthLabeledField
                             fieldLabel="First Name"
+                            labelPlacement="inCell"
                             name="contactFirstName"
                             value={form.contactFirstName}
                             onChange={handleChange}
                             error={Boolean(errors.contactFirstName)}
                             helperText={errors.contactFirstName}
                             required
-                            placeholder="e.g Jane"
+                            placeholder="e.g. Jane"
                           />
                         </Grid>
                         <Grid item xs={12} sm={6}>
                           <MollureAuthLabeledField
                             fieldLabel="Last Name"
+                            labelPlacement="inCell"
                             name="contactLastName"
                             value={form.contactLastName}
                             onChange={handleChange}
                             error={Boolean(errors.contactLastName)}
                             helperText={errors.contactLastName}
                             required
-                            placeholder="e.g Doe"
+                            placeholder="e.g. Doe"
                           />
                         </Grid>
                         <Grid item xs={12}>
                           <MollureAuthLabeledField
                             type="email"
                             fieldLabel="Email"
+                            labelPlacement="inCell"
                             name="contactEmail"
                             value={form.contactEmail}
                             onChange={handleChange}
@@ -610,12 +616,13 @@ export default function ProfessionalSignupPage() {
                             helperText={errors.contactEmail}
                             required
                             autoComplete="email"
-                            placeholder="You@gmail.com"
+                            placeholder="you@gmail.com"
                           />
                         </Grid>
                         <Grid item xs={12} sm={6}>
                           <MollureAuthLabeledPasswordField
                             fieldLabel="Password"
+                            labelPlacement="inCell"
                             name="password"
                             value={form.password}
                             onChange={handleChange}
@@ -623,12 +630,13 @@ export default function ProfessionalSignupPage() {
                             helperText={errors.password}
                             required
                             autoComplete="new-password"
-                            placeholder="Enter Password"
+                            placeholder="Enter password"
                           />
                         </Grid>
                         <Grid item xs={12} sm={6}>
                           <MollureAuthLabeledPasswordField
                             fieldLabel="Repeat password"
+                            labelPlacement="inCell"
                             name="confirmPassword"
                             value={form.confirmPassword}
                             onChange={handleChange}
@@ -636,7 +644,7 @@ export default function ProfessionalSignupPage() {
                             helperText={errors.confirmPassword}
                             required
                             autoComplete="new-password"
-                            placeholder="Confirm Password"
+                            placeholder="Confirm password"
                           />
                         </Grid>
                         <Grid item xs={12}>
