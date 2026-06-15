@@ -123,6 +123,31 @@ export default function ClientBookingPaymentDetailsCard({
           <Typography sx={{ fontWeight: 900, fontSize: 14, color: alpha(m.navy, 0.88) }}>{requesterName}</Typography>
         </Stack>
 
+        {draft?.projectDetails?.description ? (
+          <Box
+            sx={{
+              mb: 2,
+              borderRadius: "10px",
+              border: `1px solid ${alpha(m.navy, 0.08)}`,
+              bgcolor: alpha(m.navy, 0.02),
+              px: 1.5,
+              py: 1.15,
+            }}
+          >
+            <Typography sx={{ fontWeight: 900, fontSize: 12, color: alpha(m.navy, 0.72), mb: 0.5 }}>
+              Project description
+            </Typography>
+            <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.58), whiteSpace: "pre-wrap" }}>
+              {draft.projectDetails.description}
+            </Typography>
+            {(draft.projectDetails.uploads?.length ?? 0) > 0 ? (
+              <Typography sx={{ mt: 0.75, fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.48) }}>
+                {draft.projectDetails.uploads.length} file{draft.projectDetails.uploads.length === 1 ? "" : "s"} attached
+              </Typography>
+            ) : null}
+          </Box>
+        ) : null}
+
         <Stack spacing={1.25}>
           {clientServiceSections.map((section) => (
             <Stack key={section.key} spacing={1}>

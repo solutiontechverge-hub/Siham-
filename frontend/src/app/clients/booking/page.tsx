@@ -9,6 +9,7 @@ import {
   ButtonBase,
   Checkbox,
   Chip,
+  CircularProgress,
   Container,
   Dialog,
   DialogActions,
@@ -49,7 +50,14 @@ import ClientBookingListView from "./ClientBookingListView";
 import ClientBookingPageShell from "./ClientBookingPageShell";
 import { parseBookingListTab } from "./bookingPillTabs";
 import { upsertRequestedBooking } from "./clientBookingRecords";
-import { ACTIVE_BOOKING_ID_KEY, createBookingRef, setActiveBookingSession } from "./clientBookingSession";
+import {
+  ACTIVE_BOOKING_ID_KEY,
+  CHECKOUT_REF_KEY,
+  createBookingRef,
+  setActiveBookingSession,
+} from "./clientBookingSession";
+import { resolveCreateBookingStatus, resolveCreateCheckoutPath } from "./resolveCreateBookingStatus";
+import { useSnackbar } from "../../../components/common/AppSnackbar";
 import { getServicesForLocationMode, getTeamForLocationMode } from "../../../data/businessPublicProfile.data";
 import { useBusinessPublicProfile } from "../../../hooks/useBusinessPublicProfile";
 import { parsePrepaymentPercent } from "../../../components/common/client-booking/parsePrepaymentPercent";
@@ -175,6 +183,7 @@ function ClientBookingCreateView() {
   const searchParams = useSearchParams();
   const fromProfile = searchParams?.get("from") === "profile";
   const profileHydrationToken = searchParams?.get("t") ?? "";
+  const { showSnackbar } = useSnackbar();
   const theme = useTheme();
   const m = theme.palette.mollure;
   const user = useAppSelector((s) => s.auth.user);
@@ -462,8 +471,7 @@ function ClientBookingCreateView() {
     () => unassigned.filter((s) => selectedServiceIds[s.id]),
     [unassigned, selectedServiceIds],
   );
-  const canDirectAssign =
-    selectedUnassignedServices.length > 0 && selectedUnassignedServices.every((s) => Boolean(s.teamMemberId));
+  const canDirectAssign = selectedUnassignedServices.length > 0;
   const visible = serviceTab === "assigned" ? assigned : unassigned;
   const hasUnassigned = unassigned.length > 0;
 
@@ -597,7 +605,7 @@ function ClientBookingCreateView() {
         name: row.name,
         durationMins: row.durationMins,
         price: row.price,
-        guestId: row.teamMemberId ? "p-requester" : null,
+        guestId: "p-requester",
         teamMemberId: row.teamMemberId,
       }));
 
@@ -817,8 +825,19 @@ function ClientBookingCreateView() {
 
   const assignSelectedDirect = () => {
     if (!canDirectAssign) return;
+    const fallbackTeamMemberId = filteredTeamMembers[0]?.id ?? null;
     const ids = new Set(selectedUnassignedServices.map((s) => s.id));
-    setServices((prev) => prev.map((s) => (ids.has(s.id) ? { ...s, guestId: selectedPersonId } : s)));
+    setServices((prev) =>
+      prev.map((s) => {
+        if (!ids.has(s.id)) return s;
+        const teamMemberId = s.teamMemberId ?? selectedTeamMemberId ?? fallbackTeamMemberId;
+        return {
+          ...s,
+          guestId: selectedPersonId,
+          teamMemberId,
+        };
+      }),
+    );
     setSelectedServiceIds({});
     setServiceTab("assigned");
   };
@@ -869,6 +888,8 @@ function ClientBookingCreateView() {
   };
 
   const onContinue = () => {
+    if (!shop?.shopId || services.length === 0 || !allServicesAssigned) return;
+
     const peopleForDraft =
       planningPersonId != null
         ? people.map((p) =>
@@ -911,25 +932,39 @@ function ClientBookingCreateView() {
     } catch {
       // ignore
     }
-    const requiresPrepayment = parsePrepaymentPercent(businessProfile?.prepaymentLabel) > 0;
+
+    const prepaymentPercent = parsePrepaymentPercent(businessProfile?.prepaymentLabel);
+    const requiresPrepayment = !isDesiredLocation && prepaymentPercent > 0;
+    const { status, bookingRequestDirection } = resolveCreateBookingStatus({
+      locationMode,
+      requiresPrepayment,
+    });
 
     try {
+      if (fromProfile && typeof window !== "undefined") {
+        window.sessionStorage.removeItem(ACTIVE_BOOKING_ID_KEY);
+        window.sessionStorage.removeItem(CHECKOUT_REF_KEY);
+      }
+
       const existingId =
-        typeof window !== "undefined" ? window.sessionStorage.getItem(ACTIVE_BOOKING_ID_KEY) : null;
+        !fromProfile && typeof window !== "undefined"
+          ? window.sessionStorage.getItem(ACTIVE_BOOKING_ID_KEY)
+          : null;
       const bookingRef =
-        (typeof window !== "undefined" && window.sessionStorage.getItem("mollure:checkout_booking_ref")) ||
-        createBookingRef();
+        fromProfile || typeof window === "undefined"
+          ? createBookingRef()
+          : window.sessionStorage.getItem(CHECKOUT_REF_KEY) || createBookingRef();
+
       const requested = {
         id: existingId ?? `bk_req_${Date.now()}`,
         bookingRef,
-        status: "confirmed" as const,
+        status,
+        ...(bookingRequestDirection ? { bookingRequestDirection } : {}),
         shop,
         draft: payload,
         createdAt: new Date().toISOString(),
         requiresPrepayment,
-        prepaymentPercent: requiresPrepayment
-          ? parsePrepaymentPercent(businessProfile?.prepaymentLabel)
-          : 0,
+        prepaymentPercent: requiresPrepayment ? prepaymentPercent : 0,
         prepaid: false,
       };
       upsertRequestedBooking(requested);
@@ -938,8 +973,19 @@ function ClientBookingCreateView() {
       // ignore
     }
 
-    router.push(requiresPrepayment ? "/clients/booking/checkout/prepaid" : "/clients/booking/checkout");
+    showSnackbar({
+      severity: "success",
+      message: isDesiredLocation ? "BR sent" : requiresPrepayment ? "Continue to prepayment" : "Booking confirmed",
+    });
+
+    router.push(resolveCreateCheckoutPath({ locationMode, requiresPrepayment }));
   };
+
+  const continueLabel = isDesiredLocation
+    ? "Send booking request"
+    : parsePrepaymentPercent(businessProfile?.prepaymentLabel) > 0
+      ? "Continue to payment"
+      : "Confirm booking";
 
   const planningFieldSx = {
     "& .MuiOutlinedInput-root": {
@@ -1308,6 +1354,14 @@ function ClientBookingCreateView() {
       </ButtonBase>
     </Box>
   );
+
+  if (fromProfile && !profileHydrated) {
+    return (
+      <Box sx={{ minHeight: 320, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "#EAF9FB", py: { xs: 2, md: 3.5 } }}>
@@ -2362,6 +2416,21 @@ function ClientBookingCreateView() {
                         </Typography>
                       </Stack>
 
+                      {!allServicesAssigned && unassigned.length > 0 ? (
+                        <Typography
+                          sx={{
+                            mt: 1,
+                            fontSize: 11,
+                            fontWeight: 800,
+                            color: "#C67A00",
+                            lineHeight: 1.35,
+                          }}
+                        >
+                          {unassigned.length} service{unassigned.length === 1 ? "" : "s"} still need a team member.
+                          Open the <strong>Unassigned</strong> tab and pick a professional for each.
+                        </Typography>
+                      ) : null}
+
                       <Button
                         fullWidth
                         variant="contained"
@@ -2385,7 +2454,7 @@ function ClientBookingCreateView() {
                               }),
                         }}
                       >
-                        Continue
+                        {continueLabel}
                       </Button>
                     </Stack>
                   </Box>

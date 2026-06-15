@@ -8,10 +8,14 @@ export type ClientBookingStatus =
   | "cancelled"
   | "no_show";
 
+export type BookingRequestDirection = "outgoing" | "incoming";
+
 export type ClientBookingRecord = {
   id: string;
   bookingRef?: string;
   status: ClientBookingStatus;
+  /** BR/EBR direction from the client's perspective. */
+  bookingRequestDirection?: BookingRequestDirection;
   shop?: {
     shopId?: string;
     shopName?: string;
@@ -202,6 +206,7 @@ function seedDemoBookings(): ClientBookingRecord[] {
     {
       id: "demo-requested-1",
       status: "requested",
+      bookingRequestDirection: "incoming",
       requiresPrepayment: true,
       prepaid: false,
       prepaymentPercent: 20,

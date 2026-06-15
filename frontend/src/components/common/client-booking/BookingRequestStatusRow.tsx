@@ -3,7 +3,7 @@
 import CheckCircleOutlinedIcon from "@mui/icons-material/CheckCircleOutlined";
 import { Box, Chip, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import type { ClientBookingStatus } from "../../../app/clients/booking/clientBookingRecords";
+import type { BookingRequestDirection, ClientBookingStatus } from "../../../app/clients/booking/clientBookingRecords";
 import { bookingStatusChipColors, bookingStatusLabel } from "../../../app/clients/booking/clientBookingStatus";
 import EditRequestIndicatorIcon from "./EditRequestIndicatorIcon";
 import PrepaymentEuroIndicator from "./PrepaymentEuroIndicator";
@@ -13,12 +13,14 @@ export type BookingRequestRowMode = "default" | "professional_suggested" | "prof
 type Props = {
   bookingStatus: ClientBookingStatus;
   requiresPrepayment?: boolean;
+  bookingRequestDirection?: BookingRequestDirection;
   rowMode?: BookingRequestRowMode;
 };
 
 export default function BookingRequestStatusRow({
   bookingStatus,
   requiresPrepayment = false,
+  bookingRequestDirection,
   rowMode = "default",
 }: Props) {
   const m = useTheme().palette.mollure;
@@ -32,7 +34,12 @@ export default function BookingRequestStatusRow({
 
   const bookingRequestSent =
     bookingStatus === "requested" || bookingStatus === "confirmed" || bookingStatus === "completed";
-  const tickActive = bookingRequestSent;
+  const tickActive =
+    bookingRequestDirection === "outgoing"
+      ? bookingRequestSent
+      : bookingRequestDirection === "incoming"
+        ? bookingStatus === "confirmed" || bookingStatus === "completed"
+        : bookingRequestSent;
 
   const tickSize = 22;
   const tickStroke = tickActive ? m.success : alpha(m.navy, 0.32);
@@ -87,6 +94,11 @@ export default function BookingRequestStatusRow({
           <Typography sx={{ fontWeight: 900, fontSize: 12.5, color: alpha(m.navy, 0.55), letterSpacing: "0.02em" }}>
             BR
           </Typography>
+          {bookingRequestDirection ? (
+            <Typography sx={{ fontWeight: 900, fontSize: 11, color: alpha(m.navy, 0.42), lineHeight: 1 }}>
+              {bookingRequestDirection === "outgoing" ? "→" : "←"}
+            </Typography>
+          ) : null}
           {tickActive ? (
             <CheckCircleOutlinedIcon sx={{ fontSize: tickSize, color: m.success }} />
           ) : (

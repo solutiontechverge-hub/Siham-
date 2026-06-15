@@ -15,6 +15,7 @@ import {
 } from "./bookingCancellation";
 import ClientBookingCancelDialog from "./ClientBookingCancelDialog";
 import ClientBookingDeleteDialog from "./ClientBookingDeleteDialog";
+import ClientBookingDiscardDialog from "./ClientBookingDiscardDialog";
 import ClientBookingDetailsHeader from "./ClientBookingDetailsHeader";
 import ClientBookingInfoBar from "./ClientBookingInfoBar";
 import ClientBookingPaymentDetailsCard from "./ClientBookingPaymentDetailsCard";
@@ -115,6 +116,7 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
   const [phone, setPhone] = React.useState("");
   const [cancelDialogOpen, setCancelDialogOpen] = React.useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
+  const [discardDialogOpen, setDiscardDialogOpen] = React.useState(false);
   const [isCancelled, setIsCancelled] = React.useState(false);
   const [financeSettings, setFinanceSettings] = React.useState(() => readFinanceInvoiceSettings());
   const [activeDocument, setActiveDocument] = React.useState<"invoice" | "receipt" | null>(null);
@@ -177,10 +179,8 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
     setIsCancelled(true);
   };
 
-  const handleDeleteBooking = () => {
+  const clearActiveBookingSession = React.useCallback(() => {
     try {
-      const activeId = window.sessionStorage.getItem(ACTIVE_BOOKING_ID_KEY);
-      if (activeId) removeClientBookingById(activeId);
       window.localStorage.removeItem("mollure:booking_draft");
       clearCheckoutBookingCancelled(bookingRef);
       window.sessionStorage.removeItem(CHECKOUT_REF_KEY);
@@ -188,6 +188,29 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
     } catch {
       // ignore
     }
+  }, [bookingRef]);
+
+  const handleDeleteBooking = () => {
+    try {
+      const activeId = window.sessionStorage.getItem(ACTIVE_BOOKING_ID_KEY);
+      if (activeId) removeClientBookingById(activeId);
+      clearActiveBookingSession();
+    } catch {
+      // ignore
+    }
+    showSnackbar({ severity: "success", message: "Booking deleted" });
+    router.push("/clients/booking?tab=upcoming");
+  };
+
+  const handleDiscardBookingRequest = () => {
+    try {
+      const activeId = window.sessionStorage.getItem(ACTIVE_BOOKING_ID_KEY);
+      if (activeId) removeClientBookingById(activeId);
+      clearActiveBookingSession();
+    } catch {
+      // ignore
+    }
+    showSnackbar({ severity: "success", message: "Booking request discarded" });
     router.push("/clients/booking?tab=upcoming");
   };
 
@@ -234,13 +257,19 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
   const completePrepayment = React.useCallback(() => {
     try {
       const activeId = window.sessionStorage.getItem(ACTIVE_BOOKING_ID_KEY);
-      if (activeId) markClientBookingPrepaid(activeId);
+      if (activeId) {
+        markClientBookingPrepaid(activeId);
+        if (locationMode === "fixed") {
+          updateClientBookingStatus(activeId, "confirmed");
+          refreshActiveBooking();
+        }
+      }
     } catch {
       // ignore
     }
     setStripeDialogOpen(false);
-    showSnackbar({ severity: "success", message: "Prepayment received. Thank you!" });
-  }, [showSnackbar]);
+    showSnackbar({ severity: "success", message: "Prepayment received. Your booking is confirmed." });
+  }, [locationMode, refreshActiveBooking, showSnackbar]);
 
   const handlePayNow = React.useCallback(() => {
     if (prepaidAmount <= 0) {
@@ -356,9 +385,12 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
             bookingRef={bookingRef}
             dateTimeLabel={dateTimeLabel}
             bookingStatus={bookingStatus}
+            bookingRequestDirection={activeBooking?.bookingRequestDirection}
+            locationMode={locationMode}
             isCancelled={isCancelled}
             requiresPrepayment={requiresPrepayment}
             onDeleteBooking={() => setDeleteDialogOpen(true)}
+            onDiscardBookingRequest={() => setDiscardDialogOpen(true)}
           />
 
           <Box sx={{ px: { xs: 2, md: 2.5 }, pb: 2.5 }}>
@@ -400,7 +432,7 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
             <Box sx={{ mt: 2 }}>
               <ClientBookingPoliciesAccordion
                 sections={policySections}
-                showCancelAction={!isCancelled}
+                showCancelAction={!isCancelled && bookingStatus === "confirmed"}
                 onCancelBooking={() => setCancelDialogOpen(true)}
               />
             </Box>
@@ -417,6 +449,11 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
         open={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}
         onConfirm={handleDeleteBooking}
+      />
+      <ClientBookingDiscardDialog
+        open={discardDialogOpen}
+        onClose={() => setDiscardDialogOpen(false)}
+        onConfirm={handleDiscardBookingRequest}
       />
 
       <StripePrepaymentDialog
