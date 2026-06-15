@@ -23,6 +23,7 @@ import {
   Tooltip,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import { GENDER_MENU_OPTIONS } from "../../../../lib/gender-options";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
@@ -34,7 +35,7 @@ import MollureFormField from "../../../../components/common/MollureFormField";
 import MollureModal from "../../../../components/common/MollureModal";
 import MollureDrawer from "../../../../components/common/MollureDrawer";
 import MollureListToolbar from "../../../../components/common/MollureListToolbar";
-import { ClientListDataCard, ClientListHeaderCard, MollureSnackbar } from "../../../../components/common";
+import { AppCountryPhoneFields, ClientListDataCard, ClientListHeaderCard, MollureSnackbar } from "../../../../components/common";
 import { useFixedLocationClientPage } from "./useFixedLocationClientPage";
 import ClientDetailsViewPanel from "./ClientDetailsViewPanel";
 import { isClientBlocked } from "./data/clientList";
@@ -159,6 +160,8 @@ export default function FixedLocationClientPage() {
     setCoEmail,
     compErrors,
     setCompErrors,
+    editPhoneErrors,
+    setEditPhoneErrors,
     validateCompany,
     validateIndividual,
     sortOpen,
@@ -883,40 +886,25 @@ export default function FixedLocationClientPage() {
                       <MenuItem value="">
                         <Typography sx={{ color: alpha(m.navy, 0.5) }}>Select gender</Typography>
                       </MenuItem>
-                      <MenuItem value="Male">Male</MenuItem>
-                      <MenuItem value="Female">Female</MenuItem>
-                      <MenuItem value="Other">Other</MenuItem>
+                      {GENDER_MENU_OPTIONS.map((opt) => (
+                        <MenuItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </MenuItem>
+                      ))}
                     </MollureFormField>
 
-                    <Box sx={{ pt: 0.25 }}>
-                      <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
-                        Contact Number
-                      </Typography>
-                      <Stack direction="row" spacing={1}>
-                        <Box sx={{ width: 140 }}>
-                          <MollureFormField
-                            select
-                            value={editCompanyForm.countryCode}
-                            onChange={(e) => setEditCompanyForm((p) => ({ ...p, countryCode: e.target.value }))}
-                            sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                          >
-                            {["+1", "+44", "+49", "+91", "+92", "+971", "+81", "+61", "+31"].map((o) => (
-                              <MenuItem key={o} value={o}>
-                                {o}
-                              </MenuItem>
-                            ))}
-                          </MollureFormField>
-                        </Box>
-                        <Box sx={{ flex: 1 }}>
-                          <MollureFormField
-                            placeholder="+442xxxxxxxxxxx"
-                            value={editCompanyForm.phone}
-                            onChange={(e) => setEditCompanyForm((p) => ({ ...p, phone: e.target.value }))}
-                            sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                          />
-                        </Box>
-                      </Stack>
-                    </Box>
+                    <AppCountryPhoneFields
+                      countryCode={editCompanyForm.countryCode}
+                      phone={editCompanyForm.phone}
+                      onCountryCodeChange={(dialCode) =>
+                        setEditCompanyForm((p) => ({ ...p, countryCode: dialCode }))
+                      }
+                      onPhoneChange={(phone) => setEditCompanyForm((p) => ({ ...p, phone }))}
+                      countryCodeError={editPhoneErrors.countryCode}
+                      phoneError={editPhoneErrors.phone}
+                      onClearErrors={() => setEditPhoneErrors({})}
+                      phonePlaceholder="+442xxxxxxxxxxx"
+                    />
 
                     <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.62), pt: 0.5 }}>
                       Business Address
@@ -1083,9 +1071,11 @@ export default function FixedLocationClientPage() {
                       <MenuItem value="">
                         <Typography sx={{ color: alpha(m.navy, 0.5) }}>Select gender</Typography>
                       </MenuItem>
-                      <MenuItem value="Male">Male</MenuItem>
-                      <MenuItem value="Female">Female</MenuItem>
-                      <MenuItem value="Other">Other</MenuItem>
+                      {GENDER_MENU_OPTIONS.map((opt) => (
+                        <MenuItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </MenuItem>
+                      ))}
                     </MollureFormField>
                     <Box sx={{ pt: 0.25 }}>
                       <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
@@ -1098,35 +1088,18 @@ export default function FixedLocationClientPage() {
                         fullWidth
                       />
                     </Box>
-                    <Box sx={{ pt: 0.25 }}>
-                      <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
-                        Contact Number
-                      </Typography>
-                      <Stack direction="row" spacing={1}>
-                        <Box sx={{ width: 140 }}>
-                          <MollureFormField
-                            select
-                            value={editIndividualForm.countryCode}
-                            onChange={(e) => setEditIndividualForm((p) => ({ ...p, countryCode: e.target.value }))}
-                            sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                          >
-                            {["+1", "+44", "+49", "+91", "+92", "+971", "+81", "+61", "+31"].map((o) => (
-                              <MenuItem key={o} value={o}>
-                                {o}
-                              </MenuItem>
-                            ))}
-                          </MollureFormField>
-                        </Box>
-                        <Box sx={{ flex: 1 }}>
-                          <MollureFormField
-                            placeholder="+442xxxxxxxxxx"
-                            value={editIndividualForm.phone}
-                            onChange={(e) => setEditIndividualForm((p) => ({ ...p, phone: e.target.value }))}
-                            sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                          />
-                        </Box>
-                      </Stack>
-                    </Box>
+                    <AppCountryPhoneFields
+                      countryCode={editIndividualForm.countryCode}
+                      phone={editIndividualForm.phone}
+                      onCountryCodeChange={(dialCode) =>
+                        setEditIndividualForm((p) => ({ ...p, countryCode: dialCode }))
+                      }
+                      onPhoneChange={(phone) => setEditIndividualForm((p) => ({ ...p, phone }))}
+                      countryCodeError={editPhoneErrors.countryCode}
+                      phoneError={editPhoneErrors.phone}
+                      onClearErrors={() => setEditPhoneErrors({})}
+                      phonePlaceholder="+442xxxxxxxxxx"
+                    />
                     <MollureFormField
                       placeholder="Residential Address"
                       value={editIndividualForm.residentialAddress}
@@ -1417,9 +1390,11 @@ export default function FixedLocationClientPage() {
                   <MenuItem value="">
                     <Typography sx={{ color: alpha(m.navy, 0.5) }}>Select gender</Typography>
                   </MenuItem>
-                  <MenuItem value="Male">Male</MenuItem>
-                  <MenuItem value="Female">Female</MenuItem>
-                  <MenuItem value="Other">Other</MenuItem>
+                  {GENDER_MENU_OPTIONS.map((opt) => (
+                    <MenuItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </MenuItem>
+                  ))}
                 </MollureFormField>
 
                 <Box sx={{ pt: 0.25 }}>
@@ -1437,43 +1412,16 @@ export default function FixedLocationClientPage() {
                   />
                 </Box>
 
-                <Box sx={{ pt: 0.25 }}>
-                  <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
-                    Contact Number
-                  </Typography>
-                  <Stack direction="row" spacing={1}>
-                    <Box sx={{ width: 140 }}>
-                      <MollureFormField
-                        select
-                        value={indCountryCode}
-                        onChange={(e) => {
-                          setIndCountryCode(e.target.value);
-                          setIndErrors((p) => ({ ...p, phone: undefined }));
-                        }}
-                        sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                      >
-                        {["+1", "+44", "+49", "+91", "+92", "+971"].map((o) => (
-                          <MenuItem key={o} value={o}>
-                            {o}
-                          </MenuItem>
-                        ))}
-                      </MollureFormField>
-                    </Box>
-                    <Box sx={{ flex: 1 }}>
-                      <MollureFormField
-                        placeholder="+442xxxxxxxxxx"
-                        value={indPhone}
-                        onChange={(e) => {
-                          setIndPhone(e.target.value);
-                          setIndErrors((p) => ({ ...p, phone: undefined }));
-                        }}
-                        error={Boolean(indErrors.phone)}
-                        helperText={indErrors.phone}
-                        sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                      />
-                    </Box>
-                  </Stack>
-                </Box>
+                <AppCountryPhoneFields
+                  countryCode={indCountryCode}
+                  phone={indPhone}
+                  onCountryCodeChange={setIndCountryCode}
+                  onPhoneChange={setIndPhone}
+                  countryCodeError={indErrors.countryCode}
+                  phoneError={indErrors.phone}
+                  onClearErrors={() => setIndErrors((p) => ({ ...p, countryCode: undefined, phone: undefined }))}
+                  phonePlaceholder="+442xxxxxxxxxx"
+                />
 
                 <MollureFormField
                   placeholder="Email Address"
@@ -1557,9 +1505,11 @@ export default function FixedLocationClientPage() {
                   <MenuItem value="">
                     <Typography sx={{ color: alpha(m.navy, 0.5) }}>Select gender</Typography>
                   </MenuItem>
-                  <MenuItem value="Male">Male</MenuItem>
-                  <MenuItem value="Female">Female</MenuItem>
-                  <MenuItem value="Other">Other</MenuItem>
+                  {GENDER_MENU_OPTIONS.map((opt) => (
+                    <MenuItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </MenuItem>
+                  ))}
                 </MollureFormField>
 
                 <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.62), pt: 0.5 }}>
@@ -1645,43 +1595,16 @@ export default function FixedLocationClientPage() {
                   </Grid>
                 </Grid>
 
-                <Box sx={{ pt: 0.25 }}>
-                  <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
-                    Contact Number
-                  </Typography>
-                  <Stack direction="row" spacing={1}>
-                    <Box sx={{ width: 140 }}>
-                      <MollureFormField
-                        select
-                        value={coCountryCode}
-                        onChange={(e) => {
-                          setCoCountryCode(e.target.value);
-                          setCompErrors((p) => ({ ...p, phone: undefined }));
-                        }}
-                        sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                      >
-                        {["+1", "+44", "+49", "+91", "+92", "+971"].map((o) => (
-                          <MenuItem key={o} value={o}>
-                            {o}
-                          </MenuItem>
-                        ))}
-                      </MollureFormField>
-                    </Box>
-                    <Box sx={{ flex: 1 }}>
-                      <MollureFormField
-                        placeholder="+442xxxxxxxxxxx"
-                        value={coPhone}
-                        onChange={(e) => {
-                          setCoPhone(e.target.value);
-                          setCompErrors((p) => ({ ...p, phone: undefined }));
-                        }}
-                        error={Boolean(compErrors.phone)}
-                        helperText={compErrors.phone}
-                        sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                      />
-                    </Box>
-                  </Stack>
-                </Box>
+                <AppCountryPhoneFields
+                  countryCode={coCountryCode}
+                  phone={coPhone}
+                  onCountryCodeChange={setCoCountryCode}
+                  onPhoneChange={setCoPhone}
+                  countryCodeError={compErrors.countryCode}
+                  phoneError={compErrors.phone}
+                  onClearErrors={() => setCompErrors((p) => ({ ...p, countryCode: undefined, phone: undefined }))}
+                  phonePlaceholder="+442xxxxxxxxxxx"
+                />
 
                 <MollureFormField
                   placeholder="Email Address"

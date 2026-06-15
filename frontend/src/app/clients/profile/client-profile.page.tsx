@@ -41,6 +41,7 @@ import { ClientPageTabsBar, clientTopTabsActiveLabel, MollureMarketingHeader } f
 import { MarketingSiteFooter } from "../../../components/common";
 import { marketingShellFooter } from "../../../data/marketingShell.data";
 import {
+  AppCountryPhoneFields,
   AppDatePicker,
   MollureLabeledField,
   MollureLabeledPasswordField,
@@ -603,33 +604,24 @@ export default function ClientProfilePage() {
             <Grid container spacing={2.25}>
               {!isCompanyProfile ? (
                 <>
-                  <Grid item xs={12} sm={4}>
-                    <MollureLabeledField
-                      select
-                      name="countryCode"
-                      fieldLabel={profilePageData.fields.countryCode.label}
-                      value={form.countryCode || ""}
-                      onChange={handleChange}
+                  <Grid item xs={12}>
+                    <AppCountryPhoneFields
+                      countryCode={form.countryCode || ""}
+                      phone={form.phone}
+                      onCountryCodeChange={(dialCode) =>
+                        handleChange({
+                          target: { name: "countryCode", value: dialCode },
+                        } as React.ChangeEvent<HTMLInputElement>)
+                      }
+                      onPhoneChange={(phone) =>
+                        handleChange({
+                          target: { name: "phone", value: phone },
+                        } as React.ChangeEvent<HTMLInputElement>)
+                      }
+                      label={profilePageData.fields.phone.label}
+                      phonePlaceholder={profilePageData.fields.phone.placeholder}
                       disabled={fieldsDisabled}
-                    >
-                      <MenuItem value="">
-                        <em>Code</em>
-                      </MenuItem>
-                      {profilePageData.countryCodeOptions.map((opt) => (
-                        <MenuItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </MenuItem>
-                      ))}
-                    </MollureLabeledField>
-                  </Grid>
-                  <Grid item xs={12} sm={8}>
-                    <MollureLabeledField
-                      name="phone"
-                      fieldLabel={profilePageData.fields.phone.label}
-                      placeholder={profilePageData.fields.phone.placeholder}
-                      value={form.phone}
-                      onChange={handleChange}
-                      disabled={fieldsDisabled}
+                      required={false}
                     />
                   </Grid>
                 </>

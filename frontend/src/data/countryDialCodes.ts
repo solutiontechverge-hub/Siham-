@@ -206,3 +206,17 @@ export function findCountryDialCode(value: string): CountryDialCode | undefined 
 export function countryDialOptionValue(entry: CountryDialCode): string {
   return `${entry.iso}:${entry.dialCode}`;
 }
+
+/** Maps stored dial code or option value to the select's option value. */
+export function resolveCountrySelectValue(value: string): string {
+  const normalized = value.trim();
+  if (!normalized) return "";
+  if (normalized.includes(":") && findCountryDialCode(normalized)) return normalized;
+  const entry = COUNTRY_DIAL_CODES.find((item) => item.dialCode === normalized);
+  return entry ? countryDialOptionValue(entry) : normalized;
+}
+
+/** Returns the dial code (+31) from a select option or plain dial code value. */
+export function dialCodeFromSelectValue(value: string): string {
+  return findCountryDialCode(value)?.dialCode ?? value.trim();
+}

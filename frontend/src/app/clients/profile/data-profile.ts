@@ -1,3 +1,5 @@
+import { GENDER_OPTIONS } from "../../../lib/gender-options";
+
 export const profilePageData = {
   pageBg: "#E6F7F8",
   header: {
@@ -36,17 +38,7 @@ export const profilePageData = {
     { value: "full_name", label: "Full Name (e.g., John Smith)" },
     { value: "initials", label: "Initials/Abbreviation (e.g., JS)" },
   ],
-  genderOptions: [
-    { value: "female", label: "Female" },
-    { value: "male", label: "Male" },
-    { value: "other", label: "Other" },
-  ],
-  countryCodeOptions: [
-    { value: "+44", label: "+44" },
-    { value: "+31", label: "+31" },
-    { value: "+1", label: "+1" },
-    { value: "+92", label: "+92" },
-  ],
+  genderOptions: [...GENDER_OPTIONS],
   links: {
     terms: { label: "Terms & Conditions", href: "/terms" },
   },

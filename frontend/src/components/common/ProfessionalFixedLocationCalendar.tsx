@@ -19,6 +19,7 @@ import AppSearchField from "./AppSearchField";
 import AppDatePicker from "./AppDatePicker";
 import { AppCalendarPanel } from "./AppDatePicker";
 import AppTextField from "./AppTextField";
+import AppCountryPhoneFields from "./AppCountryPhoneFields";
 import AppDropdown from "./AppDropdown";
 import CalendarAddMenu from "./calendar/CalendarAddMenu";
 import CalendarBookingCard from "./calendar/CalendarBookingCard";
@@ -61,6 +62,8 @@ import type {
   ProfessionalFixedLocationCalendarData,
 } from "../../app/professionals/fixed-location/calendar/calendar.data";
 import type { CreateCalendarEntryRequest, UpsertCalendarSettingsRequest } from "../../store/services/businessApi";
+import { GENDER_OPTIONS, type GenderOption } from "../../lib/gender-options";
+import { getOptionalPhoneValidationErrors, getPhoneValidationErrors } from "../../lib/phone-validation";
 
 export type ProfessionalFixedLocationCalendarProps = {
   data: ProfessionalFixedLocationCalendarData;
@@ -239,6 +242,10 @@ export default function ProfessionalFixedLocationCalendar({
     return Math.round((totalPrice * pct) / 100);
   }, [prepaymentPercent, totalPrice]);
   const remainingAfterPrepayment = Math.max(0, totalPrice - prepaymentAmount);
+  const [bookingPhoneDraft, setBookingPhoneDraft] = React.useState<{ phoneCode: string; phoneNumber: string }>(() => ({
+    phoneCode: "",
+    phoneNumber: "",
+  }));
   const [guestDraft, setGuestDraft] = React.useState<{
     firstName: string;
     lastName: string;
@@ -256,7 +263,7 @@ export default function ProfessionalFixedLocationCalendar({
     firstName: string;
     lastName: string;
     email: string;
-    gender: "" | "male" | "female" | "other";
+    gender: "" | GenderOption;
     dob: string;
     phoneCode: string;
     phoneNumber: string;
@@ -570,6 +577,8 @@ export default function ProfessionalFixedLocationCalendar({
         | "nonMollureClientType"
         | "guestFirstName"
         | "guestLastName"
+        | "guestPhoneCode"
+        | "guestPhoneNumber"
         | "nonMollureFirstName"
         | "nonMollureLastName"
         | "nonMollureGender"
@@ -587,7 +596,9 @@ export default function ProfessionalFixedLocationCalendar({
         | "nonMollurePostalCode"
         | "nonMollureProvince"
         | "nonMollureMunicipality"
-        | "bookingClient",
+        | "bookingClient"
+        | "bookingPhoneCode"
+        | "bookingPhoneNumber",
         string
       >
     > = {};
@@ -611,6 +622,15 @@ export default function ProfessionalFixedLocationCalendar({
         isValid = false;
         errors.guestLastName = "Last name is required.";
       }
+      const guestPhoneErrors = getOptionalPhoneValidationErrors(guestDraft.phoneCode, guestDraft.phoneNumber);
+      if (guestPhoneErrors.countryCode) {
+        isValid = false;
+        errors.guestPhoneCode = guestPhoneErrors.countryCode;
+      }
+      if (guestPhoneErrors.phone) {
+        isValid = false;
+        errors.guestPhoneNumber = guestPhoneErrors.phone;
+      }
       return { isValid, errors };
     }
 
@@ -631,13 +651,14 @@ export default function ProfessionalFixedLocationCalendar({
         isValid = false;
         errors.nonMollureDob = "Date of birth is required.";
       }
-      if (isBlank(nonMollureDraft.phoneCode)) {
+      const phoneErrors = getPhoneValidationErrors(nonMollureDraft.phoneCode, nonMollureDraft.phoneNumber);
+      if (phoneErrors.countryCode) {
         isValid = false;
-        errors.nonMollurePhoneCode = "Country code is required.";
+        errors.nonMollurePhoneCode = phoneErrors.countryCode;
       }
-      if (isBlank(nonMollureDraft.phoneNumber)) {
+      if (phoneErrors.phone) {
         isValid = false;
-        errors.nonMollurePhoneNumber = "Phone number is required.";
+        errors.nonMollurePhoneNumber = phoneErrors.phone;
       }
       if (isBlank(nonMollureDraft.email)) {
         isValid = false;
@@ -691,6 +712,15 @@ export default function ProfessionalFixedLocationCalendar({
         isValid = false;
         errors.nonMollureMunicipality = "Municipality is required.";
       }
+      const companyPhoneErrors = getPhoneValidationErrors(nonMollureDraft.phoneCode, nonMollureDraft.phoneNumber);
+      if (companyPhoneErrors.countryCode) {
+        isValid = false;
+        errors.nonMollurePhoneCode = companyPhoneErrors.countryCode;
+      }
+      if (companyPhoneErrors.phone) {
+        isValid = false;
+        errors.nonMollurePhoneNumber = companyPhoneErrors.phone;
+      }
       if (isBlank(nonMollureDraft.email)) {
         isValid = false;
         errors.nonMollureEmail = "Email is required.";
@@ -707,10 +737,26 @@ export default function ProfessionalFixedLocationCalendar({
       isValid = false;
       errors.bookingClient = errors.bookingClient ?? "Select at least one item/service or product.";
     }
+    const bookingPhoneErrors = getOptionalPhoneValidationErrors(
+      bookingPhoneDraft.phoneCode,
+      bookingPhoneDraft.phoneNumber,
+    );
+    if (bookingPhoneErrors.countryCode) {
+      isValid = false;
+      errors.bookingPhoneCode = bookingPhoneErrors.countryCode;
+    }
+    if (bookingPhoneErrors.phone) {
+      isValid = false;
+      errors.bookingPhoneNumber = bookingPhoneErrors.phone;
+    }
     return { isValid, errors };
   }, [
+    bookingPhoneDraft.phoneCode,
+    bookingPhoneDraft.phoneNumber,
     guestDraft.firstName,
     guestDraft.lastName,
+    guestDraft.phoneCode,
+    guestDraft.phoneNumber,
     nonMollureClientType,
     nonMollureDraft,
     selectedProducts.length,
@@ -988,6 +1034,7 @@ export default function ProfessionalFixedLocationCalendar({
         phoneCode: "",
         phoneNumber: "",
       });
+      setBookingPhoneDraft({ phoneCode: "", phoneNumber: "" });
       setNonMollureClientType("");
       setNonMollureDraft({
         firstName: "",
@@ -2114,12 +2161,22 @@ export default function ProfessionalFixedLocationCalendar({
                     setSlotSaveAttempted(true);
                     if (!slotValidation.isValid) return;
                     if (slotBookingScreen === "non-mollure-individual" || slotBookingScreen === "non-mollure-company") {
+                      setBookingPhoneDraft({
+                        phoneCode: nonMollureDraft.phoneCode,
+                        phoneNumber: nonMollureDraft.phoneNumber,
+                      });
+                      setSlotClientAdded(true);
                       showSnackbar({ severity: "success", message: "Saved (mock)." });
                       setSlotBookingScreen("new-booking");
                       setSlotSaveAttempted(false);
                       return;
                     }
                     if (slotBookingScreen === "guest") {
+                      setBookingPhoneDraft({
+                        phoneCode: guestDraft.phoneCode,
+                        phoneNumber: guestDraft.phoneNumber,
+                      });
+                      setSlotClientAdded(true);
                       showSnackbar({ severity: "success", message: "Guest added (mock)." });
                       setSlotBookingScreen("new-booking");
                       setSlotSaveAttempted(false);
@@ -2421,11 +2478,7 @@ export default function ProfessionalFixedLocationCalendar({
                       label=""
                       value={nonMollureDraft.gender}
                       onChange={(val) => setNonMollureDraft((p) => ({ ...p, gender: val as any }))}
-                      options={[
-                        { label: "Male", value: "male" },
-                        { label: "Female", value: "female" },
-                        { label: "Other", value: "other" },
-                      ]}
+                      options={[...GENDER_OPTIONS]}
                       fullWidth
                       placeholder="Select Gender"
                       error={Boolean(slotErrors.nonMollureGender)}
@@ -2449,37 +2502,15 @@ export default function ProfessionalFixedLocationCalendar({
                       ) : null}
                     </Box>
 
-                    <Box>
-                      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
-                        Contact Number
-                      </BodyText>
-                      <Stack direction="row" spacing={1.25}>
-                        <AppDropdown
-                          label=""
-                          value={nonMollureDraft.phoneCode}
-                          onChange={(val) => setNonMollureDraft((p) => ({ ...p, phoneCode: val as string }))}
-                          options={[
-                            { label: "Select Country Code", value: "" },
-                            { label: "+1", value: "+1" },
-                            { label: "+44", value: "+44" },
-                            { label: "+92", value: "+92" },
-                          ]}
-                          fullWidth
-                          sx={{ maxWidth: 140 }}
-                          placeholder="Select Country Code"
-                          error={Boolean(slotErrors.nonMollurePhoneCode)}
-                          helperText={slotErrors.nonMollurePhoneCode}
-                        />
-                        <AppTextField
-                          placeholder="+442xxxxxxxxxx"
-                          value={nonMollureDraft.phoneNumber}
-                          onChange={(e) => setNonMollureDraft((p) => ({ ...p, phoneNumber: e.target.value }))}
-                          fullWidth
-                          error={Boolean(slotErrors.nonMollurePhoneNumber)}
-                          helperText={slotErrors.nonMollurePhoneNumber}
-                        />
-                      </Stack>
-                    </Box>
+                    <AppCountryPhoneFields
+                      countryCode={nonMollureDraft.phoneCode}
+                      phone={nonMollureDraft.phoneNumber}
+                      onCountryCodeChange={(dialCode) => setNonMollureDraft((p) => ({ ...p, phoneCode: dialCode }))}
+                      onPhoneChange={(phone) => setNonMollureDraft((p) => ({ ...p, phoneNumber: phone }))}
+                      countryCodeError={slotErrors.nonMollurePhoneCode}
+                      phoneError={slotErrors.nonMollurePhoneNumber}
+                      phonePlaceholder="+442xxxxxxxxxx"
+                    />
 
                     <AppTextField
                       placeholder="Email Address"
@@ -2582,11 +2613,7 @@ export default function ProfessionalFixedLocationCalendar({
                       label=""
                       value={nonMollureDraft.gender}
                       onChange={(val) => setNonMollureDraft((p) => ({ ...p, gender: val as any }))}
-                      options={[
-                        { label: "Male", value: "male" },
-                        { label: "Female", value: "female" },
-                        { label: "Other", value: "other" },
-                      ]}
+                      options={[...GENDER_OPTIONS]}
                       fullWidth
                       placeholder="Select Gender"
                       error={Boolean(slotErrors.nonMollureGender)}
@@ -2657,33 +2684,15 @@ export default function ProfessionalFixedLocationCalendar({
                       </Stack>
                     </Box>
 
-                    <Box>
-                      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
-                        Contact Number
-                      </BodyText>
-                      <Stack direction="row" spacing={1.25}>
-                        <AppDropdown
-                          label=""
-                          value={nonMollureDraft.phoneCode}
-                          onChange={(val) => setNonMollureDraft((p) => ({ ...p, phoneCode: val as string }))}
-                          options={[
-                            { label: "Country Code", value: "" },
-                            { label: "+1", value: "+1" },
-                            { label: "+44", value: "+44" },
-                            { label: "+92", value: "+92" },
-                          ]}
-                          fullWidth
-                          sx={{ maxWidth: 140 }}
-                          placeholder="Country Code"
-                        />
-                        <AppTextField
-                          placeholder="+442xxxxxxxxxx"
-                          value={nonMollureDraft.phoneNumber}
-                          onChange={(e) => setNonMollureDraft((p) => ({ ...p, phoneNumber: e.target.value }))}
-                          fullWidth
-                        />
-                      </Stack>
-                    </Box>
+                    <AppCountryPhoneFields
+                      countryCode={nonMollureDraft.phoneCode}
+                      phone={nonMollureDraft.phoneNumber}
+                      onCountryCodeChange={(dialCode) => setNonMollureDraft((p) => ({ ...p, phoneCode: dialCode }))}
+                      onPhoneChange={(phone) => setNonMollureDraft((p) => ({ ...p, phoneNumber: phone }))}
+                      countryCodeError={slotErrors.nonMollurePhoneCode}
+                      phoneError={slotErrors.nonMollurePhoneNumber}
+                      phonePlaceholder="+442xxxxxxxxxx"
+                    />
 
                     <AppTextField
                       placeholder="Email Address"
@@ -2745,33 +2754,17 @@ export default function ProfessionalFixedLocationCalendar({
                       fullWidth
                     />
 
-                    <Box>
-                      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
-                        Contact Number (optional)
-                      </BodyText>
-                      <Stack direction="row" spacing={1.25}>
-                        <AppDropdown
-                          label=""
-                          value={guestDraft.phoneCode}
-                          onChange={(val) => setGuestDraft((p) => ({ ...p, phoneCode: val as string }))}
-                          options={[
-                            { label: "Country Code", value: "" },
-                            { label: "+1", value: "+1" },
-                            { label: "+44", value: "+44" },
-                            { label: "+92", value: "+92" },
-                          ]}
-                          fullWidth
-                          sx={{ maxWidth: 140 }}
-                          placeholder="Country Code"
-                        />
-                        <AppTextField
-                          placeholder="Phone number"
-                          value={guestDraft.phoneNumber}
-                          onChange={(e) => setGuestDraft((p) => ({ ...p, phoneNumber: e.target.value }))}
-                          fullWidth
-                        />
-                      </Stack>
-                    </Box>
+                    <AppCountryPhoneFields
+                      countryCode={guestDraft.phoneCode}
+                      phone={guestDraft.phoneNumber}
+                      onCountryCodeChange={(dialCode) => setGuestDraft((p) => ({ ...p, phoneCode: dialCode }))}
+                      onPhoneChange={(phone) => setGuestDraft((p) => ({ ...p, phoneNumber: phone }))}
+                      countryCodeError={slotErrors.guestPhoneCode}
+                      phoneError={slotErrors.guestPhoneNumber}
+                      label="Contact Number (optional)"
+                      phonePlaceholder="Phone number"
+                      required={false}
+                    />
 
                     <Box sx={{ flex: 1, minHeight: 200 }} />
                   </Stack>
@@ -3469,23 +3462,19 @@ export default function ProfessionalFixedLocationCalendar({
                           )}
                         </Box>
 
-                        <Box>
-                          <BodyText sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.72), mb: 0.75 }}>
-                            Contact Number
-                          </BodyText>
-                          <Stack direction="row" spacing={1}>
-                            <AppDropdown
-                              label=""
-                              value=""
-                              onChange={() => undefined}
-                              options={[{ label: "Select Code", value: "" }, { label: "+44", value: "+44" }, { label: "+92", value: "+92" }]}
-                              fullWidth
-                              sx={{ maxWidth: 120 }}
-                              placeholder="Select Code"
-                            />
-                            <AppTextField placeholder="+442xxxxxxxxxx" fullWidth />
-                          </Stack>
-                        </Box>
+                        <AppCountryPhoneFields
+                          countryCode={bookingPhoneDraft.phoneCode}
+                          phone={bookingPhoneDraft.phoneNumber}
+                          onCountryCodeChange={(dialCode) =>
+                            setBookingPhoneDraft((p) => ({ ...p, phoneCode: dialCode }))
+                          }
+                          onPhoneChange={(phone) => setBookingPhoneDraft((p) => ({ ...p, phoneNumber: phone }))}
+                          countryCodeError={slotErrors.bookingPhoneCode}
+                          phoneError={slotErrors.bookingPhoneNumber}
+                          phonePlaceholder="+442xxxxxxxxxx"
+                          required={false}
+                          disabled={isViewingExisting}
+                        />
 
                         <Box
                           sx={{
