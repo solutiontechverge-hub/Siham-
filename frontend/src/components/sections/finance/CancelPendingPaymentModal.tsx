@@ -10,12 +10,18 @@ export type CancelPendingPaymentModalProps = {
   open: boolean;
   onClose: () => void;
   onConfirm: () => void;
+  title?: string;
+  message?: string;
+  confirmLabel?: string;
 };
 
 export default function CancelPendingPaymentModal({
   open,
   onClose,
   onConfirm,
+  title = "Cancel Pending Payment",
+  message = "This will cancel the pending payment and cannot be undone.",
+  confirmLabel = "Confirm",
 }: CancelPendingPaymentModalProps) {
   const m = useTheme().palette.mollure;
 
@@ -53,7 +59,7 @@ export default function CancelPendingPaymentModal({
           minWidth: 92,
         }}
       >
-        Confirm
+        {confirmLabel}
       </Button>
     </Stack>
   );
@@ -64,7 +70,7 @@ export default function CancelPendingPaymentModal({
       onClose={onClose}
       fullWidth
       maxWidth="xs"
-      title="Cancel Pending Payment"
+      title={title}
       contentMinHeight={220}
       footer={footer}
     >
@@ -94,7 +100,7 @@ export default function CancelPendingPaymentModal({
             mx: "auto",
           }}
         >
-          This will cancel the pending payment and cannot be undone.
+          {message}
         </Typography>
       </Box>
     </MollureModal>

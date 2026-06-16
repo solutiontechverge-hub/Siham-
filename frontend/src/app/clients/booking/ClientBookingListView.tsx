@@ -94,7 +94,12 @@ export default function ClientBookingListView({ listTab }: Props) {
                 const time = b.draft?.selectedTime ?? "";
                 const total = b.draft?.total ?? 0;
                 const status = (b.status ?? "confirmed") as ClientBookingStatus;
-                const chipLabel = statusChipLabel(status);
+                const chipLabel =
+                  status === "requested" && b.bookingRequestDirection === "outgoing"
+                    ? "Requested BR →"
+                    : status === "requested" && b.bookingRequestDirection === "incoming"
+                      ? "Requested BR ←"
+                      : statusChipLabel(status);
                 const chipColors = bookingStatusChipColors(status);
                 return (
                   <ButtonBase

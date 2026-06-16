@@ -9,7 +9,7 @@ import { alpha, useTheme } from "@mui/material/styles";
 import { useRouter } from "next/navigation";
 import { useSnackbar } from "../AppSnackbar";
 import { getMessagingHref, useClientMessagingUnread } from "../messaging";
-import type { ClientBookingStatus } from "../../../app/clients/booking/clientBookingRecords";
+import type { BookingRequestDirection, ClientBookingStatus } from "../../../app/clients/booking/clientBookingRecords";
 import BookingRequestStatusRow, { type BookingRequestRowMode } from "./BookingRequestStatusRow";
 import {
   professionalRejectEditRequest,
@@ -22,10 +22,13 @@ type Props = {
   bookingRef: string;
   dateTimeLabel: string;
   bookingStatus?: ClientBookingStatus;
+  bookingRequestDirection?: BookingRequestDirection;
+  locationMode?: "fixed" | "desired";
   isCancelled?: boolean;
   requiresPrepayment?: boolean;
   onEditServices?: () => void;
   onDeleteBooking?: () => void;
+  onDiscardBookingRequest?: () => void;
   messagingHref?: string;
 };
 
@@ -33,10 +36,13 @@ export default function ClientBookingDetailsHeader({
   bookingRef,
   dateTimeLabel,
   bookingStatus = "confirmed",
+  bookingRequestDirection,
+  locationMode = "fixed",
   isCancelled = false,
   requiresPrepayment = false,
   onEditServices,
   onDeleteBooking,
+  onDiscardBookingRequest,
   messagingHref,
 }: Props) {
   const m = useTheme().palette.mollure;
@@ -71,6 +77,12 @@ export default function ClientBookingDetailsHeader({
     : editRequest.isRejected
       ? "professional_rejected"
       : "default";
+
+  const isOutgoingBookingRequest =
+    bookingStatus === "requested" &&
+    bookingRequestDirection === "outgoing" &&
+    locationMode === "desired";
+  const editActionsDisabled = isCancelled || isOutgoingBookingRequest;
 
   const headerActionBtnSx = {
     borderRadius: "8px",
@@ -131,10 +143,10 @@ export default function ClientBookingDetailsHeader({
               <Button
                 variant="contained"
                 disableElevation
-                disabled={isCancelled}
-                endIcon={isCancelled ? undefined : <KeyboardArrowDownRoundedIcon sx={{ fontSize: 18 }} />}
+                disabled={editActionsDisabled}
+                endIcon={editActionsDisabled ? undefined : <KeyboardArrowDownRoundedIcon sx={{ fontSize: 18 }} />}
                 onClick={(e) => {
-                  if (isCancelled) return;
+                  if (editActionsDisabled) return;
                   setEditAnchor(e.currentTarget);
                 }}
                 sx={{
@@ -145,8 +157,8 @@ export default function ClientBookingDetailsHeader({
                   px: 2,
                   height: 34,
                   bgcolor: m.teal,
-                  "&:hover": { bgcolor: isCancelled ? m.teal : m.tealDark },
-                  ...(isCancelled && {
+                  "&:hover": { bgcolor: editActionsDisabled ? m.teal : m.tealDark },
+                  ...(editActionsDisabled && {
                     opacity: 0.45,
                     color: "#fff",
                     pointerEvents: "none",
@@ -163,6 +175,11 @@ export default function ClientBookingDetailsHeader({
               >
                 Activity
               </Button>
+              {isOutgoingBookingRequest && onDiscardBookingRequest ? (
+                <Button variant="outlined" onClick={onDiscardBookingRequest} sx={headerActionBtnSx}>
+                  Discard
+                </Button>
+              ) : null}
               {isCancelled ? (
                 <Button variant="outlined" onClick={onDeleteBooking} sx={headerActionBtnSx}>
                   Delete
@@ -172,6 +189,7 @@ export default function ClientBookingDetailsHeader({
             <BookingRequestStatusRow
               bookingStatus={displayStatus}
               requiresPrepayment={requiresPrepayment && requestRowMode === "default"}
+              bookingRequestDirection={bookingRequestDirection}
               rowMode={requestRowMode}
             />
           </Stack>

@@ -26,36 +26,41 @@ const DEFAULT_SECTIONS: readonly FinanceFiltersSection[] = [
     options: [
       { key: "entry:onlineBooking", label: "Online booking" },
       { key: "entry:offlineBooking", label: "Offline booking" },
-      { key: "entry:newSale", label: "New sale" },
+      { key: "entry:manualEntry", label: "Manual entry" },
     ],
   },
   {
-    title: "Client type",
+    title: "Client",
     options: [
       { key: "client:ic", label: "IC" },
-      { key: "client:cc", label: "CC" },
-      { key: "client:mollure", label: "Mollure" },
-      { key: "client:nonMollure", label: "non-mollure" },
+      { key: "client:bc", label: "BC" },
+      { key: "client:mollure", label: "Mollure Client" },
+      { key: "client:nonMollure", label: "Non-Mollure Client" },
+      { key: "client:guest", label: "Guest" },
     ],
   },
   {
     title: "Transaction types",
     options: [
-      { key: "tx:onlineDirect", label: "Online — direct" },
-      { key: "tx:onlineNonDirect", label: "Online — non-direct" },
-      { key: "tx:offlineDirect", label: "Offline — direct" },
-      { key: "tx:offlineNonDirect", label: "Offline — non-direct" },
+      { key: "tx:onlineDirect", label: "Online (immediate)" },
+      { key: "tx:onlineInvoice", label: "Online – invoice with due date" },
+      { key: "tx:offlineDirect", label: "Offline (immediate)" },
+      { key: "tx:offlineInvoice", label: "Offline – invoice with due date" },
     ],
   },
   {
     title: "Payment status",
     options: [
-      { key: "status:all", label: "All" },
       { key: "status:prepaid", label: "Prepaid" },
       { key: "status:paid", label: "Paid" },
+      { key: "status:refunded", label: "Refunded" },
       { key: "status:pending", label: "Pending" },
-      { key: "status:cancelled", label: "Cancelled" },
+      { key: "status:prepaymentDue", label: "Prepayment due" },
+      { key: "status:paymentDue", label: "Payment due" },
       { key: "status:failed", label: "Failed" },
+      { key: "status:overdueInvoice", label: "Overdue (past due date)" },
+      { key: "status:overdueResponse", label: "Overdue (late response/prepayment)" },
+      { key: "status:voided", label: "Voided" },
     ],
   },
 ];
@@ -127,4 +132,3 @@ export default function FinanceFiltersDrawerView({
     </FinanceDrawer>
   );
 }
-

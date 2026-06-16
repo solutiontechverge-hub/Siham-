@@ -8,6 +8,7 @@ import { query } from "./db/index.js";
 import authRoutes from "./routes/auth.routes.js";
 import businessRoutes from "./routes/business.routes.js";
 import businessSetupsRoutes from "./routes/business-setups.routes.js";
+import financeRoutes from "./routes/finance.routes.js";
 import userRoutes from "./routes/user.routes.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -43,6 +44,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/business", businessRoutes);
 app.use("/api/business-setups", businessSetupsRoutes);
+app.use("/api/finance", financeRoutes);
 
 app.use((req, res) => {
   res.status(404).json({

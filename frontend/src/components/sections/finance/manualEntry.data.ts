@@ -8,7 +8,7 @@ import {
 export type ManualEntryClientMode = "list" | "platform" | "guest";
 
 export type ManualEntryClientSelection =
-  | { type: "guest" }
+  | { type: "guest"; name?: string }
   | { type: "list"; client: ClientRecord }
   | { type: "platform"; client: MollureDirectoryRow };
 
@@ -28,7 +28,7 @@ export function filterMollureByEmail(query: string): MollureDirectoryRow[] {
 
 export function selectionLabel(selection: ManualEntryClientSelection | null): string {
   if (!selection) return "";
-  if (selection.type === "guest") return "Guest";
+  if (selection.type === "guest") return selection.name?.trim() ? selection.name.trim() : "Guest";
   return selection.client.name;
 }
 
@@ -102,19 +102,27 @@ export function formatManualEntryDiscountLabel(discount: ManualEntryDiscount): s
   return formatEurAmount(discount.amount);
 }
 
+export type ManualEntryPaymentMethod = "onlineDirect" | "offlineDirect";
+
 export type ManualEntrySavePayload = {
   clientSelection: ManualEntryClientSelection;
   lines: readonly ManualEntryLine[];
   totalPrice: number;
   discount: ManualEntryDiscount | null;
   discountAmount: number;
+  paymentMethod: ManualEntryPaymentMethod;
+  guestEmail?: string;
+  guestName?: string;
 };
 
 export function manualEntryClientFields(
   selection: ManualEntryClientSelection,
+  guestEmail?: string,
+  guestName?: string,
 ): { clientName: string; clientEmail: string; clientType: "mollure" | "nonMollure" | "business" | "guest" } {
   if (selection.type === "guest") {
-    return { clientName: "Guest", clientEmail: "", clientType: "guest" };
+    const name = guestName?.trim() || selection.name?.trim() || "Guest";
+    return { clientName: name, clientEmail: guestEmail?.trim() ?? "", clientType: "guest" };
   }
   if (selection.type === "list") {
     const client = selection.client;
