@@ -5,6 +5,7 @@ import {
   uploadTeamMemberPhotoFileToS3,
 } from "../services/s3-upload.service.js";
 import { buildServiceDetailsFromCategories } from "../utils/business-service-categories.js";
+import { syncBookingToFinanceTransaction } from "../services/finance-sync.service.js";
 import { normalizeEntityId } from "../utils/business-setup-parsers.js";
 import {
   isValidUuid,
@@ -1267,10 +1268,22 @@ export const createBooking = async (req, res) => {
       ],
     );
 
+    const booking = result.rows[0];
+    if (booking && ["confirmed", "completed"].includes(booking.status)) {
+      try {
+        await syncBookingToFinanceTransaction(booking.id, {
+          paymentPhase: booking.prepayment_status === "paid" ? "prepay" : "full",
+          paymentMethod: booking.booking_type === "offline" ? "offlineDirect" : "onlineDirect",
+        });
+      } catch {
+        // finance sync is best-effort
+      }
+    }
+
     return res.status(201).json({
       success: true,
       message: "Booking created successfully.",
-      data: result.rows[0],
+      data: booking,
     });
   } catch (error) {
     return res.status(500).json({
@@ -1401,10 +1414,21 @@ export const updateBookingStatus = async (req, res) => {
       });
     }
 
+    const booking = result.rows[0];
+    if (["confirmed", "completed"].includes(booking.status)) {
+      try {
+        await syncBookingToFinanceTransaction(booking.id, {
+          paymentMethod: booking.booking_type === "offline" ? "offlineDirect" : "onlineDirect",
+        });
+      } catch {
+        // best-effort
+      }
+    }
+
     return res.status(200).json({
       success: true,
       message: "Booking status updated successfully.",
-      data: result.rows[0],
+      data: booking,
     });
   } catch (error) {
     return res.status(500).json({

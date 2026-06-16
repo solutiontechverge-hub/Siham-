@@ -164,9 +164,23 @@ export default function ClientDetailsViewPanel({
                   }}
                 />
               ) : null}
-              {client.tags.includes("CC") ? (
+              {client.hasNoShow ? (
                 <Chip
-                  label="CC Client"
+                  label="No show"
+                  size="small"
+                  sx={{
+                    height: 20,
+                    borderRadius: "999px",
+                    bgcolor: alpha("#7B1FA2", 0.12),
+                    color: "#7B1FA2",
+                    fontSize: 10,
+                    fontWeight: 800,
+                  }}
+                />
+              ) : null}
+              {client.kind === "company" ? (
+                <Chip
+                  label="CC"
                   size="small"
                   sx={{
                     height: 20,
@@ -177,7 +191,20 @@ export default function ClientDetailsViewPanel({
                     fontWeight: 800,
                   }}
                 />
-              ) : null}
+              ) : (
+                <Chip
+                  label="IC"
+                  size="small"
+                  sx={{
+                    height: 20,
+                    borderRadius: "999px",
+                    bgcolor: alpha(m.navy, 0.08),
+                    color: alpha(m.navy, 0.65),
+                    fontSize: 10,
+                    fontWeight: 800,
+                  }}
+                />
+              )}
               {!isMollure ? (
                 <Chip
                   label="Non-Mollure"

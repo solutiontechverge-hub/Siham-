@@ -41,12 +41,20 @@ import { useBookingEditRequest } from "./useBookingEditRequest";
 import {
   FinanceDocumentPreviewDrawer,
   buildClientBookingTransactionRow,
-  readFinanceInvoiceSettings,
 } from "../finance-documents";
+import { usePublicFinanceSettings } from "../finance-documents/usePublicFinanceSettings";
 import type { ClientBookingDraft } from "./types";
 import type { BusinessPublicProfilePolicySection } from "../../../data/businessPublicProfile.data";
+import { useSyncFinanceTransactionFromBookingMutation } from "../../../store/services/financeApi";
 import { useSnackbar } from "../AppSnackbar";
 import StripePrepaymentDialog from "./StripePrepaymentDialog";
+import ClientBookingPaymentMethodSelector from "./ClientBookingPaymentMethodSelector";
+import {
+  checkoutPaymentMethodApiValue,
+  checkoutPaymentMethodSupportsPayNow,
+  resolveCheckoutPaymentOptions,
+  type CheckoutPaymentMethodId,
+} from "./checkoutPaymentOptions";
 
 const bookingPillTabs = [
   { label: "Past", value: "past" },
@@ -118,14 +126,23 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [discardDialogOpen, setDiscardDialogOpen] = React.useState(false);
   const [isCancelled, setIsCancelled] = React.useState(false);
-  const [financeSettings, setFinanceSettings] = React.useState(() => readFinanceInvoiceSettings());
+  const { invoiceSettings: financeSettings, transactionOptions } = usePublicFinanceSettings(shop?.shopId);
   const [activeDocument, setActiveDocument] = React.useState<"invoice" | "receipt" | null>(null);
   const [stripeDialogOpen, setStripeDialogOpen] = React.useState(false);
+  const checkoutPaymentOptions = React.useMemo(
+    () => resolveCheckoutPaymentOptions(transactionOptions, locationMode),
+    [locationMode, transactionOptions],
+  );
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = React.useState<CheckoutPaymentMethodId>("onlineDirect");
   const { showSnackbar } = useSnackbar();
+  const [syncFinanceFromBooking] = useSyncFinanceTransactionFromBookingMutation();
 
   React.useEffect(() => {
-    setFinanceSettings(readFinanceInvoiceSettings());
-  }, []);
+    if (!checkoutPaymentOptions.length) return;
+    setSelectedPaymentMethod((prev) =>
+      checkoutPaymentOptions.some((option) => option.id === prev) ? prev : checkoutPaymentOptions[0].id,
+    );
+  }, [checkoutPaymentOptions]);
 
   React.useEffect(() => {
     if (requesterPhone && !phone) setPhone(requesterPhone);
@@ -263,21 +280,45 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
           updateClientBookingStatus(activeId, "confirmed");
           refreshActiveBooking();
         }
+        void syncFinanceFromBooking({
+          bookingRef,
+          paymentPhase: "prepay",
+          paymentMethod: checkoutPaymentMethodApiValue(selectedPaymentMethod),
+          amount: prepaidAmount,
+          status: selectedPaymentMethod.includes("Invoice") ? "Payment due" : "Prepaid",
+        });
       }
     } catch {
       // ignore
     }
     setStripeDialogOpen(false);
-    showSnackbar({ severity: "success", message: "Prepayment received. Your booking is confirmed." });
-  }, [locationMode, refreshActiveBooking, showSnackbar]);
+    showSnackbar({
+      severity: "success",
+      message: selectedPaymentMethod.includes("Invoice")
+        ? "Invoice requested. You will receive payment details before the due date."
+        : "Prepayment received. Your booking is confirmed.",
+    });
+  }, [
+    bookingRef,
+    locationMode,
+    prepaidAmount,
+    refreshActiveBooking,
+    selectedPaymentMethod,
+    showSnackbar,
+    syncFinanceFromBooking,
+  ]);
 
   const handlePayNow = React.useCallback(() => {
+    if (!checkoutPaymentMethodSupportsPayNow(selectedPaymentMethod)) {
+      completePrepayment();
+      return;
+    }
     if (prepaidAmount <= 0) {
       showSnackbar({ severity: "error", message: "No prepayment amount due." });
       return;
     }
     setStripeDialogOpen(true);
-  }, [prepaidAmount, showSnackbar]);
+  }, [completePrepayment, prepaidAmount, selectedPaymentMethod, showSnackbar]);
 
   React.useEffect(() => {
     if (typeof window === "undefined") return;
@@ -291,8 +332,10 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
   }, [completePrepayment]);
 
   const refreshFinanceSettings = React.useCallback(() => {
-    setFinanceSettings(readFinanceInvoiceSettings());
+    // Public settings are loaded via RTK Query and stay current automatically.
   }, []);
+
+  const payNowLabel = checkoutPaymentMethodSupportsPayNow(selectedPaymentMethod) ? "Pay Now" : "Request Invoice";
 
   const openInvoice = React.useCallback(() => {
     if (!bookingTransactionRow) return;
@@ -414,19 +457,32 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
                 onViewReceipt={(prepaymentReceiptRow ?? bookingTransactionRow) ? openReceipt : undefined}
               />
             ) : (
-              <ClientBookingPaymentDetailsCard
-                key={detailsContentKey}
-                draft={draft}
-                requesterName={requesterName}
-                requesterAvatarUrl={requesterAvatarUrl}
-                prepaymentState={isPrepaid ? prepaymentState : "none"}
-                prepaymentPercent={prepaymentPercent}
-                onPayNow={prepaymentState === "required" ? handlePayNow : undefined}
-                onViewInvoice={prepaymentState === "paid" && bookingTransactionRow ? openInvoice : undefined}
-                onViewReceipt={
-                  prepaymentState === "paid" && (prepaymentReceiptRow ?? bookingTransactionRow) ? openReceipt : undefined
-                }
-              />
+              <>
+                <ClientBookingPaymentDetailsCard
+                  key={detailsContentKey}
+                  draft={draft}
+                  requesterName={requesterName}
+                  requesterAvatarUrl={requesterAvatarUrl}
+                  prepaymentState={isPrepaid ? prepaymentState : "none"}
+                  prepaymentPercent={prepaymentPercent}
+                  payNowLabel={payNowLabel}
+                  onPayNow={prepaymentState === "required" ? handlePayNow : undefined}
+                  onViewInvoice={prepaymentState === "paid" && bookingTransactionRow ? openInvoice : undefined}
+                  onViewReceipt={
+                    prepaymentState === "paid" && (prepaymentReceiptRow ?? bookingTransactionRow)
+                      ? openReceipt
+                      : undefined
+                  }
+                />
+
+                {isPrepaid && prepaymentState === "required" ? (
+                  <ClientBookingPaymentMethodSelector
+                    options={checkoutPaymentOptions}
+                    value={selectedPaymentMethod}
+                    onChange={setSelectedPaymentMethod}
+                  />
+                ) : null}
+              </>
             )}
 
             <Box sx={{ mt: 2 }}>

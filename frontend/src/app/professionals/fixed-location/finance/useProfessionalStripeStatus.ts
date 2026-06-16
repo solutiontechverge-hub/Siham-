@@ -1,98 +1,60 @@
 "use client";
 
 import * as React from "react";
-import { useGetProfileQuery } from "../../../../store/services/profileApi";
+import {
+  useGetFinanceSettingsQuery,
+  useUpdateFinanceStripeStatusMutation,
+  useCreateStripeConnectLinkMutation,
+  type FinanceStripeConnectStatus,
+  type FinanceSubscriptionStatus,
+} from "../../../../store/services/financeApi";
 
-const SUBSCRIPTION_KEY_PREFIX = "mollure:stripe:subscription:";
-const CONNECT_KEY_PREFIX = "mollure:stripe:connect:";
-
-/** Set to false when wiring real Stripe Billing subscription status from the API. */
-const STRIPE_SETTINGS_PREVIEW_ACTIVE = false;
-
-export type StripeSubscriptionStatus = "inactive" | "active";
-
-export type StripeConnectStatus = "not_connected" | "connected";
-
-function readStoredStatus(key: string): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return window.localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function writeStoredStatus(key: string, value: string | null) {
-  if (typeof window === "undefined") return;
-  try {
-    if (value === null) window.localStorage.removeItem(key);
-    else window.localStorage.setItem(key, value);
-  } catch {
-    // ignore quota / private mode
-  }
-}
+export type StripeSubscriptionStatus = FinanceSubscriptionStatus;
+export type StripeConnectStatus = FinanceStripeConnectStatus;
 
 export function useProfessionalStripeStatus() {
-  const { data: profileResponse } = useGetProfileQuery();
-  const userId = profileResponse?.data?.id ?? "anonymous";
+  const { data: settingsResponse, isLoading } = useGetFinanceSettingsQuery();
+  const [updateStripeStatus, { isLoading: isUpdating }] = useUpdateFinanceStripeStatusMutation();
+  const [createConnectLink] = useCreateStripeConnectLinkMutation();
 
-  const subscriptionStorageKey = `${SUBSCRIPTION_KEY_PREFIX}${userId}`;
-  const connectStorageKey = `${CONNECT_KEY_PREFIX}${userId}`;
+  const subscriptionStatus: StripeSubscriptionStatus =
+    settingsResponse?.data?.subscriptionStatus ?? "inactive";
+  const connectStatus: StripeConnectStatus =
+    settingsResponse?.data?.stripeConnectStatus ?? "not_connected";
 
-  const DEV_DEFAULT_SUBSCRIPTION: StripeSubscriptionStatus = "inactive";
-  const DEV_DEFAULT_CONNECT: StripeConnectStatus = "not_connected";
-
-  const [subscriptionStatus, setSubscriptionStatus] = React.useState<StripeSubscriptionStatus>(DEV_DEFAULT_SUBSCRIPTION);
-  const [connectStatus, setConnectStatus] = React.useState<StripeConnectStatus>(DEV_DEFAULT_CONNECT);
-  const [hydrated, setHydrated] = React.useState(false);
-
-  React.useEffect(() => {
-    if (!STRIPE_SETTINGS_PREVIEW_ACTIVE) {
-      writeStoredStatus(subscriptionStorageKey, null);
-      writeStoredStatus(connectStorageKey, null);
-      setSubscriptionStatus("inactive");
-      setConnectStatus("not_connected");
-      setHydrated(true);
-      return;
-    }
-
-    const storedSub = readStoredStatus(subscriptionStorageKey);
-    const storedConnect = readStoredStatus(connectStorageKey);
-    setSubscriptionStatus(
-      storedSub === null ? DEV_DEFAULT_SUBSCRIPTION : storedSub === "active" ? "active" : "inactive",
-    );
-    setConnectStatus(
-      storedConnect === null ? DEV_DEFAULT_CONNECT : storedConnect === "connected" ? "connected" : "not_connected",
-    );
-    setHydrated(true);
-  }, [subscriptionStorageKey, connectStorageKey]);
-
-  const subscriptionActive = STRIPE_SETTINGS_PREVIEW_ACTIVE || subscriptionStatus === "active";
-  const paymentsConnected = STRIPE_SETTINGS_PREVIEW_ACTIVE || connectStatus === "connected";
+  const subscriptionActive = subscriptionStatus === "active";
+  const paymentsConnected = connectStatus === "connected";
 
   const activateSubscription = React.useCallback(() => {
-    writeStoredStatus(subscriptionStorageKey, "active");
-    setSubscriptionStatus("active");
-  }, [subscriptionStorageKey]);
+    void updateStripeStatus({ action: "activate_subscription" });
+  }, [updateStripeStatus]);
 
   const deactivateSubscription = React.useCallback(() => {
-    writeStoredStatus(subscriptionStorageKey, null);
-    writeStoredStatus(connectStorageKey, null);
-    setSubscriptionStatus("inactive");
-    setConnectStatus("not_connected");
-  }, [subscriptionStorageKey, connectStorageKey]);
+    void updateStripeStatus({ action: "deactivate_subscription" });
+  }, [updateStripeStatus]);
 
-  const markPaymentsConnected = React.useCallback(() => {
-    writeStoredStatus(connectStorageKey, "connected");
-    setConnectStatus("connected");
-  }, [connectStorageKey]);
+  const markPaymentsConnected = React.useCallback(async () => {
+    try {
+      const result = await createConnectLink({}).unwrap();
+      if (result.data?.url) {
+        window.location.href = result.data.url;
+        return;
+      }
+      void updateStripeStatus({ action: "connect_payments" });
+    } catch {
+      void updateStripeStatus({ action: "connect_payments" });
+    }
+  }, [createConnectLink, updateStripeStatus]);
 
   return {
-    hydrated,
+    hydrated: !isLoading,
     subscriptionActive,
     paymentsConnected,
+    subscriptionStatus,
+    connectStatus,
     activateSubscription,
     deactivateSubscription,
     markPaymentsConnected,
+    isUpdating,
   };
 }

@@ -12,6 +12,7 @@ import {
   formatPaymentMethod,
   parseCurrencyValue,
   receiptItemsTitleForStatus,
+  receiptNumberLabelForStatus,
   receiptTitleForStatus,
   type PreviewLineItem,
 } from "./financeDocumentUtils";
@@ -39,11 +40,20 @@ export default function FinanceReceiptPreview({ row, lineItems, totalPriceLabel,
 
   const receiptTitle = receiptTitleForStatus(row?.status);
   const itemsTitle = receiptItemsTitleForStatus(row?.status);
+  const receiptNumberLabel = receiptNumberLabelForStatus(row?.status);
   const invoiceNumber = row?.document?.documentNumber || row?.entryId || row?.id || "—";
-  const receiptNumber = row?.document?.receiptNumber || row?.id || "—";
-  const date = formatDocumentDate(row?.document?.invoiceDate || row?.date) || formatDocumentDate(new Date().toISOString().slice(0, 10));
+  const receiptNumber =
+    row?.document?.creditNoteNumber ||
+    row?.document?.receiptNumber ||
+    row?.id ||
+    "—";
+  const date =
+    formatDocumentDate(row?.document?.refundedAt || row?.document?.invoiceDate || row?.date) ||
+    formatDocumentDate(new Date().toISOString().slice(0, 10));
   const paymentMethod = formatPaymentMethod(row);
   const paymentStatus = row?.status ?? "Paid";
+  const refundAmount = row?.document?.refundAmount;
+  const isRefund = row?.status === "Refunded";
 
   const downloadReceiptPdf = React.useCallback(async () => {
     if (onDownload) {
@@ -67,8 +77,9 @@ export default function FinanceReceiptPreview({ row, lineItems, totalPriceLabel,
       doc.setFontSize(11);
       const metaRows = [
         ["Invoice Number", invoiceNumber],
-        ["Receipt number", receiptNumber],
+        [receiptNumberLabel, receiptNumber],
         ["Date", date],
+        ...(isRefund && refundAmount ? [["Refund Amount", refundAmount] as const] : []),
         ["Payment Method", paymentMethod],
         ["Payment Status", paymentStatus],
       ] as const;
@@ -103,7 +114,7 @@ export default function FinanceReceiptPreview({ row, lineItems, totalPriceLabel,
     } catch {
       showSnackbar({ severity: "error", message: "Failed to download receipt." });
     }
-  }, [date, invoiceNumber, itemsTitle, lineItems, onDownload, paymentMethod, paymentStatus, receiptNumber, receiptTitle, showSnackbar, totalPriceLabel]);
+  }, [date, invoiceNumber, isRefund, itemsTitle, lineItems, onDownload, paymentMethod, paymentStatus, receiptNumber, receiptNumberLabel, receiptTitle, refundAmount, showSnackbar, totalPriceLabel]);
 
   return (
     <Box
@@ -118,8 +129,9 @@ export default function FinanceReceiptPreview({ row, lineItems, totalPriceLabel,
 
       <Stack spacing={1.15}>
         <ReceiptMetaRow label="Invoice Number" value={invoiceNumber} />
-        <ReceiptMetaRow label="Receipt number" value={receiptNumber} />
+        <ReceiptMetaRow label={receiptNumberLabel} value={receiptNumber} />
         <ReceiptMetaRow label="Date" value={date} />
+        {isRefund && refundAmount ? <ReceiptMetaRow label="Refund Amount" value={refundAmount} /> : null}
         <ReceiptMetaRow label="Payment Method" value={paymentMethod} />
         <ReceiptMetaRow label="Payment Status" value={paymentStatus} />
       </Stack>
@@ -157,7 +169,7 @@ export default function FinanceReceiptPreview({ row, lineItems, totalPriceLabel,
             "&:hover": { borderColor: alpha(m.navy, 0.24), bgcolor: alpha(m.navy, 0.02) },
           }}
         >
-          Download Receipt
+          Download {isRefund ? "Credit Note" : "Receipt"}
         </Button>
       </Stack>
     </Box>

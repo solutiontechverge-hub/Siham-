@@ -17,6 +17,7 @@ type Props = {
   requesterAvatarUrl?: string;
   prepaymentState?: ClientBookingPrepaymentState;
   prepaymentPercent?: number;
+  payNowLabel?: string;
   onPayNow?: () => void;
   onViewInvoice?: () => void;
   onViewReceipt?: () => void;
@@ -28,6 +29,7 @@ export default function ClientBookingPaymentDetailsCard({
   requesterAvatarUrl,
   prepaymentState = "none",
   prepaymentPercent = 0,
+  payNowLabel = "Pay Now",
   onPayNow,
   onViewInvoice,
   onViewReceipt,
@@ -223,7 +225,7 @@ export default function ClientBookingPaymentDetailsCard({
                         "&:hover": onPayNow ? { color: m.tealDark } : undefined,
                       }}
                     >
-                      Pay Now
+                      {payNowLabel}
                     </Typography>
                     <Typography sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.88), minWidth: 72, textAlign: "right" }}>
                       €{prepaidAmount.toFixed(2)}

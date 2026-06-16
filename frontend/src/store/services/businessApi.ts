@@ -379,6 +379,89 @@ export type UpsertBusinessSetupRequest = {
 
 export type UpsertBusinessSetupPayload = UpsertBusinessSetupRequest | FormData;
 
+export type ApiProfessionalClient = {
+  id: string;
+  client_kind: "individual" | "company";
+  is_mollure: boolean;
+  mollure_user_id: string | null;
+  display_name: string;
+  email: string;
+  phone: string;
+  technical_note: string | null;
+  is_blocked: boolean;
+  has_no_show: boolean;
+  total_sales: number;
+  total_sales_label: string;
+  last_booking_date: string | null;
+  last_booking_label: string;
+  stats_last_booking?: string;
+  bookings_completed: number;
+  average_booking_value: number;
+  average_booking_value_label: string;
+  recent_services: Array<{ name: string; price: string }>;
+  booking_history: Array<{ period: string; bookings: number }>;
+  first_name: string | null;
+  last_name: string | null;
+  gender: string | null;
+  date_of_birth: string | null;
+  residential_address: string | null;
+  legal_name: string | null;
+  coc: string | null;
+  vat: string | null;
+  contact_person_name: string | null;
+  business_address: string | null;
+  detail_email: string | null;
+  added_on: string;
+  created_at: string;
+};
+
+export type MollureClientDirectoryEntry = {
+  id: string;
+  name: string;
+  email: string;
+  has_eligible_booking: boolean;
+};
+
+export type CreateProfessionalClientRequest =
+  | { mollure_user_id: string }
+  | {
+      client_kind: "individual" | "company";
+      email: string;
+      first_name?: string;
+      last_name?: string;
+      legal_name?: string;
+      country_code?: string;
+      phone?: string;
+      gender?: string;
+      date_of_birth?: string;
+      residential_address?: string;
+      coc?: string;
+      vat?: string;
+      contact_person_name?: string;
+      business_address?: string;
+      detail_email?: string;
+      technical_note?: string;
+    };
+
+export type UpdateProfessionalClientRequest = {
+  id: string;
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+  legal_name?: string;
+  country_code?: string;
+  phone?: string;
+  gender?: string;
+  date_of_birth?: string;
+  residential_address?: string;
+  coc?: string;
+  vat?: string;
+  contact_person_name?: string;
+  business_address?: string;
+  detail_email?: string;
+  technical_note?: string;
+};
+
 export const buildUpsertBusinessSetupBody = (
   payload: UpsertBusinessSetupRequest,
   teamPhotoFiles: Array<{ memberKey: string; file: File }> = [],
@@ -698,6 +781,157 @@ export const businessApi = baseApi.injectEndpoints({
       },
       invalidatesTags: ["BusinessSetup"],
     }),
+    getProfessionalClients: builder.query<ApiEnvelope<ApiProfessionalClient[]>, void>({
+      async queryFn(_arg, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: "/api/business/clients",
+          method: "GET",
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<ApiProfessionalClient[]>;
+        if (!data.success || !Array.isArray(data.data)) {
+          return { error: customError(data.message || "Unable to fetch clients.") };
+        }
+
+        return { data };
+      },
+      providesTags: ["ProfessionalClients"],
+    }),
+    getMollureClientDirectory: builder.query<ApiEnvelope<MollureClientDirectoryEntry[]>, { q?: string } | void>({
+      async queryFn(arg, _api, _extraOptions, fetchWithBQ) {
+        const q = arg?.q?.trim();
+        const response = await fetchWithBQ({
+          url: q ? `/api/business/clients/mollure-directory?q=${encodeURIComponent(q)}` : "/api/business/clients/mollure-directory",
+          method: "GET",
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<MollureClientDirectoryEntry[]>;
+        if (!data.success || !Array.isArray(data.data)) {
+          return { error: customError(data.message || "Unable to fetch Mollure directory.") };
+        }
+
+        return { data };
+      },
+      providesTags: ["ProfessionalClients"],
+    }),
+    createProfessionalClient: builder.mutation<ApiEnvelope<ApiProfessionalClient>, CreateProfessionalClientRequest>({
+      async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: "/api/business/clients",
+          method: "POST",
+          body: payload,
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<ApiProfessionalClient>;
+        if (!data.success || !data.data) {
+          return { error: customError(data.message || "Unable to add client.") };
+        }
+
+        return { data };
+      },
+      invalidatesTags: ["ProfessionalClients"],
+    }),
+    updateProfessionalClient: builder.mutation<ApiEnvelope<ApiProfessionalClient>, UpdateProfessionalClientRequest>({
+      async queryFn({ id, ...body }, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: `/api/business/clients/${id}`,
+          method: "PATCH",
+          body,
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<ApiProfessionalClient>;
+        if (!data.success || !data.data) {
+          return { error: customError(data.message || "Unable to update client.") };
+        }
+
+        return { data };
+      },
+      invalidatesTags: ["ProfessionalClients"],
+    }),
+    updateProfessionalClientTechnicalNote: builder.mutation<
+      ApiEnvelope<ApiProfessionalClient>,
+      { id: string; technical_note: string }
+    >({
+      async queryFn({ id, technical_note }, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: `/api/business/clients/${id}/technical-note`,
+          method: "PATCH",
+          body: { technical_note },
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<ApiProfessionalClient>;
+        if (!data.success || !data.data) {
+          return { error: customError(data.message || "Unable to save technical note.") };
+        }
+
+        return { data };
+      },
+      invalidatesTags: ["ProfessionalClients"],
+    }),
+    setProfessionalClientBlocked: builder.mutation<
+      ApiEnvelope<ApiProfessionalClient>,
+      { id: string; is_blocked: boolean }
+    >({
+      async queryFn({ id, is_blocked }, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: `/api/business/clients/${id}/block`,
+          method: "PATCH",
+          body: { is_blocked },
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<ApiProfessionalClient>;
+        if (!data.success || !data.data) {
+          return { error: customError(data.message || "Unable to update block status.") };
+        }
+
+        return { data };
+      },
+      invalidatesTags: ["ProfessionalClients"],
+    }),
+    deleteProfessionalClient: builder.mutation<ApiEnvelope<null>, string>({
+      async queryFn(id, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: `/api/business/clients/${id}`,
+          method: "DELETE",
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<null>;
+        if (!data.success) {
+          return { error: customError(data.message || "Unable to delete client.") };
+        }
+
+        return { data };
+      },
+      invalidatesTags: ["ProfessionalClients"],
+    }),
   }),
   overrideExisting: false,
 });
@@ -715,4 +949,11 @@ export const {
   useUpdateBusinessSetupActiveMutation,
   useCreateBusinessSubcategoryMutation,
   useUpsertBusinessSetupMutation,
+  useGetProfessionalClientsQuery,
+  useGetMollureClientDirectoryQuery,
+  useCreateProfessionalClientMutation,
+  useUpdateProfessionalClientMutation,
+  useUpdateProfessionalClientTechnicalNoteMutation,
+  useSetProfessionalClientBlockedMutation,
+  useDeleteProfessionalClientMutation,
 } = businessApi;

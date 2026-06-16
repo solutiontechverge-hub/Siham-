@@ -4,6 +4,7 @@ export { default as FinanceInvoicePreview } from "./FinanceInvoicePreview";
 export { default as FinanceReceiptPreview, resolveReceiptTotalLabel } from "./FinanceReceiptPreview";
 export { buildClientBookingTransactionRow } from "./buildClientBookingTransactionRow";
 export type { BuildClientBookingTransactionRowInput } from "./buildClientBookingTransactionRow";
+export { usePublicFinanceSettings } from "./usePublicFinanceSettings";
 export {
   readFinanceInvoiceSettings,
   useFinanceInvoiceSettings,

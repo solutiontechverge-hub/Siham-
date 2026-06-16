@@ -37,7 +37,9 @@ import MollureListToolbar from "../../../../components/common/MollureListToolbar
 import { ClientListDataCard, ClientListHeaderCard, MollureSnackbar } from "../../../../components/common";
 import { useFixedLocationClientPage } from "./useFixedLocationClientPage";
 import ClientDetailsViewPanel from "./ClientDetailsViewPanel";
+import ClientListFilterDrawer from "./ClientListFilterDrawer";
 import { isClientBlocked } from "./data/clientList";
+import { clientTypeLabel, platformLabel } from "./data/clientListFilters";
 import { Typography } from "../../../../components/ui/typography";
 
 export default function FixedLocationClientPage() {
@@ -82,10 +84,17 @@ export default function FixedLocationClientPage() {
 
   const {
     clients,
+    clientsLoading,
+    clientsError,
     query,
     setQuery,
     sortBy,
     setSortBy,
+    activeFilters,
+    filterDrawerOpen,
+    setFilterDrawerOpen,
+    toggleClientFilter,
+    clearClientFilters,
     sortAnchor,
     setSortAnchor,
     addAnchor,
@@ -159,6 +168,8 @@ export default function FixedLocationClientPage() {
     setCoEmail,
     compErrors,
     setCompErrors,
+    nonMollureTechnicalNote,
+    setNonMollureTechnicalNote,
     validateCompany,
     validateIndividual,
     sortOpen,
@@ -190,10 +201,12 @@ export default function FixedLocationClientPage() {
     [clients, rowMenu?.id],
   );
 
-  const rowMenuOptions = useMemo(
-    () => (rowMenuClient && isClientBlocked(rowMenuClient) ? ["View", "Unblock", "Delete"] : ["View", "Block", "Delete"]),
-    [rowMenuClient],
-  );
+  const rowMenuOptions = useMemo(() => {
+    const base = rowMenuClient && isClientBlocked(rowMenuClient)
+      ? ["View", "Edit technical note", "Unblock", "Delete"]
+      : ["View", "Edit technical note", "Block", "Delete"];
+    return base;
+  }, [rowMenuClient]);
 
   return (
     <>
@@ -222,11 +235,21 @@ export default function FixedLocationClientPage() {
 
         {/* Toolbar */}
         <MollureListToolbar
-          searchPlaceholder="Search from Client list by name"
+          searchPlaceholder="Search by name, email, or phone number"
           searchValue={query}
           onSearchChange={setQuery}
+          onFilterClick={() => setFilterDrawerOpen(true)}
+          activeFilterCount={activeFilters.size}
           onSortClick={(e) => setSortAnchor(e.currentTarget)}
           onAddClick={(e) => setAddAnchor(e.currentTarget)}
+        />
+
+        <ClientListFilterDrawer
+          open={filterDrawerOpen}
+          activeFilters={activeFilters}
+          onClose={() => setFilterDrawerOpen(false)}
+          onToggle={toggleClientFilter}
+          onClear={clearClientFilters}
         />
 
         <Menu
@@ -245,12 +268,12 @@ export default function FixedLocationClientPage() {
           }}
         >
           {[
+            "Booking Dated (Current → Last)",
+            "Booking Dated (Last → Current)",
             "Alphabetical (A–Z)",
             "Alphabetical (Z–A)",
             "Sales (Highest → Lowest)",
             "Sales (Lowest → Highest)",
-            "Booking Dated (Current → Last)",
-            "Booking Dated (Last → Current)",
           ].map((opt) => (
             <MenuItem
               key={opt}
@@ -321,9 +344,22 @@ export default function FixedLocationClientPage() {
                 mb: 1.25,
               }}
             >
-              Clients ({clients.length})
+              Clients ({filtered.length}{filtered.length !== clients.length ? ` of ${clients.length}` : ""})
             </Typography>
 
+            {clientsLoading ? (
+              <Typography sx={{ fontWeight: 700, fontSize: 13, color: alpha(m.navy, 0.5), py: 3, textAlign: "center" }}>
+                Loading clients…
+              </Typography>
+            ) : clientsError ? (
+              <Typography sx={{ fontWeight: 700, fontSize: 13, color: theme.palette.error.main, py: 3, textAlign: "center" }}>
+                Unable to load clients. Please try again.
+              </Typography>
+            ) : filtered.length === 0 ? (
+              <Typography sx={{ fontWeight: 700, fontSize: 13, color: alpha(m.navy, 0.5), py: 3, textAlign: "center" }}>
+                No clients match your search or filters.
+              </Typography>
+            ) : (
             <TableContainer
               component={Paper}
               elevation={0}
@@ -351,7 +387,16 @@ export default function FixedLocationClientPage() {
               >
                 <TableHead>
                   <TableRow sx={{ bgcolor: alpha(m.navy, 0.02) }}>
-                    {["Client Name", "Phone Number", "Total Sales", "Last Booking Date", ""].map((h, colIdx, arr) => (
+                    {[
+                      "Client Name",
+                      "Type",
+                      "Platform",
+                      "Date Added",
+                      "Phone Number",
+                      "Total Sales",
+                      "Last Booking",
+                      "",
+                    ].map((h, colIdx, arr) => (
                       <TableCell
                         key={h || "actions"}
                         sx={{
@@ -373,6 +418,8 @@ export default function FixedLocationClientPage() {
                 <TableBody>
                   {filtered.map((c) => {
                     const blocked = isClientBlocked(c);
+                    const typeLabel = clientTypeLabel(c);
+                    const platform = platformLabel(c);
                     return (
                     <TableRow
                       key={c.id}
@@ -436,36 +483,21 @@ export default function FixedLocationClientPage() {
                                   }}
                                 />
                               ) : null}
-                              {c.tags.includes("CC") && (
+                              {c.hasNoShow ? (
                                 <Chip
-                                  label="CC Client"
+                                  label="No show"
                                   size="small"
                                   sx={{
                                     height: 18,
                                     borderRadius: "999px",
-                                    bgcolor: alpha(theme.palette.primary.main, 0.10),
-                                    color: theme.palette.primary.main,
+                                    bgcolor: alpha("#7B1FA2", 0.12),
+                                    color: "#7B1FA2",
                                     fontSize: 10,
                                     fontWeight: 800,
                                     px: 0.5,
                                   }}
                                 />
-                              )}
-                              <Chip
-                                label={c.tags.includes("Mollure") ? "Mollure" : "Non-Mollure"}
-                                size="small"
-                                sx={{
-                                  height: 18,
-                                  borderRadius: "999px",
-                                  bgcolor: c.tags.includes("Mollure")
-                                    ? alpha(theme.palette.primary.main, 0.10)
-                                    : alpha(m.teal, 0.14),
-                                  color: c.tags.includes("Mollure") ? theme.palette.primary.main : alpha(m.teal, 0.95),
-                                  fontSize: 10,
-                                  fontWeight: 800,
-                                  px: 0.5,
-                                }}
-                              />
+                              ) : null}
                               {c.technicalNote?.trim() ? (
                                 <Tooltip title="View technical note" arrow>
                                   <IconButton
@@ -503,6 +535,26 @@ export default function FixedLocationClientPage() {
                           </Box>
                         </Stack>
                       </TableCell>
+                      <TableCell sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.72) }}>
+                        <Chip
+                          label={typeLabel}
+                          size="small"
+                          sx={{
+                            height: 20,
+                            borderRadius: "6px",
+                            fontSize: 10,
+                            fontWeight: 900,
+                            bgcolor: typeLabel === "CC" ? alpha(m.teal, 0.12) : alpha(m.navy, 0.06),
+                            color: typeLabel === "CC" ? m.teal : alpha(m.navy, 0.65),
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.72) }}>
+                        {platform}
+                      </TableCell>
+                      <TableCell sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.62) }}>
+                        {c.addedOn}
+                      </TableCell>
                       <TableCell sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.75) }}>
                         {c.phone}
                       </TableCell>
@@ -532,6 +584,7 @@ export default function FixedLocationClientPage() {
                 </TableBody>
               </Table>
             </TableContainer>
+            )}
           </ClientListDataCard>
         </Box>
 
@@ -560,6 +613,9 @@ export default function FixedLocationClientPage() {
                 if (opt === "View") {
                   setClientDetailsMode("view");
                   setViewClientId(id);
+                }
+                if (opt === "Edit technical note") {
+                  openClientDetailsView(id, { focusTechnicalNote: true });
                 }
                 if (opt === "Block") {
                   setBlockClientId(id);
@@ -1218,6 +1274,9 @@ export default function FixedLocationClientPage() {
             <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.55), mb: 0.75 }}>
               Search on Mollure by email
             </Typography>
+            <Typography sx={{ fontSize: 11, fontWeight: 600, color: alpha(m.navy, 0.45), mb: 1 }}>
+              Only clients with a confirmed or completed booking with you can be added.
+            </Typography>
             <MollureFormField
               placeholder="Search by email"
               value={mollureSearch}
@@ -1238,7 +1297,14 @@ export default function FixedLocationClientPage() {
               bgcolor: "#fff",
             }}
           >
-            {mollureResults.slice(0, 3).map((r, idx) => (
+            {mollureResults.length === 0 ? (
+              <Box sx={{ px: 1.6, py: 2.5, textAlign: "center" }}>
+                <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.5) }}>
+                  No eligible Mollure clients found. Clients need a confirmed or completed booking first.
+                </Typography>
+              </Box>
+            ) : (
+            mollureResults.slice(0, 5).map((r, idx) => (
               <Box
                 key={r.id}
                 role="button"
@@ -1296,7 +1362,8 @@ export default function FixedLocationClientPage() {
                   <Typography sx={{ fontSize: 11.5, fontWeight: 600, color: alpha(m.navy, 0.50) }}>{r.email}</Typography>
                 </Box>
               </Box>
-            ))}
+            ))
+            )}
           </Box>
         </Box>
       </MollureModal>
@@ -1696,6 +1763,18 @@ export default function FixedLocationClientPage() {
                 />
               </Stack>
             )}
+
+            <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.86), pt: 0.5 }}>
+              Technical Note (Optional)
+            </Typography>
+            <MollureFormField
+              multiline
+              minRows={3}
+              placeholder="Any technical note about client"
+              value={nonMollureTechnicalNote}
+              onChange={(e) => setNonMollureTechnicalNote(e.target.value)}
+              sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+            />
           </Stack>
         </Box>
       </MollureDrawer>
