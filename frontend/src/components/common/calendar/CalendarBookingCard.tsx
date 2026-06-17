@@ -7,7 +7,7 @@ import BookingTimelineCard from "../BookingTimelineCard";
 import { useProfessionalMessagingUnread } from "../messaging/useProfessionalMessagingUnread";
 import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import { extractBookingId, statusChipSx } from "./calendar.utils";
-import { getBookingScenarioIndicators, statusCardAccent } from "./bookingStatus";
+import { getBookingScenarioIndicators, statusCardAccent, isBookingRequestAccepted, isBookingRequestRejected } from "./bookingStatus";
 import { resolveBookingResponseIndicators } from "./bookingResponseStatus";
 import { resolveCalendarPrepaymentStatus, toPrepaymentIconVariant } from "./prepaymentStatus";
 
@@ -91,6 +91,8 @@ export default function CalendarBookingCard({
         scenarioBadges={scenarioIndicators.map((label) => ({
           label,
           showRequestSentIcon: label === "BR",
+          requestAccepted: label === "BR" && isBookingRequestAccepted(event),
+          requestRejected: label === "BR" && isBookingRequestRejected(event),
           responseIndicators: label === "EBR" ? scenarioBadgeResponseIndicators(label, responseIndicators) : [],
           prepaymentStatus:
             label === "EBR"

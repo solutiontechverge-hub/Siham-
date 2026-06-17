@@ -20,6 +20,7 @@ import {
 import { alpha, useTheme } from "@mui/material/styles";
 import AppSearchField from "../AppSearchField";
 import MessagingAvatar from "./MessagingAvatar";
+import MessagingThreadPreviewLine from "./MessagingThreadPreviewLine";
 import { getMessagingBookingHref, getMessagingPeerProfileHref, messagingSearchPlaceholder, type MessagingAudience } from "./messagingRoutes";
 import type { MessagingThread } from "./messagingTypes";
 
@@ -230,21 +231,7 @@ export default function MessagingConversationSidebar({
                       {thread.timeLabel}
                     </Typography>
                   </Stack>
-                  <Typography
-                    sx={{
-                      mt: 0.5,
-                      fontSize: 11.5,
-                      lineHeight: 1.45,
-                      fontWeight: 500,
-                      color: alpha(m.navy, 0.5),
-                      display: "-webkit-box",
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: "vertical",
-                      overflow: "hidden",
-                    }}
-                  >
-                    {thread.preview}
-                  </Typography>
+                  <MessagingThreadPreviewLine thread={thread} />
                 </Box>
                 <Checkbox
                   size="small"

@@ -34,6 +34,10 @@ export type MessagingThread = {
   /** ISO timestamp of last message activity. */
   lastActivityAt?: string;
   preview: string;
+  /** Sender label for the latest message preview (e.g. client or professional name). */
+  previewSenderName?: string;
+  /** True when the latest preview line is from the other party. */
+  previewFromPeer?: boolean;
   avatarSeed: string;
   online?: boolean;
   presenceStatus?: MessagingPresenceStatus;
@@ -69,6 +73,8 @@ export type MessagingChatMessage = {
   dateKey: string;
   deletedForEveryone?: boolean;
   hiddenForAudience?: Partial<Record<MessagingAudience, boolean>>;
+  /** True when the other party has read this message (own messages only). */
+  readByPeer?: boolean;
 };
 
 export type MessagingSettingsFilters = Record<BookingStatusFilter, boolean>;
@@ -86,6 +92,8 @@ export type MessagingStore = {
   blockedThreadIds: string[];
   /** Per-thread last message id the user has seen (by audience). */
   lastReadMessageIdByAudience?: Partial<Record<MessagingAudience, Record<string, string>>>;
+  /** Latest timestamp the other party has read through, per thread. */
+  peerLastReadAtByThreadId?: Record<string, string>;
   /** User-selected presence when not automatically online. */
   presenceStatus?: MessagingPresenceStatus;
 };

@@ -14,7 +14,7 @@ import BookingIndicatorIcon, {
   BOOKING_INDICATOR_LABELS,
   type BookingIndicatorVariant,
 } from "./calendar/BookingIndicatorIcon";
-import BookingRequestSentIcon, { BOOKING_REQUEST_SENT_LABEL } from "./calendar/BookingRequestSentIcon";
+import BookingRequestBadge, { type BookingRequestBadgeState } from "./calendar/BookingRequestBadge";
 import PrepaymentStatusIcon, { type PrepaymentStatusIconVariant } from "./calendar/PrepaymentStatusIcon";
 import { PREPAYMENT_STATUS_LABELS } from "./calendar/PrepaymentStatusIcon";
 
@@ -35,6 +35,8 @@ export type BookingTimelineCardScenarioBadge = {
   prepaymentStatus?: PrepaymentStatusIconVariant;
   responseIndicators?: readonly BookingIndicatorVariant[];
   showRequestSentIcon?: boolean;
+  requestAccepted?: boolean;
+  requestRejected?: boolean;
   showExternalLink?: boolean;
   sx?: SxProps<Theme>;
 };
@@ -134,6 +136,19 @@ function renderScenarioBadge(
   m: { navy: string; success: string },
   key: React.Key,
 ) {
+  if (badge.showRequestSentIcon && badge.label === "BR") {
+    const brState: BookingRequestBadgeState = badge.requestRejected
+      ? "rejected"
+      : badge.requestAccepted
+        ? "accepted"
+        : "sent";
+    return (
+      <Box key={key} sx={{ display: "flex", alignItems: "center", gap: 0.35, flexShrink: 0, pointerEvents: "auto" }}>
+        <BookingRequestBadge variant="compact" state={brState} sx={badge.sx} />
+      </Box>
+    );
+  }
+
   return (
     <Stack
       key={key}
@@ -155,13 +170,6 @@ function renderScenarioBadge(
       ]}
     >
       <BodyText sx={{ fontSize: 9.5, fontWeight: 700, color: "inherit", lineHeight: 1 }}>{badge.label}</BodyText>
-      {badge.showRequestSentIcon ? (
-        <Tooltip title={BOOKING_REQUEST_SENT_LABEL} placement="top">
-          <Box sx={{ display: "grid", placeItems: "center", lineHeight: 0 }}>
-            <BookingRequestSentIcon size={10} />
-          </Box>
-        </Tooltip>
-      ) : null}
       {!badge.showRequestSentIcon && badge.responseIndicators?.length
         ? renderResponseIndicators(badge.responseIndicators)
         : !badge.showRequestSentIcon && badge.showAcceptedIcon
@@ -332,16 +340,7 @@ export default function BookingTimelineCard({
             />
           ) : null}
           {showRequestBadge ? (
-            renderScenarioBadge(
-              {
-                label: requestBadgeOptions.label ?? "BR",
-                showAcceptedIcon: requestBadgeOptions.showAcceptedIcon !== false,
-                showPaymentIcon: requestBadgeOptions.showPaymentIcon !== false,
-                sx: requestBadgeOptions.sx,
-              },
-              m,
-              "legacy-request-badge",
-            )
+            <BookingRequestBadge variant="compact" sx={requestBadgeOptions.sx} key="legacy-request-badge" />
           ) : null}
           {visibleScenarioBadges.map((badge, index) => renderScenarioBadge(badge, m, `scenario-${index}`))}
           {showStandalonePrepayment && prepaymentStatus ? (

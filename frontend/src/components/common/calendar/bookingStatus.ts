@@ -4,6 +4,7 @@ import type {
   CalendarBookingType,
   CalendarEvent,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
+import { isOutgoingBookingRequest } from "./bookingRequestNegotiation";
 
 export type BookingScenarioIndicator = "BR" | "EBR" | "ER" | "E";
 
@@ -140,7 +141,23 @@ export function isActiveBookingRequest(
 }
 
 export function canDiscardBookingRequest(
-  event: Pick<CalendarEvent, "status" | "bookingScenario" | "bookingType"> | null | undefined,
+  event: Pick<CalendarEvent, "status" | "bookingScenario" | "bookingType" | "details"> | null | undefined,
 ) {
-  return isActiveBookingRequest(event);
+  return isOutgoingBookingRequest(event);
+}
+
+/** Client accepted the booking request — status is confirmed while BR indicator remains. */
+export function isBookingRequestAccepted(
+  event: Pick<CalendarEvent, "status" | "bookingScenario"> | null | undefined,
+) {
+  if (!event || event.bookingScenario !== "BR") return false;
+  return event.status === "Confirmed" || event.status === "Completed";
+}
+
+/** Professional or client rejected the booking request — invalid while BR indicator remains. */
+export function isBookingRequestRejected(
+  event: Pick<CalendarEvent, "status" | "bookingScenario"> | null | undefined,
+) {
+  if (!event || event.bookingScenario !== "BR") return false;
+  return event.status === "Invalid";
 }

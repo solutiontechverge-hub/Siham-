@@ -63,7 +63,7 @@ const getTransporter = () => {
   });
 };
 
-const sendMail = async ({ to, subject, html, text }) => {
+export const sendMail = async ({ to, subject, html, text }) => {
   const transporter = getTransporter();
   const isRealEmailConfig = ensureEmailConfig();
 
@@ -85,25 +85,35 @@ const sendMail = async ({ to, subject, html, text }) => {
 };
 
 export const sendVerificationEmail = async ({ email, token }) => {
-  const appBaseUrl =
-    process.env.APP_BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
-  const verificationLink = `${appBaseUrl}/api/auth/verify-email?token=${encodeURIComponent(token)}`;
+  const frontendBaseUrl =
+    process.env.FRONTEND_URL || process.env.APP_FRONTEND_URL || "http://localhost:3000";
+  const verificationLink = `${frontendBaseUrl.replace(/\/$/, "")}/auth/verify-email?token=${encodeURIComponent(token)}`;
 
   await sendMail({
     to: email,
     subject: "Verify your email address",
     text: `Verify your email by opening this link: ${verificationLink}`,
     html: `
-      <div style="font-family: Arial, sans-serif; color: #1f2937;">
-        <h2>Email Verification</h2>
-        <p>Please verify your email address by clicking the button below.</p>
-        <p>
-          <a href="${verificationLink}" style="display:inline-block;padding:12px 20px;background:#111827;color:#ffffff;text-decoration:none;border-radius:6px;">
-            Verify Email
+      <div style="font-family: Arial, sans-serif; color: #1f2937; max-width: 560px; margin: 0 auto; padding: 24px;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <strong style="font-size: 22px; color: #1a2b42;">Mollure</strong>
+        </div>
+        <div style="background: #f7f9fb; border-radius: 12px; padding: 28px 24px; text-align: center;">
+          <h2 style="margin: 0 0 12px; font-size: 24px; color: #1a2b42;">One Last Step To Get Started!</h2>
+          <p style="margin: 0 0 20px; line-height: 1.6; color: #5c6778;">
+            Welcome to Mollure! We are thrilled to have you. Please verify your email address to complete your registration and unlock all features.
+          </p>
+          <a href="${verificationLink}" style="display:inline-block;padding:14px 28px;background:#0d9ea8;color:#ffffff;text-decoration:none;border-radius:10px;font-weight:700;">
+            Verify Your Email
           </a>
+          <p style="margin: 20px 0 0; font-size: 13px; color: #7a8699;">
+            If you did not sign up for this account, you can ignore this email.
+          </p>
+        </div>
+        <p style="margin-top: 20px; font-size: 12px; color: #9aa3b2; text-align: center;">
+          If the button does not work, copy this link:<br />
+          <a href="${verificationLink}">${verificationLink}</a>
         </p>
-        <p>If the button does not work, use this link:</p>
-        <p>${verificationLink}</p>
       </div>
     `,
   });

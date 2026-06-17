@@ -140,6 +140,11 @@ export function buildBookingDetailsSnapshot(input: {
   bookingTotalDiscount: ManualEntryDiscount | null;
   showKilometerAllowance: boolean;
   kilometerAllowanceDraft: BookingDrawerHydration["kilometerAllowance"];
+  requestDirection?: CalendarBookingDetails["requestDirection"];
+  originalServices?: CalendarBookingDetails["originalServices"];
+  editedServiceIds?: CalendarBookingDetails["editedServiceIds"];
+  clientEditedServiceIds?: CalendarBookingDetails["clientEditedServiceIds"];
+  lastEditedBy?: CalendarBookingDetails["lastEditedBy"];
 }): CalendarBookingDetails {
   return {
     clientEmail: input.selectedClient?.email ?? "",
@@ -159,5 +164,10 @@ export function buildBookingDetailsSnapshot(input: {
     totalDiscount: input.bookingTotalDiscount,
     showKilometerAllowance: input.showKilometerAllowance,
     kilometerAllowance: input.kilometerAllowanceDraft,
+    ...(input.requestDirection ? { requestDirection: input.requestDirection } : {}),
+    ...(input.originalServices ? { originalServices: input.originalServices } : {}),
+    ...(input.editedServiceIds ? { editedServiceIds: input.editedServiceIds } : {}),
+    ...(input.clientEditedServiceIds ? { clientEditedServiceIds: input.clientEditedServiceIds } : {}),
+    ...(input.lastEditedBy ? { lastEditedBy: input.lastEditedBy } : {}),
   };
 }

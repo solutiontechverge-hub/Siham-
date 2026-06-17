@@ -1,4 +1,5 @@
 import type { MessagingAudience } from "./messagingRoutes";
+import { buildThreadPreviewFromMessage } from "./messagingPreview";
 import { createInitialMessagingStore } from "./messagingMockData";
 import {
   formatConversationTimeLabel,
@@ -11,6 +12,7 @@ import type { MessagingChatMessage, MessagingSettingsFilters, MessagingStore, Me
 
 const STORAGE_KEY = "mollure:messaging:v1";
 const PREFS_KEY = "mollure:messaging:prefs:v1";
+const RUNTIME_KEY = "mollure:messaging:runtime:v1";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function isApiBackedStore(store: MessagingStore): boolean {
@@ -42,12 +44,17 @@ export function loadMessagingPrefs() {
 }
 
 export function mergeApiInboxWithPrefs(
-  api: Pick<MessagingStore, "threads" | "messagesByThreadId">,
+  api: Pick<MessagingStore, "threads" | "messagesByThreadId" | "peerLastReadAtByThreadId">,
   prefs: ReturnType<typeof extractMessagingPrefs>,
+  audience?: MessagingAudience,
 ): MessagingStore {
+  const threads = api.threads.map((thread) =>
+    refreshThreadPreview(thread, api.messagesByThreadId[thread.id] ?? [], audience),
+  );
   return filterToRetentionWindow({
-    threads: api.threads,
+    threads,
     messagesByThreadId: api.messagesByThreadId,
+    peerLastReadAtByThreadId: api.peerLastReadAtByThreadId ?? {},
     hiddenByAudience: prefs.hiddenByAudience,
     blockedThreadIds: prefs.blockedThreadIds,
     lastReadMessageIdByAudience: prefs.lastReadMessageIdByAudience,
@@ -74,8 +81,9 @@ function mergeMessageLists(
 /** Merge a fresh API inbox into existing client state without dropping local messages or draft threads. */
 export function mergeApiInboxIntoStore(
   current: MessagingStore,
-  api: Pick<MessagingStore, "threads" | "messagesByThreadId">,
+  api: Pick<MessagingStore, "threads" | "messagesByThreadId" | "peerLastReadAtByThreadId">,
   prefs: ReturnType<typeof extractMessagingPrefs>,
+  audience?: MessagingAudience,
 ): MessagingStore {
   const apiProfessionalKeys = new Set(api.threads.map(threadProfessionalKey));
 
@@ -113,13 +121,17 @@ export function mergeApiInboxIntoStore(
   }
 
   const threads = mergedThreads.map((thread) =>
-    refreshThreadPreview(thread, messagesByThreadId[thread.id] ?? []),
+    refreshThreadPreview(thread, messagesByThreadId[thread.id] ?? [], audience),
   );
 
   return filterToRetentionWindow({
     ...current,
     threads,
     messagesByThreadId,
+    peerLastReadAtByThreadId: {
+      ...current.peerLastReadAtByThreadId,
+      ...api.peerLastReadAtByThreadId,
+    },
     hiddenByAudience: prefs.hiddenByAudience ?? current.hiddenByAudience,
     blockedThreadIds: prefs.blockedThreadIds ?? current.blockedThreadIds,
     lastReadMessageIdByAudience:
@@ -147,23 +159,87 @@ export function notifyMessagingUpdated() {
   window.dispatchEvent(new Event(MESSAGING_UPDATED_EVENT));
 }
 
+export function loadMessagingRuntimeSnapshot(): Pick<
+  MessagingStore,
+  "threads" | "messagesByThreadId" | "peerLastReadAtByThreadId"
+> | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(RUNTIME_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Pick<MessagingStore, "threads" | "messagesByThreadId" | "peerLastReadAtByThreadId">;
+    if (!parsed?.threads?.length) return null;
+    return {
+      threads: parsed.threads,
+      messagesByThreadId: parsed.messagesByThreadId ?? {},
+      peerLastReadAtByThreadId: parsed.peerLastReadAtByThreadId ?? {},
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function saveMessagingRuntimeSnapshot(store: MessagingStore): void {
+  if (typeof window === "undefined") return;
+  try {
+    const safe = sanitizeStoreForPersistence(filterToRetentionWindow(store));
+    window.localStorage.setItem(
+      RUNTIME_KEY,
+      JSON.stringify({
+        threads: safe.threads,
+        messagesByThreadId: safe.messagesByThreadId,
+        peerLastReadAtByThreadId: safe.peerLastReadAtByThreadId ?? {},
+      }),
+    );
+    notifyMessagingUpdated();
+  } catch {
+    // ignore quota errors
+  }
+}
+
 export function loadMessagingStore(): MessagingStore {
   if (typeof window === "undefined") return createInitialMessagingStore();
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return createInitialMessagingStore();
+    const runtime = loadMessagingRuntimeSnapshot();
+    const prefs = loadMessagingPrefs();
+
+    if (!raw) {
+      if (runtime) {
+        return mergeApiInboxWithPrefs(runtime, prefs);
+      }
+      return createInitialMessagingStore();
+    }
+
     const parsed = JSON.parse(raw) as MessagingStore;
-    if (!parsed?.threads?.length) return createInitialMessagingStore();
-    const hydrated: MessagingStore = {
+    if (!parsed?.threads?.length) {
+      if (runtime) {
+        return mergeApiInboxWithPrefs(runtime, prefs);
+      }
+      return createInitialMessagingStore();
+    }
+
+    let hydrated: MessagingStore = {
       threads: parsed.threads,
       messagesByThreadId: parsed.messagesByThreadId ?? {},
       hiddenByAudience: parsed.hiddenByAudience ?? {},
       blockedThreadIds: parsed.blockedThreadIds ?? [],
       lastReadMessageIdByAudience: parsed.lastReadMessageIdByAudience ?? {},
+      peerLastReadAtByThreadId: parsed.peerLastReadAtByThreadId ?? {},
       presenceStatus: parsed.presenceStatus ?? "online",
     };
-    return filterToRetentionWindow(hydrated);
+    hydrated = filterToRetentionWindow(hydrated);
+
+    if (runtime) {
+      hydrated = mergeApiInboxIntoStore(hydrated, runtime, prefs);
+    }
+
+    return hydrated;
   } catch {
+    const runtime = loadMessagingRuntimeSnapshot();
+    if (runtime) {
+      return mergeApiInboxWithPrefs(runtime, loadMessagingPrefs());
+    }
     return createInitialMessagingStore();
   }
 }
@@ -190,6 +266,7 @@ export function saveMessagingStore(store: MessagingStore): boolean {
   try {
     if (isApiBackedStore(store)) {
       window.localStorage.setItem(PREFS_KEY, JSON.stringify(extractMessagingPrefs(store)));
+      saveMessagingRuntimeSnapshot(store);
       notifyMessagingUpdated();
       return true;
     }
@@ -234,16 +311,27 @@ export function threadMatchesSearch(
   return thread.name.toLowerCase().includes(q);
 }
 
-function refreshThreadPreview(thread: MessagingThread, messages: MessagingChatMessage[]): MessagingThread {
+function refreshThreadPreview(
+  thread: MessagingThread,
+  messages: MessagingChatMessage[],
+  audience?: MessagingAudience,
+): MessagingThread {
   const visible = messages.filter((m) => !m.deletedForEveryone);
   const last = visible[visible.length - 1];
   if (!last) {
-    return { ...thread, preview: "", lastActivityAt: undefined, timeLabel: "" };
+    return { ...thread, preview: "", previewSenderName: undefined, previewFromPeer: undefined, lastActivityAt: undefined, timeLabel: "" };
   }
   const lastActivityAt = getThreadLastActivityIso(messages, thread.lastActivityAt);
+  const previewFields = audience
+    ? buildThreadPreviewFromMessage(last, audience, thread.name)
+    : {
+        preview: last.deletedForEveryone ? "Message deleted" : last.body || (last.attachments?.[0]?.name ?? "Attachment"),
+        previewSenderName: last.senderName,
+        previewFromPeer: last.senderSide === "peer",
+      };
   return {
     ...thread,
-    preview: last.deletedForEveryone ? "Message deleted" : last.body || (last.attachments?.[0]?.name ?? "Attachment"),
+    ...previewFields,
     lastActivityAt,
     timeLabel: lastActivityAt ? formatConversationTimeLabel(lastActivityAt) : thread.timeLabel,
   };

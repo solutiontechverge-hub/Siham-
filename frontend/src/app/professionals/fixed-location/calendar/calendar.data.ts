@@ -20,6 +20,9 @@ export type CalendarBookingServiceItem = {
   name: string;
   price: number;
   durationMins: number;
+  startTime?: string;
+  endTime?: string;
+  staffResourceId?: string;
 };
 
 export type CalendarBookingProductItem = {
@@ -69,6 +72,16 @@ export type CalendarBookingDetails = {
     totalKilometer: string;
   };
   showKilometerAllowance?: boolean;
+  /** incoming = client sent request; outgoing = professional sent request */
+  requestDirection?: "incoming" | "outgoing";
+  /** Baseline services from the client — used to detect professional edits */
+  originalServices?: CalendarBookingServiceItem[];
+  /** Service ids edited by the professional before sending EBR */
+  editedServiceIds?: string[];
+  /** Service ids edited by the client when returning an EBR */
+  clientEditedServiceIds?: string[];
+  /** Who last edited before the current negotiation round */
+  lastEditedBy?: "professional" | "client";
 };
 
 export type CalendarResource = {
@@ -174,6 +187,50 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
   events: [
     // Today's mock activities
     {
+      id: "b-61201-a-accepted",
+      bookingCode: "34011",
+      resourceId: "r-1",
+      date: "2026-06-12",
+      start: "10:00",
+      end: "10:30",
+      title: "Hot stone full body massage",
+      status: "Confirmed",
+      location: "FL",
+      bookingType: "Requests",
+      bookingScenario: "BR",
+      showClientName: "Mia R",
+      details: {
+        clientEmail: "mia.r@example.com",
+        services: [{ id: "svc-hot-stone", name: "Hot stone full body massage", durationMins: 30, price: 165 }],
+        phoneCode: "+31",
+        phoneNumber: "698765432",
+        showPrepayment: true,
+        prepaymentPercent: "50",
+        prepaymentStatus: "confirmed",
+      },
+    },
+    {
+      id: "b-61201-a-rejected",
+      bookingCode: "34012",
+      resourceId: "r-1",
+      date: "2026-06-12",
+      start: "11:00",
+      end: "11:30",
+      title: "Hot stone full body massage",
+      status: "Invalid",
+      location: "FL",
+      bookingType: "Requests",
+      bookingScenario: "BR",
+      showClientName: "Sara Johnson",
+      details: {
+        clientEmail: "sarajohnson@gmail.com",
+        requestDirection: "incoming",
+        services: [{ id: "svc-hot-stone", name: "Hot stone full body massage", durationMins: 30, price: 165 }],
+        phoneCode: "+31",
+        phoneNumber: "612345679",
+      },
+    },
+    {
       id: "b-61201-a",
       bookingCode: "34009",
       resourceId: "r-1",
@@ -188,6 +245,10 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
       showClientName: "Lissa J",
       details: {
         clientEmail: "lissa.j@example.com",
+        requestDirection: "incoming",
+        originalServices: [
+          { id: "svc-hot-stone", name: "Hot stone full body massage", durationMins: 30, price: 165 },
+        ],
         services: [
           { id: "svc-hot-stone", name: "Hot stone full body massage", durationMins: 30, price: 165 },
         ],
@@ -337,10 +398,19 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
       bookingScenario: "EBR",
       showClientName: "Noah P",
       details: {
+        requestDirection: "incoming",
+        lastEditedBy: "client",
         showPrepayment: true,
         prepaymentPercent: "30",
         prepaymentStatus: "pending",
         responseStatus: "suggestion_for_change",
+        originalServices: [
+          { id: "svc-brow-shaping", name: "Brow shaping", durationMins: 15, price: 35, startTime: "08:30", endTime: "08:45" },
+        ],
+        services: [
+          { id: "svc-brow-shaping", name: "Brow shaping", durationMins: 20, price: 40, startTime: "08:30", endTime: "08:50" },
+        ],
+        clientEditedServiceIds: ["svc-brow-shaping"],
       },
     },
     {

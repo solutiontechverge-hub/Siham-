@@ -10,25 +10,33 @@ import {
   useDeleteMessagingMessageMutation,
   useGetMessagingInboxQuery,
   useLazyGetMessagingProfessionalsQuery,
+  useMarkMessagingThreadReadMutation,
   useSendMessagingMessageMutation,
 } from "../../../store/services/messagingApi";
 import { useSnackbar } from "../AppSnackbar";
 import type { LinkableBooking } from "./messagingBookingsMock";
 import { formatLinkableBookingLabel } from "./messagingBookingsMock";
 import { formatMessageTimeLabel, todayDateKey } from "./messagingMockData";
+import { uploadMessagingAttachments, resolveMessagingAttachments } from "./messagingAttachmentUpload";
+import { mergeIncomingSocketMessage } from "./messagingIncomingMessage";
+import { applyLastMessageToThread, isMessageOwn, normalizeMessageForAudience } from "./messagingPreview";
+import { applyPeerReadReceiptToMessage, applyPeerReadToStore } from "./messagingReadReceiptHelpers";
 import { formatConversationTimeLabel, getMessageTimestamp, isMessageWithinRetention, withMessageCreatedAt } from "./messagingRetention";
 import type { MessagingReportPayload } from "./messagingReportReasons";
 import {
   getUnreadFromClientCount,
   isMessageFromClient,
   markThreadReadForAudience,
+  MESSAGING_UPDATED_EVENT,
 } from "./messagingUnread";
 import {
   emitMessagingSend,
   fetchMessagingHistory,
   joinMessagingThreads,
+  joinMessagingUserRoom,
   onMessagingMessage,
   onMessagingMessageDeleted,
+  onMessagingRead,
 } from "./messagingSocketClient";
 import { canProfessionalReply, findThreadIdByBookingRef, threadHasActiveBooking } from "./messagingThreadAccess";
 import {
@@ -112,10 +120,15 @@ export type MessagingInboxNavigation = {
   searchPrefill?: string;
 };
 
-export function useMessagingInbox(audience: MessagingAudience, navigation?: MessagingInboxNavigation) {
+export function useMessagingInbox(
+  audience: MessagingAudience,
+  navigation?: MessagingInboxNavigation,
+  currentUserName = "",
+) {
   const { showSnackbar } = useSnackbar();
   const searchParams = useSearchParams();
   const accessToken = useAppSelector((state) => state.auth.accessToken);
+  const currentUserId = useAppSelector((state) => state.auth.user?.id ?? "");
   const [persistedToken, setPersistedToken] = React.useState<string | null>(null);
   const isAuthed = Boolean(accessToken || persistedToken);
 
@@ -123,14 +136,18 @@ export function useMessagingInbox(audience: MessagingAudience, navigation?: Mess
     setPersistedToken(getPersistedAuthSession()?.accessToken ?? null);
   }, [accessToken]);
 
-  const { data: apiInbox, isSuccess: apiInboxLoaded } = useGetMessagingInboxQuery(undefined, {
+  const { data: apiInbox, isSuccess: apiInboxLoaded, refetch: refetchInbox } = useGetMessagingInboxQuery(undefined, {
     skip: !isAuthed,
+    refetchOnMountOrArgChange: true,
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
   });
   const [fetchProfessionals] = useLazyGetMessagingProfessionalsQuery();
   const { data: businessSetups } = useGetAllBusinessSetupsQuery(undefined, { skip: !isAuthed || audience !== "client" });
   const [sendMessagingMessage] = useSendMessagingMessageMutation();
   const [deleteMessagingMessage] = useDeleteMessagingMessageMutation();
   const [clearMessagingThread] = useClearMessagingThreadMutation();
+  const [markMessagingThreadRead] = useMarkMessagingThreadReadMutation();
   const [store, setStore] = React.useState<MessagingStore | null>(null);
   const [search, setSearch] = React.useState("");
   const [activeThreadId, setActiveThreadId] = React.useState("");
@@ -205,8 +222,8 @@ export function useMessagingInbox(audience: MessagingAudience, navigation?: Mess
 
     if (inboxHydratedRef.current) {
       setStore((prev) => {
-        if (!prev) return mergeApiInboxWithPrefs(apiInbox, loadMessagingPrefs());
-        const merged = mergeApiInboxIntoStore(prev, apiInbox, loadMessagingPrefs());
+        if (!prev) return mergeApiInboxWithPrefs(apiInbox, loadMessagingPrefs(), audience);
+        const merged = mergeApiInboxIntoStore(prev, apiInbox, loadMessagingPrefs(), audience);
         saveMessagingStore(merged);
         return merged;
       });
@@ -219,7 +236,7 @@ export function useMessagingInbox(audience: MessagingAudience, navigation?: Mess
 
     const load = async () => {
       try {
-        let merged = mergeApiInboxWithPrefs(apiInbox, loadMessagingPrefs());
+        let merged = mergeApiInboxWithPrefs(apiInbox, loadMessagingPrefs(), audience);
         if (audience === "client" && !professionalsLoadedRef.current) {
           professionalsLoadedRef.current = true;
           merged = await loadProfessionalsPage(merged, 0, "");
@@ -300,59 +317,86 @@ export function useMessagingInbox(audience: MessagingAudience, navigation?: Mess
     saveMessagingStore(retained);
   }, []);
 
+  React.useEffect(() => {
+    if (!isAuthed) return;
+    const onExternalUpdate = () => {
+      setStore((prev) => {
+        const loaded = loadMessagingStore();
+        if (!prev) return loaded;
+        return mergeApiInboxIntoStore(prev, loaded, loadMessagingPrefs(), audience);
+      });
+    };
+    window.addEventListener(MESSAGING_UPDATED_EVENT, onExternalUpdate);
+    return () => window.removeEventListener(MESSAGING_UPDATED_EVENT, onExternalUpdate);
+  }, [audience, isAuthed]);
+
   const threadIdsKey = store?.threads.map((thread) => thread.id).join("|") ?? "";
 
   React.useEffect(() => {
-    if (!store) return;
+    if (!currentUserId || !isAuthed) return;
+    joinMessagingUserRoom(currentUserId);
+  }, [currentUserId, isAuthed]);
+
+  React.useEffect(() => {
+    if (!activeThreadId || !isAuthed) return;
+    joinMessagingThreads([activeThreadId]);
+  }, [activeThreadId, isAuthed]);
+
+  React.useEffect(() => {
+    if (!store || !isAuthed) return;
     const threadIds = store.threads.map((thread) => thread.id);
     joinMessagingThreads(threadIds);
 
-    if (isApiBackedStore(store)) {
-      const offMessage = onMessagingMessage(({ threadId, message }) => {
-        setStore((prev) => {
-          if (!prev) return prev;
-          const normalized = withMessageCreatedAt(message);
-          if (!isMessageWithinRetention(normalized)) return prev;
-          const local = prev.messagesByThreadId[threadId] ?? [];
-          if (local.some((item) => item.id === normalized.id)) return prev;
-          const threadMessages = [...local, normalized];
-          const preview = normalized.body || (normalized.attachments?.[0]?.name ?? "Attachment");
-          const nextThreads = prev.threads.map((thread) =>
-            thread.id === threadId
-              ? {
-                  ...thread,
-                  preview,
-                  timeLabel: formatConversationTimeLabel(normalized.createdAt ?? new Date().toISOString()),
-                  lastActivityAt: normalized.createdAt,
-                }
-              : thread,
-          );
-          const next = applyMessageRetention({
-            ...prev,
-            threads: nextThreads,
-            messagesByThreadId: { ...prev.messagesByThreadId, [threadId]: threadMessages },
-          });
-          saveMessagingStore(next);
-          return next;
-        });
+    const mergeIncomingMessage = (threadId: string, message: MessagingChatMessage) => {
+      setStore((prev) => {
+        if (!prev) return prev;
+        const result = mergeIncomingSocketMessage(prev, threadId, message, audience, currentUserName);
+        if (result.unknownThread) {
+          void refetchInbox();
+          return prev;
+        }
+        if (!result.isNew) return prev;
+        saveMessagingStore(result.store);
+        return result.store;
       });
+    };
 
-      const offDeleted = onMessagingMessageDeleted(({ threadId, messageId, deletedForEveryone }) => {
-        setStore((prev) => {
-          if (!prev) return prev;
-          const scope = deletedForEveryone ? "everyone" : "me";
-          const next = applyMessageDelete(prev, audience, threadId, messageId, scope);
-          saveMessagingStore(next);
-          return next;
-        });
+    const offMessage = onMessagingMessage(({ threadId, message }) => {
+      mergeIncomingMessage(threadId, message);
+    });
+
+    const offDeleted = onMessagingMessageDeleted(({ threadId, messageId, deletedForEveryone }) => {
+      setStore((prev) => {
+        if (!prev) return prev;
+        const scope = deletedForEveryone ? "everyone" : "me";
+        const next = applyMessageDelete(prev, audience, threadId, messageId, scope);
+        saveMessagingStore(next);
+        return next;
       });
+    });
 
-      return () => {
-        offMessage();
-        offDeleted();
-      };
-    }
+    const offRead = onMessagingRead((payload) => {
+      if (!payload.threadId || !payload.lastReadAt) return;
+      if (payload.userId && currentUserId && payload.userId === currentUserId) return;
+      setStore((prev) => {
+        if (!prev) return prev;
+        const next = applyPeerReadToStore(prev, payload.threadId, payload.lastReadAt!);
+        saveMessagingStore(next);
+        return next;
+      });
+    });
 
+    return () => {
+      offMessage();
+      offDeleted();
+      offRead();
+    };
+  }, [audience, currentUserId, currentUserName, isAuthed, refetchInbox, threadIdsKey]);
+
+  React.useEffect(() => {
+    if (!store || !isAuthed || isApiBackedStore(store)) return;
+
+    const threadIds = store.threads.map((thread) => thread.id);
     threadIds.forEach(async (threadId) => {
       const remoteMessages = await fetchMessagingHistory(threadId);
       if (!remoteMessages.length) return;
@@ -363,36 +407,7 @@ export function useMessagingInbox(audience: MessagingAudience, navigation?: Mess
         return merged;
       });
     });
-
-    return onMessagingMessage(({ threadId, message }) => {
-      setStore((prev) => {
-        if (!prev) return prev;
-        const normalized = withMessageCreatedAt(message);
-        if (!isMessageWithinRetention(normalized)) return prev;
-        const local = prev.messagesByThreadId[threadId] ?? [];
-        if (local.some((item) => item.id === normalized.id)) return prev;
-        const threadMessages = [...local, normalized];
-        const preview = normalized.body || (normalized.attachments?.[0]?.name ?? "Attachment");
-        const nextThreads = prev.threads.map((thread) =>
-          thread.id === threadId
-            ? {
-                ...thread,
-                preview,
-                timeLabel: formatConversationTimeLabel(normalized.createdAt ?? new Date().toISOString()),
-                lastActivityAt: normalized.createdAt,
-              }
-            : thread,
-        );
-        const next = applyMessageRetention({
-          ...prev,
-          threads: nextThreads,
-          messagesByThreadId: { ...prev.messagesByThreadId, [threadId]: threadMessages },
-        });
-        saveMessagingStore(next);
-        return next;
-      });
-    });
-  }, [audience, threadIdsKey]);
+  }, [isAuthed, store, threadIdsKey]);
 
   const filteredThreads = React.useMemo(() => {
     if (!store) return [];
@@ -463,7 +478,10 @@ export function useMessagingInbox(audience: MessagingAudience, navigation?: Mess
     const next = markThreadReadForAudience(store, audience, activeThreadId);
     setStore(next);
     saveMessagingStore(next);
-  }, [store, activeThreadId, audience]);
+    if (isApiBackedStore(store) || isAuthed) {
+      void markMessagingThreadRead({ threadId: activeThreadId, messageId: last.id });
+    }
+  }, [activeThreadId, audience, isAuthed, markMessagingThreadRead, store]);
 
   const activeThread = React.useMemo(() => {
     if (!store) return undefined;
@@ -488,8 +506,12 @@ export function useMessagingInbox(audience: MessagingAudience, navigation?: Mess
       }
     }
     raw.sort((a, b) => getMessageTimestamp(a) - getMessageTimestamp(b));
-    return filterVisibleMessages(raw, audience);
-  }, [store, activeThread, audience]);
+    const peerReadAt = store.peerLastReadAtByThreadId?.[activeThread.id];
+    return filterVisibleMessages(raw, audience).map((message) => {
+      const normalized = normalizeMessageForAudience(message, audience, currentUserName, activeThread.name);
+      return applyPeerReadReceiptToMessage(normalized, isMessageOwn(normalized, audience), peerReadAt);
+    });
+  }, [store, activeThread, audience, currentUserName]);
 
   const messageGroups = React.useMemo(() => groupMessagesByDate(messages), [messages]);
 
@@ -519,12 +541,13 @@ export function useMessagingInbox(audience: MessagingAudience, navigation?: Mess
       const createdAt = new Date().toISOString();
       const clientMessageId = `msg-${Date.now()}`;
       const draftThreadId = activeThread.id;
+      const selfName = "You";
       const msg: MessagingChatMessage = withMessageCreatedAt({
         id: clientMessageId,
         senderSide: "self",
         senderRole: audience === "client" ? "client" : "professional",
-        senderName: "You",
-        senderAvatarSeed: "you",
+        senderName: selfName,
+        senderAvatarSeed: currentUserName.trim() || selfName,
         timeLabel: formatMessageTimeLabel(),
         createdAt,
         body: trimmed,
@@ -532,19 +555,10 @@ export function useMessagingInbox(audience: MessagingAudience, navigation?: Mess
         dateKey: todayDateKey(),
       });
 
-      const preview = trimmed || (attachments?.[0]?.name ?? "Attachment");
       const applyOptimisticMessage = (base: MessagingStore, threadId: string, message: MessagingChatMessage) => {
         const threadMessages = [...(base.messagesByThreadId[threadId] ?? []), message];
         const nextThreads = base.threads.map((t) =>
-          t.id === threadId
-            ? {
-                ...t,
-                preview,
-                timeLabel: formatConversationTimeLabel(message.createdAt ?? createdAt),
-                lastActivityAt: message.createdAt ?? createdAt,
-                isNewConversation: false,
-              }
-            : t,
+          t.id === threadId ? applyLastMessageToThread(t, message, audience, currentUserName) : t,
         );
         return {
           ...base,
@@ -557,15 +571,30 @@ export function useMessagingInbox(audience: MessagingAudience, navigation?: Mess
         persist(applyOptimisticMessage(store, draftThreadId, msg));
 
         try {
+          let uploadedAttachments = attachments;
+          if (attachments?.length) {
+            const token = accessToken || persistedToken;
+            if (!token) throw new Error("Not authenticated");
+            uploadedAttachments = await uploadMessagingAttachments(attachments, token);
+          }
+
           const result = await sendMessagingMessage({
             threadId: draftThreadId,
             body: trimmed,
-            attachments,
+            attachments: uploadedAttachments,
             clientMessageId,
           }).unwrap();
 
           const resolvedThreadId = result.threadId;
-          const saved = withMessageCreatedAt(result.message);
+          const saved = normalizeMessageForAudience(
+            withMessageCreatedAt({
+              ...result.message,
+              attachments: resolveMessagingAttachments(result.message.attachments),
+            }),
+            audience,
+            currentUserName,
+            activeThread.name,
+          );
           setStore((prev) => {
             if (!prev) return prev;
             let baseStore = prev;
@@ -577,15 +606,7 @@ export function useMessagingInbox(audience: MessagingAudience, navigation?: Mess
             const withoutOptimistic = existing.filter((item) => item.id !== clientMessageId);
             const threadMessages = [...withoutOptimistic, saved];
             const nextThreads = baseStore.threads.map((t) =>
-              t.id === resolvedThreadId
-                ? {
-                    ...t,
-                    preview,
-                    timeLabel: formatConversationTimeLabel(saved.createdAt ?? createdAt),
-                    lastActivityAt: saved.createdAt ?? createdAt,
-                    isNewConversation: false,
-                  }
-                : t,
+              t.id === resolvedThreadId ? applyLastMessageToThread(t, saved, audience, currentUserName) : t,
             );
             const next = applyMessageRetention({
               ...baseStore,
@@ -596,7 +617,7 @@ export function useMessagingInbox(audience: MessagingAudience, navigation?: Mess
             return next;
           });
           setActiveThreadId((prev) => (resolvedThreadId !== draftThreadId ? resolvedThreadId : prev));
-        } catch {
+        } catch (error) {
           setStore((prev) => {
             if (!prev) return prev;
             const threadMessages = (prev.messagesByThreadId[draftThreadId] ?? []).filter(
@@ -609,21 +630,16 @@ export function useMessagingInbox(audience: MessagingAudience, navigation?: Mess
             saveMessagingStore(next);
             return next;
           });
-          showSnackbar({ severity: "error", message: "Failed to send message. Please try again." });
+          const message =
+            error instanceof Error ? error.message : "Failed to send message. Please try again.";
+          showSnackbar({ severity: "error", message });
         }
         return;
       }
 
       const threadMessages = [...(store.messagesByThreadId[activeThread.id] ?? []), msg];
       const nextThreads = store.threads.map((t) =>
-        t.id === activeThread.id
-          ? {
-              ...t,
-              preview,
-              timeLabel: formatConversationTimeLabel(createdAt),
-              lastActivityAt: createdAt,
-            }
-          : t,
+        t.id === activeThread.id ? applyLastMessageToThread(t, msg, audience, currentUserName) : t,
       );
 
       const next = {
@@ -634,7 +650,7 @@ export function useMessagingInbox(audience: MessagingAudience, navigation?: Mess
       persist(next);
       emitMessagingSend(activeThread.id, msg);
     },
-    [store, activeThread, audience, isAuthed, persist, sendMessagingMessage, showSnackbar],
+    [store, activeThread, audience, currentUserName, isAuthed, accessToken, persistedToken, persist, sendMessagingMessage, showSnackbar],
   );
 
   const deleteMessage = React.useCallback(
@@ -841,6 +857,7 @@ export function useMessagingInbox(audience: MessagingAudience, navigation?: Mess
     handleSelectAll,
     deleteSelectedThreads,
     messageGroups,
+    peerReadAt: activeThread ? store?.peerLastReadAtByThreadId?.[activeThread.id] : undefined,
     sendMessage,
     canReply,
     unreadCount,

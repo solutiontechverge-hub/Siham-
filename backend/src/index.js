@@ -4,6 +4,8 @@ import app from "./app.js";
 import { query } from "./db/index.js";
 import { runMigrations } from "./db/runMigrations.js";
 import { attachMessagingSocket } from "./messaging/messagingSocket.js";
+import { startBookingReminderJob } from "./jobs/bookingReminder.job.js";
+import { startMessagingRetentionJob } from "./jobs/messagingRetention.job.js";
 
 const port = Number(process.env.PORT) || 5000;
 // Required for Railway, Docker, and most PaaS — bind all interfaces, not loopback-only.
@@ -33,6 +35,8 @@ const startServer = async () => {
 
     server.listen(port, host, () => {
       console.log(`Backend listening on http://${host}:${port}`);
+      startBookingReminderJob();
+      startMessagingRetentionJob();
     });
   } catch (error) {
     console.error("Failed to start server:", error.message);

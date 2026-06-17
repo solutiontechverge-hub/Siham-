@@ -10,7 +10,7 @@ import { alpha, useTheme } from "@mui/material/styles";
 import MessagingAvatar from "./MessagingAvatar";
 import MessagingMessageBubble from "./MessagingMessageBubble";
 import MessagingComposer from "./MessagingComposer";
-import { isMessageFromClient } from "./messagingUnread";
+import { isMessageOwn } from "./messagingPreview";
 import type { MessagingAudience } from "./messagingRoutes";
 import type { MessagingChatMessage, MessagingThread, MessagingAttachment } from "./messagingTypes";
 
@@ -22,6 +22,7 @@ type MessageGroup = {
 
 type Props = {
   audience: MessagingAudience;
+  currentUserName: string;
   thread?: MessagingThread;
   messageGroups: MessageGroup[];
   onSend: (body: string, attachments?: MessagingAttachment[]) => void;
@@ -31,10 +32,12 @@ type Props = {
   composerDisabledHint?: string;
   onClose?: () => void;
   onBack?: () => void;
+  peerReadAt?: string | null;
 };
 
 export default function MessagingChatPanel({
   audience,
+  currentUserName,
   thread,
   messageGroups,
   onSend,
@@ -44,6 +47,7 @@ export default function MessagingChatPanel({
   composerDisabledHint,
   onClose,
   onBack,
+  peerReadAt,
 }: Props) {
   const m = useTheme().palette.mollure;
   const scrollRef = React.useRef<HTMLDivElement>(null);
@@ -135,14 +139,16 @@ export default function MessagingChatPanel({
             </Typography>
             <Stack spacing={2} sx={{ width: "100%" }}>
               {group.messages.map((msg) => {
-                const own =
-                  audience === "client" ? isMessageFromClient(msg) : !isMessageFromClient(msg);
+                const own = isMessageOwn(msg, audience);
                 return (
                   <Box key={msg.id} sx={{ width: "100%", display: "flex", justifyContent: own ? "flex-end" : "flex-start" }}>
                     <MessagingMessageBubble
                       message={msg}
                       isOwn={own}
+                      audience={audience}
+                      currentUserName={currentUserName}
                       peerName={thread.name}
+                      peerReadAt={peerReadAt}
                       onRequestDelete={onDeleteMessage}
                     />
                   </Box>

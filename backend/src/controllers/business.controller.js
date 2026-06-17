@@ -6,6 +6,10 @@ import {
 } from "../services/s3-upload.service.js";
 import { buildServiceDetailsFromCategories } from "../utils/business-service-categories.js";
 import { syncBookingToFinanceTransaction } from "../services/finance-sync.service.js";
+import {
+  notifyBookingStatusChange,
+  notifyIncomingEditRequest,
+} from "../services/bookingEmail.service.js";
 import { normalizeEntityId } from "../utils/business-setup-parsers.js";
 import {
   isValidUuid,
@@ -1280,6 +1284,10 @@ export const createBooking = async (req, res) => {
       }
     }
 
+    if (booking?.status === "confirmed") {
+      void notifyBookingStatusChange(booking.id, "requested", booking.status);
+    }
+
     return res.status(201).json({
       success: true,
       message: "Booking created successfully.",
@@ -1396,6 +1404,26 @@ export const updateBookingStatus = async (req, res) => {
     }
 
     const status = normalizeBookingStatus(req.body.status, "requested");
+
+    const existingResult = await query(
+      `SELECT status
+       FROM bookings
+       WHERE id = $1
+         AND business_setup_id = $2
+       LIMIT 1`,
+      [bookingId, businessSetup.id],
+    );
+
+    if (!existingResult.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found.",
+        data: null,
+      });
+    }
+
+    const previousStatus = existingResult.rows[0].status;
+
     const result = await query(
       `UPDATE bookings
        SET status = $1,
@@ -1423,6 +1451,12 @@ export const updateBookingStatus = async (req, res) => {
       } catch {
         // best-effort
       }
+    }
+
+    void notifyBookingStatusChange(booking.id, previousStatus, booking.status);
+
+    if (req.body.notify_incoming_er === true || req.body.email_scenario === "incoming_er") {
+      void notifyIncomingEditRequest(booking.id);
     }
 
     return res.status(200).json({
