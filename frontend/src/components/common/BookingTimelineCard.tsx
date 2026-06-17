@@ -3,19 +3,39 @@
 import * as React from "react";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
-import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
-import EuroRoundedIcon from "@mui/icons-material/EuroRounded";
+import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import LocationOnRoundedIcon from "@mui/icons-material/LocationOnRounded";
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
 import StickyNote2OutlinedIcon from "@mui/icons-material/StickyNote2Outlined";
 import { Box, Chip, IconButton, Stack, Tooltip, type SxProps, type Theme } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../ui/typography";
+import BookingIndicatorIcon, {
+  BOOKING_INDICATOR_LABELS,
+  type BookingIndicatorVariant,
+} from "./calendar/BookingIndicatorIcon";
+import BookingRequestSentIcon, { BOOKING_REQUEST_SENT_LABEL } from "./calendar/BookingRequestSentIcon";
+import PrepaymentStatusIcon, { type PrepaymentStatusIconVariant } from "./calendar/PrepaymentStatusIcon";
+import { PREPAYMENT_STATUS_LABELS } from "./calendar/PrepaymentStatusIcon";
+
+/** Icon size for status/prepayment indicators on calendar booking cards. */
+const CARD_INDICATOR_ICON_SIZE = 16;
 
 export type BookingTimelineCardPattern = "lines" | "dots" | "none";
 
 export type BookingTimelineCardStatus = {
   label: React.ReactNode;
+  sx?: SxProps<Theme>;
+};
+
+export type BookingTimelineCardScenarioBadge = {
+  label: React.ReactNode;
+  showAcceptedIcon?: boolean;
+  showPaymentIcon?: boolean;
+  prepaymentStatus?: PrepaymentStatusIconVariant;
+  responseIndicators?: readonly BookingIndicatorVariant[];
+  showRequestSentIcon?: boolean;
+  showExternalLink?: boolean;
   sx?: SxProps<Theme>;
 };
 
@@ -50,6 +70,9 @@ export type BookingTimelineCardProps = {
   backgroundColor?: string;
   pattern?: BookingTimelineCardPattern;
   requestBadge?: BookingTimelineCardRequestBadge;
+  scenarioBadges?: readonly BookingTimelineCardScenarioBadge[];
+  prepaymentStatus?: PrepaymentStatusIconVariant;
+  responseIndicators?: readonly BookingIndicatorVariant[];
   calendarAction?: BookingTimelineCardAction;
   notesAction?: BookingTimelineCardAction;
   messageAction?: BookingTimelineCardAction & { count?: number };
@@ -96,6 +119,68 @@ function stopCardClick(handler?: React.MouseEventHandler<HTMLElement>) {
   };
 }
 
+function renderResponseIndicators(indicators: readonly BookingIndicatorVariant[], size = CARD_INDICATOR_ICON_SIZE) {
+  return indicators.map((indicator) => (
+    <Tooltip key={indicator} title={BOOKING_INDICATOR_LABELS[indicator]} placement="top">
+      <Box sx={{ display: "grid", placeItems: "center", lineHeight: 0, flexShrink: 0 }}>
+        <BookingIndicatorIcon variant={indicator} size={size} />
+      </Box>
+    </Tooltip>
+  ));
+}
+
+function renderScenarioBadge(
+  badge: BookingTimelineCardScenarioBadge,
+  m: { navy: string; success: string },
+  key: React.Key,
+) {
+  return (
+    <Stack
+      key={key}
+      direction="row"
+      alignItems="center"
+      spacing={0.35}
+      sx={[
+        {
+          height: 20,
+          borderRadius: "999px",
+          border: `1px solid ${alpha(m.navy, 0.25)}`,
+          bgcolor: alpha("#fff", 0.72),
+          color: alpha(m.navy, 0.78),
+          px: 0.65,
+          pointerEvents: "auto",
+          flexShrink: 0,
+        },
+        ...(Array.isArray(badge.sx) ? badge.sx : [badge.sx]),
+      ]}
+    >
+      <BodyText sx={{ fontSize: 9.5, fontWeight: 700, color: "inherit", lineHeight: 1 }}>{badge.label}</BodyText>
+      {badge.showRequestSentIcon ? (
+        <Tooltip title={BOOKING_REQUEST_SENT_LABEL} placement="top">
+          <Box sx={{ display: "grid", placeItems: "center", lineHeight: 0 }}>
+            <BookingRequestSentIcon size={10} />
+          </Box>
+        </Tooltip>
+      ) : null}
+      {!badge.showRequestSentIcon && badge.responseIndicators?.length
+        ? renderResponseIndicators(badge.responseIndicators)
+        : !badge.showRequestSentIcon && badge.showAcceptedIcon
+          ? renderResponseIndicators(["suggestion_for_change"])
+          : null}
+      {badge.prepaymentStatus && badge.prepaymentStatus !== "pending" ? (
+        <Tooltip title={PREPAYMENT_STATUS_LABELS[badge.prepaymentStatus]} placement="top">
+          <Box sx={{ display: "grid", placeItems: "center", lineHeight: 0 }}>
+            <PrepaymentStatusIcon variant={badge.prepaymentStatus} size={CARD_INDICATOR_ICON_SIZE} />
+          </Box>
+        </Tooltip>
+      ) : badge.showPaymentIcon ? (
+        renderResponseIndicators(["waiting_for_prepayment"])
+      ) : null}
+      {badge.showExternalLink ? <OpenInNewRoundedIcon sx={{ fontSize: 11, color: "inherit" }} /> : null}
+    </Stack>
+  );
+}
+
 function renderIconAction(action: BookingTimelineCardAction | undefined, fallbackIcon: React.ReactNode) {
   if (!action?.show) return null;
 
@@ -135,6 +220,9 @@ export default function BookingTimelineCard({
   pattern = "lines",
   profileAction,
   requestBadge = false,
+  scenarioBadges,
+  prepaymentStatus,
+  responseIndicators,
   status,
   sx,
   timeLabel,
@@ -148,7 +236,19 @@ export default function BookingTimelineCard({
   const resolvedBorder = borderColor ?? alpha(lineColor, 0.34);
   const surface = resolvePattern(pattern, lineColor, bg, m.navy);
   const requestBadgeOptions = typeof requestBadge === "object" ? requestBadge : {};
-  const showRequestBadge = Boolean(requestBadge);
+  const showRequestBadge = Boolean(requestBadge) && !scenarioBadges?.length;
+  const visibleScenarioBadges = scenarioBadges ?? [];
+  const scenarioEmbedsResponse = visibleScenarioBadges.some(
+    (badge) => (badge.responseIndicators?.length ?? 0) > 0 || badge.showAcceptedIcon,
+  );
+  const scenarioShowsPrepayment = visibleScenarioBadges.some(
+    (badge) =>
+      Boolean(badge.prepaymentStatus) ||
+      badge.responseIndicators?.includes("waiting_for_prepayment") ||
+      badge.showPaymentIcon,
+  );
+  const showStandalonePrepayment = Boolean(prepaymentStatus) && !scenarioShowsPrepayment;
+  const showStandaloneResponse = Boolean(responseIndicators?.length) && !scenarioEmbedsResponse;
   const showProfile = profileAction?.show !== false && Boolean(profileAction?.name || profileAction?.icon);
   const visibleMessageAction = messageAction?.show ? messageAction : null;
 
@@ -207,8 +307,8 @@ export default function BookingTimelineCard({
             left: 8,
             right: 6,
             minWidth: 0,
-            height: 18,
-            overflow: "hidden",
+            minHeight: 20,
+            overflow: "visible",
           }}
         >
           <BodyText sx={{ fontSize: 12, fontWeight: 400, color: "#3B3E45", lineHeight: "16px", whiteSpace: "nowrap" }}>
@@ -232,47 +332,26 @@ export default function BookingTimelineCard({
             />
           ) : null}
           {showRequestBadge ? (
-            <Stack
-              direction="row"
-              alignItems="center"
-              spacing={0.35}
-              sx={[
-                {
-                  height: 17,
-                  borderRadius: "999px",
-                  border: `1px solid ${alpha(m.navy, 0.25)}`,
-                  bgcolor: alpha("#fff", 0.72),
-                  color: alpha(m.navy, 0.78),
-                  px: 0.55,
-                  pointerEvents: "auto",
-                },
-                ...(Array.isArray(requestBadgeOptions.sx) ? requestBadgeOptions.sx : [requestBadgeOptions.sx]),
-              ]}
-            >
-              <BodyText sx={{ fontSize: 9.5, fontWeight: 700, color: "inherit", lineHeight: 1 }}>
-                {requestBadgeOptions.label ?? "BR"}
-              </BodyText>
-              {requestBadgeOptions.showAcceptedIcon !== false ? (
-                <CheckCircleRoundedIcon sx={{ fontSize: 12, color: m.success }} />
-              ) : null}
-              {requestBadgeOptions.showPaymentIcon !== false ? (
-                <Box
-                  sx={{
-                    width: 12,
-                    height: 12,
-                    borderRadius: "999px",
-                    display: "grid",
-                    placeItems: "center",
-                    border: `1px solid ${alpha(m.navy, 0.35)}`,
-                    color: alpha(m.navy, 0.56),
-                    bgcolor: alpha("#fff", 0.7),
-                  }}
-                >
-                  <EuroRoundedIcon sx={{ fontSize: 8 }} />
-                </Box>
-              ) : null}
-            </Stack>
+            renderScenarioBadge(
+              {
+                label: requestBadgeOptions.label ?? "BR",
+                showAcceptedIcon: requestBadgeOptions.showAcceptedIcon !== false,
+                showPaymentIcon: requestBadgeOptions.showPaymentIcon !== false,
+                sx: requestBadgeOptions.sx,
+              },
+              m,
+              "legacy-request-badge",
+            )
           ) : null}
+          {visibleScenarioBadges.map((badge, index) => renderScenarioBadge(badge, m, `scenario-${index}`))}
+          {showStandalonePrepayment && prepaymentStatus ? (
+            <Tooltip title={PREPAYMENT_STATUS_LABELS[prepaymentStatus]} placement="top">
+              <Box sx={{ display: "grid", placeItems: "center", lineHeight: 0, flexShrink: 0 }}>
+                <PrepaymentStatusIcon variant={prepaymentStatus} size={CARD_INDICATOR_ICON_SIZE} />
+              </Box>
+            </Tooltip>
+          ) : null}
+          {showStandaloneResponse && responseIndicators ? renderResponseIndicators(responseIndicators) : null}
         </Stack>
 
         <BodyText
@@ -342,6 +421,7 @@ export default function BookingTimelineCard({
             py: "9px",
             borderLeft: `1px solid ${alpha(m.navy, 0.06)}`,
             bgcolor: alpha("#fff", 0.24),
+            pointerEvents: "auto",
           },
           ...(Array.isArray(actionRailSx) ? actionRailSx : [actionRailSx]),
         ]}

@@ -27,16 +27,13 @@ import {
   AppDatePicker,
   MarketingSiteHeader,
   MollureAuthLabeledField,
+  AppCountryPhoneFields,
   MollureAuthLabeledPasswordField,
   PasswordStrengthBar,
 } from "../../../../components/common";
 import { authSignupHeaderClient } from "../../../../data/marketingShell.data";
-import {
-  COUNTRY_DIAL_CODES,
-  countryDialOptionValue,
-  countryFlagEmoji,
-  findCountryDialCode,
-} from "../../../../data/countryDialCodes";
+import { findCountryDialCode } from "../../../../data/countryDialCodes";
+import { getPhoneValidationErrors } from "../../../../lib/phone-validation";
 import { BodyText } from "../../../../components/ui/typography";
 import { useSnackbar } from "../../../../components/common/AppSnackbar";
 import {
@@ -140,6 +137,13 @@ export default function IndividualSignupPage() {
     if (!form.confirmPassword) nextErrors.confirmPassword = "Repeat password is required.";
 
     if (!form.acceptTerms) nextErrors.acceptTerms = "Please accept the terms and conditions.";
+
+    const phoneErrors = getPhoneValidationErrors(form.countryCode, form.phone, { required: false });
+    if (phoneErrors.countryCode) nextErrors.countryCode = phoneErrors.countryCode;
+    if (phoneErrors.phone) nextErrors.phone = phoneErrors.phone;
+    if (form.phone.trim() && !form.countryCode.trim()) {
+      nextErrors.countryCode = "Country code is required.";
+    }
 
     if (Object.keys(nextErrors).length) {
       setErrors(nextErrors);
@@ -457,72 +461,27 @@ export default function IndividualSignupPage() {
                         Contact Information
                       </Typography>
                       <Grid container spacing={2}>
-                        <Grid item xs={12} sm={4}>
-                          <MollureAuthLabeledField
-                            fieldLabel="Country Code"
-                            select
-                            name="countryCode"
-                            value={form.countryCode}
-                            onChange={handleChange}
-                            SelectProps={{
-                              displayEmpty: true,
-                              MenuProps: { PaperProps: { sx: { maxHeight: 280 } } },
-                              renderValue: (selected) => {
-                                if (!selected) {
-                                  return <em style={{ fontStyle: "italic", opacity: 0.72 }}>Country Code</em>;
-                                }
-                                const entry = findCountryDialCode(String(selected));
-                                if (!entry) return String(selected);
-                                return (
-                                  <Stack direction="row" spacing={0.75} alignItems="center" component="span">
-                                    <Box component="span" sx={{ fontSize: 16, lineHeight: 1 }}>
-                                      {countryFlagEmoji(entry.iso)}
-                                    </Box>
-                                    <Box component="span">{entry.dialCode}</Box>
-                                  </Stack>
-                                );
-                              },
-                            }}
-                          >
-                            <MenuItem value="">
-                              <em>Country Code</em>
-                            </MenuItem>
-                            {COUNTRY_DIAL_CODES.map((entry) => (
-                              <MenuItem key={countryDialOptionValue(entry)} value={countryDialOptionValue(entry)}>
-                                <Stack direction="row" spacing={1} alignItems="center" sx={{ width: "100%", minWidth: 0 }}>
-                                  <Box
-                                    component="span"
-                                    sx={{ fontSize: 18, lineHeight: 1, width: 22, textAlign: "center", flexShrink: 0 }}
-                                  >
-                                    {countryFlagEmoji(entry.iso)}
-                                  </Box>
-                                  <Typography component="span" sx={{ fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
-                                    {entry.dialCode}
-                                  </Typography>
-                                  <Typography
-                                    component="span"
-                                    sx={{
-                                      fontSize: 12,
-                                      color: "text.secondary",
-                                      overflow: "hidden",
-                                      textOverflow: "ellipsis",
-                                      whiteSpace: "nowrap",
-                                    }}
-                                  >
-                                    {entry.name}
-                                  </Typography>
-                                </Stack>
-                              </MenuItem>
-                            ))}
-                          </MollureAuthLabeledField>
-                        </Grid>
-                        <Grid item xs={12} sm={8}>
-                          <MollureAuthLabeledField
-                            fieldLabel="Contact Number"
-                            name="phone"
-                            value={form.phone}
-                            onChange={handleChange}
-                            placeholder="Enter phone number"
+                        <Grid item xs={12}>
+                          <AppCountryPhoneFields
+                            countryCode={form.countryCode}
+                            phone={form.phone}
+                            onCountryCodeChange={(dialCode) =>
+                              handleChange({
+                                target: { name: "countryCode", value: dialCode },
+                              } as React.ChangeEvent<HTMLInputElement>)
+                            }
+                            onPhoneChange={(phone) =>
+                              handleChange({
+                                target: { name: "phone", value: phone },
+                              } as React.ChangeEvent<HTMLInputElement>)
+                            }
+                            countryCodeError={errors.countryCode}
+                            phoneError={errors.phone}
+                            onClearErrors={() =>
+                              setErrors((prev) => ({ ...prev, countryCode: undefined, phone: undefined }))
+                            }
+                            phonePlaceholder="Enter phone number"
+                            required={false}
                           />
                         </Grid>
                         <Grid item xs={12}>

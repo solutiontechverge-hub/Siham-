@@ -11,6 +11,7 @@ type Props = {
   onClose: () => void;
   bookings?: LinkableBooking[];
   onSubmit: (booking: LinkableBooking) => void;
+  embedded?: boolean;
 };
 
 export default function MessagingLinkBookingDialog({
@@ -18,6 +19,7 @@ export default function MessagingLinkBookingDialog({
   onClose,
   bookings = linkableBookingsMock,
   onSubmit,
+  embedded = false,
 }: Props) {
   const m = useTheme().palette.mollure;
   const [selectedId, setSelectedId] = React.useState<string>("");
@@ -34,6 +36,7 @@ export default function MessagingLinkBookingDialog({
       open={open}
       title="Link to Booking"
       onClose={onClose}
+      embedded={embedded}
       footer={
         <>
           <MessagingModalCancelButton onClick={onClose} />

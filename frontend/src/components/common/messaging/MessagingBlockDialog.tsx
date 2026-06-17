@@ -11,9 +11,10 @@ type Props = {
   audience: MessagingAudience;
   onClose: () => void;
   onConfirm: () => void;
+  embedded?: boolean;
 };
 
-export default function MessagingBlockDialog({ open, audience, onClose, onConfirm }: Props) {
+export default function MessagingBlockDialog({ open, audience, onClose, onConfirm, embedded = false }: Props) {
   const m = useTheme().palette.mollure;
   const copy = getBlockModalCopy(audience);
 
@@ -22,6 +23,7 @@ export default function MessagingBlockDialog({ open, audience, onClose, onConfir
       open={open}
       title={copy.title}
       onClose={onClose}
+      embedded={embedded}
       footer={
         <>
           <MessagingModalCancelButton onClick={onClose} />

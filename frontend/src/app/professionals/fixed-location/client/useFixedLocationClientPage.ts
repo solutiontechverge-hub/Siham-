@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { getPhoneValidationErrors } from "../../../../lib/phone-validation";
+import { mockClientRecords, mockMollureDirectory, type ClientRecord } from "./data/clientList";
 import {
   useCreateProfessionalClientMutation,
   useDeleteProfessionalClientMutation,
@@ -112,7 +114,8 @@ export function useFixedLocationClientPage() {
   const clients = React.useMemo(
     () => (clientsResponse?.data ?? []).map(mapApiProfessionalClientToRecord),
     [clientsResponse],
-  );  const [query, setQuery] = React.useState("");
+  );
+  const [query, setQuery] = React.useState("");
   const [sortBy, setSortBy] = React.useState(DEFAULT_CLIENT_LIST_SORT);
   const [activeFilters, setActiveFilters] = React.useState<Set<ClientListFilterKey>>(() => new Set());
   const [filterDrawerOpen, setFilterDrawerOpen] = React.useState(false);
@@ -133,7 +136,8 @@ export function useFixedLocationClientPage() {
   const { data: mollureDirectoryResponse } = useGetMollureClientDirectoryQuery(
     { q: mollureSearch },
     { skip: !addMollureOpen },
-  );  const [selectedMollureId, setSelectedMollureId] = React.useState<string | "">("");
+  );
+  const [selectedMollureId, setSelectedMollureId] = React.useState<string | "">("");
   const [nonMollureClientType, setNonMollureClientType] = React.useState<"" | "Individual Client" | "Company Client">(
     "",
   );
@@ -162,6 +166,7 @@ export function useFixedLocationClientPage() {
   const [coPhone, setCoPhone] = React.useState("");
   const [coEmail, setCoEmail] = React.useState("");
   const [compErrors, setCompErrors] = React.useState<Partial<Record<string, string>>>({});
+  const [editPhoneErrors, setEditPhoneErrors] = React.useState<{ countryCode?: string; phone?: string }>({});
   const [nonMollureTechnicalNote, setNonMollureTechnicalNote] = React.useState("");
 
   const [snackbar, setSnackbar] = React.useState<{
@@ -188,12 +193,9 @@ export function useFixedLocationClientPage() {
     if (!coPostal.trim()) next.postal = "Postal code is required";
     if (!coProvince) next.province = "Please select province";
     if (!coMunicipality) next.municipality = "Please select municipality";
-    const digits = coPhone.replace(/\D/g, "");
-    if (!digits) {
-      next.phone = "Phone number is required";
-    } else if (digits.length < 7 || digits.length > 15) {
-      next.phone = "Enter a valid phone number (7–15 digits)";
-    }
+    const coPhoneErrors = getPhoneValidationErrors(coCountryCode, coPhone);
+    if (coPhoneErrors.countryCode) next.countryCode = coPhoneErrors.countryCode;
+    if (coPhoneErrors.phone) next.phone = coPhoneErrors.phone;
     const email = coEmail.trim();
     if (!email) {
       next.email = "Email is required";
@@ -206,6 +208,7 @@ export function useFixedLocationClientPage() {
     coCoc,
     coContactFirst,
     coContactLast,
+    coCountryCode,
     coEmail,
     coGender,
     coLegalName,
@@ -242,12 +245,9 @@ export function useFixedLocationClientPage() {
       const d = new Date(yyyy, mm - 1, dd);
       if (d.getFullYear() !== yyyy || d.getMonth() !== mm - 1 || d.getDate() !== dd) next.dob = "Enter a valid date";
     }
-    const digits = indPhone.replace(/\D/g, "");
-    if (!digits) {
-      next.phone = "Phone number is required";
-    } else if (digits.length < 7 || digits.length > 15) {
-      next.phone = "Enter a valid phone number (7–15 digits)";
-    }
+    const indPhoneErrors = getPhoneValidationErrors(indCountryCode, indPhone);
+    if (indPhoneErrors.countryCode) next.countryCode = indPhoneErrors.countryCode;
+    if (indPhoneErrors.phone) next.phone = indPhoneErrors.phone;
     const email = indEmail.trim();
     if (!email) {
       next.email = "Email is required";
@@ -256,7 +256,7 @@ export function useFixedLocationClientPage() {
     }
     setIndErrors(next);
     return Object.keys(next).length === 0;
-  }, [indDob, indEmail, indFirstName, indGender, indLastName, indPhone]);
+  }, [indCountryCode, indDob, indEmail, indFirstName, indGender, indLastName, indPhone]);
 
   const sortOpen = Boolean(sortAnchor);
   const addOpen = Boolean(addAnchor);
@@ -627,6 +627,22 @@ export function useFixedLocationClientPage() {
       return false;
     }
 
+    const phoneErrors =
+      viewClient.kind === "company"
+        ? getPhoneValidationErrors(editCompanyForm.countryCode, editCompanyForm.phone)
+        : getPhoneValidationErrors(editIndividualForm.countryCode, editIndividualForm.phone);
+
+    if (phoneErrors.countryCode || phoneErrors.phone) {
+      setEditPhoneErrors(phoneErrors);
+      setSnackbar({
+        open: true,
+        message: phoneErrors.phone ?? phoneErrors.countryCode ?? "Enter a valid phone number.",
+        severity: "error",
+      });
+      return false;
+    }
+    setEditPhoneErrors({});
+
     try {
       if (viewClient.kind === "company") {
         const email = editCompanyForm.email.trim().toLowerCase();
@@ -709,7 +725,8 @@ export function useFixedLocationClientPage() {
   return {
     clients,
     clientsLoading,
-    clientsError,    query,
+    clientsError,
+    query,
     setQuery,
     sortBy,
     setSortBy,
@@ -794,6 +811,8 @@ export function useFixedLocationClientPage() {
     setCoEmail,
     compErrors,
     setCompErrors,
+    editPhoneErrors,
+    setEditPhoneErrors,
     nonMollureTechnicalNote,
     setNonMollureTechnicalNote,
     validateCompany,

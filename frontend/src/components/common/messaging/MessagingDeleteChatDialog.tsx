@@ -8,9 +8,10 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onConfirm: () => void;
+  embedded?: boolean;
 };
 
-export default function MessagingDeleteChatDialog({ open, onClose, onConfirm }: Props) {
+export default function MessagingDeleteChatDialog({ open, onClose, onConfirm, embedded = false }: Props) {
   const m = useTheme().palette.mollure;
 
   return (
@@ -18,6 +19,7 @@ export default function MessagingDeleteChatDialog({ open, onClose, onConfirm }: 
       open={open}
       title="Delete chat"
       onClose={onClose}
+      embedded={embedded}
       footer={
         <>
           <MessagingModalCancelButton onClick={onClose} />

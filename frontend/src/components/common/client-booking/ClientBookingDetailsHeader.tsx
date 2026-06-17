@@ -48,9 +48,9 @@ export default function ClientBookingDetailsHeader({
   const m = useTheme().palette.mollure;
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
+  const messagingWidget = useMessagingWidgetOptional();
   const [editAnchor, setEditAnchor] = React.useState<HTMLElement | null>(null);
   const [activityAnchor, setActivityAnchor] = React.useState<HTMLElement | null>(null);
-  const chatHref = messagingHref ?? getMessagingHref("client");
   const unreadFromProfessional = useClientMessagingUnread(bookingRef);
   const editRequest = useBookingEditRequest(bookingRef);
 
@@ -118,7 +118,7 @@ export default function ClientBookingDetailsHeader({
               <IconButton
                 size="small"
                 aria-label="Open messaging"
-                onClick={() => router.push(chatHref)}
+                onClick={() => messagingWidget?.openMessaging({ bookingRef })}
                 sx={{ ml: 0.25, p: 0.35 }}
               >
                 {unreadFromProfessional > 0 ? (

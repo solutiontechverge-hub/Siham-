@@ -1,8 +1,7 @@
 "use client";
 
 import * as React from "react";
-import ChatBubbleRoundedIcon from "@mui/icons-material/ChatBubbleRounded";
-import { Badge, Box, Fab, Paper } from "@mui/material";
+import { Box, Paper, useMediaQuery } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import MessagingBlockDialog from "./MessagingBlockDialog";
 import MessagingChatActionsMenu, { type MessagingChatAction } from "./MessagingChatActionsMenu";
@@ -16,6 +15,7 @@ import MessagingReportDialog from "./MessagingReportDialog";
 import MessagingSettingsDialog from "./MessagingSettingsDialog";
 import { useSnackbar } from "../AppSnackbar";
 import type { MessagingAudience } from "./messagingRoutes";
+import type { MessagingInboxNavigation } from "./useMessagingInbox";
 import { useMessagingInbox } from "./useMessagingInbox";
 
 type DeleteDialogMode = "single" | "bulk";
@@ -24,12 +24,25 @@ export type MessagingPageViewProps = {
   audience: MessagingAudience;
   currentUserName: string;
   currentUserAvatarSrc?: string;
+  embedded?: boolean;
+  navigation?: MessagingInboxNavigation;
+  onClose?: () => void;
 };
 
-export default function MessagingPageView({ audience, currentUserName, currentUserAvatarSrc }: MessagingPageViewProps) {
-  const m = useTheme().palette.mollure;
+export default function MessagingPageView({
+  audience,
+  currentUserName,
+  currentUserAvatarSrc,
+  embedded = false,
+  navigation,
+  onClose,
+}: MessagingPageViewProps) {
+  const theme = useTheme();
+  const m = theme.palette.mollure;
+  const isCompactEmbedded = embedded && useMediaQuery(theme.breakpoints.down("md"));
   const { showSnackbar } = useSnackbar();
-  const inbox = useMessagingInbox(audience);
+  const inbox = useMessagingInbox(audience, navigation);
+  const [mobileChatOpen, setMobileChatOpen] = React.useState(false);
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [filtersOpen, setFiltersOpen] = React.useState(false);
   const [actionsAnchor, setActionsAnchor] = React.useState<HTMLElement | null>(null);
@@ -38,6 +51,32 @@ export default function MessagingPageView({ audience, currentUserName, currentUs
   const [blockOpen, setBlockOpen] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [deleteMode, setDeleteMode] = React.useState<DeleteDialogMode>("single");
+
+  React.useEffect(() => {
+    if (!isCompactEmbedded) setMobileChatOpen(false);
+  }, [isCompactEmbedded]);
+
+  React.useEffect(() => {
+    if (!isCompactEmbedded) return;
+    if ((navigation?.bookingRef || navigation?.threadId) && inbox.activeThread) {
+      setMobileChatOpen(true);
+    }
+  }, [inbox.activeThread, isCompactEmbedded, navigation?.bookingRef, navigation?.threadId]);
+
+  const handleSelectThread = React.useCallback(
+    (threadId: string) => {
+      inbox.setActiveThreadId(threadId);
+      if (isCompactEmbedded) setMobileChatOpen(true);
+    },
+    [inbox, isCompactEmbedded],
+  );
+
+  const handleMobileBack = React.useCallback(() => {
+    setMobileChatOpen(false);
+  }, []);
+
+  const showSidebar = !isCompactEmbedded || !mobileChatOpen;
+  const showChatPanel = !isCompactEmbedded || mobileChatOpen;
 
   const handleChatAction = (action: MessagingChatAction) => {
     if (!inbox.activeThread) return;
@@ -63,28 +102,33 @@ export default function MessagingPageView({ audience, currentUserName, currentUs
   }
 
   return (
-    <Box sx={{ position: "relative", pb: 10 }}>
+    <Box sx={{ position: "relative", pb: embedded ? 0 : 10, height: embedded ? "100%" : undefined, display: embedded ? "flex" : "block", flexDirection: "column", minHeight: 0, isolation: embedded ? "isolate" : undefined }}>
       <Paper
         elevation={0}
         sx={{
-          borderRadius: "12px",
-          border: `1px solid ${alpha(m.navy, 0.1)}`,
+          position: "relative",
+          borderRadius: embedded ? 0 : "12px",
+          border: embedded ? "none" : `1px solid ${alpha(m.navy, 0.1)}`,
           bgcolor: "#fff",
           overflow: "hidden",
-          minHeight: { xs: 560, md: "calc(100vh - 220px)" },
+          minHeight: embedded ? 0 : { xs: 560, md: "calc(100vh - 220px)" },
+          height: embedded ? "100%" : undefined,
+          flex: embedded ? 1 : undefined,
           display: "flex",
           flexDirection: { xs: "column", md: "row" },
         }}
       >
+        {showSidebar ? (
         <MessagingConversationSidebar
           audience={audience}
           currentUserName={currentUserName}
           currentUserAvatarSrc={currentUserAvatarSrc}
+          embedded={embedded}
           search={inbox.search}
           onSearchChange={inbox.setSearch}
           threads={inbox.visibleThreads}
           activeThreadId={inbox.activeThread?.id ?? ""}
-          onSelectThread={inbox.setActiveThreadId}
+          onSelectThread={handleSelectThread}
           selectedIds={inbox.selectedIds}
           selectAll={inbox.selectAll}
           onToggleSelect={inbox.toggleThreadSelection}
@@ -99,41 +143,35 @@ export default function MessagingPageView({ audience, currentUserName, currentUs
           }}
           onOpenSettings={() => setSettingsOpen(true)}
           onOpenFilters={() => setFiltersOpen(true)}
+          onClose={embedded ? onClose : undefined}
         />
+        ) : null}
 
+        {showChatPanel ? (
         <MessagingChatPanel
           audience={audience}
           thread={inbox.activeThread}
           messageGroups={inbox.messageGroups}
           onSend={inbox.sendMessage}
           onOpenActions={setActionsAnchor}
+          onClose={embedded ? onClose : undefined}
+          onBack={isCompactEmbedded && mobileChatOpen ? handleMobileBack : undefined}
+          composerDisabled={audience === "professional" && !inbox.canReply}
+          composerDisabledHint={
+            audience === "professional" && !inbox.canReply
+              ? "You can reply after the client sends the first message. Professionals cannot start a new chat."
+              : undefined
+          }
         />
+        ) : null}
       </Paper>
-
-      <Fab
-        color="primary"
-        aria-label="Messaging"
-        sx={{
-          position: "fixed",
-          right: { xs: 20, md: 32 },
-          bottom: { xs: 20, md: 28 },
-          width: 58,
-          height: 58,
-          bgcolor: m.teal,
-          boxShadow: `0 10px 28px ${alpha(m.teal, 0.45)}`,
-          "&:hover": { bgcolor: m.tealDark },
-        }}
-      >
-        <Badge badgeContent={2} color="error" sx={{ "& .MuiBadge-badge": { fontWeight: 900, fontSize: 10 } }}>
-          <ChatBubbleRoundedIcon sx={{ fontSize: 28, color: "#fff" }} />
-        </Badge>
-      </Fab>
 
       <MessagingSettingsDialog
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         filters={inbox.settingsFilters}
         onChange={inbox.setSettingsFilters}
+        embedded={embedded}
       />
 
       <MessagingFiltersDrawer
@@ -141,6 +179,7 @@ export default function MessagingPageView({ audience, currentUserName, currentUs
         onClose={() => setFiltersOpen(false)}
         filters={inbox.drawerFilters}
         onChange={inbox.setDrawerFilters}
+        embedded={embedded}
         onApply={() => {
           inbox.applyDrawerFilters();
           setFiltersOpen(false);
@@ -156,12 +195,14 @@ export default function MessagingPageView({ audience, currentUserName, currentUs
         open={Boolean(actionsAnchor)}
         onClose={() => setActionsAnchor(null)}
         onAction={handleChatAction}
+        embedded={embedded}
       />
 
       <MessagingLinkBookingDialog
         open={linkBookingOpen}
         onClose={() => setLinkBookingOpen(false)}
         onSubmit={inbox.linkThreadToBooking}
+        embedded={embedded}
       />
 
       <MessagingReportDialog
@@ -169,11 +210,13 @@ export default function MessagingPageView({ audience, currentUserName, currentUs
         title={getReportModalTitle(audience)}
         onClose={() => setReportOpen(false)}
         onSubmit={inbox.reportThread}
+        embedded={embedded}
       />
 
       <MessagingDeleteChatDialog
         open={deleteOpen}
         onClose={() => setDeleteOpen(false)}
+        embedded={embedded}
         onConfirm={() => {
           if (deleteMode === "bulk") inbox.deleteSelectedThreads();
           else inbox.deleteActiveThread();
@@ -184,6 +227,7 @@ export default function MessagingPageView({ audience, currentUserName, currentUs
         open={blockOpen}
         audience={audience}
         onClose={() => setBlockOpen(false)}
+        embedded={embedded}
         onConfirm={() => inbox.activeThread && inbox.blockThread(inbox.activeThread.id)}
       />
     </Box>
