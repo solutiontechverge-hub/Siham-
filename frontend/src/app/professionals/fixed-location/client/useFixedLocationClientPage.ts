@@ -3,7 +3,46 @@
 import * as React from "react";
 import { getPhoneValidationErrors } from "../../../../lib/phone-validation";
 import { mockClientRecords, mockMollureDirectory, type ClientRecord } from "./data/clientList";
+import {
+  useCreateProfessionalClientMutation,
+  useDeleteProfessionalClientMutation,
+  useGetMollureClientDirectoryQuery,
+  useGetProfessionalClientsQuery,
+  useSetProfessionalClientBlockedMutation,
+  useUpdateProfessionalClientMutation,
+  useUpdateProfessionalClientTechnicalNoteMutation,
+} from "../../../../store/services/businessApi";
+import {
+  DEFAULT_CLIENT_LIST_SORT,
+  matchesClientFilters,
+  matchesClientSearch,
+  type ClientListFilterKey,
+} from "./data/clientListFilters";
+import { mapApiProfessionalClientToRecord } from "./mapApiProfessionalClient";
 
+function getApiErrorMessage(error: unknown, fallback: string): string {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "data" in error &&
+    typeof (error as { data?: { message?: string } }).data?.message === "string"
+  ) {
+    return (error as { data: { message: string } }).data.message;
+  }
+  return fallback;
+}
+
+function parseDobForApi(raw: string): string | undefined {
+  const v = raw.trim();
+  if (!v) return undefined;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+  if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(v)) {
+    const [mm, dd, yy] = v.split("/").map((x) => Number(x));
+    const yyyy = yy < 100 ? 2000 + yy : yy;
+    return `${yyyy}-${String(mm).padStart(2, "0")}-${String(dd).padStart(2, "0")}`;
+  }
+  return v;
+}
 export type EditCompanyFormState = {
   legalName: string;
   coc: string;
@@ -65,9 +104,21 @@ export const emptyEditIndividualForm = (): EditIndividualFormState => ({
 });
 
 export function useFixedLocationClientPage() {
-  const [clients, setClients] = React.useState<ClientRecord[]>(() => mockClientRecords);
+  const { data: clientsResponse, isLoading: clientsLoading, isError: clientsError } = useGetProfessionalClientsQuery();
+  const [createProfessionalClient] = useCreateProfessionalClientMutation();
+  const [updateProfessionalClient] = useUpdateProfessionalClientMutation();
+  const [updateProfessionalClientTechnicalNote] = useUpdateProfessionalClientTechnicalNoteMutation();
+  const [setProfessionalClientBlocked] = useSetProfessionalClientBlockedMutation();
+  const [deleteProfessionalClient] = useDeleteProfessionalClientMutation();
+
+  const clients = React.useMemo(
+    () => (clientsResponse?.data ?? []).map(mapApiProfessionalClientToRecord),
+    [clientsResponse],
+  );
   const [query, setQuery] = React.useState("");
-  const [sortBy, setSortBy] = React.useState("Alphabetical (A–Z)");
+  const [sortBy, setSortBy] = React.useState(DEFAULT_CLIENT_LIST_SORT);
+  const [activeFilters, setActiveFilters] = React.useState<Set<ClientListFilterKey>>(() => new Set());
+  const [filterDrawerOpen, setFilterDrawerOpen] = React.useState(false);
 
   const [sortAnchor, setSortAnchor] = React.useState<null | HTMLElement>(null);
   const [addAnchor, setAddAnchor] = React.useState<null | HTMLElement>(null);
@@ -82,6 +133,10 @@ export function useFixedLocationClientPage() {
   const [addMollureOpen, setAddMollureOpen] = React.useState(false);
   const [addNonMollureOpen, setAddNonMollureOpen] = React.useState(false);
   const [mollureSearch, setMollureSearch] = React.useState("");
+  const { data: mollureDirectoryResponse } = useGetMollureClientDirectoryQuery(
+    { q: mollureSearch },
+    { skip: !addMollureOpen },
+  );
   const [selectedMollureId, setSelectedMollureId] = React.useState<string | "">("");
   const [nonMollureClientType, setNonMollureClientType] = React.useState<"" | "Individual Client" | "Company Client">(
     "",
@@ -112,6 +167,7 @@ export function useFixedLocationClientPage() {
   const [coEmail, setCoEmail] = React.useState("");
   const [compErrors, setCompErrors] = React.useState<Partial<Record<string, string>>>({});
   const [editPhoneErrors, setEditPhoneErrors] = React.useState<{ countryCode?: string; phone?: string }>({});
+  const [nonMollureTechnicalNote, setNonMollureTechnicalNote] = React.useState("");
 
   const [snackbar, setSnackbar] = React.useState<{
     open: boolean;
@@ -217,8 +273,9 @@ export function useFixedLocationClientPage() {
   }, []);
 
   const filtered = React.useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const base = !q ? clients : clients.filter((c) => `${c.name} ${c.email}`.toLowerCase().includes(q));
+    const base = clients.filter(
+      (c) => matchesClientSearch(c, query) && matchesClientFilters(c, activeFilters),
+    );
 
     const byNameAsc = [...base].sort((a, b) => a.name.localeCompare(b.name));
     const byNameDesc = [...base].sort((a, b) => b.name.localeCompare(a.name));
@@ -242,7 +299,20 @@ export function useFixedLocationClientPage() {
       default:
         return byNameAsc;
     }
-  }, [clients, parseDmy, parseEuro, query, sortBy]);
+  }, [activeFilters, clients, parseDmy, parseEuro, query, sortBy]);
+
+  const toggleClientFilter = React.useCallback((key: ClientListFilterKey) => {
+    setActiveFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  const clearClientFilters = React.useCallback(() => {
+    setActiveFilters(new Set());
+  }, []);
 
   const viewClient = viewClientId ? clients.find((c) => c.id === viewClientId) : undefined;
   const blockClient = blockClientId ? clients.find((c) => c.id === blockClientId) : undefined;
@@ -308,11 +378,8 @@ export function useFixedLocationClientPage() {
   }, [viewClient]);
 
   const mollureResults = React.useMemo(() => {
-    const q = mollureSearch.trim().toLowerCase();
-    if (!q) return mockMollureDirectory;
-    return mockMollureDirectory.filter((r) => `${r.email} ${r.name}`.toLowerCase().includes(q));
-  }, [mollureSearch]);
-
+    return (mollureDirectoryResponse?.data ?? []).filter((r) => r.has_eligible_booking !== false);
+  }, [mollureDirectoryResponse]);
   const resetNonMollureAddForm = React.useCallback(() => {
     setNonMollureClientType("");
     setIndFirstName("");
@@ -339,100 +406,67 @@ export function useFixedLocationClientPage() {
     setCoPhone("");
     setCoEmail("");
     setCompErrors({});
+    setNonMollureTechnicalNote("");
   }, []);
 
-  const formatAddedOn = React.useCallback(() => {
-    // Matches the existing mock style like "March 2, 2024"
-    return new Date().toLocaleDateString(undefined, { month: "long", day: "numeric", year: "numeric" });
-  }, []);
-
-  const addMollureClient = React.useCallback(() => {
+  const addMollureClient = React.useCallback(async () => {
     const id = String(selectedMollureId || "").trim();
     if (!id) return false;
-    const row = mockMollureDirectory.find((r) => r.id === id);
-    if (!row) return false;
 
-    setClients((prev) => {
-      // Add a new row for every selected Mollure member (even if the email
-      // already exists in the list), so the user can add all members and
-      // the total count increases.
-      const nextId = `c_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-      const next: ClientRecord = {
-        id: nextId,
-        name: row.name,
-        email: row.email,
-        phone: "—",
-        totalSales: "€0",
-        lastBooking: "—",
-        tags: ["Mollure"],
-        kind: "individual",
-        addedOn: formatAddedOn(),
-        bookingsCompleted: 0,
-        averageBookingValue: "€0",
-        recentServices: [],
-        bookingHistory: [],
-      };
-      return [next, ...prev];
-    });
-
-    setSelectedMollureId("");
-    setMollureSearch("");
-    setAddMollureOpen(false);
-    setSnackbar({
-      open: true,
-      message: "Client Added",
-      severity: "success",
-    });
-    return true;
-  }, [formatAddedOn, selectedMollureId]);
-
-  const addNonMollureClient = React.useCallback(() => {
+    try {
+      await createProfessionalClient({ mollure_user_id: id }).unwrap();
+      setSelectedMollureId("");
+      setMollureSearch("");
+      setAddMollureOpen(false);
+      setSnackbar({
+        open: true,
+        message: "Client Added",
+        severity: "success",
+      });
+      return true;
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: getApiErrorMessage(error, "Unable to add client."),
+        severity: "error",
+      });
+      return false;
+    }
+  }, [createProfessionalClient, selectedMollureId]);
+  const addNonMollureClient = React.useCallback(async () => {
     if (!nonMollureClientType) {
       setNonMollureTypeError("Please select a client type");
       return false;
     }
     if (nonMollureClientType === "Individual Client") {
       if (!validateIndividual()) return false;
-      const fullName = `${indFirstName.trim()} ${indLastName.trim()}`.trim();
       const email = indEmail.trim().toLowerCase();
-      const normalizeDob = (raw: string) => {
-        const v = raw.trim();
-        if (!v) return "";
-        if (/^\d{4}-\d{2}-\d{2}$/.test(v)) {
-          const [yyyy, mm, dd] = v.split("-");
-          return `${Number(mm)}/${Number(dd)}/${yyyy}`;
-        }
-        return v;
-      };
 
-      setClients((prev) => {
-        if (prev.some((c) => c.email.trim().toLowerCase() === email)) return prev;
-        const nextId = `c_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-        const next: ClientRecord = {
-          id: nextId,
-          name: fullName,
+      try {
+        await createProfessionalClient({
+          client_kind: "individual",
           email,
-          phone: `${indCountryCode} ${indPhone}`.trim(),
-          totalSales: "€0",
-          lastBooking: "—",
-          tags: [],
-          kind: "individual",
-          addedOn: formatAddedOn(),
+          first_name: indFirstName.trim(),
+          last_name: indLastName.trim(),
+          country_code: indCountryCode,
+          phone: indPhone.trim(),
           gender: indGender || undefined,
-          dateOfBirth: normalizeDob(indDob) || undefined,
-          residentialAddress: undefined,
-          bookingsCompleted: 0,
-          averageBookingValue: "€0",
-          recentServices: [],
-          bookingHistory: [],
-        };
-        return [next, ...prev];
-      });
+          date_of_birth: parseDobForApi(indDob),
+          technical_note: nonMollureTechnicalNote.trim() || undefined,
+        }).unwrap();
 
-      setAddNonMollureOpen(false);
-      resetNonMollureAddForm();
-      setSnackbar({ open: true, message: "Client Added", severity: "success" });
-      return true;
+        setAddNonMollureOpen(false);
+        resetNonMollureAddForm();
+        setSnackbar({ open: true, message: "Client Added", severity: "success" });
+        return true;
+      } catch (error) {
+        setSnackbar({
+          open: true,
+          message: getApiErrorMessage(error, "Unable to add client."),
+          severity: "error",
+        });
+        return false;
+      }
     }
 
     if (nonMollureClientType === "Company Client") {
@@ -440,38 +474,34 @@ export function useFixedLocationClientPage() {
       const email = coEmail.trim().toLowerCase();
       const contactName = `${coContactFirst.trim()} ${coContactLast.trim()}`.trim();
 
-      setClients((prev) => {
-        if (prev.some((c) => c.email.trim().toLowerCase() === email)) return prev;
-        const nextId = `c_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-        const next: ClientRecord = {
-          id: nextId,
-          name: coLegalName.trim(),
+      try {
+        await createProfessionalClient({
+          client_kind: "company",
           email,
-          phone: `${coCountryCode} ${coPhone}`.trim(),
-          totalSales: "€0",
-          lastBooking: "—",
-          tags: [],
-          kind: "company",
-          addedOn: formatAddedOn(),
-          legalName: coLegalName.trim(),
+          legal_name: coLegalName.trim(),
           coc: coCoc.trim(),
           vat: coVat.trim(),
-          contactPersonName: contactName || undefined,
+          contact_person_name: contactName || undefined,
           gender: coGender || undefined,
-          businessAddress: `${coStreet.trim()} ${coStreetNumber.trim()}, ${coMunicipality.trim()} ${coPostal.trim()}`.trim(),
-          detailEmail: email,
-          bookingsCompleted: 0,
-          averageBookingValue: "€0",
-          recentServices: [],
-          bookingHistory: [],
-        };
-        return [next, ...prev];
-      });
+          country_code: coCountryCode,
+          phone: coPhone.trim(),
+          business_address: `${coStreet.trim()} ${coStreetNumber.trim()}, ${coMunicipality.trim()} ${coPostal.trim()}`.trim(),
+          detail_email: email,
+          technical_note: nonMollureTechnicalNote.trim() || undefined,
+        }).unwrap();
 
-      setAddNonMollureOpen(false);
-      resetNonMollureAddForm();
-      setSnackbar({ open: true, message: "Client Added", severity: "success" });
-      return true;
+        setAddNonMollureOpen(false);
+        resetNonMollureAddForm();
+        setSnackbar({ open: true, message: "Client Added", severity: "success" });
+        return true;
+      } catch (error) {
+        setSnackbar({
+          open: true,
+          message: getApiErrorMessage(error, "Unable to add client."),
+          severity: "error",
+        });
+        return false;
+      }
     }
 
     return false;
@@ -489,7 +519,7 @@ export function useFixedLocationClientPage() {
     coStreet,
     coStreetNumber,
     coVat,
-    formatAddedOn,
+    createProfessionalClient,
     indCountryCode,
     indDob,
     indEmail,
@@ -498,11 +528,11 @@ export function useFixedLocationClientPage() {
     indLastName,
     indPhone,
     nonMollureClientType,
+    nonMollureTechnicalNote,
     resetNonMollureAddForm,
     validateCompany,
     validateIndividual,
   ]);
-
   const openNonMollureAddDrawer = React.useCallback(() => {
     resetNonMollureAddForm();
     setNonMollureClientType("Individual Client");
@@ -529,41 +559,76 @@ export function useFixedLocationClientPage() {
     setFocusTechnicalNoteOnOpen(false);
   }, []);
 
-  const confirmDeleteClient = React.useCallback(() => {
+  const confirmDeleteClient = React.useCallback(async () => {
     if (!deleteClientId) return;
     const id = deleteClientId;
-    setClients((prev) => prev.filter((c) => c.id !== id));
-    setDeleteClientId(null);
-    if (viewClientId === id) {
-      setViewClientId(null);
-      setClientDetailsMode("view");
-    }
-    if (blockClientId === id) setBlockClientId(null);
-    setSnackbar({ open: true, message: "Client Deleted", severity: "error" });
-  }, [blockClientId, deleteClientId, viewClientId]);
 
-  const confirmBlockClient = React.useCallback(() => {
+    try {
+      await deleteProfessionalClient(id).unwrap();
+      setDeleteClientId(null);
+      if (viewClientId === id) {
+        setViewClientId(null);
+        setClientDetailsMode("view");
+      }
+      if (blockClientId === id) setBlockClientId(null);
+      setSnackbar({ open: true, message: "Client Deleted", severity: "error" });
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: getApiErrorMessage(error, "Unable to delete client."),
+        severity: "error",
+      });
+    }
+  }, [blockClientId, deleteClientId, deleteProfessionalClient, viewClientId]);
+
+  const confirmBlockClient = React.useCallback(async () => {
     if (!blockClientId) return;
     const id = blockClientId;
-    setClients((prev) => prev.map((c) => (c.id === id ? { ...c, isBlocked: true } : c)));
-    setBlockClientId(null);
-    if (deleteClientId === id) setDeleteClientId(null);
-    setSnackbar({ open: true, message: "Client blocked", severity: "error" });
-  }, [blockClientId, deleteClientId]);
 
-  const unblockClient = React.useCallback((id: string) => {
-    setClients((prev) => prev.map((c) => (c.id === id ? { ...c, isBlocked: false } : c)));
-    setSnackbar({ open: true, message: "Client unblocked", severity: "success" });
-  }, []);
+    try {
+      await setProfessionalClientBlocked({ id, is_blocked: true }).unwrap();
+      setBlockClientId(null);
+      if (deleteClientId === id) setDeleteClientId(null);
+      setSnackbar({ open: true, message: "Client blocked", severity: "error" });
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: getApiErrorMessage(error, "Unable to block client."),
+        severity: "error",
+      });
+    }
+  }, [blockClientId, deleteClientId, setProfessionalClientBlocked]);
 
-  const saveClientEdits = React.useCallback(() => {
-    if (!viewClientId) return false;
+  const unblockClient = React.useCallback(
+    async (id: string) => {
+      try {
+        await setProfessionalClientBlocked({ id, is_blocked: false }).unwrap();
+        setSnackbar({ open: true, message: "Client unblocked", severity: "success" });
+      } catch (error) {
+        setSnackbar({
+          open: true,
+          message: getApiErrorMessage(error, "Unable to unblock client."),
+          severity: "error",
+        });
+      }
+    },
+    [setProfessionalClientBlocked],
+  );
 
-    const current = clients.find((c) => c.id === viewClientId);
-    if (!current) return false;
+  const saveClientEdits = React.useCallback(async () => {
+    if (!viewClientId || !viewClient) return false;
+
+    if (viewClient.tags.includes("Mollure")) {
+      setSnackbar({
+        open: true,
+        severity: "info",
+        message: "Mollure clients manage their own profile. Client details cannot be edited here.",
+      });
+      return false;
+    }
 
     const phoneErrors =
-      current.kind === "company"
+      viewClient.kind === "company"
         ? getPhoneValidationErrors(editCompanyForm.countryCode, editCompanyForm.phone)
         : getPhoneValidationErrors(editIndividualForm.countryCode, editIndividualForm.phone);
 
@@ -578,82 +643,98 @@ export function useFixedLocationClientPage() {
     }
     setEditPhoneErrors({});
 
-    setClients((prev) =>
-      prev.map((c) => {
-        if (c.id !== viewClientId) return c;
+    try {
+      if (viewClient.kind === "company") {
+        const email = editCompanyForm.email.trim().toLowerCase();
+        const contactPersonName = `${editCompanyForm.contactFirst.trim()} ${editCompanyForm.contactLast.trim()}`.trim();
+        const businessAddress = [
+          editCompanyForm.street.trim(),
+          editCompanyForm.streetNumber.trim(),
+          editCompanyForm.municipality.trim(),
+          editCompanyForm.postal.trim(),
+          editCompanyForm.province.trim(),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .trim();
 
-        if (c.kind === "company") {
-          const email = editCompanyForm.email.trim().toLowerCase();
-          const contactPersonName = `${editCompanyForm.contactFirst.trim()} ${editCompanyForm.contactLast.trim()}`.trim();
-          const businessAddress = [
-            editCompanyForm.street.trim(),
-            editCompanyForm.streetNumber.trim(),
-            editCompanyForm.municipality.trim(),
-            editCompanyForm.postal.trim(),
-            editCompanyForm.province.trim(),
-          ]
-            .filter(Boolean)
-            .join(" ")
-            .trim();
-
-          return {
-            ...c,
-            name: editCompanyForm.legalName.trim() || c.name,
-            legalName: editCompanyForm.legalName.trim() || undefined,
-            coc: editCompanyForm.coc.trim() || undefined,
-            vat: editCompanyForm.vat.trim() || undefined,
-            contactPersonName: contactPersonName || undefined,
-            gender: editCompanyForm.gender || undefined,
-            phone: `${editCompanyForm.countryCode} ${editCompanyForm.phone}`.trim(),
-            email: email || c.email,
-            detailEmail: email || c.detailEmail,
-            businessAddress: businessAddress || undefined,
-            technicalNote: editCompanyForm.technicalNote.trim() || undefined,
-          };
-        }
-
-        // individual
+        await updateProfessionalClient({
+          id: viewClientId,
+          legal_name: editCompanyForm.legalName.trim() || undefined,
+          coc: editCompanyForm.coc.trim() || undefined,
+          vat: editCompanyForm.vat.trim() || undefined,
+          contact_person_name: contactPersonName || undefined,
+          gender: editCompanyForm.gender || undefined,
+          country_code: editCompanyForm.countryCode,
+          phone: editCompanyForm.phone.trim(),
+          email: email || undefined,
+          detail_email: email || undefined,
+          business_address: businessAddress || undefined,
+          technical_note: editCompanyForm.technicalNote.trim() || undefined,
+        }).unwrap();
+      } else {
         const email = editIndividualForm.email.trim().toLowerCase();
-        const fullName = `${editIndividualForm.firstName.trim()} ${editIndividualForm.lastName.trim()}`.trim();
-        return {
-          ...c,
-          name: fullName || c.name,
+        await updateProfessionalClient({
+          id: viewClientId,
+          first_name: editIndividualForm.firstName.trim() || undefined,
+          last_name: editIndividualForm.lastName.trim() || undefined,
           gender: editIndividualForm.gender || undefined,
-          dateOfBirth: editIndividualForm.dob.trim() || undefined,
-          phone: `${editIndividualForm.countryCode} ${editIndividualForm.phone}`.trim(),
-          email: email || c.email,
-          residentialAddress: editIndividualForm.residentialAddress.trim() || undefined,
-          technicalNote: editIndividualForm.technicalNote.trim() || undefined,
-        };
-      }),
-    );
+          date_of_birth: parseDobForApi(editIndividualForm.dob),
+          country_code: editIndividualForm.countryCode,
+          phone: editIndividualForm.phone.trim(),
+          email: email || undefined,
+          residential_address: editIndividualForm.residentialAddress.trim() || undefined,
+          technical_note: editIndividualForm.technicalNote.trim() || undefined,
+        }).unwrap();
+      }
 
-    setClientDetailsMode("view");
-    setSnackbar({ open: true, message: "Client Updated", severity: "success" });
-    return true;
-  }, [clients, editCompanyForm, editIndividualForm, viewClientId]);
+      setClientDetailsMode("view");
+      setSnackbar({ open: true, message: "Client Updated", severity: "success" });
+      return true;
+    } catch (error) {
+      setSnackbar({
+        open: true,
+        message: getApiErrorMessage(error, "Unable to update client."),
+        severity: "error",
+      });
+      return false;
+    }
+  }, [editCompanyForm, editIndividualForm, updateProfessionalClient, viewClient, viewClientId]);
 
   const saveClientTechnicalNote = React.useCallback(
-    (note: string) => {
+    async (note: string) => {
       if (!viewClientId) return;
       const trimmed = note.trim();
-      setClients((prev) =>
-        prev.map((c) =>
-          c.id === viewClientId ? { ...c, technicalNote: trimmed || undefined } : c,
-        ),
-      );
-      setSnackbar({ open: true, message: "Technical note saved", severity: "success" });
-    },
-    [viewClientId],
-  );
 
+      try {
+        await updateProfessionalClientTechnicalNote({
+          id: viewClientId,
+          technical_note: trimmed,
+        }).unwrap();
+        setSnackbar({ open: true, message: "Technical note saved", severity: "success" });
+      } catch (error) {
+        setSnackbar({
+          open: true,
+          message: getApiErrorMessage(error, "Unable to save technical note."),
+          severity: "error",
+        });
+      }
+    },
+    [updateProfessionalClientTechnicalNote, viewClientId],
+  );
   return {
     clients,
-    setClients,
+    clientsLoading,
+    clientsError,
     query,
     setQuery,
     sortBy,
     setSortBy,
+    activeFilters,
+    filterDrawerOpen,
+    setFilterDrawerOpen,
+    toggleClientFilter,
+    clearClientFilters,
     sortAnchor,
     setSortAnchor,
     addAnchor,
@@ -732,6 +813,8 @@ export function useFixedLocationClientPage() {
     setCompErrors,
     editPhoneErrors,
     setEditPhoneErrors,
+    nonMollureTechnicalNote,
+    setNonMollureTechnicalNote,
     validateCompany,
     validateIndividual,
     sortOpen,

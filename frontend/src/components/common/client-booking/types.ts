@@ -23,6 +23,11 @@ export type ClientBookingDraftTeamMember = {
   name: string;
 };
 
+export type ClientBookingDraftProjectDetails = {
+  description: string;
+  uploads: Array<{ id: string; name: string }>;
+};
+
 export type ClientBookingDraft = {
   selectedDateISO: string;
   selectedTime: string;
@@ -31,6 +36,7 @@ export type ClientBookingDraft = {
   services: ClientBookingDraftService[];
   teamMembers?: ClientBookingDraftTeamMember[];
   total: number;
+  projectDetails?: ClientBookingDraftProjectDetails;
 };
 
 export type ClientBookingSelectedShop = {

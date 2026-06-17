@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import SortRoundedIcon from "@mui/icons-material/SortRounded";
@@ -12,9 +13,10 @@ type MollureListToolbarProps = {
   searchPlaceholder: string;
   searchValue: string;
   onSearchChange: (next: string) => void;
-
   onSortClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
   onAddClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  onFilterClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
+  activeFilterCount?: number;
 };
 
 export default function MollureListToolbar({
@@ -23,6 +25,8 @@ export default function MollureListToolbar({
   onSearchChange,
   onSortClick,
   onAddClick,
+  onFilterClick,
+  activeFilterCount = 0,
 }: MollureListToolbarProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -50,6 +54,26 @@ export default function MollureListToolbar({
         <Box sx={{ flex: 1 }} />
 
         <Stack direction="row" spacing={1} alignItems="center" justifyContent="flex-end">
+          {onFilterClick ? (
+            <Button
+              variant="outlined"
+              onClick={onFilterClick}
+              startIcon={<TuneRoundedIcon sx={{ fontSize: 18 }} />}
+              sx={{
+                borderRadius: "6px",
+                textTransform: "none",
+                fontWeight: 700,
+                fontSize: 12.5,
+                borderColor: activeFilterCount > 0 ? alpha(m.teal, 0.45) : alpha(m.navy, 0.14),
+                color: activeFilterCount > 0 ? m.teal : alpha(m.navy, 0.78),
+                bgcolor: activeFilterCount > 0 ? alpha(m.teal, 0.06) : "#fff",
+                height: 34,
+                px: 1.25,
+              }}
+            >
+              Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
+            </Button>
+          ) : null}
           <Button
             variant="outlined"
             onClick={onSortClick}
