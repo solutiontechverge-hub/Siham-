@@ -214,7 +214,15 @@ export default function IndividualSignupPage() {
         message: result.message || "Account created successfully. Please check your email.",
       });
       setForm(initialForm);
-      router.push("/auth/login");
+      try {
+        window.sessionStorage.setItem("mollure_signup_email", form.email.trim().toLowerCase());
+        window.sessionStorage.setItem("mollure_signup_user_type", "individual");
+      } catch {
+        // ignore
+      }
+      router.push(
+        `/auth/check-email?email=${encodeURIComponent(form.email.trim().toLowerCase())}&type=individual`,
+      );
     } catch (error) {
       showSnackbar({
         severity: "error",

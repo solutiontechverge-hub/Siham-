@@ -216,7 +216,15 @@ export default function CompanySignupPage() {
           result.message || "Company account created successfully. Please check your email.",
       });
       setForm(initialForm);
-      router.push("/auth/professional/login");
+      try {
+        window.sessionStorage.setItem("mollure_signup_email", form.contactEmail.trim().toLowerCase());
+        window.sessionStorage.setItem("mollure_signup_user_type", "company");
+      } catch {
+        // ignore
+      }
+      router.push(
+        `/auth/check-email?email=${encodeURIComponent(form.contactEmail.trim().toLowerCase())}&type=company`,
+      );
     } catch (error) {
       showSnackbar({
         severity: "error",
