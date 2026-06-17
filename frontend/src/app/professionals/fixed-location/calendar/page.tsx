@@ -27,6 +27,7 @@ const statusMap: Record<string, CalendarBookingStatus> = {
   completed: "Completed",
   no_show: "No Show",
   "no show": "No Show",
+  invalid: "Invalid",
 };
 
 const bookingTypeMap: Record<string, CalendarBookingType> = {
@@ -80,7 +81,13 @@ const buildTodayDemoEvents = (
       status: "Requested",
       location: "FL",
       bookingType: "Requests",
+      bookingScenario: "BR",
       showClientName: "Lissa J",
+      details: {
+        showPrepayment: true,
+        prepaymentPercent: "50",
+        prepaymentStatus: "pending",
+      },
     },
     {
       id: "demo-today-34009-b",
@@ -94,6 +101,11 @@ const buildTodayDemoEvents = (
       location: "FL",
       bookingType: "Offline",
       showClientName: "Lissa J",
+      details: {
+        showPrepayment: true,
+        prepaymentPercent: "50",
+        prepaymentStatus: "canceled",
+      },
     },
     {
       id: "demo-today-34009-c",
@@ -106,7 +118,14 @@ const buildTodayDemoEvents = (
       status: "Confirmed",
       location: desiredOrFixed,
       bookingType: "Online",
+      bookingScenario: "ER",
       showClientName: "Lissa J",
+      details: {
+        showPrepayment: true,
+        prepaymentPercent: "50",
+        prepaymentStatus: "pending",
+        responseStatus: "overdue_response",
+      },
     },
     {
       id: "demo-today-34009-d",
@@ -253,6 +272,7 @@ export default function FixedLocationCalendarPage() {
 
     return {
       ...professionalFixedLocationCalendarData,
+      initialDate: todayIso,
       resources,
       supportedLocations: calendarLocations,
       availability,

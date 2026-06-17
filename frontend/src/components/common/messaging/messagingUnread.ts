@@ -52,6 +52,33 @@ export function getUnreadFromProfessionalCount(
   return total;
 }
 
+function countUnreadClientInThread(messages: MessagingChatMessage[], lastReadMessageId?: string): number {
+  if (!messages.length) return 0;
+  let startIndex = 0;
+  if (lastReadMessageId) {
+    const readIndex = messages.findIndex((m) => m.id === lastReadMessageId);
+    startIndex = readIndex >= 0 ? readIndex + 1 : 0;
+  }
+  return messages.slice(startIndex).filter(isMessageFromClient).length;
+}
+
+export function getUnreadFromClientCount(
+  store: MessagingStore,
+  options?: { bookingRef?: string; threadId?: string },
+): number {
+  let threads = store.threads.filter((t) => !store.blockedThreadIds.includes(t.id));
+  if (options?.threadId) threads = threads.filter((t) => t.id === options.threadId);
+  if (options?.bookingRef) threads = threads.filter((t) => threadMatchesBookingRef(t, options.bookingRef));
+
+  const lastRead = store.lastReadMessageIdByAudience?.professional ?? {};
+  let total = 0;
+  for (const thread of threads) {
+    const messages = store.messagesByThreadId[thread.id] ?? [];
+    total += countUnreadClientInThread(messages, lastRead[thread.id]);
+  }
+  return total;
+}
+
 export function markThreadReadForAudience(
   store: MessagingStore,
   audience: MessagingAudience,
@@ -71,4 +98,13 @@ export function markThreadReadForAudience(
       },
     },
   };
+}
+
+export function markAllThreadsReadForAudience(store: MessagingStore, audience: MessagingAudience): MessagingStore {
+  let next = store;
+  for (const thread of store.threads) {
+    if (store.blockedThreadIds.includes(thread.id)) continue;
+    next = markThreadReadForAudience(next, audience, thread.id);
+  }
+  return next;
 }

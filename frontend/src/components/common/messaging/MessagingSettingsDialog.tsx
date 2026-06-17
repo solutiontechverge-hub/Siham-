@@ -5,6 +5,7 @@ import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import { Dialog, DialogContent, IconButton, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import MessagingFilterCheckboxList from "./MessagingFilterCheckboxList";
+import MessagingInsetOverlay from "./MessagingInsetOverlay";
 import type { MessagingSettingsFilters } from "./messagingTypes";
 import type { BookingStatusFilter } from "./messagingTypes";
 
@@ -21,10 +22,35 @@ type Props = {
   onClose: () => void;
   filters: MessagingSettingsFilters;
   onChange: (next: MessagingSettingsFilters) => void;
+  embedded?: boolean;
 };
 
-export default function MessagingSettingsDialog({ open, onClose, filters, onChange }: Props) {
+function SettingsContent({
+  filters,
+  onChange,
+}: {
+  filters: MessagingSettingsFilters;
+  onChange: (next: MessagingSettingsFilters) => void;
+}) {
+  return (
+    <MessagingFilterCheckboxList
+      options={OPTIONS}
+      checked={filters as Record<string, boolean>}
+      onToggle={(key, value) => onChange({ ...filters, [key as BookingStatusFilter]: value })}
+    />
+  );
+}
+
+export default function MessagingSettingsDialog({ open, onClose, filters, onChange, embedded = false }: Props) {
   const m = useTheme().palette.mollure;
+
+  if (embedded) {
+    return (
+      <MessagingInsetOverlay open={open} title="Settings" onClose={onClose} maxWidth={380}>
+        <SettingsContent filters={filters} onChange={onChange} />
+      </MessagingInsetOverlay>
+    );
+  }
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth PaperProps={{ sx: { borderRadius: "12px" } }}>
@@ -35,11 +61,7 @@ export default function MessagingSettingsDialog({ open, onClose, filters, onChan
             <CloseRoundedIcon sx={{ color: alpha(m.navy, 0.45) }} />
           </IconButton>
         </Stack>
-        <MessagingFilterCheckboxList
-          options={OPTIONS}
-          checked={filters as Record<string, boolean>}
-          onToggle={(key, value) => onChange({ ...filters, [key as BookingStatusFilter]: value })}
-        />
+        <SettingsContent filters={filters} onChange={onChange} />
       </DialogContent>
     </Dialog>
   );

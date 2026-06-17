@@ -28,9 +28,10 @@ type Props = {
   title: string;
   onClose: () => void;
   onSubmit: (payload: MessagingReportPayload) => void;
+  embedded?: boolean;
 };
 
-export default function MessagingReportDialog({ open, title, onClose, onSubmit }: Props) {
+export default function MessagingReportDialog({ open, title, onClose, onSubmit, embedded = false }: Props) {
   const m = useTheme().palette.mollure;
   const [reasonId, setReasonId] = React.useState<MessagingReportReasonId | "">("");
   const [otherText, setOtherText] = React.useState("");
@@ -54,6 +55,7 @@ export default function MessagingReportDialog({ open, title, onClose, onSubmit }
       title={title}
       onClose={onClose}
       maxWidth="sm"
+      embedded={embedded}
       footer={
         <>
           <MessagingModalCancelButton onClick={onClose} />

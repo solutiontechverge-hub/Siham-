@@ -1200,6 +1200,7 @@ function ClientBookingCreateView() {
                     placeholder="Select team member"
                     size="small"
                     fullWidth
+                    disabled={serviceTab === "unassigned" && !selectedServiceIds[s.id]}
                     InputProps={{
                       startAdornment: (
                         <PersonOutlineRoundedIcon

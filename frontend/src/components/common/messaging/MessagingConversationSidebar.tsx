@@ -3,6 +3,7 @@
 import * as React from "react";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import {
   Avatar,
@@ -25,6 +26,7 @@ type Props = {
   audience: MessagingAudience;
   currentUserName: string;
   currentUserAvatarSrc?: string;
+  embedded?: boolean;
   search: string;
   onSearchChange: (value: string) => void;
   threads: MessagingThread[];
@@ -37,12 +39,14 @@ type Props = {
   onRequestDelete: () => void;
   onOpenSettings: () => void;
   onOpenFilters: () => void;
+  onClose?: () => void;
 };
 
 export default function MessagingConversationSidebar({
   audience,
   currentUserName,
   currentUserAvatarSrc,
+  embedded = false,
   search,
   onSearchChange,
   threads,
@@ -55,43 +59,51 @@ export default function MessagingConversationSidebar({
   onRequestDelete,
   onOpenSettings,
   onOpenFilters,
+  onClose,
 }: Props) {
   const m = useTheme().palette.mollure;
 
   return (
     <Box
       sx={{
-        width: { xs: "100%", md: "34%" },
-        minWidth: { md: 300 },
-        maxWidth: { md: 380 },
+        width: { xs: "100%", md: embedded ? "38%" : "34%" },
+        minWidth: { md: embedded ? 220 : 300 },
+        maxWidth: { md: embedded ? 320 : 380 },
+        flex: { xs: "1 1 auto", md: embedded ? "0 0 38%" : undefined },
         borderRight: { md: `1px solid ${alpha(m.navy, 0.08)}` },
         display: "flex",
         flexDirection: "column",
         bgcolor: "#fff",
+        minHeight: 0,
       }}
     >
-      <Box sx={{ px: 2, pt: 2, pb: 1.5 }}>
+      <Box sx={{ px: { xs: 1.25, sm: 1.5, md: embedded ? 1.5 : 2 }, pt: { xs: 1, sm: embedded ? 1.25 : 2 }, pb: { xs: 1.25, sm: 1.5 } }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <Stack direction="row" alignItems="center" spacing={1.25}>
+          <Stack direction="row" alignItems="center" spacing={1.25} sx={{ minWidth: 0 }}>
             <Avatar
               src={currentUserAvatarSrc}
               sx={{ width: 28, height: 28, fontSize: 12, fontWeight: 900, bgcolor: alpha(m.teal, 0.15), color: m.teal }}
             >
               {currentUserName.slice(0, 1).toUpperCase()}
             </Avatar>
-            <Typography sx={{ fontWeight: 900, fontSize: 18, color: alpha(m.navy, 0.9) }}>Messaging</Typography>
+            <Typography sx={{ fontWeight: 900, fontSize: { xs: 14, sm: embedded ? 15 : 18 }, color: alpha(m.navy, 0.9) }}>Messaging</Typography>
           </Stack>
-          <Stack direction="row" spacing={0.25}>
+          <Stack direction="row" spacing={0.25} sx={{ flexShrink: 0 }}>
             <IconButton size="small" aria-label="Settings" onClick={onOpenSettings}>
               <SettingsRoundedIcon sx={{ fontSize: 20, color: alpha(m.navy, 0.45) }} />
             </IconButton>
             <IconButton size="small" aria-label="Filter" onClick={onOpenFilters}>
               <TuneRoundedIcon sx={{ fontSize: 20, color: alpha(m.navy, 0.45) }} />
             </IconButton>
+            {embedded && onClose ? (
+              <IconButton size="small" aria-label="Close messaging" onClick={onClose}>
+                <CloseRoundedIcon sx={{ fontSize: 20, color: alpha(m.navy, 0.45) }} />
+              </IconButton>
+            ) : null}
           </Stack>
         </Stack>
 
-        <Box sx={{ mt: 1.75 }}>
+        <Box sx={{ mt: { xs: 1.25, sm: 1.75 } }}>
           <AppSearchField
             fullWidth
             placeholder={messagingSearchPlaceholder(audience)}
@@ -102,14 +114,14 @@ export default function MessagingConversationSidebar({
               "& .MuiOutlinedInput-root": {
                 borderRadius: "10px",
                 bgcolor: "#fff",
-                fontSize: 13,
+                fontSize: { xs: 12, sm: 13 },
                 "& fieldset": { borderColor: alpha(m.navy, 0.14) },
               },
             }}
           />
         </Box>
 
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: 1.5 }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: { xs: 1.25, sm: 1.5 } }}>
           <Button
             variant="outlined"
             size="small"
@@ -144,12 +156,16 @@ export default function MessagingConversationSidebar({
 
       <Divider />
 
-      <Box sx={{ flex: 1, overflowY: "auto", minHeight: 200 }}>
+      <Box sx={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
         {threads.length === 0 ? (
           <Typography sx={{ px: 2, py: 3, fontSize: 13, color: alpha(m.navy, 0.45), fontWeight: 600 }}>
             {search.trim()
-              ? "No professionals match your search. Try a name or booking ID (e.g. B500844)."
-              : "No conversations match the current filters."}
+              ? audience === "professional"
+                ? "No client conversations match your search. Try a client name or booking ID."
+                : "No professionals match your search. Try a name or booking ID (e.g. B500844)."
+              : audience === "professional"
+                ? "No client messages yet. You can reply after a client starts the conversation."
+                : "No conversations match the current filters."}
           </Typography>
         ) : (
           threads.map((thread) => {
@@ -163,8 +179,8 @@ export default function MessagingConversationSidebar({
                   display: "flex",
                   alignItems: "flex-start",
                   gap: 1.25,
-                  px: 2,
-                  py: 1.6,
+                  px: { xs: 1.25, sm: 2 },
+                  py: { xs: 1.25, sm: 1.6 },
                   cursor: "pointer",
                   bgcolor: active ? alpha(m.navy, 0.04) : "transparent",
                   borderLeft: active ? `4px solid ${m.teal}` : "4px solid transparent",

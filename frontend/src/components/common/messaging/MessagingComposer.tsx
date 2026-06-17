@@ -13,15 +13,18 @@ const FILE_INPUT_ID = "messaging-attach-input";
 
 type Props = {
   onSend: (body: string, attachments?: MessagingAttachment[]) => void;
+  disabled?: boolean;
+  disabledHint?: string;
 };
 
-export default function MessagingComposer({ onSend }: Props) {
+export default function MessagingComposer({ onSend, disabled = false, disabledHint }: Props) {
   const m = useTheme().palette.mollure;
   const [draft, setDraft] = React.useState("");
   const [pendingAttachments, setPendingAttachments] = React.useState<MessagingAttachment[]>([]);
   const [attachError, setAttachError] = React.useState<string | null>(null);
 
   const handleSend = () => {
+    if (disabled) return;
     const trimmed = draft.trim();
     if (!trimmed && !pendingAttachments.length) return;
 
@@ -63,7 +66,12 @@ export default function MessagingComposer({ onSend }: Props) {
   };
 
   return (
-    <Box sx={{ px: 2.5, py: 2, borderTop: `1px solid ${alpha(m.navy, 0.08)}` }}>
+    <Box sx={{ px: { xs: 1.5, sm: 2, md: 2.5 }, py: { xs: 1.5, sm: 2 }, borderTop: `1px solid ${alpha(m.navy, 0.08)}` }}>
+      {disabled && disabledHint ? (
+        <Typography sx={{ mb: 1.25, fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.52), lineHeight: 1.45 }}>
+          {disabledHint}
+        </Typography>
+      ) : null}
       <input
         id={FILE_INPUT_ID}
         type="file"
@@ -105,15 +113,16 @@ export default function MessagingComposer({ onSend }: Props) {
       <Stack direction="row" alignItems="flex-end" spacing={1}>
         <Box
           component="label"
-          htmlFor={FILE_INPUT_ID}
+          htmlFor={disabled ? undefined : FILE_INPUT_ID}
           sx={{
             flexShrink: 0,
             mb: 0.5,
             display: "inline-flex",
-            cursor: "pointer",
+            cursor: disabled ? "not-allowed" : "pointer",
             borderRadius: "50%",
             bgcolor: alpha(m.navy, 0.04),
-            "&:hover": { bgcolor: alpha(m.navy, 0.08) },
+            opacity: disabled ? 0.45 : 1,
+            "&:hover": disabled ? undefined : { bgcolor: alpha(m.navy, 0.08) },
           }}
         >
           <IconButton component="span" tabIndex={-1} size="small" aria-label="Attach file" disableRipple sx={{ pointerEvents: "none" }}>
@@ -126,14 +135,15 @@ export default function MessagingComposer({ onSend }: Props) {
           multiline
           minRows={1}
           maxRows={4}
-          placeholder="Type Message"
+          placeholder={disabled ? "Waiting for client message..." : "Type Message"}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={handleKeyDown}
+          disabled={disabled}
           sx={{
             "& .MuiOutlinedInput-root": {
               borderRadius: "12px",
-              fontSize: 13,
+              fontSize: { xs: 12.5, sm: 13 },
               bgcolor: "#fff",
               "& fieldset": { borderColor: alpha(m.teal, 0.55), borderWidth: 1.5 },
               "&:hover fieldset": { borderColor: m.teal },
@@ -146,15 +156,15 @@ export default function MessagingComposer({ onSend }: Props) {
           type="button"
           size="small"
           aria-label="Send message"
-          disabled={!draft.trim() && !pendingAttachments.length}
+          disabled={disabled || (!draft.trim() && !pendingAttachments.length)}
           onClick={handleSend}
           sx={{
             flexShrink: 0,
             mb: 0.5,
             bgcolor: m.teal,
             color: "#fff",
-            width: 40,
-            height: 40,
+            width: { xs: 36, sm: 40 },
+            height: { xs: 36, sm: 40 },
             "&:hover": { bgcolor: m.tealDark },
             "&.Mui-disabled": { bgcolor: alpha(m.teal, 0.35), color: "#fff" },
           }}

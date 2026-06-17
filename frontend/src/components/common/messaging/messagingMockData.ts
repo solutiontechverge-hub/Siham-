@@ -2,6 +2,18 @@ import type { MessagingChatMessage, MessagingStore, MessagingThread } from "./me
 
 export const messagingThreadsSeed: MessagingThread[] = [
   {
+    id: "lissa-j",
+    name: "Lissa J",
+    bookingId: "34009",
+    bookingMeta: "34009 - Requested - FL",
+    bookingStatus: "requested",
+    locationType: "fixed",
+    timeLabel: "Just now",
+    preview: "Hi, can we confirm the hot stone massage time?",
+    avatarSeed: "lissa",
+    online: true,
+  },
+  {
     id: "craig-martha",
     name: "Craig Martha",
     bookingId: "B500844",
@@ -86,13 +98,37 @@ function seedMessagesForThread(thread: MessagingThread): MessagingChatMessage[] 
 export function createInitialMessagingStore(): MessagingStore {
   const messagesByThreadId: Record<string, MessagingChatMessage[]> = {};
   for (const thread of messagingThreadsSeed) {
+    if (thread.id === "lissa-j") {
+      messagesByThreadId[thread.id] = [
+        {
+          id: "lissa-j-m1",
+          senderSide: "peer",
+          senderRole: "client",
+          senderName: "Lissa J",
+          senderAvatarSeed: "lissa",
+          timeLabel: "08:10 am",
+          body: "Hi, can we confirm the hot stone massage time?",
+          dateKey: todayDateKey(),
+        },
+      ];
+      continue;
+    }
     messagesByThreadId[thread.id] = seedMessagesForThread(thread);
   }
+
+  const clientLastRead: Record<string, string> = {};
+  for (const thread of messagingThreadsSeed) {
+    const messages = messagesByThreadId[thread.id] ?? [];
+    const last = messages[messages.length - 1];
+    if (last) clientLastRead[thread.id] = last.id;
+  }
+
   return {
     threads: messagingThreadsSeed,
     messagesByThreadId,
     hiddenByAudience: {},
     blockedThreadIds: [],
+    lastReadMessageIdByAudience: { client: clientLastRead, professional: { ...clientLastRead } },
   };
 }
 

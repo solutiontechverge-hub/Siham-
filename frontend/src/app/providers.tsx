@@ -5,11 +5,18 @@ import { GoogleOAuthProvider } from "@react-oauth/google";
 import ThemeRegistry from "../theme/ThemeRegistry";
 import { googleClientId } from "../lib/oauth-config";
 import StoreProvider from "../store/provider";
+import MessagingWidgetHost from "../components/common/messaging/MessagingWidgetHost";
+import { MessagingWidgetProvider } from "../components/common/messaging/MessagingWidgetContext";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const content = (
     <StoreProvider>
-      <ThemeRegistry>{children}</ThemeRegistry>
+      <ThemeRegistry>
+        <MessagingWidgetProvider>
+          {children}
+          <MessagingWidgetHost />
+        </MessagingWidgetProvider>
+      </ThemeRegistry>
     </StoreProvider>
   );
 

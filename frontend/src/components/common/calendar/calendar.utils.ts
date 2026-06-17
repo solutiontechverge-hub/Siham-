@@ -38,20 +38,10 @@ export type BlockTimeDraft = {
   endTime: string;
 };
 
-export function statusChipSx(status: CalendarBookingStatus, m: { navy: string }) {
-  switch (status) {
-    case "Requested":
-      return { bgcolor: alpha("#F4A100", 0.12), color: "#C87800", borderColor: alpha("#F4A100", 0.5) };
-    case "Cancelled":
-      return { bgcolor: alpha("#D32F2F", 0.1), color: "#B71C1C", borderColor: alpha("#D32F2F", 0.4) };
-    case "Confirmed":
-      return { bgcolor: alpha("#2E7D32", 0.1), color: "#1B5E20", borderColor: alpha("#2E7D32", 0.4) };
-    case "Completed":
-      return { bgcolor: alpha(m.navy, 0.06), color: alpha(m.navy, 0.7), borderColor: alpha(m.navy, 0.2) };
-    case "No Show":
-    default:
-      return { bgcolor: alpha(m.navy, 0.06), color: alpha(m.navy, 0.7), borderColor: alpha(m.navy, 0.2) };
-  }
+import { statusChipSx as bookingStatusChipSx } from "./bookingStatus";
+
+export function statusChipSx(status: CalendarBookingStatus, _m?: { navy: string }) {
+  return bookingStatusChipSx(status);
 }
 
 export function extractBookingId(rawId: string) {

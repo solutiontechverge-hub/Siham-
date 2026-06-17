@@ -1,12 +1,24 @@
 "use client";
 
 import * as React from "react";
+import { useSearchParams } from "next/navigation";
 import { useSnackbar } from "../AppSnackbar";
 import type { LinkableBooking } from "./messagingBookingsMock";
 import { formatLinkableBookingLabel } from "./messagingBookingsMock";
 import { formatMessageTimeLabel, todayDateKey } from "./messagingMockData";
 import type { MessagingReportPayload } from "./messagingReportReasons";
-import { markThreadReadForAudience } from "./messagingUnread";
+import {
+  getUnreadFromClientCount,
+  isMessageFromClient,
+  markThreadReadForAudience,
+} from "./messagingUnread";
+import {
+  emitMessagingSend,
+  fetchMessagingHistory,
+  joinMessagingThreads,
+  onMessagingMessage,
+} from "./messagingSocketClient";
+import { canProfessionalReply, findThreadIdByBookingRef } from "./messagingThreadAccess";
 import { threadMatchesSearch, hideThreadsForAudience, isThreadHiddenForAudience, loadMessagingStore, saveMessagingStore } from "./messagingStorage";
 import { threadPassesDrawerFilters, threadPassesSettingsFilters } from "./messagingFilters";
 import type { MessagingAudience } from "./messagingRoutes";
@@ -39,8 +51,32 @@ function groupMessagesByDate(messages: MessagingChatMessage[]) {
   return groups;
 }
 
-export function useMessagingInbox(audience: MessagingAudience) {
+function mergeRemoteMessages(
+  store: MessagingStore,
+  threadId: string,
+  remoteMessages: MessagingChatMessage[],
+): MessagingStore {
+  if (!remoteMessages.length) return store;
+  const local = store.messagesByThreadId[threadId] ?? [];
+  const merged = [...local];
+  for (const message of remoteMessages) {
+    if (!merged.some((item) => item.id === message.id)) merged.push(message);
+  }
+  merged.sort((a, b) => a.id.localeCompare(b.id));
+  return {
+    ...store,
+    messagesByThreadId: { ...store.messagesByThreadId, [threadId]: merged },
+  };
+}
+
+export type MessagingInboxNavigation = {
+  bookingRef?: string;
+  threadId?: string;
+};
+
+export function useMessagingInbox(audience: MessagingAudience, navigation?: MessagingInboxNavigation) {
   const { showSnackbar } = useSnackbar();
+  const searchParams = useSearchParams();
   const [store, setStore] = React.useState<MessagingStore | null>(null);
   const [search, setSearch] = React.useState("");
   const [activeThreadId, setActiveThreadId] = React.useState("");
@@ -56,10 +92,59 @@ export function useMessagingInbox(audience: MessagingAudience) {
     if (loaded.threads[0]) setActiveThreadId(loaded.threads[0].id);
   }, []);
 
+  React.useEffect(() => {
+    if (!store) return;
+    const bookingRef = navigation?.bookingRef ?? searchParams.get("booking") ?? "";
+    const threadRef = navigation?.threadId ?? searchParams.get("thread") ?? "";
+    const resolvedThreadId =
+      threadRef ||
+      findThreadIdByBookingRef(store, bookingRef) ||
+      store.threads.find((thread) => thread.name.toLowerCase() === (searchParams.get("client") ?? "").toLowerCase())?.id ||
+      "";
+    if (resolvedThreadId) setActiveThreadId(resolvedThreadId);
+  }, [navigation?.bookingRef, navigation?.threadId, searchParams, store]);
+
   const persist = React.useCallback((next: MessagingStore) => {
     setStore(next);
     saveMessagingStore(next);
   }, []);
+
+  React.useEffect(() => {
+    if (!store) return;
+    const threadIds = store.threads.map((thread) => thread.id);
+    joinMessagingThreads(threadIds);
+
+    threadIds.forEach(async (threadId) => {
+      const remoteMessages = await fetchMessagingHistory(threadId);
+      if (!remoteMessages.length) return;
+      setStore((prev) => {
+        if (!prev) return prev;
+        const merged = mergeRemoteMessages(prev, threadId, remoteMessages);
+        saveMessagingStore(merged);
+        return merged;
+      });
+    });
+
+    return onMessagingMessage(({ threadId, message }) => {
+      setStore((prev) => {
+        if (!prev) return prev;
+        const local = prev.messagesByThreadId[threadId] ?? [];
+        if (local.some((item) => item.id === message.id)) return prev;
+        const threadMessages = [...local, message];
+        const preview = message.body || (message.attachments?.[0]?.name ?? "Attachment");
+        const nextThreads = prev.threads.map((thread) =>
+          thread.id === threadId ? { ...thread, preview, timeLabel: message.timeLabel } : thread,
+        );
+        const next = {
+          ...prev,
+          threads: nextThreads,
+          messagesByThreadId: { ...prev.messagesByThreadId, [threadId]: threadMessages },
+        };
+        saveMessagingStore(next);
+        return next;
+      });
+    });
+  }, [store?.threads.length]);
 
   const visibleThreads = React.useMemo(() => {
     if (!store) return [];
@@ -69,6 +154,9 @@ export function useMessagingInbox(audience: MessagingAudience) {
       if (!threadMatchesSearch(thread, search)) return false;
       if (!threadPassesSettingsFilters(thread, settingsFilters)) return false;
       if (!threadPassesDrawerFilters(thread, appliedDrawerFilters)) return false;
+      if (audience === "professional" && !(store.messagesByThreadId[thread.id] ?? []).some(isMessageFromClient)) {
+        return false;
+      }
       return true;
     });
   }, [store, audience, search, settingsFilters, appliedDrawerFilters]);
@@ -81,13 +169,13 @@ export function useMessagingInbox(audience: MessagingAudience) {
   }, [activeThreadId, visibleThreads]);
 
   React.useEffect(() => {
-    if (!store || !activeThreadId || audience !== "client") return;
+    if (!store || !activeThreadId) return;
     const messages = store.messagesByThreadId[activeThreadId] ?? [];
     const last = messages[messages.length - 1];
     if (!last) return;
-    const currentRead = store.lastReadMessageIdByAudience?.client?.[activeThreadId];
+    const currentRead = store.lastReadMessageIdByAudience?.[audience]?.[activeThreadId];
     if (currentRead === last.id) return;
-    const next = markThreadReadForAudience(store, "client", activeThreadId);
+    const next = markThreadReadForAudience(store, audience, activeThreadId);
     setStore(next);
     saveMessagingStore(next);
   }, [store, activeThreadId, audience]);
@@ -101,9 +189,25 @@ export function useMessagingInbox(audience: MessagingAudience) {
 
   const messageGroups = React.useMemo(() => groupMessagesByDate(messages), [messages]);
 
+  const canReply =
+    audience === "client" ? true : store && activeThread ? canProfessionalReply(store, activeThread.id) : false;
+
+  const unreadCount = React.useMemo(() => {
+    if (!store) return 0;
+    return audience === "professional" ? getUnreadFromClientCount(store) : 0;
+  }, [audience, store]);
+
   const sendMessage = React.useCallback(
     (body: string, attachments?: MessagingAttachment[]) => {
       if (!store || !activeThread) return;
+      if (audience === "professional" && !canProfessionalReply(store, activeThread.id)) {
+        showSnackbar({
+          severity: "info",
+          message: "You can reply after the client sends the first message.",
+        });
+        return;
+      }
+
       const trimmed = body.trim();
       if (!trimmed && !attachments?.length) return;
 
@@ -125,13 +229,15 @@ export function useMessagingInbox(audience: MessagingAudience) {
         t.id === activeThread.id ? { ...t, preview, timeLabel: msg.timeLabel } : t,
       );
 
-      persist({
+      const next = {
         ...store,
         threads: nextThreads,
         messagesByThreadId: { ...store.messagesByThreadId, [activeThread.id]: threadMessages },
-      });
+      };
+      persist(next);
+      emitMessagingSend(activeThread.id, msg);
     },
-    [store, activeThread, persist],
+    [store, activeThread, audience, persist, showSnackbar],
   );
 
   const deleteSelectedThreads = React.useCallback(() => {
@@ -244,6 +350,8 @@ export function useMessagingInbox(audience: MessagingAudience) {
     deleteSelectedThreads,
     messageGroups,
     sendMessage,
+    canReply,
+    unreadCount,
     settingsFilters,
     setSettingsFilters,
     drawerFilters,

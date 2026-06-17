@@ -8,7 +8,7 @@ import { Badge, Box, Button, Divider, IconButton, Menu, MenuItem, Stack, Typogra
 import { alpha, useTheme } from "@mui/material/styles";
 import { useRouter } from "next/navigation";
 import { useSnackbar } from "../AppSnackbar";
-import { getMessagingHref, useClientMessagingUnread } from "../messaging";
+import { useClientMessagingUnread, useMessagingWidgetOptional } from "../messaging";
 import type { ClientBookingStatus } from "../../../app/clients/booking/clientBookingRecords";
 import BookingRequestStatusRow, { type BookingRequestRowMode } from "./BookingRequestStatusRow";
 import {
@@ -26,7 +26,6 @@ type Props = {
   requiresPrepayment?: boolean;
   onEditServices?: () => void;
   onDeleteBooking?: () => void;
-  messagingHref?: string;
 };
 
 export default function ClientBookingDetailsHeader({
@@ -37,14 +36,13 @@ export default function ClientBookingDetailsHeader({
   requiresPrepayment = false,
   onEditServices,
   onDeleteBooking,
-  messagingHref,
 }: Props) {
   const m = useTheme().palette.mollure;
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
+  const messagingWidget = useMessagingWidgetOptional();
   const [editAnchor, setEditAnchor] = React.useState<HTMLElement | null>(null);
   const [activityAnchor, setActivityAnchor] = React.useState<HTMLElement | null>(null);
-  const chatHref = messagingHref ?? getMessagingHref("client");
   const unreadFromProfessional = useClientMessagingUnread(bookingRef);
   const editRequest = useBookingEditRequest(bookingRef);
 
@@ -106,7 +104,7 @@ export default function ClientBookingDetailsHeader({
               <IconButton
                 size="small"
                 aria-label="Open messaging"
-                onClick={() => router.push(chatHref)}
+                onClick={() => messagingWidget?.openMessaging({ bookingRef })}
                 sx={{ ml: 0.25, p: 0.35 }}
               >
                 {unreadFromProfessional > 0 ? (
