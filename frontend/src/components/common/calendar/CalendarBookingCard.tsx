@@ -90,9 +90,10 @@ export default function CalendarBookingCard({
         pattern={isDesiredLocation ? "dots" : "lines"}
         scenarioBadges={scenarioIndicators.map((label) => ({
           label,
-          responseIndicators: scenarioBadgeResponseIndicators(label, responseIndicators),
+          showRequestSentIcon: label === "BR",
+          responseIndicators: label === "EBR" ? scenarioBadgeResponseIndicators(label, responseIndicators) : [],
           prepaymentStatus:
-            label === "BR" || label === "EBR"
+            label === "EBR"
               ? prepaymentIconVariant === "pending"
                 ? undefined
                 : prepaymentIconVariant
@@ -100,7 +101,13 @@ export default function CalendarBookingCard({
           showExternalLink: label === "ER",
         }))}
         prepaymentStatus={prepaymentIconVariant}
-        responseIndicators={scenarioIndicators.length ? undefined : responseIndicators}
+        responseIndicators={
+          scenarioIndicators.includes("BR")
+            ? responseIndicators
+            : scenarioIndicators.length
+              ? undefined
+              : responseIndicators
+        }
         titleLineClamp={1}
         calendarAction={{
           show: true,

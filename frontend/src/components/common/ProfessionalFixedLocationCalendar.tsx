@@ -110,6 +110,7 @@ import {
 import PrepaymentStatusIcon from "./calendar/PrepaymentStatusIcon";
 import { PREPAYMENT_STATUS_LABELS } from "./calendar/PrepaymentStatusIcon";
 import BookingIndicatorIcon, { BOOKING_INDICATOR_LABELS } from "./calendar/BookingIndicatorIcon";
+import BookingRequestSentIcon, { BOOKING_REQUEST_SENT_LABEL } from "./calendar/BookingRequestSentIcon";
 import { resolveBookingResponseIndicators } from "./calendar/bookingResponseStatus";
 import { resolveCalendarPrepaymentStatus, toPrepaymentIconVariant } from "./calendar/prepaymentStatus";
 import type {
@@ -3485,9 +3486,11 @@ export default function ProfessionalFixedLocationCalendar({
                                 const prepayment = resolveCalendarPrepaymentStatus(viewingBookingEvent);
                                 const prepaymentVariant = prepayment ? toPrepaymentIconVariant(prepayment) : undefined;
                                 const badgeResponses =
-                                  indicator === "BR" || indicator === "EBR"
+                                  indicator === "EBR"
                                     ? responseIndicators
-                                    : responseIndicators.filter((item) => item === "overdue_response");
+                                    : indicator === "ER" || indicator === "E"
+                                      ? responseIndicators.filter((item) => item === "overdue_response")
+                                      : [];
 
                                 return (
                                   <Tooltip key={indicator} title={BOOKING_SCENARIO_LABELS[indicator]} placement="top">
@@ -3496,6 +3499,13 @@ export default function ProfessionalFixedLocationCalendar({
                                       label={
                                         <Stack direction="row" alignItems="center" spacing={0.35}>
                                           <span>{indicator}</span>
+                                          {indicator === "BR" ? (
+                                            <Tooltip title={BOOKING_REQUEST_SENT_LABEL} placement="top">
+                                              <Box sx={{ display: "grid", placeItems: "center", lineHeight: 0 }}>
+                                                <BookingRequestSentIcon size={12} />
+                                              </Box>
+                                            </Tooltip>
+                                          ) : null}
                                           {badgeResponses.map((item) => (
                                             <Tooltip key={item} title={BOOKING_INDICATOR_LABELS[item]} placement="top">
                                               <Box sx={{ display: "grid", placeItems: "center", lineHeight: 0 }}>
@@ -3504,9 +3514,7 @@ export default function ProfessionalFixedLocationCalendar({
                                             </Tooltip>
                                           ))}
                                           {indicator === "ER" ? <OpenInNewRoundedIcon sx={{ fontSize: 12 }} /> : null}
-                                          {(indicator === "BR" || indicator === "EBR") &&
-                                          prepaymentVariant &&
-                                          prepaymentVariant !== "pending" ? (
+                                          {indicator === "EBR" && prepaymentVariant && prepaymentVariant !== "pending" ? (
                                             <PrepaymentStatusIcon variant={prepaymentVariant} size={18} />
                                           ) : null}
                                         </Stack>
@@ -3528,30 +3536,45 @@ export default function ProfessionalFixedLocationCalendar({
                                 const scenarioIndicators = getBookingScenarioIndicators(viewingBookingEvent);
                                 const responseIndicators = resolveBookingResponseIndicators(viewingBookingEvent);
                                 const prepayment = resolveCalendarPrepaymentStatus(viewingBookingEvent);
-                                if (scenarioIndicators.length) {
+                                const hasBr = scenarioIndicators.includes("BR");
+
+                                if (scenarioIndicators.length && !hasBr) {
                                   if (!responseIndicators.includes("overdue_response")) return null;
                                   if (scenarioIndicators.some((indicator) => indicator === "ER" || indicator === "E")) {
                                     return null;
                                   }
                                 }
+
+                                const standaloneResponses = hasBr
+                                  ? responseIndicators
+                                  : scenarioIndicators.length === 0
+                                    ? responseIndicators
+                                    : [];
+
+                                const standalonePrepayment =
+                                  prepayment && (scenarioIndicators.length === 0 || hasBr) ? prepayment : undefined;
+
+                                if (!standaloneResponses.length && !standalonePrepayment) return null;
+
                                 return (
                                   <Stack direction="row" alignItems="center" spacing={0.5}>
-                                    {scenarioIndicators.length === 0
-                                      ? responseIndicators.map((item) => (
-                                          <Tooltip key={item} title={BOOKING_INDICATOR_LABELS[item]} placement="top">
-                                            <Box sx={{ display: "grid", placeItems: "center", lineHeight: 0 }}>
-                                              <BookingIndicatorIcon variant={item} size={18} />
-                                            </Box>
-                                          </Tooltip>
-                                        ))
-                                      : null}
-                                    {prepayment && scenarioIndicators.length === 0 ? (
+                                    {standaloneResponses.map((item) => (
+                                      <Tooltip key={item} title={BOOKING_INDICATOR_LABELS[item]} placement="top">
+                                        <Box sx={{ display: "grid", placeItems: "center", lineHeight: 0 }}>
+                                          <BookingIndicatorIcon variant={item} size={18} />
+                                        </Box>
+                                      </Tooltip>
+                                    ))}
+                                    {standalonePrepayment ? (
                                       <Tooltip
-                                        title={PREPAYMENT_STATUS_LABELS[toPrepaymentIconVariant(prepayment)]}
+                                        title={PREPAYMENT_STATUS_LABELS[toPrepaymentIconVariant(standalonePrepayment)]}
                                         placement="top"
                                       >
                                         <Box sx={{ display: "grid", placeItems: "center", lineHeight: 0 }}>
-                                          <PrepaymentStatusIcon variant={toPrepaymentIconVariant(prepayment)} size={18} />
+                                          <PrepaymentStatusIcon
+                                            variant={toPrepaymentIconVariant(standalonePrepayment)}
+                                            size={18}
+                                          />
                                         </Box>
                                       </Tooltip>
                                     ) : null}

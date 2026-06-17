@@ -14,6 +14,7 @@ import BookingIndicatorIcon, {
   BOOKING_INDICATOR_LABELS,
   type BookingIndicatorVariant,
 } from "./calendar/BookingIndicatorIcon";
+import BookingRequestSentIcon, { BOOKING_REQUEST_SENT_LABEL } from "./calendar/BookingRequestSentIcon";
 import PrepaymentStatusIcon, { type PrepaymentStatusIconVariant } from "./calendar/PrepaymentStatusIcon";
 import { PREPAYMENT_STATUS_LABELS } from "./calendar/PrepaymentStatusIcon";
 
@@ -33,6 +34,7 @@ export type BookingTimelineCardScenarioBadge = {
   showPaymentIcon?: boolean;
   prepaymentStatus?: PrepaymentStatusIconVariant;
   responseIndicators?: readonly BookingIndicatorVariant[];
+  showRequestSentIcon?: boolean;
   showExternalLink?: boolean;
   sx?: SxProps<Theme>;
 };
@@ -153,9 +155,16 @@ function renderScenarioBadge(
       ]}
     >
       <BodyText sx={{ fontSize: 9.5, fontWeight: 700, color: "inherit", lineHeight: 1 }}>{badge.label}</BodyText>
-      {badge.responseIndicators?.length
+      {badge.showRequestSentIcon ? (
+        <Tooltip title={BOOKING_REQUEST_SENT_LABEL} placement="top">
+          <Box sx={{ display: "grid", placeItems: "center", lineHeight: 0 }}>
+            <BookingRequestSentIcon size={10} />
+          </Box>
+        </Tooltip>
+      ) : null}
+      {!badge.showRequestSentIcon && badge.responseIndicators?.length
         ? renderResponseIndicators(badge.responseIndicators)
-        : badge.showAcceptedIcon
+        : !badge.showRequestSentIcon && badge.showAcceptedIcon
           ? renderResponseIndicators(["suggestion_for_change"])
           : null}
       {badge.prepaymentStatus && badge.prepaymentStatus !== "pending" ? (
