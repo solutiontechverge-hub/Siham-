@@ -13,14 +13,15 @@ import {
   Divider,
   FormControlLabel,
   IconButton,
+  Link,
   Stack,
   Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppSearchField from "../AppSearchField";
 import MessagingAvatar from "./MessagingAvatar";
+import { getMessagingBookingHref, getMessagingPeerProfileHref, messagingSearchPlaceholder, type MessagingAudience } from "./messagingRoutes";
 import type { MessagingThread } from "./messagingTypes";
-import { messagingSearchPlaceholder, type MessagingAudience } from "./messagingRoutes";
 
 type Props = {
   audience: MessagingAudience;
@@ -40,6 +41,10 @@ type Props = {
   onOpenSettings: () => void;
   onOpenFilters: () => void;
   onClose?: () => void;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
+  showBulkActions?: boolean;
 };
 
 export default function MessagingConversationSidebar({
@@ -60,6 +65,10 @@ export default function MessagingConversationSidebar({
   onOpenSettings,
   onOpenFilters,
   onClose,
+  hasMore = false,
+  loadingMore = false,
+  onLoadMore,
+  showBulkActions = true,
 }: Props) {
   const m = useTheme().palette.mollure;
 
@@ -121,37 +130,39 @@ export default function MessagingConversationSidebar({
           />
         </Box>
 
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: { xs: 1.25, sm: 1.5 } }}>
-          <Button
-            variant="outlined"
-            size="small"
-            onClick={onRequestDelete}
-            sx={{
-              textTransform: "none",
-              fontWeight: 800,
-              fontSize: 12,
-              borderRadius: "8px",
-              color: "#D32F2F",
-              borderColor: alpha("#D32F2F", 0.45),
-              px: 2,
-              py: 0.55,
-              "&:hover": { borderColor: "#D32F2F", bgcolor: alpha("#D32F2F", 0.04) },
-            }}
-          >
-            Delete
-          </Button>
-          <FormControlLabel
-            control={
-              <Checkbox
-                size="small"
-                checked={selectAll}
-                onChange={onSelectAll}
-                sx={{ color: alpha(m.navy, 0.35), "&.Mui-checked": { color: m.teal } }}
-              />
-            }
-            label={<Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.55) }}>Select All</Typography>}
-          />
-        </Stack>
+        {showBulkActions ? (
+          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: { xs: 1.25, sm: 1.5 } }}>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={onRequestDelete}
+              sx={{
+                textTransform: "none",
+                fontWeight: 800,
+                fontSize: 12,
+                borderRadius: "8px",
+                color: "#D32F2F",
+                borderColor: alpha("#D32F2F", 0.45),
+                px: 2,
+                py: 0.55,
+                "&:hover": { borderColor: "#D32F2F", bgcolor: alpha("#D32F2F", 0.04) },
+              }}
+            >
+              Delete
+            </Button>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  size="small"
+                  checked={selectAll}
+                  onChange={onSelectAll}
+                  sx={{ color: alpha(m.navy, 0.35), "&.Mui-checked": { color: m.teal } }}
+                />
+              }
+              label={<Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.55) }}>Select All</Typography>}
+            />
+          </Stack>
+        ) : null}
       </Box>
 
       <Divider />
@@ -165,7 +176,7 @@ export default function MessagingConversationSidebar({
                 : "No professionals match your search. Try a name or booking ID (e.g. B500844)."
               : audience === "professional"
                 ? "No client messages yet. You can reply after a client starts the conversation."
-                : "No conversations match the current filters."}
+                : "Browse professionals below and tap one to start chatting."}
           </Typography>
         ) : (
           threads.map((thread) => {
@@ -191,12 +202,28 @@ export default function MessagingConversationSidebar({
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
                     <Stack direction="row" alignItems="center" spacing={0.5} sx={{ minWidth: 0, flexWrap: "wrap" }}>
-                      <Typography sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.88) }} noWrap>
+                      <Link
+                        href={getMessagingPeerProfileHref(audience, thread)}
+                        underline="hover"
+                        onClick={(e) => e.stopPropagation()}
+                        sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.88), maxWidth: "100%" }}
+                      >
                         {thread.name}
-                      </Typography>
-                      <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: alpha(m.navy, 0.45) }} noWrap>
-                        {thread.bookingMeta}
-                      </Typography>
+                      </Link>
+                      {!thread.unlinked ? (
+                        <Link
+                          href={getMessagingBookingHref(audience, thread)}
+                          underline="hover"
+                          onClick={(e) => e.stopPropagation()}
+                          sx={{ fontSize: 10.5, fontWeight: 700, color: alpha(m.navy, 0.45) }}
+                        >
+                          {thread.bookingMeta}
+                        </Link>
+                      ) : (
+                        <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: alpha(m.navy, 0.45) }} noWrap>
+                          Unlinked
+                        </Typography>
+                      )}
                       <CheckCircleRoundedIcon sx={{ fontSize: 13, color: "#4CAF50" }} />
                     </Stack>
                     <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: alpha(m.navy, 0.42), whiteSpace: "nowrap" }}>
@@ -224,12 +251,39 @@ export default function MessagingConversationSidebar({
                   checked={checked}
                   onClick={(e) => e.stopPropagation()}
                   onChange={() => onToggleSelect(thread.id)}
-                  sx={{ mt: -0.25, color: alpha(m.navy, 0.35), "&.Mui-checked": { color: m.teal } }}
+                  sx={{
+                    mt: -0.25,
+                    color: alpha(m.navy, 0.35),
+                    "&.Mui-checked": { color: m.teal },
+                    visibility: showBulkActions ? "visible" : "hidden",
+                  }}
                 />
               </Box>
             );
           })
         )}
+        {hasMore && onLoadMore ? (
+          <Box sx={{ px: 2, py: 1.5 }}>
+            <Button
+              fullWidth
+              variant="outlined"
+              disabled={loadingMore}
+              onClick={onLoadMore}
+              sx={{
+                textTransform: "none",
+                fontWeight: 800,
+                fontSize: 12,
+                borderRadius: "8px",
+                borderColor: alpha(m.teal, 0.45),
+                color: m.teal,
+                py: 0.85,
+                "&:hover": { borderColor: m.teal, bgcolor: alpha(m.teal, 0.04) },
+              }}
+            >
+              {loadingMore ? "Loading..." : "Load more"}
+            </Button>
+          </Box>
+        ) : null}
       </Box>
     </Box>
   );

@@ -1,5 +1,10 @@
 import { Server } from "socket.io";
-import { appendThreadMessage, getThreadMessages } from "./messagingStore.js";
+import {
+  appendThreadMessageLegacy,
+  deleteMessage,
+  getThreadMessagesLegacy,
+  purgeExpiredMessages,
+} from "./messaging.repository.js";
 
 export function attachMessagingSocket(httpServer) {
   const io = new Server(httpServer, {
@@ -18,17 +23,42 @@ export function attachMessagingSocket(httpServer) {
       });
     });
 
-    socket.on("messaging:history", ({ threadId }, callback) => {
+    socket.on("messaging:history", async ({ threadId }, callback) => {
       if (typeof callback !== "function") return;
-      callback({ threadId, messages: getThreadMessages(threadId) });
+      try {
+        await purgeExpiredMessages();
+        const messages = await getThreadMessagesLegacy(threadId);
+        callback({ threadId, messages });
+      } catch {
+        callback({ threadId, messages: [] });
+      }
     });
 
-    socket.on("messaging:send", (payload = {}) => {
+    socket.on("messaging:send", async (payload = {}) => {
       const { threadId, message } = payload;
       if (!threadId || !message?.id) return;
 
-      appendThreadMessage(threadId, message);
-      io.to(`thread:${threadId}`).emit("messaging:message", { threadId, message });
+      try {
+        await appendThreadMessageLegacy(threadId, message);
+        io.to(`thread:${threadId}`).emit("messaging:message", { threadId, message });
+      } catch (error) {
+        console.error("[messaging:socket] send failed:", error.message);
+      }
+    });
+
+    socket.on("messaging:delete", async (payload = {}, callback) => {
+      const { threadId, messageId, scope, userId } = payload;
+      if (!threadId || !messageId || !userId) {
+        if (typeof callback === "function") callback({ ok: false });
+        return;
+      }
+      try {
+        const result = await deleteMessage(threadId, messageId, userId, scope === "everyone" ? "everyone" : "me");
+        io.to(`thread:${result.threadId}`).emit("messaging:message-deleted", result);
+        if (typeof callback === "function") callback({ ok: true, data: result });
+      } catch (error) {
+        if (typeof callback === "function") callback({ ok: false, message: error.message });
+      }
     });
   });
 

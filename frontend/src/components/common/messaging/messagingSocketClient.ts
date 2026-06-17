@@ -1,7 +1,7 @@
 "use client";
 
 import { io, type Socket } from "socket.io-client";
-import { API_BASE_URL } from "../../../lib/api";
+import { apiBaseUrl } from "../../../lib/api";
 import type { MessagingChatMessage } from "./messagingTypes";
 
 let socket: Socket | null = null;
@@ -9,7 +9,7 @@ let socket: Socket | null = null;
 export function getMessagingSocket() {
   if (typeof window === "undefined") return null;
   if (!socket) {
-    socket = io(API_BASE_URL, {
+    socket = io(apiBaseUrl, {
       path: "/socket.io",
       transports: ["websocket", "polling"],
       autoConnect: true,
@@ -49,5 +49,16 @@ export function onMessagingMessage(handler: (payload: { threadId: string; messag
   client.on("messaging:message", handler);
   return () => {
     client.off("messaging:message", handler);
+  };
+}
+
+export function onMessagingMessageDeleted(
+  handler: (payload: { threadId: string; messageId: string; scope: string; deletedForEveryone: boolean }) => void,
+) {
+  const client = getMessagingSocket();
+  if (!client) return () => {};
+  client.on("messaging:message-deleted", handler);
+  return () => {
+    client.off("messaging:message-deleted", handler);
   };
 }

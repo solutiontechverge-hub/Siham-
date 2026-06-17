@@ -7,7 +7,8 @@ import MessagingBlockDialog from "./MessagingBlockDialog";
 import MessagingChatActionsMenu, { type MessagingChatAction } from "./MessagingChatActionsMenu";
 import MessagingChatPanel from "./MessagingChatPanel";
 import MessagingConversationSidebar from "./MessagingConversationSidebar";
-import MessagingDeleteChatDialog from "./MessagingDeleteChatDialog";
+import MessagingDeleteChatDialog, { type MessagingDeleteScope } from "./MessagingDeleteChatDialog";
+import MessagingDeleteMessageDialog, { type MessagingMessageDeleteScope } from "./MessagingDeleteMessageDialog";
 import MessagingFiltersDrawer from "./MessagingFiltersDrawer";
 import MessagingLinkBookingDialog from "./MessagingLinkBookingDialog";
 import { getReportModalTitle } from "./messagingPeerLabels";
@@ -15,10 +16,12 @@ import MessagingReportDialog from "./MessagingReportDialog";
 import MessagingSettingsDialog from "./MessagingSettingsDialog";
 import { useSnackbar } from "../AppSnackbar";
 import type { MessagingAudience } from "./messagingRoutes";
+import type { MessagingChatMessage } from "./messagingTypes";
+import { isMessageFromClient } from "./messagingUnread";
 import type { MessagingInboxNavigation } from "./useMessagingInbox";
 import { useMessagingInbox } from "./useMessagingInbox";
 
-type DeleteDialogMode = "single" | "bulk";
+type DeleteDialogMode = "single" | "bulk" | "clear";
 
 export type MessagingPageViewProps = {
   audience: MessagingAudience;
@@ -51,6 +54,9 @@ export default function MessagingPageView({
   const [blockOpen, setBlockOpen] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
   const [deleteMode, setDeleteMode] = React.useState<DeleteDialogMode>("single");
+  const [deletePresetScope, setDeletePresetScope] = React.useState<MessagingDeleteScope>("me");
+  const [deleteMessageOpen, setDeleteMessageOpen] = React.useState(false);
+  const [messageToDelete, setMessageToDelete] = React.useState<MessagingChatMessage | null>(null);
 
   React.useEffect(() => {
     if (!isCompactEmbedded) setMobileChatOpen(false);
@@ -81,8 +87,18 @@ export default function MessagingPageView({
   const handleChatAction = (action: MessagingChatAction) => {
     if (!inbox.activeThread) return;
     switch (action) {
-      case "delete":
+      case "clearChat":
+        setDeleteMode("clear");
+        setDeleteOpen(true);
+        break;
+      case "deleteForMe":
         setDeleteMode("single");
+        setDeletePresetScope("me");
+        setDeleteOpen(true);
+        break;
+      case "deleteForEveryone":
+        setDeleteMode("single");
+        setDeletePresetScope("everyone");
         setDeleteOpen(true);
         break;
       case "block":
@@ -144,6 +160,10 @@ export default function MessagingPageView({
           onOpenSettings={() => setSettingsOpen(true)}
           onOpenFilters={() => setFiltersOpen(true)}
           onClose={embedded ? onClose : undefined}
+          hasMore={inbox.hasMoreThreads}
+          loadingMore={inbox.loadingMore}
+          onLoadMore={() => void inbox.loadMoreThreads()}
+          showBulkActions={audience !== "client"}
         />
         ) : null}
 
@@ -154,12 +174,16 @@ export default function MessagingPageView({
           messageGroups={inbox.messageGroups}
           onSend={inbox.sendMessage}
           onOpenActions={setActionsAnchor}
+          onDeleteMessage={(message) => {
+            setMessageToDelete(message);
+            setDeleteMessageOpen(true);
+          }}
           onClose={embedded ? onClose : undefined}
           onBack={isCompactEmbedded && mobileChatOpen ? handleMobileBack : undefined}
           composerDisabled={audience === "professional" && !inbox.canReply}
           composerDisabledHint={
             audience === "professional" && !inbox.canReply
-              ? "You can reply after the client sends the first message. Professionals cannot start a new chat."
+              ? "Reply when the client messages first, or when a requested, confirmed, or completed booking exists."
               : undefined
           }
         />
@@ -171,6 +195,8 @@ export default function MessagingPageView({
         onClose={() => setSettingsOpen(false)}
         filters={inbox.settingsFilters}
         onChange={inbox.setSettingsFilters}
+        presenceStatus={inbox.presenceStatus}
+        onPresenceChange={inbox.setPresenceStatus}
         embedded={embedded}
       />
 
@@ -179,6 +205,7 @@ export default function MessagingPageView({
         onClose={() => setFiltersOpen(false)}
         filters={inbox.drawerFilters}
         onChange={inbox.setDrawerFilters}
+        audience={audience}
         embedded={embedded}
         onApply={() => {
           inbox.applyDrawerFilters();
@@ -217,9 +244,31 @@ export default function MessagingPageView({
         open={deleteOpen}
         onClose={() => setDeleteOpen(false)}
         embedded={embedded}
-        onConfirm={() => {
+        mode={deleteMode}
+        initialScope={deletePresetScope}
+        onConfirm={(scope: MessagingDeleteScope) => {
           if (deleteMode === "bulk") inbox.deleteSelectedThreads();
-          else inbox.deleteActiveThread();
+          else inbox.clearChat(scope);
+        }}
+      />
+
+      <MessagingDeleteMessageDialog
+        open={deleteMessageOpen}
+        onClose={() => {
+          setDeleteMessageOpen(false);
+          setMessageToDelete(null);
+        }}
+        embedded={embedded}
+        canDeleteForEveryone={
+          messageToDelete
+            ? audience === "client"
+              ? isMessageFromClient(messageToDelete)
+              : !isMessageFromClient(messageToDelete)
+            : false
+        }
+        onConfirm={(scope: MessagingMessageDeleteScope) => {
+          if (messageToDelete) inbox.deleteMessage(messageToDelete, scope);
+          setMessageToDelete(null);
         }}
       />
 

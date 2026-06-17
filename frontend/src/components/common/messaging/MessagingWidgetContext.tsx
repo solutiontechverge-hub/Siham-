@@ -5,6 +5,8 @@ import * as React from "react";
 export type MessagingOpenParams = {
   bookingRef?: string;
   threadId?: string;
+  /** Prefill inbox search (e.g. when opening from a booking). */
+  searchPrefill?: string;
 };
 
 /** @deprecated Use MessagingOpenParams */

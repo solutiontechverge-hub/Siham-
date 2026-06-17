@@ -125,6 +125,7 @@ export default function MessagingFloatingWidget({ audience }: MessagingFloatingW
               navigation={{
                 bookingRef: params.bookingRef,
                 threadId: params.threadId,
+                searchPrefill: params.searchPrefill,
               }}
               onClose={closeMessaging}
             />
