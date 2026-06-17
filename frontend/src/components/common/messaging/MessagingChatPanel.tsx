@@ -26,6 +26,7 @@ type Props = {
   messageGroups: MessageGroup[];
   onSend: (body: string, attachments?: MessagingAttachment[]) => void;
   onOpenActions: (anchor: HTMLElement) => void;
+  onDeleteMessage?: (message: MessagingChatMessage) => void;
   composerDisabled?: boolean;
   composerDisabledHint?: string;
   onClose?: () => void;
@@ -38,6 +39,7 @@ export default function MessagingChatPanel({
   messageGroups,
   onSend,
   onOpenActions,
+  onDeleteMessage,
   composerDisabled = false,
   composerDisabledHint,
   onClose,
@@ -90,8 +92,12 @@ export default function MessagingChatPanel({
                 </Typography>
                 <CheckCircleRoundedIcon sx={{ fontSize: 14, color: "#4CAF50", flexShrink: 0 }} />
               </Stack>
-              {thread.online ? (
+              {thread.online || thread.presenceStatus === "online" ? (
                 <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#4CAF50", mt: 0.2 }}>Online</Typography>
+              ) : thread.presenceStatus === "busy" ? (
+                <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#FF9800", mt: 0.2 }}>Busy</Typography>
+              ) : thread.presenceStatus === "offline" ? (
+                <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#F44336", mt: 0.2 }}>Offline</Typography>
               ) : (
                 <Typography
                   sx={{
@@ -133,7 +139,12 @@ export default function MessagingChatPanel({
                   audience === "client" ? isMessageFromClient(msg) : !isMessageFromClient(msg);
                 return (
                   <Box key={msg.id} sx={{ width: "100%", display: "flex", justifyContent: own ? "flex-end" : "flex-start" }}>
-                    <MessagingMessageBubble message={msg} isOwn={own} peerName={thread.name} />
+                    <MessagingMessageBubble
+                      message={msg}
+                      isOwn={own}
+                      peerName={thread.name}
+                      onRequestDelete={onDeleteMessage}
+                    />
                   </Box>
                 );
               })}

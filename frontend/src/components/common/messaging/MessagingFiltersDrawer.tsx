@@ -8,14 +8,15 @@ import MessagingFilterCheckboxList from "./MessagingFilterCheckboxList";
 import MessagingInsetOverlay from "./MessagingInsetOverlay";
 import type { MessagingDrawerFilters, MessagingBookingStatus } from "./messagingTypes";
 
-const SEARCH_OPTIONS: { key: MessagingDrawerFilters["searchFor"]; label: string; info?: boolean }[] = [
+const SEARCH_OPTIONS: { key: MessagingDrawerFilters["searchFor"]; label: string; info?: boolean; professionalOnly?: boolean }[] = [
   { key: "all", label: "All" },
   { key: "completed", label: "Completed" },
   { key: "confirmed", label: "Confirmed" },
   { key: "requested", label: "Requests", info: true },
   { key: "cancelled", label: "Cancelled" },
   { key: "invalid", label: "Invalid" },
-  { key: "no_show", label: "No Show" },
+  { key: "no_show", label: "No Show", professionalOnly: true },
+  { key: "unlinked", label: "No booking status", info: true },
 ];
 
 type Props = {
@@ -25,17 +26,21 @@ type Props = {
   onChange: (next: MessagingDrawerFilters) => void;
   onApply: () => void;
   onCancel: () => void;
+  audience?: "client" | "professional";
   embedded?: boolean;
 };
 
 function FiltersContent({
   filters,
   onChange,
+  audience = "client",
 }: {
   filters: MessagingDrawerFilters;
   onChange: (next: MessagingDrawerFilters) => void;
+  audience?: "client" | "professional";
 }) {
-  const searchChecked = SEARCH_OPTIONS.reduce(
+  const visibleOptions = SEARCH_OPTIONS.filter((opt) => !opt.professionalOnly || audience === "professional");
+  const searchChecked = visibleOptions.reduce(
     (acc, opt) => {
       acc[opt.key] = filters.searchFor === opt.key;
       return acc;
@@ -47,12 +52,12 @@ function FiltersContent({
     <>
       <MessagingFilterCheckboxList
         title="Search for"
-        options={SEARCH_OPTIONS}
+        options={visibleOptions}
         checked={searchChecked}
         singleSelect
         onToggle={(key, value) => {
           if (!value) return;
-          onChange({ ...filters, searchFor: key as MessagingBookingStatus | "all" });
+          onChange({ ...filters, searchFor: key as MessagingDrawerFilters["searchFor"] });
         }}
       />
       <Box sx={{ mt: 2.5 }}>
@@ -127,6 +132,7 @@ export default function MessagingFiltersDrawer({
   onChange,
   onApply,
   onCancel,
+  audience = "client",
   embedded = false,
 }: Props) {
   const m = useTheme().palette.mollure;
@@ -140,7 +146,7 @@ export default function MessagingFiltersDrawer({
         maxWidth={420}
         footer={<FiltersFooter onCancel={onCancel} onApply={onApply} />}
       >
-        <FiltersContent filters={filters} onChange={onChange} />
+        <FiltersContent filters={filters} onChange={onChange} audience={audience} />
       </MessagingInsetOverlay>
     );
   }
@@ -156,7 +162,7 @@ export default function MessagingFiltersDrawer({
         </Stack>
 
         <Box sx={{ flex: 1, overflowY: "auto" }}>
-          <FiltersContent filters={filters} onChange={onChange} />
+          <FiltersContent filters={filters} onChange={onChange} audience={audience} />
         </Box>
 
         <Box sx={{ mt: 2, pt: 2 }}>

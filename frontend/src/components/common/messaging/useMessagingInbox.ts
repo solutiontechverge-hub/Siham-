@@ -2,10 +2,21 @@
 
 import * as React from "react";
 import { useSearchParams } from "next/navigation";
+import { useAppSelector } from "../../../store/hooks";
+import { getPersistedAuthSession } from "../../../lib/auth-storage";
+import { useGetAllBusinessSetupsQuery } from "../../../store/services/businessApi";
+import {
+  useClearMessagingThreadMutation,
+  useDeleteMessagingMessageMutation,
+  useGetMessagingInboxQuery,
+  useLazyGetMessagingProfessionalsQuery,
+  useSendMessagingMessageMutation,
+} from "../../../store/services/messagingApi";
 import { useSnackbar } from "../AppSnackbar";
 import type { LinkableBooking } from "./messagingBookingsMock";
 import { formatLinkableBookingLabel } from "./messagingBookingsMock";
 import { formatMessageTimeLabel, todayDateKey } from "./messagingMockData";
+import { formatConversationTimeLabel, getMessageTimestamp, isMessageWithinRetention, withMessageCreatedAt } from "./messagingRetention";
 import type { MessagingReportPayload } from "./messagingReportReasons";
 import {
   getUnreadFromClientCount,
@@ -17,15 +28,39 @@ import {
   fetchMessagingHistory,
   joinMessagingThreads,
   onMessagingMessage,
+  onMessagingMessageDeleted,
 } from "./messagingSocketClient";
-import { canProfessionalReply, findThreadIdByBookingRef } from "./messagingThreadAccess";
-import { threadMatchesSearch, hideThreadsForAudience, isThreadHiddenForAudience, loadMessagingStore, saveMessagingStore } from "./messagingStorage";
-import { threadPassesDrawerFilters, threadPassesSettingsFilters } from "./messagingFilters";
+import { canProfessionalReply, findThreadIdByBookingRef, threadHasActiveBooking } from "./messagingThreadAccess";
+import {
+  applyAutoDeleteSettings,
+  applyClearChat,
+  applyMessageDelete,
+  applyMessageRetention,
+  filterVisibleMessages,
+  isApiBackedStore,
+  loadMessagingPrefs,
+  loadMessagingStore,
+  mergeApiInboxIntoStore,
+  mergeApiInboxWithPrefs,
+  mapDraftActiveThreadId,
+  replaceThreadIdInStore,
+  threadMatchesSearch,
+  hideThreadsForAudience,
+  isThreadHiddenForAudience,
+  saveMessagingStore,
+} from "./messagingStorage";
+import {
+  CLIENT_PROFESSIONALS_PAGE_SIZE,
+  mergeClientThreadsWithProfessionals,
+  type MessagingProfessionalListItem,
+} from "./messagingProfessionals";
+import { threadPassesDrawerFilters } from "./messagingFilters";
 import type { MessagingAudience } from "./messagingRoutes";
 import type {
   MessagingAttachment,
   MessagingChatMessage,
   MessagingDrawerFilters,
+  MessagingPresenceStatus,
   MessagingSettingsFilters,
   MessagingStore,
   MessagingThread,
@@ -60,23 +95,42 @@ function mergeRemoteMessages(
   const local = store.messagesByThreadId[threadId] ?? [];
   const merged = [...local];
   for (const message of remoteMessages) {
-    if (!merged.some((item) => item.id === message.id)) merged.push(message);
+    const normalized = withMessageCreatedAt(message);
+    if (!merged.some((item) => item.id === normalized.id)) merged.push(normalized);
   }
   merged.sort((a, b) => a.id.localeCompare(b.id));
-  return {
+  const retained = merged.filter(isMessageWithinRetention);
+  return applyMessageRetention({
     ...store,
-    messagesByThreadId: { ...store.messagesByThreadId, [threadId]: merged },
-  };
+    messagesByThreadId: { ...store.messagesByThreadId, [threadId]: retained },
+  });
 }
 
 export type MessagingInboxNavigation = {
   bookingRef?: string;
   threadId?: string;
+  searchPrefill?: string;
 };
 
 export function useMessagingInbox(audience: MessagingAudience, navigation?: MessagingInboxNavigation) {
   const { showSnackbar } = useSnackbar();
   const searchParams = useSearchParams();
+  const accessToken = useAppSelector((state) => state.auth.accessToken);
+  const [persistedToken, setPersistedToken] = React.useState<string | null>(null);
+  const isAuthed = Boolean(accessToken || persistedToken);
+
+  React.useEffect(() => {
+    setPersistedToken(getPersistedAuthSession()?.accessToken ?? null);
+  }, [accessToken]);
+
+  const { data: apiInbox, isSuccess: apiInboxLoaded } = useGetMessagingInboxQuery(undefined, {
+    skip: !isAuthed,
+  });
+  const [fetchProfessionals] = useLazyGetMessagingProfessionalsQuery();
+  const { data: businessSetups } = useGetAllBusinessSetupsQuery(undefined, { skip: !isAuthed || audience !== "client" });
+  const [sendMessagingMessage] = useSendMessagingMessageMutation();
+  const [deleteMessagingMessage] = useDeleteMessagingMessageMutation();
+  const [clearMessagingThread] = useClearMessagingThreadMutation();
   const [store, setStore] = React.useState<MessagingStore | null>(null);
   const [search, setSearch] = React.useState("");
   const [activeThreadId, setActiveThreadId] = React.useState("");
@@ -85,34 +139,219 @@ export function useMessagingInbox(audience: MessagingAudience, navigation?: Mess
   const [settingsFilters, setSettingsFilters] = React.useState<MessagingSettingsFilters>(defaultSettingsFilters);
   const [drawerFilters, setDrawerFilters] = React.useState<MessagingDrawerFilters>(defaultDrawerFilters);
   const [appliedDrawerFilters, setAppliedDrawerFilters] = React.useState<MessagingDrawerFilters>(defaultDrawerFilters);
+  const [listVisibleCount, setListVisibleCount] = React.useState(CLIENT_PROFESSIONALS_PAGE_SIZE);
+  const [professionalsHasMore, setProfessionalsHasMore] = React.useState(false);
+  const [professionalsOffset, setProfessionalsOffset] = React.useState(0);
+  const [loadingMore, setLoadingMore] = React.useState(false);
+  const professionalsLoadedRef = React.useRef(false);
+  const inboxHydratingRef = React.useRef(false);
+  const inboxHydratedRef = React.useRef(false);
 
   React.useEffect(() => {
-    const loaded = loadMessagingStore();
+    setListVisibleCount(CLIENT_PROFESSIONALS_PAGE_SIZE);
+    professionalsLoadedRef.current = false;
+    setProfessionalsOffset(0);
+  }, [search, audience]);
+
+  const mergeProfessionalsIntoStore = React.useCallback(
+    (base: MessagingStore, professionals: MessagingProfessionalListItem[]) => {
+      const mergedThreads = mergeClientThreadsWithProfessionals(base.threads, professionals);
+      const messagesByThreadId = { ...base.messagesByThreadId };
+      for (const thread of mergedThreads) {
+        if (!(thread.id in messagesByThreadId)) messagesByThreadId[thread.id] = [];
+      }
+      return { ...base, threads: mergedThreads, messagesByThreadId };
+    },
+    [],
+  );
+
+  const loadProfessionalsPage = React.useCallback(
+    async (baseStore: MessagingStore, offset: number, searchQuery: string) => {
+      try {
+        const page = await fetchProfessionals({
+          offset,
+          limit: CLIENT_PROFESSIONALS_PAGE_SIZE,
+          q: searchQuery,
+        }).unwrap();
+        setProfessionalsHasMore(page.hasMore);
+        setProfessionalsOffset(offset + page.professionals.length);
+        return mergeProfessionalsIntoStore(baseStore, page.professionals);
+      } catch {
+        return baseStore;
+      }
+    },
+    [fetchProfessionals, mergeProfessionalsIntoStore],
+  );
+
+  const buildFromSetups = React.useCallback(
+    (base: MessagingStore) => {
+      if (!businessSetups?.data?.length) return base;
+      const professionals: MessagingProfessionalListItem[] = businessSetups.data.map((setup) => ({
+        id: setup.id,
+        professionalUserId: setup.professionalProfileId ?? setup.id,
+        businessSetupId: setup.id,
+        name: setup.businessName || setup.salonName || "Professional",
+        email: undefined,
+        locationType: setup.locationMode === "desired" ? "desired" : "fixed",
+        avatarSeed: setup.id,
+      }));
+      return mergeProfessionalsIntoStore(base, professionals);
+    },
+    [businessSetups?.data, mergeProfessionalsIntoStore],
+  );
+
+  React.useEffect(() => {
+    if (!isAuthed || !apiInboxLoaded || !apiInbox) return;
+
+    if (inboxHydratedRef.current) {
+      setStore((prev) => {
+        if (!prev) return mergeApiInboxWithPrefs(apiInbox, loadMessagingPrefs());
+        const merged = mergeApiInboxIntoStore(prev, apiInbox, loadMessagingPrefs());
+        saveMessagingStore(merged);
+        return merged;
+      });
+      setActiveThreadId((prev) => mapDraftActiveThreadId(prev, apiInbox.threads));
+      return;
+    }
+
+    if (inboxHydratingRef.current) return;
+    inboxHydratingRef.current = true;
+
+    const load = async () => {
+      try {
+        let merged = mergeApiInboxWithPrefs(apiInbox, loadMessagingPrefs());
+        if (audience === "client" && !professionalsLoadedRef.current) {
+          professionalsLoadedRef.current = true;
+          merged = await loadProfessionalsPage(merged, 0, "");
+          if (!merged.threads.some((t) => t.isNewConversation)) {
+            merged = buildFromSetups(merged);
+            setProfessionalsHasMore((businessSetups?.data?.length ?? 0) > CLIENT_PROFESSIONALS_PAGE_SIZE);
+          }
+        }
+        setStore(merged);
+        saveMessagingStore(merged);
+        inboxHydratedRef.current = true;
+        if (merged.threads[0]) setActiveThreadId((prev) => prev || merged.threads[0].id);
+      } finally {
+        inboxHydratingRef.current = false;
+      }
+    };
+    void load();
+  }, [
+    apiInbox,
+    apiInboxLoaded,
+    audience,
+    buildFromSetups,
+    businessSetups?.data?.length,
+    isAuthed,
+    loadProfessionalsPage,
+  ]);
+
+  React.useEffect(() => {
+    if (isAuthed) return;
+    let loaded = applyMessageRetention(loadMessagingStore());
+    if (audience === "client") loaded = buildFromSetups(loaded);
     setStore(loaded);
-    if (loaded.threads[0]) setActiveThreadId(loaded.threads[0].id);
-  }, []);
+    if (loaded.threads[0]) setActiveThreadId((prev) => prev || loaded.threads[0].id);
+  }, [audience, buildFromSetups, isAuthed]);
+
+  React.useEffect(() => {
+    if (!isAuthed || audience !== "client" || !store || !businessSetups?.data?.length) return;
+    if (store.threads.some((t) => t.isNewConversation || t.id.startsWith("draft:"))) return;
+
+    const merged = buildFromSetups(store);
+    if (merged.threads.length === store.threads.length) return;
+
+    setStore(merged);
+    setProfessionalsHasMore(businessSetups.data.length > CLIENT_PROFESSIONALS_PAGE_SIZE);
+  }, [audience, buildFromSetups, businessSetups?.data, isAuthed, store]);
 
   React.useEffect(() => {
     if (!store) return;
     const bookingRef = navigation?.bookingRef ?? searchParams.get("booking") ?? "";
     const threadRef = navigation?.threadId ?? searchParams.get("thread") ?? "";
+    const searchPrefill =
+      navigation?.searchPrefill ??
+      searchParams.get("client") ??
+      searchParams.get("professional") ??
+      "";
     const resolvedThreadId =
       threadRef ||
       findThreadIdByBookingRef(store, bookingRef) ||
       store.threads.find((thread) => thread.name.toLowerCase() === (searchParams.get("client") ?? "").toLowerCase())?.id ||
       "";
+
     if (resolvedThreadId) setActiveThreadId(resolvedThreadId);
-  }, [navigation?.bookingRef, navigation?.threadId, searchParams, store]);
+
+    if (searchPrefill.trim()) {
+      setSearch(searchPrefill.trim());
+      return;
+    }
+
+    if (resolvedThreadId) {
+      const thread = store.threads.find((item) => item.id === resolvedThreadId);
+      if (thread && bookingRef) setSearch(thread.name);
+    }
+  }, [navigation?.bookingRef, navigation?.searchPrefill, navigation?.threadId, searchParams, store]);
 
   const persist = React.useCallback((next: MessagingStore) => {
-    setStore(next);
-    saveMessagingStore(next);
+    const retained = applyMessageRetention(next);
+    setStore(retained);
+    saveMessagingStore(retained);
   }, []);
+
+  const threadIdsKey = store?.threads.map((thread) => thread.id).join("|") ?? "";
 
   React.useEffect(() => {
     if (!store) return;
     const threadIds = store.threads.map((thread) => thread.id);
     joinMessagingThreads(threadIds);
+
+    if (isApiBackedStore(store)) {
+      const offMessage = onMessagingMessage(({ threadId, message }) => {
+        setStore((prev) => {
+          if (!prev) return prev;
+          const normalized = withMessageCreatedAt(message);
+          if (!isMessageWithinRetention(normalized)) return prev;
+          const local = prev.messagesByThreadId[threadId] ?? [];
+          if (local.some((item) => item.id === normalized.id)) return prev;
+          const threadMessages = [...local, normalized];
+          const preview = normalized.body || (normalized.attachments?.[0]?.name ?? "Attachment");
+          const nextThreads = prev.threads.map((thread) =>
+            thread.id === threadId
+              ? {
+                  ...thread,
+                  preview,
+                  timeLabel: formatConversationTimeLabel(normalized.createdAt ?? new Date().toISOString()),
+                  lastActivityAt: normalized.createdAt,
+                }
+              : thread,
+          );
+          const next = applyMessageRetention({
+            ...prev,
+            threads: nextThreads,
+            messagesByThreadId: { ...prev.messagesByThreadId, [threadId]: threadMessages },
+          });
+          saveMessagingStore(next);
+          return next;
+        });
+      });
+
+      const offDeleted = onMessagingMessageDeleted(({ threadId, messageId, deletedForEveryone }) => {
+        setStore((prev) => {
+          if (!prev) return prev;
+          const scope = deletedForEveryone ? "everyone" : "me";
+          const next = applyMessageDelete(prev, audience, threadId, messageId, scope);
+          saveMessagingStore(next);
+          return next;
+        });
+      });
+
+      return () => {
+        offMessage();
+        offDeleted();
+      };
+    }
 
     threadIds.forEach(async (threadId) => {
       const remoteMessages = await fetchMessagingHistory(threadId);
@@ -128,45 +367,91 @@ export function useMessagingInbox(audience: MessagingAudience, navigation?: Mess
     return onMessagingMessage(({ threadId, message }) => {
       setStore((prev) => {
         if (!prev) return prev;
+        const normalized = withMessageCreatedAt(message);
+        if (!isMessageWithinRetention(normalized)) return prev;
         const local = prev.messagesByThreadId[threadId] ?? [];
-        if (local.some((item) => item.id === message.id)) return prev;
-        const threadMessages = [...local, message];
-        const preview = message.body || (message.attachments?.[0]?.name ?? "Attachment");
+        if (local.some((item) => item.id === normalized.id)) return prev;
+        const threadMessages = [...local, normalized];
+        const preview = normalized.body || (normalized.attachments?.[0]?.name ?? "Attachment");
         const nextThreads = prev.threads.map((thread) =>
-          thread.id === threadId ? { ...thread, preview, timeLabel: message.timeLabel } : thread,
+          thread.id === threadId
+            ? {
+                ...thread,
+                preview,
+                timeLabel: formatConversationTimeLabel(normalized.createdAt ?? new Date().toISOString()),
+                lastActivityAt: normalized.createdAt,
+              }
+            : thread,
         );
-        const next = {
+        const next = applyMessageRetention({
           ...prev,
           threads: nextThreads,
           messagesByThreadId: { ...prev.messagesByThreadId, [threadId]: threadMessages },
-        };
+        });
         saveMessagingStore(next);
         return next;
       });
     });
-  }, [store?.threads.length]);
+  }, [audience, threadIdsKey]);
 
-  const visibleThreads = React.useMemo(() => {
+  const filteredThreads = React.useMemo(() => {
     if (!store) return [];
     return store.threads.filter((thread) => {
       if (isThreadHiddenForAudience(store, audience, thread.id)) return false;
       if (store.blockedThreadIds.includes(thread.id)) return false;
       if (!threadMatchesSearch(thread, search)) return false;
-      if (!threadPassesSettingsFilters(thread, settingsFilters)) return false;
       if (!threadPassesDrawerFilters(thread, appliedDrawerFilters)) return false;
-      if (audience === "professional" && !(store.messagesByThreadId[thread.id] ?? []).some(isMessageFromClient)) {
-        return false;
+      if (audience === "professional") {
+        const hasClientMsg = (store.messagesByThreadId[thread.id] ?? []).some(isMessageFromClient);
+        if (!hasClientMsg && !threadHasActiveBooking(store, thread.id)) return false;
       }
       return true;
     });
-  }, [store, audience, search, settingsFilters, appliedDrawerFilters]);
+  }, [store, audience, search, appliedDrawerFilters]);
+
+  const visibleThreads = React.useMemo(() => {
+    if (audience !== "client") return filteredThreads;
+    return filteredThreads.slice(0, listVisibleCount);
+  }, [audience, filteredThreads, listVisibleCount]);
+
+  const hasMoreThreads = React.useMemo(() => {
+    if (audience !== "client") return false;
+    return listVisibleCount < filteredThreads.length || professionalsHasMore;
+  }, [audience, filteredThreads.length, listVisibleCount, professionalsHasMore]);
+
+  const loadMoreThreads = React.useCallback(async () => {
+    if (!store || audience !== "client") return;
+    if (listVisibleCount < filteredThreads.length) {
+      setListVisibleCount((count) => count + CLIENT_PROFESSIONALS_PAGE_SIZE);
+      return;
+    }
+    if (!professionalsHasMore || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const next = await loadProfessionalsPage(store, professionalsOffset, search);
+      setStore(next);
+      saveMessagingStore(next);
+      setListVisibleCount((count) => count + CLIENT_PROFESSIONALS_PAGE_SIZE);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [
+    audience,
+    filteredThreads.length,
+    listVisibleCount,
+    loadProfessionalsPage,
+    loadingMore,
+    professionalsHasMore,
+    professionalsOffset,
+    search,
+    store,
+  ]);
 
   React.useEffect(() => {
-    if (!visibleThreads.length) return;
-    if (!visibleThreads.some((t) => t.id === activeThreadId)) {
-      setActiveThreadId(visibleThreads[0].id);
-    }
-  }, [activeThreadId, visibleThreads]);
+    if (!store?.threads.length) return;
+    if (store.threads.some((thread) => thread.id === activeThreadId)) return;
+    setActiveThreadId(store.threads[0].id);
+  }, [activeThreadId, store]);
 
   React.useEffect(() => {
     if (!store || !activeThreadId) return;
@@ -180,12 +465,31 @@ export function useMessagingInbox(audience: MessagingAudience, navigation?: Mess
     saveMessagingStore(next);
   }, [store, activeThreadId, audience]);
 
-  const activeThread = visibleThreads.find((t) => t.id === activeThreadId) ?? visibleThreads[0];
+  const activeThread = React.useMemo(() => {
+    if (!store) return undefined;
+    const match = store.threads.find((t) => t.id === activeThreadId);
+    return match ?? visibleThreads[0];
+  }, [store, activeThreadId, visibleThreads]);
 
   const messages = React.useMemo(() => {
     if (!store || !activeThread) return [];
-    return store.messagesByThreadId[activeThread.id] ?? [];
-  }, [store, activeThread]);
+    const messageKeys = new Set<string>([activeThread.id]);
+    if (activeThread.professionalUserId) messageKeys.add(`draft:${activeThread.professionalUserId}`);
+    if (activeThread.businessSetupId) messageKeys.add(`draft:setup-${activeThread.businessSetupId}`);
+    if (activeThread.peerProfileId) messageKeys.add(`draft:setup-${activeThread.peerProfileId}`);
+
+    const raw: MessagingChatMessage[] = [];
+    const seen = new Set<string>();
+    for (const key of messageKeys) {
+      for (const message of store.messagesByThreadId[key] ?? []) {
+        if (seen.has(message.id)) continue;
+        seen.add(message.id);
+        raw.push(message);
+      }
+    }
+    raw.sort((a, b) => getMessageTimestamp(a) - getMessageTimestamp(b));
+    return filterVisibleMessages(raw, audience);
+  }, [store, activeThread, audience]);
 
   const messageGroups = React.useMemo(() => groupMessagesByDate(messages), [messages]);
 
@@ -198,12 +502,13 @@ export function useMessagingInbox(audience: MessagingAudience, navigation?: Mess
   }, [audience, store]);
 
   const sendMessage = React.useCallback(
-    (body: string, attachments?: MessagingAttachment[]) => {
+    async (body: string, attachments?: MessagingAttachment[]) => {
       if (!store || !activeThread) return;
       if (audience === "professional" && !canProfessionalReply(store, activeThread.id)) {
         showSnackbar({
           severity: "info",
-          message: "You can reply after the client sends the first message.",
+          message:
+            "You can reply after the client sends the first message, or when there is a requested, confirmed, or completed booking.",
         });
         return;
       }
@@ -211,22 +516,114 @@ export function useMessagingInbox(audience: MessagingAudience, navigation?: Mess
       const trimmed = body.trim();
       if (!trimmed && !attachments?.length) return;
 
-      const msg: MessagingChatMessage = {
-        id: `msg-${Date.now()}`,
+      const createdAt = new Date().toISOString();
+      const clientMessageId = `msg-${Date.now()}`;
+      const draftThreadId = activeThread.id;
+      const msg: MessagingChatMessage = withMessageCreatedAt({
+        id: clientMessageId,
         senderSide: "self",
         senderRole: audience === "client" ? "client" : "professional",
         senderName: "You",
         senderAvatarSeed: "you",
         timeLabel: formatMessageTimeLabel(),
+        createdAt,
         body: trimmed,
         attachments,
         dateKey: todayDateKey(),
+      });
+
+      const preview = trimmed || (attachments?.[0]?.name ?? "Attachment");
+      const applyOptimisticMessage = (base: MessagingStore, threadId: string, message: MessagingChatMessage) => {
+        const threadMessages = [...(base.messagesByThreadId[threadId] ?? []), message];
+        const nextThreads = base.threads.map((t) =>
+          t.id === threadId
+            ? {
+                ...t,
+                preview,
+                timeLabel: formatConversationTimeLabel(message.createdAt ?? createdAt),
+                lastActivityAt: message.createdAt ?? createdAt,
+                isNewConversation: false,
+              }
+            : t,
+        );
+        return {
+          ...base,
+          threads: nextThreads,
+          messagesByThreadId: { ...base.messagesByThreadId, [threadId]: threadMessages },
+        };
       };
 
+      if (isApiBackedStore(store) || isAuthed) {
+        persist(applyOptimisticMessage(store, draftThreadId, msg));
+
+        try {
+          const result = await sendMessagingMessage({
+            threadId: draftThreadId,
+            body: trimmed,
+            attachments,
+            clientMessageId,
+          }).unwrap();
+
+          const resolvedThreadId = result.threadId;
+          const saved = withMessageCreatedAt(result.message);
+          setStore((prev) => {
+            if (!prev) return prev;
+            let baseStore = prev;
+            if (resolvedThreadId !== draftThreadId) {
+              baseStore = replaceThreadIdInStore(prev, draftThreadId, resolvedThreadId);
+            }
+
+            const existing = baseStore.messagesByThreadId[resolvedThreadId] ?? [];
+            const withoutOptimistic = existing.filter((item) => item.id !== clientMessageId);
+            const threadMessages = [...withoutOptimistic, saved];
+            const nextThreads = baseStore.threads.map((t) =>
+              t.id === resolvedThreadId
+                ? {
+                    ...t,
+                    preview,
+                    timeLabel: formatConversationTimeLabel(saved.createdAt ?? createdAt),
+                    lastActivityAt: saved.createdAt ?? createdAt,
+                    isNewConversation: false,
+                  }
+                : t,
+            );
+            const next = applyMessageRetention({
+              ...baseStore,
+              threads: nextThreads,
+              messagesByThreadId: { ...baseStore.messagesByThreadId, [resolvedThreadId]: threadMessages },
+            });
+            saveMessagingStore(next);
+            return next;
+          });
+          setActiveThreadId((prev) => (resolvedThreadId !== draftThreadId ? resolvedThreadId : prev));
+        } catch {
+          setStore((prev) => {
+            if (!prev) return prev;
+            const threadMessages = (prev.messagesByThreadId[draftThreadId] ?? []).filter(
+              (item) => item.id !== clientMessageId,
+            );
+            const next = applyMessageRetention({
+              ...prev,
+              messagesByThreadId: { ...prev.messagesByThreadId, [draftThreadId]: threadMessages },
+            });
+            saveMessagingStore(next);
+            return next;
+          });
+          showSnackbar({ severity: "error", message: "Failed to send message. Please try again." });
+        }
+        return;
+      }
+
       const threadMessages = [...(store.messagesByThreadId[activeThread.id] ?? []), msg];
-      const preview = trimmed || (attachments?.[0]?.name ?? "Attachment");
       const nextThreads = store.threads.map((t) =>
-        t.id === activeThread.id ? { ...t, preview, timeLabel: msg.timeLabel } : t,
+        t.id === activeThread.id
+          ? {
+              ...t,
+              preview,
+              timeLabel: formatConversationTimeLabel(createdAt),
+              lastActivityAt: createdAt,
+            }
+          : t,
       );
 
       const next = {
@@ -237,7 +634,43 @@ export function useMessagingInbox(audience: MessagingAudience, navigation?: Mess
       persist(next);
       emitMessagingSend(activeThread.id, msg);
     },
-    [store, activeThread, audience, persist, showSnackbar],
+    [store, activeThread, audience, isAuthed, persist, sendMessagingMessage, showSnackbar],
+  );
+
+  const deleteMessage = React.useCallback(
+    async (message: MessagingChatMessage, scope: "me" | "everyone") => {
+      if (!store || !activeThread) return;
+
+      if (isApiBackedStore(store) || isAuthed) {
+        try {
+          await deleteMessagingMessage({
+            threadId: activeThread.id,
+            messageId: message.id,
+            scope,
+          }).unwrap();
+          const resolved = applyMessageDelete(store, audience, activeThread.id, message.id, scope);
+          persist(resolved);
+          showSnackbar({
+            severity: "success",
+            message: scope === "everyone" ? "Message deleted for everyone." : "Message deleted for you.",
+          });
+        } catch (error) {
+          const msg =
+            error && typeof error === "object" && "data" in error
+              ? String((error as { data?: { message?: string } }).data?.message ?? "")
+              : "";
+          showSnackbar({ severity: "error", message: msg || "Failed to delete message." });
+        }
+        return;
+      }
+
+      persist(applyMessageDelete(store, audience, activeThread.id, message.id, scope));
+      showSnackbar({
+        severity: "success",
+        message: scope === "everyone" ? "Message deleted for everyone." : "Message deleted for you.",
+      });
+    },
+    [store, activeThread, audience, isAuthed, deleteMessagingMessage, persist, showSnackbar],
   );
 
   const deleteSelectedThreads = React.useCallback(() => {
@@ -270,11 +703,70 @@ export function useMessagingInbox(audience: MessagingAudience, navigation?: Mess
     [store, persist, showSnackbar],
   );
 
-  const deleteActiveThread = React.useCallback(() => {
-    if (!store || !activeThread) return;
-    persist(hideThreadsForAudience(store, audience, [activeThread.id]));
-    showSnackbar({ severity: "success", message: "Chat deleted from your history." });
-  }, [store, activeThread, audience, persist, showSnackbar]);
+  const clearChat = React.useCallback(
+    async (scope: "me" | "everyone") => {
+      if (!store || !activeThread) return;
+
+      if (isApiBackedStore(store) || isAuthed) {
+        try {
+          const result = await clearMessagingThread({
+            threadId: activeThread.id,
+            scope,
+          }).unwrap();
+          let baseStore = store;
+          if (result.threadId !== activeThread.id) {
+            baseStore = replaceThreadIdInStore(store, activeThread.id, result.threadId);
+            setActiveThreadId(result.threadId);
+          }
+          persist(applyClearChat(baseStore, audience, result.threadId, scope));
+          showSnackbar({
+            severity: "success",
+            message:
+              scope === "everyone"
+                ? "Chat cleared for everyone."
+                : "Chat cleared from your view. The professional remains in your list.",
+          });
+        } catch {
+          showSnackbar({ severity: "error", message: "Failed to clear chat. Please try again." });
+        }
+        return;
+      }
+
+      persist(applyClearChat(store, audience, activeThread.id, scope));
+      showSnackbar({
+        severity: "success",
+        message:
+          scope === "everyone"
+            ? "Chat cleared for everyone."
+            : "Chat cleared from your view. The professional remains in your list.",
+      });
+    },
+    [store, activeThread, audience, isAuthed, clearMessagingThread, persist, showSnackbar],
+  );
+
+  const deleteActiveThread = React.useCallback(
+    (scope: "me" | "everyone") => {
+      void clearChat(scope);
+    },
+    [clearChat],
+  );
+
+  const setPresenceStatus = React.useCallback(
+    (status: MessagingPresenceStatus) => {
+      if (!store) return;
+      persist({ ...store, presenceStatus: status });
+    },
+    [store, persist],
+  );
+
+  const handleSettingsFiltersChange = React.useCallback(
+    (next: MessagingSettingsFilters) => {
+      setSettingsFilters(next);
+      if (!store) return;
+      persist(applyAutoDeleteSettings(store, next));
+    },
+    [store, persist],
+  );
 
   const linkThreadToBooking = React.useCallback(
     (booking: LinkableBooking) => {
@@ -353,14 +845,21 @@ export function useMessagingInbox(audience: MessagingAudience, navigation?: Mess
     canReply,
     unreadCount,
     settingsFilters,
-    setSettingsFilters,
+    setSettingsFilters: handleSettingsFiltersChange,
+    presenceStatus: store?.presenceStatus ?? "online",
+    setPresenceStatus,
     drawerFilters,
     setDrawerFilters,
     applyDrawerFilters,
     resetDrawerFilters,
     blockThread,
+    clearChat,
     deleteActiveThread,
+    deleteMessage,
     linkThreadToBooking,
     reportThread,
+    loadMoreThreads,
+    hasMoreThreads,
+    loadingMore,
   };
 }

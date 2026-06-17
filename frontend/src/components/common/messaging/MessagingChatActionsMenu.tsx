@@ -5,7 +5,7 @@ import { Button, Menu, MenuItem, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import MessagingInsetOverlay from "./MessagingInsetOverlay";
 
-export type MessagingChatAction = "delete" | "block" | "link" | "report";
+export type MessagingChatAction = "clearChat" | "deleteForMe" | "deleteForEveryone" | "block" | "link" | "report";
 
 type Props = {
   anchorEl: HTMLElement | null;
@@ -18,7 +18,9 @@ type Props = {
 export default function MessagingChatActionsMenu({ anchorEl, open, onClose, onAction, embedded = false }: Props) {
   const m = useTheme().palette.mollure;
   const items: { action: MessagingChatAction; label: string }[] = [
-    { action: "delete", label: "Delete" },
+    { action: "clearChat", label: "Clear chat" },
+    { action: "deleteForMe", label: "Delete for me" },
+    { action: "deleteForEveryone", label: "Delete for everyone" },
     { action: "block", label: "Block" },
     { action: "link", label: "Link to Booking" },
     { action: "report", label: "Report" },
