@@ -8,7 +8,10 @@ type ApiEnvelope<T> = {
   data: T;
 };
 
-export type MessagingInboxResponse = Pick<MessagingStore, "threads" | "messagesByThreadId">;
+export type MessagingInboxResponse = Pick<
+  MessagingStore,
+  "threads" | "messagesByThreadId" | "peerLastReadAtByThreadId"
+>;
 export type MessagingMessageDeleteScope = "me" | "everyone";
 
 export type MessagingProfessionalsResponse = {
@@ -89,6 +92,24 @@ export const messagingApi = baseApi.injectEndpoints({
       ) => response.data,
       invalidatesTags: ["Messaging"],
     }),
+    markMessagingThreadRead: build.mutation<
+      { threadId: string; lastReadMessageId: string | null; lastReadAt: string | null; userId: string },
+      { threadId: string; messageId?: string }
+    >({
+      query: ({ threadId, messageId }) => ({
+        url: `/api/messaging/threads/${threadId}/read`,
+        method: "POST",
+        body: messageId ? { messageId } : {},
+      }),
+      transformResponse: (
+        response: ApiEnvelope<{
+          threadId: string;
+          lastReadMessageId: string | null;
+          lastReadAt: string | null;
+          userId: string;
+        }>,
+      ) => response.data,
+    }),
   }),
 });
 
@@ -100,4 +121,5 @@ export const {
   useSendMessagingMessageMutation,
   useDeleteMessagingMessageMutation,
   useClearMessagingThreadMutation,
+  useMarkMessagingThreadReadMutation,
 } = messagingApi;

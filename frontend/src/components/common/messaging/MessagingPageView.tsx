@@ -44,7 +44,7 @@ export default function MessagingPageView({
   const m = theme.palette.mollure;
   const isCompactEmbedded = embedded && useMediaQuery(theme.breakpoints.down("md"));
   const { showSnackbar } = useSnackbar();
-  const inbox = useMessagingInbox(audience, navigation);
+  const inbox = useMessagingInbox(audience, navigation, currentUserName);
   const [mobileChatOpen, setMobileChatOpen] = React.useState(false);
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [filtersOpen, setFiltersOpen] = React.useState(false);
@@ -170,6 +170,7 @@ export default function MessagingPageView({
         {showChatPanel ? (
         <MessagingChatPanel
           audience={audience}
+          currentUserName={currentUserName}
           thread={inbox.activeThread}
           messageGroups={inbox.messageGroups}
           onSend={inbox.sendMessage}
@@ -186,6 +187,7 @@ export default function MessagingPageView({
               ? "Reply when the client messages first, or when a requested, confirmed, or completed booking exists."
               : undefined
           }
+          peerReadAt={inbox.peerReadAt}
         />
         ) : null}
       </Paper>

@@ -13,21 +13,36 @@ const dateKeyFromIso = (iso) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
 
+const parseAttachments = (value) => {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
 export const mapMessageRow = (row, viewerUserId) => {
   const isSelf = row.sender_user_id === viewerUserId;
   const createdAt = row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at);
+  const senderName = row.sender_display_name || "User";
 
   return {
     id: row.client_message_id || row.id,
     dbId: row.id,
     senderSide: isSelf ? "self" : "peer",
     senderRole: row.sender_role,
-    senderName: isSelf ? "You" : row.sender_display_name || "User",
-    senderAvatarSeed: row.sender_avatar_seed || (row.sender_role === "client" ? "client" : "pro"),
+    senderName,
+    senderAvatarSeed: row.sender_avatar_seed || senderName || (row.sender_role === "client" ? "client" : "pro"),
     timeLabel: formatTimeLabel(createdAt),
     createdAt,
     body: row.deleted_for_everyone ? "" : row.body || "",
-    attachments: row.deleted_for_everyone ? undefined : row.attachments || [],
+    attachments: row.deleted_for_everyone ? undefined : parseAttachments(row.attachments),
     dateKey: dateKeyFromIso(createdAt),
     deletedForEveryone: Boolean(row.deleted_for_everyone),
   };
@@ -61,6 +76,15 @@ export const mapThreadRow = (row, viewerUserId) => {
       ? row.last_message_at.toISOString()
       : String(row.last_message_at)
     : undefined;
+  const lastFromPeer = row.last_message_sender_role
+    ? isProfessional
+      ? row.last_message_sender_role === "client"
+      : row.last_message_sender_role === "professional"
+    : undefined;
+  const viewerDisplayName = isProfessional ? row.professional_display_name : row.client_display_name;
+  const previewSenderName = row.last_message_sender_role
+    ? row.last_message_sender_name || (lastFromPeer ? peerName : viewerDisplayName) || "User"
+    : undefined;
 
   return {
     id: row.id,
@@ -76,6 +100,8 @@ export const mapThreadRow = (row, viewerUserId) => {
     timeLabel: lastActivityAt ? formatTimeLabel(lastActivityAt) : "",
     lastActivityAt,
     preview: row.last_message_preview || "",
+    previewSenderName,
+    previewFromPeer: lastFromPeer,
     avatarSeed: row.avatar_seed || (isProfessional ? "client" : "pro"),
     unlinked: Boolean(row.unlinked),
   };

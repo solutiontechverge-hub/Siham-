@@ -22,7 +22,9 @@ const THREAD_SELECT = `
     ip.user_id::text AS client_profile_id,
     pp.id::text AS professional_profile_id,
     lm.body AS last_message_preview,
-    lm.created_at AS last_message_at
+    lm.created_at AS last_message_at,
+    lm.sender_role AS last_message_sender_role,
+    lm.sender_display_name AS last_message_sender_name
   FROM messaging_threads t
   JOIN users cu ON cu.id = t.client_user_id
   JOIN users pu ON pu.id = t.professional_user_id
@@ -30,8 +32,24 @@ const THREAD_SELECT = `
   LEFT JOIN company_profiles cp ON cp.user_id = t.client_user_id
   LEFT JOIN professional_profiles pp ON pp.user_id = t.professional_user_id
   LEFT JOIN LATERAL (
-    SELECT body, created_at
+    SELECT
+      m.body,
+      m.created_at,
+      m.sender_role,
+      COALESCE(
+        NULLIF(TRIM(ip.display_name), ''),
+        NULLIF(TRIM(CONCAT(ip.first_name, ' ', ip.last_name)), ''),
+        NULLIF(TRIM(cp.legal_name), ''),
+        NULLIF(TRIM(CONCAT(cp.contact_first_name, ' ', cp.contact_last_name)), ''),
+        NULLIF(TRIM(pp.legal_name), ''),
+        NULLIF(TRIM(CONCAT(pp.contact_first_name, ' ', pp.contact_last_name)), ''),
+        u.email
+      ) AS sender_display_name
     FROM messaging_messages m
+    JOIN users u ON u.id = m.sender_user_id
+    LEFT JOIN individual_profiles ip ON ip.user_id = m.sender_user_id
+    LEFT JOIN company_profiles cp ON cp.user_id = m.sender_user_id
+    LEFT JOIN professional_profiles pp ON pp.user_id = m.sender_user_id
     WHERE m.thread_id = t.id
       AND m.deleted_for_everyone = false
       AND m.created_at >= NOW() - INTERVAL '${MESSAGE_RETENTION_INTERVAL}'
@@ -257,12 +275,24 @@ export async function getInboxForUser(userId, userType) {
 
   const threads = result.rows.map((row) => mapThreadRow(row, userId));
   const messagesByThreadId = {};
+  const peerLastReadAtByThreadId = {};
 
   for (const thread of threads) {
     messagesByThreadId[thread.id] = await getThreadMessages(thread.id, userId, { skipPurge: true });
+    const row = result.rows.find((item) => item.id === thread.id);
+    if (!row) continue;
+    const peerUserId =
+      row.client_user_id === userId ? row.professional_user_id : row.client_user_id;
+    const peerRead = await getThreadReadState(thread.id, peerUserId);
+    if (peerRead?.last_read_at) {
+      peerLastReadAtByThreadId[thread.id] =
+        peerRead.last_read_at instanceof Date
+          ? peerRead.last_read_at.toISOString()
+          : String(peerRead.last_read_at);
+    }
   }
 
-  return { threads, messagesByThreadId };
+  return { threads, messagesByThreadId, peerLastReadAtByThreadId };
 }
 
 export async function getThreadMessages(threadId, userId, options = {}) {
@@ -273,6 +303,13 @@ export async function getThreadMessages(threadId, userId, options = {}) {
     await purgeExpiredMessages();
   }
   await assertThreadAccess(threadId, userId);
+  const thread = await query(
+    `SELECT client_user_id, professional_user_id
+     FROM messaging_threads
+     WHERE id = $1`,
+    [threadId],
+  );
+  const threadRow = thread.rows[0];
 
   const result = await query(
     `SELECT
@@ -308,7 +345,120 @@ export async function getThreadMessages(threadId, userId, options = {}) {
     [threadId, userId],
   );
 
-  return result.rows.map((row) => mapMessageRow(row, userId));
+  const messages = result.rows.map((row) => mapMessageRow(row, userId));
+  if (!threadRow) return messages;
+
+  const peerUserId =
+    threadRow.client_user_id === userId ? threadRow.professional_user_id : threadRow.client_user_id;
+  const peerRead = await getThreadReadState(threadId, peerUserId);
+  return applyReadReceiptsToMessages(messages, peerRead?.last_read_at ?? null);
+}
+
+async function getThreadReadState(threadId, userId) {
+  const result = await query(
+    `SELECT last_read_message_id, last_read_at
+     FROM messaging_thread_reads
+     WHERE thread_id = $1 AND user_id = $2`,
+    [threadId, userId],
+  );
+  return result.rows[0] ?? null;
+}
+
+export async function getPeerUserIdForThread(threadId, viewerUserId) {
+  const thread = await assertThreadAccess(threadId, viewerUserId);
+  return thread.client_user_id === viewerUserId ? thread.professional_user_id : thread.client_user_id;
+}
+
+function applyReadReceiptsToMessages(messages, peerReadAt) {
+  if (!peerReadAt) {
+    return messages.map((message) =>
+      message.senderSide === "self" ? { ...message, readByPeer: false } : message,
+    );
+  }
+
+  const readThroughMs = new Date(peerReadAt).getTime();
+  if (Number.isNaN(readThroughMs)) {
+    return messages.map((message) =>
+      message.senderSide === "self" ? { ...message, readByPeer: false } : message,
+    );
+  }
+
+  return messages.map((message) => {
+    if (message.senderSide !== "self") return message;
+    const messageMs = new Date(message.createdAt).getTime();
+    if (Number.isNaN(messageMs)) return { ...message, readByPeer: false };
+    return { ...message, readByPeer: messageMs <= readThroughMs };
+  });
+}
+
+export async function getPeerReadAt(threadId, viewerUserId) {
+  const thread = await assertThreadAccess(threadId, viewerUserId);
+  const peerUserId =
+    thread.client_user_id === viewerUserId ? thread.professional_user_id : thread.client_user_id;
+  const state = await getThreadReadState(threadId, peerUserId);
+  if (!state?.last_read_at) return null;
+  return state.last_read_at instanceof Date ? state.last_read_at.toISOString() : String(state.last_read_at);
+}
+
+export async function markThreadRead(threadId, userId, messageRef) {
+  await purgeExpiredMessages();
+  const resolvedThreadId = await resolveThreadId(threadId, userId);
+  await assertThreadAccess(resolvedThreadId, userId);
+
+  let messageRow = null;
+  if (messageRef) {
+    const result = await query(
+      `SELECT id, client_message_id, created_at
+       FROM messaging_messages
+       WHERE thread_id = $1
+         AND deleted_for_everyone = false
+         AND (id::text = $2 OR client_message_id = $2)
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [resolvedThreadId, messageRef],
+    );
+    messageRow = result.rows[0] ?? null;
+  }
+
+  if (!messageRow) {
+    const result = await query(
+      `SELECT id, client_message_id, created_at
+       FROM messaging_messages
+       WHERE thread_id = $1 AND deleted_for_everyone = false
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [resolvedThreadId],
+    );
+    messageRow = result.rows[0] ?? null;
+  }
+
+  if (!messageRow) {
+    return {
+      threadId: resolvedThreadId,
+      lastReadMessageId: null,
+      lastReadAt: null,
+      userId,
+    };
+  }
+
+  const readAt =
+    messageRow.created_at instanceof Date ? messageRow.created_at : new Date(messageRow.created_at);
+
+  await query(
+    `INSERT INTO messaging_thread_reads (thread_id, user_id, last_read_message_id, last_read_at)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (thread_id, user_id) DO UPDATE
+       SET last_read_message_id = EXCLUDED.last_read_message_id,
+           last_read_at = GREATEST(messaging_thread_reads.last_read_at, EXCLUDED.last_read_at)`,
+    [resolvedThreadId, userId, messageRow.id, readAt],
+  );
+
+  return {
+    threadId: resolvedThreadId,
+    lastReadMessageId: messageRow.client_message_id || messageRow.id,
+    lastReadAt: readAt.toISOString(),
+    userId,
+  };
 }
 
 export async function appendThreadMessage(threadId, userId, payload = {}) {
@@ -341,12 +491,36 @@ export async function appendThreadMessage(threadId, userId, payload = {}) {
 
   await query(`UPDATE messaging_threads SET updated_at = NOW() WHERE id = $1`, [resolvedThreadId]);
 
-  const row = result.rows[0];
-  row.sender_display_name = "You";
-  row.sender_avatar_seed = senderRole === "client" ? "client" : "pro";
+  const enriched = await query(
+    `SELECT
+       m.*,
+       COALESCE(
+         NULLIF(TRIM(ip.display_name), ''),
+         NULLIF(TRIM(CONCAT(ip.first_name, ' ', ip.last_name)), ''),
+         NULLIF(TRIM(cp.legal_name), ''),
+         NULLIF(TRIM(CONCAT(cp.contact_first_name, ' ', cp.contact_last_name)), ''),
+         NULLIF(TRIM(pp.legal_name), ''),
+         NULLIF(TRIM(CONCAT(pp.contact_first_name, ' ', pp.contact_last_name)), ''),
+         u.email
+       ) AS sender_display_name,
+       CASE
+         WHEN m.sender_role = 'client' THEN COALESCE(ip.user_id::text, 'client')
+         ELSE COALESCE(pp.id::text, 'pro')
+       END AS sender_avatar_seed
+     FROM messaging_messages m
+     JOIN users u ON u.id = m.sender_user_id
+     LEFT JOIN individual_profiles ip ON ip.user_id = m.sender_user_id
+     LEFT JOIN company_profiles cp ON cp.user_id = m.sender_user_id
+     LEFT JOIN professional_profiles pp ON pp.user_id = m.sender_user_id
+     WHERE m.id = $1
+     LIMIT 1`,
+    [result.rows[0].id],
+  );
 
-  const message = mapMessageRow(row, userId);
-  return { threadId: resolvedThreadId, message };
+  const message = mapMessageRow(enriched.rows[0], userId);
+  const peerUserId =
+    thread.client_user_id === userId ? thread.professional_user_id : thread.client_user_id;
+  return { threadId: resolvedThreadId, message, peerUserId };
 }
 
 export async function deleteMessage(threadId, messageRef, userId, scope) {
@@ -442,26 +616,47 @@ export async function clearThreadMessages(threadId, userId, scope) {
 export async function getThreadMessagesLegacy(threadId) {
   await purgeExpiredMessages();
   const result = await query(
-    `SELECT m.*, u.email AS sender_display_name, m.sender_role AS sender_avatar_seed
+    `SELECT
+       m.*,
+       COALESCE(
+         NULLIF(TRIM(ip.display_name), ''),
+         NULLIF(TRIM(CONCAT(ip.first_name, ' ', ip.last_name)), ''),
+         NULLIF(TRIM(cp.legal_name), ''),
+         NULLIF(TRIM(CONCAT(cp.contact_first_name, ' ', cp.contact_last_name)), ''),
+         NULLIF(TRIM(pp.legal_name), ''),
+         NULLIF(TRIM(CONCAT(pp.contact_first_name, ' ', pp.contact_last_name)), ''),
+         u.email
+       ) AS sender_display_name,
+       CASE
+         WHEN m.sender_role = 'client' THEN COALESCE(ip.user_id::text, 'client')
+         ELSE COALESCE(pp.id::text, 'pro')
+       END AS sender_avatar_seed
      FROM messaging_messages m
      JOIN users u ON u.id = m.sender_user_id
+     LEFT JOIN individual_profiles ip ON ip.user_id = m.sender_user_id
+     LEFT JOIN company_profiles cp ON cp.user_id = m.sender_user_id
+     LEFT JOIN professional_profiles pp ON pp.user_id = m.sender_user_id
      WHERE m.thread_id = $1
        AND m.created_at >= NOW() - INTERVAL '${MESSAGE_RETENTION_INTERVAL}'
      ORDER BY m.created_at ASC`,
     [threadId],
   );
-  return result.rows.map((row) => ({
-    id: row.client_message_id || row.id,
-    senderRole: row.sender_role,
-    senderName: row.sender_display_name,
-    senderAvatarSeed: row.sender_role,
-    timeLabel: row.created_at,
-    createdAt: row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
-    body: row.deleted_for_everyone ? "" : row.body,
-    attachments: row.deleted_for_everyone ? undefined : row.attachments,
-    dateKey: row.created_at.toISOString().slice(0, 10),
-    deletedForEveryone: Boolean(row.deleted_for_everyone),
-  }));
+  return result.rows.map((row) => {
+    const createdAt = row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at);
+    const senderName = row.sender_display_name || "User";
+    return {
+      id: row.client_message_id || row.id,
+      senderRole: row.sender_role,
+      senderName,
+      senderAvatarSeed: row.sender_avatar_seed || senderName,
+      timeLabel: createdAt,
+      createdAt,
+      body: row.deleted_for_everyone ? "" : row.body,
+      attachments: row.deleted_for_everyone ? undefined : row.attachments,
+      dateKey: createdAt.slice(0, 10),
+      deletedForEveryone: Boolean(row.deleted_for_everyone),
+    };
+  });
 }
 
 export async function appendThreadMessageLegacy(threadId, message) {

@@ -5,6 +5,26 @@ import { apiBaseUrl } from "../../../lib/api";
 import type { MessagingChatMessage } from "./messagingTypes";
 
 let socket: Socket | null = null;
+let joinedThreadIds: string[] = [];
+let joinedUserId: string | null = null;
+let lifecycleBound = false;
+
+function bindSocketLifecycle(client: Socket) {
+  if (lifecycleBound) return;
+  lifecycleBound = true;
+
+  const rejoin = () => {
+    if (joinedUserId) {
+      client.emit("messaging:join-user", { userId: joinedUserId });
+    }
+    if (joinedThreadIds.length) {
+      client.emit("messaging:join", { threadIds: joinedThreadIds });
+    }
+  };
+
+  client.on("connect", rejoin);
+  client.io.on("reconnect", rejoin);
+}
 
 export function getMessagingSocket() {
   if (typeof window === "undefined") return null;
@@ -13,15 +33,30 @@ export function getMessagingSocket() {
       path: "/socket.io",
       transports: ["websocket", "polling"],
       autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
     });
+    bindSocketLifecycle(socket);
   }
   return socket;
 }
 
-export function joinMessagingThreads(threadIds: string[]) {
+export function joinMessagingUserRoom(userId: string) {
+  if (!userId) return;
+  joinedUserId = userId;
   const client = getMessagingSocket();
-  if (!client || !threadIds.length) return;
-  client.emit("messaging:join", { threadIds });
+  if (!client) return;
+  client.emit("messaging:join-user", { userId });
+}
+
+export function joinMessagingThreads(threadIds: string[]) {
+  const nextIds = threadIds.filter(Boolean);
+  if (!nextIds.length) return;
+  joinedThreadIds = Array.from(new Set([...joinedThreadIds, ...nextIds]));
+  const client = getMessagingSocket();
+  if (!client) return;
+  client.emit("messaging:join", { threadIds: joinedThreadIds });
 }
 
 export function emitMessagingSend(threadId: string, message: MessagingChatMessage) {
@@ -60,5 +95,21 @@ export function onMessagingMessageDeleted(
   client.on("messaging:message-deleted", handler);
   return () => {
     client.off("messaging:message-deleted", handler);
+  };
+}
+
+export type MessagingReadPayload = {
+  threadId: string;
+  lastReadMessageId: string | null;
+  lastReadAt: string | null;
+  userId: string;
+};
+
+export function onMessagingRead(handler: (payload: MessagingReadPayload) => void) {
+  const client = getMessagingSocket();
+  if (!client) return () => {};
+  client.on("messaging:read", handler);
+  return () => {
+    client.off("messaging:read", handler);
   };
 }
