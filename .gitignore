@@ -18,6 +18,7 @@ frontend/.next/
 frontend/dist/
 frontend/build/
 frontend/.env.local
+*.tsbuildinfo
 
 # Local merge clones (must not be git submodules)
 _temp_mollure_frontend/

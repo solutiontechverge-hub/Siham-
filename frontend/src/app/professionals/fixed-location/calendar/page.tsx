@@ -29,6 +29,7 @@ const statusMap: Record<string, CalendarBookingStatus> = {
   completed: "Completed",
   no_show: "No Show",
   "no show": "No Show",
+  invalid: "Invalid",
 };
 
 const bookingTypeMap: Record<string, CalendarBookingType> = {
@@ -57,6 +58,117 @@ const dateFromValue = (value?: string | null) => {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return new Date().toISOString().slice(0, 10);
   return parsed.toISOString().slice(0, 10);
+};
+
+const buildTodayDemoEvents = (
+  resources: readonly { id: string; name: string; avatarText: string }[],
+  todayIso: string,
+  supportedLocations: readonly CalendarBookingLocation[],
+): CalendarEvent[] => {
+  const first = resources[0]?.id ?? "";
+  const second = resources[1]?.id ?? first;
+  const third = resources[2]?.id ?? first;
+  const canShowDesired = supportedLocations.includes("DL");
+  const desiredOrFixed = canShowDesired ? "DL" : "FL";
+
+  return [
+    {
+      id: "demo-today-34009-a",
+      bookingCode: "34009",
+      resourceId: first,
+      date: todayIso,
+      start: "08:00",
+      end: "08:15",
+      title: "Hot stone full body massage",
+      status: "Requested",
+      location: "FL",
+      bookingType: "Requests",
+      bookingScenario: "BR",
+      showClientName: "Lissa J",
+      details: {
+        showPrepayment: true,
+        prepaymentPercent: "50",
+        prepaymentStatus: "pending",
+      },
+    },
+    {
+      id: "demo-today-34009-b",
+      bookingCode: "34009",
+      resourceId: first,
+      date: todayIso,
+      start: "08:15",
+      end: "08:30",
+      title: "Hair Cut",
+      status: "Cancelled",
+      location: "FL",
+      bookingType: "Offline",
+      showClientName: "Lissa J",
+      details: {
+        showPrepayment: true,
+        prepaymentPercent: "50",
+        prepaymentStatus: "canceled",
+      },
+    },
+    {
+      id: "demo-today-34009-c",
+      bookingCode: "34009",
+      resourceId: first,
+      date: todayIso,
+      start: "09:00",
+      end: "09:15",
+      title: "Hair Cut",
+      status: "Confirmed",
+      location: desiredOrFixed,
+      bookingType: "Online",
+      bookingScenario: "ER",
+      showClientName: "Lissa J",
+      details: {
+        showPrepayment: true,
+        prepaymentPercent: "50",
+        prepaymentStatus: "pending",
+        responseStatus: "overdue_response",
+      },
+    },
+    {
+      id: "demo-today-34009-d",
+      bookingCode: "34009",
+      resourceId: first,
+      date: todayIso,
+      start: "09:15",
+      end: "09:30",
+      title: "Hair Cut",
+      status: "Completed",
+      location: desiredOrFixed,
+      bookingType: "Project",
+      showClientName: "Lissa J",
+    },
+    {
+      id: "demo-today-44001-a",
+      bookingCode: "44001",
+      resourceId: second,
+      date: todayIso,
+      start: "09:00",
+      end: "09:30",
+      title: "Make-up",
+      status: "Confirmed",
+      location: "FL",
+      bookingType: "Online",
+      showClientName: "Ava K",
+    },
+    {
+      id: "demo-today-55002-a",
+      bookingCode: "55002",
+      resourceId: third,
+      date: todayIso,
+      start: "08:30",
+      end: "09:00",
+      title: "Lashes",
+      status: "Completed",
+      location: "FL",
+      bookingType: "Project",
+      showClientName: "Emma S",
+    },
+  ];
 };
 
 export default function FixedLocationCalendarPage() {

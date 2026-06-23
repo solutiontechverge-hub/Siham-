@@ -27,7 +27,7 @@ export function useAuthSessionLogin() {
   const { showSnackbar } = useSnackbar();
 
   const completeLogin = useCallback(
-    (data: AuthLoginPayload, remember: boolean) => {
+    (data: AuthLoginPayload, remember: boolean, redirectTo?: string | null) => {
       dispatch(
         setAuthSession({
           accessToken: data.access_token,
@@ -43,7 +43,7 @@ export function useAuthSessionLogin() {
       });
       queueSnackbarFlash({ severity: "success", message: "Signed in successfully." });
       showSnackbar({ severity: "success", message: "Signed in successfully." });
-      router.push(getDefaultRouteForUser(data.user.user_type));
+      router.push(redirectTo || getDefaultRouteForUser(data.user.user_type));
     },
     [dispatch, router, showSnackbar],
   );

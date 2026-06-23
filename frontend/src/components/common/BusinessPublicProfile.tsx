@@ -657,9 +657,7 @@ export default function BusinessPublicProfile({
   const [serviceQty, setServiceQty] = React.useState<Record<string, number>>({});
   const [selectedServiceIds, setSelectedServiceIds] = React.useState<Record<string, boolean>>({});
   const [selectedComboIds, setSelectedComboIds] = React.useState<Record<string, boolean>>({});
-  const [teamAssignments, setTeamAssignments] = React.useState<Record<string, readonly string[]>>({});
-  const [teamDraftAssignments, setTeamDraftAssignments] = React.useState<Record<string, readonly string[]>>({});
-  const [teamAssignLocked, setTeamAssignLocked] = React.useState<Record<string, boolean>>({});
+  const [memberSlotSelections, setMemberSlotSelections] = React.useState<Record<string, string>>({});
 
   const activeServices = React.useMemo(
     () => getServicesForLocationMode(data, effectiveLocationMode),
@@ -681,10 +679,17 @@ export default function BusinessPublicProfile({
     setSelectedServiceIds({});
     setSelectedComboIds({});
     setServiceQty({});
-    setTeamAssignments({});
-    setTeamDraftAssignments({});
-    setTeamAssignLocked({});
   }, [locationMode]);
+
+  React.useEffect(() => {
+    const next: Record<string, string> = {};
+    for (const member of visibleTeamMembers) {
+      for (const slot of member.serviceSlots) {
+        next[`${member.id}:${slot.id}`] = slot.defaultValue;
+      }
+    }
+    setMemberSlotSelections(next);
+  }, [visibleTeamMembers]);
 
   React.useEffect(() => {
     if (!projectEnabled) {
@@ -762,96 +767,6 @@ export default function BusinessPublicProfile({
       return { ...prev, [id]: next };
     });
   };
-
-  const assignmentOptions = React.useMemo(() => {
-    const comboOptions = selectedCombos.map((combo) => ({
-      value: `combo:${combo.id}`,
-      label: `${combo.categoryLabel} + ${combo.serviceLabel}`,
-    }));
-    const serviceOptions = selectedServices.map((service) => ({
-      value: `svc:${service.id}`,
-      label: service.name,
-    }));
-    return [...comboOptions, ...serviceOptions];
-  }, [selectedCombos, selectedServices]);
-
-  const hasAssignableSelection = assignmentOptions.length > 0;
-
-  const getClaimedByOtherMembers = React.useCallback(
-    (memberId: string, assignments: Record<string, readonly string[]>) => {
-      const claimed = new Set<string>();
-      for (const [id, ids] of Object.entries(assignments)) {
-        if (id !== memberId) ids.forEach((value) => claimed.add(value));
-      }
-      return claimed;
-    },
-    [],
-  );
-
-  const getAssignmentOptionsForMember = React.useCallback(
-    (memberId: string) => {
-      const claimedByOthers = getClaimedByOtherMembers(memberId, teamAssignments);
-      const memberDraft = teamDraftAssignments[memberId] ?? teamAssignments[memberId] ?? [];
-      const keepVisible = new Set(memberDraft);
-      return assignmentOptions.filter(
-        (opt) => keepVisible.has(opt.value) || !claimedByOthers.has(opt.value),
-      );
-    },
-    [assignmentOptions, getClaimedByOtherMembers, teamAssignments, teamDraftAssignments],
-  );
-
-  const commitAssignToMember = (memberId: string) => {
-    const draft = [...(teamDraftAssignments[memberId] ?? [])];
-    if (!draft.length) return;
-    const claimed = new Set(draft);
-
-    setTeamAssignments((prev) => {
-      const next: Record<string, readonly string[]> = { ...prev, [memberId]: draft };
-      for (const id of Object.keys(next)) {
-        if (id === memberId) continue;
-        next[id] = (next[id] ?? []).filter((value) => !claimed.has(value));
-      }
-
-      setTeamAssignLocked((locks) => {
-        const lockNext: Record<string, boolean> = { ...locks, [memberId]: true };
-        for (const id of Object.keys(prev)) {
-          if (id === memberId) continue;
-          const hadOverlap = (prev[id] ?? []).some((value) => claimed.has(value));
-          if (hadOverlap) lockNext[id] = false;
-        }
-        return lockNext;
-      });
-
-      return next;
-    });
-
-    setTeamDraftAssignments((prev) => {
-      const next: Record<string, readonly string[]> = { ...prev, [memberId]: draft };
-      for (const id of Object.keys(prev)) {
-        if (id === memberId) continue;
-        next[id] = (prev[id] ?? []).filter((value) => !claimed.has(value));
-      }
-      return next;
-    });
-  };
-
-  React.useEffect(() => {
-    const validIds = new Set(assignmentOptions.map((opt) => opt.value));
-    const cleanRecord = (record: Record<string, readonly string[]>) => {
-      const next: Record<string, readonly string[]> = {};
-      let changed = false;
-      for (const [memberId, ids] of Object.entries(record)) {
-        const filtered = ids.filter((id) => validIds.has(id));
-        next[memberId] = filtered;
-        if (filtered.length !== ids.length) changed = true;
-      }
-      return changed ? next : record;
-    };
-
-    setTeamAssignments((prev) => cleanRecord(prev));
-    setTeamDraftAssignments((prev) => cleanRecord(prev));
-    setTeamAssignLocked({});
-  }, [assignmentOptions]);
 
   return (
     <Box>
@@ -1308,11 +1223,6 @@ export default function BusinessPublicProfile({
         ) : null}
 
         <SectionCard title="Our Professional Team">
-          {!hasAssignableSelection ? (
-            <Typography sx={{ fontSize: 12, fontWeight: 600, color: alpha(m.navy, 0.5), mb: 1.25 }}>
-              Select services in Services Details or combos in Book Service, then use Assign on a team member.
-            </Typography>
-          ) : null}
           <Stack spacing={1.25}>
             {visibleTeamMembers.length === 0 ? (
               <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.5) }}>
@@ -1386,86 +1296,52 @@ export default function BusinessPublicProfile({
                   </Stack>
 
                   <Box sx={{ flex: 1, minWidth: 0, px: { md: 2 }, py: { xs: 0, md: 0.25 } }}>
-                    {hasAssignableSelection ? (
-                      (() => {
-                        const memberOptions = getAssignmentOptionsForMember(member.id);
-                        const draftValues = teamDraftAssignments[member.id] ?? teamAssignments[member.id] ?? [];
-                        const committedValues = teamAssignments[member.id] ?? [];
-                        const draftKey = [...draftValues].sort().join("|");
-                        const committedKey = [...committedValues].sort().join("|");
-                        const hasPendingChanges = draftKey !== committedKey;
-                        const isAssignConfirmed =
-                          Boolean(teamAssignLocked[member.id]) && committedValues.length > 0 && !hasPendingChanges;
-                        const canAssign = draftValues.length > 0 && hasPendingChanges;
-
-                        return (
-                          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
-                            <Box sx={{ flex: 1, width: "100%" }}>
-                              <AppDropdown
-                                multiple
-                                value={draftValues}
-                                onChange={(val) => {
-                                  const next = Array.isArray(val) ? val : val ? [String(val)] : [];
-                                  setTeamDraftAssignments((prev) => ({ ...prev, [member.id]: next }));
-                                  setTeamAssignLocked((prev) => ({ ...prev, [member.id]: false }));
-                                }}
-                                options={memberOptions}
-                                placeholder={member.allCategoriesPlaceholder ?? "Select service or combo"}
-                                size="small"
-                                fullWidth
-                                renderValue={(selected) => {
-                                  const ids = Array.isArray(selected) ? selected : [];
-                                  if (!ids.length) {
-                                    return (
-                                      <span style={{ opacity: 0.6 }}>
-                                        {member.allCategoriesPlaceholder ?? "Select service or combo"}
-                                      </span>
-                                    );
-                                  }
-                                  return ids
-                                    .map((id) => assignmentOptions.find((opt) => opt.value === id)?.label)
-                                    .filter(Boolean)
-                                    .join(", ");
-                                }}
-                              />
-                            </Box>
-                            <Button
-                              variant="contained"
-                              disableElevation
-                              disabled={!canAssign && !isAssignConfirmed}
-                              onClick={() => commitAssignToMember(member.id)}
+                    {member.serviceSlots.length > 0 ? (
+                      <Stack
+                        direction={{ xs: "column", sm: "row" }}
+                        spacing={1}
+                        useFlexGap
+                        flexWrap="wrap"
+                      >
+                        {member.serviceSlots.map((slot) => {
+                          const slotKey = `${member.id}:${slot.id}`;
+                          return (
+                            <Box
+                              key={slot.id}
                               sx={{
-                                flexShrink: 0,
-                                alignSelf: { xs: "flex-start", sm: "center" },
-                                borderRadius: "10px",
-                                textTransform: "none",
-                                fontWeight: 900,
-                                fontSize: 12.5,
-                                minWidth: 96,
-                                height: 40,
-                                px: 2,
-                                bgcolor: isAssignConfirmed ? m.fxGrayDCDFE3 : m.teal,
-                                color: isAssignConfirmed ? alpha(m.navy, 0.55) : "#fff",
-                                boxShadow: "none",
-                                "&:hover": {
-                                  bgcolor: isAssignConfirmed ? m.fxGrayF2F4F7 : m.tealDark,
-                                  boxShadow: "none",
-                                },
-                                "&.Mui-disabled": {
-                                  bgcolor: isAssignConfirmed ? m.fxGrayDCDFE3 : alpha(m.teal, 0.35),
-                                  color: isAssignConfirmed ? alpha(m.navy, 0.55) : alpha("#fff", 0.85),
-                                },
+                                flex: { sm: member.serviceSlots.length > 1 ? "1 1 calc(50% - 8px)" : "1 1 100%" },
+                                minWidth: { sm: member.serviceSlots.length > 1 ? 0 : "100%" },
+                                width: "100%",
                               }}
                             >
-                              {isAssignConfirmed ? "Assigned" : "Assign"}
-                            </Button>
-                          </Stack>
-                        );
-                      })()
+                              <AppDropdown
+                                value={memberSlotSelections[slotKey] ?? slot.defaultValue}
+                                onChange={(val) => {
+                                  const next = Array.isArray(val) ? val[0] : String(val ?? "");
+                                  setMemberSlotSelections((prev) => ({ ...prev, [slotKey]: next }));
+                                }}
+                                options={slot.options}
+                                placeholder={slot.label}
+                                size="small"
+                                fullWidth
+                                renderValue={() => (
+                                  <span style={{ color: alpha(m.navy, 0.62) }}>{slot.label}</span>
+                                )}
+                              />
+                            </Box>
+                          );
+                        })}
+                      </Stack>
                     ) : (
-                      <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: alpha(m.navy, 0.42) }}>
-                        {member.allCategoriesPlaceholder ?? "Select services above to assign"}
-                      </Typography>
+                      <AppDropdown
+                        value=""
+                        onChange={() => {}}
+                        options={[]}
+                        placeholder={member.allCategoriesPlaceholder ?? "All Categories and services"}
+                        size="small"
+                        fullWidth
+                        disabled
+                      />
                     )}
                   </Box>
                 </Stack>
@@ -1605,8 +1481,7 @@ export default function BusinessPublicProfile({
                     selectedServiceIds,
                     serviceQty,
                     selectedComboIds,
-                    teamAssignments,
-                    teamDraftAssignments,
+                    teamAssignments: {},
                     projectEnabled,
                   }),
                 );

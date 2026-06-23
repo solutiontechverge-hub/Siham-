@@ -4,6 +4,7 @@ import * as React from "react";
 import { useTheme } from "@mui/material/styles";
 import { profilePageData } from "./data-profile";
 import { getPasswordStrength } from "../../../lib/passwordStrength";
+import { getOptionalPhoneValidationErrors } from "../../../lib/phone-validation";
 import {
   isAllowedProfileImageFile,
   PROFILE_IMAGE_INVALID_MESSAGE,
@@ -342,6 +343,14 @@ export function useClientProfilePage() {
 
       if (!getPasswordStrength(form.password).isStrong) {
         setErrorMessage("Only strong passwords are allowed.");
+        return;
+      }
+    }
+
+    if (!isCompanyProfile) {
+      const phoneErrors = getOptionalPhoneValidationErrors(form.countryCode, form.phone);
+      if (phoneErrors.phone || phoneErrors.countryCode) {
+        setErrorMessage(phoneErrors.phone ?? phoneErrors.countryCode ?? "Enter a valid phone number.");
         return;
       }
     }

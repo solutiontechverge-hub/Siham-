@@ -33,6 +33,10 @@ import ManualEntryCatalogPicker from "./ManualEntryCatalogPicker";
 import ManualEntryDiscountModal from "./ManualEntryDiscountModal";
 import ManualEntryLineCard from "./ManualEntryLineCard";
 import ManualEntryLineEditModal from "./ManualEntryLineEditModal";
+import ManualEntryUniqueItemModal from "./ManualEntryUniqueItemModal";
+
+const STEPS = ["Client", "Items", "Payment", "Summary"] as const;
+type ManualEntryStep = (typeof STEPS)[number];
 
 export type ManualEntryDrawerProps = {
   open: boolean;
@@ -55,6 +59,11 @@ export default function ManualEntryDrawer({ open, onClose, onSave }: ManualEntry
   const [discount, setDiscount] = React.useState<ManualEntryDiscount | null>(null);
   const [discountModalOpen, setDiscountModalOpen] = React.useState(false);
   const [editingLine, setEditingLine] = React.useState<ManualEntryLine | null>(null);
+  const [paymentMethod, setPaymentMethod] = React.useState<"onlineDirect" | "offlineDirect">("offlineDirect");
+  const [guestEmail, setGuestEmail] = React.useState("");
+  const [guestName, setGuestName] = React.useState("");
+  const [step, setStep] = React.useState(0);
+  const [uniqueItemOpen, setUniqueItemOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (!open) return;
@@ -66,6 +75,11 @@ export default function ManualEntryDrawer({ open, onClose, onSave }: ManualEntry
     setDiscount(null);
     setDiscountModalOpen(false);
     setEditingLine(null);
+    setPaymentMethod("offlineDirect");
+    setGuestEmail("");
+    setGuestName("");
+    setStep(0);
+    setUniqueItemOpen(false);
   }, [open]);
 
   const productOptions = React.useMemo<ManualEntryCatalogOption[]>(
@@ -126,8 +140,34 @@ export default function ManualEntryDrawer({ open, onClose, onSave }: ManualEntry
   const displayClient = selectionLabel(clientSelection) || "Search Client";
 
   const pickGuest = () => {
-    setClientSelection({ type: "guest" });
+    setClientSelection({ type: "guest", name: guestName || undefined });
     setClientOpen(false);
+  };
+
+  const canNext =
+    (step === 0 && Boolean(clientSelection)) ||
+    (step === 1 && hasItems) ||
+    step === 2;
+
+  const handlePrimary = () => {
+    if (step < 3) {
+      if (canNext) setStep((s) => s + 1);
+      return;
+    }
+    if (!clientSelection || !hasItems) return;
+    onSave?.({
+      clientSelection:
+        clientSelection.type === "guest"
+          ? { type: "guest", name: guestName.trim() || clientSelection.name }
+          : clientSelection,
+      lines,
+      totalPrice,
+      discount,
+      discountAmount,
+      paymentMethod,
+      guestEmail: clientSelection?.type === "guest" ? guestEmail : undefined,
+      guestName: clientSelection?.type === "guest" ? guestName : undefined,
+    });
   };
 
   const pickListClient = (client: (typeof listResults)[number]) => {
@@ -169,26 +209,35 @@ export default function ManualEntryDrawer({ open, onClose, onSave }: ManualEntry
     <FinanceDrawer
       open={open}
       onClose={onClose}
-      title="New Sale"
+      title={`New Sales — ${STEPS[step]}`}
       footer={
         <FinanceDrawerActionsFooter
-          onCancel={onClose}
-          primaryLabel="Save"
-          primaryDisabled={!clientSelection || !hasItems}
-          onPrimary={() => {
-            if (!clientSelection || !hasItems) return;
-            onSave?.({
-              clientSelection,
-              lines,
-              totalPrice,
-              discount,
-              discountAmount,
-            });
-          }}
+          onCancel={step === 0 ? onClose : () => setStep((s) => Math.max(0, s - 1))}
+          cancelLabel={step === 0 ? "Cancel" : "Back"}
+          primaryLabel={step < 3 ? "Next" : "Finalize checkout"}
+          primaryDisabled={step < 3 ? !canNext : !clientSelection || !hasItems}
+          onPrimary={handlePrimary}
         />
       }
     >
+      <Stack direction="row" spacing={0.75} sx={{ mb: 2 }}>
+        {STEPS.map((label, idx) => (
+          <Chip
+            key={label}
+            label={label}
+            size="small"
+            sx={{
+              fontWeight: 800,
+              fontSize: 10.5,
+              bgcolor: idx === step ? alpha(m.teal, 0.12) : alpha(m.navy, 0.04),
+              color: idx === step ? m.teal : alpha(m.navy, 0.45),
+            }}
+          />
+        ))}
+      </Stack>
+
       <Stack spacing={2.5}>
+        {step === 0 ? (
         <Box ref={rootRef}>
           <BodyText sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.55), mb: 0.75 }}>Client</BodyText>
           <Box
@@ -403,7 +452,23 @@ export default function ManualEntryDrawer({ open, onClose, onSave }: ManualEntry
             </Paper>
           ) : null}
         </Box>
+        ) : null}
 
+        {clientSelection?.type === "guest" && step === 0 ? (
+          <MollureFormField
+            label="Guest name (optional)"
+            placeholder="Personalize guest name"
+            value={guestName}
+            onChange={(e) => {
+              setGuestName(e.target.value);
+              setClientSelection({ type: "guest", name: e.target.value });
+            }}
+            fullWidth
+            size="small"
+          />
+        ) : null}
+
+        {step === 1 ? (
         <Box>
           <BodyText sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.86), mb: 1.25 }}>Items</BodyText>
 
@@ -449,6 +514,21 @@ export default function ManualEntryDrawer({ open, onClose, onSave }: ManualEntry
                   emptyLabel="No services configured yet."
                   onSelect={(option) => addLineFromCatalog("item", option)}
                 />
+                <Button
+                  variant="outlined"
+                  onClick={() => setUniqueItemOpen(true)}
+                  sx={{
+                    mt: 0.5,
+                    borderRadius: "10px",
+                    textTransform: "none",
+                    fontWeight: 800,
+                    fontSize: 12.5,
+                    borderColor: alpha(m.navy, 0.14),
+                    color: m.teal,
+                  }}
+                >
+                  + Unique item
+                </Button>
               </Stack>
             </Box>
 
@@ -513,7 +593,78 @@ export default function ManualEntryDrawer({ open, onClose, onSave }: ManualEntry
             ) : null}
           </Stack>
         </Box>
+        ) : null}
+
+        {step === 2 ? (
+        <Box>
+          <BodyText sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.86), mb: 1 }}>Payment Method</BodyText>
+          <Stack spacing={0.75}>
+            {(
+              [
+                { id: "onlineDirect", label: "Online direct" },
+                { id: "offlineDirect", label: "Offline direct" },
+              ] as const
+            ).map((option) => (
+              <Button
+                key={option.id}
+                variant={paymentMethod === option.id ? "contained" : "outlined"}
+                disableElevation
+                onClick={() => setPaymentMethod(option.id)}
+                sx={{
+                  justifyContent: "flex-start",
+                  textTransform: "none",
+                  fontWeight: 800,
+                  fontSize: 12.5,
+                  borderRadius: "8px",
+                  height: 36,
+                  bgcolor: paymentMethod === option.id ? m.teal : "#fff",
+                  borderColor: alpha(m.navy, 0.14),
+                  color: paymentMethod === option.id ? "#fff" : alpha(m.navy, 0.72),
+                  "&:hover": {
+                    bgcolor: paymentMethod === option.id ? m.tealDark : alpha(m.navy, 0.02),
+                  },
+                }}
+              >
+                {option.label}
+              </Button>
+            ))}
+          </Stack>
+          {paymentMethod === "onlineDirect" && clientSelection?.type === "guest" ? (
+            <Box sx={{ mt: 1.25 }}>
+              <MollureFormField
+                label="Guest email"
+                placeholder="Email for invoice and receipt"
+                value={guestEmail}
+                onChange={(e) => setGuestEmail(e.target.value)}
+                size="small"
+                fullWidth
+              />
+            </Box>
+          ) : null}
+        </Box>
+        ) : null}
+
+        {step === 3 ? (
+          <Stack spacing={1.25}>
+            <BodyText sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.86) }}>Final summary</BodyText>
+            <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.65) }}>
+              Client: {selectionLabel(clientSelection)}
+            </Typography>
+            <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.65) }}>
+              Items: {lines.length} · Payment: {paymentMethod === "onlineDirect" ? "Online direct" : "Offline direct"}
+            </Typography>
+            <Typography sx={{ fontSize: 18, fontWeight: 900, color: alpha(m.navy, 0.88) }}>
+              Total: {formatEurAmount(totalPrice)}
+            </Typography>
+          </Stack>
+        ) : null}
       </Stack>
+
+      <ManualEntryUniqueItemModal
+        open={uniqueItemOpen}
+        onClose={() => setUniqueItemOpen(false)}
+        onSave={(line) => setLines((prev) => [...prev, line])}
+      />
 
       <ManualEntryLineEditModal
         open={Boolean(editingLine)}

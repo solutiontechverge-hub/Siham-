@@ -18,6 +18,15 @@ import {
   listCategories,
   upsertBusinessSetup,
 } from "../controllers/business.controller.js";
+import {
+  createProfessionalClient,
+  deleteProfessionalClient,
+  listMollureClientDirectory,
+  listProfessionalClients,
+  setProfessionalClientBlocked,
+  updateProfessionalClient,
+  updateProfessionalClientTechnicalNote,
+} from "../controllers/professional-clients.controller.js";
 import { authenticateUser, authorizeRoles } from "../middleware/auth.middleware.js";
 import { validateRequest } from "../middleware/validate.middleware.js";
 import { upload } from "../middleware/upload.middleware.js";
@@ -301,5 +310,44 @@ router.patch(
   validateRequest,
   updateBookingStatus,
 );
+
+router.get("/clients", requireProfessional, listProfessionalClients);
+router.get("/clients/mollure-directory", requireProfessional, listMollureClientDirectory);
+router.post(
+  "/clients",
+  requireProfessional,
+  [
+    body("client_kind")
+      .optional({ values: "falsy" })
+      .trim()
+      .isIn(["individual", "company"])
+      .withMessage("client_kind must be individual or company."),
+    body("email").optional({ values: "falsy" }).isEmail().withMessage("email must be valid."),
+    body("mollure_user_id").optional({ values: "falsy" }).isUUID().withMessage("mollure_user_id must be a UUID."),
+  ],
+  validateRequest,
+  createProfessionalClient,
+);
+router.patch(
+  "/clients/:id",
+  requireProfessional,
+  validateRequest,
+  updateProfessionalClient,
+);
+router.patch(
+  "/clients/:id/technical-note",
+  requireProfessional,
+  [body("technical_note").optional().isString()],
+  validateRequest,
+  updateProfessionalClientTechnicalNote,
+);
+router.patch(
+  "/clients/:id/block",
+  requireProfessional,
+  [body("is_blocked").isBoolean().withMessage("is_blocked must be a boolean.")],
+  validateRequest,
+  setProfessionalClientBlocked,
+);
+router.delete("/clients/:id", requireProfessional, deleteProfessionalClient);
 
 export default router;

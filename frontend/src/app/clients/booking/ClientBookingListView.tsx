@@ -15,6 +15,7 @@ import {
   type ClientBookingStatus,
 } from "./clientBookingRecords";
 import { bookingStatusChipColors } from "./clientBookingStatus";
+import BookingRequestBadge from "../../../components/common/calendar/BookingRequestBadge";
 import { getCheckoutPath, setActiveBookingSession } from "./clientBookingSession";
 
 const fallbackAddress = "Marina-Park 50, Den Helder, Noord-Holland";
@@ -94,7 +95,8 @@ export default function ClientBookingListView({ listTab }: Props) {
                 const time = b.draft?.selectedTime ?? "";
                 const total = b.draft?.total ?? 0;
                 const status = (b.status ?? "confirmed") as ClientBookingStatus;
-                const chipLabel = statusChipLabel(status);
+                const isRequested = status === "requested";
+                const chipLabel = isRequested ? "Requested" : statusChipLabel(status);
                 const chipColors = bookingStatusChipColors(status);
                 return (
                   <ButtonBase
@@ -150,17 +152,20 @@ export default function ClientBookingListView({ listTab }: Props) {
                         ) : null}
                       </Box>
                       <Stack alignItems={{ xs: "flex-start", sm: "flex-end" }} spacing={0.5}>
-                        <Chip
-                          label={chipLabel}
-                          size="small"
-                          sx={{
-                            height: 22,
-                            fontWeight: 900,
-                            bgcolor: chipColors.bgcolor,
-                            color: chipColors.color,
-                            border: chipColors.border,
-                          }}
-                        />
+                        <Stack direction="row" alignItems="center" spacing={0.75}>
+                          <Chip
+                            label={chipLabel}
+                            size="small"
+                            sx={{
+                              height: 22,
+                              fontWeight: 900,
+                              bgcolor: chipColors.bgcolor,
+                              color: chipColors.color,
+                              border: chipColors.border,
+                            }}
+                          />
+                          {isRequested ? <BookingRequestBadge variant="compact" iconSize={10} /> : null}
+                        </Stack>
                         <Typography sx={{ fontWeight: 1000, color: alpha(m.navy, 0.85) }}>{total} €</Typography>
                       </Stack>
                     </Stack>

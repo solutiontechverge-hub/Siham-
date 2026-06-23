@@ -6,11 +6,83 @@ export type CalendarBookingStatus =
   | "Cancelled"
   | "Confirmed"
   | "Completed"
-  | "No Show";
+  | "No Show"
+  | "Invalid";
 
 export type CalendarBookingLocation = "FL" | "DL";
 
 export type CalendarBookingType = "Online" | "Offline" | "Project" | "Requests";
+
+export type CalendarBookingScenario = "BR" | "EBR" | "ER" | "E";
+
+export type CalendarBookingServiceItem = {
+  id: string;
+  name: string;
+  price: number;
+  durationMins: number;
+  startTime?: string;
+  endTime?: string;
+  staffResourceId?: string;
+};
+
+export type CalendarBookingProductItem = {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  unitPrice: number;
+};
+
+export type CalendarBookingGuestItem = {
+  id: string;
+  name: string;
+  services: CalendarBookingServiceItem[];
+  products: CalendarBookingProductItem[];
+};
+
+export type CalendarBookingDetails = {
+  clientEmail?: string;
+  services?: CalendarBookingServiceItem[];
+  products?: CalendarBookingProductItem[];
+  guests?: CalendarBookingGuestItem[];
+  phoneCode?: string;
+  phoneNumber?: string;
+  desiredLocation?: {
+    street: string;
+    number: string;
+    postalCode: string;
+    province: string;
+    municipality: string;
+  };
+  prepaymentPercent?: string;
+  showPrepayment?: boolean;
+  prepaymentStatus?: "pending" | "confirmed" | "canceled" | "invalid";
+  responseStatus?: "suggestion_for_change" | "overdue_response";
+  paymentMethod?: "online" | "offline";
+  lateCancellationFeePercent?: string;
+  showLateCancellation?: boolean;
+  internalNote?: string;
+  showInternalNote?: boolean;
+  totalDiscount?: {
+    type: "fixed" | "percentage";
+    amount: number;
+  } | null;
+  kilometerAllowance?: {
+    eurPerKm: string;
+    totalKilometer: string;
+  };
+  showKilometerAllowance?: boolean;
+  /** incoming = client sent request; outgoing = professional sent request */
+  requestDirection?: "incoming" | "outgoing";
+  /** Baseline services from the client — used to detect professional edits */
+  originalServices?: CalendarBookingServiceItem[];
+  /** Service ids edited by the professional before sending EBR */
+  editedServiceIds?: string[];
+  /** Service ids edited by the client when returning an EBR */
+  clientEditedServiceIds?: string[];
+  /** Who last edited before the current negotiation round */
+  lastEditedBy?: "professional" | "client";
+};
 
 export type CalendarResource = {
   id: string;
@@ -29,7 +101,10 @@ export type CalendarEvent = {
   status: CalendarBookingStatus;
   location: CalendarBookingLocation;
   bookingType?: CalendarBookingType;
+  /** Online booking scenario indicator (BR, EBR, ER, E). */
+  bookingScenario?: CalendarBookingScenario;
   showClientName?: string;
+  details?: CalendarBookingDetails;
 };
 
 export type CalendarBlock = {
@@ -87,8 +162,7 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
   subTabs: ["Overview", "Schedule", "Hours and Rules"],
   initialSubTab: "Overview",
   initialView: "day",
-  // Mock seed: open directly on today's timeline so the reusable cards are visible.
-  initialDate: "2026-06-12",
+  initialDate: "",
   resources: [
     { id: "r-1", name: "Abril Lewis", avatarText: "A" },
     { id: "r-2", name: "Jordan Smith", avatarText: "J" },
@@ -113,7 +187,52 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
   events: [
     // Today's mock activities
     {
+      id: "b-61201-a-accepted",
+      bookingCode: "34011",
+      resourceId: "r-1",
+      date: "2026-06-12",
+      start: "10:00",
+      end: "10:30",
+      title: "Hot stone full body massage",
+      status: "Confirmed",
+      location: "FL",
+      bookingType: "Requests",
+      bookingScenario: "BR",
+      showClientName: "Mia R",
+      details: {
+        clientEmail: "mia.r@example.com",
+        services: [{ id: "svc-hot-stone", name: "Hot stone full body massage", durationMins: 30, price: 165 }],
+        phoneCode: "+31",
+        phoneNumber: "698765432",
+        showPrepayment: true,
+        prepaymentPercent: "50",
+        prepaymentStatus: "confirmed",
+      },
+    },
+    {
+      id: "b-61201-a-rejected",
+      bookingCode: "34012",
+      resourceId: "r-1",
+      date: "2026-06-12",
+      start: "11:00",
+      end: "11:30",
+      title: "Hot stone full body massage",
+      status: "Invalid",
+      location: "FL",
+      bookingType: "Requests",
+      bookingScenario: "BR",
+      showClientName: "Sara Johnson",
+      details: {
+        clientEmail: "sarajohnson@gmail.com",
+        requestDirection: "incoming",
+        services: [{ id: "svc-hot-stone", name: "Hot stone full body massage", durationMins: 30, price: 165 }],
+        phoneCode: "+31",
+        phoneNumber: "612345679",
+      },
+    },
+    {
       id: "b-61201-a",
+      bookingCode: "34009",
       resourceId: "r-1",
       date: "2026-06-12",
       start: "08:00",
@@ -122,10 +241,31 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
       status: "Requested",
       location: "FL",
       bookingType: "Requests",
+      bookingScenario: "BR",
       showClientName: "Lissa J",
+      details: {
+        clientEmail: "lissa.j@example.com",
+        requestDirection: "incoming",
+        originalServices: [
+          { id: "svc-hot-stone", name: "Hot stone full body massage", durationMins: 30, price: 165 },
+        ],
+        services: [
+          { id: "svc-hot-stone", name: "Hot stone full body massage", durationMins: 30, price: 165 },
+        ],
+        phoneCode: "+31",
+        phoneNumber: "612345678",
+        showPrepayment: true,
+        prepaymentPercent: "50",
+        prepaymentStatus: "pending",
+        showLateCancellation: true,
+        lateCancellationFeePercent: "100",
+        internalNote: "Client requested extra focus on shoulders.",
+        showInternalNote: true,
+      },
     },
     {
       id: "b-61201-b",
+      bookingCode: "34009",
       resourceId: "r-1",
       date: "2026-06-12",
       start: "08:30",
@@ -135,9 +275,19 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
       location: "FL",
       bookingType: "Offline",
       showClientName: "Lissa J",
+      details: {
+        clientEmail: "lissa.j@example.com",
+        services: [{ id: "svc-hair-cut", name: "Hair Cut", durationMins: 15, price: 45 }],
+        phoneCode: "+31",
+        phoneNumber: "612345678",
+        showPrepayment: true,
+        prepaymentPercent: "50",
+        prepaymentStatus: "canceled",
+      },
     },
     {
       id: "b-61201-c",
+      bookingCode: "34009",
       resourceId: "r-1",
       date: "2026-06-12",
       start: "09:00",
@@ -146,7 +296,26 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
       status: "Confirmed",
       location: "DL",
       bookingType: "Online",
+      bookingScenario: "ER",
       showClientName: "Lissa J",
+      details: {
+        clientEmail: "lissa.j@example.com",
+        services: [{ id: "svc-hair-cut", name: "Hair Cut", durationMins: 15, price: 45 }],
+        phoneCode: "+31",
+        phoneNumber: "612345678",
+        desiredLocation: {
+          street: "Keizersgracht",
+          number: "123",
+          postalCode: "1015 CJ",
+          province: "North Holland",
+          municipality: "Amsterdam",
+        },
+        showPrepayment: true,
+        prepaymentPercent: "50",
+        prepaymentStatus: "confirmed",
+        responseStatus: "overdue_response",
+        paymentMethod: "online",
+      },
     },
     {
       id: "b-61201-d",
@@ -186,6 +355,7 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
     },
     {
       id: "b-61203-a",
+      bookingCode: "55002",
       resourceId: "r-3",
       date: "2026-06-12",
       start: "08:30",
@@ -195,6 +365,12 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
       location: "FL",
       bookingType: "Project",
       showClientName: "Emma S",
+      details: {
+        clientEmail: "emma.s@example.com",
+        services: [{ id: "svc-lashes", name: "Lashes", durationMins: 30, price: 85 }],
+        phoneCode: "+31",
+        phoneNumber: "698765432",
+      },
     },
     // April mock activities
     {
@@ -219,7 +395,23 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
       status: "Requested",
       location: "DL",
       bookingType: "Requests",
+      bookingScenario: "EBR",
       showClientName: "Noah P",
+      details: {
+        requestDirection: "incoming",
+        lastEditedBy: "client",
+        showPrepayment: true,
+        prepaymentPercent: "30",
+        prepaymentStatus: "pending",
+        responseStatus: "suggestion_for_change",
+        originalServices: [
+          { id: "svc-brow-shaping", name: "Brow shaping", durationMins: 15, price: 35, startTime: "08:30", endTime: "08:45" },
+        ],
+        services: [
+          { id: "svc-brow-shaping", name: "Brow shaping", durationMins: 20, price: 40, startTime: "08:30", endTime: "08:50" },
+        ],
+        clientEditedServiceIds: ["svc-brow-shaping"],
+      },
     },
     {
       id: "b-24001-c",
@@ -351,6 +543,7 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
       status: "Requested",
       location: "FL",
       bookingType: "Requests",
+      bookingScenario: "BR",
       showClientName: "Lissa J",
     },
     {
@@ -363,6 +556,7 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
       status: "Requested",
       location: "FL",
       bookingType: "Requests",
+      bookingScenario: "BR",
       showClientName: "Lissa J",
     },
     {

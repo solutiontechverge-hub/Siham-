@@ -57,3 +57,5 @@ export function revokeAttachmentUrls(attachments?: MessagingAttachment[]) {
 export function isImageAttachment(mimeType?: string): boolean {
   return Boolean(mimeType?.startsWith("image/"));
 }
+
+export { resolveMessagingAttachmentUrl, resolveMessagingAttachments } from "./messagingAttachmentUpload";

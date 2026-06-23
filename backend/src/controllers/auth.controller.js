@@ -130,9 +130,23 @@ const getUserWithProfile = async (userId) => {
     [userId],
   );
 
+  const profile = profileResult.rows[0] || null;
+  let stripe_connect_status = null;
+
+  if (user.user_type === "professional" && profile?.id) {
+    const financeResult = await query(
+      `SELECT stripe_connect_status
+       FROM professional_finance_settings
+       WHERE professional_profile_id = $1`,
+      [profile.id],
+    );
+    stripe_connect_status = financeResult.rows[0]?.stripe_connect_status ?? "not_connected";
+  }
+
   return {
     ...user,
-    profile: profileResult.rows[0] || null,
+    profile,
+    ...(stripe_connect_status ? { stripe_connect_status } : {}),
   };
 };
 

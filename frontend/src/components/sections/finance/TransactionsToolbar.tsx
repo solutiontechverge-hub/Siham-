@@ -78,7 +78,7 @@ export default function TransactionsToolbar({
       <Stack direction={{ xs: "column", lg: "row" }} spacing={1.5} alignItems={{ lg: "center" }}>
         <Box sx={{ flex: 1, maxWidth: { lg: 420 } }}>
           <MollureFormField
-            placeholder="Search from Client list by name"
+            placeholder="Search by Booking ID, client name or email"
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
             sx={{

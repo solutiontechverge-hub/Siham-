@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useSearchParams } from "next/navigation";
 import {
   Box,
   Button,
@@ -33,6 +34,8 @@ export type AuthLoginShellProps = {
 export default function AuthLoginShell({ header, signupHref }: AuthLoginShellProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect");
   const { showSnackbar } = useSnackbar();
   const { completeLogin } = useAuthSessionLogin();
   const [email, setEmail] = React.useState("");
@@ -51,7 +54,7 @@ export default function AuthLoginShell({ header, signupHref }: AuthLoginShellPro
         password,
       }).unwrap();
 
-      completeLogin(result.data, remember);
+      completeLogin(result.data, remember, redirectTo);
     } catch (error) {
       showSnackbar({
         severity: "error",

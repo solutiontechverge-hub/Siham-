@@ -4,8 +4,12 @@ import * as React from "react";
 import { Box } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import BookingTimelineCard from "../BookingTimelineCard";
+import { useProfessionalMessagingUnread } from "../messaging/useProfessionalMessagingUnread";
 import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import { extractBookingId, statusChipSx } from "./calendar.utils";
+import { getBookingScenarioIndicators, statusCardAccent, isBookingRequestAccepted, isBookingRequestRejected } from "./bookingStatus";
+import { resolveBookingResponseIndicators } from "./bookingResponseStatus";
+import { resolveCalendarPrepaymentStatus, toPrepaymentIconVariant } from "./prepaymentStatus";
 
 export type CalendarBookingCardProps = {
   event: CalendarEvent;
@@ -18,22 +22,18 @@ export type CalendarBookingCardProps = {
   onOpenCalendar: () => void;
   onOpenNotes: () => void;
   onOpenClient: () => void;
+  onOpenMessages: () => void;
 };
 
-function statusAccent(status: CalendarEvent["status"]) {
-  switch (status) {
-    case "Requested":
-      return { color: "#FBB500", bg: "rgba(253, 246, 239, 0.6)", border: "#FBB500" };
-    case "Cancelled":
-      return { color: "#EF4444", bg: "#FFF1F1", border: "#F4A3A3" };
-    case "Confirmed":
-      return { color: "#22B573", bg: "#ECFFF4", border: "#75D9A6" };
-    case "Completed":
-      return { color: "#74839A", bg: "#F7F9FC", border: "#B6C0CE" };
-    case "No Show":
-    default:
-      return { color: "#8B98AA", bg: "#F4F6F9", border: "#BFC8D4" };
+function scenarioBadgeResponseIndicators(
+  label: ReturnType<typeof getBookingScenarioIndicators>[number],
+  responseIndicators: ReturnType<typeof resolveBookingResponseIndicators>,
+) {
+  if (label === "BR" || label === "EBR") return responseIndicators;
+  if (label === "ER" || label === "E") {
+    return responseIndicators.filter((indicator) => indicator === "overdue_response");
   }
+  return [];
 }
 
 export default function CalendarBookingCard({
@@ -47,10 +47,17 @@ export default function CalendarBookingCard({
   onOpenCalendar,
   onOpenNotes,
   onOpenClient,
+  onOpenMessages,
 }: CalendarBookingCardProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
-  const accent = statusAccent(event.status);
+  const bookingRef = event.bookingCode ?? extractBookingId(event.id);
+  const unreadCount = useProfessionalMessagingUnread(bookingRef);
+  const accent = statusCardAccent(event.status);
+  const scenarioIndicators = getBookingScenarioIndicators(event);
+  const responseIndicators = resolveBookingResponseIndicators(event);
+  const prepaymentStatus = resolveCalendarPrepaymentStatus(event);
+  const prepaymentIconVariant = prepaymentStatus ? toPrepaymentIconVariant(prepaymentStatus) : undefined;
   const isDesiredLocation = event.location === "DL";
   const accentColor = serviceColor ?? accent.color;
   const backgroundColor = serviceColor ? alpha(serviceColor, isDesiredLocation ? 0.08 : 0.075) : accent.bg;
@@ -81,7 +88,28 @@ export default function CalendarBookingCard({
         borderColor={borderColor}
         backgroundColor={backgroundColor}
         pattern={isDesiredLocation ? "dots" : "lines"}
-        requestBadge={event.status === "Requested"}
+        scenarioBadges={scenarioIndicators.map((label) => ({
+          label,
+          showRequestSentIcon: label === "BR",
+          requestAccepted: label === "BR" && isBookingRequestAccepted(event),
+          requestRejected: label === "BR" && isBookingRequestRejected(event),
+          responseIndicators: label === "EBR" ? scenarioBadgeResponseIndicators(label, responseIndicators) : [],
+          prepaymentStatus:
+            label === "EBR"
+              ? prepaymentIconVariant === "pending"
+                ? undefined
+                : prepaymentIconVariant
+              : undefined,
+          showExternalLink: label === "ER",
+        }))}
+        prepaymentStatus={prepaymentIconVariant}
+        responseIndicators={
+          scenarioIndicators.includes("BR")
+            ? responseIndicators
+            : scenarioIndicators.length
+              ? undefined
+              : responseIndicators
+        }
         titleLineClamp={1}
         calendarAction={{
           show: true,
@@ -101,9 +129,9 @@ export default function CalendarBookingCard({
         }}
         messageAction={{
           show: true,
-          count: event.status === "Requested" ? 1 : undefined,
+          count: unreadCount > 0 ? unreadCount : undefined,
           tooltip: `Messages: ${event.showClientName ?? "Client"}`,
-          onClick: onOpenClient,
+          onClick: onOpenMessages,
         }}
         onClick={onOpen}
         sx={{ width: "100%" }}
