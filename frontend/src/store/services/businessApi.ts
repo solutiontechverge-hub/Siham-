@@ -572,6 +572,26 @@ export const businessApi = baseApi.injectEndpoints({
       },
       invalidatesTags: ["Calendar"],
     }),
+    deleteCalendarEntry: builder.mutation<ApiEnvelope<{ id: string }>, string>({
+      async queryFn(id, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: `/api/business/calendar/${id}`,
+          method: "DELETE",
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<{ id: string }>;
+        if (!data.success) {
+          return { error: customError(data.message || "Unable to delete calendar entry.") };
+        }
+
+        return { data };
+      },
+      invalidatesTags: ["Calendar"],
+    }),
     updateBookingStatus: builder.mutation<ApiEnvelope<CalendarBooking>, UpdateBookingStatusRequest>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
         const response = await fetchWithBQ({
@@ -710,6 +730,7 @@ export const {
   useCreateCalendarEntryMutation,
   useUpsertCalendarSettingsMutation,
   useUpdateCalendarEntryStatusMutation,
+  useDeleteCalendarEntryMutation,
   useUpdateBookingStatusMutation,
   useUploadBusinessMediaMutation,
   useUpdateBusinessSetupActiveMutation,

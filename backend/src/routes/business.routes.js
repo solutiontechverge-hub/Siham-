@@ -3,6 +3,7 @@ import { body } from "express-validator";
 import {
   createBooking,
   createCalendarEntry,
+  deleteCalendarEntry,
   updateCalendarEntryStatus,
   updateBookingStatus,
   getCalendarOverview,
@@ -225,8 +226,8 @@ router.post(
     body("unique_code").optional({ values: "falsy" }).trim(),
     body("team_member_id")
       .optional({ values: "falsy" })
-      .isInt({ min: 1 })
-      .withMessage("team_member_id must be a valid integer."),
+      .isUUID()
+      .withMessage("team_member_id must be a valid UUID."),
     body("booking_type")
       .optional({ values: "falsy" })
       .trim()
@@ -252,6 +253,12 @@ router.patch(
   ],
   validateRequest,
   updateCalendarEntryStatus,
+);
+
+router.delete(
+  "/calendar/:id",
+  requireProfessional,
+  deleteCalendarEntry,
 );
 
 router.get("/bookings", listBookings);
