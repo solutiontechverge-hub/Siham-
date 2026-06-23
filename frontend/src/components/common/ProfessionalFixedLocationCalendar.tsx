@@ -40,7 +40,9 @@ import {
   resolveOriginalServices,
 } from "./calendar/bookingRequestNegotiation";
 import CalendarBlockTimeModal from "./calendar/CalendarBlockTimeModal";
-import CalendarDesignModal, { type CalendarDesignDraft } from "./calendar/CalendarDesignModal";
+import CalendarDesignModal, { type CalendarDesignDraft, getCalendarDesignServiceLabel } from "./calendar/CalendarDesignModal";
+import CalendarSettingsPanel from "./calendar/CalendarSettingsPanel";
+import CalendarTeamMemberSchedule from "./calendar/CalendarTeamMemberSchedule";
 import CalendarPublicBusinessHoursModal, {
   type PublicBusinessHoursDraft,
 } from "./calendar/CalendarPublicBusinessHoursModal";
@@ -133,13 +135,27 @@ import type {
   CalendarSubTab,
   CalendarViewMode,
   ProfessionalFixedLocationCalendarData,
+  TeamScheduleAvailabilityEntry,
+  TeamScheduleBlockedEntry,
 } from "../../app/professionals/fixed-location/calendar/calendar.data";
-import type { CreateCalendarEntryRequest, UpsertCalendarSettingsRequest } from "../../store/services/businessApi";
+import type { CalendarSettings, CreateCalendarEntryRequest, UpsertCalendarSettingsRequest } from "../../store/services/businessApi";
+import { BUSINESS_SERVICE_CATEGORY_CATALOG } from "../../data/businessServiceCategorySlider.data";
 import { GENDER_OPTIONS, type GenderOption } from "../../lib/gender-options";
 import { getOptionalPhoneValidationErrors, getPhoneValidationErrors } from "../../lib/phone-validation";
+import {
+  appendPublicHoursFromDraft,
+  buildAvailabilityPayload,
+  defaultBookingRules,
+  defaultPublicHoursState,
+  parseAvailability,
+  parseDesign,
+} from "./calendar/calendarSettings.types";
+import CalendarServiceColorEditModal from "./calendar/CalendarServiceColorEditModal";
+import { resolveServiceCategorySliderIconId } from "../../data/businessServiceCategorySlider.data";
 
 export type ProfessionalFixedLocationCalendarProps = {
   data: ProfessionalFixedLocationCalendarData;
+  initialCalendarSettings?: CalendarSettings | null;
   isSaving?: boolean;
   onCreateCalendarEntry?: (payload: CreateCalendarEntryRequest) => Promise<void>;
   onSaveCalendarSettings?: (payload: UpsertCalendarSettingsRequest) => Promise<void>;
@@ -156,6 +172,7 @@ const formatWeekDayDate = (iso: string) =>
 
 export default function ProfessionalFixedLocationCalendar({
   data,
+  initialCalendarSettings = null,
   isSaving = false,
   onCreateCalendarEntry,
   onSaveCalendarSettings,
@@ -199,6 +216,19 @@ export default function ProfessionalFixedLocationCalendar({
 
   const defaultDateIso = React.useMemo(() => toIsoLocalDate(new Date()), []);
   const [activeSubTab, setActiveSubTab] = React.useState<CalendarSubTab>(data.initialSubTab);
+  const [scheduleDateIso, setScheduleDateIso] = React.useState(defaultDateIso);
+  const [scheduleAvailability, setScheduleAvailability] = React.useState<readonly TeamScheduleAvailabilityEntry[]>(
+    () => [...data.scheduleAvailability],
+  );
+  const [scheduleBlocked, setScheduleBlocked] = React.useState<readonly TeamScheduleBlockedEntry[]>(
+    () => [...data.scheduleBlocked],
+  );
+  React.useEffect(() => {
+    setScheduleAvailability([...data.scheduleAvailability]);
+  }, [data.scheduleAvailability]);
+  React.useEffect(() => {
+    setScheduleBlocked([...data.scheduleBlocked]);
+  }, [data.scheduleBlocked]);
   const [viewMode, setViewMode] = React.useState<CalendarViewMode>("day");
   const [activeDateIso, setActiveDateIso] = React.useState(defaultDateIso);
   const [selectedResourceId, setSelectedResourceId] = React.useState("");
@@ -538,6 +568,78 @@ export default function ProfessionalFixedLocationCalendar({
     scope: "Categories",
     colorsByCategory: {},
   }));
+
+  const [publicHoursState, setPublicHoursState] = React.useState(defaultPublicHoursState);
+  const [bookingRules, setBookingRules] = React.useState(defaultBookingRules);
+  const [serviceOrderKeys, setServiceOrderKeys] = React.useState<readonly string[]>(() =>
+    BUSINESS_SERVICE_CATEGORY_CATALOG.map((entry) => entry.key),
+  );
+  const [colorEditKey, setColorEditKey] = React.useState<string | null>(null);
+
+  const buildSettingsPayload = React.useCallback(
+    (overrides?: {
+      publicBusinessHours?: PublicBusinessHoursDraft;
+      publicHoursState?: ReturnType<typeof defaultPublicHoursState>;
+      bookingRules?: ReturnType<typeof defaultBookingRules>;
+      serviceOrderKeys?: readonly string[];
+      design?: CalendarDesignDraft;
+    }): UpsertCalendarSettingsRequest => ({
+      availability: buildAvailabilityPayload(
+        overrides?.publicBusinessHours ?? publicBusinessHoursDraft,
+        overrides?.publicHoursState ?? publicHoursState,
+        overrides?.bookingRules ?? bookingRules,
+        overrides?.serviceOrderKeys ?? serviceOrderKeys,
+      ),
+      design: overrides?.design ?? appliedDesign,
+    }),
+    [appliedDesign, bookingRules, publicBusinessHoursDraft, publicHoursState, serviceOrderKeys],
+  );
+
+  const saveCalendarSettings = React.useCallback(
+    async (overrides?: Parameters<typeof buildSettingsPayload>[0]) => {
+      await onSaveCalendarSettings?.(buildSettingsPayload(overrides));
+    },
+    [buildSettingsPayload, onSaveCalendarSettings],
+  );
+
+  React.useEffect(() => {
+    if (!initialCalendarSettings) return;
+    const availability = parseAvailability(initialCalendarSettings.availability);
+    const design = parseDesign(initialCalendarSettings.design);
+
+    if (availability.publicBusinessHours) {
+      setPublicBusinessHoursDraft(availability.publicBusinessHours);
+    }
+    if (availability.publicHoursState) {
+      setPublicHoursState(availability.publicHoursState);
+    }
+    if (availability.bookingRules) {
+      setBookingRules(availability.bookingRules);
+    }
+    if (availability.serviceOrder?.categoryKeys?.length) {
+      setServiceOrderKeys(availability.serviceOrder.categoryKeys);
+    }
+    if (design) {
+      setDesignDraft(design);
+      setAppliedDesign(design);
+    }
+  }, [initialCalendarSettings]);
+
+  const openPublicBusinessHours = React.useCallback((location: CalendarBookingLocation) => {
+    setPublicBusinessHoursDraft((prev) => ({
+      ...prev,
+      location,
+      schedule: location === "FL" ? "fixed" : "variable",
+    }));
+    setPublicBusinessHoursOpen(true);
+  }, []);
+
+  const getServiceCategoryKey = React.useCallback((title: string) => {
+    const iconId = resolveServiceCategorySliderIconId(title);
+    if (iconId === "generic" || iconId === "all") return null;
+    const entry = BUSINESS_SERVICE_CATEGORY_CATALOG.find((item) => item.iconId === iconId);
+    return entry?.key ?? null;
+  }, []);
 
   const getServiceCategory = React.useCallback((title: string) => {
     const t = String(title ?? "").toLowerCase();
@@ -1817,6 +1919,74 @@ export default function ProfessionalFixedLocationCalendar({
         alignStart={false}
       />
 
+      {activeSubTab === "Schedule" ? (
+        <CalendarTeamMemberSchedule
+          resources={data.resources}
+          supportedLocations={data.supportedLocations}
+          availability={scheduleAvailability}
+          blocked={scheduleBlocked}
+          activeDateIso={scheduleDateIso}
+          onDateChange={setScheduleDateIso}
+          onAvailabilityChange={setScheduleAvailability}
+          onBlockedChange={setScheduleBlocked}
+        />
+      ) : null}
+
+      {activeSubTab === "Settings" ? (
+        <CalendarSettingsPanel
+          supportedLocations={data.supportedLocations}
+          publicHoursState={publicHoursState}
+          onPublicHoursStateChange={(next) => {
+            setPublicHoursState(next);
+            void saveCalendarSettings({ publicHoursState: next });
+          }}
+          bookingRules={bookingRules}
+          onBookingRulesChange={setBookingRules}
+          serviceOrderKeys={serviceOrderKeys}
+          onServiceOrderKeysChange={setServiceOrderKeys}
+          appliedDesign={appliedDesign}
+          onOpenPublicBusinessHours={openPublicBusinessHours}
+          onOpenDesign={() => {
+            setDesignDraft(appliedDesign);
+            setDesignOpen(true);
+          }}
+          onEditServiceColor={(serviceKey) => setColorEditKey(serviceKey)}
+          onRemoveServiceColor={async (serviceKey) => {
+            const nextDesign: CalendarDesignDraft = {
+              ...appliedDesign,
+              colorsByCategory: { ...appliedDesign.colorsByCategory },
+            };
+            delete nextDesign.colorsByCategory[serviceKey];
+            setAppliedDesign(nextDesign);
+            setDesignDraft(nextDesign);
+            try {
+              await saveCalendarSettings({ design: nextDesign });
+              showSnackbar({ severity: "success", message: "Service colour reset." });
+            } catch {
+              showSnackbar({ severity: "error", message: "Unable to reset service colour." });
+            }
+          }}
+          onSaveBookingRules={async () => {
+            try {
+              await saveCalendarSettings();
+              showSnackbar({ severity: "success", message: "Booking rules saved." });
+            } catch {
+              showSnackbar({ severity: "error", message: "Unable to save booking rules." });
+            }
+          }}
+          onSaveServiceOrder={async () => {
+            try {
+              await saveCalendarSettings();
+              showSnackbar({ severity: "success", message: "Service order saved." });
+            } catch {
+              showSnackbar({ severity: "error", message: "Unable to save service order." });
+            }
+          }}
+          isSaving={isSaving}
+        />
+      ) : null}
+
+      {activeSubTab === "Overview" ? (
       <Paper
         elevation={0}
         sx={{
@@ -2569,8 +2739,10 @@ export default function ProfessionalFixedLocationCalendar({
                                   const widthPct = 100 / overlapCount;
                                   const left = isSplit ? `calc(${overlapIndex * widthPct}% + 2px)` : 0;
                                   const right = isSplit ? `calc(${(overlapCount - overlapIndex - 1) * widthPct}% + 2px)` : 0;
-                                  const cardServiceCategory = getServiceCategory(ev.title);
-                                  const cardServiceColor = cardServiceCategory ? appliedDesign.colorsByCategory[cardServiceCategory] : undefined;
+                                  const cardServiceCategoryKey = getServiceCategoryKey(ev.title);
+                                  const cardServiceColor = cardServiceCategoryKey
+                                    ? appliedDesign.colorsByCategory[cardServiceCategoryKey]
+                                    : undefined;
 
                                   return (
                                     <CalendarBookingCard
@@ -2602,6 +2774,7 @@ export default function ProfessionalFixedLocationCalendar({
           )}
         </Box>
       </Paper>
+      ) : null}
 
       <MollureDrawer
         anchor="right"
@@ -5112,14 +5285,23 @@ export default function ProfessionalFixedLocationCalendar({
         onClose={() => setPublicBusinessHoursOpen(false)}
         onApply={async () => {
           try {
-            await onSaveCalendarSettings?.({
-              availability: {
-                publicBusinessHours: publicBusinessHoursDraft,
-              },
-              design: appliedDesign,
+            const nextState = appendPublicHoursFromDraft(publicBusinessHoursDraft, publicHoursState);
+            setPublicHoursState(nextState);
+            await saveCalendarSettings({
+              publicBusinessHours: publicBusinessHoursDraft,
+              publicHoursState: nextState,
             });
-            showSnackbar({ severity: "success", message: "Public business hours saved." });
+            showSnackbar({ severity: "success", message: "Public business hours added." });
             setPublicBusinessHoursOpen(false);
+            setPublicBusinessHoursDraft({
+              location: publicBusinessHoursDraft.location,
+              schedule: publicBusinessHoursDraft.schedule,
+              day: "",
+              startTime: "08:00",
+              endTime: "18:00",
+              notAvailable: false,
+              note: "",
+            });
           } catch {
             showSnackbar({ severity: "error", message: "Unable to save public business hours." });
           }
@@ -5130,15 +5312,25 @@ export default function ProfessionalFixedLocationCalendar({
       <CalendarDesignModal
         open={designOpen}
         onClose={() => setDesignOpen(false)}
+        onColorSelect={async (key, color) => {
+          const nextDesign: CalendarDesignDraft = {
+            ...designDraft,
+            colorsByCategory: { ...designDraft.colorsByCategory, [key]: color },
+          };
+          setDesignDraft(nextDesign);
+          setAppliedDesign(nextDesign);
+          setDesignOpen(false);
+          try {
+            await saveCalendarSettings({ design: nextDesign });
+            showSnackbar({ severity: "success", message: "Service colour saved." });
+          } catch {
+            showSnackbar({ severity: "error", message: "Unable to save service colour." });
+          }
+        }}
         onApply={async () => {
           try {
             setAppliedDesign(designDraft);
-            await onSaveCalendarSettings?.({
-              availability: {
-                publicBusinessHours: publicBusinessHoursDraft,
-              },
-              design: designDraft,
-            });
+            await saveCalendarSettings({ design: designDraft });
             showSnackbar({ severity: "success", message: "Design saved." });
             setDesignOpen(false);
           } catch {
@@ -5147,6 +5339,28 @@ export default function ProfessionalFixedLocationCalendar({
         }}
         draft={designDraft}
         setDraft={setDesignDraft}
+      />
+      <CalendarServiceColorEditModal
+        open={Boolean(colorEditKey)}
+        serviceLabel={colorEditKey ? getCalendarDesignServiceLabel(colorEditKey) : ""}
+        color={colorEditKey ? appliedDesign.colorsByCategory[colorEditKey] ?? "" : ""}
+        onClose={() => setColorEditKey(null)}
+        onApply={async (color) => {
+          if (!colorEditKey) return;
+          const nextDesign: CalendarDesignDraft = {
+            ...appliedDesign,
+            colorsByCategory: { ...appliedDesign.colorsByCategory, [colorEditKey]: color },
+          };
+          setAppliedDesign(nextDesign);
+          setDesignDraft(nextDesign);
+          setColorEditKey(null);
+          try {
+            await saveCalendarSettings({ design: nextDesign });
+            showSnackbar({ severity: "success", message: "Service colour updated." });
+          } catch {
+            showSnackbar({ severity: "error", message: "Unable to save service colour." });
+          }
+        }}
       />
       <ManualEntryDiscountModal
         open={bookingDiscountModalOpen}

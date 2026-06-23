@@ -7,6 +7,7 @@ import { alpha, useTheme } from "@mui/material/styles";
 import AppDropdown from "../AppDropdown";
 import MollureModal from "../MollureModal";
 import { BodyText } from "../../ui/typography";
+import { BUSINESS_SERVICE_CATEGORY_CATALOG } from "../../../data/businessServiceCategorySlider.data";
 
 export type CalendarDesignDraft = {
   scope: "Categories";
@@ -17,13 +18,26 @@ type CalendarDesignModalProps = {
   open: boolean;
   onClose: () => void;
   onApply: () => void;
+  onColorSelect?: (key: string, color: string) => void;
   draft: CalendarDesignDraft;
   setDraft: React.Dispatch<React.SetStateAction<CalendarDesignDraft>>;
 };
 
-const categoryRows = ["Hair", "Nails", "Face treatments", "Body treatments"] as const;
+export function getCalendarDesignServiceLabel(key: string): string {
+  const entry = BUSINESS_SERVICE_CATEGORY_CATALOG.find((item) => item.key === key);
+  if (!entry) return key;
+  if (entry.key === "hair") return "Haar";
+  return entry.label;
+}
 
-export default function CalendarDesignModal({ open, onClose, onApply, draft, setDraft }: CalendarDesignModalProps) {
+export default function CalendarDesignModal({
+  open,
+  onClose,
+  onApply,
+  onColorSelect,
+  draft,
+  setDraft,
+}: CalendarDesignModalProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
 
@@ -130,11 +144,12 @@ export default function CalendarDesignModal({ open, onClose, onApply, draft, set
               overflow: "hidden",
             }}
           >
-            {categoryRows.map((label) => {
-              const color = draft.colorsByCategory[label] ?? "";
+            {BUSINESS_SERVICE_CATEGORY_CATALOG.map((entry) => {
+              const color = draft.colorsByCategory[entry.key] ?? "";
+              const label = getCalendarDesignServiceLabel(entry.key);
               return (
                 <Box
-                  key={label}
+                  key={entry.key}
                   sx={{
                     display: "grid",
                     gridTemplateColumns: "1fr auto auto",
@@ -175,7 +190,7 @@ export default function CalendarDesignModal({ open, onClose, onApply, draft, set
                           height: 16,
                           borderRadius: "4px",
                           bgcolor: color || alpha(m.navy, 0.08),
-                          border: `1px solid ${alpha(m.navy, color ? 0.18 : 0.10)}`,
+                          border: `1px solid ${alpha(m.navy, color ? 0.18 : 0.1)}`,
                         }}
                       />
                       <span>Choose color</span>
@@ -183,19 +198,24 @@ export default function CalendarDesignModal({ open, onClose, onApply, draft, set
                     <input
                       type="color"
                       value={color || "#22B8A7"}
-                      onChange={(e) => setColor(label, e.target.value)}
+                      onChange={(e) => {
+                        const nextColor = e.target.value;
+                        setColor(entry.key, nextColor);
+                        onColorSelect?.(entry.key, nextColor);
+                        e.currentTarget.blur();
+                      }}
                       style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }}
                     />
                   </Button>
 
                   <IconButton
                     size="small"
-                    onClick={() => clearColor(label)}
+                    onClick={() => clearColor(entry.key)}
                     sx={{
                       width: 30,
                       height: 30,
                       borderRadius: "10px",
-                      border: `1px solid ${alpha(m.navy, 0.10)}`,
+                      border: `1px solid ${alpha(m.navy, 0.1)}`,
                       bgcolor: "#fff",
                       color: alpha(m.navy, 0.55),
                       "&:hover": { bgcolor: alpha(m.navy, 0.03) },
@@ -212,4 +232,3 @@ export default function CalendarDesignModal({ open, onClose, onApply, draft, set
     </MollureModal>
   );
 }
-

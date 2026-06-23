@@ -1,4 +1,4 @@
-export type CalendarSubTab = "Overview" | "Schedule" | "Hours and Rules";
+export type CalendarSubTab = "Overview" | "Schedule" | "Settings";
 export type CalendarViewMode = "day" | "week" | "month";
 
 export type CalendarBookingStatus =
@@ -131,6 +131,36 @@ export type ResourceAvailability = {
   weekly: Partial<Record<0 | 1 | 2 | 3 | 4 | 5 | 6, readonly AvailabilityWindow[]>>;
 };
 
+export type TeamScheduleTimeRange = {
+  start: string;
+  end: string;
+};
+
+export type TeamScheduleAvailabilityEntry = {
+  id: string;
+  resourceId: string;
+  location: CalendarBookingLocation;
+  dateFrom: string;
+  dateTo: string;
+  dayFrom: string;
+  dayTo: string;
+  times: readonly TeamScheduleTimeRange[];
+  bookedDates?: readonly string[];
+  archived?: boolean;
+};
+
+export type TeamScheduleBlockedEntry = {
+  id: string;
+  resourceId: string;
+  activity: string;
+  dateFrom: string;
+  dateTo: string;
+  dayFrom: string;
+  dayTo: string;
+  times: readonly TeamScheduleTimeRange[];
+  archived?: boolean;
+};
+
 export type ProfessionalFixedLocationCalendarData = {
   subTabs: readonly CalendarSubTab[];
   initialSubTab: CalendarSubTab;
@@ -146,6 +176,8 @@ export type ProfessionalFixedLocationCalendarData = {
   };
   events: readonly CalendarEvent[];
   blocks: readonly CalendarBlock[];
+  scheduleAvailability: readonly TeamScheduleAvailabilityEntry[];
+  scheduleBlocked: readonly TeamScheduleBlockedEntry[];
 };
 
 const everyDayAvailability = (start: string, end: string): ResourceAvailability["weekly"] => ({
@@ -159,7 +191,7 @@ const everyDayAvailability = (start: string, end: string): ResourceAvailability[
 });
 
 export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCalendarData = {
-  subTabs: ["Overview", "Schedule", "Hours and Rules"],
+  subTabs: ["Overview", "Schedule", "Settings"],
   initialSubTab: "Overview",
   initialView: "day",
   initialDate: "",
@@ -667,5 +699,96 @@ export const professionalFixedLocationCalendarData: ProfessionalFixedLocationCal
     { id: "blk-1", resourceId: "r-1", date: "2022-05-27", start: "08:45", end: "09:00", title: "Lunch Break", kind: "break" },
     { id: "blk-2", resourceId: "r-2", date: "2022-05-27", start: "08:00", end: "09:00", title: "Unavailable", kind: "unavailable" },
     { id: "blk-3", resourceId: "r-3", date: "2022-05-27", start: "09:00", end: "09:15", title: "Break", kind: "break" },
+  ],
+  scheduleAvailability: [
+    {
+      id: "avail-1",
+      resourceId: "r-1",
+      location: "FL",
+      dateFrom: "2020-01-01",
+      dateTo: "2030-12-31",
+      dayFrom: "Mon",
+      dayTo: "Fri",
+      times: [
+        { start: "09:00", end: "12:00" },
+        { start: "13:00", end: "18:00" },
+        { start: "13:00", end: "18:00" },
+      ],
+      bookedDates: ["2025-01-02", "2025-01-02", "2025-01-02", "2025-01-02"],
+    },
+    {
+      id: "avail-2",
+      resourceId: "r-1",
+      location: "DL",
+      dateFrom: "2020-01-01",
+      dateTo: "2030-12-31",
+      dayFrom: "Mon",
+      dayTo: "Fri",
+      times: [{ start: "13:00", end: "17:00" }],
+    },
+    {
+      id: "avail-3",
+      resourceId: "r-2",
+      location: "FL",
+      dateFrom: "2020-01-01",
+      dateTo: "2030-12-31",
+      dayFrom: "Mon",
+      dayTo: "Sat",
+      times: [{ start: "08:00", end: "16:00" }],
+    },
+    {
+      id: "avail-archived",
+      resourceId: "r-1",
+      location: "FL",
+      dateFrom: "2020-01-01",
+      dateTo: "2030-12-31",
+      dayFrom: "Mon",
+      dayTo: "Fri",
+      times: [{ start: "10:00", end: "14:00" }],
+      archived: true,
+    },
+  ],
+  scheduleBlocked: [
+    {
+      id: "blocked-1",
+      resourceId: "r-1",
+      activity: "ABC",
+      dateFrom: "2020-01-01",
+      dateTo: "2030-12-31",
+      dayFrom: "Mon",
+      dayTo: "Fri",
+      times: [{ start: "09:00", end: "12:00" }],
+    },
+    {
+      id: "blocked-2",
+      resourceId: "r-1",
+      activity: "ABC",
+      dateFrom: "2020-01-01",
+      dateTo: "2030-12-31",
+      dayFrom: "Mon",
+      dayTo: "Fri",
+      times: [{ start: "13:00", end: "17:00" }],
+    },
+    {
+      id: "blocked-3",
+      resourceId: "r-2",
+      activity: "Training",
+      dateFrom: "2020-01-01",
+      dateTo: "2030-12-31",
+      dayFrom: "Wed",
+      dayTo: "Wed",
+      times: [{ start: "14:00", end: "16:00" }],
+    },
+    {
+      id: "blocked-archived",
+      resourceId: "r-1",
+      activity: "Holiday",
+      dateFrom: "2020-01-01",
+      dateTo: "2030-12-31",
+      dayFrom: "Mon",
+      dayTo: "Sun",
+      times: [{ start: "00:00", end: "23:59" }],
+      archived: true,
+    },
   ],
 };

@@ -270,12 +270,28 @@ export default function FixedLocationCalendarPage() {
       resourceId: resources[index]?.id ?? item.resourceId,
     }));
 
+    const scheduleAvailability = professionalFixedLocationCalendarData.scheduleAvailability.map((item, index) => ({
+      ...item,
+      resourceId: resources.find((resource) => resource.id === item.resourceId)?.id
+        ?? resources[index % resources.length]?.id
+        ?? item.resourceId,
+    }));
+
+    const scheduleBlocked = professionalFixedLocationCalendarData.scheduleBlocked.map((item, index) => ({
+      ...item,
+      resourceId: resources.find((resource) => resource.id === item.resourceId)?.id
+        ?? resources[index % resources.length]?.id
+        ?? item.resourceId,
+    }));
+
     return {
       ...professionalFixedLocationCalendarData,
       initialDate: todayIso,
       resources,
       supportedLocations: calendarLocations,
       availability,
+      scheduleAvailability,
+      scheduleBlocked,
       events,
       blocks,
     };
@@ -284,6 +300,7 @@ export default function FixedLocationCalendarPage() {
   return (
     <ProfessionalFixedLocationCalendar
       data={calendarData}
+      initialCalendarSettings={calendarOverviewData?.data?.settings ?? null}
       isSaving={isCreatingCalendarEntry || isSavingCalendarSettings}
       onCreateCalendarEntry={async (payload) => {
         try {

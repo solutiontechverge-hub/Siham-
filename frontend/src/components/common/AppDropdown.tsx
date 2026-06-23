@@ -14,6 +14,8 @@ type AppDropdownProps = Omit<TextFieldProps, "select" | "onChange" | "children" 
   options: AppDropdownOption[];
   value: string | readonly string[];
   multiple?: boolean;
+  /** Close the menu after each selection (useful for multi-select in modals). */
+  closeOnSelect?: boolean;
   renderValue?: (selected: string | readonly string[]) => React.ReactNode;
   onChange: (
     value: string | readonly string[],
@@ -38,19 +40,36 @@ export default function AppDropdown({
   options,
   value,
   multiple,
+  closeOnSelect = false,
   renderValue,
   placeholder,
   ...props
 }: AppDropdownProps) {
+  const [menuOpen, setMenuOpen] = React.useState(false);
+
+  const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    onChange(normalizeSelectValue(event.target.value, multiple), event);
+    if (closeOnSelect) {
+      setMenuOpen(false);
+    }
+  };
+
   return (
     <AppTextField
       select
       value={value}
-      onChange={(event) => onChange(normalizeSelectValue(event.target.value, multiple), event)}
+      onChange={handleChange}
       SelectProps={{
         IconComponent: ExpandMoreRoundedIcon,
         multiple: Boolean(multiple),
         displayEmpty: true,
+        ...(closeOnSelect
+          ? {
+              open: menuOpen,
+              onOpen: () => setMenuOpen(true),
+              onClose: () => setMenuOpen(false),
+            }
+          : {}),
         renderValue:
           (renderValue as any) ??
           ((selected: any) => {
