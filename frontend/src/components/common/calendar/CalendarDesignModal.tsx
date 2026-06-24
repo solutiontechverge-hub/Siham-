@@ -9,8 +9,9 @@ import MollureModal from "../MollureModal";
 import { BodyText } from "../../ui/typography";
 
 export type CalendarDesignDraft = {
-  scope: "Categories";
+  scope: "Categories" | "Services";
   colorsByCategory: Record<string, string>;
+  colorsByService?: Record<string, string>;
 };
 
 type CalendarDesignModalProps = {
@@ -19,31 +20,50 @@ type CalendarDesignModalProps = {
   onApply: () => void;
   draft: CalendarDesignDraft;
   setDraft: React.Dispatch<React.SetStateAction<CalendarDesignDraft>>;
+  serviceOptions?: readonly string[];
 };
 
 const categoryRows = ["Hair", "Nails", "Face treatments", "Body treatments"] as const;
 
-export default function CalendarDesignModal({ open, onClose, onApply, draft, setDraft }: CalendarDesignModalProps) {
+export default function CalendarDesignModal({
+  open,
+  onClose,
+  onApply,
+  draft,
+  setDraft,
+  serviceOptions = [],
+}: CalendarDesignModalProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
+  const isServices = draft.scope === "Services";
+  const colorRows = isServices ? serviceOptions : categoryRows;
 
   const setColor = React.useCallback(
     (key: string, hex: string) => {
       const safe = hex?.startsWith("#") ? hex : `#${hex}`;
-      setDraft((p) => ({ ...p, colorsByCategory: { ...p.colorsByCategory, [key]: safe } }));
+      setDraft((p) =>
+        isServices
+          ? { ...p, colorsByService: { ...(p.colorsByService ?? {}), [key]: safe } }
+          : { ...p, colorsByCategory: { ...p.colorsByCategory, [key]: safe } },
+      );
     },
-    [setDraft],
+    [isServices, setDraft],
   );
 
   const clearColor = React.useCallback(
     (key: string) => {
       setDraft((p) => {
+        if (isServices) {
+          const next = { ...(p.colorsByService ?? {}) };
+          delete next[key];
+          return { ...p, colorsByService: next };
+        }
         const next = { ...p.colorsByCategory };
         delete next[key];
         return { ...p, colorsByCategory: next };
       });
     },
-    [setDraft],
+    [isServices, setDraft],
   );
 
   return (
@@ -117,7 +137,10 @@ export default function CalendarDesignModal({ open, onClose, onApply, draft, set
             label=""
             value={draft.scope}
             onChange={(val) => setDraft((p) => ({ ...p, scope: String(val) as CalendarDesignDraft["scope"] }))}
-            options={[{ label: "Categories", value: "Categories" }]}
+            options={[
+              { label: "Categories", value: "Categories" },
+              { label: "Services", value: "Services" },
+            ]}
             placeholder="Categories"
             fullWidth
           />
@@ -130,8 +153,8 @@ export default function CalendarDesignModal({ open, onClose, onApply, draft, set
               overflow: "hidden",
             }}
           >
-            {categoryRows.map((label) => {
-              const color = draft.colorsByCategory[label] ?? "";
+            {colorRows.map((label) => {
+              const color = (isServices ? draft.colorsByService?.[label] : draft.colorsByCategory[label]) ?? "";
               return (
                 <Box
                   key={label}

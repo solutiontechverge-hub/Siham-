@@ -35,7 +35,7 @@ export default function MessagingDeleteMessageDialog({
       title="Delete message"
       onClose={onClose}
       embedded={embedded}
-      maxWidth={360}
+      maxWidth="xs"
       footer={
         <>
           <MessagingModalCancelButton onClick={onClose} />

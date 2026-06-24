@@ -12,8 +12,10 @@ import {
 } from "./calendar.data";
 import { useSnackbar } from "../../../../components/common/AppSnackbar";
 import { getApiErrorMessage } from "../../../../lib/api-error";
+import { parseCalendarSettings } from "../../../../components/common/calendar/calendar-settings.types";
 import {
   useCreateCalendarEntryMutation,
+  useDeleteCalendarEntryMutation,
   useGetBusinessSetupQuery,
   useGetCalendarOverviewQuery,
   useUpsertCalendarSettingsMutation,
@@ -173,6 +175,7 @@ export default function FixedLocationCalendarPage() {
   const { data: setupData } = useGetBusinessSetupQuery();
   const { data: calendarOverviewData } = useGetCalendarOverviewQuery();
   const [createCalendarEntry, { isLoading: isCreatingCalendarEntry }] = useCreateCalendarEntryMutation();
+  const [deleteCalendarEntry, { isLoading: isDeletingCalendarEntry }] = useDeleteCalendarEntryMutation();
   const [upsertCalendarSettings, { isLoading: isSavingCalendarSettings }] = useUpsertCalendarSettingsMutation();
   const { showSnackbar } = useSnackbar();
 
@@ -199,7 +202,7 @@ export default function FixedLocationCalendarPage() {
         .filter((entry) => entry.status !== "blocked")
         .map((entry) => ({
           id: `ce-${entry.id}`,
-          bookingCode: String(entry.id),
+          bookingCode: entry.unique_code || String(entry.id),
           resourceId: String(entry.team_member_id ?? resources[0]?.id ?? ""),
           date: dateFromValue(entry.date || entry.start_time),
           start: entry.start || timeFromIso(entry.start_time),
@@ -212,7 +215,7 @@ export default function FixedLocationCalendarPage() {
         })),
       ...(overview?.bookings ?? []).map((booking) => ({
         id: `b-${booking.id}`,
-        bookingCode: String(booking.id),
+        bookingCode: booking.unique_code || String(booking.id),
         resourceId: String(booking.team_member_id ?? resources[0]?.id ?? ""),
         date: dateFromValue(booking.date || booking.booking_date || booking.start_time),
         start: booking.start || timeFromIso(booking.start_time),
@@ -223,15 +226,8 @@ export default function FixedLocationCalendarPage() {
         bookingType: (
           booking.booking_type ? bookingTypeMap[booking.booking_type] ?? "Online" : booking.status === "requested" ? "Requests" : "Online"
         ) as CalendarBookingType,
-        showClientName: booking.unique_code || booking.notes || undefined,
+        showClientName: booking.team_member_name || booking.notes || undefined,
       })),
-    ];
-    const todayIso = new Date().toISOString().slice(0, 10);
-    const todayDemoEvents = buildTodayDemoEvents(resources, todayIso, supportedLocations);
-    const apiEventKeys = new Set(apiEvents.map((event) => `${event.resourceId}-${event.date}-${event.start}-${event.end}-${event.title}`));
-    const events = [
-      ...todayDemoEvents.filter((event) => !apiEventKeys.has(`${event.resourceId}-${event.date}-${event.start}-${event.end}-${event.title}`)),
-      ...apiEvents,
     ];
 
     const apiBlocks: CalendarBlock[] = (overview?.entries ?? [])
@@ -243,26 +239,11 @@ export default function FixedLocationCalendarPage() {
         start: entry.start || timeFromIso(entry.blocked_time_start),
         end: entry.end || timeFromIso(entry.blocked_time_end),
         title: entry.title,
-        kind: "unavailable",
+        kind: "unavailable" as const,
       }));
-    const blocks = [
-      ...(apiBlocks.some((block) => block.date === todayIso && block.resourceId === (resources[0]?.id ?? ""))
-        ? []
-        : [
-            {
-              id: "demo-block-today-1",
-              resourceId: resources[0]?.id ?? "",
-              date: todayIso,
-              start: "08:45",
-              end: "09:00",
-              title: "Lunch Break",
-              kind: "break" as const,
-            },
-          ]),
-      ...apiBlocks,
-    ];
+
     const calendarLocations = Array.from(
-      new Set<CalendarBookingLocation>([...supportedLocations, ...events.map((event) => event.location)]),
+      new Set<CalendarBookingLocation>([...supportedLocations, ...apiEvents.map((event) => event.location)]),
     );
 
     const availability = professionalFixedLocationCalendarData.availability.map((item, index) => ({
@@ -272,26 +253,77 @@ export default function FixedLocationCalendarPage() {
 
     return {
       ...professionalFixedLocationCalendarData,
-      initialDate: todayIso,
+      initialDate: new Date().toISOString().slice(0, 10),
       resources,
       supportedLocations: calendarLocations,
       availability,
-      events,
-      blocks,
+      events: apiEvents,
+      blocks: apiBlocks,
     };
   }, [calendarOverviewData, setupData]);
+
+  const calendarSettings = React.useMemo(
+    () => parseCalendarSettings(calendarOverviewData?.data?.settings?.availability, calendarOverviewData?.data?.settings?.design),
+    [calendarOverviewData],
+  );
+
+  const serviceOptions = React.useMemo(() => {
+    const setup = setupData?.data;
+    if (!setup?.service_details?.length) {
+      return ["Haircut", "Hair Color", "Hair Styling", "Manicure", "Facial"];
+    }
+    return setup.service_details.map((service) => service.service_title).filter(Boolean);
+  }, [setupData]);
+
+  const serviceOrderDefaults = React.useMemo(() => {
+    const setup = setupData?.data;
+    const categories = Array.from(
+      new Set(setup?.service_details?.map((service) => service.category_title).filter(Boolean) ?? []),
+    );
+    if (!categories.length) {
+      return {
+        categories: ["Hair", "Nails", "Face treatments", "Body treatments"],
+        servicesByCategory: {},
+      };
+    }
+    const servicesByCategory: Record<string, string[]> = {};
+    for (const category of categories) {
+      servicesByCategory[category] =
+        setup?.service_details
+          ?.filter((service) => service.category_title === category)
+          .map((service) => service.service_title)
+          .filter(Boolean) ?? [];
+    }
+    return { categories, servicesByCategory };
+  }, [setupData]);
 
   return (
     <ProfessionalFixedLocationCalendar
       data={calendarData}
-      isSaving={isCreatingCalendarEntry || isSavingCalendarSettings}
+      calendarSettings={calendarSettings}
+      serviceOptions={serviceOptions}
+      serviceOrderDefaults={serviceOrderDefaults}
+      isSaving={isCreatingCalendarEntry || isSavingCalendarSettings || isDeletingCalendarEntry}
       onCreateCalendarEntry={async (payload) => {
         try {
-          await createCalendarEntry(payload).unwrap();
+          const response = await createCalendarEntry(payload).unwrap();
+          return response.data;
         } catch (error) {
           showSnackbar({
             severity: "error",
             message: getApiErrorMessage(error, "Unable to save calendar entry."),
+          });
+          throw error;
+        }
+      }}
+      onDeleteCalendarEntry={async (id) => {
+        try {
+          await deleteCalendarEntry(id).unwrap();
+          showSnackbar({ severity: "success", message: "Calendar entry deleted." });
+        } catch (error) {
+          showSnackbar({
+            severity: "error",
+            message: getApiErrorMessage(error, "Unable to delete calendar entry."),
           });
           throw error;
         }
@@ -310,4 +342,3 @@ export default function FixedLocationCalendarPage() {
     />
   );
 }
-
