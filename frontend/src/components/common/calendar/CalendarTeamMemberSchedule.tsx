@@ -318,6 +318,12 @@ export default function CalendarTeamMemberSchedule({
 
   const [deleteTarget, setDeleteTarget] = React.useState<DeleteTarget>(null);
 
+  const teamLabelById = React.useMemo(() => {
+    const map = new Map<string, string>();
+    resources.forEach((resource) => map.set(resource.id, resource.name));
+    return map;
+  }, [resources]);
+
   const isArchived = statusTab === "archived";
 
   const filteredAvailability = React.useMemo(
@@ -660,11 +666,11 @@ export default function CalendarTeamMemberSchedule({
 
       <CalendarAvailabilityModal
         open={availabilityModalOpen}
-        mode={availabilityMode}
         draft={availabilityDraft}
         resources={resources}
-        supportedLocations={supportedLocations}
-        editingTeamMemberName={editingAvailabilityName}
+        availableLocations={supportedLocations}
+        teamLabelById={teamLabelById}
+        title={availabilityMode === "edit" ? "Edit Availability" : "Add Availability"}
         onClose={() => setAvailabilityModalOpen(false)}
         onApply={applyAvailability}
         setDraft={setAvailabilityDraft}
