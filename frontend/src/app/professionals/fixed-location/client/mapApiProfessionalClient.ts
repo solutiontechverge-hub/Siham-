@@ -1,5 +1,5 @@
-import type { ClientRecord } from "../../../app/professionals/fixed-location/client/data/clientList";
-import type { ApiProfessionalClient } from "../../../store/services/businessApi";
+import type { ClientRecord } from "./data/clientList";
+import type { ApiProfessionalClient } from "../../../../store/services/businessApi";
 
 export function mapApiProfessionalClientToRecord(row: ApiProfessionalClient): ClientRecord {
   const tags: ClientRecord["tags"] = [];

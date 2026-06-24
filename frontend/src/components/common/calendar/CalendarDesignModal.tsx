@@ -10,8 +10,9 @@ import { BodyText } from "../../ui/typography";
 import { BUSINESS_SERVICE_CATEGORY_CATALOG } from "../../../data/businessServiceCategorySlider.data";
 
 export type CalendarDesignDraft = {
-  scope: "Categories";
+  scope: "Categories" | "Services";
   colorsByCategory: Record<string, string>;
+  colorsByService?: Record<string, string>;
 };
 
 type CalendarDesignModalProps = {
@@ -21,6 +22,7 @@ type CalendarDesignModalProps = {
   onColorSelect?: (key: string, color: string) => void;
   draft: CalendarDesignDraft;
   setDraft: React.Dispatch<React.SetStateAction<CalendarDesignDraft>>;
+  serviceOptions?: readonly string[];
 };
 
 export function getCalendarDesignServiceLabel(key: string): string {
@@ -30,6 +32,8 @@ export function getCalendarDesignServiceLabel(key: string): string {
   return entry.label;
 }
 
+type ColorRow = { key: string; label: string };
+
 export default function CalendarDesignModal({
   open,
   onClose,
@@ -37,27 +41,48 @@ export default function CalendarDesignModal({
   onColorSelect,
   draft,
   setDraft,
+  serviceOptions = [],
 }: CalendarDesignModalProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
+  const isServices = draft.scope === "Services";
+
+  const colorRows = React.useMemo<ColorRow[]>(() => {
+    if (isServices) {
+      return serviceOptions.map((label) => ({ key: label, label }));
+    }
+    return BUSINESS_SERVICE_CATEGORY_CATALOG.map((entry) => ({
+      key: entry.key,
+      label: getCalendarDesignServiceLabel(entry.key),
+    }));
+  }, [isServices, serviceOptions]);
 
   const setColor = React.useCallback(
     (key: string, hex: string) => {
       const safe = hex?.startsWith("#") ? hex : `#${hex}`;
-      setDraft((p) => ({ ...p, colorsByCategory: { ...p.colorsByCategory, [key]: safe } }));
+      setDraft((p) =>
+        isServices
+          ? { ...p, colorsByService: { ...(p.colorsByService ?? {}), [key]: safe } }
+          : { ...p, colorsByCategory: { ...p.colorsByCategory, [key]: safe } },
+      );
     },
-    [setDraft],
+    [isServices, setDraft],
   );
 
   const clearColor = React.useCallback(
     (key: string) => {
       setDraft((p) => {
+        if (isServices) {
+          const next = { ...(p.colorsByService ?? {}) };
+          delete next[key];
+          return { ...p, colorsByService: next };
+        }
         const next = { ...p.colorsByCategory };
         delete next[key];
         return { ...p, colorsByCategory: next };
       });
     },
-    [setDraft],
+    [isServices, setDraft],
   );
 
   return (
@@ -131,7 +156,10 @@ export default function CalendarDesignModal({
             label=""
             value={draft.scope}
             onChange={(val) => setDraft((p) => ({ ...p, scope: String(val) as CalendarDesignDraft["scope"] }))}
-            options={[{ label: "Categories", value: "Categories" }]}
+            options={[
+              { label: "Categories", value: "Categories" },
+              { label: "Services", value: "Services" },
+            ]}
             placeholder="Categories"
             fullWidth
           />
@@ -144,12 +172,11 @@ export default function CalendarDesignModal({
               overflow: "hidden",
             }}
           >
-            {BUSINESS_SERVICE_CATEGORY_CATALOG.map((entry) => {
-              const color = draft.colorsByCategory[entry.key] ?? "";
-              const label = getCalendarDesignServiceLabel(entry.key);
+            {colorRows.map(({ key, label }) => {
+              const color = (isServices ? draft.colorsByService?.[key] : draft.colorsByCategory[key]) ?? "";
               return (
                 <Box
-                  key={entry.key}
+                  key={key}
                   sx={{
                     display: "grid",
                     gridTemplateColumns: "1fr auto auto",
@@ -200,8 +227,10 @@ export default function CalendarDesignModal({
                       value={color || "#22B8A7"}
                       onChange={(e) => {
                         const nextColor = e.target.value;
-                        setColor(entry.key, nextColor);
-                        onColorSelect?.(entry.key, nextColor);
+                        setColor(key, nextColor);
+                        if (!isServices) {
+                          onColorSelect?.(key, nextColor);
+                        }
                         e.currentTarget.blur();
                       }}
                       style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }}
@@ -210,7 +239,7 @@ export default function CalendarDesignModal({
 
                   <IconButton
                     size="small"
-                    onClick={() => clearColor(entry.key)}
+                    onClick={() => clearColor(key)}
                     sx={{
                       width: 30,
                       height: 30,

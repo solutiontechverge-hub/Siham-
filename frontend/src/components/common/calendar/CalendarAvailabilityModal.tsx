@@ -2,118 +2,91 @@
 
 import * as React from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import { Box, Button, IconButton, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import type { CalendarBookingLocation, CalendarResource } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import AppDatePicker from "../AppDatePicker";
 import AppDropdown from "../AppDropdown";
-import AppSelect from "../AppSelect";
 import AppTextField from "../AppTextField";
 import MollureModal from "../MollureModal";
-import { DAY_FULL_OPTIONS, type AvailabilityDraft } from "./schedule.utils";
+import type { CalendarBookingLocation, CalendarResource } from "../../../app/professionals/fixed-location/calendar/calendar.data";
+import type { BlockTimeDraft } from "./calendar.utils";
+import type { ScheduleShift } from "./calendar-settings.types";
 
-type CalendarAvailabilityModalProps = {
-  open: boolean;
-  mode: "add" | "edit";
-  draft: AvailabilityDraft;
-  resources: readonly CalendarResource[];
-  supportedLocations: readonly CalendarBookingLocation[];
-  editingTeamMemberName?: string;
-  onClose: () => void;
-  onApply: () => void;
-  setDraft: React.Dispatch<React.SetStateAction<AvailabilityDraft>>;
+export type AvailabilityDraft = {
+  teamIds: string[];
+  locations: CalendarBookingLocation[];
+  dateFrom: string;
+  dateTo: string;
+  dayFrom: BlockTimeDraft["dayFrom"];
+  dayTo: BlockTimeDraft["dayTo"];
+  shifts: ScheduleShift[];
 };
 
+type CalendarAvailabilityModalProps = {
+  availableLocations: readonly CalendarBookingLocation[];
+  draft: AvailabilityDraft;
+  onApply: () => void;
+  onClose: () => void;
+  open: boolean;
+  resources: readonly CalendarResource[];
+  setDraft: React.Dispatch<React.SetStateAction<AvailabilityDraft>>;
+  teamLabelById: ReadonlyMap<string, string>;
+  title?: string;
+};
+
+const dayOptions = [
+  { label: "Monday", value: "Monday" },
+  { label: "Tuesday", value: "Tuesday" },
+  { label: "Wednesday", value: "Wednesday" },
+  { label: "Thursday", value: "Thursday" },
+  { label: "Friday", value: "Friday" },
+  { label: "Saturday", value: "Saturday" },
+  { label: "Sunday", value: "Sunday" },
+];
+
 export default function CalendarAvailabilityModal({
-  open,
-  mode,
+  availableLocations,
   draft,
-  resources,
-  supportedLocations,
-  editingTeamMemberName,
-  onClose,
   onApply,
+  onClose,
+  open,
+  resources,
   setDraft,
+  teamLabelById,
+  title = "Add Availability",
 }: CalendarAvailabilityModalProps) {
-  const m = useTheme().palette.mollure;
-  const isEdit = mode === "edit";
+  const theme = useTheme();
+  const m = theme.palette.mollure;
 
-  const updateShift = (index: number, key: "start" | "end", value: string) => {
-    setDraft((prev) => ({
-      ...prev,
-      shifts: prev.shifts.map((shift, idx) => (idx === index ? { ...shift, [key]: value } : shift)),
-    }));
+  const toggleLocation = (location: CalendarBookingLocation) => {
+    setDraft((prev) => {
+      const has = prev.locations.includes(location);
+      const next = has ? prev.locations.filter((item) => item !== location) : [...prev.locations, location];
+      return { ...prev, locations: next.length ? next : [...availableLocations] };
+    });
   };
-
-  const addShift = () => {
-    setDraft((prev) => ({
-      ...prev,
-      shifts: [...prev.shifts, { start: "13:00", end: "18:00" }],
-    }));
-  };
-
-  const removeShift = (index: number) => {
-    setDraft((prev) => ({
-      ...prev,
-      shifts: prev.shifts.filter((_, idx) => idx !== index),
-    }));
-  };
-
-  const teamMemberNameById = React.useCallback(
-    (resourceId: string) => resources.find((resource) => resource.id === resourceId)?.name ?? resourceId,
-    [resources],
-  );
-
-  const formatTeamMemberSelection = React.useCallback(
-    (ids: readonly string[]) => {
-      if (!ids.length) return "Select Team Member";
-      if (ids.length === resources.length) return "All";
-      return ids.map((id) => teamMemberNameById(id)).join(", ");
-    },
-    [resources.length, teamMemberNameById],
-  );
 
   return (
     <MollureModal
       open={open}
       onClose={onClose}
-      title={isEdit ? "Edit Availability" : "Add Availability"}
+      title={title}
       maxWidth="sm"
       fullWidth
       footer={
         <Box sx={{ px: 2.5, py: 2 }}>
-          <Stack direction="row" justifyContent="center" spacing={1.25}>
-            <Button
-              variant="outlined"
-              onClick={onClose}
-              sx={{
-                borderRadius: "10px",
-                textTransform: "none",
-                fontWeight: 800,
-                height: 40,
-                minWidth: 120,
-                borderColor: alpha(m.navy, 0.14),
-                color: alpha(m.navy, 0.72),
-                bgcolor: "#fff",
-              }}
-            >
+          <Stack direction="row" justifyContent="flex-end" spacing={1.25}>
+            <Button variant="outlined" onClick={onClose} sx={{ borderRadius: "10px", textTransform: "none", fontWeight: 800, height: 38 }}>
               Cancel
             </Button>
             <Button
               variant="contained"
               disableElevation
               onClick={onApply}
-              sx={{
-                borderRadius: "10px",
-                textTransform: "none",
-                fontWeight: 800,
-                height: 40,
-                minWidth: 120,
-                bgcolor: m.teal,
-                "&:hover": { bgcolor: m.tealDark },
-              }}
+              sx={{ borderRadius: "10px", textTransform: "none", fontWeight: 800, height: 38, bgcolor: m.teal, "&:hover": { bgcolor: m.tealDark } }}
             >
-              Apply
+              Save
             </Button>
           </Stack>
         </Box>
@@ -121,150 +94,76 @@ export default function CalendarAvailabilityModal({
     >
       <Box sx={{ px: 2.5, py: 2 }}>
         <Stack spacing={1.75}>
-          {isEdit ? (
-            <AppTextField label="Team Member" value={editingTeamMemberName ?? ""} fullWidth disabled />
-          ) : (
-            <AppDropdown
-              label="Team Member"
-              value={draft.teamIds}
-              multiple
-              closeOnSelect
-              placeholder="Select Team Member"
-              renderValue={(selected) => formatTeamMemberSelection(selected as readonly string[])}
-              onChange={(val) => setDraft((prev) => ({ ...prev, teamIds: val as string[] }))}
-              options={resources.map((resource) => ({
-                value: resource.id,
-                label: resource.name,
-              }))}
-              fullWidth
-            />
-          )}
-
           <AppDropdown
-            label="Location"
-            value={isEdit ? (draft.locations[0] ?? "") : draft.locations}
-            multiple={!isEdit}
-            closeOnSelect
-            placeholder="Select Location"
+            label="Team Member(s)"
+            value={draft.teamIds}
+            multiple
             renderValue={(selected) => {
-              if (isEdit) {
-                const loc = selected as string;
-                return loc || "Select Location";
-              }
-              const locs = selected as readonly string[];
-              if (!locs.length) return "Select Location";
-              if (locs.length === supportedLocations.length) return "All";
-              return locs.join(", ");
+              const ids = selected as readonly string[];
+              if (!ids.length) return "Select Team Member";
+              if (ids.length === resources.length) return "All";
+              return ids.map((id) => teamLabelById.get(id) ?? id).join(", ");
             }}
-            onChange={(val) => {
-              if (isEdit) {
-                setDraft((prev) => ({ ...prev, locations: [val as CalendarBookingLocation] }));
-                return;
-              }
-              setDraft((prev) => ({ ...prev, locations: val as CalendarBookingLocation[] }));
-            }}
-            options={supportedLocations.map((location) => ({ label: location, value: location }))}
+            onChange={(val) => setDraft((p) => ({ ...p, teamIds: val as string[] }))}
+            options={resources.map((resource) => ({
+              label: teamLabelById.get(resource.id) ?? resource.name,
+              value: resource.id,
+            }))}
             fullWidth
           />
 
-          <Stack direction="row" spacing={1.25}>
-            <Box sx={{ flex: 1 }}>
-              <AppDatePicker
-                label="Date (from)"
-                value={draft.dateFrom}
-                onChange={(iso) => setDraft((prev) => ({ ...prev, dateFrom: iso }))}
-                fullWidth
-              />
-            </Box>
-            <Box sx={{ flex: 1 }}>
-              <AppDatePicker
-                label="Date (To)"
-                value={draft.dateTo}
-                onChange={(iso) => setDraft((prev) => ({ ...prev, dateTo: iso }))}
-                min={draft.dateFrom || undefined}
-                fullWidth
-              />
-            </Box>
+          <Stack direction="row" spacing={1}>
+            {availableLocations.map((location) => {
+              const active = draft.locations.includes(location);
+              return (
+                <Button
+                  key={location}
+                  variant={active ? "contained" : "outlined"}
+                  onClick={() => toggleLocation(location)}
+                  sx={{
+                    borderRadius: "8px",
+                    textTransform: "none",
+                    fontWeight: 800,
+                    bgcolor: active ? m.teal : "#fff",
+                    "&:hover": { bgcolor: active ? m.tealDark : alpha(m.teal, 0.04) },
+                  }}
+                >
+                  {location}
+                </Button>
+              );
+            })}
           </Stack>
 
           <Stack direction="row" spacing={1.25}>
-            <AppSelect
-              label="Day (From)"
-              value={draft.dayFrom}
-              onChange={(e) =>
-                setDraft((prev) => ({ ...prev, dayFrom: e.target.value as AvailabilityDraft["dayFrom"] }))
-              }
-              options={[...DAY_FULL_OPTIONS]}
-              fullWidth
-            />
-            <AppSelect
-              label="Day (To)"
-              value={draft.dayTo}
-              onChange={(e) => setDraft((prev) => ({ ...prev, dayTo: e.target.value as AvailabilityDraft["dayTo"] }))}
-              options={[...DAY_FULL_OPTIONS]}
-              fullWidth
-            />
+            <AppDatePicker label="Date from" value={draft.dateFrom} onChange={(val) => setDraft((p) => ({ ...p, dateFrom: val }))} fullWidth />
+            <AppDatePicker label="Date to" value={draft.dateTo} onChange={(val) => setDraft((p) => ({ ...p, dateTo: val }))} fullWidth />
+          </Stack>
+
+          <Stack direction="row" spacing={1.25}>
+            <AppDropdown label="Day from" value={draft.dayFrom} onChange={(val) => setDraft((p) => ({ ...p, dayFrom: String(val) as AvailabilityDraft["dayFrom"] }))} options={dayOptions} fullWidth />
+            <AppDropdown label="Day to" value={draft.dayTo} onChange={(val) => setDraft((p) => ({ ...p, dayTo: String(val) as AvailabilityDraft["dayTo"] }))} options={dayOptions} fullWidth />
           </Stack>
 
           {draft.shifts.map((shift, index) => (
-            <Stack key={`shift-${index}`} direction="row" spacing={1.25} alignItems="flex-end">
-              <AppTextField
-                label="Start Time"
-                type="time"
-                value={shift.start}
-                onChange={(e) => updateShift(index, "start", e.target.value)}
-                fullWidth
-                InputLabelProps={{ shrink: true }}
-              />
-              <AppTextField
-                label="End Time"
-                type="time"
-                value={shift.end}
-                onChange={(e) => updateShift(index, "end", e.target.value)}
-                fullWidth
-                InputLabelProps={{ shrink: true }}
-              />
-              {draft.shifts.length > 1 ? (
-                <IconButton
-                  size="small"
-                  onClick={() => removeShift(index)}
-                  sx={{ mb: 0.5, color: alpha(m.navy, 0.45) }}
-                >
-                  ×
-                </IconButton>
-              ) : null}
+            <Stack key={`shift-${index}`} direction="row" spacing={1.25} alignItems="center">
+              <AppTextField label="Start" type="time" value={shift.start} onChange={(e) => setDraft((p) => ({ ...p, shifts: p.shifts.map((item, i) => (i === index ? { ...item, start: e.target.value } : item)) }))} fullWidth InputLabelProps={{ shrink: true }} />
+              <AppTextField label="End" type="time" value={shift.end} onChange={(e) => setDraft((p) => ({ ...p, shifts: p.shifts.map((item, i) => (i === index ? { ...item, end: e.target.value } : item)) }))} fullWidth InputLabelProps={{ shrink: true }} />
+              <IconButton
+                size="small"
+                disabled={draft.shifts.length === 1}
+                onClick={() => setDraft((p) => ({ ...p, shifts: p.shifts.filter((_, i) => i !== index) }))}
+              >
+                <DeleteOutlineRoundedIcon fontSize="small" />
+              </IconButton>
             </Stack>
           ))}
 
           <Button
-            onClick={addShift}
-            startIcon={
-              <Box
-                sx={{
-                  width: 18,
-                  height: 18,
-                  borderRadius: "999px",
-                  bgcolor: m.teal,
-                  color: "#fff",
-                  display: "grid",
-                  placeItems: "center",
-                }}
-              >
-                <AddRoundedIcon sx={{ fontSize: 14 }} />
-              </Box>
-            }
-            sx={{
-              alignSelf: "flex-start",
-              textTransform: "none",
-              fontWeight: 800,
-              fontSize: 13,
-              color: m.teal,
-              px: 0,
-              minWidth: 0,
-              "&:hover": { bgcolor: "transparent", color: m.tealDark },
-            }}
+            startIcon={<AddRoundedIcon />}
+            onClick={() => setDraft((p) => ({ ...p, shifts: [...p.shifts, { start: "09:00", end: "17:00" }] }))}
+            sx={{ alignSelf: "flex-start", textTransform: "none", fontWeight: 800, color: m.teal }}
           >
-            Add Shift
+            Add shift
           </Button>
         </Stack>
       </Box>

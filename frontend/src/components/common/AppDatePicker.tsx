@@ -31,6 +31,7 @@ export type AppCalendarPanelProps = {
   /** Called after a day is picked (e.g. close parent popover) */
   onDaySelect?: () => void;
   compact?: boolean;
+  daySx?: (iso: string) => Record<string, unknown> | undefined;
 };
 
 type PanelView = "days" | "months" | "years";
@@ -73,7 +74,7 @@ function monthFromValue(value: string) {
   return new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 }
 
-export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compact = false }: AppCalendarPanelProps) {
+export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compact = false, daySx }: AppCalendarPanelProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
 
@@ -259,6 +260,7 @@ export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compa
                 const todayIso = new Date().toISOString().slice(0, 10);
                 const isToday = iso === todayIso;
                 const isPast = !off && iso < todayIso;
+                const extraDaySx = daySx?.(iso) ?? {};
                 return (
                   <ButtonBase
                     key={iso}
@@ -288,6 +290,7 @@ export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compa
                       cursor: off ? "not-allowed" : "pointer",
                       "&.Mui-disabled": { pointerEvents: "auto" },
                       "&:hover": { bgcolor: off ? "transparent" : selected ? m.tealDark : alpha(m.teal, 0.09) },
+                      ...extraDaySx,
                     }}
                   >
                     {day}

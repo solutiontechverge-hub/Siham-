@@ -1375,6 +1375,66 @@ export const updateCalendarEntryStatus = async (req, res) => {
   }
 };
 
+export const deleteCalendarEntry = async (req, res) => {
+  try {
+    if (req.user.user_type !== "professional") {
+      return res.status(403).json({
+        success: false,
+        message: "Only professional users can delete calendar entries.",
+        data: null,
+      });
+    }
+
+    const professionalProfile = await getProfessionalProfile(req.user.id);
+    if (!professionalProfile) {
+      return res.status(404).json({
+        success: false,
+        message: "Professional profile not found.",
+        data: null,
+      });
+    }
+
+    const entryId = parseUuid(req.params.id);
+    if (!entryId) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid calendar entry id.",
+        data: null,
+      });
+    }
+
+    const result = await query(
+      `DELETE FROM calendar_entries
+       WHERE id = $1
+         AND professional_profile_id = $2
+       RETURNING id`,
+      [entryId, professionalProfile.id],
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: "Calendar entry not found.",
+        data: null,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Calendar entry deleted successfully.",
+      data: { id: result.rows[0].id },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete calendar entry.",
+      data: {
+        error: error.message,
+      },
+    });
+  }
+};
+
 export const updateBookingStatus = async (req, res) => {
   try {
     if (req.user.user_type !== "professional") {

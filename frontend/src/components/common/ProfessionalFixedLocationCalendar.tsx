@@ -26,6 +26,8 @@ import AppCountryPhoneFields from "./AppCountryPhoneFields";
 import AppDropdown from "./AppDropdown";
 import CalendarAddMenu from "./calendar/CalendarAddMenu";
 import CalendarBookingCard from "./calendar/CalendarBookingCard";
+import CalendarBookingTicketStack from "./calendar/CalendarBookingTicketStack";
+import { clusterOverlappingEvents, getClusterTimeBounds } from "./calendar/calendar-overlap.utils";
 import { useMessagingWidget } from "./messaging/MessagingWidgetContext";
 import {
   buildBookingDetailsSnapshot,
@@ -40,13 +42,17 @@ import {
   resolveOriginalServices,
 } from "./calendar/bookingRequestNegotiation";
 import CalendarBlockTimeModal from "./calendar/CalendarBlockTimeModal";
-import CalendarDesignModal, { type CalendarDesignDraft, getCalendarDesignServiceLabel } from "./calendar/CalendarDesignModal";
-import CalendarSettingsPanel from "./calendar/CalendarSettingsPanel";
-import CalendarTeamMemberSchedule from "./calendar/CalendarTeamMemberSchedule";
+import CalendarDesignModal, { type CalendarDesignDraft } from "./calendar/CalendarDesignModal";
 import CalendarPublicBusinessHoursModal, {
   type PublicBusinessHoursDraft,
 } from "./calendar/CalendarPublicBusinessHoursModal";
 import CalendarFiltersDrawer from "./calendar/CalendarFiltersDrawer";
+import CalendarSchedulePanel from "./calendar/CalendarSchedulePanel";
+import CalendarHoursRulesPanel from "./calendar/CalendarHoursRulesPanel";
+import CalendarEditAvailabilityModal, {
+  type EditAvailabilityDraft,
+} from "./calendar/CalendarEditAvailabilityModal";
+import CalendarServiceOrderModal from "./calendar/CalendarServiceOrderModal";
 import ManualEntryDiscountModal from "../sections/finance/ManualEntryDiscountModal";
 import {
   calculateManualEntryDiscountAmount,
@@ -90,6 +96,19 @@ import {
   getUniqueItemDraftErrors,
   type BookingUniqueItemDraft,
 } from "../../data/bookingUniqueItem.data";
+import {
+  getCombinedAvailabilityIntervals,
+  getLocationAvailabilityIntervals,
+  makeScheduleRowId,
+} from "./calendar/calendar-schedule.utils";
+import {
+  defaultBookingRules,
+  normalizeServiceOrderSettings,
+  type BookingRules,
+  type ParsedCalendarSettings,
+  type ScheduleAvailabilityRow,
+  type ServiceOrderSettings,
+} from "./calendar/calendar-settings.types";
 import {
   addDaysIso,
   addMonthsIso,
@@ -135,30 +154,25 @@ import type {
   CalendarSubTab,
   CalendarViewMode,
   ProfessionalFixedLocationCalendarData,
-  TeamScheduleAvailabilityEntry,
-  TeamScheduleBlockedEntry,
 } from "../../app/professionals/fixed-location/calendar/calendar.data";
-import type { CalendarSettings, CreateCalendarEntryRequest, UpsertCalendarSettingsRequest } from "../../store/services/businessApi";
-import { BUSINESS_SERVICE_CATEGORY_CATALOG } from "../../data/businessServiceCategorySlider.data";
+import {
+  buildCreateCalendarEntryPayload,
+  isApiCalendarEventId,
+  mapCalendarEntryToEvent,
+} from "./calendar/calendar-entry.mappers";
+import type { CreateCalendarEntryRequest, CalendarEntry, UpsertCalendarSettingsRequest } from "../../store/services/businessApi";
 import { GENDER_OPTIONS, type GenderOption } from "../../lib/gender-options";
 import { getOptionalPhoneValidationErrors, getPhoneValidationErrors } from "../../lib/phone-validation";
-import {
-  appendPublicHoursFromDraft,
-  buildAvailabilityPayload,
-  defaultBookingRules,
-  defaultPublicHoursState,
-  parseAvailability,
-  parseDesign,
-} from "./calendar/calendarSettings.types";
-import CalendarServiceColorEditModal from "./calendar/CalendarServiceColorEditModal";
-import { resolveServiceCategorySliderIconId } from "../../data/businessServiceCategorySlider.data";
 
 export type ProfessionalFixedLocationCalendarProps = {
   data: ProfessionalFixedLocationCalendarData;
-  initialCalendarSettings?: CalendarSettings | null;
+  calendarSettings?: ParsedCalendarSettings | null;
+  serviceOptions?: string[];
+  serviceOrderDefaults?: ServiceOrderSettings;
   isSaving?: boolean;
-  onCreateCalendarEntry?: (payload: CreateCalendarEntryRequest) => Promise<void>;
+  onCreateCalendarEntry?: (payload: CreateCalendarEntryRequest) => Promise<CalendarEntry | void>;
   onSaveCalendarSettings?: (payload: UpsertCalendarSettingsRequest) => Promise<void>;
+  onDeleteCalendarEntry?: (id: string) => Promise<void>;
 };
 
 const toDateTimeInput = (date: string, time: string) => `${date}T${time}:00`;
@@ -172,10 +186,13 @@ const formatWeekDayDate = (iso: string) =>
 
 export default function ProfessionalFixedLocationCalendar({
   data,
-  initialCalendarSettings = null,
+  calendarSettings,
+  serviceOptions = [],
+  serviceOrderDefaults,
   isSaving = false,
   onCreateCalendarEntry,
   onSaveCalendarSettings,
+  onDeleteCalendarEntry,
 }: ProfessionalFixedLocationCalendarProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -216,23 +233,10 @@ export default function ProfessionalFixedLocationCalendar({
 
   const defaultDateIso = React.useMemo(() => toIsoLocalDate(new Date()), []);
   const [activeSubTab, setActiveSubTab] = React.useState<CalendarSubTab>(data.initialSubTab);
-  const [scheduleDateIso, setScheduleDateIso] = React.useState(defaultDateIso);
-  const [scheduleAvailability, setScheduleAvailability] = React.useState<readonly TeamScheduleAvailabilityEntry[]>(
-    () => [...data.scheduleAvailability],
-  );
-  const [scheduleBlocked, setScheduleBlocked] = React.useState<readonly TeamScheduleBlockedEntry[]>(
-    () => [...data.scheduleBlocked],
-  );
-  React.useEffect(() => {
-    setScheduleAvailability([...data.scheduleAvailability]);
-  }, [data.scheduleAvailability]);
-  React.useEffect(() => {
-    setScheduleBlocked([...data.scheduleBlocked]);
-  }, [data.scheduleBlocked]);
   const [viewMode, setViewMode] = React.useState<CalendarViewMode>("day");
   const [activeDateIso, setActiveDateIso] = React.useState(defaultDateIso);
   const [selectedResourceId, setSelectedResourceId] = React.useState("");
-  const [resourceMenuAnchor, setResourceMenuAnchor] = React.useState<HTMLElement | null>(null);
+  const [teamActionAnchor, setTeamActionAnchor] = React.useState<HTMLElement | null>(null);
   const [datePickerAnchor, setDatePickerAnchor] = React.useState<HTMLElement | null>(null);
   const [addAnchor, setAddAnchor] = React.useState<HTMLElement | null>(null);
   const [filtersOpen, setFiltersOpen] = React.useState(false);
@@ -563,83 +567,78 @@ export default function ProfessionalFixedLocationCalendar({
   const [designDraft, setDesignDraft] = React.useState<CalendarDesignDraft>(() => ({
     scope: "Categories",
     colorsByCategory: {},
+    colorsByService: {},
   }));
   const [appliedDesign, setAppliedDesign] = React.useState<CalendarDesignDraft>(() => ({
     scope: "Categories",
     colorsByCategory: {},
+    colorsByService: {},
+  }));
+  const [bookingRules, setBookingRules] = React.useState<BookingRules>(() => defaultBookingRules());
+  const [scheduleRows, setScheduleRows] = React.useState<ScheduleAvailabilityRow[]>([]);
+  const [dateOverrides, setDateOverrides] = React.useState<ParsedCalendarSettings["availability"]["dateOverrides"]>([]);
+  const [serviceOrderDraft, setServiceOrderDraft] = React.useState<ServiceOrderSettings>(() =>
+    normalizeServiceOrderSettings(undefined, {
+      categories: serviceOrderDefaults?.categories ?? [],
+      servicesByCategory: serviceOrderDefaults?.servicesByCategory ?? {},
+    }),
+  );
+  const [serviceOrderOpen, setServiceOrderOpen] = React.useState(false);
+  const [scheduleResourceFilter, setScheduleResourceFilter] = React.useState<string[]>([]);
+  const [editAvailabilityOpen, setEditAvailabilityOpen] = React.useState(false);
+  const [editAvailabilityDraft, setEditAvailabilityDraft] = React.useState<EditAvailabilityDraft>(() => ({
+    resourceId: "",
+    date: "",
+    locations: [...data.supportedLocations],
+    shifts: [{ start: "09:00", end: "17:00" }],
   }));
 
-  const [publicHoursState, setPublicHoursState] = React.useState(defaultPublicHoursState);
-  const [bookingRules, setBookingRules] = React.useState(defaultBookingRules);
-  const [serviceOrderKeys, setServiceOrderKeys] = React.useState<readonly string[]>(() =>
-    BUSINESS_SERVICE_CATEGORY_CATALOG.map((entry) => entry.key),
-  );
-  const [colorEditKey, setColorEditKey] = React.useState<string | null>(null);
-
-  const buildSettingsPayload = React.useCallback(
-    (overrides?: {
-      publicBusinessHours?: PublicBusinessHoursDraft;
-      publicHoursState?: ReturnType<typeof defaultPublicHoursState>;
-      bookingRules?: ReturnType<typeof defaultBookingRules>;
-      serviceOrderKeys?: readonly string[];
-      design?: CalendarDesignDraft;
-    }): UpsertCalendarSettingsRequest => ({
-      availability: buildAvailabilityPayload(
-        overrides?.publicBusinessHours ?? publicBusinessHoursDraft,
-        overrides?.publicHoursState ?? publicHoursState,
-        overrides?.bookingRules ?? bookingRules,
-        overrides?.serviceOrderKeys ?? serviceOrderKeys,
-      ),
-      design: overrides?.design ?? appliedDesign,
-    }),
-    [appliedDesign, bookingRules, publicBusinessHoursDraft, publicHoursState, serviceOrderKeys],
-  );
-
-  const saveCalendarSettings = React.useCallback(
-    async (overrides?: Parameters<typeof buildSettingsPayload>[0]) => {
-      await onSaveCalendarSettings?.(buildSettingsPayload(overrides));
-    },
-    [buildSettingsPayload, onSaveCalendarSettings],
-  );
-
   React.useEffect(() => {
-    if (!initialCalendarSettings) return;
-    const availability = parseAvailability(initialCalendarSettings.availability);
-    const design = parseDesign(initialCalendarSettings.design);
+    if (!calendarSettings) return;
+    setBookingRules(calendarSettings.availability.bookingRules ?? defaultBookingRules());
+    setScheduleRows(calendarSettings.availability.scheduleAvailability ?? []);
+    setDateOverrides(calendarSettings.availability.dateOverrides ?? []);
+    setAppliedDesign(calendarSettings.design);
+    setDesignDraft(calendarSettings.design);
+    if (calendarSettings.availability.serviceOrder) {
+      setServiceOrderDraft(
+        normalizeServiceOrderSettings(calendarSettings.availability.serviceOrder, serviceOrderDefaults),
+      );
+    } else if (serviceOrderDefaults) {
+      setServiceOrderDraft(normalizeServiceOrderSettings(serviceOrderDefaults));
+    }
+  }, [calendarSettings, serviceOrderDefaults]);
 
-    if (availability.publicBusinessHours) {
-      setPublicBusinessHoursDraft(availability.publicBusinessHours);
-    }
-    if (availability.publicHoursState) {
-      setPublicHoursState(availability.publicHoursState);
-    }
-    if (availability.bookingRules) {
-      setBookingRules(availability.bookingRules);
-    }
-    if (availability.serviceOrder?.categoryKeys?.length) {
-      setServiceOrderKeys(availability.serviceOrder.categoryKeys);
-    }
-    if (design) {
-      setDesignDraft(design);
-      setAppliedDesign(design);
-    }
-  }, [initialCalendarSettings]);
-
-  const openPublicBusinessHours = React.useCallback((location: CalendarBookingLocation) => {
-    setPublicBusinessHoursDraft((prev) => ({
-      ...prev,
-      location,
-      schedule: location === "FL" ? "fixed" : "variable",
-    }));
-    setPublicBusinessHoursOpen(true);
-  }, []);
-
-  const getServiceCategoryKey = React.useCallback((title: string) => {
-    const iconId = resolveServiceCategorySliderIconId(title);
-    if (iconId === "generic" || iconId === "all") return null;
-    const entry = BUSINESS_SERVICE_CATEGORY_CATALOG.find((item) => item.iconId === iconId);
-    return entry?.key ?? null;
-  }, []);
+  const persistAvailabilitySettings = React.useCallback(
+    async (next: {
+      bookingRules?: BookingRules;
+      scheduleAvailability?: ScheduleAvailabilityRow[];
+      dateOverrides?: ParsedCalendarSettings["availability"]["dateOverrides"];
+      serviceOrder?: ServiceOrderSettings;
+      publicBusinessHours?: PublicBusinessHoursDraft[];
+      design?: CalendarDesignDraft;
+    }) => {
+      await onSaveCalendarSettings?.({
+        availability: {
+          bookingRules: next.bookingRules ?? bookingRules,
+          scheduleAvailability: next.scheduleAvailability ?? scheduleRows,
+          dateOverrides: next.dateOverrides ?? dateOverrides,
+          serviceOrder: next.serviceOrder ?? serviceOrderDraft,
+          publicBusinessHours: next.publicBusinessHours ?? calendarSettings?.availability.publicBusinessHours,
+        },
+        design: next.design ?? appliedDesign,
+      });
+    },
+    [
+      appliedDesign,
+      bookingRules,
+      calendarSettings?.availability.publicBusinessHours,
+      dateOverrides,
+      onSaveCalendarSettings,
+      scheduleRows,
+      serviceOrderDraft,
+    ],
+  );
 
   const getServiceCategory = React.useCallback((title: string) => {
     const t = String(title ?? "").toLowerCase();
@@ -733,13 +732,14 @@ export default function ProfessionalFixedLocationCalendar({
     () => filteredResources.find((r) => r.id === selectedResourceId) ?? filteredResources[0],
     [filteredResources, selectedResourceId],
   );
-  const displayedResources = React.useMemo(
-    () => {
-      if (viewMode === "week" || viewMode === "day") return activeResource ? [activeResource] : [];
-      return filteredResources;
-    },
-    [activeResource, filteredResources, viewMode],
-  );
+  const displayedResources = React.useMemo(() => {
+    if (viewMode === "week") return activeResource ? [activeResource] : [];
+    if (viewMode === "day") {
+      if (appliedFilters.teamAll) return filteredResources;
+      return activeResource ? [activeResource] : [];
+    }
+    return filteredResources;
+  }, [activeResource, appliedFilters.teamAll, filteredResources, viewMode]);
 
   const eventsInRange = React.useMemo(
     () => {
@@ -878,7 +878,9 @@ export default function ProfessionalFixedLocationCalendar({
         | "nonMollureMunicipality"
         | "bookingClient"
         | "bookingPhoneCode"
-        | "bookingPhoneNumber",
+        | "bookingPhoneNumber"
+        | "uniqueItemProductName"
+        | "uniqueItemPrice",
         string
       >
     > = {};
@@ -1122,13 +1124,25 @@ export default function ProfessionalFixedLocationCalendar({
 
   const getAvailabilityFor = React.useCallback(
     (resourceId: string, iso: string): Interval[] => {
+      const fromSchedule = getCombinedAvailabilityIntervals(resourceId, iso, scheduleRows, dateOverrides ?? []);
+      if (fromSchedule.length) return fromSchedule;
+
       const av = data.availability.find((a) => a.resourceId === resourceId);
       if (!av) return [];
       const dow = parseIsoDate(iso).getUTCDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6;
       const windows = av.weekly[dow] ?? [];
       return windows.map((w) => ({ startMin: minutesSinceMidnight(w.start), endMin: minutesSinceMidnight(w.end) }));
     },
-    [data.availability],
+    [data.availability, dateOverrides, scheduleRows],
+  );
+
+  const getLocationAvailability = React.useCallback(
+    (resourceId: string, iso: string, location: CalendarBookingLocation): Interval[] => {
+      const fromSchedule = getLocationAvailabilityIntervals(resourceId, iso, location, scheduleRows, dateOverrides ?? []);
+      if (fromSchedule.length) return fromSchedule;
+      return getAvailabilityFor(resourceId, iso);
+    },
+    [dateOverrides, getAvailabilityFor, scheduleRows],
   );
 
   const getBusyFor = React.useCallback(
@@ -1190,7 +1204,11 @@ export default function ProfessionalFixedLocationCalendar({
     );
   };
 
-  const renderTeamMemberHeader = () => (
+  const renderTeamMemberHeader = (laneResource?: (typeof filteredResources)[number]) => {
+    const headerResources =
+      viewMode === "day" && appliedFilters.teamAll && laneResource ? [laneResource] : filteredResources;
+
+    return (
     <>
       <Box
         sx={{
@@ -1205,7 +1223,7 @@ export default function ProfessionalFixedLocationCalendar({
           flexWrap: "nowrap",
         }}
       >
-        {filteredResources.map((resource) => {
+        {headerResources.map((resource) => {
           const isActive = resource.id === activeResource?.id;
           const teamAvatarSx = {
             width: 22,
@@ -1230,9 +1248,9 @@ export default function ProfessionalFixedLocationCalendar({
                 key={resource.id}
                 role="button"
                 tabIndex={0}
-                onClick={(e) => setResourceMenuAnchor(e.currentTarget)}
+                onClick={(e) => setTeamActionAnchor(e.currentTarget)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") setResourceMenuAnchor(e.currentTarget);
+                  if (e.key === "Enter" || e.key === " ") setTeamActionAnchor(e.currentTarget);
                 }}
                 sx={{
                   display: "flex",
@@ -1283,9 +1301,9 @@ export default function ProfessionalFixedLocationCalendar({
         })}
       </Box>
       <Popover
-        open={Boolean(resourceMenuAnchor)}
-        anchorEl={resourceMenuAnchor}
-        onClose={() => setResourceMenuAnchor(null)}
+        open={Boolean(teamActionAnchor)}
+        anchorEl={teamActionAnchor}
+        onClose={() => setTeamActionAnchor(null)}
         anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
         transformOrigin={{ vertical: "top", horizontal: "left" }}
         PaperProps={{
@@ -1300,6 +1318,40 @@ export default function ProfessionalFixedLocationCalendar({
           },
         }}
       >
+        <ButtonBase
+          onClick={() => {
+            setTeamActionAnchor(null);
+            showSnackbar({ severity: "info", message: "Client profile panel opened." });
+          }}
+          sx={{ width: "100%", px: 1, py: 0.75, justifyContent: "flex-start", borderRadius: "8px" }}
+        >
+          <BodyText sx={{ fontWeight: 700, fontSize: 11.5, color: alpha(m.navy, 0.78) }}>View profile</BodyText>
+        </ButtonBase>
+        <ButtonBase
+          disabled={viewMode !== "day"}
+          onClick={() => {
+            if (!activeResource) return;
+            const shifts =
+              getCombinedAvailabilityIntervals(activeResource.id, activeDateIso, scheduleRows, dateOverrides ?? []).length > 0
+                ? getCombinedAvailabilityIntervals(activeResource.id, activeDateIso, scheduleRows, dateOverrides ?? []).map((interval) => ({
+                    start: fmtMinToTime(interval.startMin),
+                    end: fmtMinToTime(interval.endMin),
+                  }))
+                : [{ start: "09:00", end: "17:00" }];
+            setEditAvailabilityDraft({
+              resourceId: activeResource.id,
+              date: activeDateIso,
+              locations: [...data.supportedLocations],
+              shifts,
+            });
+            setEditAvailabilityOpen(true);
+            setTeamActionAnchor(null);
+          }}
+          sx={{ width: "100%", px: 1, py: 0.75, justifyContent: "flex-start", borderRadius: "8px", opacity: viewMode !== "day" ? 0.5 : 1 }}
+        >
+          <BodyText sx={{ fontWeight: 700, fontSize: 11.5, color: alpha(m.navy, 0.78) }}>Edit availability</BodyText>
+        </ButtonBase>
+        <Box sx={{ my: 0.5, borderTop: `1px solid ${alpha(m.navy, 0.08)}` }} />
         {filteredResources.map((resource) => {
           const isActive = resource.id === activeResource?.id;
           return (
@@ -1307,7 +1359,7 @@ export default function ProfessionalFixedLocationCalendar({
               key={resource.id}
               onClick={() => {
                 setSelectedResourceId(resource.id);
-                setResourceMenuAnchor(null);
+                setTeamActionAnchor(null);
               }}
               sx={{
                 width: "100%",
@@ -1346,7 +1398,8 @@ export default function ProfessionalFixedLocationCalendar({
         })}
       </Popover>
     </>
-  );
+    );
+  };
 
   const openBookingDrawer = React.useCallback(
     (payload: SelectedSlot) => {
@@ -1835,72 +1888,220 @@ export default function ProfessionalFixedLocationCalendar({
     [getAvailabilityFor, getBusyFor, grid.stepMinutes, openBookingDrawer, showSnackbar, startMin, todayIso],
   );
 
-  const saveSelectedBooking = React.useCallback(
-    async (clientNameOverride?: string) => {
-      if (!selectedSlot) return;
+  const persistBookingFromDrawer = React.useCallback(async (): Promise<boolean> => {
+    if (!selectedSlot) return false;
 
+    const existingEvent = editingEventId ? events.find((event) => event.id === editingEventId) : null;
+
+    if (incomingRequestEditMode && editingEventId && existingEvent) {
+      const editedIds = detectEditedServiceIds(originalServicesSnapshot, selectedServices);
+      const originalServices = existingEvent.details?.originalServices ?? originalServicesSnapshot;
+      const nextDetails = buildBookingDetailsSnapshot({
+        selectedClient,
+        selectedServices,
+        selectedProducts,
+        bookingGuests,
+        bookingPhoneDraft,
+        desiredLocationDraft,
+        showPrepayment,
+        prepaymentPercent,
+        paymentMethod,
+        showLateCancellation,
+        lateCancellationFeePercent,
+        showInternalNote,
+        bookingInternalNote,
+        bookingTotalDiscount,
+        showKilometerAllowance,
+        kilometerAllowanceDraft,
+        requestDirection: "incoming",
+        originalServices,
+        editedServiceIds: editedIds,
+        clientEditedServiceIds: [],
+        lastEditedBy: "professional",
+      });
+
+      setEvents((prev) =>
+        prev.map((event) =>
+          event.id === editingEventId
+            ? {
+                ...event,
+                status: "Requested",
+                bookingScenario: "EBR",
+                title: selectedServices[0]?.name ?? event.title,
+                details: {
+                  ...event.details,
+                  ...nextDetails,
+                  prepaymentStatus: event.details?.prepaymentStatus,
+                  responseStatus: "suggestion_for_change",
+                },
+              }
+            : event,
+        ),
+      );
+      setIncomingRequestEditMode(false);
+      setIsEditingExisting(false);
+      setSlotStatus("Requested");
+      showSnackbar({ severity: "success", message: "Edited booking request sent to client." });
+      setSlotSaveAttempted(false);
+      return true;
+    }
+
+    const title = selectedServices[0]?.name ?? selectedProducts[0]?.name ?? "Booking";
+    const clientName =
+      selectedClient?.name?.trim() ||
+      `${guestDraft.firstName} ${guestDraft.lastName}`.trim() ||
+      `${nonMollureDraft.firstName} ${nonMollureDraft.lastName}`.trim() ||
+      "Client";
+    const isNewManualBooking = !editingEventId;
+    const shouldPersistToApi = isNewManualBooking || !isApiCalendarEventId(editingEventId);
+
+    const details = buildBookingDetailsSnapshot({
+      selectedClient,
+      selectedServices,
+      selectedProducts,
+      bookingGuests,
+      bookingPhoneDraft,
+      desiredLocationDraft,
+      showPrepayment,
+      prepaymentPercent,
+      paymentMethod,
+      showLateCancellation,
+      lateCancellationFeePercent,
+      showInternalNote,
+      bookingInternalNote,
+      bookingTotalDiscount,
+      showKilometerAllowance,
+      kilometerAllowanceDraft,
+      ...(isNewManualBooking
+        ? {
+            requestDirection: "outgoing" as const,
+            originalServices: selectedServices,
+          }
+        : {}),
+    });
+
+    const buildLocalEvent = (id: string, bookingCode: string): CalendarEvent => ({
+      id,
+      bookingCode,
+      resourceId: selectedSlot.resourceId,
+      date: selectedSlot.date,
+      start: selectedSlot.start,
+      end: selectedSlot.end,
+      title,
+      status: existingEvent?.status ?? slotStatus,
+      location: slotLocation,
+      bookingType: existingEvent?.bookingType ?? slotBookingType,
+      bookingScenario: existingEvent?.bookingScenario ?? "BR",
+      showClientName: clientName,
+      details,
+    });
+
+    if (shouldPersistToApi) {
       if (!onCreateCalendarEntry) {
         showSnackbar({ severity: "error", message: "Calendar API is not connected." });
-        return;
+        return false;
       }
-
-      const clientName =
-        clientNameOverride ||
-        (slotClientAdded && guestDraft.firstName.trim()
-          ? `${guestDraft.firstName.trim()} ${guestDraft.lastName.trim()}`.trim()
-          : nonMollureDraft.firstName.trim()
-            ? `${nonMollureDraft.firstName.trim()} ${nonMollureDraft.lastName.trim()}`.trim()
-            : "Walk-in client");
-      const teamMemberId = selectedSlot.resourceId?.trim() || null;
-      const statusToApi: Record<typeof slotStatus, CreateCalendarEntryRequest["status"]> = {
-        Confirmed: "confirmed",
-        Requested: "requested",
-        Invalid: "cancelled",
-        "No Show": "no_show",
-        Completed: "completed",
-        Cancelled: "cancelled",
-      };
-      const bookingTypeToApi: Record<CalendarBookingType, NonNullable<CreateCalendarEntryRequest["booking_type"]>> = {
-        Online: "online",
-        Offline: "offline",
-        Project: "project",
-        Requests: "request",
-      };
-      const apiStatus = statusToApi[slotStatus];
-      const apiBookingType = bookingTypeToApi[slotBookingType];
 
       try {
-        await onCreateCalendarEntry({
-          team_member_id: teamMemberId,
-          status: apiStatus,
-          title: `${slotBookingType} booking`,
-          start_time: toDateTimeInput(selectedSlot.date, selectedSlot.start),
-          end_time: toDateTimeInput(selectedSlot.date, selectedSlot.end),
-          location_type: locationToApi(slotLocation),
-          booking_type: apiBookingType,
-          client_name: clientName,
-          notes: slotLocation,
+        const created = await onCreateCalendarEntry(
+          buildCreateCalendarEntryPayload({
+            selectedSlot,
+            title,
+            clientName,
+            status: existingEvent?.status ?? slotStatus,
+            bookingType: existingEvent?.bookingType ?? slotBookingType,
+            location: slotLocation,
+            serviceIds: selectedServices.map((service) => service.id),
+            notes: bookingInternalNote.trim() || null,
+          }),
+        );
+
+        const nextEvent = created
+          ? {
+              ...mapCalendarEntryToEvent(created, selectedSlot.resourceId),
+              title,
+              bookingType: existingEvent?.bookingType ?? slotBookingType,
+              bookingScenario: existingEvent?.bookingScenario ?? "BR",
+              showClientName: clientName,
+              details,
+            }
+          : buildLocalEvent(
+              editingEventId ?? `b-${Date.now()}-a`,
+              existingEvent?.bookingCode ?? String(Math.floor(10000 + Math.random() * 90000)),
+            );
+
+        setEvents((prev) => {
+          if (editingEventId && !isApiCalendarEventId(editingEventId)) {
+            return prev.map((event) => (event.id === editingEventId ? nextEvent : event));
+          }
+          if (editingEventId && isApiCalendarEventId(editingEventId)) {
+            return prev.map((event) => (event.id === editingEventId ? { ...event, ...nextEvent, id: event.id } : event));
+          }
+          return [...prev, nextEvent];
         });
-        showSnackbar({ severity: "success", message: "Booking saved." });
-        setSlotDrawerOpen(false);
+
+        setEditingEventId(nextEvent.id);
+        setSlotStatus(nextEvent.status);
+        setIsEditingExisting(false);
+        showSnackbar({
+          severity: "success",
+          message: isNewManualBooking ? "Booking saved." : "Booking updated.",
+        });
+        setSlotSaveAttempted(false);
+        return true;
       } catch {
         showSnackbar({ severity: "error", message: "Unable to save booking." });
+        return false;
       }
-    },
-    [
-      guestDraft.firstName,
-      guestDraft.lastName,
-      nonMollureDraft.firstName,
-      nonMollureDraft.lastName,
-      onCreateCalendarEntry,
-      selectedSlot,
-      showSnackbar,
-      slotClientAdded,
-      slotBookingType,
-      slotStatus,
-      slotLocation,
-    ],
-  );
+    }
+
+    const nextEvent = buildLocalEvent(
+      editingEventId ?? `b-${Date.now()}-a`,
+      existingEvent?.bookingCode ?? String(Math.floor(10000 + Math.random() * 90000)),
+    );
+
+    setEvents((prev) => {
+      if (!editingEventId) return [...prev, nextEvent];
+      return prev.map((event) => (event.id === editingEventId ? nextEvent : event));
+    });
+    setEditingEventId(nextEvent.id);
+    setSlotStatus(nextEvent.status);
+    setIsEditingExisting(false);
+    showSnackbar({ severity: "success", message: "Booking updated." });
+    setSlotSaveAttempted(false);
+    return true;
+  }, [
+    bookingGuests,
+    bookingInternalNote,
+    bookingPhoneDraft,
+    bookingTotalDiscount,
+    desiredLocationDraft,
+    editingEventId,
+    events,
+    guestDraft.firstName,
+    guestDraft.lastName,
+    incomingRequestEditMode,
+    kilometerAllowanceDraft,
+    lateCancellationFeePercent,
+    nonMollureDraft.firstName,
+    nonMollureDraft.lastName,
+    onCreateCalendarEntry,
+    originalServicesSnapshot,
+    paymentMethod,
+    prepaymentPercent,
+    selectedClient,
+    selectedProducts,
+    selectedServices,
+    selectedSlot,
+    showInternalNote,
+    showKilometerAllowance,
+    showLateCancellation,
+    showPrepayment,
+    showSnackbar,
+    slotBookingType,
+    slotLocation,
+    slotStatus,
+  ]);
 
   return (
     <Stack
@@ -1919,72 +2120,6 @@ export default function ProfessionalFixedLocationCalendar({
         alignStart={false}
       />
 
-      {activeSubTab === "Schedule" ? (
-        <CalendarTeamMemberSchedule
-          resources={data.resources}
-          supportedLocations={data.supportedLocations}
-          availability={scheduleAvailability}
-          blocked={scheduleBlocked}
-          activeDateIso={scheduleDateIso}
-          onDateChange={setScheduleDateIso}
-          onAvailabilityChange={setScheduleAvailability}
-          onBlockedChange={setScheduleBlocked}
-        />
-      ) : null}
-
-      {activeSubTab === "Settings" ? (
-        <CalendarSettingsPanel
-          supportedLocations={data.supportedLocations}
-          publicHoursState={publicHoursState}
-          onPublicHoursStateChange={(next) => {
-            setPublicHoursState(next);
-            void saveCalendarSettings({ publicHoursState: next });
-          }}
-          bookingRules={bookingRules}
-          onBookingRulesChange={setBookingRules}
-          serviceOrderKeys={serviceOrderKeys}
-          onServiceOrderKeysChange={setServiceOrderKeys}
-          appliedDesign={appliedDesign}
-          onOpenPublicBusinessHours={openPublicBusinessHours}
-          onOpenDesign={() => {
-            setDesignDraft(appliedDesign);
-            setDesignOpen(true);
-          }}
-          onEditServiceColor={(serviceKey) => setColorEditKey(serviceKey)}
-          onRemoveServiceColor={async (serviceKey) => {
-            const nextDesign: CalendarDesignDraft = {
-              ...appliedDesign,
-              colorsByCategory: { ...appliedDesign.colorsByCategory },
-            };
-            delete nextDesign.colorsByCategory[serviceKey];
-            setAppliedDesign(nextDesign);
-            setDesignDraft(nextDesign);
-            try {
-              await saveCalendarSettings({ design: nextDesign });
-              showSnackbar({ severity: "success", message: "Service colour reset." });
-            } catch {
-              showSnackbar({ severity: "error", message: "Unable to reset service colour." });
-            }
-          }}
-          onSaveBookingRules={async () => {
-            try {
-              await saveCalendarSettings();
-              showSnackbar({ severity: "success", message: "Booking rules saved." });
-            } catch {
-              showSnackbar({ severity: "error", message: "Unable to save booking rules." });
-            }
-          }}
-          onSaveServiceOrder={async () => {
-            try {
-              await saveCalendarSettings();
-              showSnackbar({ severity: "success", message: "Service order saved." });
-            } catch {
-              showSnackbar({ severity: "error", message: "Unable to save service order." });
-            }
-          }}
-          isSaving={isSaving}
-        />
-      ) : null}
 
       {activeSubTab === "Overview" ? (
       <Paper
@@ -2486,9 +2621,7 @@ export default function ProfessionalFixedLocationCalendar({
                   {displayedResources.map((res, laneIdx) => {
                     const laneDates = viewMode === "week" ? visibleDates : [activeDateIso];
                     const laneColumns = viewMode === "day"
-                      ? activeResource
-                        ? [{ key: activeResource.id, resource: activeResource, date: activeDateIso }]
-                        : []
+                      ? [{ key: res.id, resource: res, date: activeDateIso }]
                       : laneDates.map((date) => ({ key: date, resource: res, date }));
                     return (
                       <Box
@@ -2498,7 +2631,7 @@ export default function ProfessionalFixedLocationCalendar({
                         }}
                       >
                         {/* Lane header */}
-                        {renderTeamMemberHeader()}
+                        {renderTeamMemberHeader(res)}
                         {viewMode === "week" ? (
                           <Box
                             sx={{
@@ -2594,26 +2727,91 @@ export default function ProfessionalFixedLocationCalendar({
                                   }}
                                 />
 
-                                {/* Per-slot row backgrounds */}
-                                {slotLines.map((t) => {
-                                  const isAvailable = isMinuteInAvailability(t, availability);
-                                  return (
-                                    <Box
-                                      key={`slot-bg-${resource.id}-${date}-${t}`}
-                                      sx={{
-                                        position: "absolute",
-                                        left: 0,
-                                        right: 0,
-                                        top: ((t - startMin) / grid.stepMinutes) * rowPx,
-                                        height: rowPx,
-                                        bgcolor: isAvailable ? "#fff" : m.fxGrayF2F4F7,
-                                        borderBottom: `1px solid ${alpha(m.navy, 0.07)}`,
-                                        pointerEvents: "none",
-                                        zIndex: 1,
-                                      }}
-                                    />
-                                  );
+                                {/* Outside availability tint */}
+                                {availability.length ? (
+                                  <>
+                                    {/* Top unavailable */}
+                                    {Math.min(...availability.map((a) => a.startMin)) > startMin ? (
+                                      <Box
+                                        sx={{
+                                          position: "absolute",
+                                          left: 0,
+                                          right: 0,
+                                          top: 0,
+                                          height: ((Math.min(...availability.map((a) => a.startMin)) - startMin) / grid.stepMinutes) * rowPx,
+                                          bgcolor: "#fff",
+                                          pointerEvents: "none",
+                                        }}
+                                      />
+                                    ) : null}
+                                    {/* Bottom unavailable */}
+                                    {Math.max(...availability.map((a) => a.endMin)) < endMin ? (
+                                      <Box
+                                        sx={{
+                                          position: "absolute",
+                                          left: 0,
+                                          right: 0,
+                                          top: ((Math.max(...availability.map((a) => a.endMin)) - startMin) / grid.stepMinutes) * rowPx,
+                                          height: ((endMin - Math.max(...availability.map((a) => a.endMin))) / grid.stepMinutes) * rowPx,
+                                          bgcolor: "#fff",
+                                          pointerEvents: "none",
+                                        }}
+                                      />
+                                    ) : null}
+                                  </>
+                                ) : (
+                                  <Box sx={{ position: "absolute", inset: 0, bgcolor: "#fff", pointerEvents: "none" }} />
+                                )}
+
+                                {data.supportedLocations.map((location) => {
+                                  const locationIntervals = getLocationAvailability(resource.id, date, location);
+                                  return locationIntervals.map((interval, intervalIdx) => {
+                                    const top = ((interval.startMin - startMin) / grid.stepMinutes) * rowPx;
+                                    const height = ((interval.endMin - interval.startMin) / grid.stepMinutes) * rowPx;
+                                    const flOnly = location === "FL";
+                                    const dlOnly = location === "DL";
+                                    const tooltipTitle = flOnly
+                                      ? "FL Availability: Available for booking at a fixed location."
+                                      : "DL Availability: Available for booking at a desired location.";
+
+                                    return (
+                                      <Tooltip key={`${location}-${intervalIdx}`} title={tooltipTitle} placement="top">
+                                        <Box
+                                          sx={{
+                                            position: "absolute",
+                                            left: 0,
+                                            right: 0,
+                                            top,
+                                            height,
+                                            pointerEvents: "none",
+                                            zIndex: 1,
+                                            bgcolor: flOnly ? "#fff" : alpha(m.fxMintTint, 0.65),
+                                            backgroundImage: dlOnly
+                                              ? "repeating-linear-gradient(135deg, rgba(20,156,167,0.05) 0 6px, transparent 6px 12px)"
+                                              : undefined,
+                                            borderLeft: dlOnly ? `2px solid ${alpha(m.teal, 0.18)}` : undefined,
+                                          }}
+                                        />
+                                      </Tooltip>
+                                    );
+                                  });
                                 })}
+
+                                {/* Horizontal grid lines */}
+                                {slotLines.map((t) => (
+                                  <Box
+                                    key={`line-${resource.id}-${date}-${t}`}
+                                    sx={{
+                                      position: "absolute",
+                                      left: 0,
+                                      right: 0,
+                                      top: ((t - startMin) / grid.stepMinutes) * rowPx,
+                                      height: 1,
+                                      bgcolor: alpha(m.navy, 0.065),
+                                      pointerEvents: "none",
+                                    }}
+                                  />
+                                ))}
 
                                 {/* Blocks */}
                                 {laneBlocks.map((b) => {
@@ -2721,43 +2919,57 @@ export default function ProfessionalFixedLocationCalendar({
                                 })}
 
                                 {/* Events */}
-                                {laneEvents.map((ev, idx) => {
-                                  const evStart = minutesSinceMidnight(ev.start);
-                                  const evEnd = minutesSinceMidnight(ev.end);
-                                  const top = ((evStart - startMin) / grid.stepMinutes) * rowPx + 0.15;
-                                  const height = Math.max(78, ((evEnd - evStart) / grid.stepMinutes) * rowPx - 0.3);
-                                  const overlapping = laneEvents
-                                    .filter((other) => {
-                                      const otherStart = minutesSinceMidnight(other.start);
-                                      const otherEnd = minutesSinceMidnight(other.end);
-                                      return evStart < otherEnd && evEnd > otherStart;
-                                    })
-                                    .sort((a, b) => a.id.localeCompare(b.id));
-                                  const overlapIndex = Math.max(0, overlapping.findIndex((other) => other.id === ev.id));
-                                  const overlapCount = Math.max(1, overlapping.length);
-                                  const isSplit = overlapCount > 1;
-                                  const widthPct = 100 / overlapCount;
-                                  const left = isSplit ? `calc(${overlapIndex * widthPct}% + 2px)` : 0;
-                                  const right = isSplit ? `calc(${(overlapCount - overlapIndex - 1) * widthPct}% + 2px)` : 0;
-                                  const cardServiceCategoryKey = getServiceCategoryKey(ev.title);
-                                  const cardServiceColor = cardServiceCategoryKey
-                                    ? appliedDesign.colorsByCategory[cardServiceCategoryKey]
-                                    : undefined;
+                                {clusterOverlappingEvents(laneEvents).map((cluster) => {
+                                  const { startMin: clusterStart, endMin: clusterEnd } = getClusterTimeBounds(cluster);
+                                  const top = ((clusterStart - startMin) / grid.stepMinutes) * rowPx + 0.15;
+                                  const height = Math.max(78, ((clusterEnd - clusterStart) / grid.stepMinutes) * rowPx - 0.3);
+                                  const resolveServiceColor = (ev: (typeof cluster)[number]) => {
+                                    const cardServiceCategory = getServiceCategory(ev.title);
+                                    return appliedDesign.scope === "Services"
+                                      ? appliedDesign.colorsByService?.[ev.title]
+                                      : cardServiceCategory
+                                        ? appliedDesign.colorsByCategory[cardServiceCategory]
+                                        : undefined;
+                                  };
+                                  const eventHandlers = {
+                                    onOpen: openExistingBooking,
+                                    onOpenCalendar: (ev: (typeof cluster)[number]) =>
+                                      showSnackbar({ severity: "info", message: `Calendar for booking ${extractBookingId(ev.id)}` }),
+                                    onOpenNotes: (ev: (typeof cluster)[number]) =>
+                                      showSnackbar({ severity: "info", message: `Notes for booking ${extractBookingId(ev.id)}` }),
+                                    onOpenClient: (ev: (typeof cluster)[number]) =>
+                                      showSnackbar({ severity: "info", message: `Client drawer: ${ev.showClientName ?? "Client"}` }),
+                                    onOpenMessages: openBookingMessages,
+                                  };
 
+                                  if (cluster.length > 1) {
+                                    return (
+                                      <CalendarBookingTicketStack
+                                        key={cluster.map((event) => event.id).join("-")}
+                                        events={cluster}
+                                        top={top}
+                                        height={height}
+                                        getServiceColor={resolveServiceColor}
+                                        {...eventHandlers}
+                                      />
+                                    );
+                                  }
+
+                                  const ev = cluster[0];
                                   return (
                                     <CalendarBookingCard
                                       key={ev.id}
                                       event={ev}
                                       top={top}
                                       height={height}
-                                      left={left}
-                                      right={right}
-                                      serviceColor={cardServiceColor}
-                                      onOpen={() => openExistingBooking(ev)}
-                                      onOpenCalendar={() => showSnackbar({ severity: "info", message: `Calendar for booking ${extractBookingId(ev.id)}` })}
-                                      onOpenNotes={() => showSnackbar({ severity: "info", message: `Notes for booking ${extractBookingId(ev.id)}` })}
-                                      onOpenClient={() => showSnackbar({ severity: "info", message: `Client drawer: ${ev.showClientName ?? "Client"}` })}
-                                      onOpenMessages={() => openBookingMessages(ev)}
+                                      left={0}
+                                      right={0}
+                                      serviceColor={resolveServiceColor(ev)}
+                                      onOpen={() => eventHandlers.onOpen(ev)}
+                                      onOpenCalendar={() => eventHandlers.onOpenCalendar(ev)}
+                                      onOpenNotes={() => eventHandlers.onOpenNotes(ev)}
+                                      onOpenClient={() => eventHandlers.onOpenClient(ev)}
+                                      onOpenMessages={() => eventHandlers.onOpenMessages(ev)}
                                     />
                                   );
                                 })}
@@ -2774,6 +2986,66 @@ export default function ProfessionalFixedLocationCalendar({
           )}
         </Box>
       </Paper>
+      ) : null}
+
+      {activeSubTab === "Schedule" ? (
+        <CalendarSchedulePanel
+          activeDateIso={activeDateIso}
+          availableLocations={data.supportedLocations}
+          blocks={blocks}
+          isSaving={isSaving}
+          onActiveDateChange={setActiveDateIso}
+          onCreateBlockedTime={async (draft) => {
+            const nextBlocks = buildBlocksFromDraft(draft, draft.teamIds);
+            setBlocks((prev) => [...prev, ...nextBlocks]);
+            if (!onCreateCalendarEntry) return;
+            for (const teamId of draft.teamIds) {
+              for (const location of draft.locations) {
+                await onCreateCalendarEntry({
+                  team_member_id: String(teamId).trim() || null,
+                  status: "blocked",
+                  title: draft.title || "Blocked time",
+                  blocked_time_start: toDateTimeInput(draft.dateFrom, draft.startTime),
+                  blocked_time_end: toDateTimeInput(draft.dateTo || draft.dateFrom, draft.endTime),
+                  start_date: draft.dateFrom,
+                  end_date: draft.dateTo || draft.dateFrom,
+                  location_type: locationToApi(location),
+                  notes: `${draft.dayFrom}${draft.dayTo ? ` - ${draft.dayTo}` : ""}`.trim() || null,
+                });
+              }
+            }
+            showSnackbar({ severity: "success", message: "Blocked time added." });
+          }}
+          onDeleteBlockedEntry={onDeleteCalendarEntry}
+          onSaveScheduleRows={async (rows) => {
+            setScheduleRows(rows);
+            await persistAvailabilitySettings({ scheduleAvailability: rows });
+            showSnackbar({ severity: "success", message: "Availability saved." });
+          }}
+          resources={data.resources}
+          scheduleRows={scheduleRows}
+          selectedResourceIds={scheduleResourceFilter}
+          onSelectedResourceIdsChange={setScheduleResourceFilter}
+        />
+      ) : null}
+
+      {activeSubTab === "Settings" ? (
+        <CalendarHoursRulesPanel
+          availableLocations={data.supportedLocations}
+          bookingRules={bookingRules}
+          isSaving={isSaving}
+          onBookingRulesChange={setBookingRules}
+          onOpenDesign={() => {
+            setDesignDraft(appliedDesign);
+            setDesignOpen(true);
+          }}
+          onOpenPublicHours={() => setPublicBusinessHoursOpen(true)}
+          onOpenServiceOrder={() => setServiceOrderOpen(true)}
+          onSaveBookingRules={async () => {
+            await persistAvailabilitySettings({ bookingRules });
+            showSnackbar({ severity: "success", message: "Booking rules saved." });
+          }}
+        />
       ) : null}
 
       <MollureDrawer
@@ -3029,124 +3301,7 @@ export default function ProfessionalFixedLocationCalendar({
                       return;
                     }
                     if (!selectedSlot) return;
-
-                    const existingEvent = editingEventId ? events.find((event) => event.id === editingEventId) : null;
-
-                    if (incomingRequestEditMode && editingEventId && existingEvent) {
-                      const editedIds = detectEditedServiceIds(originalServicesSnapshot, selectedServices);
-                      const originalServices = existingEvent.details?.originalServices ?? originalServicesSnapshot;
-                      const nextDetails = buildBookingDetailsSnapshot({
-                        selectedClient,
-                        selectedServices,
-                        selectedProducts,
-                        bookingGuests,
-                        bookingPhoneDraft,
-                        desiredLocationDraft,
-                        showPrepayment,
-                        prepaymentPercent,
-                        paymentMethod,
-                        showLateCancellation,
-                        lateCancellationFeePercent,
-                        showInternalNote,
-                        bookingInternalNote,
-                        bookingTotalDiscount,
-                        showKilometerAllowance,
-                        kilometerAllowanceDraft,
-                        requestDirection: "incoming",
-                        originalServices,
-                        editedServiceIds: editedIds,
-                        clientEditedServiceIds: [],
-                        lastEditedBy: "professional",
-                      });
-
-                      setEvents((prev) =>
-                        prev.map((event) =>
-                          event.id === editingEventId
-                            ? {
-                                ...event,
-                                status: "Requested",
-                                bookingScenario: "EBR",
-                                title: selectedServices[0]?.name ?? event.title,
-                                details: {
-                                  ...event.details,
-                                  ...nextDetails,
-                                  prepaymentStatus: event.details?.prepaymentStatus,
-                                  responseStatus: "suggestion_for_change",
-                                },
-                              }
-                            : event,
-                        ),
-                      );
-                      setIncomingRequestEditMode(false);
-                      setIsEditingExisting(false);
-                      setSlotStatus("Requested");
-                      showSnackbar({ severity: "success", message: "Edited booking request sent to client." });
-                      setSlotSaveAttempted(false);
-                      return;
-                    }
-
-                    const title =
-                      selectedServices[0]?.name ??
-                      selectedProducts[0]?.name ??
-                      "Booking";
-                    const clientName = selectedClient?.name ?? `${guestDraft.firstName} ${guestDraft.lastName}`.trim() ?? "Client";
-
-                    const isNewManualBooking = !editingEventId;
-                    const nextEvent: CalendarEvent = {
-                      id: editingEventId ?? `b-${Date.now()}-a`,
-                      bookingCode: existingEvent?.bookingCode ?? String(Math.floor(10000 + Math.random() * 90000)),
-                      resourceId: selectedSlot.resourceId,
-                      date: selectedSlot.date,
-                      start: selectedSlot.start,
-                      end: selectedSlot.end,
-                      title,
-                      status: existingEvent?.status ?? "Requested",
-                      location: slotLocation,
-                      bookingType: existingEvent?.bookingType ?? "Requests",
-                      bookingScenario: existingEvent?.bookingScenario ?? "BR",
-                      showClientName: clientName || "Client",
-                      details: buildBookingDetailsSnapshot({
-                        selectedClient,
-                        selectedServices,
-                        selectedProducts,
-                        bookingGuests,
-                        bookingPhoneDraft,
-                        desiredLocationDraft,
-                        showPrepayment,
-                        prepaymentPercent,
-                        paymentMethod,
-                        showLateCancellation,
-                        lateCancellationFeePercent,
-                        showInternalNote,
-                        bookingInternalNote,
-                        bookingTotalDiscount,
-                        showKilometerAllowance,
-                        kilometerAllowanceDraft,
-                        ...(isNewManualBooking
-                          ? {
-                              requestDirection: "outgoing" as const,
-                              originalServices: selectedServices,
-                            }
-                          : {}),
-                      }),
-                    };
-
-                    setEvents((prev) => {
-                      if (!editingEventId) return [...prev, nextEvent];
-                      return prev.map((e) => (e.id === editingEventId ? nextEvent : e));
-                    });
-                    showSnackbar({
-                      severity: "success",
-                      message: editingEventId ? "Booking updated." : "Booking request sent to client.",
-                    });
-                    setSlotSaveAttempted(false);
-                    if (isNewManualBooking) {
-                      setEditingEventId(nextEvent.id);
-                      setSlotStatus("Requested");
-                      setIsEditingExisting(false);
-                    } else if (editingEventId) {
-                      setIsEditingExisting(false);
-                    }
+                    void persistBookingFromDrawer();
                   }}
                   sx={{
                     borderRadius: "10px",
@@ -5285,11 +5440,11 @@ export default function ProfessionalFixedLocationCalendar({
         onClose={() => setPublicBusinessHoursOpen(false)}
         onApply={async () => {
           try {
-            const nextState = appendPublicHoursFromDraft(publicBusinessHoursDraft, publicHoursState);
-            setPublicHoursState(nextState);
-            await saveCalendarSettings({
-              publicBusinessHours: publicBusinessHoursDraft,
-              publicHoursState: nextState,
+            await persistAvailabilitySettings({
+              publicBusinessHours: [
+                ...(calendarSettings?.availability.publicBusinessHours ?? []),
+                publicBusinessHoursDraft,
+              ],
             });
             showSnackbar({ severity: "success", message: "Public business hours added." });
             setPublicBusinessHoursOpen(false);
@@ -5321,7 +5476,7 @@ export default function ProfessionalFixedLocationCalendar({
           setAppliedDesign(nextDesign);
           setDesignOpen(false);
           try {
-            await saveCalendarSettings({ design: nextDesign });
+            await persistAvailabilitySettings({ design: nextDesign });
             showSnackbar({ severity: "success", message: "Service colour saved." });
           } catch {
             showSnackbar({ severity: "error", message: "Unable to save service colour." });
@@ -5330,7 +5485,7 @@ export default function ProfessionalFixedLocationCalendar({
         onApply={async () => {
           try {
             setAppliedDesign(designDraft);
-            await saveCalendarSettings({ design: designDraft });
+            await persistAvailabilitySettings({ design: designDraft });
             showSnackbar({ severity: "success", message: "Design saved." });
             setDesignOpen(false);
           } catch {
@@ -5339,28 +5494,48 @@ export default function ProfessionalFixedLocationCalendar({
         }}
         draft={designDraft}
         setDraft={setDesignDraft}
+        serviceOptions={serviceOptions}
       />
-      <CalendarServiceColorEditModal
-        open={Boolean(colorEditKey)}
-        serviceLabel={colorEditKey ? getCalendarDesignServiceLabel(colorEditKey) : ""}
-        color={colorEditKey ? appliedDesign.colorsByCategory[colorEditKey] ?? "" : ""}
-        onClose={() => setColorEditKey(null)}
-        onApply={async (color) => {
-          if (!colorEditKey) return;
-          const nextDesign: CalendarDesignDraft = {
-            ...appliedDesign,
-            colorsByCategory: { ...appliedDesign.colorsByCategory, [colorEditKey]: color },
-          };
-          setAppliedDesign(nextDesign);
-          setDesignDraft(nextDesign);
-          setColorEditKey(null);
+      <CalendarServiceOrderModal
+        draft={serviceOrderDraft}
+        onApply={async () => {
           try {
-            await saveCalendarSettings({ design: nextDesign });
-            showSnackbar({ severity: "success", message: "Service colour updated." });
+            await persistAvailabilitySettings({ serviceOrder: serviceOrderDraft });
+            showSnackbar({ severity: "success", message: "Service order saved." });
+            setServiceOrderOpen(false);
           } catch {
-            showSnackbar({ severity: "error", message: "Unable to save service colour." });
+            showSnackbar({ severity: "error", message: "Unable to save service order." });
           }
         }}
+        onClose={() => setServiceOrderOpen(false)}
+        open={serviceOrderOpen}
+        setDraft={setServiceOrderDraft}
+      />
+      <CalendarEditAvailabilityModal
+        availableLocations={data.supportedLocations}
+        draft={editAvailabilityDraft}
+        onApply={async () => {
+          const nextOverrides = [
+            ...(dateOverrides ?? []).filter(
+              (item) => !(item.resourceId === editAvailabilityDraft.resourceId && item.date === editAvailabilityDraft.date),
+            ),
+            {
+              id: makeScheduleRowId(),
+              resourceId: editAvailabilityDraft.resourceId,
+              date: editAvailabilityDraft.date,
+              locations: editAvailabilityDraft.locations,
+              shifts: editAvailabilityDraft.shifts,
+            },
+          ];
+          setDateOverrides(nextOverrides);
+          await persistAvailabilitySettings({ dateOverrides: nextOverrides });
+          showSnackbar({ severity: "success", message: "Availability updated." });
+          setEditAvailabilityOpen(false);
+        }}
+        onClose={() => setEditAvailabilityOpen(false)}
+        open={editAvailabilityOpen}
+        resource={data.resources.find((resource) => resource.id === editAvailabilityDraft.resourceId)}
+        setDraft={setEditAvailabilityDraft}
       />
       <ManualEntryDiscountModal
         open={bookingDiscountModalOpen}
