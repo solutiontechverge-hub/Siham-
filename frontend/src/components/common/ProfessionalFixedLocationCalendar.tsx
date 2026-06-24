@@ -26,6 +26,8 @@ import AppCountryPhoneFields from "./AppCountryPhoneFields";
 import AppDropdown from "./AppDropdown";
 import CalendarAddMenu from "./calendar/CalendarAddMenu";
 import CalendarBookingCard from "./calendar/CalendarBookingCard";
+import CalendarBookingTicketStack from "./calendar/CalendarBookingTicketStack";
+import { clusterOverlappingEvents, getClusterTimeBounds } from "./calendar/calendar-overlap.utils";
 import { useMessagingWidget } from "./messaging/MessagingWidgetContext";
 import {
   buildBookingDetailsSnapshot,
@@ -101,6 +103,7 @@ import {
 } from "./calendar/calendar-schedule.utils";
 import {
   defaultBookingRules,
+  normalizeServiceOrderSettings,
   type BookingRules,
   type ParsedCalendarSettings,
   type ScheduleAvailabilityRow,
@@ -152,7 +155,12 @@ import type {
   CalendarViewMode,
   ProfessionalFixedLocationCalendarData,
 } from "../../app/professionals/fixed-location/calendar/calendar.data";
-import type { CreateCalendarEntryRequest, UpsertCalendarSettingsRequest } from "../../store/services/businessApi";
+import {
+  buildCreateCalendarEntryPayload,
+  isApiCalendarEventId,
+  mapCalendarEntryToEvent,
+} from "./calendar/calendar-entry.mappers";
+import type { CreateCalendarEntryRequest, CalendarEntry, UpsertCalendarSettingsRequest } from "../../store/services/businessApi";
 import { GENDER_OPTIONS, type GenderOption } from "../../lib/gender-options";
 import { getOptionalPhoneValidationErrors, getPhoneValidationErrors } from "../../lib/phone-validation";
 
@@ -162,7 +170,7 @@ export type ProfessionalFixedLocationCalendarProps = {
   serviceOptions?: string[];
   serviceOrderDefaults?: ServiceOrderSettings;
   isSaving?: boolean;
-  onCreateCalendarEntry?: (payload: CreateCalendarEntryRequest) => Promise<void>;
+  onCreateCalendarEntry?: (payload: CreateCalendarEntryRequest) => Promise<CalendarEntry | void>;
   onSaveCalendarSettings?: (payload: UpsertCalendarSettingsRequest) => Promise<void>;
   onDeleteCalendarEntry?: (id: string) => Promise<void>;
 };
@@ -569,10 +577,12 @@ export default function ProfessionalFixedLocationCalendar({
   const [bookingRules, setBookingRules] = React.useState<BookingRules>(() => defaultBookingRules());
   const [scheduleRows, setScheduleRows] = React.useState<ScheduleAvailabilityRow[]>([]);
   const [dateOverrides, setDateOverrides] = React.useState<ParsedCalendarSettings["availability"]["dateOverrides"]>([]);
-  const [serviceOrderDraft, setServiceOrderDraft] = React.useState<ServiceOrderSettings>(() => ({
-    categories: serviceOrderDefaults?.categories ?? [],
-    servicesByCategory: serviceOrderDefaults?.servicesByCategory ?? {},
-  }));
+  const [serviceOrderDraft, setServiceOrderDraft] = React.useState<ServiceOrderSettings>(() =>
+    normalizeServiceOrderSettings(undefined, {
+      categories: serviceOrderDefaults?.categories ?? [],
+      servicesByCategory: serviceOrderDefaults?.servicesByCategory ?? {},
+    }),
+  );
   const [serviceOrderOpen, setServiceOrderOpen] = React.useState(false);
   const [scheduleResourceFilter, setScheduleResourceFilter] = React.useState<string[]>([]);
   const [editAvailabilityOpen, setEditAvailabilityOpen] = React.useState(false);
@@ -591,9 +601,11 @@ export default function ProfessionalFixedLocationCalendar({
     setAppliedDesign(calendarSettings.design);
     setDesignDraft(calendarSettings.design);
     if (calendarSettings.availability.serviceOrder) {
-      setServiceOrderDraft(calendarSettings.availability.serviceOrder);
+      setServiceOrderDraft(
+        normalizeServiceOrderSettings(calendarSettings.availability.serviceOrder, serviceOrderDefaults),
+      );
     } else if (serviceOrderDefaults) {
-      setServiceOrderDraft(serviceOrderDefaults);
+      setServiceOrderDraft(normalizeServiceOrderSettings(serviceOrderDefaults));
     }
   }, [calendarSettings, serviceOrderDefaults]);
 
@@ -865,7 +877,9 @@ export default function ProfessionalFixedLocationCalendar({
         | "nonMollureMunicipality"
         | "bookingClient"
         | "bookingPhoneCode"
-        | "bookingPhoneNumber",
+        | "bookingPhoneNumber"
+        | "uniqueItemProductName"
+        | "uniqueItemPrice",
         string
       >
     > = {};
@@ -1873,72 +1887,220 @@ export default function ProfessionalFixedLocationCalendar({
     [getAvailabilityFor, getBusyFor, grid.stepMinutes, openBookingDrawer, showSnackbar, startMin, todayIso],
   );
 
-  const saveSelectedBooking = React.useCallback(
-    async (clientNameOverride?: string) => {
-      if (!selectedSlot) return;
+  const persistBookingFromDrawer = React.useCallback(async (): Promise<boolean> => {
+    if (!selectedSlot) return false;
 
+    const existingEvent = editingEventId ? events.find((event) => event.id === editingEventId) : null;
+
+    if (incomingRequestEditMode && editingEventId && existingEvent) {
+      const editedIds = detectEditedServiceIds(originalServicesSnapshot, selectedServices);
+      const originalServices = existingEvent.details?.originalServices ?? originalServicesSnapshot;
+      const nextDetails = buildBookingDetailsSnapshot({
+        selectedClient,
+        selectedServices,
+        selectedProducts,
+        bookingGuests,
+        bookingPhoneDraft,
+        desiredLocationDraft,
+        showPrepayment,
+        prepaymentPercent,
+        paymentMethod,
+        showLateCancellation,
+        lateCancellationFeePercent,
+        showInternalNote,
+        bookingInternalNote,
+        bookingTotalDiscount,
+        showKilometerAllowance,
+        kilometerAllowanceDraft,
+        requestDirection: "incoming",
+        originalServices,
+        editedServiceIds: editedIds,
+        clientEditedServiceIds: [],
+        lastEditedBy: "professional",
+      });
+
+      setEvents((prev) =>
+        prev.map((event) =>
+          event.id === editingEventId
+            ? {
+                ...event,
+                status: "Requested",
+                bookingScenario: "EBR",
+                title: selectedServices[0]?.name ?? event.title,
+                details: {
+                  ...event.details,
+                  ...nextDetails,
+                  prepaymentStatus: event.details?.prepaymentStatus,
+                  responseStatus: "suggestion_for_change",
+                },
+              }
+            : event,
+        ),
+      );
+      setIncomingRequestEditMode(false);
+      setIsEditingExisting(false);
+      setSlotStatus("Requested");
+      showSnackbar({ severity: "success", message: "Edited booking request sent to client." });
+      setSlotSaveAttempted(false);
+      return true;
+    }
+
+    const title = selectedServices[0]?.name ?? selectedProducts[0]?.name ?? "Booking";
+    const clientName =
+      selectedClient?.name?.trim() ||
+      `${guestDraft.firstName} ${guestDraft.lastName}`.trim() ||
+      `${nonMollureDraft.firstName} ${nonMollureDraft.lastName}`.trim() ||
+      "Client";
+    const isNewManualBooking = !editingEventId;
+    const shouldPersistToApi = isNewManualBooking || !isApiCalendarEventId(editingEventId);
+
+    const details = buildBookingDetailsSnapshot({
+      selectedClient,
+      selectedServices,
+      selectedProducts,
+      bookingGuests,
+      bookingPhoneDraft,
+      desiredLocationDraft,
+      showPrepayment,
+      prepaymentPercent,
+      paymentMethod,
+      showLateCancellation,
+      lateCancellationFeePercent,
+      showInternalNote,
+      bookingInternalNote,
+      bookingTotalDiscount,
+      showKilometerAllowance,
+      kilometerAllowanceDraft,
+      ...(isNewManualBooking
+        ? {
+            requestDirection: "outgoing" as const,
+            originalServices: selectedServices,
+          }
+        : {}),
+    });
+
+    const buildLocalEvent = (id: string, bookingCode: string): CalendarEvent => ({
+      id,
+      bookingCode,
+      resourceId: selectedSlot.resourceId,
+      date: selectedSlot.date,
+      start: selectedSlot.start,
+      end: selectedSlot.end,
+      title,
+      status: existingEvent?.status ?? slotStatus,
+      location: slotLocation,
+      bookingType: existingEvent?.bookingType ?? slotBookingType,
+      bookingScenario: existingEvent?.bookingScenario ?? "BR",
+      showClientName: clientName,
+      details,
+    });
+
+    if (shouldPersistToApi) {
       if (!onCreateCalendarEntry) {
         showSnackbar({ severity: "error", message: "Calendar API is not connected." });
-        return;
+        return false;
       }
-
-      const clientName =
-        clientNameOverride ||
-        (slotClientAdded && guestDraft.firstName.trim()
-          ? `${guestDraft.firstName.trim()} ${guestDraft.lastName.trim()}`.trim()
-          : nonMollureDraft.firstName.trim()
-            ? `${nonMollureDraft.firstName.trim()} ${nonMollureDraft.lastName.trim()}`.trim()
-            : "Walk-in client");
-      const teamMemberId = selectedSlot.resourceId?.trim() || null;
-      const statusToApi: Record<typeof slotStatus, CreateCalendarEntryRequest["status"]> = {
-        Confirmed: "confirmed",
-        Requested: "requested",
-        Invalid: "cancelled",
-        "No Show": "no_show",
-        Completed: "completed",
-        Cancelled: "cancelled",
-      };
-      const bookingTypeToApi: Record<CalendarBookingType, NonNullable<CreateCalendarEntryRequest["booking_type"]>> = {
-        Online: "online",
-        Offline: "offline",
-        Project: "project",
-        Requests: "request",
-      };
-      const apiStatus = statusToApi[slotStatus];
-      const apiBookingType = bookingTypeToApi[slotBookingType];
 
       try {
-        await onCreateCalendarEntry({
-          team_member_id: teamMemberId,
-          status: apiStatus,
-          title: `${slotBookingType} booking`,
-          start_time: toDateTimeInput(selectedSlot.date, selectedSlot.start),
-          end_time: toDateTimeInput(selectedSlot.date, selectedSlot.end),
-          location_type: locationToApi(slotLocation),
-          booking_type: apiBookingType,
-          client_name: clientName,
-          notes: slotLocation,
+        const created = await onCreateCalendarEntry(
+          buildCreateCalendarEntryPayload({
+            selectedSlot,
+            title,
+            clientName,
+            status: existingEvent?.status ?? slotStatus,
+            bookingType: existingEvent?.bookingType ?? slotBookingType,
+            location: slotLocation,
+            serviceIds: selectedServices.map((service) => service.id),
+            notes: bookingInternalNote.trim() || null,
+          }),
+        );
+
+        const nextEvent = created
+          ? {
+              ...mapCalendarEntryToEvent(created, selectedSlot.resourceId),
+              title,
+              bookingType: existingEvent?.bookingType ?? slotBookingType,
+              bookingScenario: existingEvent?.bookingScenario ?? "BR",
+              showClientName: clientName,
+              details,
+            }
+          : buildLocalEvent(
+              editingEventId ?? `b-${Date.now()}-a`,
+              existingEvent?.bookingCode ?? String(Math.floor(10000 + Math.random() * 90000)),
+            );
+
+        setEvents((prev) => {
+          if (editingEventId && !isApiCalendarEventId(editingEventId)) {
+            return prev.map((event) => (event.id === editingEventId ? nextEvent : event));
+          }
+          if (editingEventId && isApiCalendarEventId(editingEventId)) {
+            return prev.map((event) => (event.id === editingEventId ? { ...event, ...nextEvent, id: event.id } : event));
+          }
+          return [...prev, nextEvent];
         });
-        showSnackbar({ severity: "success", message: "Booking saved." });
-        setSlotDrawerOpen(false);
+
+        setEditingEventId(nextEvent.id);
+        setSlotStatus(nextEvent.status);
+        setIsEditingExisting(false);
+        showSnackbar({
+          severity: "success",
+          message: isNewManualBooking ? "Booking saved." : "Booking updated.",
+        });
+        setSlotSaveAttempted(false);
+        return true;
       } catch {
         showSnackbar({ severity: "error", message: "Unable to save booking." });
+        return false;
       }
-    },
-    [
-      guestDraft.firstName,
-      guestDraft.lastName,
-      nonMollureDraft.firstName,
-      nonMollureDraft.lastName,
-      onCreateCalendarEntry,
-      selectedSlot,
-      showSnackbar,
-      slotClientAdded,
-      slotBookingType,
-      slotStatus,
-      slotLocation,
-    ],
-  );
+    }
+
+    const nextEvent = buildLocalEvent(
+      editingEventId ?? `b-${Date.now()}-a`,
+      existingEvent?.bookingCode ?? String(Math.floor(10000 + Math.random() * 90000)),
+    );
+
+    setEvents((prev) => {
+      if (!editingEventId) return [...prev, nextEvent];
+      return prev.map((event) => (event.id === editingEventId ? nextEvent : event));
+    });
+    setEditingEventId(nextEvent.id);
+    setSlotStatus(nextEvent.status);
+    setIsEditingExisting(false);
+    showSnackbar({ severity: "success", message: "Booking updated." });
+    setSlotSaveAttempted(false);
+    return true;
+  }, [
+    bookingGuests,
+    bookingInternalNote,
+    bookingPhoneDraft,
+    bookingTotalDiscount,
+    desiredLocationDraft,
+    editingEventId,
+    events,
+    guestDraft.firstName,
+    guestDraft.lastName,
+    incomingRequestEditMode,
+    kilometerAllowanceDraft,
+    lateCancellationFeePercent,
+    nonMollureDraft.firstName,
+    nonMollureDraft.lastName,
+    onCreateCalendarEntry,
+    originalServicesSnapshot,
+    paymentMethod,
+    prepaymentPercent,
+    selectedClient,
+    selectedProducts,
+    selectedServices,
+    selectedSlot,
+    showInternalNote,
+    showKilometerAllowance,
+    showLateCancellation,
+    showPrepayment,
+    showSnackbar,
+    slotBookingType,
+    slotLocation,
+    slotStatus,
+  ]);
 
   return (
     <Stack
@@ -2755,46 +2917,57 @@ export default function ProfessionalFixedLocationCalendar({
                                 })}
 
                                 {/* Events */}
-                                {laneEvents.map((ev, idx) => {
-                                  const evStart = minutesSinceMidnight(ev.start);
-                                  const evEnd = minutesSinceMidnight(ev.end);
-                                  const top = ((evStart - startMin) / grid.stepMinutes) * rowPx + 0.15;
-                                  const height = Math.max(78, ((evEnd - evStart) / grid.stepMinutes) * rowPx - 0.3);
-                                  const overlapping = laneEvents
-                                    .filter((other) => {
-                                      const otherStart = minutesSinceMidnight(other.start);
-                                      const otherEnd = minutesSinceMidnight(other.end);
-                                      return evStart < otherEnd && evEnd > otherStart;
-                                    })
-                                    .sort((a, b) => a.id.localeCompare(b.id));
-                                  const overlapIndex = Math.max(0, overlapping.findIndex((other) => other.id === ev.id));
-                                  const overlapCount = Math.max(1, overlapping.length);
-                                  const isSplit = overlapCount > 1;
-                                  const widthPct = 100 / overlapCount;
-                                  const left = isSplit ? `calc(${overlapIndex * widthPct}% + 2px)` : 0;
-                                  const right = isSplit ? `calc(${(overlapCount - overlapIndex - 1) * widthPct}% + 2px)` : 0;
-                                  const cardServiceCategory = getServiceCategory(ev.title);
-                                  const cardServiceColor =
-                                    appliedDesign.scope === "Services"
+                                {clusterOverlappingEvents(laneEvents).map((cluster) => {
+                                  const { startMin: clusterStart, endMin: clusterEnd } = getClusterTimeBounds(cluster);
+                                  const top = ((clusterStart - startMin) / grid.stepMinutes) * rowPx + 0.15;
+                                  const height = Math.max(78, ((clusterEnd - clusterStart) / grid.stepMinutes) * rowPx - 0.3);
+                                  const resolveServiceColor = (ev: (typeof cluster)[number]) => {
+                                    const cardServiceCategory = getServiceCategory(ev.title);
+                                    return appliedDesign.scope === "Services"
                                       ? appliedDesign.colorsByService?.[ev.title]
                                       : cardServiceCategory
                                         ? appliedDesign.colorsByCategory[cardServiceCategory]
                                         : undefined;
+                                  };
+                                  const eventHandlers = {
+                                    onOpen: openExistingBooking,
+                                    onOpenCalendar: (ev: (typeof cluster)[number]) =>
+                                      showSnackbar({ severity: "info", message: `Calendar for booking ${extractBookingId(ev.id)}` }),
+                                    onOpenNotes: (ev: (typeof cluster)[number]) =>
+                                      showSnackbar({ severity: "info", message: `Notes for booking ${extractBookingId(ev.id)}` }),
+                                    onOpenClient: (ev: (typeof cluster)[number]) =>
+                                      showSnackbar({ severity: "info", message: `Client drawer: ${ev.showClientName ?? "Client"}` }),
+                                    onOpenMessages: openBookingMessages,
+                                  };
 
+                                  if (cluster.length > 1) {
+                                    return (
+                                      <CalendarBookingTicketStack
+                                        key={cluster.map((event) => event.id).join("-")}
+                                        events={cluster}
+                                        top={top}
+                                        height={height}
+                                        getServiceColor={resolveServiceColor}
+                                        {...eventHandlers}
+                                      />
+                                    );
+                                  }
+
+                                  const ev = cluster[0];
                                   return (
                                     <CalendarBookingCard
                                       key={ev.id}
                                       event={ev}
                                       top={top}
                                       height={height}
-                                      left={left}
-                                      right={right}
-                                      serviceColor={cardServiceColor}
-                                      onOpen={() => openExistingBooking(ev)}
-                                      onOpenCalendar={() => showSnackbar({ severity: "info", message: `Calendar for booking ${extractBookingId(ev.id)}` })}
-                                      onOpenNotes={() => showSnackbar({ severity: "info", message: `Notes for booking ${extractBookingId(ev.id)}` })}
-                                      onOpenClient={() => showSnackbar({ severity: "info", message: `Client drawer: ${ev.showClientName ?? "Client"}` })}
-                                      onOpenMessages={() => openBookingMessages(ev)}
+                                      left={0}
+                                      right={0}
+                                      serviceColor={resolveServiceColor(ev)}
+                                      onOpen={() => eventHandlers.onOpen(ev)}
+                                      onOpenCalendar={() => eventHandlers.onOpenCalendar(ev)}
+                                      onOpenNotes={() => eventHandlers.onOpenNotes(ev)}
+                                      onOpenClient={() => eventHandlers.onOpenClient(ev)}
+                                      onOpenMessages={() => eventHandlers.onOpenMessages(ev)}
                                     />
                                   );
                                 })}
@@ -3126,124 +3299,7 @@ export default function ProfessionalFixedLocationCalendar({
                       return;
                     }
                     if (!selectedSlot) return;
-
-                    const existingEvent = editingEventId ? events.find((event) => event.id === editingEventId) : null;
-
-                    if (incomingRequestEditMode && editingEventId && existingEvent) {
-                      const editedIds = detectEditedServiceIds(originalServicesSnapshot, selectedServices);
-                      const originalServices = existingEvent.details?.originalServices ?? originalServicesSnapshot;
-                      const nextDetails = buildBookingDetailsSnapshot({
-                        selectedClient,
-                        selectedServices,
-                        selectedProducts,
-                        bookingGuests,
-                        bookingPhoneDraft,
-                        desiredLocationDraft,
-                        showPrepayment,
-                        prepaymentPercent,
-                        paymentMethod,
-                        showLateCancellation,
-                        lateCancellationFeePercent,
-                        showInternalNote,
-                        bookingInternalNote,
-                        bookingTotalDiscount,
-                        showKilometerAllowance,
-                        kilometerAllowanceDraft,
-                        requestDirection: "incoming",
-                        originalServices,
-                        editedServiceIds: editedIds,
-                        clientEditedServiceIds: [],
-                        lastEditedBy: "professional",
-                      });
-
-                      setEvents((prev) =>
-                        prev.map((event) =>
-                          event.id === editingEventId
-                            ? {
-                                ...event,
-                                status: "Requested",
-                                bookingScenario: "EBR",
-                                title: selectedServices[0]?.name ?? event.title,
-                                details: {
-                                  ...event.details,
-                                  ...nextDetails,
-                                  prepaymentStatus: event.details?.prepaymentStatus,
-                                  responseStatus: "suggestion_for_change",
-                                },
-                              }
-                            : event,
-                        ),
-                      );
-                      setIncomingRequestEditMode(false);
-                      setIsEditingExisting(false);
-                      setSlotStatus("Requested");
-                      showSnackbar({ severity: "success", message: "Edited booking request sent to client." });
-                      setSlotSaveAttempted(false);
-                      return;
-                    }
-
-                    const title =
-                      selectedServices[0]?.name ??
-                      selectedProducts[0]?.name ??
-                      "Booking";
-                    const clientName = selectedClient?.name ?? `${guestDraft.firstName} ${guestDraft.lastName}`.trim() ?? "Client";
-
-                    const isNewManualBooking = !editingEventId;
-                    const nextEvent: CalendarEvent = {
-                      id: editingEventId ?? `b-${Date.now()}-a`,
-                      bookingCode: existingEvent?.bookingCode ?? String(Math.floor(10000 + Math.random() * 90000)),
-                      resourceId: selectedSlot.resourceId,
-                      date: selectedSlot.date,
-                      start: selectedSlot.start,
-                      end: selectedSlot.end,
-                      title,
-                      status: existingEvent?.status ?? "Requested",
-                      location: slotLocation,
-                      bookingType: existingEvent?.bookingType ?? "Requests",
-                      bookingScenario: existingEvent?.bookingScenario ?? "BR",
-                      showClientName: clientName || "Client",
-                      details: buildBookingDetailsSnapshot({
-                        selectedClient,
-                        selectedServices,
-                        selectedProducts,
-                        bookingGuests,
-                        bookingPhoneDraft,
-                        desiredLocationDraft,
-                        showPrepayment,
-                        prepaymentPercent,
-                        paymentMethod,
-                        showLateCancellation,
-                        lateCancellationFeePercent,
-                        showInternalNote,
-                        bookingInternalNote,
-                        bookingTotalDiscount,
-                        showKilometerAllowance,
-                        kilometerAllowanceDraft,
-                        ...(isNewManualBooking
-                          ? {
-                              requestDirection: "outgoing" as const,
-                              originalServices: selectedServices,
-                            }
-                          : {}),
-                      }),
-                    };
-
-                    setEvents((prev) => {
-                      if (!editingEventId) return [...prev, nextEvent];
-                      return prev.map((e) => (e.id === editingEventId ? nextEvent : e));
-                    });
-                    showSnackbar({
-                      severity: "success",
-                      message: editingEventId ? "Booking updated." : "Booking request sent to client.",
-                    });
-                    setSlotSaveAttempted(false);
-                    if (isNewManualBooking) {
-                      setEditingEventId(nextEvent.id);
-                      setSlotStatus("Requested");
-                      setIsEditingExisting(false);
-                    } else if (editingEventId) {
-                      setIsEditingExisting(false);
-                    }
+                    void persistBookingFromDrawer();
                   }}
                   sx={{
                     borderRadius: "10px",

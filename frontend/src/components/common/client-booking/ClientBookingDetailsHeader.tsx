@@ -8,7 +8,7 @@ import { Badge, Box, Button, Divider, IconButton, Menu, MenuItem, Stack, Typogra
 import { alpha, useTheme } from "@mui/material/styles";
 import { useRouter } from "next/navigation";
 import { useSnackbar } from "../AppSnackbar";
-import { getMessagingHref, useClientMessagingUnread } from "../messaging";
+import { getMessagingHref, useClientMessagingUnread, useMessagingWidgetOptional } from "../messaging";
 import type { BookingRequestDirection, ClientBookingStatus } from "../../../app/clients/booking/clientBookingRecords";
 import BookingRequestStatusRow, { type BookingRequestRowMode } from "./BookingRequestStatusRow";
 import {

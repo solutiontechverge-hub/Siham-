@@ -44,6 +44,34 @@ export type ServiceOrderSettings = {
   servicesByCategory: Record<string, string[]>;
 };
 
+type RawServiceOrderSettings = Partial<ServiceOrderSettings> & {
+  categoryKeys?: readonly string[];
+};
+
+export function normalizeServiceOrderSettings(
+  raw: RawServiceOrderSettings | null | undefined,
+  fallback?: ServiceOrderSettings,
+): ServiceOrderSettings {
+  const base: ServiceOrderSettings = {
+    categories: fallback?.categories ?? [],
+    servicesByCategory: fallback?.servicesByCategory ?? {},
+  };
+  if (!raw) return base;
+
+  const categories = raw.categories?.length
+    ? [...raw.categories]
+    : raw.categoryKeys?.length
+      ? [...raw.categoryKeys]
+      : base.categories;
+
+  const servicesByCategory = { ...base.servicesByCategory, ...(raw.servicesByCategory ?? {}) };
+  for (const category of categories) {
+    servicesByCategory[category] ??= [];
+  }
+
+  return { categories, servicesByCategory };
+}
+
 export type CalendarAvailabilitySettings = {
   publicBusinessHours?: PublicBusinessHoursDraft[];
   bookingRules?: BookingRules;
@@ -77,7 +105,7 @@ export function parseCalendarSettings(
     availability: {
       publicBusinessHours: availability.publicBusinessHours ?? [],
       bookingRules: { ...defaultBookingRules(), ...availability.bookingRules },
-      serviceOrder: availability.serviceOrder,
+      serviceOrder: normalizeServiceOrderSettings(availability.serviceOrder as RawServiceOrderSettings | undefined),
       scheduleAvailability: availability.scheduleAvailability ?? [],
       dateOverrides: availability.dateOverrides ?? [],
     },

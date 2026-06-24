@@ -306,7 +306,8 @@ export default function FixedLocationCalendarPage() {
       isSaving={isCreatingCalendarEntry || isSavingCalendarSettings || isDeletingCalendarEntry}
       onCreateCalendarEntry={async (payload) => {
         try {
-          await createCalendarEntry(payload).unwrap();
+          const response = await createCalendarEntry(payload).unwrap();
+          return response.data;
         } catch (error) {
           showSnackbar({
             severity: "error",

@@ -6,7 +6,7 @@ import { Box, Button, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../../ui/typography";
 import MollureModal from "../MollureModal";
-import type { ServiceOrderSettings } from "./calendar-settings.types";
+import { normalizeServiceOrderSettings, type ServiceOrderSettings } from "./calendar-settings.types";
 
 type CalendarServiceOrderModalProps = {
   draft: ServiceOrderSettings;
@@ -28,19 +28,27 @@ export default function CalendarServiceOrderModal({ draft, onApply, onClose, ope
   const m = theme.palette.mollure;
   const [dragCategory, setDragCategory] = React.useState<string | null>(null);
   const [dragService, setDragService] = React.useState<{ category: string; service: string } | null>(null);
+  const categories = draft.categories ?? [];
+  const servicesByCategory = draft.servicesByCategory ?? {};
 
   const moveCategory = (from: number, to: number) => {
-    setDraft((prev) => ({ ...prev, categories: reorderList(prev.categories, from, to) }));
+    setDraft((prev) => ({
+      ...normalizeServiceOrderSettings(prev),
+      categories: reorderList(normalizeServiceOrderSettings(prev).categories, from, to),
+    }));
   };
 
   const moveService = (category: string, from: number, to: number) => {
-    setDraft((prev) => ({
-      ...prev,
-      servicesByCategory: {
-        ...prev.servicesByCategory,
-        [category]: reorderList(prev.servicesByCategory[category] ?? [], from, to),
-      },
-    }));
+    setDraft((prev) => {
+      const normalized = normalizeServiceOrderSettings(prev);
+      return {
+        ...normalized,
+        servicesByCategory: {
+          ...normalized.servicesByCategory,
+          [category]: reorderList(normalized.servicesByCategory[category] ?? [], from, to),
+        },
+      };
+    });
   };
 
   return (
@@ -70,7 +78,7 @@ export default function CalendarServiceOrderModal({ draft, onApply, onClose, ope
     >
       <Box sx={{ px: 2.5, py: 2 }}>
         <Stack spacing={1.5}>
-          {draft.categories.map((category, categoryIndex) => (
+          {categories.map((category, categoryIndex) => (
             <Box
               key={category}
               draggable
@@ -78,7 +86,7 @@ export default function CalendarServiceOrderModal({ draft, onApply, onClose, ope
               onDragOver={(e) => e.preventDefault()}
               onDrop={() => {
                 if (!dragCategory) return;
-                const from = draft.categories.indexOf(dragCategory);
+                const from = categories.indexOf(dragCategory);
                 if (from >= 0) moveCategory(from, categoryIndex);
                 setDragCategory(null);
               }}
@@ -95,7 +103,7 @@ export default function CalendarServiceOrderModal({ draft, onApply, onClose, ope
               </Stack>
 
               <Stack spacing={0.75} sx={{ mt: 1, pl: 3 }}>
-                {(draft.servicesByCategory[category] ?? []).map((service, serviceIndex) => (
+                {(servicesByCategory[category] ?? []).map((service, serviceIndex) => (
                   <Box
                     key={`${category}-${service}`}
                     draggable
@@ -103,7 +111,7 @@ export default function CalendarServiceOrderModal({ draft, onApply, onClose, ope
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={() => {
                       if (!dragService || dragService.category !== category) return;
-                      const from = (draft.servicesByCategory[category] ?? []).indexOf(dragService.service);
+                      const from = (servicesByCategory[category] ?? []).indexOf(dragService.service);
                       if (from >= 0) moveService(category, from, serviceIndex);
                       setDragService(null);
                     }}
