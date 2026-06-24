@@ -454,7 +454,7 @@ export default function FixedLocationClientPage() {
                           >
                             {c.name
                               .split(" ")
-                              .map((p) => p[0])
+                              .map((p: string) => p[0])
                               .join("")
                               .slice(0, 2)
                               .toUpperCase()}
@@ -864,7 +864,7 @@ export default function FixedLocationClientPage() {
                       >
                         {viewClient.name
                           .split(" ")
-                          .map((p) => p[0])
+                          .map((p: string) => p[0])
                           .join("")
                           .slice(0, 2)
                           .toUpperCase()}
@@ -1067,7 +1067,7 @@ export default function FixedLocationClientPage() {
                       >
                         {viewClient.name
                           .split(" ")
-                          .map((p) => p[0])
+                          .map((p: string) => p[0])
                           .join("")
                           .slice(0, 2)
                           .toUpperCase()}
@@ -1310,7 +1310,7 @@ export default function FixedLocationClientPage() {
                 >
                   {r.name
                     .split(" ")
-                    .map((p) => p[0])
+                    .map((p: string) => p[0])
                     .join("")
                     .slice(0, 2)
                     .toUpperCase()}
