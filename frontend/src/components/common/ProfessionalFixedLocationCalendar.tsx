@@ -616,6 +616,7 @@ export default function ProfessionalFixedLocationCalendar({
       dateOverrides?: ParsedCalendarSettings["availability"]["dateOverrides"];
       serviceOrder?: ServiceOrderSettings;
       publicBusinessHours?: PublicBusinessHoursDraft[];
+      design?: CalendarDesignDraft;
     }) => {
       await onSaveCalendarSettings?.({
         availability: {
@@ -625,7 +626,7 @@ export default function ProfessionalFixedLocationCalendar({
           serviceOrder: next.serviceOrder ?? serviceOrderDraft,
           publicBusinessHours: next.publicBusinessHours ?? calendarSettings?.availability.publicBusinessHours,
         },
-        design: appliedDesign,
+        design: next.design ?? appliedDesign,
       });
     },
     [
@@ -2119,6 +2120,7 @@ export default function ProfessionalFixedLocationCalendar({
         alignStart={false}
       />
 
+
       {activeSubTab === "Overview" ? (
       <Paper
         elevation={0}
@@ -3027,7 +3029,7 @@ export default function ProfessionalFixedLocationCalendar({
         />
       ) : null}
 
-      {activeSubTab === "Hours and Rules" ? (
+      {activeSubTab === "Settings" ? (
         <CalendarHoursRulesPanel
           availableLocations={data.supportedLocations}
           bookingRules={bookingRules}
@@ -5439,10 +5441,22 @@ export default function ProfessionalFixedLocationCalendar({
         onApply={async () => {
           try {
             await persistAvailabilitySettings({
-              publicBusinessHours: [publicBusinessHoursDraft],
+              publicBusinessHours: [
+                ...(calendarSettings?.availability.publicBusinessHours ?? []),
+                publicBusinessHoursDraft,
+              ],
             });
-            showSnackbar({ severity: "success", message: "Public business hours saved." });
+            showSnackbar({ severity: "success", message: "Public business hours added." });
             setPublicBusinessHoursOpen(false);
+            setPublicBusinessHoursDraft({
+              location: publicBusinessHoursDraft.location,
+              schedule: publicBusinessHoursDraft.schedule,
+              day: "",
+              startTime: "08:00",
+              endTime: "18:00",
+              notAvailable: false,
+              note: "",
+            });
           } catch {
             showSnackbar({ severity: "error", message: "Unable to save public business hours." });
           }
@@ -5453,19 +5467,25 @@ export default function ProfessionalFixedLocationCalendar({
       <CalendarDesignModal
         open={designOpen}
         onClose={() => setDesignOpen(false)}
+        onColorSelect={async (key, color) => {
+          const nextDesign: CalendarDesignDraft = {
+            ...designDraft,
+            colorsByCategory: { ...designDraft.colorsByCategory, [key]: color },
+          };
+          setDesignDraft(nextDesign);
+          setAppliedDesign(nextDesign);
+          setDesignOpen(false);
+          try {
+            await persistAvailabilitySettings({ design: nextDesign });
+            showSnackbar({ severity: "success", message: "Service colour saved." });
+          } catch {
+            showSnackbar({ severity: "error", message: "Unable to save service colour." });
+          }
+        }}
         onApply={async () => {
           try {
             setAppliedDesign(designDraft);
-            await onSaveCalendarSettings?.({
-              availability: {
-                bookingRules,
-                scheduleAvailability: scheduleRows,
-                dateOverrides,
-                serviceOrder: serviceOrderDraft,
-                publicBusinessHours: calendarSettings?.availability.publicBusinessHours,
-              },
-              design: designDraft,
-            });
+            await persistAvailabilitySettings({ design: designDraft });
             showSnackbar({ severity: "success", message: "Design saved." });
             setDesignOpen(false);
           } catch {

@@ -7,6 +7,7 @@ import { alpha, useTheme } from "@mui/material/styles";
 import AppDropdown from "../AppDropdown";
 import MollureModal from "../MollureModal";
 import { BodyText } from "../../ui/typography";
+import { BUSINESS_SERVICE_CATEGORY_CATALOG } from "../../../data/businessServiceCategorySlider.data";
 
 export type CalendarDesignDraft = {
   scope: "Categories" | "Services";
@@ -18,17 +19,26 @@ type CalendarDesignModalProps = {
   open: boolean;
   onClose: () => void;
   onApply: () => void;
+  onColorSelect?: (key: string, color: string) => void;
   draft: CalendarDesignDraft;
   setDraft: React.Dispatch<React.SetStateAction<CalendarDesignDraft>>;
   serviceOptions?: readonly string[];
 };
 
-const categoryRows = ["Hair", "Nails", "Face treatments", "Body treatments"] as const;
+export function getCalendarDesignServiceLabel(key: string): string {
+  const entry = BUSINESS_SERVICE_CATEGORY_CATALOG.find((item) => item.key === key);
+  if (!entry) return key;
+  if (entry.key === "hair") return "Haar";
+  return entry.label;
+}
+
+type ColorRow = { key: string; label: string };
 
 export default function CalendarDesignModal({
   open,
   onClose,
   onApply,
+  onColorSelect,
   draft,
   setDraft,
   serviceOptions = [],
@@ -36,7 +46,16 @@ export default function CalendarDesignModal({
   const theme = useTheme();
   const m = theme.palette.mollure;
   const isServices = draft.scope === "Services";
-  const colorRows = isServices ? serviceOptions : categoryRows;
+
+  const colorRows = React.useMemo<ColorRow[]>(() => {
+    if (isServices) {
+      return serviceOptions.map((label) => ({ key: label, label }));
+    }
+    return BUSINESS_SERVICE_CATEGORY_CATALOG.map((entry) => ({
+      key: entry.key,
+      label: getCalendarDesignServiceLabel(entry.key),
+    }));
+  }, [isServices, serviceOptions]);
 
   const setColor = React.useCallback(
     (key: string, hex: string) => {
@@ -153,11 +172,11 @@ export default function CalendarDesignModal({
               overflow: "hidden",
             }}
           >
-            {colorRows.map((label) => {
-              const color = (isServices ? draft.colorsByService?.[label] : draft.colorsByCategory[label]) ?? "";
+            {colorRows.map(({ key, label }) => {
+              const color = (isServices ? draft.colorsByService?.[key] : draft.colorsByCategory[key]) ?? "";
               return (
                 <Box
-                  key={label}
+                  key={key}
                   sx={{
                     display: "grid",
                     gridTemplateColumns: "1fr auto auto",
@@ -198,7 +217,7 @@ export default function CalendarDesignModal({
                           height: 16,
                           borderRadius: "4px",
                           bgcolor: color || alpha(m.navy, 0.08),
-                          border: `1px solid ${alpha(m.navy, color ? 0.18 : 0.10)}`,
+                          border: `1px solid ${alpha(m.navy, color ? 0.18 : 0.1)}`,
                         }}
                       />
                       <span>Choose color</span>
@@ -206,19 +225,26 @@ export default function CalendarDesignModal({
                     <input
                       type="color"
                       value={color || "#22B8A7"}
-                      onChange={(e) => setColor(label, e.target.value)}
+                      onChange={(e) => {
+                        const nextColor = e.target.value;
+                        setColor(key, nextColor);
+                        if (!isServices) {
+                          onColorSelect?.(key, nextColor);
+                        }
+                        e.currentTarget.blur();
+                      }}
                       style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }}
                     />
                   </Button>
 
                   <IconButton
                     size="small"
-                    onClick={() => clearColor(label)}
+                    onClick={() => clearColor(key)}
                     sx={{
                       width: 30,
                       height: 30,
                       borderRadius: "10px",
-                      border: `1px solid ${alpha(m.navy, 0.10)}`,
+                      border: `1px solid ${alpha(m.navy, 0.1)}`,
                       bgcolor: "#fff",
                       color: alpha(m.navy, 0.55),
                       "&:hover": { bgcolor: alpha(m.navy, 0.03) },
@@ -235,4 +261,3 @@ export default function CalendarDesignModal({
     </MollureModal>
   );
 }
-
