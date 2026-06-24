@@ -111,8 +111,19 @@ export function mapCalendarEntryToEvent(entry: CalendarEntry, fallbackResourceId
     title: entry.title,
     status: statusFromApi[entry.status] ?? "Confirmed",
     location: entry.location_type ? (locationFromApi[entry.location_type] ?? "FL") : "FL",
-    bookingType: entry.booking_type ? (bookingTypeFromApi[entry.booking_type] ?? "Offline") : "Offline",
+    bookingType: entry.booking_type
+      ? (bookingTypeFromApi[entry.booking_type] ?? "Offline")
+      : statusFromApi[entry.status] === "Requested"
+        ? "Requests"
+        : "Offline",
+    bookingScenario: statusFromApi[entry.status] === "Requested" ? "BR" : undefined,
     showClientName: entry.client_name ?? undefined,
+    details: entry.notes
+      ? {
+          internalNote: entry.notes,
+          showInternalNote: true,
+        }
+      : undefined,
   };
 }
 

@@ -1054,11 +1054,18 @@ export const getCalendarOverview = async (req, res) => {
         `SELECT
            b.*,
            s.title AS service_title,
-           tm.full_name AS team_member_name
+           tm.full_name AS team_member_name,
+           COALESCE(
+             NULLIF(TRIM(ip.display_name), ''),
+             NULLIF(TRIM(CONCAT_WS(' ', ip.first_name, ip.last_name)), ''),
+             u.email
+           ) AS customer_name
          FROM bookings b
          INNER JOIN business_setups bs ON bs.id = b.business_setup_id
          LEFT JOIN subcategories s ON s.id = b.service_id
          LEFT JOIN business_team_members tm ON tm.id = b.team_member_id
+         LEFT JOIN users u ON u.id = b.customer_id
+         LEFT JOIN individual_profiles ip ON ip.user_id = u.id
          WHERE bs.professional_profile_id = $1
          ORDER BY COALESCE(b.start_time, b.created_at) DESC`,
         [professionalProfile.id],

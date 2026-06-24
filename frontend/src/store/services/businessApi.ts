@@ -269,6 +269,8 @@ export type CalendarBooking = {
   total_price: string | number | null;
   service_title?: string | null;
   team_member_name?: string | null;
+  customer_name?: string | null;
+  client_name?: string | null;
   date?: string | null;
   start?: string | null;
   end?: string | null;

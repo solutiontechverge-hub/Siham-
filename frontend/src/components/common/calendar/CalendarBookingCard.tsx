@@ -68,9 +68,13 @@ export default function CalendarBookingCard({
   const prepaymentStatus = resolveCalendarPrepaymentStatus(event);
   const prepaymentIconVariant = prepaymentStatus ? toPrepaymentIconVariant(prepaymentStatus) : undefined;
   const isDesiredLocation = event.location === "DL";
+  const isFixedLocation = event.location === "FL";
+  const hasNote = Boolean(event.details?.internalNote?.trim() || event.details?.showInternalNote);
   const accentColor = serviceColor ?? accent.color;
   const backgroundColor = serviceColor ? alpha(serviceColor, isDesiredLocation ? 0.08 : 0.075) : accent.bg;
-  const borderColor = serviceColor ? alpha(serviceColor, 0.34) : accent.border;
+  const borderColor =
+    event.status === "Requested" && !serviceColor ? accent.border : serviceColor ? alpha(serviceColor, 0.34) : accent.border;
+  const cardPattern = isDesiredLocation ? "dots" : isFixedLocation ? "lines" : "none";
 
   return (
     <Box
@@ -123,7 +127,7 @@ export default function CalendarBookingCard({
         accentColor={accentColor}
         borderColor={borderColor}
         backgroundColor={backgroundColor}
-        pattern={isDesiredLocation ? "dots" : "lines"}
+        pattern={cardPattern}
         scenarioBadges={scenarioIndicators.map((label) => ({
           label,
           showRequestSentIcon: label === "BR",
@@ -153,8 +157,8 @@ export default function CalendarBookingCard({
           onClick: onOpenCalendar,
         }}
         notesAction={{
-          show: !isTicket,
-          tooltip: "Open notes",
+          show: !isTicket && hasNote,
+          tooltip: "Note added",
           onClick: onOpenNotes,
         }}
         profileAction={{
