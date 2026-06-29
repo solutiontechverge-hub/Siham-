@@ -19,6 +19,10 @@ import { howItWorksData } from "../../app/how-it-works/howItWorks.data";
 import type { HowItWorksServiceCategory } from "../../app/how-it-works/howItWorks.data";
 import type { MarketingAudience } from "./MarketingShellLayout";
 import {
+  MOLLURE_HEADING_BODY_GAP_PX,
+  MOLLURE_SECTION_GAP_PX,
+} from "../../theme/spacing";
+import {
   HowItWorksDesiredLocationBookingIcon,
   HowItWorksFixedLocationBookingIcon,
   HowItWorksBusinessClientIcon,
@@ -84,6 +88,9 @@ const InfoCard = ({ title, points }: any) => (
 );
 
 const cardShadow = "0 10px 28px rgba(16, 35, 63, 0.10)";
+
+const sectionGapSx = { mt: `${MOLLURE_SECTION_GAP_PX}px` } as const;
+const headingBodyGapSx = { mb: `${MOLLURE_HEADING_BODY_GAP_PX}px` } as const;
 
 function HowItWorksCategoryIcon({ iconId }: { iconId: HowItWorksServiceCategory["iconId"] }) {
   const sx = { fontSize: 26, color: "primary.main" };
@@ -319,7 +326,7 @@ export function HowItWorksPageContent({ audience = "clients" }: { audience?: Mar
         </Container>
       </Box>
 
-      <Container maxWidth="lg" sx={{ py: 8 }}>
+      <Container maxWidth="lg" sx={{ py: `${MOLLURE_SECTION_GAP_PX}px` }}>
         {/* INTERACTIVE PROCESS */}
         <ContentCard
           sx={{ bgcolor: cardbg, color: textcolorgrey700 }}
@@ -330,15 +337,15 @@ export function HowItWorksPageContent({ audience = "clients" }: { audience?: Mar
 
         {/* KEY PRINCIPLES */}
         <Box
-          mt={6}
           sx={{
+            ...sectionGapSx,
             bgcolor: cardbg,
             borderRadius: 3,
             px: { xs: 2.5, sm: 4 },
             py: { xs: 3.5, sm: 4.5 },
           }}
         >
-          <HowItWorksSectionTitle title="Key Principles of Mollure" mb={4} />
+          <HowItWorksSectionTitle title="Key Principles of Mollure" />
 
           <Grid container spacing={3}>
             {howItWorksData.keyPrinciples.map(({ title, description, icon }) => (
@@ -375,7 +382,7 @@ export function HowItWorksPageContent({ audience = "clients" }: { audience?: Mar
         </Box>
 
         {/* BOOKING TYPES */}
-        <Box mt={10}>
+        <Box sx={sectionGapSx}>
           <AppCard
             sx={{
               p: { xs: 2.5, sm: 4 },
@@ -383,7 +390,7 @@ export function HowItWorksPageContent({ audience = "clients" }: { audience?: Mar
               borderRadius: "28px",
             }}
           >
-            <HowItWorksSectionTitle title="Booking Types and Setup" mb={4} />
+            <HowItWorksSectionTitle title="Booking Types and Setup" />
 
             <Stack spacing={4}>
               {/* Fixed Location */}
@@ -698,7 +705,7 @@ export function HowItWorksPageContent({ audience = "clients" }: { audience?: Mar
           </AppCard>
         </Box>
         {/* REQUEST TYPES */}
-        <Box mt={10} sx={{ pb: { xs: 4, sm: 5 } }}>
+        <Box sx={{ ...sectionGapSx, pb: { xs: 4, sm: 5 } }}>
           <HowItWorksSectionTitle title="Types of Requests" />
 
           <Box sx={requestTypesCreamPanelSx}>
@@ -874,15 +881,15 @@ export function HowItWorksPageContent({ audience = "clients" }: { audience?: Mar
 
         {/* CHANGES WITHOUT APPROVAL */}
         <Box
-          mt={10}
           sx={{
+            ...sectionGapSx,
             bgcolor: "#F9FAFB",
             borderRadius: 3,
             px: { xs: 2.5, sm: 4 },
             py: { xs: 3.5, sm: 4.5 },
           }}
         >
-          <HowItWorksSectionTitle title="Changes Without Approval" mb={4} />
+          <HowItWorksSectionTitle title="Changes Without Approval" />
 
           <Stack spacing={3}>
             {/* Detail Changes */}
@@ -975,8 +982,8 @@ export function HowItWorksPageContent({ audience = "clients" }: { audience?: Mar
         </Box>
         {/* RESPONSE */}
         <Box
-          mt={10}
           sx={{
+            ...sectionGapSx,
             borderRadius: 3,
             px: { xs: 2, sm: 3 },
             py: { xs: 3, sm: 4 },
@@ -987,7 +994,7 @@ export function HowItWorksPageContent({ audience = "clients" }: { audience?: Mar
             sx={{
               ...sectionHeadingSx,
               textAlign: "center",
-              mb: 2,
+              ...headingBodyGapSx,
             }}
           >
             How Professionals Respond To Requests
@@ -1000,7 +1007,7 @@ export function HowItWorksPageContent({ audience = "clients" }: { audience?: Mar
                 textAlign: "center",
                 maxWidth: 720,
                 mx: "auto",
-                mb: 4,
+                mb: `${MOLLURE_HEADING_BODY_GAP_PX}px`,
                 lineHeight: 1.7,
               }}
             >
@@ -1153,7 +1160,7 @@ export function HowItWorksPageContent({ audience = "clients" }: { audience?: Mar
         </Box>
 
         {/* Discarding requests — follows “How Professionals Respond” */}
-        <Box mt={4}>
+        <Box sx={sectionGapSx}>
           <ContentCard
             sx={{
               bgcolor: bgshadow,
@@ -1179,8 +1186,8 @@ export function HowItWorksPageContent({ audience = "clients" }: { audience?: Mar
 
         {/* RESCHEDULING */}
         <Box
-          mt={10}
           sx={{
+            ...sectionGapSx,
             bgcolor: cardbg,
             borderRadius: 3,
             px: { xs: 2, sm: 3 },
@@ -1192,7 +1199,7 @@ export function HowItWorksPageContent({ audience = "clients" }: { audience?: Mar
             sx={{
               ...sectionHeadingSx,
               textAlign: "center",
-              mb: 4,
+              ...headingBodyGapSx,
             }}
           >
             Client Rescheduling
@@ -1360,8 +1367,8 @@ export function HowItWorksPageContent({ audience = "clients" }: { audience?: Mar
         </Box>
         {/* PAYMENTS */}
         <Box
-          mt={10}
           sx={{
+            ...sectionGapSx,
             bgcolor: cardbg,
             borderRadius: 3,
             px: { xs: 2, sm: 3 },
@@ -1373,7 +1380,7 @@ export function HowItWorksPageContent({ audience = "clients" }: { audience?: Mar
             sx={{
               ...sectionHeadingSx,
               textAlign: "center",
-              mb: 4,
+              ...headingBodyGapSx,
             }}
           >
             Payments & Invoices
@@ -1654,8 +1661,8 @@ export function HowItWorksPageContent({ audience = "clients" }: { audience?: Mar
         </Box>
 
         {/* WHO CAN BOOK */}
-        <Box mt={10}>
-          <HowItWorksSectionTitle title="Who Can Book On Mollure" mb={4} />
+        <Box sx={sectionGapSx}>
+          <HowItWorksSectionTitle title="Who Can Book On Mollure" />
 
           <Grid container spacing={3}>
             <Grid item xs={12} md={6}>
@@ -1714,15 +1721,15 @@ export function HowItWorksPageContent({ audience = "clients" }: { audience?: Mar
 
         {audience === "professionals" ? (
           <Box
-            mt={10}
             sx={{
+              ...sectionGapSx,
               bgcolor: cardbg,
               borderRadius: 3,
               px: { xs: 2.5, sm: 4 },
               py: { xs: 3.5, sm: 4.5 },
             }}
           >
-            <HowItWorksSectionTitle title="Getting Started" mb={4} />
+            <HowItWorksSectionTitle title="Getting Started" />
 
             <Stack spacing={3}>
               <ContentCard
@@ -1799,8 +1806,8 @@ export function HowItWorksPageContent({ audience = "clients" }: { audience?: Mar
 
         {/* GROUP PAYMENT */}
         <Box
-          mt={10}
           sx={{
+            ...sectionGapSx,
             bgcolor: cardbg,
             borderRadius: 3,
             px: { xs: 2, sm: 3 },
@@ -1812,7 +1819,7 @@ export function HowItWorksPageContent({ audience = "clients" }: { audience?: Mar
             spacing={1.5}
             alignItems="center"
             justifyContent="center"
-            sx={{ mb: 4 }}
+            sx={headingBodyGapSx}
           >
             <Box
               sx={{
@@ -1899,8 +1906,8 @@ export function HowItWorksPageContent({ audience = "clients" }: { audience?: Mar
 
         {/* BOOKING COMMUNICATION */}
         <Box
-          mt={10}
           sx={{
+            ...sectionGapSx,
             bgcolor: bgshadow,
             borderRadius: 3,
             px: { xs: 2.5, sm: 4 },

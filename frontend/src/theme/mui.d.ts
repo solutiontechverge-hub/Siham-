@@ -82,6 +82,8 @@ declare module "@mui/material/styles" {
     salesVolumeStackMid: string;
     salesVolumeStackLight: string;
     salesVolumeStackPale: string;
+    sectionGapPx: number;
+    headingBodyGapPx: number;
   }
 
   interface Palette {

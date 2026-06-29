@@ -98,6 +98,7 @@ export { default as ProfessionalMarketingHeader } from "./ProfessionalMarketingH
 export { default as MollureMarketingHeader } from "./MollureMarketingHeader";
 export { default as MarketingSiteFooter } from "./MarketingSiteFooter";
 export { default as MarketingSectionHeading } from "./MarketingSectionHeading";
+export { default as MarketingSection } from "./MarketingSection";
 export { default as MarketingFeatureCard } from "./MarketingFeatureCard";
 export { default as MarketingResultCard } from "./MarketingResultCard";
 export { default as ContactUs } from "./ContactUs";

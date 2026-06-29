@@ -95,6 +95,9 @@ const theme = createTheme({
       salesVolumeStackMid: "#21B8BF",
       salesVolumeStackLight: "#62C4C8",
       salesVolumeStackPale: "#9DD8DB",
+      /** Layout rhythm — 40px between sections, 16px heading-to-body */
+      sectionGapPx: 40,
+      headingBodyGapPx: 16,
     },
     
   },
