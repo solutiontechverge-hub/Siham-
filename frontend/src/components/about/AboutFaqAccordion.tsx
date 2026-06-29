@@ -12,6 +12,7 @@ import {
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import { BodyText, CardTitle, SubHeading } from "../ui/typography";
+import { MOLLURE_HEADING_BODY_GAP_PX, MOLLURE_SECTION_GAP_PX } from "../../theme/spacing";
 
 export type AboutFaqItem = {
   id: string;
@@ -32,7 +33,7 @@ export default function AboutFaqAccordion({
     <Box
       component="section"
       sx={{
-        py: { xs: 6, md: 8 },
+        py: `${MOLLURE_SECTION_GAP_PX}px`,
         bgcolor: "mollure.surface",
       }}
     >
@@ -41,7 +42,7 @@ export default function AboutFaqAccordion({
           sx={{
             textAlign: "center",
             color: "mollure.textcolorgrey700",
-            mb: 4,
+            mb: `${MOLLURE_HEADING_BODY_GAP_PX}px`,
             fontSize: { xs: "1.5rem", sm: "1.75rem" },
           }}
         >

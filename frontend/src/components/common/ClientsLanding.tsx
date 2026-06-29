@@ -18,6 +18,7 @@ import type { ClientsLandingData } from "../../app/clients/clients.data";
 import { buildListingSearchHref } from "../../app/clients/listing/listingSearchParams";
 import { clientsShellHeader, type ClientsShellHeaderConfig } from "../../data/marketingShell.data";
 import { getFeatureIcon, useClientsPageTokens } from "../../app/clients/clients.use";
+import { MOLLURE_SECTION_GAP_PX } from "../../theme/spacing";
 import MarketingSectionHeading from "./MarketingSectionHeading";
 import MarketingSiteFooter from "./MarketingSiteFooter";
 import MollureMarketingHeader from "./MollureMarketingHeader";
@@ -233,7 +234,7 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
         </Container>
       </Box>
 
-      <Box sx={{ bgcolor: tokens.surface, py: { xs: 8, md: 10 } }}>
+      <Box sx={{ bgcolor: tokens.surface, py: `${MOLLURE_SECTION_GAP_PX}px` }}>
         <Container maxWidth="lg">
           <MarketingSectionHeading title={whyChooseSection.title} />
           <Grid container spacing={2.5}>
@@ -263,10 +264,10 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
                     >
                       {getFeatureIcon(item.iconKey)}
                     </Box>
-                    <Typography sx={{ mb: 0.85, fontSize: 16, fontWeight: 600, lineHeight: 1.25, color: tokens.textcolorgrey700 }}>
+                    <Typography sx={{ mb: 2, fontSize: 16, fontWeight: 600, lineHeight: 1.25, color: tokens.textcolorgrey700 }}>
                       {item.title}
                     </Typography>
-                    <Typography sx={{ mb: 1, fontSize: 12.5, fontWeight: 600, lineHeight: 1.35, color: tokens.teal }}>
+                    <Typography sx={{ mb: 2, fontSize: 12.5, fontWeight: 600, lineHeight: 1.35, color: tokens.teal }}>
                       {item.body}
                     </Typography>
                     <Typography sx={{ color: tokens.slate, lineHeight: 1.75, fontSize: 13, fontWeight: 400 }}>
@@ -280,7 +281,7 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
         </Container>
       </Box>
 
-      <Container maxWidth="lg" sx={{ py: { xs: 8, md: 10 } }}>
+      <Container maxWidth="lg" sx={{ py: `${MOLLURE_SECTION_GAP_PX}px` }}>
         <MarketingSectionHeading title={stepsSection.title} />
         <Grid container spacing={2.5}>
           {stepsSection.items.map((step) => (
@@ -302,7 +303,7 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
                 >
                   {step.number}
                 </Box>
-                <Typography sx={{ mt: 2.2, mb: 0.9, fontSize: 21, fontWeight: 600, color: tokens.textcolorgrey700 }}>
+                <Typography sx={{ mt: 2, mb: 2, fontSize: 21, fontWeight: 600, color: tokens.textcolorgrey700 }}>
                   {step.title}
                 </Typography>
                 <Typography sx={{ maxWidth: 240, color: tokens.slate, lineHeight: 1.7, fontSize: 13 }}>
@@ -314,17 +315,25 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
         </Grid>
       </Container>
 
-      <Box sx={{ bgcolor: tokens.surface, py: { xs: 7, md: 9 } }}>
+      <Box sx={{ bgcolor: tokens.surface, py: `${MOLLURE_SECTION_GAP_PX}px` }}>
         <Container maxWidth="lg">
-          <MarketingSectionHeading title={testimonialsSection.title} mb={4} />
+          <MarketingSectionHeading title={testimonialsSection.title} />
           <TestimonialsCarousel items={[...testimonialsSection.items]} />
         </Container>
       </Box>
 
-      <Box sx={{ bgcolor: tokens.teal, py: { xs: 7, md: 8 } }}>
-        <Container maxWidth="md">
+      <Box sx={{ bgcolor: tokens.teal, py: `${MOLLURE_SECTION_GAP_PX}px` }}>
+        <Container maxWidth="lg">
           <Stack alignItems="center" textAlign="center">
-            <Typography sx={{ fontSize: { xs: "2rem", md: "2.8rem" }, fontWeight: 800, lineHeight: 1.1, color: "#fff" }}>
+            <Typography
+              sx={{
+                fontSize: { xs: "1.75rem", sm: "2rem", md: "2.5rem", lg: "2.8rem" },
+                fontWeight: 800,
+                lineHeight: 1.1,
+                color: "#fff",
+                whiteSpace: { md: "nowrap" },
+              }}
+            >
               {professionalCta.title}
             </Typography>
             <Typography sx={{ mt: 2, maxWidth: 700, color: "rgba(255,255,255,0.86)", fontSize: 17, lineHeight: 1.8 }}>

@@ -4,23 +4,24 @@ import * as React from "react";
 import { Stack } from "@mui/material";
 import type { ResponsiveStyleValue } from "@mui/system";
 import { Description, MainHeading } from "../ui/typography";
+import { MOLLURE_HEADING_BODY_GAP, MOLLURE_HEADING_BODY_GAP_PX } from "../../theme/spacing";
 
 type MarketingSectionHeadingProps = {
   title: React.ReactNode;
   subtitle?: React.ReactNode;
   align?: "left" | "center" | "right";
-  mb?: ResponsiveStyleValue<number>;
+  mb?: ResponsiveStyleValue<number | string>;
 };
 
 export default function MarketingSectionHeading({
   title,
   subtitle,
   align = "center",
-  mb = 5,
+  mb = MOLLURE_HEADING_BODY_GAP,
 }: MarketingSectionHeadingProps) {
   return (
     <Stack
-      spacing={1.25}
+      spacing={MOLLURE_HEADING_BODY_GAP}
       sx={{
         mb,
         textAlign: align,

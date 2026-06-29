@@ -1,6 +1,7 @@
 import * as React from "react";
 import MuiTypography, { type TypographyProps } from "@mui/material/Typography";
 import { alpha, type SxProps, type Theme } from "@mui/material/styles";
+import { MOLLURE_HEADING_BODY_GAP_PX } from "../../theme/spacing";
 
 type AppTypographyProps<C extends React.ElementType> = Omit<
   TypographyProps<C, { component?: C }>,
@@ -93,6 +94,7 @@ export function MarketingHeroDescription<C extends React.ElementType = "p">(prop
             color: (theme) => alpha(theme.palette.mollure.navy, 0.55),
           },
           { maxWidth: 500 },
+          { mt: `${MOLLURE_HEADING_BODY_GAP_PX}px` },
         ],
         sx,
       )}
@@ -138,6 +140,7 @@ export function MarketingSectionSubtitle<C extends React.ElementType = "p">(prop
           lineHeight: 1.55,
           maxWidth: 620,
           mx: "auto",
+          mt: `${MOLLURE_HEADING_BODY_GAP_PX}px`,
         },
         sx,
       )}
@@ -174,7 +177,7 @@ export function MarketingKpiSubtitle<C extends React.ElementType = "div">(props:
         {
           color: "text.secondary",
           fontSize: { xs: "0.71875rem", md: "0.875rem" },
-          mt: 0.45,
+          mt: `${MOLLURE_HEADING_BODY_GAP_PX}px`,
         },
         sx,
       )}
