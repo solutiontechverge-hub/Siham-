@@ -175,7 +175,7 @@ export default function ContactUs({ illustrationSrc }: ContactUsProps) {
                   sx={{
                     display: "flex",
                     flexDirection: { xs: "column", sm: "row" },
-                    gap: { xs: 2.25, sm: "10%" },
+                    gap: { xs: 2.25, sm: "5%" },
                     width: "100%",
                   }}
                 >
@@ -190,7 +190,7 @@ export default function ContactUs({ illustrationSrc }: ContactUsProps) {
                       helperText={touched.name ? errors.name : undefined}
                     />
                   </Box>
-                  <Box sx={{ width: { xs: "100%", sm: "55%" } }}>
+                  <Box sx={{ width: { xs: "100%", sm: "60%" } }}>
                     <MollureLabeledField
                       fieldLabel={contactUsData.fields.email.label}
                       placeholder={contactUsData.fields.email.placeholder}
