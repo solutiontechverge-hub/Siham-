@@ -322,9 +322,17 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
       </Box>
 
       <Box sx={{ bgcolor: tokens.teal, py: { xs: 7, md: 8 } }}>
-        <Container maxWidth="md">
+        <Container maxWidth="lg">
           <Stack alignItems="center" textAlign="center">
-            <Typography sx={{ fontSize: { xs: "2rem", md: "2.8rem" }, fontWeight: 800, lineHeight: 1.1, color: "#fff" }}>
+            <Typography
+              sx={{
+                fontSize: { xs: "1.75rem", sm: "2rem", md: "2.5rem", lg: "2.8rem" },
+                fontWeight: 800,
+                lineHeight: 1.1,
+                color: "#fff",
+                whiteSpace: { md: "nowrap" },
+              }}
+            >
               {professionalCta.title}
             </Typography>
             <Typography sx={{ mt: 2, maxWidth: 700, color: "rgba(255,255,255,0.86)", fontSize: 17, lineHeight: 1.8 }}>

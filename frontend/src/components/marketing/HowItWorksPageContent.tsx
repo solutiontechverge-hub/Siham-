@@ -1,5 +1,7 @@
 "use client";
 
+import type { ReactNode } from "react";
+import Image from "next/image";
 import {
   Box,
   Container,
@@ -10,31 +12,46 @@ import {
   Divider,
   Stack,
 } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
+import { alpha, useTheme, type Theme } from "@mui/material/styles";
 import { AppCard, ContentCard } from "../common";
 import { HowItWorksSectionTitle } from "../howItWorks";
 import { howItWorksData } from "../../app/how-it-works/howItWorks.data";
+import type { HowItWorksServiceCategory } from "../../app/how-it-works/howItWorks.data";
+import type { MarketingAudience } from "./MarketingShellLayout";
+import {
+  HowItWorksDesiredLocationBookingIcon,
+  HowItWorksFixedLocationBookingIcon,
+  HowItWorksBusinessClientIcon,
+  HowItWorksIndividualClientIcon,
+  HowItWorksSuggestionForChangeIcon,
+  HowItWorksDesiredLocationClockIcon,
+  HowItWorksBookingEditedBellIcon,
+} from "../../../images";
 import { Typography } from "../ui/typography";
 import {
   CheckCircleOutline,
   CheckOutlined,
   CheckCircle,
-  PersonPinCircleOutlined,
-  LocationOnOutlined,
   BoltOutlined,
   EventSeatOutlined,
-  ScheduleOutlined,
   NearMeOutlined,
+  PersonPinCircleOutlined,
   EditOutlined,
   EditNoteOutlined,
   CloseOutlined,
   FormatListBulletedOutlined,
-  NotificationsOutlined,
   CreditCard,
   Language,
   ReceiptLong,
   ForumOutlined,
 } from "@mui/icons-material";
+import ContentCutRoundedIcon from "@mui/icons-material/ContentCutRounded";
+import BrushRoundedIcon from "@mui/icons-material/BrushRounded";
+import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
+import GestureRoundedIcon from "@mui/icons-material/GestureRounded";
+import FaceRetouchingNaturalOutlinedIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
+import SpaOutlinedIcon from "@mui/icons-material/SpaOutlined";
+import WaterDropOutlinedIcon from "@mui/icons-material/WaterDropOutlined";
 
 /** Section headings: semibold (600); pair with `variant="h4"` */
 const sectionHeadingSx = {
@@ -66,42 +83,240 @@ const InfoCard = ({ title, points }: any) => (
   </Card>
 );
 
-export function HowItWorksPageContent() {
+const cardShadow = "0 10px 28px rgba(16, 35, 63, 0.10)";
+
+function HowItWorksCategoryIcon({ iconId }: { iconId: HowItWorksServiceCategory["iconId"] }) {
+  const sx = { fontSize: 26, color: "primary.main" };
+  switch (iconId) {
+    case "hair":
+      return <ContentCutRoundedIcon sx={sx} />;
+    case "makeup":
+      return <BrushRoundedIcon sx={sx} />;
+    case "lashes":
+      return <VisibilityRoundedIcon sx={sx} />;
+    case "brows":
+      return <GestureRoundedIcon sx={sx} />;
+    case "facial":
+      return <FaceRetouchingNaturalOutlinedIcon sx={sx} />;
+    case "body":
+      return <SpaOutlinedIcon sx={sx} />;
+    case "waxing":
+      return <WaterDropOutlinedIcon sx={sx} />;
+  }
+}
+
+function HowItWorksCheckList({ items }: { items: readonly string[] }) {
+  return (
+    <Stack spacing={1.2}>
+      {items.map((item) => (
+        <Stack key={item} direction="row" spacing={1.5} alignItems="flex-start">
+          <CheckOutlined sx={{ color: "primary.main", fontSize: 18, mt: 0.15, flexShrink: 0 }} />
+          <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.6 }}>
+            {item}
+          </Typography>
+        </Stack>
+      ))}
+    </Stack>
+  );
+}
+
+const requestTypeIconSx = {
+  width: 34,
+  height: 34,
+  borderRadius: 2,
+  bgcolor: "mollure.requestAccent",
+  color: "common.white",
+  display: "grid",
+  placeItems: "center",
+  flexShrink: 0,
+} as const;
+
+const requestTypeCardSx = {
+  p: 0,
+  overflow: "hidden",
+  borderRadius: 3,
+  boxShadow: (theme: Theme) => theme.palette.mollure.sectionSurfaceShadow,
+} as const;
+
+const requestTypeResponseSx = {
+  px: { xs: 2.5, sm: 3 },
+  pb: { xs: 2.5, sm: 3 },
+  pt: 2,
+  borderTop: "1px solid",
+  borderColor: "mollure.border",
+  bgcolor: "mollure.sectionSurface",
+} as const;
+
+const requestTypeResponseExpandedSx = {
+  ...requestTypeResponseSx,
+  pb: { xs: 3.5, sm: 4.5 },
+} as const;
+
+const changesSubsectionCardSx = {
+  bgcolor: "#F0FDFB",
+  boxShadow: "0 2px 12px rgba(16,35,63,0.07)",
+  borderRadius: 3,
+  border: "1px solid",
+  borderColor: "mollure.cardBorder",
+  px: { xs: 2.5, sm: 3.5 },
+  py: { xs: 2.5, sm: 3 },
+} as const;
+
+const changesInnerCardSx = {
+  p: 2.5,
+  borderRadius: 2,
+  bgcolor: "#FFFFFF",
+  border: "1px solid",
+  borderColor: "mollure.cardBorder",
+} as const;
+
+const changesSubsectionIconSx = {
+  width: 40,
+  height: 40,
+  borderRadius: "50%",
+  bgcolor: "primary.main",
+  color: "common.white",
+  display: "grid",
+  placeItems: "center",
+  flexShrink: 0,
+} as const;
+
+const requestTypesCreamPanelSx = {
+  bgcolor: "mollure.warmwarning",
+  borderRadius: 3,
+  px: { xs: 0, sm: 0.5 },
+  pt: { xs: 0.5, sm: 1 },
+  pb: { xs: 1, sm: 1.5 },
+} as const;
+
+function HowItWorksAcceptActionIcon() {
+  return (
+    <Box
+      sx={{
+        width: 22,
+        height: 22,
+        borderRadius: "50%",
+        bgcolor: "success.main",
+        color: "common.white",
+        display: "grid",
+        placeItems: "center",
+        flexShrink: 0,
+      }}
+    >
+      <CheckOutlined sx={{ fontSize: 14 }} />
+    </Box>
+  );
+}
+
+type HowItWorksResponseActionKey = "accept" | "suggestion" | "reject";
+
+function HowItWorksResponseActions({
+  actions,
+  theme,
+}: {
+  actions: HowItWorksResponseActionKey[];
+  theme: Theme;
+}) {
+  const actionMap: Record<
+    HowItWorksResponseActionKey,
+    { label: string; bg: string; icon: ReactNode }
+  > = {
+    accept: {
+      label: "Accept",
+      bg: theme.palette.mollure.mintSoft,
+      icon: <HowItWorksAcceptActionIcon />,
+    },
+    suggestion: {
+      label: "Suggestion for change",
+      bg: alpha(theme.palette.mollure.border, 0.35),
+      icon: <Image src={HowItWorksSuggestionForChangeIcon} alt="" width={24} height={24} />,
+    },
+    reject: {
+      label: "Reject",
+      bg: alpha("#E31B23", 0.1),
+      icon: <CloseOutlined sx={{ fontSize: 18, color: "#E31B23" }} />,
+    },
+  };
+
+  return (
+    <Grid container spacing={2} sx={{ mt: 1.5 }}>
+      {actions.map((key) => {
+        const action = actionMap[key];
+        return (
+          <Grid item xs={12} sm={4} key={key}>
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                px: 2,
+                py: 1.25,
+                borderRadius: 2,
+                bgcolor: action.bg,
+                minHeight: 46,
+              }}
+            >
+              {action.icon}
+              <Typography variant="body2" sx={{ fontWeight: 600, color: "mollure.textcolorgrey700" }}>
+                {action.label}
+              </Typography>
+            </Box>
+          </Grid>
+        );
+      })}
+    </Grid>
+  );
+}
+
+export function HowItWorksPageContent({ audience = "clients" }: { audience?: MarketingAudience }) {
   const theme = useTheme();
   const bgshadow = theme.palette.mollure.bgshadow;
   const cardbg = theme.palette.mollure.cardbg;
   const textcolorgrey700 = theme.palette.mollure.textcolorgrey700;
 
   return (
-    <Box sx={{ bgcolor: "#f7f9fb" }}>
+    <Box sx={{ bgcolor: "background.default" }}>
       {/* HERO */}
       <Box
         sx={{
-          bgcolor: "#cfe8e6",
-          py: 8,
+          background: `linear-gradient(180deg, ${theme.palette.mollure.heroGradientStart} 0%, ${theme.palette.mollure.heroGradientEnd} 100%)`,
+          position: "relative",
+          overflow: "hidden",
+          py: { xs: 7, md: 8 },
           textAlign: "center",
         }}
       >
-        <Typography
-          variant="h3"
+        <Box
           sx={{
-            fontWeight: 600,
-            color: "mollure.textcolorgrey700",
-            fontSize: { xs: "1.75rem", sm: "2.125rem" },
+            position: "absolute",
+            inset: 0,
+            opacity: 0.65,
+            background: theme.palette.mollure.heroGlow,
+            pointerEvents: "none",
           }}
-        >
-          {howItWorksData.hero.title}
-        </Typography>
-        <Typography
-          mt={2}
-          maxWidth="700px"
-          mx="auto"
-          variant="body1"
-          color="text.secondary"
-          sx={{ fontWeight: 400, lineHeight: 1.7 }}
-        >
-          {howItWorksData.hero.subtitle}
-        </Typography>
+        />
+        <Container maxWidth="lg" sx={{ position: "relative", zIndex: 1 }}>
+          <Typography
+            variant="h3"
+            sx={{
+              fontWeight: 600,
+              color: "mollure.textcolorgrey700",
+              fontSize: { xs: "1.75rem", sm: "2.125rem" },
+            }}
+          >
+            {howItWorksData.hero.title}
+          </Typography>
+          <Typography
+            mt={2}
+            maxWidth="700px"
+            mx="auto"
+            variant="body1"
+            color="text.secondary"
+            sx={{ fontWeight: 400, lineHeight: 1.7 }}
+          >
+            {howItWorksData.hero.subtitle}
+          </Typography>
+        </Container>
       </Box>
 
       <Container maxWidth="lg" sx={{ py: 8 }}>
@@ -113,134 +328,31 @@ export function HowItWorksPageContent() {
           description="Mollure uses an interactive online booking process. This means bookings are not always instantly confirmed. Some bookings require review and approval before they are finalized. In certain situations, changes made before or after confirmation also require approval, ensuring both parties stay aligned throughout the booking process."
         />
 
-        <Box bgcolor={bgshadow} p={4} borderRadius={3} boxShadow={2} mt={3}>
-          <HowItWorksSectionTitle title="Getting Started" mb={4} />
-          <Grid container spacing={4}>
-            <Grid item xs={12} md={6}>
-              <ContentCard>
-                <Stack spacing={2}>
-                  {/* ICON */}
-                  <Box
-                    sx={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: "50%",
-                      bgcolor: "#e6f4f1",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <PersonPinCircleOutlined sx={{ color: "#1bb3a9" }} />
-                  </Box>
-
-                  {/* TITLE */}
-                  <Typography variant="h6" fontWeight={600}>
-                    Individual Clients
-                  </Typography>
-
-                  {/* LIST */}
-                  <Stack spacing={1.2}>
-                    {howItWorksData.gettingStarted.individualPoints.map(
-                      (item, index) => (
-                      <Stack
-                        key={index}
-                        direction="row"
-                        spacing={1.5}
-                        alignItems="center"
-                      >
-                        <CheckOutlined
-                          sx={{ color: "#1bb3a9", fontSize: 18 }}
-                        />
-                        <Typography variant="body2" color="text.secondary">
-                          {item}
-                        </Typography>
-                      </Stack>
-                    ))}
-                  </Stack>
-                </Stack>
-              </ContentCard>
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <ContentCard>
-                <Stack spacing={2}>
-                  {/* ICON */}
-                  <Box
-                    sx={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: "50%",
-                      bgcolor: "#e6f4f1",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <PersonPinCircleOutlined sx={{ color: "#1bb3a9" }} />
-                  </Box>
-
-                  {/* TITLE */}
-                  <Typography variant="h6" fontWeight={600}>
-                    Business Clients
-                  </Typography>
-
-                  {/* LIST */}
-                  <Stack spacing={1.2}>
-                    {howItWorksData.gettingStarted.businessPoints.map(
-                      (item, index) => (
-                      <Stack
-                        key={index}
-                        direction="row"
-                        spacing={1.5}
-                        alignItems="center"
-                      >
-                        <CheckOutlined
-                          sx={{ color: "#1bb3a9", fontSize: 18 }}
-                        />
-                        <Typography variant="body2" color="text.secondary">
-                          {item}
-                        </Typography>
-                      </Stack>
-                    ))}
-                  </Stack>
-                </Stack>
-              </ContentCard>
-            </Grid>
-          </Grid>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-            {howItWorksData.gettingStarted.note}
-          </Typography>
-        </Box>
-
         {/* KEY PRINCIPLES */}
-        <Box mt={10}>
+        <Box
+          mt={6}
+          sx={{
+            bgcolor: cardbg,
+            borderRadius: 3,
+            px: { xs: 2.5, sm: 4 },
+            py: { xs: 3.5, sm: 4.5 },
+          }}
+        >
           <HowItWorksSectionTitle title="Key Principles of Mollure" mb={4} />
 
           <Grid container spacing={3}>
-            {howItWorksData.keyPrinciples.map(({ title, description, Icon }) => (
+            {howItWorksData.keyPrinciples.map(({ title, description, icon }) => (
               <Grid item xs={12} sm={6} md={3} key={title}>
                 <ContentCard
                   sx={{
                     height: "100%",
-                    // backgroundColor: "rgba(255,255,255,0.92)",
-                    backgroundColor: { cardbg },
-                    boxShadow: "0 10px 28px rgba(16, 35, 63, 0.10)",
+                    bgcolor: "background.paper",
+                    boxShadow: cardShadow,
                   }}
                 >
                   <Stack spacing={2} sx={{ height: "100%" }}>
-                    <Box
-                      sx={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 2,
-                        bgcolor: { cardbg },
-                        color: theme.palette.primary.main,
-                        display: "grid",
-                        placeItems: "center",
-                      }}
-                    >
-                      <Icon fontSize="small" />
+                    <Box sx={{ width: 50, height: 49, flexShrink: 0 }}>
+                      <Image src={icon} alt="" width={50} height={49} />
                     </Box>
 
                     <Typography sx={cardTitleSx}>{title}</Typography>
@@ -261,6 +373,7 @@ export function HowItWorksPageContent() {
             ))}
           </Grid>
         </Box>
+
         {/* BOOKING TYPES */}
         <Box mt={10}>
           <AppCard
@@ -294,7 +407,7 @@ export function HowItWorksPageContent() {
                     gap: 1.5,
                   }}
                 >
-                  <EventSeatOutlined sx={{ fontSize: 28 }} />
+                  <Image src={HowItWorksFixedLocationBookingIcon} alt="" width={40} height={40} />
                   <Typography
                     variant="h6"
                     sx={{ fontWeight: 600, color: "common.white" }}
@@ -400,7 +513,7 @@ export function HowItWorksPageContent() {
                     gap: 1.5,
                   }}
                 >
-                  <LocationOnOutlined sx={{ fontSize: 28 }} />
+                  <Image src={HowItWorksDesiredLocationBookingIcon} alt="" width={40} height={40} />
                   <Typography
                     variant="h6"
                     sx={{ fontWeight: 600, color: "common.white" }}
@@ -568,9 +681,9 @@ export function HowItWorksPageContent() {
                       gap: 1.5,
                     }}
                   >
-                    <ScheduleOutlined
-                      sx={{ color: "mollure.star", fontSize: 26 }}
-                    />
+                    <Box sx={{ width: 24, height: 24, flexShrink: 0, display: "grid", placeItems: "center" }}>
+                      <Image src={HowItWorksDesiredLocationClockIcon} alt="" width={24} height={24} />
+                    </Box>
                     <Typography
                       variant="body2"
                       sx={{ color: "text.primary", fontWeight: 600 }}
@@ -585,12 +698,13 @@ export function HowItWorksPageContent() {
           </AppCard>
         </Box>
         {/* REQUEST TYPES */}
-        <Box mt={10} bgcolor={theme.palette.mollure.warmwarning}>
+        <Box mt={10} sx={{ pb: { xs: 4, sm: 5 } }}>
           <HowItWorksSectionTitle title="Types of Requests" />
 
-          <Stack spacing={3}>
+          <Box sx={requestTypesCreamPanelSx}>
+            <Stack spacing={3}>
             {/* Booking Request */}
-            <AppCard sx={{ p: 0, overflow: "hidden" }}>
+            <AppCard sx={requestTypeCardSx}>
               <Box
                 sx={{
                   p: { xs: 2.5, sm: 3 },
@@ -598,18 +712,7 @@ export function HowItWorksPageContent() {
                 }}
               >
                 <Stack direction="row" spacing={1.5} alignItems="center">
-                  <Box
-                    sx={{
-                      width: 34,
-                      height: 34,
-                      borderRadius: 2,
-                      bgcolor: theme.palette.mollure.warmwarning,
-                      color: "mollure.star",
-                      display: "grid",
-                      placeItems: "center",
-                      flexShrink: 0,
-                    }}
-                  >
+                  <Box sx={requestTypeIconSx}>
                     <NearMeOutlined sx={{ fontSize: 18 }} />
                   </Box>
                   <Typography sx={{ fontWeight: 600, color: "text.primary" }}>
@@ -625,16 +728,7 @@ export function HowItWorksPageContent() {
                 </Typography>
               </Box>
 
-              <Box
-                sx={{
-                  px: { xs: 2.5, sm: 3 },
-                  pb: { xs: 2.5, sm: 3 },
-                  pt: 2,
-                  borderTop: "1px solid",
-                  borderColor: "mollure.border",
-                  bgcolor: alpha(theme.palette.mollure.bgshadow, 0.65),
-                }}
-              >
+              <Box sx={requestTypeResponseSx}>
                 <Typography
                   variant="caption"
                   sx={{ color: "text.secondary", fontWeight: 600 }}
@@ -642,57 +736,15 @@ export function HowItWorksPageContent() {
                   Client can respond with:
                 </Typography>
 
-                <Grid container spacing={2} sx={{ mt: 1.5 }}>
-                  {[
-                    {
-                      label: "Accept",
-                      bg: alpha(theme.palette.primary.main, 0.1),
-                      color: theme.palette.primary.main,
-                      icon: <CheckCircle sx={{ fontSize: 18 }} />,
-                    },
-                    {
-                      label: "Suggestion for change",
-                      bg: alpha(theme.palette.mollure.border, 0.35),
-                      color: theme.palette.mollure.slate,
-                      icon: <EditOutlined sx={{ fontSize: 18 }} />,
-                    },
-                    {
-                      label: "Reject",
-                      bg: alpha("#E31B23", 0.1),
-                      color: "#E31B23",
-                      icon: <CloseOutlined sx={{ fontSize: 18 }} />,
-                    },
-                  ].map((a) => (
-                    <Grid item xs={12} sm={4} key={a.label}>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 1,
-                          px: 2,
-                          py: 1.25,
-                          borderRadius: 2,
-                          bgcolor: a.bg,
-                          color: a.color,
-                          minHeight: 46,
-                        }}
-                      >
-                        {a.icon}
-                        <Typography
-                          variant="body2"
-                          sx={{ fontWeight: 600, color: "text.primary" }}
-                        >
-                          {a.label}
-                        </Typography>
-                      </Box>
-                    </Grid>
-                  ))}
-                </Grid>
+                <HowItWorksResponseActions
+                  theme={theme}
+                  actions={["accept", "suggestion", "reject"]}
+                />
               </Box>
             </AppCard>
 
             {/* Edited Booking Request */}
-            <AppCard sx={{ p: 0, overflow: "hidden" }}>
+            <AppCard sx={requestTypeCardSx}>
               <Box
                 sx={{
                   p: { xs: 2.5, sm: 3 },
@@ -700,18 +752,7 @@ export function HowItWorksPageContent() {
                 }}
               >
                 <Stack direction="row" spacing={1.5} alignItems="center">
-                  <Box
-                    sx={{
-                      width: 34,
-                      height: 34,
-                      borderRadius: 2,
-                      bgcolor: (t) => alpha(t.palette.mollure.star, 0.22),
-                      color: "mollure.star",
-                      display: "grid",
-                      placeItems: "center",
-                      flexShrink: 0,
-                    }}
-                  >
+                  <Box sx={requestTypeIconSx}>
                     <EditNoteOutlined sx={{ fontSize: 18 }} />
                   </Box>
                   <Typography sx={{ fontWeight: 600, color: "text.primary" }}>
@@ -728,16 +769,7 @@ export function HowItWorksPageContent() {
                 </Typography>
               </Box>
 
-              <Box
-                sx={{
-                  px: { xs: 2.5, sm: 3 },
-                  pb: { xs: 2.5, sm: 3 },
-                  pt: 2,
-                  borderTop: "1px solid",
-                  borderColor: "mollure.border",
-                  bgcolor: alpha(theme.palette.mollure.bgshadow, 0.65),
-                }}
-              >
+              <Box sx={requestTypeResponseSx}>
                 <Typography
                   variant="caption"
                   sx={{ color: "text.secondary", fontWeight: 600 }}
@@ -745,57 +777,15 @@ export function HowItWorksPageContent() {
                   Client can respond with:
                 </Typography>
 
-                <Grid container spacing={2} sx={{ mt: 1.5 }}>
-                  {[
-                    {
-                      label: "Accept",
-                      bg: alpha(theme.palette.primary.main, 0.1),
-                      color: theme.palette.primary.main,
-                      icon: <CheckCircle sx={{ fontSize: 18 }} />,
-                    },
-                    {
-                      label: "Suggestion for change",
-                      bg: alpha(theme.palette.mollure.border, 0.35),
-                      color: theme.palette.mollure.slate,
-                      icon: <EditOutlined sx={{ fontSize: 18 }} />,
-                    },
-                    {
-                      label: "Reject",
-                      bg: alpha("#E31B23", 0.1),
-                      color: "#E31B23",
-                      icon: <CloseOutlined sx={{ fontSize: 18 }} />,
-                    },
-                  ].map((a) => (
-                    <Grid item xs={12} sm={4} key={a.label}>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 1,
-                          px: 2,
-                          py: 1.25,
-                          borderRadius: 2,
-                          bgcolor: a.bg,
-                          color: a.color,
-                          minHeight: 46,
-                        }}
-                      >
-                        {a.icon}
-                        <Typography
-                          variant="body2"
-                          sx={{ fontWeight: 600, color: "text.primary" }}
-                        >
-                          {a.label}
-                        </Typography>
-                      </Box>
-                    </Grid>
-                  ))}
-                </Grid>
+                <HowItWorksResponseActions
+                  theme={theme}
+                  actions={["accept", "suggestion", "reject"]}
+                />
               </Box>
             </AppCard>
 
             {/* Edit Request */}
-            <AppCard sx={{ p: 0, overflow: "hidden" }}>
+            <AppCard sx={requestTypeCardSx}>
               <Box
                 sx={{
                   p: { xs: 2.5, sm: 3 },
@@ -803,18 +793,7 @@ export function HowItWorksPageContent() {
                 }}
               >
                 <Stack direction="row" spacing={1.5} alignItems="center">
-                  <Box
-                    sx={{
-                      width: 34,
-                      height: 34,
-                      borderRadius: 2,
-                      bgcolor: (t) => alpha(t.palette.mollure.star, 0.22),
-                      color: "mollure.star",
-                      display: "grid",
-                      placeItems: "center",
-                      flexShrink: 0,
-                    }}
-                  >
+                  <Box sx={requestTypeIconSx}>
                     <EditOutlined sx={{ fontSize: 18 }} />
                   </Box>
                   <Typography sx={{ fontWeight: 600, color: "text.primary" }}>
@@ -834,16 +813,7 @@ export function HowItWorksPageContent() {
                 </Typography>
               </Box>
 
-              <Box
-                sx={{
-                  px: { xs: 2.5, sm: 3 },
-                  pb: { xs: 2.5, sm: 3 },
-                  pt: 2,
-                  borderTop: "1px solid",
-                  borderColor: "mollure.border",
-                  bgcolor: alpha(theme.palette.mollure.bgshadow, 0.65),
-                }}
-              >
+              <Box sx={requestTypeResponseExpandedSx}>
                 <Typography
                   variant="caption"
                   sx={{ color: "text.secondary", fontWeight: 600 }}
@@ -887,46 +857,7 @@ export function HowItWorksPageContent() {
                   When client receives an edit request, client can:
                 </Typography>
 
-                <Grid container spacing={2} sx={{ mt: 1.5 }}>
-                  {[
-                    {
-                      label: "Accept",
-                      bg: alpha(theme.palette.primary.main, 0.1),
-                      color: theme.palette.primary.main,
-                      icon: <CheckCircle sx={{ fontSize: 18 }} />,
-                    },
-                    {
-                      label: "Suggestion for change",
-                      bg: alpha(theme.palette.mollure.border, 0.35),
-                      color: theme.palette.mollure.slate,
-                      icon: <EditOutlined sx={{ fontSize: 18 }} />,
-                    },
-                  ].map((a) => (
-                    <Grid item xs={12} sm={4} key={a.label}>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 1,
-                          px: 2,
-                          py: 1.25,
-                          borderRadius: 2,
-                          bgcolor: a.bg,
-                          color: a.color,
-                          minHeight: 46,
-                        }}
-                      >
-                        {a.icon}
-                        <Typography
-                          variant="body2"
-                          sx={{ fontWeight: 600, color: "text.primary" }}
-                        >
-                          {a.label}
-                        </Typography>
-                      </Box>
-                    </Grid>
-                  ))}
-                </Grid>
+                <HowItWorksResponseActions theme={theme} actions={["accept", "suggestion"]} />
 
                 <Typography
                   variant="body2"
@@ -937,184 +868,110 @@ export function HowItWorksPageContent() {
                 </Typography>
               </Box>
             </AppCard>
-          </Stack>
-        </Box>
-        {/* CHANGES */}
-
-        <Box mt={10}>
-          <HowItWorksSectionTitle title="Changes Without Approval" />
-
-          <Box
-            sx={(t) => ({
-              borderRadius: 3,
-              p: { xs: 2, sm: 3 },
-              // bgcolor: theme.palette.mollure.cardbg,
-            })}
-          >
-            <Stack spacing={3}>
-              {/* Detail Changes */}
-              <ContentCard
-                sx={{
-                  bgcolor: theme.palette.mollure.cardbg,
-                  overflow: "hidden",
-                }}
-              >
-                <Stack spacing={2} bgcolor={theme.palette.mollure.cardbg}>
-                  <Stack direction="row" spacing={1.5} alignItems="center">
-                    <Box
-                      sx={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: "50%",
-                        bgcolor: "primary.main",
-                        color: "common.white",
-                        display: "grid",
-                        placeItems: "center",
-                        flexShrink: 0,
-                      }}
-                    >
-                      <BoltOutlined sx={{ fontSize: 22 }} />
-                    </Box>
-                    <Typography variant="h6" sx={cardTitleSx}>
-                      Detail Changes
-                    </Typography>
-                  </Stack>
-
-                  <Typography variant="body2" color="text.secondary">
-                    Applied directly and shown as &apos;updated&apos;. No
-                    approval needed:
-                  </Typography>
-
-                  <Box
-                    sx={(t) => ({
-                      p: 2.5,
-                      borderRadius: 2,
-                      bgcolor: "background.paper",
-                      boxShadow: `0 10px 28px ${alpha(t.palette.common.black, 0.08)}`,
-                      border: "1px solid",
-                      borderColor: "mollure.border",
-                    })}
-                  >
-                    <Stack spacing={1.75}>
-                      {["Contact details", "Guest names"].map((label) => (
-                        <Stack
-                          key={label}
-                          direction="row"
-                          spacing={1.25}
-                          alignItems="center"
-                        >
-                          <CheckCircle
-                            sx={{
-                              color: "primary.main",
-                              fontSize: 22,
-                              flexShrink: 0,
-                            }}
-                          />
-                          <Typography variant="body2" color="text.secondary">
-                            {label}
-                          </Typography>
-                        </Stack>
-                      ))}
-                    </Stack>
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        mt: 2.5,
-                        color: "mollure.bodyText",
-                        fontWeight: 600,
-                      }}
-                    >
-                      This applies to both clients and professionals.
-                    </Typography>
-                  </Box>
-                </Stack>
-              </ContentCard>
-
-              {/* Service order changes */}
-              <ContentCard
-                sx={{
-                  bgcolor: theme.palette.mollure.cardbg,
-                  overflow: "hidden",
-                }}
-              >
-                <Stack spacing={2} bgcolor={theme.palette.mollure.cardbg}>
-                  <Stack direction="row" spacing={1.5} alignItems="center">
-                    <Box
-                      sx={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: "50%",
-                        bgcolor: "primary.main",
-                        color: "common.white",
-                        display: "grid",
-                        placeItems: "center",
-                        flexShrink: 0,
-                      }}
-                    >
-                      <FormatListBulletedOutlined sx={{ fontSize: 22 }} />
-                    </Box>
-                    <Typography variant="h6" sx={cardTitleSx}>
-                      Service Order Changes
-                    </Typography>
-                  </Stack>
-
-                  <Typography variant="body2" color="text.secondary">
-                    If a professional only changes the service order:
-                  </Typography>
-
-                  <Box
-                    sx={(t) => ({
-                      p: 2.5,
-                      borderRadius: 2,
-                      bgcolor: "background.paper",
-                      boxShadow: `0 10px 28px ${alpha(t.palette.common.black, 0.08)}`,
-                      border: "1px solid",
-                      borderColor: "mollure.border",
-                    })}
-                  >
-                    <Stack spacing={1.75}>
-                      <Stack direction="row" spacing={1.25} alignItems="center">
-                        <CheckCircle
-                          sx={{
-                            color: "primary.main",
-                            fontSize: 22,
-                            flexShrink: 0,
-                          }}
-                        />
-                        <Typography variant="body2" color="text.secondary">
-                          The booking remains confirmed
-                        </Typography>
-                      </Stack>
-                      <Stack direction="row" spacing={1.25} alignItems="center">
-                        <NotificationsOutlined
-                          sx={{
-                            color: "primary.main",
-                            fontSize: 22,
-                            flexShrink: 0,
-                          }}
-                        />
-                        <Typography variant="body2" color="text.secondary">
-                          You&apos;ll be notified that the booking has been
-                          edited
-                        </Typography>
-                      </Stack>
-                    </Stack>
-                    <Typography
-                      variant="body2"
-                      sx={{
-                        mt: 2.5,
-                        color: "mollure.bodyText",
-                        fontWeight: 600,
-                      }}
-                    >
-                      If service order is changed with other details, it becomes
-                      part of a request.
-                    </Typography>
-                  </Box>
-                </Stack>
-              </ContentCard>
             </Stack>
           </Box>
+        </Box>
+
+        {/* CHANGES WITHOUT APPROVAL */}
+        <Box
+          mt={10}
+          sx={{
+            bgcolor: "#F9FAFB",
+            borderRadius: 3,
+            px: { xs: 2.5, sm: 4 },
+            py: { xs: 3.5, sm: 4.5 },
+          }}
+        >
+          <HowItWorksSectionTitle title="Changes Without Approval" mb={4} />
+
+          <Stack spacing={3}>
+            {/* Detail Changes */}
+            <Box sx={changesSubsectionCardSx}>
+              <Stack spacing={2}>
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <Box sx={changesSubsectionIconSx}>
+                    <BoltOutlined sx={{ fontSize: 22 }} />
+                  </Box>
+                  <Typography variant="h6" sx={cardTitleSx}>
+                    Detail Changes
+                  </Typography>
+                </Stack>
+
+                <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.65 }}>
+                  Applied directly and shown as &apos;updated&apos;. No approval needed even when
+                  a booking is in requested state:
+                </Typography>
+
+                <Box sx={changesInnerCardSx}>
+                  <Stack spacing={1.75} mb={2.5}>
+                    {["Contact details", "Guest names"].map((label) => (
+                      <Stack key={label} direction="row" spacing={1.25} alignItems="center">
+                        <CheckOutlined
+                          sx={{ color: "primary.main", fontSize: 18, flexShrink: 0 }}
+                        />
+                        <Typography variant="body2" color="text.secondary">
+                          {label}
+                        </Typography>
+                      </Stack>
+                    ))}
+                  </Stack>
+                  <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.65 }}>
+                    This applies to both clients and professionals.
+                  </Typography>
+                </Box>
+              </Stack>
+            </Box>
+
+            {/* Service Order Change */}
+            <Box sx={changesSubsectionCardSx}>
+              <Stack spacing={2}>
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <Box sx={changesSubsectionIconSx}>
+                    <FormatListBulletedOutlined sx={{ fontSize: 22 }} />
+                  </Box>
+                  <Typography variant="h6" sx={cardTitleSx}>
+                    Service Order Change
+                  </Typography>
+                </Stack>
+
+                <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.65 }}>
+                  If a professional only changes the service order:
+                </Typography>
+
+                <Box sx={changesInnerCardSx}>
+                  <Stack spacing={1.75} mb={2.5}>
+                    <Stack direction="row" spacing={1.25} alignItems="center">
+                      <CheckOutlined
+                        sx={{ color: "primary.main", fontSize: 18, flexShrink: 0 }}
+                      />
+                      <Typography variant="body2" color="text.secondary">
+                        The booking remains confirmed
+                      </Typography>
+                    </Stack>
+                    <Stack direction="row" spacing={1.25} alignItems="center">
+                      <Box
+                        sx={{
+                          width: 20,
+                          height: 20,
+                          flexShrink: 0,
+                          display: "grid",
+                          placeItems: "center",
+                        }}
+                      >
+                        <Image src={HowItWorksBookingEditedBellIcon} alt="" width={20} height={20} />
+                      </Box>
+                      <Typography variant="body2" color="text.secondary">
+                        The client will be notified that the booking has been edited
+                      </Typography>
+                    </Stack>
+                  </Stack>
+                  <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.65 }}>
+                    If service order is changed with other details, it becomes part of a request.
+                  </Typography>
+                </Box>
+              </Stack>
+            </Box>
+          </Stack>
         </Box>
         {/* RESPONSE */}
         <Box
@@ -1795,6 +1652,151 @@ export function HowItWorksPageContent() {
             </Grid>
           </Grid>
         </Box>
+
+        {/* WHO CAN BOOK */}
+        <Box mt={10}>
+          <HowItWorksSectionTitle title="Who Can Book On Mollure" mb={4} />
+
+          <Grid container spacing={3}>
+            <Grid item xs={12} md={6}>
+              <ContentCard
+                sx={{
+                  height: "100%",
+                  bgcolor: "background.paper",
+                  boxShadow: cardShadow,
+                }}
+              >
+                <Stack spacing={2}>
+                  <Box sx={{ width: 50, height: 49, flexShrink: 0 }}>
+                    <Image src={HowItWorksIndividualClientIcon} alt="" width={50} height={49} />
+                  </Box>
+
+                  <Typography variant="h6" fontWeight={600}>
+                    Individual Clients
+                  </Typography>
+
+                  <HowItWorksCheckList items={howItWorksData.gettingStarted.individualPoints} />
+                </Stack>
+              </ContentCard>
+            </Grid>
+
+            <Grid item xs={12} md={6}>
+              <ContentCard
+                sx={{
+                  height: "100%",
+                  bgcolor: "background.paper",
+                  boxShadow: cardShadow,
+                }}
+              >
+                <Stack spacing={2}>
+                  <Box sx={{ width: 50, height: 49, flexShrink: 0 }}>
+                    <Image src={HowItWorksBusinessClientIcon} alt="" width={50} height={49} />
+                  </Box>
+
+                  <Typography variant="h6" fontWeight={600}>
+                    Business Clients
+                  </Typography>
+
+                  <HowItWorksCheckList items={howItWorksData.gettingStarted.businessPoints} />
+                </Stack>
+              </ContentCard>
+            </Grid>
+          </Grid>
+
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{ mt: 3, textAlign: "center", lineHeight: 1.7, maxWidth: 920, mx: "auto" }}
+          >
+            {howItWorksData.gettingStarted.note}
+          </Typography>
+        </Box>
+
+        {audience === "professionals" ? (
+          <Box
+            mt={10}
+            sx={{
+              bgcolor: cardbg,
+              borderRadius: 3,
+              px: { xs: 2.5, sm: 4 },
+              py: { xs: 3.5, sm: 4.5 },
+            }}
+          >
+            <HowItWorksSectionTitle title="Getting Started" mb={4} />
+
+            <Stack spacing={3}>
+              <ContentCard
+                sx={{
+                  bgcolor: "background.paper",
+                  boxShadow: cardShadow,
+                }}
+              >
+                <Typography sx={{ ...cardTitleSx, mb: 1.5 }}>Requirements</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2, lineHeight: 1.65 }}>
+                  {howItWorksData.professionalGettingStarted.requirements.intro}
+                </Typography>
+                <HowItWorksCheckList items={howItWorksData.professionalGettingStarted.requirements.points} />
+
+                <Box
+                  sx={{
+                    mt: 3,
+                    display: "grid",
+                    gridTemplateColumns: {
+                      xs: "repeat(2, minmax(0, 1fr))",
+                      sm: "repeat(4, minmax(0, 1fr))",
+                      md: "repeat(7, minmax(0, 1fr))",
+                    },
+                    gap: 1.5,
+                  }}
+                >
+                  {howItWorksData.professionalGettingStarted.requirements.categories.map((category) => (
+                    <Box
+                      key={category.label}
+                      sx={{
+                        borderRadius: 2,
+                        border: "1px solid",
+                        borderColor: "mollure.cardBorder",
+                        bgcolor: "background.paper",
+                        px: 1,
+                        py: 1.5,
+                        textAlign: "center",
+                      }}
+                    >
+                      <Box sx={{ display: "grid", placeItems: "center", minHeight: 40, mb: 0.75 }}>
+                        <HowItWorksCategoryIcon iconId={category.iconId} />
+                      </Box>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          display: "block",
+                          fontWeight: 600,
+                          color: "mollure.textcolorgrey700",
+                          lineHeight: 1.25,
+                        }}
+                      >
+                        {category.label}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+              </ContentCard>
+
+              <ContentCard
+                sx={{
+                  bgcolor: "background.paper",
+                  boxShadow: cardShadow,
+                }}
+              >
+                <Typography sx={{ ...cardTitleSx, mb: 1.5 }}>Validation & Onboarding</Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2, lineHeight: 1.65 }}>
+                  {howItWorksData.professionalGettingStarted.validation.intro}
+                </Typography>
+                <HowItWorksCheckList items={howItWorksData.professionalGettingStarted.validation.points} />
+              </ContentCard>
+            </Stack>
+          </Box>
+        ) : null}
+
         {/* GROUP PAYMENT */}
         <Box
           mt={10}

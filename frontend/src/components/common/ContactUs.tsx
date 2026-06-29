@@ -5,6 +5,7 @@ import Image from "next/image";
 import {
   Box,
   Button,
+  Checkbox,
   Container,
   Grid,
   MenuItem,
@@ -159,10 +160,10 @@ export default function ContactUs({ illustrationSrc }: ContactUsProps) {
                   onChange={(e) => setField("persona", String(e.target.value))}
                   onBlur={() => touch("persona")}
                   errorText={touched.persona ? errors.persona : undefined}
+                  renderValue={(val) =>
+                    val ? String(val) : contactUsData.whoAreYou.label
+                  }
                 >
-                  <MenuItem value="">
-                    <em>{contactUsData.whoAreYou.label}</em>
-                  </MenuItem>
                   {contactUsData.whoAreYou.options.map((opt) => (
                     <MenuItem key={opt} value={opt}>
                       {opt}
@@ -170,8 +171,15 @@ export default function ContactUs({ illustrationSrc }: ContactUsProps) {
                   ))}
                 </MollureLabeledSelect>
 
-                <Grid container spacing={0.2}>
-                  <Grid item xs={12} sm={6}>
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexDirection: { xs: "column", sm: "row" },
+                    gap: { xs: 2.25, sm: "10%" },
+                    width: "100%",
+                  }}
+                >
+                  <Box sx={{ width: { xs: "100%", sm: "35%" } }}>
                     <MollureLabeledField
                       fieldLabel={contactUsData.fields.name.label}
                       placeholder={contactUsData.fields.name.placeholder}
@@ -181,8 +189,8 @@ export default function ContactUs({ illustrationSrc }: ContactUsProps) {
                       error={Boolean(touched.name && errors.name)}
                       helperText={touched.name ? errors.name : undefined}
                     />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
+                  </Box>
+                  <Box sx={{ width: { xs: "100%", sm: "55%" } }}>
                     <MollureLabeledField
                       fieldLabel={contactUsData.fields.email.label}
                       placeholder={contactUsData.fields.email.placeholder}
@@ -192,8 +200,8 @@ export default function ContactUs({ illustrationSrc }: ContactUsProps) {
                       error={Boolean(touched.email && errors.email)}
                       helperText={touched.email ? errors.email : undefined}
                     />
-                  </Grid>
-                </Grid>
+                  </Box>
+                </Box>
 
                 <MollureLabeledSelect
                   fieldLabel={contactUsData.fields.subject.label}
@@ -205,9 +213,6 @@ export default function ContactUs({ illustrationSrc }: ContactUsProps) {
                     val ? String(val) : contactUsData.fields.subject.placeholder
                   }
                 >
-                  <MenuItem value="">
-                    <em>{contactUsData.fields.subject.placeholder}</em>
-                  </MenuItem>
                   {contactUsData.fields.subject.options.map((opt) => (
                     <MenuItem key={opt} value={opt}>
                       {opt}
@@ -280,13 +285,13 @@ export default function ContactUs({ illustrationSrc }: ContactUsProps) {
 
                 <Stack spacing={0.75}>
                   <Stack direction="row" spacing={1.25} alignItems="center">
-                    <Box
-                      component="input"
-                      type="checkbox"
+                    <Checkbox
+                      size="small"
                       checked={values.consent}
                       onChange={(e) => setField("consent", e.target.checked)}
                       onBlur={() => touch("consent")}
-                      sx={{ width: 16, height: 16 }}
+                      color="primary"
+                      sx={{ p: 0 }}
                     />
                     <BodyText sx={{ fontSize: 11, color: alpha(m.navy, 0.55) }}>
                       {contactUsData.fields.consent.label}
