@@ -13,6 +13,7 @@ export type BookingRequestDirection = "outgoing" | "incoming";
 export type ClientBookingRecord = {
   id: string;
   bookingRef?: string;
+  apiBookingId?: string;
   status: ClientBookingStatus;
   /** BR/EBR direction from the client's perspective. */
   bookingRequestDirection?: BookingRequestDirection;
