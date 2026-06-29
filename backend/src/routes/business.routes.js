@@ -277,8 +277,8 @@ router.post(
   [
     body("booking_date").isISO8601().withMessage("booking_date must be a valid date."),
     body("business_setup_id")
-      .isInt({ min: 1 })
-      .withMessage("business_setup_id must be a valid integer."),
+      .isUUID()
+      .withMessage("business_setup_id must be a valid UUID."),
     body("location_type")
       .optional({ values: "falsy" })
       .trim()

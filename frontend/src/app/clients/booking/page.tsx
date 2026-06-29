@@ -50,6 +50,7 @@ import ClientBookingListView from "./ClientBookingListView";
 import ClientBookingPageShell from "./ClientBookingPageShell";
 import { parseBookingListTab } from "./bookingPillTabs";
 import { upsertRequestedBooking } from "./clientBookingRecords";
+import { buildClientBookingApiPayload } from "./clientBookingApi.mapper";
 import {
   ACTIVE_BOOKING_ID_KEY,
   CHECKOUT_REF_KEY,
@@ -60,6 +61,9 @@ import { resolveCreateBookingStatus, resolveCreateCheckoutPath } from "./resolve
 import { useSnackbar } from "../../../components/common/AppSnackbar";
 import { getServicesForLocationMode, getTeamForLocationMode } from "../../../data/businessPublicProfile.data";
 import { useBusinessPublicProfile } from "../../../hooks/useBusinessPublicProfile";
+import { findBusinessSetupByShopId } from "../listing/businessPublicProfile.mapper";
+import { getApiErrorMessage } from "../../../lib/api-error";
+import { useCreateBookingMutation } from "../../../store/services/businessApi";
 import { parsePrepaymentPercent } from "../../../components/common/client-booking/parsePrepaymentPercent";
 import { loadPublicProfileBookingSelection } from "../../../data/publicProfileBookingSelection";
 import { useAppSelector } from "../../../store/hooks";
@@ -201,7 +205,8 @@ function ClientBookingCreateView() {
     locationMode?: "fixed" | "desired";
   } | null>(null);
 
-  const { profile: businessProfile } = useBusinessPublicProfile(shop?.shopId);
+  const { profile: businessProfile, setups } = useBusinessPublicProfile(shop?.shopId);
+  const [createBooking] = useCreateBookingMutation();
 
   const fallbackAddress = "Marina-Park 50, Den Helder, Noord-Holland";
 
@@ -887,7 +892,7 @@ function ClientBookingCreateView() {
     if (!checked) updateServiceTeamMember(serviceId, "");
   };
 
-  const onContinue = () => {
+  const onContinue = async () => {
     if (!shop?.shopId || services.length === 0 || !allServicesAssigned) return;
 
     const peopleForDraft =
@@ -955,9 +960,28 @@ function ClientBookingCreateView() {
           ? createBookingRef()
           : window.sessionStorage.getItem(CHECKOUT_REF_KEY) || createBookingRef();
 
+      let apiBookingId: string | undefined;
+      const businessSetup = findBusinessSetupByShopId(shop.shopId, setups);
+      if (businessSetup) {
+        const apiPayload = buildClientBookingApiPayload({
+          setup: businessSetup,
+          shopId: shop.shopId,
+          locationMode,
+          draft: payload,
+          status,
+          bookingRef,
+          total,
+        });
+        if (apiPayload) {
+          const response = await createBooking(apiPayload).unwrap();
+          apiBookingId = response.data?.id;
+        }
+      }
+
       const requested = {
         id: existingId ?? `bk_req_${Date.now()}`,
         bookingRef,
+        ...(apiBookingId ? { apiBookingId } : {}),
         status,
         ...(bookingRequestDirection ? { bookingRequestDirection } : {}),
         shop,
@@ -969,16 +993,19 @@ function ClientBookingCreateView() {
       };
       upsertRequestedBooking(requested);
       setActiveBookingSession(requested);
-    } catch {
-      // ignore
+
+      showSnackbar({
+        severity: "success",
+        message: isDesiredLocation ? "BR sent" : requiresPrepayment ? "Continue to prepayment" : "Booking confirmed",
+      });
+
+      router.push(resolveCreateCheckoutPath({ locationMode, requiresPrepayment }));
+    } catch (error) {
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Unable to submit booking. Please try again."),
+      });
     }
-
-    showSnackbar({
-      severity: "success",
-      message: isDesiredLocation ? "BR sent" : requiresPrepayment ? "Continue to prepayment" : "Booking confirmed",
-    });
-
-    router.push(resolveCreateCheckoutPath({ locationMode, requiresPrepayment }));
   };
 
   const continueLabel = isDesiredLocation

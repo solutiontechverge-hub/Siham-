@@ -425,11 +425,11 @@ export default function BookingTimelineCard({
           ...(Array.isArray(actionRailSx) ? actionRailSx : [actionRailSx]),
         ]}
       >
-        <Box sx={{ display: "none" }}>
-          {renderIconAction(calendarAction, <CalendarMonthRoundedIcon sx={{ fontSize: 13 }} />)}
-          {renderIconAction(notesAction, <StickyNote2OutlinedIcon sx={{ fontSize: 13 }} />)}
-        </Box>
         <Stack alignItems="center" justifyContent="center" spacing={0.35} sx={{ minWidth: 0, height: "100%" }}>
+          {renderIconAction(
+            notesAction,
+            <StickyNote2OutlinedIcon sx={{ fontSize: 15, color: m.teal }} />,
+          )}
           {showProfile ? (
             <Tooltip title={profileAction?.tooltip ?? ""} placement="left">
               <Box

@@ -19,6 +19,8 @@ export type BookingDrawerHydration = {
   paymentMethod: "online" | "offline";
   showLateCancellation: boolean;
   lateCancellationFeePercent: string;
+  showLateRescheduling: boolean;
+  lateRescheduleFeePercent: string;
   showInternalNote: boolean;
   internalNote: string;
   totalDiscount: ManualEntryDiscount | null;
@@ -115,6 +117,8 @@ export function hydrateBookingDrawerFromEvent(ev: CalendarEvent): BookingDrawerH
     paymentMethod: details.paymentMethod ?? "online",
     showLateCancellation: Boolean(details.showLateCancellation),
     lateCancellationFeePercent: details.lateCancellationFeePercent ?? "",
+    showLateRescheduling: Boolean(details.showLateRescheduling),
+    lateRescheduleFeePercent: details.lateRescheduleFeePercent ?? "",
     showInternalNote: Boolean(details.showInternalNote) || Boolean(details.internalNote),
     internalNote: details.internalNote ?? "",
     totalDiscount: details.totalDiscount ?? null,
@@ -135,6 +139,8 @@ export function buildBookingDetailsSnapshot(input: {
   paymentMethod: "online" | "offline";
   showLateCancellation: boolean;
   lateCancellationFeePercent: string;
+  showLateRescheduling: boolean;
+  lateRescheduleFeePercent: string;
   showInternalNote: boolean;
   bookingInternalNote: string;
   bookingTotalDiscount: ManualEntryDiscount | null;
@@ -159,6 +165,8 @@ export function buildBookingDetailsSnapshot(input: {
     paymentMethod: input.paymentMethod,
     showLateCancellation: input.showLateCancellation,
     lateCancellationFeePercent: input.lateCancellationFeePercent,
+    showLateRescheduling: input.showLateRescheduling,
+    lateRescheduleFeePercent: input.lateRescheduleFeePercent,
     showInternalNote: input.showInternalNote,
     internalNote: input.bookingInternalNote,
     totalDiscount: input.bookingTotalDiscount,

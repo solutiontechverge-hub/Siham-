@@ -61,6 +61,8 @@ export type CalendarBookingDetails = {
   paymentMethod?: "online" | "offline";
   lateCancellationFeePercent?: string;
   showLateCancellation?: boolean;
+  lateRescheduleFeePercent?: string;
+  showLateRescheduling?: boolean;
   internalNote?: string;
   showInternalNote?: boolean;
   totalDiscount?: {

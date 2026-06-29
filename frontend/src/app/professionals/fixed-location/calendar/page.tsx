@@ -13,6 +13,7 @@ import {
 import { useSnackbar } from "../../../../components/common/AppSnackbar";
 import { getApiErrorMessage } from "../../../../lib/api-error";
 import { parseCalendarSettings } from "../../../../components/common/calendar/calendar-settings.types";
+import { mergeCalendarOverviewEvents } from "../../../../components/common/calendar/calendar-overview.mappers";
 import {
   useCreateCalendarEntryMutation,
   useDeleteCalendarEntryMutation,
@@ -197,38 +198,12 @@ export default function FixedLocationCalendarPage() {
           ? ["DL"]
           : ["FL", "DL"];
 
-    const apiEvents: CalendarEvent[] = [
-      ...(overview?.entries ?? [])
-        .filter((entry) => entry.status !== "blocked")
-        .map((entry) => ({
-          id: `ce-${entry.id}`,
-          bookingCode: entry.unique_code || String(entry.id),
-          resourceId: String(entry.team_member_id ?? resources[0]?.id ?? ""),
-          date: dateFromValue(entry.date || entry.start_time),
-          start: entry.start || timeFromIso(entry.start_time),
-          end: entry.end || timeFromIso(entry.end_time),
-          title: entry.title,
-          status: statusMap[entry.status] ?? "Confirmed",
-          location: entry.location_type ? locationMap[entry.location_type] ?? "FL" : "FL",
-          bookingType: (entry.booking_type ? bookingTypeMap[entry.booking_type] ?? "Offline" : "Offline") as CalendarBookingType,
-          showClientName: entry.client_name ?? undefined,
-        })),
-      ...(overview?.bookings ?? []).map((booking) => ({
-        id: `b-${booking.id}`,
-        bookingCode: booking.unique_code || String(booking.id),
-        resourceId: String(booking.team_member_id ?? resources[0]?.id ?? ""),
-        date: dateFromValue(booking.date || booking.booking_date || booking.start_time),
-        start: booking.start || timeFromIso(booking.start_time),
-        end: booking.end || timeFromIso(booking.end_time),
-        title: booking.service_title || "Booking",
-        status: statusMap[booking.status] ?? "Requested",
-        location: booking.location_type ? locationMap[booking.location_type] ?? "FL" : "FL",
-        bookingType: (
-          booking.booking_type ? bookingTypeMap[booking.booking_type] ?? "Online" : booking.status === "requested" ? "Requests" : "Online"
-        ) as CalendarBookingType,
-        showClientName: booking.team_member_name || booking.notes || undefined,
-      })),
-    ];
+    const fallbackResourceId = resources[0]?.id ?? "";
+    const apiEvents = mergeCalendarOverviewEvents(
+      overview?.entries ?? [],
+      overview?.bookings ?? [],
+      fallbackResourceId,
+    );
 
     const apiBlocks: CalendarBlock[] = (overview?.entries ?? [])
       .filter((entry) => entry.status === "blocked")
@@ -319,6 +294,12 @@ export default function FixedLocationCalendarPage() {
       calendarSettings={calendarSettings}
       serviceOptions={serviceOptions}
       serviceOrderDefaults={serviceOrderDefaults}
+      fixedLocationAddress={setupData?.data?.fixed_location_address || setupData?.data?.salon_name || undefined}
+      lateRescheduleFeePercentDefault={
+        setupData?.data?.late_reschedule_fee_percentage != null
+          ? String(setupData.data.late_reschedule_fee_percentage)
+          : undefined
+      }
       isSaving={isCreatingCalendarEntry || isSavingCalendarSettings || isDeletingCalendarEntry}
       onCreateCalendarEntry={async (payload) => {
         try {
