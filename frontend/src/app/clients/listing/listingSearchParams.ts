@@ -14,27 +14,18 @@ function splitParam(value: string | null): string[] {
     .filter(Boolean);
 }
 
-function mapHomeLocationToMode(label: string): "fixed" | "desired" | null {
-  const normalized = label.trim().toLowerCase();
-  if (normalized === "fixed" || normalized === "fixed location") return "fixed";
-  if (normalized === "desired location" || normalized === "desired") return "desired";
-  return null;
-}
 
 export function buildListingSearchHref(filterValues: Record<string, string[]>): string {
   const params = new URLSearchParams();
 
   const categories = filterValues[CLIENT_HOME_FILTER_LABELS.category] ?? [];
-  const locations = filterValues[CLIENT_HOME_FILTER_LABELS.location] ?? [];
-  const municipalities = filterValues[CLIENT_HOME_FILTER_LABELS.municipality] ?? [];
+  const cities = filterValues[CLIENT_HOME_FILTER_LABELS.location] ?? [];
+  const provinces = filterValues[CLIENT_HOME_FILTER_LABELS.municipality] ?? [];
 
   if (categories.length) params.set("categories", categories.join(","));
-  if (municipalities.length) params.set("municipalities", municipalities.join(","));
 
-  const locationModes = locations
-    .map(mapHomeLocationToMode)
-    .filter((mode): mode is "fixed" | "desired" => mode != null);
-  if (locationModes.length) params.set("locations", locationModes.join(","));
+  const municipalities = [...cities, ...provinces];
+  if (municipalities.length) params.set("municipalities", municipalities.join(","));
 
   const qs = params.toString();
   return qs ? `/clients/listing?${qs}` : "/clients/listing";

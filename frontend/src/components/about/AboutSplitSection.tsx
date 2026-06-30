@@ -6,6 +6,7 @@ import { Box, Container, Stack } from "@mui/material";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import { AboutUsImage } from "../../../images";
 import { BodyText, SubHeading } from "../ui/typography";
+import { MOLLURE_HEADING_BODY_GAP_PX, MOLLURE_SECTION_GAP_PX } from "../../theme/spacing";
 
 type AboutSplitSectionProps = {
   imageSrc: string;
@@ -28,7 +29,7 @@ export default function AboutSplitSection({
       id="about-split"
       component="section"
       aria-labelledby="about-split-heading"
-      sx={{ py: { xs: 4, md: 6 }, }}
+      sx={{ py: `${MOLLURE_SECTION_GAP_PX}px` }}
     >
       <Container maxWidth="lg" sx={{ px: { xs: 2, sm: 3 } }} >
         <Box
@@ -102,7 +103,7 @@ export default function AboutSplitSection({
                 />
               </Stack>
 
-              <Stack spacing={2.25} sx={{ flex: 1 }}>
+              <Stack spacing={`${MOLLURE_HEADING_BODY_GAP_PX}px`} sx={{ flex: 1 }}>
                 {paragraphs.map((p) => (
                   <BodyText
                     key={p.slice(0, 40)}

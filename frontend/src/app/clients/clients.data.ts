@@ -1,4 +1,5 @@
 import { clientsShellHeader, marketingShellFooter } from "../../data/marketingShell.data";
+import { netherlandsCities } from "../../data/netherlandsCities.data";
 
 export type ClientFeatureIconKey =
   | "location"
@@ -80,7 +81,7 @@ export const clientsPageData = {
         placeholder: "Select category",
         options: [...clientHomeServiceCategories],
       },
-      { label: "Location", placeholder: "Select city", options: ["Fixed Location", "Desired Location"] },
+      { label: "Location", placeholder: "Select city", options: [...netherlandsCities] },
       {
         label: "Select Municipality",
         placeholder: "Select municipality",

@@ -17,6 +17,7 @@ import {
 import { alpha, useTheme } from "@mui/material/styles";
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import { MOLLURE_HEADING_BODY_GAP_PX, MOLLURE_SECTION_GAP_PX } from "../../theme/spacing";
 import MarketingSectionHeading from "./MarketingSectionHeading";
 import MarketingSiteFooter from "./MarketingSiteFooter";
 import MollureMarketingHeader from "./MollureMarketingHeader";
@@ -307,7 +308,7 @@ export default function ProfessionalLanding({
       </Box>
 
       {/* Why choose */}
-      <Container maxWidth="lg" sx={{ py: { xs: 7, md: 9 } }}>
+      <Container maxWidth="lg" sx={{ py: `${MOLLURE_SECTION_GAP_PX}px` }}>
         <MarketingSectionHeading title={whyChoose.title} />
         <Grid container spacing={2.25}>
           {whyChoose.items.map((item) => (
@@ -323,12 +324,12 @@ export default function ProfessionalLanding({
       </Container>
 
       {/* Results */}
-      <Box sx={{ bgcolor: "background.default", py: { xs: 6, md: 8 } }}>
+      <Box sx={{ bgcolor: "background.default", py: `${MOLLURE_SECTION_GAP_PX}px` }}>
         <Container maxWidth="lg">
           <MarketingSectionTitle>
             {results.title}
           </MarketingSectionTitle>
-          <MarketingSectionSubtitle sx={{ mt: 0.65 }}>
+          <MarketingSectionSubtitle>
             {results.subtitle}
           </MarketingSectionSubtitle>
 
@@ -362,7 +363,7 @@ export default function ProfessionalLanding({
       </Box>
 
       {/* Pricing */}
-      <Box sx={{ bgcolor: "background.default", py: { xs: 6, md: 8 } }}>
+      <Box sx={{ bgcolor: "background.default", py: `${MOLLURE_SECTION_GAP_PX}px` }}>
         <Container maxWidth="lg">
           <MarketingSectionTitle
             sx={{
@@ -565,7 +566,7 @@ export default function ProfessionalLanding({
       </Box>
 
       {/* Steps */}
-      <Container maxWidth="lg" sx={{ py: { xs: 7, md: 9 } }}>
+      <Container maxWidth="lg" sx={{ py: `${MOLLURE_SECTION_GAP_PX}px` }}>
         <MarketingSectionHeading
           title={steps.title}
           subtitle={steps.subtitle}
@@ -618,7 +619,7 @@ export default function ProfessionalLanding({
       </Container>
 
       {/* CTA */}
-      <Box sx={{ bgcolor: tokens.teal, py: { xs: 7, md: 8 } }}>
+      <Box sx={{ bgcolor: tokens.teal, py: `${MOLLURE_SECTION_GAP_PX}px` }}>
         <Container maxWidth="lg">
           <Stack alignItems="center" textAlign="center" spacing={2.25}>
             <Typography

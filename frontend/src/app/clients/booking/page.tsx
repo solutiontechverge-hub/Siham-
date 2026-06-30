@@ -61,10 +61,10 @@ import { useSnackbar } from "../../../components/common/AppSnackbar";
 import { getApiErrorMessage } from "../../../lib/api-error";
 import { getServicesForLocationMode, getTeamForLocationMode } from "../../../data/businessPublicProfile.data";
 import { useBusinessPublicProfile } from "../../../hooks/useBusinessPublicProfile";
+import { useCreateBookingMutation } from "../../../store/services/businessApi";
 import { parsePrepaymentPercent } from "../../../components/common/client-booking/parsePrepaymentPercent";
 import { loadPublicProfileBookingSelection } from "../../../data/publicProfileBookingSelection";
 import { useAppSelector } from "../../../store/hooks";
-import { useCreateBookingMutation } from "../../../store/services/businessApi";
 import {
   useGetProfileQuery,
   type CompanyProfile,

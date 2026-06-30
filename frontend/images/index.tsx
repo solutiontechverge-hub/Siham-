@@ -26,3 +26,15 @@ export const SignupRs = require("./signup-rs.svg");
 export const IC = require("./IC.svg");
 export const CC = require("./CC.svg");
 export const Professional = require("./Professional.svg");
+
+export const HowItWorksClientCreatedIcon = require("./how-it-works/client-created-bookings.svg");
+export const HowItWorksProfessionalCreatedIcon = require("./how-it-works/professional-created-bookings.svg");
+export const HowItWorksChangesApprovalIcon = require("./how-it-works/changes-requiring-approval.svg");
+export const HowItWorksChangesWithoutApprovalIcon = require("./how-it-works/changes-without-approval.svg");
+export const HowItWorksFixedLocationBookingIcon = require("./how-it-works/fixed-location-booking.svg");
+export const HowItWorksDesiredLocationBookingIcon = require("./how-it-works/desired-location-booking.svg");
+export const HowItWorksIndividualClientIcon = require("./how-it-works/individual-client.svg");
+export const HowItWorksBusinessClientIcon = require("./how-it-works/business-client.svg");
+export const HowItWorksSuggestionForChangeIcon = require("./how-it-works/suggestion-for-change.svg");
+export const HowItWorksDesiredLocationClockIcon = require("./how-it-works/desired-location-clock.svg");
+export const HowItWorksBookingEditedBellIcon = require("./how-it-works/booking-edited-bell.svg");

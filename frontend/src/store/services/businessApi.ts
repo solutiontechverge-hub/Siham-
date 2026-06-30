@@ -337,11 +337,14 @@ export type CreateBookingRequest = {
   start_time?: string | null;
   end_time?: string | null;
   location_type?: "fixed" | "desired" | null;
+  location_details?: Record<string, unknown>;
   notes?: string | null;
+  prepayment_status?: string | null;
   status?: "requested" | "cancelled" | "completed" | "confirmed" | "no_show";
   booking_type?: "online" | "offline" | "project" | "request";
   unique_code?: string | null;
   total_price?: number | string | null;
+  contact_number?: string | null;
 };
 
 export type UpdateBusinessSetupActiveRequest = {
@@ -701,6 +704,27 @@ export const businessApi = baseApi.injectEndpoints({
       },
       invalidatesTags: ["Calendar"],
     }),
+    createBooking: builder.mutation<ApiEnvelope<CalendarBooking>, CreateBookingRequest>({
+      async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: "/api/business/bookings",
+          method: "POST",
+          body: payload,
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<CalendarBooking>;
+        if (!data.success || !data.data) {
+          return { error: customError(data.message || "Unable to create booking.") };
+        }
+
+        return { data };
+      },
+      invalidatesTags: ["Calendar"],
+    }),
     updateBookingStatus: builder.mutation<ApiEnvelope<CalendarBooking>, UpdateBookingStatusRequest>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
         const response = await fetchWithBQ({
@@ -722,27 +746,6 @@ export const businessApi = baseApi.injectEndpoints({
         const bookingRef = data.data.unique_code;
         if (clientStatus && bookingRef) {
           updateClientBookingStatusByRef(bookingRef, clientStatus);
-        }
-
-        return { data };
-      },
-      invalidatesTags: ["Calendar"],
-    }),
-    createBooking: builder.mutation<ApiEnvelope<CalendarBooking>, CreateBookingRequest>({
-      async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
-        const response = await fetchWithBQ({
-          url: "/api/business/bookings",
-          method: "POST",
-          body: payload,
-        });
-
-        if (response.error) {
-          return { error: toMutationError(response.error) };
-        }
-
-        const data = response.data as ApiEnvelope<CalendarBooking>;
-        if (!data.success || !data.data) {
-          return { error: customError(data.message || "Unable to create booking.") };
         }
 
         return { data };
@@ -1012,8 +1015,8 @@ export const {
   useUpsertCalendarSettingsMutation,
   useUpdateCalendarEntryStatusMutation,
   useDeleteCalendarEntryMutation,
-  useUpdateBookingStatusMutation,
   useCreateBookingMutation,
+  useUpdateBookingStatusMutation,
   useUploadBusinessMediaMutation,
   useUpdateBusinessSetupActiveMutation,
   useCreateBusinessSubcategoryMutation,

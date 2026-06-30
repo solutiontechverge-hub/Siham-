@@ -63,11 +63,17 @@ const theme = createTheme({
       logoAccent: "#A7E9A8",
       logoText: "#62758A",
       bgshadow: "#F9FAFB",
+      /** Muted section panels (e.g. How it works — Changes Without Approval) */
+      sectionSurface: "#F9FAFB",
+      sectionSurfaceShadow: "0 10px 28px rgba(16, 35, 63, 0.10)",
       cardbg: "#F8FFFF",
       textcolorgrey700: "#344054",
       headingText: "#333333",
       descriptionText: "#5A5A5A",
       warmwarning: "#FFFCF5",
+      /** Request-type accents (How it works — Types of Requests icon chips) */
+      requestAccent: "#DC6803",
+      requestAccentSoft: "rgba(220, 104, 3, 0.14)",
       white: "#FFFFFF",
       // Fixed-location schedule palette (from provided design)
       fxLavenderTint: "#FAF6FFCF",
@@ -89,6 +95,9 @@ const theme = createTheme({
       salesVolumeStackMid: "#21B8BF",
       salesVolumeStackLight: "#62C4C8",
       salesVolumeStackPale: "#9DD8DB",
+      /** Layout rhythm — 40px between sections, 16px heading-to-body */
+      sectionGapPx: 40,
+      headingBodyGapPx: 16,
     },
     
   },
