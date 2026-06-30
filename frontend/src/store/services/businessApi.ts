@@ -291,6 +291,11 @@ export type CalendarOverview = {
   settings: CalendarSettings | null;
 };
 
+export type CalendarOverviewQuery = {
+  startDate: string;
+  endDate: string;
+};
+
 export type CreateCalendarEntryRequest = {
   team_member_id?: string | null;
   status?: CalendarEntry["status"];
@@ -322,6 +327,21 @@ export type UpdateCalendarEntryStatusRequest = {
 export type UpdateBookingStatusRequest = {
   id: string;
   status: "requested" | "cancelled" | "completed" | "confirmed" | "no_show";
+};
+
+export type CreateBookingRequest = {
+  booking_date: string;
+  business_setup_id: string;
+  service_id?: string | null;
+  team_member_id?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  location_type?: "fixed" | "desired" | null;
+  notes?: string | null;
+  status?: "requested" | "cancelled" | "completed" | "confirmed" | "no_show";
+  booking_type?: "online" | "offline" | "project" | "request";
+  unique_code?: string | null;
+  total_price?: number | string | null;
 };
 
 export type UpdateBusinessSetupActiveRequest = {
@@ -574,10 +594,14 @@ export const businessApi = baseApi.injectEndpoints({
       },
       providesTags: ["BusinessSetup"],
     }),
-    getCalendarOverview: builder.query<ApiEnvelope<CalendarOverview>, void>({
-      async queryFn(_arg, _api, _extraOptions, fetchWithBQ) {
+    getCalendarOverview: builder.query<ApiEnvelope<CalendarOverview>, CalendarOverviewQuery>({
+      async queryFn(arg, _api, _extraOptions, fetchWithBQ) {
+        const params = new URLSearchParams({
+          startDate: arg.startDate,
+          endDate: arg.endDate,
+        });
         const response = await fetchWithBQ({
-          url: "/api/business/calendar/overview",
+          url: `/api/business/calendar/overview?${params.toString()}`,
           method: "GET",
         });
 
@@ -698,6 +722,27 @@ export const businessApi = baseApi.injectEndpoints({
         const bookingRef = data.data.unique_code;
         if (clientStatus && bookingRef) {
           updateClientBookingStatusByRef(bookingRef, clientStatus);
+        }
+
+        return { data };
+      },
+      invalidatesTags: ["Calendar"],
+    }),
+    createBooking: builder.mutation<ApiEnvelope<CalendarBooking>, CreateBookingRequest>({
+      async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: "/api/business/bookings",
+          method: "POST",
+          body: payload,
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<CalendarBooking>;
+        if (!data.success || !data.data) {
+          return { error: customError(data.message || "Unable to create booking.") };
         }
 
         return { data };
@@ -968,6 +1013,7 @@ export const {
   useUpdateCalendarEntryStatusMutation,
   useDeleteCalendarEntryMutation,
   useUpdateBookingStatusMutation,
+  useCreateBookingMutation,
   useUploadBusinessMediaMutation,
   useUpdateBusinessSetupActiveMutation,
   useCreateBusinessSubcategoryMutation,

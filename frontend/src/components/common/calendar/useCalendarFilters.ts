@@ -32,10 +32,23 @@ export function useCalendarFilters(
   const [draftFilters, setDraftFilters] = React.useState<CalendarFilters>(() => initialFilters);
   const [appliedFilters, setAppliedFilters] = React.useState<CalendarFilters>(() => initialFilters);
 
+  const resourceKey = React.useMemo(() => resources.map((resource) => resource.id).join("|"), [resources]);
+
   React.useEffect(() => {
-    setDraftFilters(initialFilters);
-    setAppliedFilters(initialFilters);
-  }, [initialFilters]);
+    const mergeTeamIds = (prev: CalendarFilters) => ({
+      ...Object.fromEntries(resources.map((resource) => [resource.id, false])),
+      ...prev.teamIds,
+    });
+
+    setDraftFilters((prev) => ({
+      ...prev,
+      teamIds: mergeTeamIds(prev),
+    }));
+    setAppliedFilters((prev) => ({
+      ...prev,
+      teamIds: mergeTeamIds(prev),
+    }));
+  }, [resourceKey, resources]);
 
   const filteredResources = React.useMemo(() => {
     if (appliedFilters.teamAll) return resources;

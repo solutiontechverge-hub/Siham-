@@ -1,17 +1,13 @@
 import type { BookingRequestDirection, ClientBookingStatus } from "./clientBookingRecords";
 
-/** Client-created booking: DL → BR outgoing (requested); FL → confirmed or pending prepay. */
+/** Client-created bookings start as requested until the professional accepts. */
 export function resolveCreateBookingStatus(input: {
   locationMode: "fixed" | "desired";
-  requiresPrepayment: boolean;
 }): { status: ClientBookingStatus; bookingRequestDirection?: BookingRequestDirection } {
   if (input.locationMode === "desired") {
     return { status: "requested", bookingRequestDirection: "outgoing" };
   }
-  if (input.requiresPrepayment) {
-    return { status: "requested" };
-  }
-  return { status: "confirmed" };
+  return { status: "requested" };
 }
 
 export function resolveCreateCheckoutPath(input: {

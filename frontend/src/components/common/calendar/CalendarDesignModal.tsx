@@ -8,11 +8,15 @@ import AppDropdown from "../AppDropdown";
 import MollureModal from "../MollureModal";
 import { BodyText } from "../../ui/typography";
 import { BUSINESS_SERVICE_CATEGORY_CATALOG } from "../../../data/businessServiceCategorySlider.data";
+import type { CalendarBookingStatus } from "../../../app/professionals/fixed-location/calendar/calendar.data";
+import { BOOKING_STATUS_THEME } from "./bookingStatus";
 
 export type CalendarDesignDraft = {
-  scope: "Categories" | "Services";
+  scope: "Categories" | "Services" | "Status" | "Team Members";
   colorsByCategory: Record<string, string>;
   colorsByService?: Record<string, string>;
+  colorsByStatus?: Partial<Record<CalendarBookingStatus, string>>;
+  colorsByTeamMember?: Record<string, string>;
 };
 
 type CalendarDesignModalProps = {
@@ -23,6 +27,7 @@ type CalendarDesignModalProps = {
   draft: CalendarDesignDraft;
   setDraft: React.Dispatch<React.SetStateAction<CalendarDesignDraft>>;
   serviceOptions?: readonly string[];
+  teamMemberOptions?: readonly { id: string; name: string }[];
 };
 
 export function getCalendarDesignServiceLabel(key: string): string {
@@ -42,12 +47,24 @@ export default function CalendarDesignModal({
   draft,
   setDraft,
   serviceOptions = [],
+  teamMemberOptions = [],
 }: CalendarDesignModalProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
   const isServices = draft.scope === "Services";
+  const isStatus = draft.scope === "Status";
+  const isTeamMembers = draft.scope === "Team Members";
 
   const colorRows = React.useMemo<ColorRow[]>(() => {
+    if (isTeamMembers) {
+      return teamMemberOptions.map((member) => ({ key: member.id, label: member.name }));
+    }
+    if (isStatus) {
+      return (Object.keys(BOOKING_STATUS_THEME) as CalendarBookingStatus[]).map((status) => ({
+        key: status,
+        label: status,
+      }));
+    }
     if (isServices) {
       return serviceOptions.map((label) => ({ key: label, label }));
     }
@@ -55,23 +72,43 @@ export default function CalendarDesignModal({
       key: entry.key,
       label: getCalendarDesignServiceLabel(entry.key),
     }));
-  }, [isServices, serviceOptions]);
+  }, [isServices, isStatus, isTeamMembers, serviceOptions, teamMemberOptions]);
 
   const setColor = React.useCallback(
     (key: string, hex: string) => {
       const safe = hex?.startsWith("#") ? hex : `#${hex}`;
-      setDraft((p) =>
-        isServices
-          ? { ...p, colorsByService: { ...(p.colorsByService ?? {}), [key]: safe } }
-          : { ...p, colorsByCategory: { ...p.colorsByCategory, [key]: safe } },
-      );
+      setDraft((p) => {
+        if (isTeamMembers) {
+          return { ...p, colorsByTeamMember: { ...(p.colorsByTeamMember ?? {}), [key]: safe } };
+        }
+        if (isStatus) {
+          return {
+            ...p,
+            colorsByStatus: { ...(p.colorsByStatus ?? {}), [key as CalendarBookingStatus]: safe },
+          };
+        }
+        if (isServices) {
+          return { ...p, colorsByService: { ...(p.colorsByService ?? {}), [key]: safe } };
+        }
+        return { ...p, colorsByCategory: { ...p.colorsByCategory, [key]: safe } };
+      });
     },
-    [isServices, setDraft],
+    [isServices, isStatus, isTeamMembers, setDraft],
   );
 
   const clearColor = React.useCallback(
     (key: string) => {
       setDraft((p) => {
+        if (isTeamMembers) {
+          const next = { ...(p.colorsByTeamMember ?? {}) };
+          delete next[key];
+          return { ...p, colorsByTeamMember: next };
+        }
+        if (isStatus) {
+          const next = { ...(p.colorsByStatus ?? {}) };
+          delete next[key as CalendarBookingStatus];
+          return { ...p, colorsByStatus: next };
+        }
         if (isServices) {
           const next = { ...(p.colorsByService ?? {}) };
           delete next[key];
@@ -82,7 +119,7 @@ export default function CalendarDesignModal({
         return { ...p, colorsByCategory: next };
       });
     },
-    [isServices, setDraft],
+    [isServices, isStatus, isTeamMembers, setDraft],
   );
 
   return (
@@ -159,6 +196,8 @@ export default function CalendarDesignModal({
             options={[
               { label: "Categories", value: "Categories" },
               { label: "Services", value: "Services" },
+              { label: "Status", value: "Status" },
+              { label: "Team Members", value: "Team Members" },
             ]}
             placeholder="Categories"
             fullWidth
@@ -173,7 +212,13 @@ export default function CalendarDesignModal({
             }}
           >
             {colorRows.map(({ key, label }) => {
-              const color = (isServices ? draft.colorsByService?.[key] : draft.colorsByCategory[key]) ?? "";
+              const color = isTeamMembers
+                ? draft.colorsByTeamMember?.[key]
+                : isStatus
+                  ? draft.colorsByStatus?.[key as CalendarBookingStatus]
+                  : isServices
+                    ? draft.colorsByService?.[key]
+                    : draft.colorsByCategory[key];
               return (
                 <Box
                   key={key}
@@ -228,7 +273,7 @@ export default function CalendarDesignModal({
                       onChange={(e) => {
                         const nextColor = e.target.value;
                         setColor(key, nextColor);
-                        if (!isServices) {
+                        if (!isServices && !isStatus && !isTeamMembers) {
                           onColorSelect?.(key, nextColor);
                         }
                         e.currentTarget.blur();

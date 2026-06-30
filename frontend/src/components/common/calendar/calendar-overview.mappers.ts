@@ -5,6 +5,8 @@ import type {
   CalendarEvent,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { CalendarBooking, CalendarEntry } from "../../../store/services/businessApi";
+import { wallClockDateFromDateTime, wallClockTimeFromDateTime } from "./calendar.utils";
+import { parseCalendarEntryNotes } from "./bookingEventDetails";
 
 const statusFromApi: Record<string, CalendarBookingStatus> = {
   requested: "Requested",
@@ -30,19 +32,11 @@ const locationFromApi: Record<string, CalendarBookingLocation> = {
 };
 
 const timeFromIso = (value?: string | null) => {
-  if (!value) return "08:00";
-  if (/^\d{2}:\d{2}/.test(value)) return value.slice(0, 5);
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "08:00";
-  return parsed.toISOString().slice(11, 16);
+  return wallClockTimeFromDateTime(value) ?? "08:00";
 };
 
 const dateFromValue = (value?: string | null) => {
-  if (!value) return new Date().toISOString().slice(0, 10);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return new Date().toISOString().slice(0, 10);
-  return parsed.toISOString().slice(0, 10);
+  return wallClockDateFromDateTime(value) ?? new Date().toISOString().slice(0, 10);
 };
 
 const bookingDurationMins = (start: string, end: string) => {
@@ -75,12 +69,7 @@ export function mapCalendarEntryToOverviewEvent(
         : "Offline",
     bookingScenario: isRequested ? "BR" : undefined,
     showClientName: entry.client_name ?? undefined,
-    details: entry.notes
-      ? {
-          internalNote: entry.notes,
-          showInternalNote: true,
-        }
-      : undefined,
+    details: parseCalendarEntryNotes(entry.notes),
   };
 }
 
@@ -94,23 +83,25 @@ export function mapCalendarBookingToEvent(
   const end = booking.end || timeFromIso(booking.end_time);
   const title = booking.service_title || "Booking";
   const clientName = booking.customer_name || booking.client_name || undefined;
+  const isRequestBooking =
+    isRequested || booking.booking_type === "request" || booking.status?.toLowerCase() === "requested";
 
   return {
     id: `b-${booking.id}`,
     bookingCode: booking.unique_code || String(booking.id),
     resourceId: String(booking.team_member_id ?? fallbackResourceId),
-    date: dateFromValue(booking.date || booking.booking_date || booking.start_time),
+    date: dateFromValue(booking.date || booking.start_time || booking.booking_date),
     start,
     end,
     title,
     status,
     location: booking.location_type ? (locationFromApi[booking.location_type] ?? "FL") : "FL",
-    bookingType: booking.booking_type
-      ? (bookingTypeFromApi[booking.booking_type] ?? "Online")
-      : isRequested
-        ? "Requests"
+    bookingType: isRequestBooking
+      ? "Requests"
+      : booking.booking_type
+        ? (bookingTypeFromApi[booking.booking_type] ?? "Online")
         : "Online",
-    bookingScenario: isRequested ? "BR" : undefined,
+    bookingScenario: isRequestBooking ? "BR" : undefined,
     showClientName: clientName,
     details: {
       clientEmail: "",
@@ -123,12 +114,13 @@ export function mapCalendarBookingToEvent(
           price: Number(booking.total_price) || 0,
         },
       ],
-      ...(booking.notes
-        ? {
-            internalNote: booking.notes,
-            showInternalNote: true,
-          }
-        : {}),
+      ...(parseCalendarEntryNotes(booking.notes) ??
+        (booking.notes
+          ? {
+              internalNote: booking.notes,
+              showInternalNote: true,
+            }
+          : {})),
     },
   };
 }

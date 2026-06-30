@@ -11,6 +11,7 @@ import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import StickyNote2OutlinedIcon from "@mui/icons-material/StickyNote2Outlined";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import { Avatar, Box, Button, ButtonBase, Chip, IconButton, Paper, Popover, Stack, Tooltip } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
@@ -27,12 +28,13 @@ import AppDropdown from "./AppDropdown";
 import CalendarAddMenu from "./calendar/CalendarAddMenu";
 import CalendarBookingCard from "./calendar/CalendarBookingCard";
 import CalendarBookingTicketStack from "./calendar/CalendarBookingTicketStack";
-import { clusterOverlappingEvents, getClusterTimeBounds } from "./calendar/calendar-overlap.utils";
+import { clusterSameStartTimeEvents, getClusterTimeBounds } from "./calendar/calendar-overlap.utils";
 import { useMessagingWidget } from "./messaging/MessagingWidgetContext";
 import {
   buildBookingDetailsSnapshot,
   emptyDesiredLocation,
   hydrateBookingDrawerFromEvent,
+  parseApiCalendarEventId,
 } from "./calendar/bookingEventDetails";
 import {
   canDiscardEbr,
@@ -68,7 +70,8 @@ import BookingEditServiceScreen from "./calendar/BookingEditServiceScreen";
 import BookingSelectProductsScreen from "./calendar/BookingSelectProductsScreen";
 import BookingAddUniqueItemScreen from "./calendar/BookingAddUniqueItemScreen";
 import { useCalendarFilters } from "./calendar/useCalendarFilters";
-import { allBookingCatalogServices, formatBookingServiceMeta } from "../../data/bookingServiceCatalog.data";
+import type { BookingCatalogService } from "../../data/bookingServiceCatalog.data";
+import { formatBookingServiceMeta } from "../../data/bookingServiceCatalog.data";
 import {
   buildBookingServiceLineItem,
   buildServiceEditDraftFromCatalog,
@@ -119,6 +122,8 @@ import {
   formatMdyDate,
   formatMonthYearUtc,
   buildBlocksFromDraft,
+  getCalendarQueryDateRange,
+  type CalendarQueryDateRange,
   type BlockTimeDraft,
   type Interval,
   mergeIntervals,
@@ -148,6 +153,7 @@ import { resolveBookingResponseIndicators } from "./calendar/bookingResponseStat
 import { resolveCalendarPrepaymentStatus, toPrepaymentIconVariant } from "./calendar/prepaymentStatus";
 import type {
   CalendarBlock,
+  CalendarBookingStatus,
   CalendarBookingType,
   CalendarBookingLocation,
   CalendarEvent,
@@ -168,13 +174,25 @@ export type ProfessionalFixedLocationCalendarProps = {
   data: ProfessionalFixedLocationCalendarData;
   calendarSettings?: ParsedCalendarSettings | null;
   serviceOptions?: string[];
+  serviceCatalog?: readonly BookingCatalogService[];
   serviceOrderDefaults?: ServiceOrderSettings;
   fixedLocationAddress?: string;
   lateRescheduleFeePercentDefault?: string;
+  clientOptions?: readonly { name: string; email: string }[];
+  platformClientOptions?: readonly { name: string; email: string }[];
   isSaving?: boolean;
   onCreateCalendarEntry?: (payload: CreateCalendarEntryRequest) => Promise<CalendarEntry | void>;
   onSaveCalendarSettings?: (payload: UpsertCalendarSettingsRequest) => Promise<void>;
   onDeleteCalendarEntry?: (id: string) => Promise<void>;
+  onUpdateBookingStatus?: (
+    id: string,
+    status: "requested" | "cancelled" | "completed" | "confirmed" | "no_show",
+  ) => Promise<void>;
+  onUpdateCalendarEntryStatus?: (
+    id: string,
+    status: "requested" | "cancelled" | "completed" | "confirmed" | "no_show",
+  ) => Promise<void>;
+  onDateRangeChange?: (range: CalendarQueryDateRange) => void;
 };
 
 const toDateTimeInput = (date: string, time: string) => `${date}T${time}:00`;
@@ -190,13 +208,19 @@ export default function ProfessionalFixedLocationCalendar({
   data,
   calendarSettings,
   serviceOptions = [],
+  serviceCatalog = [],
   serviceOrderDefaults,
   fixedLocationAddress,
   lateRescheduleFeePercentDefault,
+  clientOptions = [],
+  platformClientOptions = [],
   isSaving = false,
   onCreateCalendarEntry,
   onSaveCalendarSettings,
   onDeleteCalendarEntry,
+  onUpdateBookingStatus,
+  onUpdateCalendarEntryStatus,
+  onDateRangeChange,
 }: ProfessionalFixedLocationCalendarProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -206,7 +230,11 @@ export default function ProfessionalFixedLocationCalendar({
   const openBookingMessages = React.useCallback(
     (ev: CalendarEvent) => {
       const bookingRef = ev.bookingCode ?? extractBookingId(ev.id);
-      openMessaging({ bookingRef });
+      const clientName = ev.showClientName?.trim();
+      openMessaging({
+        bookingRef,
+        searchPrefill: clientName || undefined,
+      });
     },
     [openMessaging],
   );
@@ -232,15 +260,20 @@ export default function ProfessionalFixedLocationCalendar({
 
   const addMenuButtonRef = React.useRef<HTMLButtonElement | null>(null);
 
-  const serviceCatalog = React.useMemo(() => allBookingCatalogServices, []);
-  const productCatalog = React.useMemo(() => bookingProductCatalog, []);
+  const productCatalog = React.useMemo(() => [] as typeof bookingProductCatalog, []);
 
   const defaultDateIso = React.useMemo(() => toIsoLocalDate(new Date()), []);
   const [activeSubTab, setActiveSubTab] = React.useState<CalendarSubTab>(data.initialSubTab);
   const [viewMode, setViewMode] = React.useState<CalendarViewMode>("day");
   const [activeDateIso, setActiveDateIso] = React.useState(defaultDateIso);
+
+  React.useEffect(() => {
+    onDateRangeChange?.(getCalendarQueryDateRange(activeDateIso, viewMode));
+  }, [activeDateIso, onDateRangeChange, viewMode]);
+
   const [selectedResourceId, setSelectedResourceId] = React.useState("");
   const [teamActionAnchor, setTeamActionAnchor] = React.useState<HTMLElement | null>(null);
+  const [teamMenuResourceId, setTeamMenuResourceId] = React.useState("");
   const [datePickerAnchor, setDatePickerAnchor] = React.useState<HTMLElement | null>(null);
   const [addAnchor, setAddAnchor] = React.useState<HTMLElement | null>(null);
   const [filtersOpen, setFiltersOpen] = React.useState(false);
@@ -359,26 +392,8 @@ export default function ProfessionalFixedLocationCalendar({
     setAddClientSource("");
   }, [slotBookingScreen]);
 
-  const clientList = React.useMemo(
-    () =>
-      [
-        { name: "Sara Johnson", email: "sarajohnson@gmail.com" },
-        { name: "Emma Stone", email: "emma.stone@gmail.com" },
-        { name: "Noah Parker", email: "noah.parker@gmail.com" },
-        { name: "Priya Shah", email: "priya.shah@gmail.com" },
-      ] as const,
-    [],
-  );
-  const mollurePlatformClients = React.useMemo(
-    () =>
-      [
-        { name: "Alex Morgan", email: "alex.morgan@mollure.com" },
-        { name: "Yuki Tanaka", email: "yuki.tanaka@mollure.com" },
-        { name: "Liam Roberts", email: "liam.roberts@mollure.com" },
-        { name: "Ava Kim", email: "ava.kim@mollure.com" },
-      ] as const,
-    [],
-  );
+  const clientList = clientOptions;
+  const mollurePlatformClients = platformClientOptions;
 
   const servicesTotal = React.useMemo(
     () => selectedServices.reduce((sum, service) => sum + getEffectiveServicePrice(service), 0),
@@ -527,6 +542,7 @@ export default function ProfessionalFixedLocationCalendar({
       status: slotStatus,
       location: slotLocation,
       bookingType: slotBookingType,
+      bookingScenario: slotStatus === "Requested" ? "BR" : undefined,
       showClientName:
         selectedClient?.name ||
         `${guestDraft.firstName} ${guestDraft.lastName}`.trim() ||
@@ -644,11 +660,15 @@ export default function ProfessionalFixedLocationCalendar({
     scope: "Categories",
     colorsByCategory: {},
     colorsByService: {},
+    colorsByStatus: {},
+    colorsByTeamMember: {},
   }));
   const [appliedDesign, setAppliedDesign] = React.useState<CalendarDesignDraft>(() => ({
     scope: "Categories",
     colorsByCategory: {},
     colorsByService: {},
+    colorsByStatus: {},
+    colorsByTeamMember: {},
   }));
   const [bookingRules, setBookingRules] = React.useState<BookingRules>(() => defaultBookingRules());
   const [scheduleRows, setScheduleRows] = React.useState<ScheduleAvailabilityRow[]>([]);
@@ -718,13 +738,58 @@ export default function ProfessionalFixedLocationCalendar({
 
   const getServiceCategory = React.useCallback((title: string) => {
     const t = String(title ?? "").toLowerCase();
-    // Heuristic mapping (mock): lets the Design modal color the grid right away.
-    if (/\b(nail|manicure|pedicure)\b/.test(t)) return "Nails";
-    if (/\b(facial|brow|lash|lashes|make-?up|makeup)\b/.test(t)) return "Face treatments";
-    if (/\b(massage|spa|body)\b/.test(t)) return "Body treatments";
-    if (/\b(hair|cut|wash|blow|color|colour|keratin|style|styling)\b/.test(t)) return "Hair";
+    if (/\b(nail|manicure|pedicure)\b/.test(t)) return "nails";
+    if (/\b(facial|brow|lash|lashes|make-?up|makeup)\b/.test(t)) return "face-treatments";
+    if (/\b(massage|spa|body)\b/.test(t)) return "body-treatments";
+    if (/\b(hair|cut|wash|blow|color|colour|keratin|style|styling)\b/.test(t)) return "hair";
     return null;
   }, []);
+
+  const resolveEventColors = React.useCallback(
+    (event: CalendarEvent) => {
+      const cardServiceCategory = getServiceCategory(event.title);
+      const serviceColor =
+        appliedDesign.scope === "Services"
+          ? appliedDesign.colorsByService?.[event.title]
+          : cardServiceCategory
+            ? appliedDesign.colorsByCategory[cardServiceCategory]
+            : undefined;
+      const teamColor = appliedDesign.colorsByTeamMember?.[event.resourceId];
+      const statusColor = appliedDesign.colorsByStatus?.[event.status];
+      return {
+        serviceColor: teamColor ?? serviceColor,
+        statusColor,
+      };
+    },
+    [appliedDesign, getServiceCategory],
+  );
+
+  const persistEventStatus = React.useCallback(
+    async (eventId: string, status: CalendarEvent["status"]) => {
+      const parsed = parseApiCalendarEventId(eventId);
+      if (!parsed) return;
+      const apiStatus =
+        status === "Requested"
+          ? "requested"
+          : status === "Confirmed"
+            ? "confirmed"
+            : status === "Completed"
+              ? "completed"
+              : status === "No Show"
+                ? "no_show"
+                : "cancelled";
+      if (parsed.kind === "booking") {
+        if (onUpdateBookingStatus) {
+          await onUpdateBookingStatus(parsed.id, apiStatus);
+        }
+        return;
+      }
+      if (onUpdateCalendarEntryStatus) {
+        await onUpdateCalendarEntryStatus(parsed.id, apiStatus);
+      }
+    },
+    [onUpdateBookingStatus, onUpdateCalendarEntryStatus],
+  );
 
   React.useEffect(() => {
     setBlockDraft((prev) => {
@@ -750,27 +815,13 @@ export default function ProfessionalFixedLocationCalendar({
   }, [data.resources]);
 
   const grid = data.timeGrid;
-  const { startMin, endMin } = React.useMemo(() => {
-    const defaultStart = grid.startHour * 60;
-    const defaultEnd = grid.endHour * 60;
-    const step = grid.stepMinutes;
-    const mins: number[] = [];
-    for (const event of events) {
-      mins.push(minutesSinceMidnight(event.start), minutesSinceMidnight(event.end));
-    }
-    for (const block of blocks) {
-      mins.push(minutesSinceMidnight(block.start), minutesSinceMidnight(block.end));
-    }
-    if (!mins.length) {
-      return { startMin: defaultStart, endMin: defaultEnd };
-    }
-    const minT = Math.min(defaultStart, ...mins);
-    const maxT = Math.max(defaultEnd, ...mins);
-    return {
-      startMin: Math.floor(minT / step) * step,
-      endMin: Math.ceil(maxT / step) * step,
-    };
-  }, [blocks, events, grid.endHour, grid.startHour, grid.stepMinutes]);
+  const { startMin, endMin } = React.useMemo(
+    () => ({
+      startMin: grid.startHour * 60,
+      endMin: grid.endHour * 60,
+    }),
+    [grid.endHour, grid.startHour],
+  );
   const rows = Math.floor((endMin - startMin) / grid.stepMinutes) + 1;
   const rowPx = 78;
   const laneHeaderPx = 48;
@@ -798,24 +849,57 @@ export default function ProfessionalFixedLocationCalendar({
       setSelectedResourceId("");
       return;
     }
-    const stillValid = filteredResources.some((r) => r.id === selectedResourceId);
-    if (!stillValid) {
-      setSelectedResourceId(filteredResources[0].id);
-    }
-  }, [filteredResources, selectedResourceId]);
+    setSelectedResourceId((current) => {
+      const stillValid = current && filteredResources.some((resource) => resource.id === current);
+      return stillValid ? current : filteredResources[0].id;
+    });
+  }, [filteredResources]);
 
   const activeResource = React.useMemo(
     () => filteredResources.find((r) => r.id === selectedResourceId) ?? filteredResources[0],
     [filteredResources, selectedResourceId],
   );
+
+  const closeTeamMenu = React.useCallback(() => {
+    setTeamActionAnchor(null);
+    setTeamMenuResourceId("");
+  }, []);
+
+  const openTeamMenu = React.useCallback((resourceId: string, anchor: HTMLElement) => {
+    setTeamMenuResourceId(resourceId);
+    setTeamActionAnchor(anchor);
+  }, []);
+
+  const selectTeamMember = React.useCallback(
+    (resourceId: string) => {
+      const normalizedId = String(resourceId);
+      if (!data.resources.some((resource) => String(resource.id) === normalizedId)) return;
+
+      setSelectedResourceId(normalizedId);
+      const focusTeam = (prev: typeof appliedFilters) => ({
+        ...prev,
+        teamAll: false,
+        teamIds: Object.fromEntries(
+          data.resources.map((resource) => [resource.id, String(resource.id) === normalizedId]),
+        ),
+      });
+      setAppliedFilters(focusTeam);
+      setDraftFilters(focusTeam);
+      closeTeamMenu();
+    },
+    [closeTeamMenu, data.resources, setAppliedFilters, setDraftFilters],
+  );
+
+  const teamMenuResource = React.useMemo(
+    () => data.resources.find((resource) => resource.id === teamMenuResourceId) ?? activeResource,
+    [activeResource, data.resources, teamMenuResourceId],
+  );
+
   const displayedResources = React.useMemo(() => {
     if (viewMode === "week") return activeResource ? [activeResource] : [];
-    if (viewMode === "day") {
-      if (appliedFilters.teamAll) return filteredResources;
-      return activeResource ? [activeResource] : [];
-    }
+    if (viewMode === "day") return activeResource ? [activeResource] : [];
     return filteredResources;
-  }, [activeResource, appliedFilters.teamAll, filteredResources, viewMode]);
+  }, [activeResource, filteredResources, viewMode]);
 
   const eventsInRange = React.useMemo(
     () => {
@@ -1283,9 +1367,10 @@ export default function ProfessionalFixedLocationCalendar({
   const renderTeamMemberHeader = (laneResource?: (typeof filteredResources)[number]) => {
     const headerResources =
       viewMode === "day" && appliedFilters.teamAll && laneResource ? [laneResource] : filteredResources;
+    const menuResourceId =
+      viewMode === "day" && appliedFilters.teamAll && laneResource ? laneResource.id : activeResource?.id;
 
     return (
-    <>
       <Box
         sx={{
           minHeight: laneHeaderPx,
@@ -1300,7 +1385,7 @@ export default function ProfessionalFixedLocationCalendar({
         }}
       >
         {headerResources.map((resource) => {
-          const isActive = resource.id === activeResource?.id;
+          const isActive = resource.id === menuResourceId;
           const teamAvatarSx = {
             width: 22,
             height: 22,
@@ -1324,9 +1409,9 @@ export default function ProfessionalFixedLocationCalendar({
                 key={resource.id}
                 role="button"
                 tabIndex={0}
-                onClick={(e) => setTeamActionAnchor(e.currentTarget)}
+                onClick={(e) => openTeamMenu(resource.id, e.currentTarget)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") setTeamActionAnchor(e.currentTarget);
+                  if (e.key === "Enter" || e.key === " ") openTeamMenu(resource.id, e.currentTarget);
                 }}
                 sx={{
                   display: "flex",
@@ -1356,7 +1441,7 @@ export default function ProfessionalFixedLocationCalendar({
           return (
             <ButtonBase
               key={resource.id}
-              onClick={() => setSelectedResourceId(resource.id)}
+              onClick={() => selectTeamMember(resource.id)}
               sx={{
                 display: "flex",
                 alignItems: "center",
@@ -1376,106 +1461,106 @@ export default function ProfessionalFixedLocationCalendar({
           );
         })}
       </Box>
-      <Popover
-        open={Boolean(teamActionAnchor)}
-        anchorEl={teamActionAnchor}
-        onClose={() => setTeamActionAnchor(null)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
-        transformOrigin={{ vertical: "top", horizontal: "left" }}
-        PaperProps={{
-          sx: {
-            mt: 0.75,
-            borderRadius: "10px",
-            border: `1px solid ${alpha(m.navy, 0.10)}`,
-            boxShadow: "0 8px 24px rgba(16, 35, 63, 0.12)",
-            minWidth: 200,
-            py: 0.75,
-            px: 0.5,
-          },
-        }}
-      >
-        <ButtonBase
-          onClick={() => {
-            setTeamActionAnchor(null);
-            showSnackbar({ severity: "info", message: "Client profile panel opened." });
-          }}
-          sx={{ width: "100%", px: 1, py: 0.75, justifyContent: "flex-start", borderRadius: "8px" }}
-        >
-          <BodyText sx={{ fontWeight: 700, fontSize: 11.5, color: alpha(m.navy, 0.78) }}>View profile</BodyText>
-        </ButtonBase>
-        <ButtonBase
-          disabled={viewMode !== "day"}
-          onClick={() => {
-            if (!activeResource) return;
-            const shifts =
-              getCombinedAvailabilityIntervals(activeResource.id, activeDateIso, scheduleRows, dateOverrides ?? []).length > 0
-                ? getCombinedAvailabilityIntervals(activeResource.id, activeDateIso, scheduleRows, dateOverrides ?? []).map((interval) => ({
-                    start: fmtMinToTime(interval.startMin),
-                    end: fmtMinToTime(interval.endMin),
-                  }))
-                : [{ start: "09:00", end: "17:00" }];
-            setEditAvailabilityDraft({
-              resourceId: activeResource.id,
-              date: activeDateIso,
-              locations: [...data.supportedLocations],
-              shifts,
-            });
-            setEditAvailabilityOpen(true);
-            setTeamActionAnchor(null);
-          }}
-          sx={{ width: "100%", px: 1, py: 0.75, justifyContent: "flex-start", borderRadius: "8px", opacity: viewMode !== "day" ? 0.5 : 1 }}
-        >
-          <BodyText sx={{ fontWeight: 700, fontSize: 11.5, color: alpha(m.navy, 0.78) }}>Edit availability</BodyText>
-        </ButtonBase>
-        <Box sx={{ my: 0.5, borderTop: `1px solid ${alpha(m.navy, 0.08)}` }} />
-        {filteredResources.map((resource) => {
-          const isActive = resource.id === activeResource?.id;
-          return (
-            <ButtonBase
-              key={resource.id}
-              onClick={() => {
-                setSelectedResourceId(resource.id);
-                setTeamActionAnchor(null);
-              }}
-              sx={{
-                width: "100%",
-                px: 1,
-                py: 0.65,
-                display: "flex",
-                alignItems: "center",
-                gap: 0.75,
-                justifyContent: "flex-start",
-                borderRadius: "8px",
-                bgcolor: isActive ? alpha(m.teal, 0.06) : "transparent",
-                "&:hover": { bgcolor: alpha(m.teal, 0.04) },
-              }}
-            >
-              <Avatar
-                sx={{
-                  width: 22,
-                  height: 22,
-                  bgcolor: alpha(m.teal, 0.14),
-                  color: m.teal,
-                  fontWeight: 700,
-                  fontSize: 9.5,
-                }}
-              >
-                {resource.avatarText}
-              </Avatar>
-              {isActive ? (
-                <BodyText sx={{ fontWeight: 600, fontSize: 11.5, color: alpha(m.navy, 0.78) }}>{resource.name}</BodyText>
-              ) : (
-                <Box sx={{ borderBottom: `1px solid ${alpha(m.navy, 0.2)}`, pb: 0.15 }}>
-                  <BodyText sx={{ fontWeight: 600, fontSize: 11.5, color: alpha(m.navy, 0.78) }}>{resource.name}</BodyText>
-                </Box>
-              )}
-            </ButtonBase>
-          );
-        })}
-      </Popover>
-    </>
     );
   };
+
+  const renderTeamActionPopover = () => (
+    <Popover
+      open={Boolean(teamActionAnchor)}
+      anchorEl={teamActionAnchor}
+      onClose={closeTeamMenu}
+      anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+      transformOrigin={{ vertical: "top", horizontal: "left" }}
+      PaperProps={{
+        sx: {
+          mt: 0.75,
+          borderRadius: "10px",
+          border: `1px solid ${alpha(m.navy, 0.10)}`,
+          boxShadow: "0 8px 24px rgba(16, 35, 63, 0.12)",
+          minWidth: 200,
+          py: 0.75,
+          px: 0.5,
+        },
+      }}
+    >
+      <ButtonBase
+        onClick={() => {
+          closeTeamMenu();
+          showSnackbar({ severity: "info", message: "Client profile panel opened." });
+        }}
+        sx={{ width: "100%", px: 1, py: 0.75, justifyContent: "flex-start", borderRadius: "8px" }}
+      >
+        <BodyText sx={{ fontWeight: 700, fontSize: 11.5, color: alpha(m.navy, 0.78) }}>View profile</BodyText>
+      </ButtonBase>
+      <ButtonBase
+        disabled={viewMode !== "day" || !teamMenuResource}
+        onClick={() => {
+          if (!teamMenuResource) return;
+          const shifts =
+            getCombinedAvailabilityIntervals(teamMenuResource.id, activeDateIso, scheduleRows, dateOverrides ?? []).length > 0
+              ? getCombinedAvailabilityIntervals(teamMenuResource.id, activeDateIso, scheduleRows, dateOverrides ?? []).map((interval) => ({
+                  start: fmtMinToTime(interval.startMin),
+                  end: fmtMinToTime(interval.endMin),
+                }))
+              : [{ start: "09:00", end: "17:00" }];
+          setEditAvailabilityDraft({
+            resourceId: teamMenuResource.id,
+            date: activeDateIso,
+            locations: [...data.supportedLocations],
+            shifts,
+          });
+          setEditAvailabilityOpen(true);
+          closeTeamMenu();
+        }}
+        sx={{ width: "100%", px: 1, py: 0.75, justifyContent: "flex-start", borderRadius: "8px", opacity: viewMode !== "day" ? 0.5 : 1 }}
+      >
+        <BodyText sx={{ fontWeight: 700, fontSize: 11.5, color: alpha(m.navy, 0.78) }}>Edit availability</BodyText>
+      </ButtonBase>
+      <Box sx={{ my: 0.5, borderTop: `1px solid ${alpha(m.navy, 0.08)}` }} />
+      {data.resources.map((resource) => {
+        const focusedId = selectedResourceId || activeResource?.id;
+        const isActive = String(resource.id) === String(focusedId);
+        return (
+          <ButtonBase
+            key={resource.id}
+            onClick={() => selectTeamMember(resource.id)}
+            sx={{
+              width: "100%",
+              px: 1,
+              py: 0.65,
+              display: "flex",
+              alignItems: "center",
+              gap: 0.75,
+              justifyContent: "flex-start",
+              borderRadius: "8px",
+              bgcolor: isActive ? alpha(m.teal, 0.06) : "transparent",
+              "&:hover": { bgcolor: alpha(m.teal, 0.04) },
+            }}
+          >
+            <Avatar
+              sx={{
+                width: 22,
+                height: 22,
+                bgcolor: alpha(m.teal, 0.14),
+                color: m.teal,
+                fontWeight: 700,
+                fontSize: 9.5,
+              }}
+            >
+              {resource.avatarText}
+            </Avatar>
+            {isActive ? (
+              <BodyText sx={{ fontWeight: 600, fontSize: 11.5, color: alpha(m.navy, 0.78) }}>{resource.name}</BodyText>
+            ) : (
+              <Box sx={{ borderBottom: `1px solid ${alpha(m.navy, 0.2)}`, pb: 0.15 }}>
+                <BodyText sx={{ fontWeight: 600, fontSize: 11.5, color: alpha(m.navy, 0.78) }}>{resource.name}</BodyText>
+              </Box>
+            )}
+          </ButtonBase>
+        );
+      })}
+    </Popover>
+  );
 
   const openBookingDrawer = React.useCallback(
     (payload: SelectedSlot) => {
@@ -1617,8 +1702,14 @@ export default function ProfessionalFixedLocationCalendar({
     [],
   );
 
-  const handleDiscardBr = React.useCallback(() => {
+  const handleDiscardBr = React.useCallback(async () => {
     if (!editingEventId) return;
+    try {
+      await persistEventStatus(editingEventId, "Invalid");
+    } catch {
+      showSnackbar({ severity: "error", message: "Unable to discard booking request." });
+      return;
+    }
     setEvents((prev) =>
       prev.map((event) =>
         event.id === editingEventId ? { ...event, status: "Invalid", bookingScenario: undefined } : event,
@@ -1626,7 +1717,7 @@ export default function ProfessionalFixedLocationCalendar({
     );
     setSlotStatus("Invalid");
     showSnackbar({ severity: "success", message: "Booking request discarded." });
-  }, [editingEventId, showSnackbar]);
+  }, [editingEventId, persistEventStatus, showSnackbar]);
 
   const handleAcknowledgeAcceptedBr = React.useCallback(() => {
     if (!editingEventId) return;
@@ -1636,18 +1727,30 @@ export default function ProfessionalFixedLocationCalendar({
     showSnackbar({ severity: "success", message: "Booking request acknowledged." });
   }, [editingEventId, showSnackbar]);
 
-  const handleAcceptIncomingRequest = React.useCallback(() => {
+  const handleAcceptIncomingRequest = React.useCallback(async () => {
     if (!editingEventId) return;
+    try {
+      await persistEventStatus(editingEventId, "Confirmed");
+    } catch {
+      showSnackbar({ severity: "error", message: "Unable to accept booking request." });
+      return;
+    }
     setEvents((prev) =>
       prev.map((event) => (event.id === editingEventId ? { ...event, status: "Confirmed" } : event)),
     );
     setSlotStatus("Confirmed");
     setIncomingRequestEditMode(false);
     showSnackbar({ severity: "success", message: "Booking request accepted." });
-  }, [editingEventId, showSnackbar]);
+  }, [editingEventId, persistEventStatus, showSnackbar]);
 
-  const handleRejectIncomingRequest = React.useCallback(() => {
+  const handleRejectIncomingRequest = React.useCallback(async () => {
     if (!editingEventId) return;
+    try {
+      await persistEventStatus(editingEventId, "Invalid");
+    } catch {
+      showSnackbar({ severity: "error", message: "Unable to reject booking request." });
+      return;
+    }
     setEvents((prev) =>
       prev.map((event) => (event.id === editingEventId ? { ...event, status: "Invalid" } : event)),
     );
@@ -1655,7 +1758,7 @@ export default function ProfessionalFixedLocationCalendar({
     setIncomingRequestEditMode(false);
     setIsEditingExisting(false);
     showSnackbar({ severity: "success", message: "Booking request rejected." });
-  }, [editingEventId, showSnackbar]);
+  }, [editingEventId, persistEventStatus, showSnackbar]);
 
   const handleStartIncomingEdit = React.useCallback(() => {
     if (!viewingBookingEvent) return;
@@ -1665,8 +1768,14 @@ export default function ProfessionalFixedLocationCalendar({
     setIsEditingExisting(true);
   }, [viewingBookingEvent]);
 
-  const handleDiscardEbr = React.useCallback(() => {
+  const handleDiscardEbr = React.useCallback(async () => {
     if (!editingEventId) return;
+    try {
+      await persistEventStatus(editingEventId, "Invalid");
+    } catch {
+      showSnackbar({ severity: "error", message: "Unable to discard edited booking request." });
+      return;
+    }
     setEvents((prev) =>
       prev.map((event) =>
         event.id === editingEventId ? { ...event, status: "Invalid", bookingScenario: undefined } : event,
@@ -1675,7 +1784,7 @@ export default function ProfessionalFixedLocationCalendar({
     setSlotStatus("Invalid");
     setIncomingRequestEditMode(false);
     showSnackbar({ severity: "success", message: "Edited booking request discarded." });
-  }, [editingEventId, showSnackbar]);
+  }, [editingEventId, persistEventStatus, showSnackbar]);
 
   const openSelectServices = React.useCallback(() => {
     setSelectionTarget(addMenuTarget);
@@ -1695,7 +1804,7 @@ export default function ProfessionalFixedLocationCalendar({
   }, [addMenuTarget, bookingGuests, selectedServices]);
 
   const openEditService = React.useCallback(
-    (service: (typeof serviceCatalog)[number]) => {
+    (service: BookingCatalogService) => {
       const override = serviceOverridesDraft[service.id];
       setServiceEditDraft(
         buildServiceEditDraftFromCatalog(service, {
@@ -2102,7 +2211,7 @@ export default function ProfessionalFixedLocationCalendar({
             bookingType: resolvedBookingType,
             location: slotLocation,
             serviceIds: selectedServices.map((service) => service.id),
-            notes: bookingInternalNote.trim() || null,
+            details,
           }),
         );
 
@@ -2637,7 +2746,8 @@ export default function ProfessionalFixedLocationCalendar({
               sx={{
                 borderRadius: "1px",
                 border: `1px solid ${alpha(m.navy, 0.08)}`,
-                overflow: "hidden",
+                overflowX: "hidden",
+                overflowY: "visible",
                 bgcolor: "#fff",
               }}
             >
@@ -2724,7 +2834,7 @@ export default function ProfessionalFixedLocationCalendar({
                         }}
                       >
                         {/* Lane header */}
-                        {renderTeamMemberHeader(res)}
+                        {renderTeamMemberHeader(viewMode === "day" ? undefined : res)}
                         {viewMode === "week" ? (
                           <Box
                             sx={{
@@ -2788,8 +2898,16 @@ export default function ProfessionalFixedLocationCalendar({
                           }}
                         >
                           {laneColumns.map(({ key, resource, date }, colIdx) => {
-                            const laneEvents = eventsInRange.filter((e) => e.resourceId === resource.id && e.date === date);
-                            const laneBlocks = blocksInRange.filter((b) => b.resourceId === resource.id && b.date === date);
+                            const laneEvents = eventsInRange.filter((event) => {
+                              if (event.date !== date) return false;
+                              if (viewMode === "day" && appliedFilters.teamAll) return true;
+                              return event.resourceId === resource.id;
+                            });
+                            const laneBlocks = blocksInRange.filter((block) => {
+                              if (block.date !== date) return false;
+                              if (viewMode === "day" && appliedFilters.teamAll) return true;
+                              return block.resourceId === resource.id;
+                            });
 
                             // Unavailable overlay (everything outside availability windows)
                             const availability = getAvailabilityFor(resource.id, date);
@@ -2802,6 +2920,7 @@ export default function ProfessionalFixedLocationCalendar({
                                   borderLeft: colIdx > 0 ? `1px solid ${alpha(m.navy, 0.07)}` : undefined,
                                   height: rows * rowPx,
                                   bgcolor: m.fxGrayF2F4F7,
+                                  overflow: "visible",
                                 }}
                               >
                                 {/* Click layer */}
@@ -2910,7 +3029,7 @@ export default function ProfessionalFixedLocationCalendar({
                                     2,
                                     ((minutesSinceMidnight(b.end) - minutesSinceMidnight(b.start)) / grid.stepMinutes) * rowPx,
                                   );
-                                  const isBlockedTime = b.kind === "unavailable";
+                                  const isBlockedTime = true;
 
                                   if (isBlockedTime) {
                                     return (
@@ -2929,37 +3048,16 @@ export default function ProfessionalFixedLocationCalendar({
                                         <Box
                                           sx={{
                                             position: "absolute",
-                                            left: 6,
-                                            top: 0,
-                                            bottom: 0,
-                                            width: 3,
-                                            bgcolor: "#FF2F64",
-                                            borderRadius: "999px",
-                                            zIndex: 4,
-                                          }}
-                                        />
-                                        <Box
-                                          sx={{
-                                            position: "absolute",
                                             left: 0,
                                             right: 0,
-                                            top: 0,
+                                            top: "50%",
                                             height: 2,
                                             bgcolor: "#FF2F64",
-                                          }}
-                                        />
-                                        <Box
-                                          sx={{
-                                            position: "absolute",
-                                            left: 0,
-                                            right: 0,
-                                            bottom: 0,
-                                            height: 2,
-                                            bgcolor: "#FF2F64",
+                                            transform: "translateY(-50%)",
                                           }}
                                         />
                                         {height >= 40 ? (
-                                          <Box sx={{ position: "absolute", left: 14, top: 6, pointerEvents: "none" }}>
+                                          <Box sx={{ position: "absolute", left: 8, top: 6, pointerEvents: "none" }}>
                                             <BodyText sx={{ fontWeight: 900, fontSize: 10, color: alpha(m.navy, 0.62), lineHeight: 1.1 }}>
                                               {b.start} to {b.end}
                                             </BodyText>
@@ -2972,52 +3070,18 @@ export default function ProfessionalFixedLocationCalendar({
                                     );
                                   }
 
-                                  return (
-                                    <Box
-                                      key={b.id}
-                                      sx={{
-                                        position: "absolute",
-                                        left: 0,
-                                        right: 0,
-                                        top,
-                                        height,
-                                        borderRadius: 0,
-                                        bgcolor: alpha(m.navy, 0.03),
-                                        borderTop: `1px solid ${alpha(m.navy, 0.12)}`,
-                                        borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
-                                        px: 1.2,
-                                        py: 0.55,
-                                        pointerEvents: "none",
-                                        zIndex: 2,
-                                      }}
-                                    >
-                                      {height >= 34 ? (
-                                        <>
-                                          <BodyText sx={{ fontWeight: 900, fontSize: 10, color: alpha(m.navy, 0.62), lineHeight: 1.1 }}>
-                                            {b.start} to {b.end}
-                                          </BodyText>
-                                          <BodyText sx={{ fontSize: 10.5, fontWeight: 800, color: alpha(m.navy, 0.58), lineHeight: 1.1 }}>
-                                            {b.title}
-                                          </BodyText>
-                                        </>
-                                      ) : null}
-                                    </Box>
-                                  );
+                                  return null;
                                 })}
 
                                 {/* Events */}
-                                {clusterOverlappingEvents(laneEvents).map((cluster) => {
+                                {clusterSameStartTimeEvents(laneEvents).map((cluster) => {
                                   const { startMin: clusterStart, endMin: clusterEnd } = getClusterTimeBounds(cluster);
                                   const top = ((clusterStart - startMin) / grid.stepMinutes) * rowPx + 0.15;
                                   const height = Math.max(78, ((clusterEnd - clusterStart) / grid.stepMinutes) * rowPx - 0.3);
-                                  const resolveServiceColor = (ev: (typeof cluster)[number]) => {
-                                    const cardServiceCategory = getServiceCategory(ev.title);
-                                    return appliedDesign.scope === "Services"
-                                      ? appliedDesign.colorsByService?.[ev.title]
-                                      : cardServiceCategory
-                                        ? appliedDesign.colorsByCategory[cardServiceCategory]
-                                        : undefined;
-                                  };
+                                  const resolveServiceColor = (ev: (typeof cluster)[number]) =>
+                                    resolveEventColors(ev).serviceColor;
+                                  const resolveStatusColor = (ev: (typeof cluster)[number]) =>
+                                    resolveEventColors(ev).statusColor;
                                   const eventHandlers = {
                                     onOpen: openExistingBooking,
                                     onOpenCalendar: (ev: (typeof cluster)[number]) =>
@@ -3036,6 +3100,7 @@ export default function ProfessionalFixedLocationCalendar({
                                         top={top}
                                         height={height}
                                         getServiceColor={resolveServiceColor}
+                                        getStatusColor={resolveStatusColor}
                                         {...eventHandlers}
                                       />
                                     );
@@ -3051,6 +3116,7 @@ export default function ProfessionalFixedLocationCalendar({
                                       left={0}
                                       right={0}
                                       serviceColor={resolveServiceColor(ev)}
+                                      statusColor={resolveStatusColor(ev)}
                                       onOpen={() => eventHandlers.onOpen(ev)}
                                       onOpenCalendar={() => eventHandlers.onOpenCalendar(ev)}
                                       onOpenNotes={() => eventHandlers.onOpenNotes(ev)}
@@ -5426,9 +5492,12 @@ export default function ProfessionalFixedLocationCalendar({
 
                         {showInternalNote ? (
                           <Box>
-                            <BodyText sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78), mb: 0.75 }}>
-                              Internal Note
-                            </BodyText>
+                            <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.75 }}>
+                              <StickyNote2OutlinedIcon sx={{ fontSize: 16, color: m.teal }} />
+                              <BodyText sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78) }}>
+                                Internal Note
+                              </BodyText>
+                            </Stack>
                             <AppTextField
                               placeholder="Description"
                               value={bookingInternalNote}
@@ -5618,6 +5687,7 @@ export default function ProfessionalFixedLocationCalendar({
           )}
         </Box>
       </MollureDrawer>
+      {renderTeamActionPopover()}
       <CalendarFiltersDrawer
         appliedFilters={appliedFilters}
         bookingTypes={bookingTypes}
@@ -5732,18 +5802,32 @@ export default function ProfessionalFixedLocationCalendar({
         open={designOpen}
         onClose={() => setDesignOpen(false)}
         onColorSelect={async (key, color) => {
-          const nextDesign: CalendarDesignDraft = {
-            ...designDraft,
-            colorsByCategory: { ...designDraft.colorsByCategory, [key]: color },
-          };
+          const nextDesign: CalendarDesignDraft =
+            designDraft.scope === "Status"
+              ? {
+                  ...designDraft,
+                  colorsByStatus: {
+                    ...(designDraft.colorsByStatus ?? {}),
+                    [key as CalendarBookingStatus]: color,
+                  },
+                }
+              : designDraft.scope === "Team Members"
+                ? {
+                    ...designDraft,
+                    colorsByTeamMember: { ...(designDraft.colorsByTeamMember ?? {}), [key]: color },
+                  }
+                : {
+                    ...designDraft,
+                    colorsByCategory: { ...designDraft.colorsByCategory, [key]: color },
+                  };
           setDesignDraft(nextDesign);
           setAppliedDesign(nextDesign);
           setDesignOpen(false);
           try {
             await persistAvailabilitySettings({ design: nextDesign });
-            showSnackbar({ severity: "success", message: "Service colour saved." });
+            showSnackbar({ severity: "success", message: "Calendar colour saved." });
           } catch {
-            showSnackbar({ severity: "error", message: "Unable to save service colour." });
+            showSnackbar({ severity: "error", message: "Unable to save calendar colour." });
           }
         }}
         onApply={async () => {
@@ -5759,6 +5843,7 @@ export default function ProfessionalFixedLocationCalendar({
         draft={designDraft}
         setDraft={setDesignDraft}
         serviceOptions={serviceOptions}
+        teamMemberOptions={data.resources.map((resource) => ({ id: resource.id, name: resource.name }))}
       />
       <CalendarServiceOrderModal
         draft={serviceOrderDraft}
