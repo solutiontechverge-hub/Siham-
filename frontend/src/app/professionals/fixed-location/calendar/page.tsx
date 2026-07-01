@@ -5,192 +5,95 @@ import ProfessionalFixedLocationCalendar from "../../../../components/common/Pro
 import {
   type CalendarBlock,
   type CalendarBookingLocation,
-  type CalendarBookingStatus,
-  type CalendarBookingType,
   type CalendarEvent,
-  professionalFixedLocationCalendarData,
+  type CalendarResource,
 } from "./calendar.data";
 import { useSnackbar } from "../../../../components/common/AppSnackbar";
 import { getApiErrorMessage } from "../../../../lib/api-error";
 import { parseCalendarSettings } from "../../../../components/common/calendar/calendar-settings.types";
 import { mergeCalendarOverviewEvents } from "../../../../components/common/calendar/calendar-overview.mappers";
 import {
+  getCalendarQueryDateRange,
+  toIsoLocalDate,
+  wallClockDateFromDateTime,
+  wallClockTimeFromDateTime,
+} from "../../../../components/common/calendar/calendar.utils";
+import {
   useCreateCalendarEntryMutation,
   useDeleteCalendarEntryMutation,
   useGetBusinessSetupQuery,
   useGetCalendarOverviewQuery,
+  useGetMollureClientDirectoryQuery,
+  useGetProfessionalClientsQuery,
+  useUpdateBookingStatusMutation,
+  useUpdateCalendarEntryStatusMutation,
   useUpsertCalendarSettingsMutation,
+  type BusinessServiceDetail,
+  type CalendarOverviewQuery,
 } from "../../../../store/services/businessApi";
+import type { BookingCatalogService } from "../../../../data/bookingServiceCatalog.data";
 
-const statusMap: Record<string, CalendarBookingStatus> = {
-  requested: "Requested",
-  cancelled: "Cancelled",
-  canceled: "Cancelled",
-  confirmed: "Confirmed",
-  completed: "Completed",
-  no_show: "No Show",
-  "no show": "No Show",
-  invalid: "Invalid",
+const DEFAULT_TIME_GRID = { startHour: 8, endHour: 22, stepMinutes: 15 } as const;
+
+const timeFromApi = (value?: string | null) => wallClockTimeFromDateTime(value) ?? "08:00";
+
+const dateFromApi = (value?: string | null) =>
+  wallClockDateFromDateTime(value) ?? new Date().toISOString().slice(0, 10);
+
+const parseServiceDurationMins = (label?: string | null) => {
+  if (!label) return 30;
+  const hours = label.match(/(\d+)\s*h/i);
+  const mins = label.match(/(\d+)\s*m(?:in)?/i);
+  let total = 0;
+  if (hours) total += Number(hours[1]) * 60;
+  if (mins) total += Number(mins[1]);
+  if (total > 0) return total;
+  const fallback = label.match(/(\d+)/);
+  return fallback ? Number(fallback[1]) : 30;
 };
 
-const bookingTypeMap: Record<string, CalendarBookingType> = {
-  online: "Online",
-  offline: "Offline",
-  project: "Project",
-  request: "Requests",
-};
-
-const locationMap: Record<string, CalendarBookingLocation> = {
-  fixed: "FL",
-  desired: "DL",
-};
-
-const timeFromIso = (value?: string | null) => {
-  if (!value) return "08:00";
-  if (/^\d{2}:\d{2}/.test(value)) return value.slice(0, 5);
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return "08:00";
-  return parsed.toISOString().slice(11, 16);
-};
-
-const dateFromValue = (value?: string | null) => {
-  if (!value) return new Date().toISOString().slice(0, 10);
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return new Date().toISOString().slice(0, 10);
-  return parsed.toISOString().slice(0, 10);
-};
-
-const buildTodayDemoEvents = (
-  resources: readonly { id: string; name: string; avatarText: string }[],
-  todayIso: string,
-  supportedLocations: readonly CalendarBookingLocation[],
-): CalendarEvent[] => {
-  const first = resources[0]?.id ?? "";
-  const second = resources[1]?.id ?? first;
-  const third = resources[2]?.id ?? first;
-  const canShowDesired = supportedLocations.includes("DL");
-  const desiredOrFixed = canShowDesired ? "DL" : "FL";
-
-  return [
-    {
-      id: "demo-today-34009-a",
-      bookingCode: "34009",
-      resourceId: first,
-      date: todayIso,
-      start: "08:00",
-      end: "08:15",
-      title: "Hot stone full body massage",
-      status: "Requested",
-      location: "FL",
-      bookingType: "Requests",
-      bookingScenario: "BR",
-      showClientName: "Lissa J",
-      details: {
-        showPrepayment: true,
-        prepaymentPercent: "50",
-        prepaymentStatus: "pending",
-      },
-    },
-    {
-      id: "demo-today-34009-b",
-      bookingCode: "34009",
-      resourceId: first,
-      date: todayIso,
-      start: "08:15",
-      end: "08:30",
-      title: "Hair Cut",
-      status: "Cancelled",
-      location: "FL",
-      bookingType: "Offline",
-      showClientName: "Lissa J",
-      details: {
-        showPrepayment: true,
-        prepaymentPercent: "50",
-        prepaymentStatus: "canceled",
-      },
-    },
-    {
-      id: "demo-today-34009-c",
-      bookingCode: "34009",
-      resourceId: first,
-      date: todayIso,
-      start: "09:00",
-      end: "09:15",
-      title: "Hair Cut",
-      status: "Confirmed",
-      location: desiredOrFixed,
-      bookingType: "Online",
-      bookingScenario: "ER",
-      showClientName: "Lissa J",
-      details: {
-        showPrepayment: true,
-        prepaymentPercent: "50",
-        prepaymentStatus: "pending",
-        responseStatus: "overdue_response",
-      },
-    },
-    {
-      id: "demo-today-34009-d",
-      bookingCode: "34009",
-      resourceId: first,
-      date: todayIso,
-      start: "09:15",
-      end: "09:30",
-      title: "Hair Cut",
-      status: "Completed",
-      location: desiredOrFixed,
-      bookingType: "Project",
-      showClientName: "Lissa J",
-    },
-    {
-      id: "demo-today-44001-a",
-      bookingCode: "44001",
-      resourceId: second,
-      date: todayIso,
-      start: "09:00",
-      end: "09:30",
-      title: "Make-up",
-      status: "Confirmed",
-      location: "FL",
-      bookingType: "Online",
-      showClientName: "Ava K",
-    },
-    {
-      id: "demo-today-55002-a",
-      bookingCode: "55002",
-      resourceId: third,
-      date: todayIso,
-      start: "08:30",
-      end: "09:00",
-      title: "Lashes",
-      status: "Completed",
-      location: "FL",
-      bookingType: "Project",
-      showClientName: "Emma S",
-    },
-  ];
-};
+const mapSetupServicesToCatalog = (services: readonly BusinessServiceDetail[] | undefined): BookingCatalogService[] =>
+  (services ?? []).map((service) => ({
+    id: String(service.service_id || service.id),
+    name: service.service_title,
+    durationMins: parseServiceDurationMins(service.duration_label),
+    price: Number(service.price) || 0,
+  }));
 
 export default function FixedLocationCalendarPage() {
   const { data: setupData } = useGetBusinessSetupQuery();
-  const { data: calendarOverviewData } = useGetCalendarOverviewQuery();
+  const [overviewQuery, setOverviewQuery] = React.useState<CalendarOverviewQuery>(() =>
+    getCalendarQueryDateRange(toIsoLocalDate(new Date()), "day"),
+  );
+  const handleOverviewDateRangeChange = React.useCallback((range: CalendarOverviewQuery) => {
+    setOverviewQuery((prev) =>
+      prev.startDate === range.startDate && prev.endDate === range.endDate ? prev : range,
+    );
+  }, []);
+  const { data: calendarOverviewData } = useGetCalendarOverviewQuery(overviewQuery, {
+    refetchOnMountOrArgChange: true,
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
+  });
+  const { data: professionalClientsData } = useGetProfessionalClientsQuery();
+  const { data: mollureDirectoryData } = useGetMollureClientDirectoryQuery();
   const [createCalendarEntry, { isLoading: isCreatingCalendarEntry }] = useCreateCalendarEntryMutation();
   const [deleteCalendarEntry, { isLoading: isDeletingCalendarEntry }] = useDeleteCalendarEntryMutation();
   const [upsertCalendarSettings, { isLoading: isSavingCalendarSettings }] = useUpsertCalendarSettingsMutation();
+  const [updateBookingStatus] = useUpdateBookingStatusMutation();
+  const [updateCalendarEntryStatus] = useUpdateCalendarEntryStatusMutation();
   const { showSnackbar } = useSnackbar();
 
   const calendarData = React.useMemo(() => {
     const businessSetup = setupData?.data ?? null;
     const overview = calendarOverviewData?.data ?? null;
-    const resources =
-      businessSetup?.team_members?.length
-        ? businessSetup.team_members.map((member, index) => ({
-            id: String(member.id ?? index + 1),
-            name: member.full_name,
-            avatarText: member.full_name?.trim()?.[0]?.toUpperCase() || "T",
-          }))
-        : professionalFixedLocationCalendarData.resources;
+    const resources: CalendarResource[] =
+      businessSetup?.team_members?.map((member, index) => ({
+        id: String(member.id ?? `team-${index + 1}`),
+        name: member.full_name?.trim() || `Team Member ${index + 1}`,
+        avatarText: member.full_name?.trim()?.[0]?.toUpperCase() || "T",
+      })) ?? [];
+
     const supportedLocations: CalendarBookingLocation[] =
       businessSetup?.location_mode === "fixed"
         ? ["FL"]
@@ -199,7 +102,7 @@ export default function FixedLocationCalendarPage() {
           : ["FL", "DL"];
 
     const fallbackResourceId = resources[0]?.id ?? "";
-    const apiEvents = mergeCalendarOverviewEvents(
+    const apiEvents: CalendarEvent[] = mergeCalendarOverviewEvents(
       overview?.entries ?? [],
       overview?.bookings ?? [],
       fallbackResourceId,
@@ -210,9 +113,9 @@ export default function FixedLocationCalendarPage() {
       .map((entry) => ({
         id: `blk-${entry.id}`,
         resourceId: String(entry.team_member_id ?? resources[0]?.id ?? ""),
-        date: dateFromValue(entry.date || entry.blocked_time_start || entry.start_date),
-        start: entry.start || timeFromIso(entry.blocked_time_start),
-        end: entry.end || timeFromIso(entry.blocked_time_end),
+        date: dateFromApi(entry.date || entry.blocked_time_start || entry.start_date),
+        start: entry.start || timeFromApi(entry.blocked_time_start),
+        end: entry.end || timeFromApi(entry.blocked_time_end),
         title: entry.title,
         kind: "unavailable" as const,
       }));
@@ -221,35 +124,19 @@ export default function FixedLocationCalendarPage() {
       new Set<CalendarBookingLocation>([...supportedLocations, ...apiEvents.map((event) => event.location)]),
     );
 
-    const availability = professionalFixedLocationCalendarData.availability.map((item, index) => ({
-      ...item,
-      resourceId: resources[index]?.id ?? item.resourceId,
-    }));
-
-    const scheduleAvailability = professionalFixedLocationCalendarData.scheduleAvailability.map((item, index) => ({
-      ...item,
-      resourceId: resources.find((resource) => resource.id === item.resourceId)?.id
-        ?? resources[index % resources.length]?.id
-        ?? item.resourceId,
-    }));
-
-    const scheduleBlocked = professionalFixedLocationCalendarData.scheduleBlocked.map((item, index) => ({
-      ...item,
-      resourceId: resources.find((resource) => resource.id === item.resourceId)?.id
-        ?? resources[index % resources.length]?.id
-        ?? item.resourceId,
-    }));
-
     return {
-      ...professionalFixedLocationCalendarData,
+      subTabs: ["Overview", "Schedule", "Settings"] as const,
+      initialSubTab: "Overview" as const,
+      initialView: "day" as const,
       initialDate: new Date().toISOString().slice(0, 10),
       resources,
       supportedLocations: calendarLocations,
-      availability,
-      scheduleAvailability,
-      scheduleBlocked,
+      availability: [],
+      timeGrid: DEFAULT_TIME_GRID,
       events: apiEvents,
       blocks: apiBlocks,
+      scheduleAvailability: [],
+      scheduleBlocked: [],
     };
   }, [calendarOverviewData, setupData]);
 
@@ -258,13 +145,12 @@ export default function FixedLocationCalendarPage() {
     [calendarOverviewData],
   );
 
-  const serviceOptions = React.useMemo(() => {
-    const setup = setupData?.data;
-    if (!setup?.service_details?.length) {
-      return ["Haircut", "Hair Color", "Hair Styling", "Manicure", "Facial"];
-    }
-    return setup.service_details.map((service) => service.service_title).filter(Boolean);
-  }, [setupData]);
+  const serviceCatalog = React.useMemo(
+    () => mapSetupServicesToCatalog(setupData?.data?.service_details),
+    [setupData],
+  );
+
+  const serviceOptions = React.useMemo(() => serviceCatalog.map((service) => service.name), [serviceCatalog]);
 
   const serviceOrderDefaults = React.useMemo(() => {
     const setup = setupData?.data;
@@ -272,10 +158,7 @@ export default function FixedLocationCalendarPage() {
       new Set(setup?.service_details?.map((service) => service.category_title).filter(Boolean) ?? []),
     );
     if (!categories.length) {
-      return {
-        categories: ["Hair", "Nails", "Face treatments", "Body treatments"],
-        servicesByCategory: {},
-      };
+      return { categories: [], servicesByCategory: {} };
     }
     const servicesByCategory: Record<string, string[]> = {};
     for (const category of categories) {
@@ -288,12 +171,34 @@ export default function FixedLocationCalendarPage() {
     return { categories, servicesByCategory };
   }, [setupData]);
 
+  const clientOptions = React.useMemo(
+    () =>
+      (professionalClientsData?.data ?? []).map((client) => ({
+        name: client.display_name,
+        email: client.email,
+      })),
+    [professionalClientsData],
+  );
+
+  const platformClientOptions = React.useMemo(
+    () =>
+      (mollureDirectoryData?.data ?? []).map((client) => ({
+        name: client.name,
+        email: client.email,
+      })),
+    [mollureDirectoryData],
+  );
+
   return (
     <ProfessionalFixedLocationCalendar
       data={calendarData}
+      onDateRangeChange={handleOverviewDateRangeChange}
       calendarSettings={calendarSettings}
       serviceOptions={serviceOptions}
+      serviceCatalog={serviceCatalog}
       serviceOrderDefaults={serviceOrderDefaults}
+      clientOptions={clientOptions}
+      platformClientOptions={platformClientOptions}
       fixedLocationAddress={setupData?.data?.fixed_location_address || setupData?.data?.salon_name || undefined}
       lateRescheduleFeePercentDefault={
         setupData?.data?.late_reschedule_fee_percentage != null
@@ -335,6 +240,12 @@ export default function FixedLocationCalendarPage() {
           });
           throw error;
         }
+      }}
+      onUpdateBookingStatus={async (id, status) => {
+        await updateBookingStatus({ id, status }).unwrap();
+      }}
+      onUpdateCalendarEntryStatus={async (id, status) => {
+        await updateCalendarEntryStatus({ id, status }).unwrap();
       }}
     />
   );

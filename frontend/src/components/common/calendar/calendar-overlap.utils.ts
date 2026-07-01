@@ -9,6 +9,25 @@ export function eventsOverlap(a: CalendarEvent, b: CalendarEvent): boolean {
   return aStart < bEnd && aEnd > bStart;
 }
 
+export function clusterSameStartTimeEvents(events: readonly CalendarEvent[]): CalendarEvent[][] {
+  const groups = new Map<string, CalendarEvent[]>();
+
+  for (const event of events) {
+    const key = event.start;
+    const group = groups.get(key);
+    if (group) group.push(event);
+    else groups.set(key, [event]);
+  }
+
+  return [...groups.values()]
+    .map((group) => [...group].sort((a, b) => a.id.localeCompare(b.id)))
+    .sort(
+      (a, b) =>
+        minutesSinceMidnight(a[0].start) - minutesSinceMidnight(b[0].start) ||
+        a[0].id.localeCompare(b[0].id),
+    );
+}
+
 export function clusterOverlappingEvents(events: readonly CalendarEvent[]): CalendarEvent[][] {
   const remaining = [...events];
   const clusters: CalendarEvent[][] = [];

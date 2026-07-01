@@ -6,6 +6,85 @@ import type { ManualEntryDiscount } from "../../sections/finance/manualEntry.dat
 import { allBookingCatalogServices } from "../../../data/bookingServiceCatalog.data";
 import { minutesSinceMidnight } from "./calendar.utils";
 
+const NOTES_META_PREFIX = "---mollure-meta---";
+
+type StoredBookingNoteMeta = Partial<
+  Pick<
+    CalendarBookingDetails,
+    | "showInternalNote"
+    | "showLateRescheduling"
+    | "lateRescheduleFeePercent"
+    | "showLateCancellation"
+    | "lateCancellationFeePercent"
+    | "showPrepayment"
+    | "prepaymentPercent"
+    | "paymentMethod"
+    | "showKilometerAllowance"
+  >
+>;
+
+export function serializeCalendarEntryNotes(internalNote: string, details?: CalendarBookingDetails): string | null {
+  const trimmed = internalNote.trim();
+  const meta: StoredBookingNoteMeta = {
+    showInternalNote: Boolean(trimmed) || Boolean(details?.showInternalNote),
+    showLateRescheduling: details?.showLateRescheduling,
+    lateRescheduleFeePercent: details?.lateRescheduleFeePercent,
+    showLateCancellation: details?.showLateCancellation,
+    lateCancellationFeePercent: details?.lateCancellationFeePercent,
+    showPrepayment: details?.showPrepayment,
+    prepaymentPercent: details?.prepaymentPercent,
+    paymentMethod: details?.paymentMethod,
+    showKilometerAllowance: details?.showKilometerAllowance,
+  };
+  const hasMeta = Object.values(meta).some((value) => value != null && value !== false && value !== "");
+  if (!trimmed && !hasMeta) return null;
+  if (!hasMeta) return trimmed;
+  return `${trimmed}${trimmed ? "\n" : ""}${NOTES_META_PREFIX}\n${JSON.stringify(meta)}`;
+}
+
+export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingDetails | undefined {
+  if (!notes?.trim()) return undefined;
+  const markerIndex = notes.indexOf(NOTES_META_PREFIX);
+  if (markerIndex === -1) {
+    return {
+      internalNote: notes.trim(),
+      showInternalNote: true,
+    };
+  }
+  const internalNote = notes.slice(0, markerIndex).trim();
+  const metaRaw = notes.slice(markerIndex + NOTES_META_PREFIX.length).trim();
+  try {
+    const meta = JSON.parse(metaRaw) as StoredBookingNoteMeta;
+    return {
+      internalNote,
+      showInternalNote: Boolean(internalNote) || Boolean(meta.showInternalNote),
+      showLateRescheduling: Boolean(meta.showLateRescheduling),
+      lateRescheduleFeePercent: meta.lateRescheduleFeePercent ?? "",
+      showLateCancellation: Boolean(meta.showLateCancellation),
+      lateCancellationFeePercent: meta.lateCancellationFeePercent ?? "",
+      showPrepayment: Boolean(meta.showPrepayment),
+      prepaymentPercent: meta.prepaymentPercent ?? "",
+      paymentMethod: meta.paymentMethod ?? "online",
+      showKilometerAllowance: Boolean(meta.showKilometerAllowance),
+    };
+  } catch {
+    return {
+      internalNote: notes.trim(),
+      showInternalNote: true,
+    };
+  }
+}
+
+export function parseApiCalendarEventId(eventId: string | null | undefined):
+  | { kind: "booking"; id: string }
+  | { kind: "calendar_entry"; id: string }
+  | null {
+  if (!eventId) return null;
+  if (eventId.startsWith("b-")) return { kind: "booking", id: eventId.slice(2) };
+  if (eventId.startsWith("ce-")) return { kind: "calendar_entry", id: eventId.slice(3) };
+  return null;
+}
+
 export type BookingDrawerHydration = {
   clientEmail: string;
   services: NonNullable<CalendarBookingDetails["services"]>;
@@ -167,7 +246,7 @@ export function buildBookingDetailsSnapshot(input: {
     lateCancellationFeePercent: input.lateCancellationFeePercent,
     showLateRescheduling: input.showLateRescheduling,
     lateRescheduleFeePercent: input.lateRescheduleFeePercent,
-    showInternalNote: input.showInternalNote,
+    showInternalNote: input.showInternalNote || Boolean(input.bookingInternalNote.trim()),
     internalNote: input.bookingInternalNote,
     totalDiscount: input.bookingTotalDiscount,
     showKilometerAllowance: input.showKilometerAllowance,

@@ -4,7 +4,8 @@ import type { ClientBookingRecord } from "./clientBookingRecords";
 export const CHECKOUT_REF_KEY = "mollure:checkout_booking_ref";
 export const ACTIVE_BOOKING_ID_KEY = "mollure:active_booking_id";
 export function createBookingRef() {
-  return `B${String(Date.now()).slice(-6)}`;
+  const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
+  return `B${Date.now()}${suffix}`;
 }
 
 export function setActiveBookingSession(record: ClientBookingRecord) {

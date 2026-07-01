@@ -110,9 +110,18 @@ export function parseCalendarSettings(
       dateOverrides: availability.dateOverrides ?? [],
     },
     design: {
-      scope: designRaw.scope === "Services" ? "Services" : "Categories",
+      scope:
+        designRaw.scope === "Services"
+          ? "Services"
+          : designRaw.scope === "Status"
+            ? "Status"
+            : designRaw.scope === "Team Members"
+              ? "Team Members"
+              : "Categories",
       colorsByCategory: designRaw.colorsByCategory ?? {},
       colorsByService: designRaw.colorsByService ?? {},
+      colorsByStatus: designRaw.colorsByStatus ?? {},
+      colorsByTeamMember: designRaw.colorsByTeamMember ?? {},
     },
   };
 }

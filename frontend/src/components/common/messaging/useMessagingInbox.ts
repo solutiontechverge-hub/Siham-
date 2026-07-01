@@ -38,7 +38,12 @@ import {
   onMessagingMessageDeleted,
   onMessagingRead,
 } from "./messagingSocketClient";
-import { canProfessionalReply, findThreadIdByBookingRef, threadHasActiveBooking } from "./messagingThreadAccess";
+import {
+  canProfessionalReply,
+  findThreadIdByBookingRef,
+  findThreadIdByClientName,
+  threadHasActiveBooking,
+} from "./messagingThreadAccess";
 import {
   applyAutoDeleteSettings,
   applyClearChat,
@@ -295,6 +300,7 @@ export function useMessagingInbox(
     const resolvedThreadId =
       threadRef ||
       findThreadIdByBookingRef(store, bookingRef) ||
+      findThreadIdByClientName(store, searchPrefill) ||
       store.threads.find((thread) => thread.name.toLowerCase() === (searchParams.get("client") ?? "").toLowerCase())?.id ||
       "";
 

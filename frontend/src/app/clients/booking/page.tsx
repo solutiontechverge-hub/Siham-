@@ -45,12 +45,11 @@ import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
 import ModeEditOutlineRoundedIcon from "@mui/icons-material/ModeEditOutlineRounded";
 import { AppDropdown, ClientPageTabsBar, clientTopTabsActiveLabel, MarketingSiteFooter, MollureMarketingHeader } from "../../../components/common";
 import { ServiceSummaryMetaLine } from "../../../components/common/ServiceSummaryMetaLine";
-import { fmtMinutesToTimeLabel, parseTimeLabelToMinutes, serviceTimeRangeLabel } from "./booking-time";
+import { fmtMinutesToIsoTime, fmtMinutesToTimeLabel, parseTimeLabelToMinutes, serviceTimeRangeLabel } from "./booking-time";
 import ClientBookingListView from "./ClientBookingListView";
 import ClientBookingPageShell from "./ClientBookingPageShell";
 import { parseBookingListTab } from "./bookingPillTabs";
 import { upsertRequestedBooking } from "./clientBookingRecords";
-import { buildClientBookingApiPayload } from "./clientBookingApi.mapper";
 import {
   ACTIVE_BOOKING_ID_KEY,
   CHECKOUT_REF_KEY,
@@ -59,10 +58,9 @@ import {
 } from "./clientBookingSession";
 import { resolveCreateBookingStatus, resolveCreateCheckoutPath } from "./resolveCreateBookingStatus";
 import { useSnackbar } from "../../../components/common/AppSnackbar";
+import { getApiErrorMessage } from "../../../lib/api-error";
 import { getServicesForLocationMode, getTeamForLocationMode } from "../../../data/businessPublicProfile.data";
 import { useBusinessPublicProfile } from "../../../hooks/useBusinessPublicProfile";
-import { findBusinessSetupByShopId } from "../listing/businessPublicProfile.mapper";
-import { getApiErrorMessage } from "../../../lib/api-error";
 import { useCreateBookingMutation } from "../../../store/services/businessApi";
 import { parsePrepaymentPercent } from "../../../components/common/client-booking/parsePrepaymentPercent";
 import { loadPublicProfileBookingSelection } from "../../../data/publicProfileBookingSelection";
@@ -205,7 +203,7 @@ function ClientBookingCreateView() {
     locationMode?: "fixed" | "desired";
   } | null>(null);
 
-  const { profile: businessProfile, setups } = useBusinessPublicProfile(shop?.shopId);
+  const { profile: businessProfile } = useBusinessPublicProfile(shop?.shopId);
   const [createBooking] = useCreateBookingMutation();
 
   const fallbackAddress = "Marina-Park 50, Den Helder, Noord-Holland";
@@ -932,18 +930,102 @@ function ClientBookingCreateView() {
         : {}),
     };
 
+    const prepaymentPercent = parsePrepaymentPercent(businessProfile?.prepaymentLabel);
+    const requiresPrepayment = !isDesiredLocation && prepaymentPercent > 0;
+    const { status, bookingRequestDirection } = resolveCreateBookingStatus({
+      locationMode,
+    });
+
+    const existingId =
+      !fromProfile && typeof window !== "undefined"
+        ? window.sessionStorage.getItem(ACTIVE_BOOKING_ID_KEY)
+        : null;
+    const bookingRef = createBookingRef();
+
+    const primaryService = servicesForDraft[0];
+    const bookingDate = toISO(selectedDate);
+    const startMinutes = parseTimeLabelToMinutes(selectedTime);
+    const endMinutes =
+      startMinutes + servicesForDraft.reduce((sum, service) => sum + service.durationMins, 0);
+    const uuidPattern =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+    if (shop.shopId && primaryService) {
+      let savedBookingRef = bookingRef;
+      try {
+        const created = await createBooking({
+          booking_date: bookingDate,
+          business_setup_id: shop.shopId,
+          service_id: uuidPattern.test(primaryService.id) ? primaryService.id : null,
+          team_member_id:
+            primaryService.teamMemberId && uuidPattern.test(primaryService.teamMemberId)
+              ? primaryService.teamMemberId
+              : null,
+          start_time: `${bookingDate}T${fmtMinutesToIsoTime(startMinutes)}:00`,
+          end_time: `${bookingDate}T${fmtMinutesToIsoTime(endMinutes)}:00`,
+          location_type: isDesiredLocation ? "desired" : "fixed",
+          status: "requested",
+          booking_type: "request",
+          unique_code: bookingRef,
+          total_price: total,
+        }).unwrap();
+        savedBookingRef = created.data?.unique_code ?? bookingRef;
+      } catch (error) {
+        showSnackbar({
+          severity: "error",
+          message: getApiErrorMessage(error, "Unable to save booking to server. Please try again."),
+        });
+        return;
+      }
+
+      try {
+        window.localStorage.setItem("mollure:booking_draft", JSON.stringify(payload));
+      } catch {
+        // ignore
+      }
+
+      try {
+        if (fromProfile && typeof window !== "undefined") {
+          window.sessionStorage.removeItem(ACTIVE_BOOKING_ID_KEY);
+          window.sessionStorage.removeItem(CHECKOUT_REF_KEY);
+        }
+
+        const requested = {
+          id: existingId ?? `bk_req_${Date.now()}`,
+          bookingRef: savedBookingRef,
+          status,
+          ...(bookingRequestDirection ? { bookingRequestDirection } : {}),
+          shop,
+          draft: payload,
+          createdAt: new Date().toISOString(),
+          requiresPrepayment,
+          prepaymentPercent: requiresPrepayment ? prepaymentPercent : 0,
+          prepaid: false,
+        };
+        upsertRequestedBooking(requested);
+        setActiveBookingSession(requested);
+      } catch {
+        showSnackbar({
+          severity: "error",
+          message: "Booking was saved on the server, but local session could not be updated.",
+        });
+        return;
+      }
+
+      showSnackbar({
+        severity: "success",
+        message: requiresPrepayment ? "Booking request sent — continue to prepayment" : "Booking request sent",
+      });
+
+      router.push(resolveCreateCheckoutPath({ locationMode, requiresPrepayment }));
+      return;
+    }
+
     try {
       window.localStorage.setItem("mollure:booking_draft", JSON.stringify(payload));
     } catch {
       // ignore
     }
-
-    const prepaymentPercent = parsePrepaymentPercent(businessProfile?.prepaymentLabel);
-    const requiresPrepayment = !isDesiredLocation && prepaymentPercent > 0;
-    const { status, bookingRequestDirection } = resolveCreateBookingStatus({
-      locationMode,
-      requiresPrepayment,
-    });
 
     try {
       if (fromProfile && typeof window !== "undefined") {
@@ -951,37 +1033,9 @@ function ClientBookingCreateView() {
         window.sessionStorage.removeItem(CHECKOUT_REF_KEY);
       }
 
-      const existingId =
-        !fromProfile && typeof window !== "undefined"
-          ? window.sessionStorage.getItem(ACTIVE_BOOKING_ID_KEY)
-          : null;
-      const bookingRef =
-        fromProfile || typeof window === "undefined"
-          ? createBookingRef()
-          : window.sessionStorage.getItem(CHECKOUT_REF_KEY) || createBookingRef();
-
-      let apiBookingId: string | undefined;
-      const businessSetup = findBusinessSetupByShopId(shop.shopId, setups);
-      if (businessSetup) {
-        const apiPayload = buildClientBookingApiPayload({
-          setup: businessSetup,
-          shopId: shop.shopId,
-          locationMode,
-          draft: payload,
-          status,
-          bookingRef,
-          total,
-        });
-        if (apiPayload) {
-          const response = await createBooking(apiPayload).unwrap();
-          apiBookingId = response.data?.id;
-        }
-      }
-
       const requested = {
         id: existingId ?? `bk_req_${Date.now()}`,
         bookingRef,
-        ...(apiBookingId ? { apiBookingId } : {}),
         status,
         ...(bookingRequestDirection ? { bookingRequestDirection } : {}),
         shop,
@@ -993,26 +1047,26 @@ function ClientBookingCreateView() {
       };
       upsertRequestedBooking(requested);
       setActiveBookingSession(requested);
-
-      showSnackbar({
-        severity: "success",
-        message: isDesiredLocation ? "BR sent" : requiresPrepayment ? "Continue to prepayment" : "Booking confirmed",
-      });
-
-      router.push(resolveCreateCheckoutPath({ locationMode, requiresPrepayment }));
-    } catch (error) {
+    } catch {
       showSnackbar({
         severity: "error",
-        message: getApiErrorMessage(error, "Unable to submit booking. Please try again."),
+        message: "Booking was saved on the server, but local session could not be updated.",
       });
+      return;
     }
+
+    showSnackbar({
+      severity: "success",
+      message: requiresPrepayment ? "Booking request sent — continue to prepayment" : "Booking request sent",
+    });
+
+    router.push(resolveCreateCheckoutPath({ locationMode, requiresPrepayment }));
   };
 
-  const continueLabel = isDesiredLocation
-    ? "Send booking request"
-    : parsePrepaymentPercent(businessProfile?.prepaymentLabel) > 0
-      ? "Continue to payment"
-      : "Confirm booking";
+  const continueLabel =
+    parsePrepaymentPercent(businessProfile?.prepaymentLabel) > 0
+      ? "Send request & continue to payment"
+      : "Send booking request";
 
   const planningFieldSx = {
     "& .MuiOutlinedInput-root": {

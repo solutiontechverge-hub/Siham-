@@ -1,20 +1,21 @@
 "use client";
 
 import * as React from "react";
-import { Box, Chip } from "@mui/material";
+import { Box, Chip, Stack } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import type { SxProps, Theme } from "@mui/material/styles";
 import CalendarBookingCard from "./CalendarBookingCard";
 import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 
-const TICKET_OFFSET_Y = 8;
-const TICKET_OFFSET_X = 14;
+const TICKET_GAP = 4;
+const TICKET_ROW_HEIGHT = 72;
 
 export type CalendarBookingTicketStackProps = {
   events: readonly CalendarEvent[];
   top: number;
   height: number;
   getServiceColor: (event: CalendarEvent) => string | undefined;
+  getStatusColor?: (event: CalendarEvent) => string | undefined;
   onOpen: (event: CalendarEvent) => void;
   onOpenCalendar: (event: CalendarEvent) => void;
   onOpenNotes: (event: CalendarEvent) => void;
@@ -25,8 +26,9 @@ export type CalendarBookingTicketStackProps = {
 export default function CalendarBookingTicketStack({
   events,
   top,
-  height,
+  height: _slotHeight,
   getServiceColor,
+  getStatusColor,
   onOpen,
   onOpenCalendar,
   onOpenNotes,
@@ -35,8 +37,8 @@ export default function CalendarBookingTicketStack({
 }: CalendarBookingTicketStackProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
-  const ticketHeight = Math.max(72, height);
-  const stackHeight = ticketHeight + (events.length - 1) * TICKET_OFFSET_Y;
+  const ticketHeight = TICKET_ROW_HEIGHT;
+  const stackHeight = events.length * ticketHeight + Math.max(0, events.length - 1) * TICKET_GAP;
 
   return (
     <Box
@@ -47,8 +49,8 @@ export default function CalendarBookingTicketStack({
         right: 6,
         height: stackHeight,
         minHeight: stackHeight,
-        zIndex: 5,
-        pointerEvents: "none",
+        zIndex: 8,
+        overflow: "visible",
       }}
     >
       <Chip
@@ -70,38 +72,39 @@ export default function CalendarBookingTicketStack({
         }}
       />
 
-      {events.map((event, index) => {
-        const ticketSx: SxProps<Theme> = {
-          position: "absolute",
-          top: index * TICKET_OFFSET_Y,
-          left: index * TICKET_OFFSET_X,
-          right: Math.max(0, (events.length - 1 - index) * 6),
-          height: ticketHeight,
-          minHeight: ticketHeight,
-          zIndex: index + 1,
-          pointerEvents: "auto",
-        };
+      <Stack spacing={`${TICKET_GAP}px`} sx={{ width: "100%", overflow: "visible" }}>
+        {events.map((event, index) => {
+          const ticketSx: SxProps<Theme> = {
+            flexShrink: 0,
+            width: "100%",
+            height: ticketHeight,
+            minHeight: ticketHeight,
+            zIndex: index + 1,
+            position: "relative",
+          };
 
-        return (
-          <CalendarBookingCard
-            key={event.id}
-            event={event}
-            top={0}
-            height={ticketHeight}
-            left={0}
-            right={0}
-            variant="ticket"
-            positioned={false}
-            containerSx={ticketSx}
-            serviceColor={getServiceColor(event)}
-            onOpen={() => onOpen(event)}
-            onOpenCalendar={() => onOpenCalendar(event)}
-            onOpenNotes={() => onOpenNotes(event)}
-            onOpenClient={() => onOpenClient(event)}
-            onOpenMessages={() => onOpenMessages(event)}
-          />
-        );
-      })}
+          return (
+            <CalendarBookingCard
+              key={event.id}
+              event={event}
+              top={0}
+              height={ticketHeight}
+              left={0}
+              right={0}
+              variant="ticket"
+              positioned={false}
+              containerSx={ticketSx}
+              serviceColor={getServiceColor(event)}
+              statusColor={getStatusColor?.(event)}
+              onOpen={() => onOpen(event)}
+              onOpenCalendar={() => onOpenCalendar(event)}
+              onOpenNotes={() => onOpenNotes(event)}
+              onOpenClient={() => onOpenClient(event)}
+              onOpenMessages={() => onOpenMessages(event)}
+            />
+          );
+        })}
+      </Stack>
     </Box>
   );
 }

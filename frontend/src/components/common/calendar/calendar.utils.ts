@@ -75,6 +75,22 @@ export function toIsoLocalDate(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+/** Extract YYYY-MM-DD without UTC timezone shifts (for API timestamps). */
+export function wallClockDateFromDateTime(value?: string | null) {
+  if (!value) return null;
+  const match = String(value).match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : null;
+}
+
+/** Extract HH:mm without UTC timezone shifts (for API timestamps). */
+export function wallClockTimeFromDateTime(value?: string | null) {
+  if (!value) return null;
+  const match = String(value).match(/T(\d{2}:\d{2})/);
+  if (match) return match[1];
+  if (/^\d{2}:\d{2}/.test(value)) return value.slice(0, 5);
+  return null;
+}
+
 export function formatLongDateUtc(iso: string) {
   return parseIsoDate(iso).toLocaleDateString("en-US", {
     month: "short",
@@ -121,6 +137,32 @@ export function startOfWeekIso(iso: string) {
   const dt = parseIsoDate(iso);
   const dow = dt.getUTCDay();
   return addDaysIso(iso, -((dow + 6) % 7));
+}
+
+export type CalendarQueryViewMode = "day" | "week" | "month";
+
+export type CalendarQueryDateRange = {
+  startDate: string;
+  endDate: string;
+};
+
+/** Maps the visible calendar range to API query params for /calendar/overview. */
+export function getCalendarQueryDateRange(
+  activeDateIso: string,
+  viewMode: CalendarQueryViewMode,
+): CalendarQueryDateRange {
+  if (viewMode === "day") {
+    return { startDate: activeDateIso, endDate: activeDateIso };
+  }
+
+  if (viewMode === "week") {
+    const startDate = startOfWeekIso(activeDateIso);
+    return { startDate, endDate: addDaysIso(startDate, 6) };
+  }
+
+  const monthStart = toMonthIso(activeDateIso);
+  const gridStart = startOfWeekIso(monthStart);
+  return { startDate: gridStart, endDate: addDaysIso(gridStart, 41) };
 }
 
 export function mergeIntervals(intervals: readonly Interval[]) {
