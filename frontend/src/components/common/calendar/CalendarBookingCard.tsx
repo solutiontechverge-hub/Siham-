@@ -7,8 +7,8 @@ import type { SxProps, Theme } from "@mui/material/styles";
 import BookingTimelineCard from "../BookingTimelineCard";
 import { useProfessionalMessagingUnread } from "../messaging/useProfessionalMessagingUnread";
 import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
-import { extractBookingId, statusChipSx } from "./calendar.utils";
-import { getBookingScenarioIndicators, statusCardAccent, isBookingRequestAccepted, isBookingRequestRejected } from "./bookingStatus";
+import { extractBookingId } from "./calendar.utils";
+import { getBookingScenarioIndicators, statusCardAccent, statusChipSxWithOverride, isBookingRequestAccepted, isBookingRequestRejected } from "./bookingStatus";
 import { resolveBookingResponseIndicators } from "./bookingResponseStatus";
 import { resolveCalendarPrepaymentStatus, toPrepaymentIconVariant } from "./prepaymentStatus";
 
@@ -19,6 +19,7 @@ export type CalendarBookingCardProps = {
   left: string | number;
   right: string | number;
   serviceColor?: string;
+  statusColor?: string;
   variant?: "default" | "ticket";
   positioned?: boolean;
   containerSx?: SxProps<Theme>;
@@ -47,6 +48,7 @@ export default function CalendarBookingCard({
   left,
   right,
   serviceColor,
+  statusColor,
   variant = "default",
   positioned = true,
   containerSx,
@@ -59,21 +61,25 @@ export default function CalendarBookingCard({
   const theme = useTheme();
   const m = theme.palette.mollure;
   const isTicket = variant === "ticket";
-  const cardHeight = Math.max(isTicket ? 72 : 78, height);
+  const cardHeight = isTicket ? 72 : Math.max(78, height);
   const bookingRef = event.bookingCode ?? extractBookingId(event.id);
   const unreadCount = useProfessionalMessagingUnread(bookingRef);
-  const accent = statusCardAccent(event.status);
+  const accent = statusCardAccent(event.status, statusColor);
   const scenarioIndicators = getBookingScenarioIndicators(event);
   const responseIndicators = resolveBookingResponseIndicators(event);
   const prepaymentStatus = resolveCalendarPrepaymentStatus(event);
   const prepaymentIconVariant = prepaymentStatus ? toPrepaymentIconVariant(prepaymentStatus) : undefined;
   const isDesiredLocation = event.location === "DL";
   const isFixedLocation = event.location === "FL";
-  const hasNote = Boolean(event.details?.internalNote?.trim() || event.details?.showInternalNote);
+  const hasNote = Boolean(event.details?.internalNote?.trim());
   const accentColor = serviceColor ?? accent.color;
   const backgroundColor = serviceColor ? alpha(serviceColor, isDesiredLocation ? 0.08 : 0.075) : accent.bg;
   const borderColor =
-    event.status === "Requested" && !serviceColor ? accent.border : serviceColor ? alpha(serviceColor, 0.34) : accent.border;
+    serviceColor
+      ? alpha(serviceColor, 0.34)
+      : event.status === "Requested"
+        ? accent.border
+        : accent.border;
   const cardPattern = isDesiredLocation ? "dots" : isFixedLocation ? "lines" : "none";
 
   return (
@@ -122,7 +128,7 @@ export default function CalendarBookingCard({
         locationLabel={event.location}
         status={{
           label: event.status,
-          sx: statusChipSx(event.status, m),
+          sx: statusChipSxWithOverride(event.status, statusColor),
         }}
         accentColor={accentColor}
         borderColor={borderColor}
@@ -157,7 +163,7 @@ export default function CalendarBookingCard({
           onClick: onOpenCalendar,
         }}
         notesAction={{
-          show: !isTicket && hasNote,
+          show: hasNote,
           tooltip: "Note added",
           onClick: onOpenNotes,
         }}

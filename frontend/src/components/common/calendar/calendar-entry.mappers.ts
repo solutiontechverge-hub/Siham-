@@ -6,6 +6,8 @@ import type {
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { CalendarEntry, CreateCalendarEntryRequest } from "../../../store/services/businessApi";
 import type { SelectedSlot } from "./calendar.utils";
+import { parseCalendarEntryNotes, serializeCalendarEntryNotes } from "./bookingEventDetails";
+import type { CalendarBookingDetails } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 
 const statusToApi: Record<CalendarBookingStatus, CreateCalendarEntryRequest["status"]> = {
   Confirmed: "confirmed",
@@ -81,8 +83,9 @@ export function buildCreateCalendarEntryPayload(input: {
   location: CalendarBookingLocation;
   serviceIds?: readonly string[];
   notes?: string | null;
+  details?: CalendarBookingDetails;
 }): CreateCalendarEntryRequest {
-  const { selectedSlot, title, clientName, status, bookingType, location, serviceIds, notes } = input;
+  const { selectedSlot, title, clientName, status, bookingType, location, serviceIds, notes, details } = input;
 
   return {
     team_member_id: selectedSlot.resourceId?.trim() || null,
@@ -95,7 +98,7 @@ export function buildCreateCalendarEntryPayload(input: {
     location_type: locationToApi(location),
     booking_type: bookingTypeToApi[bookingType],
     client_name: clientName,
-    notes: notes ?? null,
+    notes: notes ?? serializeCalendarEntryNotes(details?.internalNote ?? "", details),
     service_ids: filterUuidServiceIds(serviceIds ?? []),
   };
 }
@@ -118,12 +121,7 @@ export function mapCalendarEntryToEvent(entry: CalendarEntry, fallbackResourceId
         : "Offline",
     bookingScenario: statusFromApi[entry.status] === "Requested" ? "BR" : undefined,
     showClientName: entry.client_name ?? undefined,
-    details: entry.notes
-      ? {
-          internalNote: entry.notes,
-          showInternalNote: true,
-        }
-      : undefined,
+    details: parseCalendarEntryNotes(entry.notes),
   };
 }
 

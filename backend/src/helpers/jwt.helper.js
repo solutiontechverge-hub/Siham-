@@ -11,7 +11,7 @@ const getPayload = (user) => ({
 });
 
 export const generateAccessToken = (user) =>
-  jwt.sign(getPayload(user), jwtSecret, { expiresIn: "15m" });
+  jwt.sign(getPayload(user), jwtSecret, { expiresIn: "5h" });
 
 export const generateRefreshToken = (user) =>
   jwt.sign(getPayload(user), refreshSecret, { expiresIn: "7d" });

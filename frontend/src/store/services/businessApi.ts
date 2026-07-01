@@ -291,6 +291,11 @@ export type CalendarOverview = {
   settings: CalendarSettings | null;
 };
 
+export type CalendarOverviewQuery = {
+  startDate: string;
+  endDate: string;
+};
+
 export type CreateCalendarEntryRequest = {
   team_member_id?: string | null;
   status?: CalendarEntry["status"];
@@ -337,8 +342,8 @@ export type CreateBookingRequest = {
   prepayment_status?: string | null;
   status?: "requested" | "cancelled" | "completed" | "confirmed" | "no_show";
   booking_type?: "online" | "offline" | "project" | "request";
-  unique_code?: string;
-  total_price?: number | null;
+  unique_code?: string | null;
+  total_price?: number | string | null;
   contact_number?: string | null;
 };
 
@@ -592,10 +597,14 @@ export const businessApi = baseApi.injectEndpoints({
       },
       providesTags: ["BusinessSetup"],
     }),
-    getCalendarOverview: builder.query<ApiEnvelope<CalendarOverview>, void>({
-      async queryFn(_arg, _api, _extraOptions, fetchWithBQ) {
+    getCalendarOverview: builder.query<ApiEnvelope<CalendarOverview>, CalendarOverviewQuery>({
+      async queryFn(arg, _api, _extraOptions, fetchWithBQ) {
+        const params = new URLSearchParams({
+          startDate: arg.startDate,
+          endDate: arg.endDate,
+        });
         const response = await fetchWithBQ({
-          url: "/api/business/calendar/overview",
+          url: `/api/business/calendar/overview?${params.toString()}`,
           method: "GET",
         });
 

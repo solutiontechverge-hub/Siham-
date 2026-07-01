@@ -100,6 +100,8 @@ const parseOptionalInteger = (value) => {
 
 const toIsoDate = (value) => {
   if (!value) return null;
+  const wallClock = String(value).match(/^(\d{4}-\d{2}-\d{2})/);
+  if (wallClock) return wallClock[1];
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed.toISOString().slice(0, 10);
@@ -107,14 +109,58 @@ const toIsoDate = (value) => {
 
 const toTimeLabel = (value) => {
   if (!value) return null;
+  const wallClock = String(value).match(/T(\d{2}:\d{2})/);
+  if (wallClock) return wallClock[1];
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed.toISOString().slice(11, 16);
 };
 
+const normalizeBookingDateInput = (value) => {
+  if (!value) return null;
+  const match = String(value).match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : null;
+};
+
+const calendarEntryDateSql = (alias) =>
+  `substring(COALESCE(${alias}.start_time::text, ${alias}.blocked_time_start::text, ${alias}.start_date::text) from 1 for 10)::date`;
+
+const calendarEntryInRangeSql = (alias, startParam, endParam) => `(
+  ${calendarEntryDateSql(alias)} BETWEEN ${startParam}::date AND ${endParam}::date
+  OR (
+    ${alias}.start_date IS NOT NULL
+    AND ${alias}.end_date IS NOT NULL
+    AND ${alias}.start_date <= ${endParam}::date
+    AND ${alias}.end_date >= ${startParam}::date
+  )
+)`;
+
+const bookingDateSql = (alias) =>
+  `substring(COALESCE(${alias}.start_time::text, ${alias}.booking_date::text) from 1 for 10)::date`;
+
 const makeCalendarCode = (prefix = "OF123") => `${prefix}${Date.now()}${Math.random().toString(16).slice(2, 6)}`;
 const calendarStatusSet = new Set(["requested", "cancelled", "completed", "confirmed", "blocked", "no_show"]);
 const bookingStatusSet = new Set(["requested", "cancelled", "completed", "confirmed", "no_show"]);
+
+const ensureUniqueBookingCode = async (preferredCode, prefix = "123") => {
+  const trimmed = String(preferredCode ?? "").trim();
+  if (trimmed) {
+    const existing = await query(`SELECT 1 FROM bookings WHERE unique_code = $1 LIMIT 1`, [trimmed]);
+    if (!existing.rows.length) {
+      return trimmed;
+    }
+  }
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const candidate = makeCalendarCode(prefix);
+    const existing = await query(`SELECT 1 FROM bookings WHERE unique_code = $1 LIMIT 1`, [candidate]);
+    if (!existing.rows.length) {
+      return candidate;
+    }
+  }
+
+  return makeCalendarCode(prefix);
+};
 
 const normalizeCalendarStatus = (value, fallback = "confirmed") => {
   const next = String(value ?? "").trim().toLowerCase();
@@ -1032,6 +1078,25 @@ export const getCalendarOverview = async (req, res) => {
       });
     }
 
+    const startDate = normalizeBookingDateInput(req.query.startDate);
+    const endDate = normalizeBookingDateInput(req.query.endDate);
+
+    if ((startDate && !endDate) || (!startDate && endDate)) {
+      return res.status(400).json({
+        success: false,
+        message: "Both startDate and endDate are required when filtering calendar overview.",
+        data: null,
+      });
+    }
+
+    if (startDate && endDate && startDate > endDate) {
+      return res.status(400).json({
+        success: false,
+        message: "startDate must be on or before endDate.",
+        data: null,
+      });
+    }
+
     const professionalProfile = await getProfessionalProfile(req.user.id);
 
     if (!professionalProfile) {
@@ -1042,13 +1107,20 @@ export const getCalendarOverview = async (req, res) => {
       });
     }
 
+    const dateFilterParams = startDate && endDate ? [startDate, endDate] : [];
+    const entriesDateClause =
+      startDate && endDate ? `AND ${calendarEntryInRangeSql("calendar_entries", "$2", "$3")}` : "";
+    const bookingsDateClause =
+      startDate && endDate ? `AND ${bookingDateSql("b")} BETWEEN $2::date AND $3::date` : "";
+
     const [entriesResult, bookingsResult, settingsResult] = await Promise.all([
       query(
         `SELECT *
          FROM calendar_entries
          WHERE professional_profile_id = $1
+         ${entriesDateClause}
          ORDER BY COALESCE(start_time, blocked_time_start, created_at) DESC`,
-        [professionalProfile.id],
+        [professionalProfile.id, ...dateFilterParams],
       ),
       query(
         `SELECT
@@ -1067,8 +1139,9 @@ export const getCalendarOverview = async (req, res) => {
          LEFT JOIN users u ON u.id = b.customer_id
          LEFT JOIN individual_profiles ip ON ip.user_id = u.id
          WHERE bs.professional_profile_id = $1
+         ${bookingsDateClause}
          ORDER BY COALESCE(b.start_time, b.created_at) DESC`,
-        [professionalProfile.id],
+        [professionalProfile.id, ...dateFilterParams],
       ),
       query(
         `SELECT *
@@ -1093,7 +1166,7 @@ export const getCalendarOverview = async (req, res) => {
           booking_type:
             booking.booking_type || (normalizeBookingStatus(booking.status, "confirmed") === "requested" ? "request" : "online"),
           unique_code: booking.unique_code || `123${booking.id}`,
-          date: toIsoDate(booking.booking_date || booking.start_time),
+          date: toIsoDate(booking.start_time || booking.booking_date),
           start: toTimeLabel(booking.start_time),
           end: toTimeLabel(booking.end_time),
         })),
@@ -1221,6 +1294,7 @@ export const createBooking = async (req, res) => {
     const normalizedStatus = normalizeBookingStatus(req.body.status, "requested");
     const bookingType = req.body.booking_type ?? "online";
     const generatedCodePrefix = bookingType === "offline" ? "OF123" : "123";
+    const uniqueCode = await ensureUniqueBookingCode(req.body.unique_code, generatedCodePrefix);
 
     const result = await query(
       `INSERT INTO bookings (
@@ -1253,7 +1327,7 @@ export const createBooking = async (req, res) => {
        )
        RETURNING *`,
       [
-        req.body.booking_date,
+        normalizeBookingDateInput(req.body.booking_date),
         req.body.business_setup_id,
         req.user.id,
         req.body.service_id ?? null,
@@ -1266,7 +1340,7 @@ export const createBooking = async (req, res) => {
         req.body.prepayment_status ?? null,
         normalizedStatus,
         bookingType,
-        req.body.unique_code || makeCalendarCode(generatedCodePrefix),
+        uniqueCode,
         parseOptionalNumber(req.body.total_price),
         parseTextArray(req.body.images),
         req.body.contact_number ?? null,

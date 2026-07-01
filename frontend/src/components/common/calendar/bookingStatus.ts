@@ -1,4 +1,13 @@
 import { alpha, type SxProps, type Theme } from "@mui/material/styles";
+
+const withAlpha = (hex: string, opacity: number) => {
+  const normalized = hex.replace("#", "");
+  if (normalized.length !== 6) return hex;
+  const r = Number.parseInt(normalized.slice(0, 2), 16);
+  const g = Number.parseInt(normalized.slice(2, 4), 16);
+  const b = Number.parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+};
 import type {
   CalendarBookingStatus,
   CalendarBookingType,
@@ -104,9 +113,29 @@ export function statusChipSx(status: CalendarBookingStatus): SxProps<Theme> {
   };
 }
 
-export function statusCardAccent(status: CalendarBookingStatus) {
+export function statusCardAccent(status: CalendarBookingStatus, customAccent?: string) {
+  if (customAccent) {
+    return {
+      color: customAccent,
+      bg: withAlpha(customAccent, status === "Requested" ? 0.14 : 0.1),
+      border: customAccent,
+    };
+  }
   const theme = BOOKING_STATUS_THEME[status] ?? BOOKING_STATUS_THEME["No Show"];
   return { color: theme.accent, bg: theme.cardBg, border: theme.cardBorder };
+}
+
+export function statusChipSxWithOverride(
+  status: CalendarBookingStatus,
+  customAccent?: string,
+): SxProps<Theme> {
+  if (!customAccent) return statusChipSx(status);
+  const onSolid = status === "Requested";
+  return {
+    bgcolor: onSolid ? customAccent : withAlpha(customAccent, 0.12),
+    color: onSolid ? "#FFFFFF" : customAccent,
+    borderColor: customAccent,
+  };
 }
 
 export function statusAccentColor(status: CalendarBookingStatus) {

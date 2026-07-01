@@ -12,6 +12,13 @@ export function parseTimeLabelToMinutes(label: string) {
   return hh * 60 + mm;
 }
 
+export function fmtMinutesToIsoTime(mins: number) {
+  const normalized = ((mins % (24 * 60)) + 24 * 60) % (24 * 60);
+  const hh24 = Math.floor(normalized / 60);
+  const mm = normalized % 60;
+  return `${String(hh24).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+}
+
 export function fmtMinutesToTimeLabel(mins: number) {
   const m = ((mins % (24 * 60)) + 24 * 60) % (24 * 60);
   const hh24 = Math.floor(m / 60);

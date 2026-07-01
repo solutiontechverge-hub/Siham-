@@ -23,10 +23,15 @@ export function canProfessionalReply(store: MessagingStore, threadId?: string) {
 
 export function findThreadIdByBookingRef(store: MessagingStore, bookingRef?: string) {
   if (!bookingRef?.trim()) return "";
+  const raw = bookingRef.trim();
   const q = normalizeBookingIdQuery(bookingRef);
   const match = store.threads.find((thread) => {
     const id = normalizeBookingIdQuery(thread.bookingId);
-    return id === q || id.includes(q) || q.includes(id);
+    if (q && (id === q || id.includes(q) || q.includes(id))) return true;
+    const meta = thread.bookingMeta.toLowerCase();
+    if (meta.includes(raw.toLowerCase())) return true;
+    const normalizedMeta = normalizeBookingIdQuery(thread.bookingMeta);
+    return Boolean(q && normalizedMeta.includes(q));
   });
   return match?.id ?? "";
 }
@@ -34,6 +39,11 @@ export function findThreadIdByBookingRef(store: MessagingStore, bookingRef?: str
 export function findThreadIdByClientName(store: MessagingStore, clientName?: string) {
   if (!clientName?.trim()) return "";
   const normalized = clientName.trim().toLowerCase();
-  const match = store.threads.find((thread) => thread.name.trim().toLowerCase() === normalized);
-  return match?.id ?? "";
+  const exact = store.threads.find((thread) => thread.name.trim().toLowerCase() === normalized);
+  if (exact) return exact.id;
+  const partial = store.threads.find((thread) => {
+    const threadName = thread.name.trim().toLowerCase();
+    return threadName.startsWith(normalized) || normalized.startsWith(threadName);
+  });
+  return partial?.id ?? "";
 }
