@@ -21,9 +21,9 @@ export default function AppPagination({
       direction={{ xs: "column", sm: "row" }}
       spacing={2}
       alignItems={{ xs: "stretch", sm: "center" }}
-      justifyContent="space-between"
+      justifyContent={summary ? "space-between" : "flex-end"}
     >
-      <BodyText color="text.secondary">{summary || "Browse more results"}</BodyText>
+      {summary ? <BodyText color="text.secondary">{summary}</BodyText> : null}
       <Pagination
         color="primary"
         shape="rounded"
