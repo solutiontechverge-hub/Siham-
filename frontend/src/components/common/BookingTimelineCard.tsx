@@ -14,7 +14,10 @@ import BookingIndicatorIcon, {
   BOOKING_INDICATOR_LABELS,
   type BookingIndicatorVariant,
 } from "./calendar/BookingIndicatorIcon";
-import BookingRequestBadge, { type BookingRequestBadgeState } from "./calendar/BookingRequestBadge";
+import BookingRequestBadge, {
+  type BookingRequestBadgeState,
+  type BookingRequestDirection,
+} from "./calendar/BookingRequestBadge";
 import PrepaymentStatusIcon, { type PrepaymentStatusIconVariant } from "./calendar/PrepaymentStatusIcon";
 import { PREPAYMENT_STATUS_LABELS } from "./calendar/PrepaymentStatusIcon";
 
@@ -35,6 +38,7 @@ export type BookingTimelineCardScenarioBadge = {
   prepaymentStatus?: PrepaymentStatusIconVariant;
   responseIndicators?: readonly BookingIndicatorVariant[];
   showRequestSentIcon?: boolean;
+  requestDirection?: BookingRequestDirection;
   requestAccepted?: boolean;
   requestRejected?: boolean;
   showExternalLink?: boolean;
@@ -144,7 +148,12 @@ function renderScenarioBadge(
         : "sent";
     return (
       <Box key={key} sx={{ display: "flex", alignItems: "center", gap: 0.35, flexShrink: 0, pointerEvents: "auto" }}>
-        <BookingRequestBadge variant="compact" state={brState} sx={badge.sx} />
+        <BookingRequestBadge
+          variant="compact"
+          state={brState}
+          direction={badge.requestDirection ?? "outgoing"}
+          sx={badge.sx}
+        />
       </Box>
     );
   }

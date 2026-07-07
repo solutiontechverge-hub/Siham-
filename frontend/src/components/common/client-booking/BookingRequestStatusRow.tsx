@@ -12,6 +12,8 @@ export type BookingRequestRowMode = "default" | "professional_suggested" | "prof
 
 type Props = {
   bookingStatus: ClientBookingStatus;
+  bookingRequestSent?: boolean;
+  editRequestPending?: boolean;
   requiresPrepayment?: boolean;
   bookingRequestDirection?: BookingRequestDirection;
   rowMode?: BookingRequestRowMode;
@@ -19,12 +21,21 @@ type Props = {
 
 export default function BookingRequestStatusRow({
   bookingStatus,
+  bookingRequestSent = false,
+  editRequestPending = false,
   requiresPrepayment = false,
+  bookingRequestDirection = "outgoing",
   rowMode = "default",
 }: Props) {
   const m = useTheme().palette.mollure;
   const showErPill = rowMode === "professional_suggested" || rowMode === "professional_rejected";
-  const showBrPill = bookingStatus !== "cancelled" && rowMode === "default";
+  const isDraft = bookingStatus === "draft";
+  const showBrPill =
+    bookingStatus !== "cancelled" &&
+    rowMode === "default" &&
+    (isDraft
+      ? bookingRequestSent || editRequestPending
+      : bookingRequestSent || !isDraft);
   const brAccepted = bookingStatus === "confirmed" || bookingStatus === "completed";
   const brRejected = bookingStatus === "cancelled";
 
@@ -72,6 +83,7 @@ export default function BookingRequestStatusRow({
           <BookingRequestBadge
             iconSize={12}
             state={brRejected ? "rejected" : brAccepted ? "accepted" : "sent"}
+            direction={bookingRequestDirection}
           />
           {requiresPrepayment ? <PrepaymentEuroIndicator size={22} /> : null}
         </Stack>

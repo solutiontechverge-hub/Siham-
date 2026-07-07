@@ -15,6 +15,8 @@ export type ClientBookingRecord = {
   bookingRef?: string;
   apiBookingId?: string;
   status: ClientBookingStatus;
+  /** True after the client sends a booking request while checkout is still draft. */
+  bookingRequestSent?: boolean;
   /** BR/EBR direction from the client's perspective. */
   bookingRequestDirection?: BookingRequestDirection;
   shop?: {
@@ -63,10 +65,15 @@ function isPastBooking(record: ClientBookingRecord, today = startOfDay(new Date(
   return d.getTime() < today.getTime();
 }
 
+/** Draft bookings are checkout-only until the client sends a booking request. */
+export function isClientListVisibleBooking(record: ClientBookingRecord): boolean {
+  return normalizeStatus(record) !== "draft" || Boolean(record.bookingRequestSent);
+}
+
 function normalizeStatus(record: ClientBookingRecord): ClientBookingStatus {
   if (record.status === "cancelled") return "cancelled";
   if (record.status === "no_show") return "no_show";
-  if (record.status === "draft") return "confirmed";
+  if (record.status === "draft") return "draft";
   if (record.status === "requested") return "requested";
   if (record.status === "completed") return "completed";
   if (record.status === "confirmed") {
@@ -207,7 +214,7 @@ function seedDemoBookings(): ClientBookingRecord[] {
     {
       id: "demo-requested-1",
       status: "requested",
-      bookingRequestDirection: "incoming",
+      bookingRequestDirection: "outgoing",
       requiresPrepayment: true,
       prepaid: false,
       prepaymentPercent: 20,
@@ -254,7 +261,11 @@ export function filterBookingsByTab(bookings: ClientBookingRecord[], tab: Bookin
       return status === "completed" || status === "cancelled" || status === "no_show";
     }
     if (tab === "outgoing") return status === "confirmed" && isPresentBooking(b, today);
-    return status === "requested" || status === "draft" || (status === "confirmed" && isPresentBooking(b, today));
+    return (
+      status === "requested" ||
+      (status === "draft" && Boolean(b.bookingRequestSent)) ||
+      (status === "confirmed" && isPresentBooking(b, today))
+    );
   });
   return filtered.sort((a, b) => {
     const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;

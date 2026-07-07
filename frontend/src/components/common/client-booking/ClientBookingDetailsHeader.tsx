@@ -22,11 +22,13 @@ type Props = {
   bookingRef: string;
   dateTimeLabel: string;
   bookingStatus?: ClientBookingStatus;
+  bookingRequestSent?: boolean;
   bookingRequestDirection?: BookingRequestDirection;
   locationMode?: "fixed" | "desired";
   isCancelled?: boolean;
   requiresPrepayment?: boolean;
   onEditServices?: () => void;
+  onSendBookingRequest?: () => void | Promise<void>;
   onDeleteBooking?: () => void;
   onDiscardBookingRequest?: () => void;
   messagingHref?: string;
@@ -36,11 +38,13 @@ export default function ClientBookingDetailsHeader({
   bookingRef,
   dateTimeLabel,
   bookingStatus = "confirmed",
+  bookingRequestSent = false,
   bookingRequestDirection,
   locationMode = "fixed",
   isCancelled = false,
   requiresPrepayment = false,
   onEditServices,
+  onSendBookingRequest,
   onDeleteBooking,
   onDiscardBookingRequest,
   messagingHref,
@@ -68,6 +72,11 @@ export default function ClientBookingDetailsHeader({
     });
   };
 
+  const handleSendBookingRequestFromEdit = () => {
+    setEditAnchor(null);
+    void onSendBookingRequest?.();
+  };
+
   const menuItemSx = { fontSize: 12.5, fontWeight: 800 };
 
   const displayStatus: ClientBookingStatus = isCancelled ? "cancelled" : bookingStatus;
@@ -82,7 +91,7 @@ export default function ClientBookingDetailsHeader({
     bookingStatus === "requested" &&
     bookingRequestDirection === "outgoing" &&
     locationMode === "desired";
-  const editActionsDisabled = isCancelled || isOutgoingBookingRequest;
+  const editActionsDisabled = isCancelled || isOutgoingBookingRequest || bookingRequestSent;
 
   const headerActionBtnSx = {
     borderRadius: "8px",
@@ -188,6 +197,8 @@ export default function ClientBookingDetailsHeader({
             </Stack>
             <BookingRequestStatusRow
               bookingStatus={displayStatus}
+              bookingRequestSent={bookingRequestSent}
+              editRequestPending={editRequest.isPending}
               requiresPrepayment={requiresPrepayment && requestRowMode === "default"}
               bookingRequestDirection={bookingRequestDirection}
               rowMode={requestRowMode}
@@ -259,9 +270,17 @@ export default function ClientBookingDetailsHeader({
               Change date &amp; time
             </MenuItem>
           </>
+        ) : bookingRequestSent ? (
+          <MenuItem disabled sx={{ ...menuItemSx, whiteSpace: "normal", py: 1.25, opacity: 1 }}>
+            Booking request sent — awaiting professional approval
+          </MenuItem>
         ) : editRequest.isPending ? (
           <MenuItem disabled sx={{ ...menuItemSx, whiteSpace: "normal", py: 1.25, opacity: 1 }}>
             Edit request sent — awaiting professional approval
+          </MenuItem>
+        ) : bookingStatus === "draft" && onSendBookingRequest ? (
+          <MenuItem onClick={handleSendBookingRequestFromEdit} sx={menuItemSx}>
+            Send booking request to professional
           </MenuItem>
         ) : (
           <MenuItem onClick={handleSendEditRequest} sx={menuItemSx}>
