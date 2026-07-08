@@ -7,6 +7,7 @@ import { Box, Button, ButtonBase, Chip, Container, Divider, Paper, Stack, Typogr
 import { alpha, useTheme } from "@mui/material/styles";
 import {
   filterBookingsByTab,
+  isClientBookingPaymentDue,
   statusChipLabel,
   type BookingListTab,
   type ClientBookingRecord,
@@ -14,14 +15,16 @@ import {
 } from "./clientBookingRecords";
 import { bookingStatusChipColors } from "./clientBookingStatus";
 import BookingRequestBadge from "../../../components/common/calendar/BookingRequestBadge";
+import PrepaymentPayNowIcon from "../../../components/common/client-booking/PrepaymentPayNowIcon";
+import PaymentDueIcon from "../../../components/common/client-booking/PaymentDueIcon";
 import { getCheckoutPath, setActiveBookingSession } from "./clientBookingSession";
 import { useGetMyBookingsQuery } from "../../../store/services/businessApi";
 import { mapApiBookingToClientRecord } from "./clientBookingApi.mapper";
 
 const emptyCopy: Record<BookingListTab, string> = {
-  past: "No completed bookings yet.",
-  outgoing: "No confirmed bookings for upcoming dates.",
-  upcoming: "No bookings awaiting approval. Start a new booking to request a service.",
+  past: "No past bookings yet.",
+  ongoing: "No upcoming booking",
+  upcoming: "No upcoming bookings. Start a new booking to request a service.",
 };
 
 type Props = {
@@ -40,7 +43,7 @@ export default function ClientBookingListView({ listTab }: Props) {
 
   const openBooking = (record: ClientBookingRecord) => {
     setActiveBookingSession(record);
-    router.push(getCheckoutPath(record));
+    router.push(getCheckoutPath(record, listTab));
   };
 
   const filtered = React.useMemo(() => filterBookingsByTab(bookings, listTab), [bookings, listTab]);
@@ -65,7 +68,14 @@ export default function ClientBookingListView({ listTab }: Props) {
             href="/clients/booking?tab=upcoming&mode=create"
             variant="contained"
             disableElevation
-            sx={{ borderRadius: "10px", textTransform: "none", fontWeight: 900, bgcolor: m.teal, "&:hover": { bgcolor: m.tealDark } }}
+            sx={{
+              borderRadius: "10px",
+              textTransform: "none",
+              fontWeight: 900,
+              color: "#fff",
+              bgcolor: m.teal,
+              "&:hover": { bgcolor: m.tealDark, color: "#fff" },
+            }}
           >
             New Booking
           </Button>
@@ -98,9 +108,20 @@ export default function ClientBookingListView({ listTab }: Props) {
                 const time = b.draft?.selectedTime ?? "";
                 const total = b.draft?.total ?? 0;
                 const status = (b.status ?? "confirmed") as ClientBookingStatus;
-                const isRequested = status === "requested";
-                const chipLabel = isRequested ? "Requested" : statusChipLabel(status);
-                const chipColors = bookingStatusChipColors(status);
+                const paymentDue = isClientBookingPaymentDue(b);
+                const showBrBadge =
+                  status !== "completed" &&
+                  status !== "cancelled" &&
+                  (status === "requested" || Boolean(b.bookingRequestSent));
+                const waitingForPayment =
+                  paymentDue ||
+                  (status !== "completed" &&
+                    status !== "cancelled" &&
+                    Boolean(b.requiresPrepayment) &&
+                    !b.prepaid);
+                const chipLabel =
+                  status === "requested" ? "Requested" : statusChipLabel(status, { paymentDue });
+                const chipColors = bookingStatusChipColors(status, { paymentDue });
                 return (
                   <ButtonBase
                     key={b.id}
@@ -167,7 +188,30 @@ export default function ClientBookingListView({ listTab }: Props) {
                                 border: chipColors.border,
                               }}
                             />
-                            {isRequested ? <BookingRequestBadge variant="compact" iconSize={10} /> : null}
+                            {waitingForPayment ? (
+                              <Box
+                                sx={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  width: paymentDue ? 26 : undefined,
+                                  height: paymentDue ? 26 : undefined,
+                                  borderRadius: paymentDue ? "7px" : undefined,
+                                  bgcolor: paymentDue ? alpha(m.navy, 0.04) : undefined,
+                                }}
+                                title={paymentDue ? "Payment due" : "Waiting for payment"}
+                                aria-label={paymentDue ? "Payment due" : "Waiting for payment"}
+                              >
+                                {paymentDue ? <PaymentDueIcon size={18} /> : <PrepaymentPayNowIcon size={18} />}
+                              </Box>
+                            ) : null}
+                            {showBrBadge ? (
+                              <BookingRequestBadge
+                                variant="compact"
+                                iconSize={10}
+                                direction={b.bookingRequestDirection ?? "outgoing"}
+                              />
+                            ) : null}
                           </Stack>
                           <Typography sx={{ fontWeight: 1000, color: alpha(m.navy, 0.85) }}>{total} €</Typography>
                         </Stack>

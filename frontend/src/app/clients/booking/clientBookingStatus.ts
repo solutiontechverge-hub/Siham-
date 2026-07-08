@@ -1,6 +1,7 @@
 import type { ClientBookingStatus } from "./clientBookingRecords";
 
-export function bookingStatusLabel(status: ClientBookingStatus): string {
+export function bookingStatusLabel(status: ClientBookingStatus, opts?: { paymentDue?: boolean }): string {
+  if (opts?.paymentDue) return "Payment Due";
   switch (status) {
     case "draft":
       return "Draft";
@@ -19,11 +20,21 @@ export function bookingStatusLabel(status: ClientBookingStatus): string {
   }
 }
 
-export function bookingStatusChipColors(status: ClientBookingStatus): {
+export function bookingStatusChipColors(
+  status: ClientBookingStatus,
+  opts?: { paymentDue?: boolean },
+): {
   bgcolor: string;
   color: string;
   border: string;
 } {
+  if (opts?.paymentDue) {
+    return {
+      bgcolor: "rgba(245, 166, 35, 0.18)",
+      color: "#C67A00",
+      border: "1px solid rgba(245, 166, 35, 0.35)",
+    };
+  }
   switch (status) {
     case "confirmed":
       return {

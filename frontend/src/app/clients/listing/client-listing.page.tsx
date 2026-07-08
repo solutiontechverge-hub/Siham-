@@ -176,7 +176,10 @@ export default function ClientListingPage() {
             select
             size="small"
             value={state.sort}
-            onChange={(e) => state.setSort(e.target.value as ListingSortValue)}
+            onChange={(e) => {
+              state.setSort(e.target.value as ListingSortValue);
+              state.setPage(1);
+            }}
             sx={{
               width: 104,
               "& .MuiOutlinedInput-root": {

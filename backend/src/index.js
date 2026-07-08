@@ -37,6 +37,11 @@ const startServer = async () => {
     const server = http.createServer(app);
     attachMessagingSocket(server);
 
+    server.on("error", (error) => {
+      console.error("Failed to start server:", error?.message || error);
+      process.exit(1);
+    });
+
     server.listen(port, host, () => {
       console.log(`Backend listening on http://${host}:${port}`);
       startBookingReminderJob();
@@ -44,7 +49,7 @@ const startServer = async () => {
       startMessagingRetentionJob();
     });
   } catch (error) {
-    console.error("Failed to start server:", error.message);
+    console.error("Failed to start server:", error?.message || error);
     process.exit(1);
   }
 };

@@ -18,6 +18,8 @@ export { mollureGradientIconSx, useMollureIconGradient } from "./MollureIconGrad
 export { default as ServiceCategorySliderCard } from "./ServiceCategorySliderCard";
 export { default as ServiceCategoryBar } from "./ServiceCategoryBar";
 export type { ServiceCategoryBarItem } from "./ServiceCategoryBar";
+export { default as ServiceCategoryIcon } from "./ServiceCategoryIcon";
+export type { ServiceCategoryIconProps } from "./ServiceCategoryIcon";
 export { default as AppDrawer } from "./AppDrawer";
 export { default as AppDropdown } from "./AppDropdown";
 export { default as AppDatePicker, AppCalendarPanel, normalizeDateToIso } from "./AppDatePicker";

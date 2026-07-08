@@ -99,6 +99,10 @@ function mapApiBookingType(locationMode: "fixed" | "desired"): CreateBookingRequ
   return locationMode === "desired" ? "project" : "online";
 }
 
+function mapClientBookingRequestType(locationMode: "fixed" | "desired"): CreateBookingRequest["booking_type"] {
+  return locationMode === "desired" ? "project" : "request";
+}
+
 export function buildClientBookingApiPayload(input: {
   setup: BusinessSetupListing;
   shopId: string;
@@ -107,6 +111,8 @@ export function buildClientBookingApiPayload(input: {
   status: ClientBookingStatus;
   bookingRef: string;
   total: number;
+  /** When true, creates an incoming BR for the professional (not a direct online booking). */
+  asBookingRequest?: boolean;
 }): CreateBookingRequest | null {
   const dateIso = input.draft.selectedDateISO;
   const startMinutes = parseTimeLabelToMinutes(input.draft.selectedTime ?? "");
@@ -134,7 +140,9 @@ export function buildClientBookingApiPayload(input: {
     end_time: buildDateTimeIso(dateIso, startMinutes + Math.max(durationMinutes, 15)),
     location_type: input.locationMode === "desired" ? "desired" : "fixed",
     status: mapApiStatus(input.status),
-    booking_type: mapApiBookingType(input.locationMode),
+    booking_type: input.asBookingRequest
+      ? mapClientBookingRequestType(input.locationMode)
+      : mapApiBookingType(input.locationMode),
     unique_code: input.bookingRef,
     total_price: input.total,
     notes,

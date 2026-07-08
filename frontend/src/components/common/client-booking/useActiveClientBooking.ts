@@ -3,7 +3,11 @@
 import * as React from "react";
 import type { ClientBookingRecord } from "../../../app/clients/booking/clientBookingRecords";
 import { mapApiBookingToClientRecord } from "../../../app/clients/booking/clientBookingApi.mapper";
-import { ACTIVE_BOOKING_ID_KEY, CHECKOUT_REF_KEY } from "../../../app/clients/booking/clientBookingSession";
+import {
+  ACTIVE_BOOKING_ID_KEY,
+  CHECKOUT_REF_KEY,
+  getActiveBookingSession,
+} from "../../../app/clients/booking/clientBookingSession";
 import { useGetMyBookingsQuery } from "../../../store/services/businessApi";
 
 function matchActiveBooking(
@@ -61,10 +65,24 @@ export function useActiveClientBooking() {
     return rows.map(mapApiBookingToClientRecord);
   }, [data]);
 
-  const record = React.useMemo(
-    () => matchActiveBooking(bookings, activeId, bookingRef),
-    [activeId, bookingRef, bookings],
-  );
+  const record = React.useMemo(() => {
+    const fromApi = matchActiveBooking(bookings, activeId, bookingRef);
+    if (fromApi) return fromApi;
+
+    const sessionRecord = getActiveBookingSession();
+    if (!sessionRecord) return null;
+
+    const sessionId = sessionRecord.apiBookingId ?? sessionRecord.id;
+    if (activeId && sessionId !== activeId) return null;
+
+    if (bookingRef) {
+      const normalized = bookingRef.replace(/^#/, "").trim();
+      const recordRef = sessionRecord.bookingRef?.replace(/^#/, "").trim();
+      if (recordRef && recordRef !== normalized && sessionId !== normalized) return null;
+    }
+
+    return sessionRecord;
+  }, [activeId, bookingRef, bookings]);
 
   React.useEffect(() => {
     if (!record || typeof window === "undefined") return;
