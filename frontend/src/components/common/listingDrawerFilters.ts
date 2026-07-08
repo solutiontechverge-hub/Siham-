@@ -1,5 +1,5 @@
 export type ListingSearchFor = "all" | "women" | "men" | "kids";
-export type ListingPriceTier = "1" | "2" | "3" | "4";
+export type ListingPriceTier = "1" | "2" | "3";
 
 export type ListingDrawerFilters = {
   /** `null` = no audience filter (nothing checked) */
@@ -25,7 +25,7 @@ export type ListingCardFilterMeta = {
 
 export const defaultListingDrawerFilters = (): ListingDrawerFilters => ({
   searchFor: null,
-  priceTiers: { "1": false, "2": false, "3": false, "4": false },
+  priceTiers: { "1": false, "2": false, "3": false },
   discount: false,
   allSelectedCategories: false,
   noPrepayment: false,
@@ -41,10 +41,9 @@ const SEARCH_FOR_OPTIONS: { key: ListingSearchFor; label: string }[] = [
 ];
 
 const PRICE_TIER_OPTIONS: { key: ListingPriceTier; label: string }[] = [
-  { key: "1", label: "€" },
-  { key: "2", label: "€€" },
-  { key: "3", label: "€€€" },
-  { key: "4", label: "€€€€" },
+  { key: "1", label: "€ (Budget-friendly)" },
+  { key: "2", label: "€€ (Standard)" },
+  { key: "3", label: "€€€ (Premium)" },
 ];
 
 const OTHER_OPTIONS: { key: keyof Omit<ListingDrawerFilters, "searchFor" | "priceTiers">; label: string }[] = [
@@ -71,10 +70,10 @@ function getLowestPrice(card: ListingCardFilterMeta): number {
 
 export function resolvePriceTier(card: ListingCardFilterMeta): ListingPriceTier {
   const price = getLowestPrice(card);
+  // Budget-friendly / Standard / Premium based on lowest service price
   if (price < 30) return "1";
   if (price < 60) return "2";
-  if (price < 100) return "3";
-  return "4";
+  return "3";
 }
 
 function cardMatchesSearchFor(card: ListingCardFilterMeta, searchFor: ListingSearchFor | null): boolean {
