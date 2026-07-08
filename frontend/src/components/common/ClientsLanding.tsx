@@ -24,6 +24,7 @@ import MarketingSiteFooter from "./MarketingSiteFooter";
 import MollureMarketingHeader from "./MollureMarketingHeader";
 import { BodyText as Typography } from "../ui/typography";
 import AppMultiSelect from "./AppMultiSelect";
+import ServiceCategoryIcon from "./ServiceCategoryIcon";
 import TestimonialsCarousel from "./TestimonialsCarousel";
 
 export type ClientsLandingOverrides = {
@@ -191,6 +192,17 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
                       options={(filter.options ?? []).map((option) => ({
                         label: option,
                         value: option,
+                        ...(filter.label === "Select Category"
+                          ? {
+                              icon: (
+                                <ServiceCategoryIcon
+                                  label={option}
+                                  fontSize={18}
+                                  color={tokens.teal}
+                                />
+                              ),
+                            }
+                          : {}),
                       }))}
                       onChange={(next) =>
                         setFilterValues((prev) => ({
@@ -340,6 +352,8 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
               {professionalCta.description}
             </Typography>
             <Button
+              component={Link}
+              href={professionalCta.href}
               variant="contained"
               disableElevation
               sx={{

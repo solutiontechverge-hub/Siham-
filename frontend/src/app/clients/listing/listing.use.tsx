@@ -8,7 +8,7 @@ import { cardMatchesListingFilters } from "./listing.filters";
 import { hasListingSearchParams } from "./listingSearchParams";
 import type { ListingCardData } from "./listing.data";
 
-export type ListingSortValue = "recommended" | "rating" | "price_asc" | "price_desc";
+export type ListingSortValue = "recommended" | "alpha_asc" | "alpha_desc" | "rating_desc";
 
 const initialFilters: ListingFilterValues = {
   dateTime: null,
@@ -89,18 +89,29 @@ export function useClientListingState(
 
   const sorted = React.useMemo(() => {
     if (sort === "recommended") return filtered;
+
     const clone = [...filtered];
-    if (sort === "rating") {
-      clone.sort((a, b) => b.rating - a.rating);
+    const byTitle = (a: ListingCardData, b: ListingCardData) =>
+      a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
+
+    if (sort === "alpha_asc") {
+      clone.sort(byTitle);
       return clone;
     }
-    // price sorting using first service "Starting From XX EUR"
-    const getPrice = (c: ListingCardData) => {
-      const text = c.services[0]?.priceLabel || c.startingFromLabel;
-      const match = text.match(/(\d+)\s*EUR/i);
-      return match ? Number(match[1]) : 0;
-    };
-    clone.sort((a, b) => (sort === "price_asc" ? getPrice(a) - getPrice(b) : getPrice(b) - getPrice(a)));
+
+    if (sort === "alpha_desc") {
+      clone.sort((a, b) => byTitle(b, a));
+      return clone;
+    }
+
+    // Highest Rated → Lowest Rated (tie-break: more reviews, then title)
+    clone.sort((a, b) => {
+      const ratingDiff = b.rating - a.rating;
+      if (ratingDiff !== 0) return ratingDiff;
+      const reviewDiff = b.reviewsCount - a.reviewsCount;
+      if (reviewDiff !== 0) return reviewDiff;
+      return byTitle(a, b);
+    });
     return clone;
   }, [filtered, sort]);
 
