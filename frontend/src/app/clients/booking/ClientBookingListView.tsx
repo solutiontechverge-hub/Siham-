@@ -18,6 +18,7 @@ import {
 import { bookingStatusChipColors } from "./clientBookingStatus";
 import BookingRequestBadge from "../../../components/common/calendar/BookingRequestBadge";
 import PrepaymentPayNowIcon from "../../../components/common/client-booking/PrepaymentPayNowIcon";
+import PaymentDueIcon from "../../../components/common/client-booking/PaymentDueIcon";
 import { getCheckoutPath, setActiveBookingSession } from "./clientBookingSession";
 
 const fallbackAddress = "Marina-Park 50, Den Helder, Noord-Holland";
@@ -186,11 +187,19 @@ export default function ClientBookingListView({ listTab }: Props) {
                           />
                           {waitingForPayment ? (
                             <Box
-                              sx={{ display: "inline-flex", alignItems: "center" }}
+                              sx={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                width: paymentDue ? 26 : undefined,
+                                height: paymentDue ? 26 : undefined,
+                                borderRadius: paymentDue ? "7px" : undefined,
+                                bgcolor: paymentDue ? alpha(m.navy, 0.04) : undefined,
+                              }}
                               title={paymentDue ? "Payment due" : "Waiting for payment"}
                               aria-label={paymentDue ? "Payment due" : "Waiting for payment"}
                             >
-                              <PrepaymentPayNowIcon size={18} />
+                              {paymentDue ? <PaymentDueIcon size={18} /> : <PrepaymentPayNowIcon size={18} />}
                             </Box>
                           ) : null}
                           {showBrBadge ? (

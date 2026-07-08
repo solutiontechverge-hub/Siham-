@@ -42,6 +42,7 @@ export default function ClientBookingPoliciesAccordion({
       sx={{
         borderRadius: "10px !important",
         border: `1px solid ${alpha(m.navy, 0.08)}`,
+        borderLeft: `3px solid ${alpha(m.teal, 0.55)}`,
         bgcolor: "#fff",
         overflow: "hidden",
         "&:before": { display: "none" },
@@ -59,7 +60,7 @@ export default function ClientBookingPoliciesAccordion({
         }
         sx={{
           px: 2,
-          minHeight: 48,
+          minHeight: 52,
           "& .MuiAccordionSummary-content": { my: 1 },
         }}
       >

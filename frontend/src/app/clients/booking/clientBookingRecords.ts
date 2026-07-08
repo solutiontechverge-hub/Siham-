@@ -118,7 +118,7 @@ export function loadClientBookingsForList(): ClientBookingRecord[] {
   const hasUserBooking = all.some((b) => !b.id.startsWith("demo-"));
   if (hasUserBooking) return all.filter((b) => !b.id.startsWith("demo-"));
   // Demo-only storage: refresh once when the past trio seed is missing.
-  if (!all.some((b) => b.id === "demo-cancelled-1" && b.status === "cancelled")) {
+  if (!all.some((b) => b.id === "demo-completed-1" && (b.draft?.total ?? 0) >= 600)) {
     const seeded = seedDemoBookings();
     saveClientBookings(seeded);
     return seeded;
@@ -226,13 +226,50 @@ function seedDemoBookings(): ClientBookingRecord[] {
       id: "demo-completed-1",
       status: "completed",
       paid: true,
+      requiresPrepayment: true,
+      prepaid: true,
+      prepaymentPercent: 50,
       shop: { shopName: "Craig Martha Salon", addressLabel: "Marina-Park 50, Den Helder" },
       draft: {
         selectedDateISO: fmt(pastCompleted),
         selectedTime: "10:00 AM",
         combineServices: false,
-        services: [{ id: "s1", name: "Buzz Cut", durationMins: 45, price: 25, guestId: null, teamMemberId: "tm-1" }],
-        total: 25,
+        people: [
+          { id: "p-main", name: "Sara Johnson", isRequester: true },
+          { id: "p-guest", name: "Emily", participantType: "guest" },
+        ],
+        teamMembers: [
+          { id: "tm-1", name: "Craig Martha" },
+          { id: "tm-2", name: "Ryan Harris" },
+        ],
+        services: [
+          {
+            id: "s1",
+            name: "Buzz Cut",
+            durationMins: 45,
+            price: 200,
+            guestId: "p-main",
+            teamMemberId: "tm-1",
+          },
+          {
+            id: "s2",
+            name: "Blow Dry",
+            durationMins: 30,
+            price: 200,
+            guestId: "p-guest",
+            teamMemberId: "tm-2",
+          },
+          {
+            id: "s3",
+            name: "Hair Treatment Add-on",
+            durationMins: 20,
+            price: 200,
+            guestId: "p-main",
+            teamMemberId: "tm-1",
+            isAddOn: true,
+          },
+        ],
+        total: 600,
       },
       createdAt: pastCompleted.toISOString(),
     },

@@ -7,6 +7,7 @@ import { bookingStatusChipColors, bookingStatusLabel } from "../../../app/client
 import BookingRequestBadge from "../calendar/BookingRequestBadge";
 import EditRequestIndicatorIcon from "./EditRequestIndicatorIcon";
 import PrepaymentPayNowIcon from "./PrepaymentPayNowIcon";
+import PaymentDueIcon from "./PaymentDueIcon";
 
 export type BookingRequestRowMode = "default" | "professional_suggested" | "professional_rejected";
 
@@ -95,11 +96,19 @@ export default function BookingRequestStatusRow({
       ) : null}
       {showPaymentIcon ? (
         <Box
-          sx={{ display: "inline-flex", alignItems: "center" }}
+          sx={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: paymentDue ? 30 : undefined,
+            height: paymentDue ? 30 : undefined,
+            borderRadius: paymentDue ? "8px" : undefined,
+            bgcolor: paymentDue ? alpha(m.navy, 0.04) : undefined,
+          }}
           title={paymentDue ? "Payment due" : "Waiting for payment"}
           aria-label={paymentDue ? "Payment due" : "Waiting for payment"}
         >
-          <PrepaymentPayNowIcon size={22} />
+          {paymentDue ? <PaymentDueIcon size={22} /> : <PrepaymentPayNowIcon size={22} />}
         </Box>
       ) : null}
       {showBrPill ? (

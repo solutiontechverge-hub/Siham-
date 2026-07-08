@@ -8,10 +8,15 @@ type Props = {
   open: boolean;
   onClose: () => void;
   onConfirm: () => void;
+  variant?: "cancelled" | "completed";
 };
 
-export default function ClientBookingDeleteDialog({ open, onClose, onConfirm }: Props) {
+export default function ClientBookingDeleteDialog({ open, onClose, onConfirm, variant = "cancelled" }: Props) {
   const m = useTheme().palette.mollure;
+  const message =
+    variant === "completed"
+      ? "Remove this completed booking from your list?"
+      : "Remove this cancelled booking from your list?";
 
   return (
     <MessagingModalShell
@@ -32,9 +37,7 @@ export default function ClientBookingDeleteDialog({ open, onClose, onConfirm }: 
       }
     >
       <Box sx={{ py: 2, textAlign: "center" }}>
-        <Typography sx={{ fontWeight: 900, fontSize: 14, color: alpha(m.navy, 0.85) }}>
-          Remove this cancelled booking from your list?
-        </Typography>
+        <Typography sx={{ fontWeight: 900, fontSize: 14, color: alpha(m.navy, 0.85) }}>{message}</Typography>
       </Box>
     </MessagingModalShell>
   );
