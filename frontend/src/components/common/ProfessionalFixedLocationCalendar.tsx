@@ -243,9 +243,14 @@ export default function ProfessionalFixedLocationCalendar({
   const [editingEventId, setEditingEventId] = React.useState<string | null>(null);
   const [isEditingExisting, setIsEditingExisting] = React.useState(false);
 
+  // Sync whenever overview payload changes (ids or content). String key catches RTK/304 reuse quirks.
+  const overviewEventKey = React.useMemo(
+    () => data.events.map((event) => `${event.id}:${event.date}:${event.start}:${event.resourceId}`).join("|"),
+    [data.events],
+  );
   React.useEffect(() => {
     setEvents([...data.events]);
-  }, [data.events]);
+  }, [overviewEventKey, data.events]);
 
   const [blocks, setBlocks] = React.useState<readonly CalendarBlock[]>(() => [...data.blocks]);
   React.useEffect(() => {
@@ -875,19 +880,13 @@ export default function ProfessionalFixedLocationCalendar({
       const normalizedId = String(resourceId);
       if (!data.resources.some((resource) => String(resource.id) === normalizedId)) return;
 
+      // Day view shows one active lane but must keep all-date bookings visible.
+      // Only switch the active header — do not focus-filter by team (client bookings
+      // often have null team_member_id and would disappear).
       setSelectedResourceId(normalizedId);
-      const focusTeam = (prev: typeof appliedFilters) => ({
-        ...prev,
-        teamAll: false,
-        teamIds: Object.fromEntries(
-          data.resources.map((resource) => [resource.id, String(resource.id) === normalizedId]),
-        ),
-      });
-      setAppliedFilters(focusTeam);
-      setDraftFilters(focusTeam);
       closeTeamMenu();
     },
-    [closeTeamMenu, data.resources, setAppliedFilters, setDraftFilters],
+    [closeTeamMenu, data.resources],
   );
 
   const teamMenuResource = React.useMemo(
@@ -897,16 +896,32 @@ export default function ProfessionalFixedLocationCalendar({
 
   const displayedResources = React.useMemo(() => {
     if (viewMode === "week") return activeResource ? [activeResource] : [];
+    // Day view: one body lane for the active (or first) team member.
+    // Headers still list everyone; teamAll shows all events on this lane.
     if (viewMode === "day") return activeResource ? [activeResource] : [];
     return filteredResources;
   }, [activeResource, filteredResources, viewMode]);
 
+  const knownResourceIds = React.useMemo(
+    () => new Set(data.resources.map((resource) => String(resource.id))),
+    [data.resources],
+  );
+
   const eventsInRange = React.useMemo(
     () => {
       const base = events.filter((e) => visibleDates.includes(e.date));
-      const byTeam = appliedFilters.teamAll
-        ? base
-        : base.filter((e) => appliedFilters.teamIds[e.resourceId]);
+      // Day view: never drop bookings by team focus. Client bookings often have
+      // null team_member_id and get assigned to the first resource; focusing another
+      // team member must not hide them.
+      const byTeam =
+        viewMode === "day" || appliedFilters.teamAll
+          ? base
+          : base.filter(
+              (e) =>
+                appliedFilters.teamIds[e.resourceId] ||
+                !e.resourceId ||
+                !knownResourceIds.has(e.resourceId),
+            );
       const byLocation = appliedFilters.locationAll
         ? byTeam
         : byTeam.filter((e) => appliedFilters.locations[e.location]);
@@ -926,6 +941,8 @@ export default function ProfessionalFixedLocationCalendar({
       appliedFilters.teamAll,
       appliedFilters.teamIds,
       events,
+      knownResourceIds,
+      viewMode,
       visibleDates,
     ],
   );
@@ -2546,7 +2563,7 @@ export default function ProfessionalFixedLocationCalendar({
                 setDesignOpen(true);
               }}
               onClose={() => setAddAnchor(null)}
-              onMockAction={(label) => showSnackbar({ severity: "info", message: `${label} (mock).` })}
+              onMockAction={(label) => showSnackbar({ severity: "info", message: label })}
             />
           </Stack>
         </Box>
@@ -2900,12 +2917,15 @@ export default function ProfessionalFixedLocationCalendar({
                           {laneColumns.map(({ key, resource, date }, colIdx) => {
                             const laneEvents = eventsInRange.filter((event) => {
                               if (event.date !== date) return false;
-                              if (viewMode === "day" && appliedFilters.teamAll) return true;
+                              // Day view uses a single active lane — show every booking for that date.
+                              if (viewMode === "day") return true;
+                              if (!event.resourceId || !knownResourceIds.has(event.resourceId)) return true;
                               return event.resourceId === resource.id;
                             });
                             const laneBlocks = blocksInRange.filter((block) => {
                               if (block.date !== date) return false;
-                              if (viewMode === "day" && appliedFilters.teamAll) return true;
+                              if (viewMode === "day") return true;
+                              if (!block.resourceId || !knownResourceIds.has(block.resourceId)) return true;
                               return block.resourceId === resource.id;
                             });
 
@@ -2923,7 +2943,7 @@ export default function ProfessionalFixedLocationCalendar({
                                   overflow: "visible",
                                 }}
                               >
-                                {/* Click layer */}
+                                {/* Click layer — below booking cards */}
                                 <Box
                                   onClick={(e) => {
                                     const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
@@ -2935,7 +2955,7 @@ export default function ProfessionalFixedLocationCalendar({
                                     position: "absolute",
                                     inset: 0,
                                     cursor: date < todayIso ? "default" : "pointer",
-                                    zIndex: 2,
+                                    zIndex: 1,
                                   }}
                                 />
 
@@ -3098,7 +3118,8 @@ export default function ProfessionalFixedLocationCalendar({
                                         key={cluster.map((event) => event.id).join("-")}
                                         events={cluster}
                                         top={top}
-                                        height={height}
+                                        rowPx={rowPx}
+                                        slotHeight={height}
                                         getServiceColor={resolveServiceColor}
                                         getStatusColor={resolveStatusColor}
                                         {...eventHandlers}
@@ -3445,7 +3466,7 @@ export default function ProfessionalFixedLocationCalendar({
                         phoneNumber: nonMollureDraft.phoneNumber,
                       });
                       setSlotClientAdded(true);
-                      showSnackbar({ severity: "success", message: "Saved (mock)." });
+                      showSnackbar({ severity: "success", message: "Client details saved." });
                       setSlotBookingScreen("new-booking");
                       setSlotSaveAttempted(false);
                       return;
@@ -3456,7 +3477,7 @@ export default function ProfessionalFixedLocationCalendar({
                         phoneNumber: guestDraft.phoneNumber,
                       });
                       setSlotClientAdded(true);
-                      showSnackbar({ severity: "success", message: "Guest added (mock)." });
+                      showSnackbar({ severity: "success", message: "Guest added." });
                       setSlotBookingScreen("new-booking");
                       setSlotSaveAttempted(false);
                       return;

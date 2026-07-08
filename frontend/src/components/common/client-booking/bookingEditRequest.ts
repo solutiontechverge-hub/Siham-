@@ -26,7 +26,7 @@ export function notifyBookingEditRequestUpdated() {
 function loadAll(): Record<string, BookingEditRequestRecord> {
   if (typeof window === "undefined") return {};
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return {};
     return JSON.parse(raw) as Record<string, BookingEditRequestRecord>;
   } catch {
@@ -36,7 +36,7 @@ function loadAll(): Record<string, BookingEditRequestRecord> {
 
 function saveAll(data: Record<string, BookingEditRequestRecord>) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   notifyBookingEditRequestUpdated();
 }
 

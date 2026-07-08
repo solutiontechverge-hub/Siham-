@@ -109,7 +109,7 @@ export default function ClientListingCard({
         addressLabel: item.addressLabel,
         locationMode: mode,
       };
-      window.localStorage.setItem("mollure:selected_shop", JSON.stringify(payload));
+      window.sessionStorage.setItem("mollure:selected_shop", JSON.stringify(payload));
     } catch {
       // ignore
     }

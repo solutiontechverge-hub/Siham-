@@ -40,6 +40,20 @@ export function emitMessagingThreadRead(threadId, payload) {
   messagingIo.to(`thread:${threadId}`).emit("messaging:read", payload);
 }
 
+export function emitBookingChanged(booking, action = "updated") {
+  if (!messagingIo || !booking?.business_setup_id) return;
+  const payload = {
+    action,
+    bookingId: booking.id,
+    business_setup_id: booking.business_setup_id,
+    customer_id: booking.customer_id,
+  };
+  messagingIo.to(`business:${booking.business_setup_id}`).emit("bookings:changed", payload);
+  if (booking.customer_id) {
+    messagingIo.to(`user:${booking.customer_id}`).emit("bookings:changed", payload);
+  }
+}
+
 export function attachMessagingSocket(httpServer) {
   const io = new Server(httpServer, {
     cors: {
@@ -60,6 +74,10 @@ export function attachMessagingSocket(httpServer) {
       ids.forEach((threadId) => {
         if (threadId) socket.join(`thread:${threadId}`);
       });
+    });
+
+    socket.on("bookings:join-business", ({ businessSetupId } = {}) => {
+      if (businessSetupId) socket.join(`business:${businessSetupId}`);
     });
 
     socket.on("messaging:history", async ({ threadId }, callback) => {

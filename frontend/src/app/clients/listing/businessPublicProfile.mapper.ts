@@ -238,7 +238,7 @@ function buildProfileServices(setup: BusinessSetupListing): BusinessPublicProfil
       const priceValue = Number(detail.price);
 
       return {
-        id: detail.id != null ? String(detail.id) : `svc-${detail.serviceId ?? index}`,
+        id: detail.serviceId != null ? String(detail.serviceId) : detail.id != null ? String(detail.id) : `svc-${index}`,
         categoryId,
         categoryTitle,
         name: detail.serviceTitle as string,
@@ -340,29 +340,43 @@ function buildCategoriesFromDetails(setup: BusinessSetupListing, services: Busin
   return buildDynamicServiceCategoryTabs(categories);
 }
 
-function findServiceDetail(setup: BusinessSetupListing, serviceId: number | null | undefined) {
-  if (serviceId == null) return undefined;
-  return setup.serviceDetails?.find((d) => Number(d.serviceId) === Number(serviceId));
+function findServiceDetail(setup: BusinessSetupListing, serviceId: string | number | null | undefined) {
+  if (serviceId == null || serviceId === "") return undefined;
+  const key = String(serviceId);
+  return setup.serviceDetails?.find(
+    (d) => String(d.serviceId ?? "") === key || String(d.id ?? "") === key,
+  );
 }
 
 function buildBookCombos(setup: BusinessSetupListing): BusinessPublicProfileBookCombo[] {
   const durationByServiceId = buildDurationByServiceId(setup);
 
   return (setup.bookServiceCombinations ?? [])
-    .filter((combo) => combo.serviceTitle || combo.categoryTitle)
+    .filter((combo) => combo.serviceTitle || combo.categoryTitle || combo.service_title || combo.category_title)
     .map((combo, index) => {
-      const serviceId = Number(combo.service_id ?? combo.serviceId);
+      const serviceId = String(combo.service_id ?? combo.serviceId ?? "").trim() || null;
       const detail = findServiceDetail(setup, serviceId);
       const rawDuration =
-        durationByServiceId.get(String(serviceId)) || detail?.durationLabel?.trim() || "";
+        (serviceId ? durationByServiceId.get(serviceId) : undefined) || detail?.durationLabel?.trim() || "";
       const durationMins = parseDurationMins(rawDuration);
       const durationLabel = normalizeServiceDurationLabel(rawDuration, durationMins);
       const priceValue = detail?.price != null ? Number(detail.price) : 0;
+      const categoryLabel = String(
+        combo.categoryTitle ??
+          (combo as { category_title?: string }).category_title ??
+          "",
+      ).trim();
+      const serviceLabel = String(
+        combo.serviceTitle ??
+          (combo as { service_title?: string }).service_title ??
+          "",
+      ).trim();
 
       return {
         id: `bc-${setup.id}-${index}`,
-        categoryLabel: combo.categoryTitle?.trim() || "Category",
-        serviceLabel: combo.serviceTitle?.trim() || "Service",
+        serviceId,
+        categoryLabel: categoryLabel || "Category",
+        serviceLabel: serviceLabel || "Service",
         durationLabel: durationLabel || "—",
         priceLabel: priceValue > 0 ? formatPriceLabel(priceValue) : setup.priceRange ? `${setup.priceRange} EUR` : "Price on request",
         priceValue,

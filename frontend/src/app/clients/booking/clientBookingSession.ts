@@ -11,10 +11,7 @@ export function createBookingRef() {
 export function setActiveBookingSession(record: ClientBookingRecord) {
   if (typeof window === "undefined") return;
   if (record.bookingRef) window.sessionStorage.setItem(CHECKOUT_REF_KEY, record.bookingRef);
-  window.sessionStorage.setItem(ACTIVE_BOOKING_ID_KEY, record.id);
-  if (record.draft) {
-    window.localStorage.setItem("mollure:booking_draft", JSON.stringify(record.draft));
-  }
+  window.sessionStorage.setItem(ACTIVE_BOOKING_ID_KEY, record.apiBookingId ?? record.id);
   const shop = record.shop;
   if (shop?.shopId && shop.shopName) {
     const payload: ClientBookingSelectedShop = {
@@ -24,7 +21,7 @@ export function setActiveBookingSession(record: ClientBookingRecord) {
       addressLabel: shop.addressLabel,
       locationMode: shop.locationMode,
     };
-    window.localStorage.setItem("mollure:selected_shop", JSON.stringify(payload));
+    window.sessionStorage.setItem("mollure:selected_shop", JSON.stringify(payload));
   }
 }
 

@@ -6,6 +6,7 @@ import {
   deleteCalendarEntry,
   updateCalendarEntryStatus,
   updateBookingStatus,
+  updateMyBooking,
   getCalendarOverview,
   upsertCalendarSettings,
   createCategory,
@@ -309,6 +310,24 @@ router.patch(
   ],
   validateRequest,
   updateBookingStatus,
+);
+
+router.patch(
+  "/bookings/:id",
+  [
+    body("status")
+      .optional({ values: "falsy" })
+      .trim()
+      .isIn(["cancelled", "confirmed"])
+      .withMessage("status must be cancelled or confirmed."),
+    body("prepayment_status")
+      .optional({ values: "falsy" })
+      .trim()
+      .isIn(["paid", "pending", "failed", "required"])
+      .withMessage("prepayment_status must be paid, pending, failed, or required."),
+  ],
+  validateRequest,
+  updateMyBooking,
 );
 
 router.get("/clients", requireProfessional, listProfessionalClients);

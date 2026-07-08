@@ -49,6 +49,8 @@ export type BusinessPublicProfileServiceForItem = {
 
 export type BusinessPublicProfileBookCombo = {
   id: string;
+  /** Subcategory UUID when available from book_service_combinations. */
+  serviceId?: string | null;
   categoryLabel: string;
   serviceLabel: string;
   durationLabel: string;

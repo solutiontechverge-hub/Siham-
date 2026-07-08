@@ -49,7 +49,6 @@ import { fmtMinutesToIsoTime, fmtMinutesToTimeLabel, parseTimeLabelToMinutes, se
 import ClientBookingListView from "./ClientBookingListView";
 import ClientBookingPageShell from "./ClientBookingPageShell";
 import { parseBookingListTab } from "./bookingPillTabs";
-import { upsertRequestedBooking } from "./clientBookingRecords";
 import {
   ACTIVE_BOOKING_ID_KEY,
   CHECKOUT_REF_KEY,
@@ -62,6 +61,11 @@ import { getApiErrorMessage } from "../../../lib/api-error";
 import { getServicesForLocationMode, getTeamForLocationMode } from "../../../data/businessPublicProfile.data";
 import { useBusinessPublicProfile } from "../../../hooks/useBusinessPublicProfile";
 import { useCreateBookingMutation } from "../../../store/services/businessApi";
+import {
+  extractUuidFromSyntheticId,
+  resolveSubcategoryServiceId,
+  resolveTeamMemberId,
+} from "./clientBookingApi.mapper";
 import { parsePrepaymentPercent } from "../../../components/common/client-booking/parsePrepaymentPercent";
 import { loadPublicProfileBookingSelection } from "../../../data/publicProfileBookingSelection";
 import { useAppSelector } from "../../../store/hooks";
@@ -73,67 +77,8 @@ import {
   type ProfileResponse,
 } from "../../../store/services/profileApi";
 
-const DEFAULT_BOOKING_SERVICES: Array<{
-  id: string;
-  name: string;
-  durationMins: number;
-  price: number;
-  originalPrice?: number;
-  discountPct?: number;
-  guestId: string | null;
-  teamMemberId: string | null;
-}> = [
-  {
-    id: "svc-1",
-    name: "Buzz Cut",
-    durationMins: 45,
-    price: 25,
-    originalPrice: 50,
-    discountPct: 50,
-    guestId: "p-requester",
-    teamMemberId: "tm-elly",
-  },
-  {
-    id: "svc-2",
-    name: "Buzz Cut",
-    durationMins: 45,
-    price: 25,
-    originalPrice: 50,
-    discountPct: 50,
-    guestId: null,
-    teamMemberId: "tm-elly",
-  },
-  { id: "svc-4", name: "Nose Wax", durationMins: 15, price: 5, guestId: "p-requester", teamMemberId: "tm-elly" },
-];
-
-const DEFAULT_SHOP_TEAM_MEMBERS: Array<{ id: string; name: string; locationModes: Array<"fixed" | "desired"> }> = [
-  { id: "tm-elly", name: "Elly Elsavy", locationModes: ["fixed", "desired"] },
-  { id: "tm-james", name: "James Cole", locationModes: ["fixed"] },
-  { id: "tm-nina", name: "Nina Park", locationModes: ["desired"] },
-  { id: "tm-omar", name: "Omar Haddad", locationModes: ["fixed", "desired"] },
-];
-
-function readClientProfileNameFromStorage(userEmail?: string): string {
-  if (typeof window === "undefined") return "";
-  try {
-    const raw = window.localStorage.getItem("mollure:client_profile");
-    if (!raw) return "";
-    const data = JSON.parse(raw) as {
-      email?: string;
-      first_name?: string;
-      last_name?: string;
-      display_name?: string;
-    };
-    const authedEmail = userEmail?.trim().toLowerCase();
-    const persistedEmail = data?.email?.trim().toLowerCase();
-    if (authedEmail && persistedEmail && authedEmail !== persistedEmail) return "";
-    const persistedName = (data.display_name ?? "").trim();
-    const fullName = `${data.first_name ?? ""} ${data.last_name ?? ""}`.trim();
-    return persistedName || fullName;
-  } catch {
-    return "";
-  }
-}
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function resolveNameFromProfileResponse(profile: ProfileResponse | null | undefined): string {
   if (!profile) return "";
@@ -170,9 +115,6 @@ function resolveRequesterDisplayName(user: unknown, profileResponse?: ProfileRes
     u?.display_name?.trim() || `${u?.first_name ?? ""} ${u?.last_name ?? ""}`.trim();
   if (fromAuthUser) return fromAuthUser;
 
-  const fromStorage = readClientProfileNameFromStorage(u?.email);
-  if (fromStorage) return fromStorage;
-
   return "Guest";
 }
 
@@ -203,10 +145,12 @@ function ClientBookingCreateView() {
     locationMode?: "fixed" | "desired";
   } | null>(null);
 
-  const { profile: businessProfile } = useBusinessPublicProfile(shop?.shopId);
+  const { profile: businessProfile, setups } = useBusinessPublicProfile(shop?.shopId);
   const [createBooking] = useCreateBookingMutation();
-
-  const fallbackAddress = "Marina-Park 50, Den Helder, Noord-Holland";
+  const businessSetup = React.useMemo(
+    () => (shop?.shopId ? setups.find((row) => row.id === shop.shopId) ?? null : null),
+    [setups, shop?.shopId],
+  );
 
   const startOfDay = (d: Date) => {
     const next = new Date(d);
@@ -271,7 +215,20 @@ function ClientBookingCreateView() {
     });
   };
 
-  const times = React.useMemo(() => ["10:20 AM", "11:15 AM", "1:15 PM", "2:15 PM", "2:45 PM"], []);
+  const times = React.useMemo(() => {
+    const slots: string[] = [];
+    for (let minutes = 9 * 60; minutes <= 18 * 60; minutes += 30) {
+      slots.push(fmtMinutesToTimeLabel(minutes));
+    }
+    return slots;
+  }, []);
+
+  const timeScrollRef = React.useRef<HTMLDivElement>(null);
+  const scrollTimeSlots = React.useCallback((direction: "left" | "right") => {
+    const el = timeScrollRef.current;
+    if (!el) return;
+    el.scrollBy({ left: direction === "left" ? -180 : 180, behavior: "smooth" });
+  }, []);
 
   type BookingPerson = {
     id: string;
@@ -294,7 +251,7 @@ function ClientBookingCreateView() {
   }, [requesterDisplayName]);
 
   type ShopTeamMember = { id: string; name: string; locationModes: Array<"fixed" | "desired"> };
-  const [shopTeamMembers, setShopTeamMembers] = React.useState<ShopTeamMember[]>(DEFAULT_SHOP_TEAM_MEMBERS);
+  const [shopTeamMembers, setShopTeamMembers] = React.useState<ShopTeamMember[]>([]);
 
   type CatalogService = {
     id: string;
@@ -305,31 +262,10 @@ function ClientBookingCreateView() {
     discountPct?: number;
   };
 
-  const defaultCatalogByTeamMemberId = React.useMemo<Record<string, CatalogService[]>>(
-    () => ({
-      "tm-elly": [
-        { id: "cat-buzz", name: "Buzz Cut", durationMins: 45, price: 25, originalPrice: 50, discountPct: 50 },
-        { id: "cat-nose", name: "Nose Wax", durationMins: 15, price: 5 },
-        { id: "cat-dry", name: "Hair Dry", durationMins: 30, price: 15 },
-      ],
-      "tm-james": [
-        { id: "cat-beard", name: "Beard Trim", durationMins: 20, price: 12 },
-        { id: "cat-buzz", name: "Buzz Cut", durationMins: 45, price: 25, originalPrice: 50, discountPct: 50 },
-      ],
-      "tm-nina": [
-        { id: "cat-color", name: "Root Color", durationMins: 60, price: 45 },
-        { id: "cat-dry", name: "Hair Dry", durationMins: 30, price: 15 },
-      ],
-      "tm-omar": [
-        { id: "cat-buzz", name: "Buzz Cut", durationMins: 45, price: 25, originalPrice: 50, discountPct: 50 },
-        { id: "cat-nose", name: "Nose Wax", durationMins: 15, price: 5 },
-      ],
-    }),
-    [],
-  );
-
   type Service = {
     id: string;
+    /** Real subcategory UUID when known (profile / catalog). */
+    catalogServiceId?: string | null;
     name: string;
     durationMins: number;
     price: number;
@@ -350,10 +286,10 @@ function ClientBookingCreateView() {
   const [profileHydrated, setProfileHydrated] = React.useState(false);
   const hydrationSignatureRef = React.useRef<string | null>(null);
 
-  const [selectedTime, setSelectedTime] = React.useState(times[1]!);
+  const [selectedTime, setSelectedTime] = React.useState(times[0] ?? "");
   const [combineServices, setCombineServices] = React.useState(true);
   const [selectedPersonId, setSelectedPersonId] = React.useState<string>("p-requester");
-  const [selectedTeamMemberId, setSelectedTeamMemberId] = React.useState<string>("tm-elly");
+  const [selectedTeamMemberId, setSelectedTeamMemberId] = React.useState<string>("");
   const [serviceTab, setServiceTab] = React.useState<"assigned" | "unassigned">("assigned");
   const [selectedServiceIds, setSelectedServiceIds] = React.useState<Record<string, boolean>>({});
 
@@ -376,7 +312,7 @@ function ClientBookingCreateView() {
   const participantLabel = isDesiredLocation ? "Model" : "Guest";
 
   const catalogByTeamMemberId = React.useMemo<Record<string, CatalogService[]>>(() => {
-    if (!shop?.shopId || !profileHydrated || !businessProfile) return defaultCatalogByTeamMemberId;
+    if (!shop?.shopId || !profileHydrated || !businessProfile) return {};
 
     const catalogItems: CatalogService[] = getServicesForLocationMode(businessProfile, locationMode).map((s) => ({
       id: s.id,
@@ -389,8 +325,8 @@ function ClientBookingCreateView() {
     for (const tm of shopTeamMembers) {
       map[tm.id] = catalogItems;
     }
-    return Object.keys(map).length > 0 ? map : defaultCatalogByTeamMemberId;
-  }, [businessProfile, defaultCatalogByTeamMemberId, locationMode, profileHydrated, shop?.shopId, shopTeamMembers]);
+    return map;
+  }, [businessProfile, locationMode, profileHydrated, shop?.shopId, shopTeamMembers]);
 
   const isPlanningPerson = React.useCallback(
     (p: BookingPerson) => p.participantType === "planning" || p.name === "Planning",
@@ -560,7 +496,7 @@ function ClientBookingCreateView() {
   React.useEffect(() => {
     try {
       const profileSelection = loadPublicProfileBookingSelection();
-      const raw = window.localStorage.getItem("mollure:selected_shop");
+      const raw = window.sessionStorage.getItem("mollure:selected_shop");
       const parsed = raw
         ? (JSON.parse(raw) as {
             shopId?: string;
@@ -605,6 +541,7 @@ function ClientBookingCreateView() {
 
       const profileServices = profileSelection.services.map((row) => ({
         id: row.id,
+        catalogServiceId: row.catalogServiceId ?? extractUuidFromSyntheticId(row.id),
         name: row.name,
         durationMins: row.durationMins,
         price: row.price,
@@ -682,9 +619,23 @@ function ClientBookingCreateView() {
         }))
       : [];
 
-    setServices(DEFAULT_BOOKING_SERVICES);
-    setShopTeamMembers(apiTeam.length > 0 ? apiTeam : DEFAULT_SHOP_TEAM_MEMBERS);
-    setServiceTab(getPreferredServiceTab(DEFAULT_BOOKING_SERVICES));
+    const catalogServices = getServicesForLocationMode(
+      businessProfile,
+      shop.locationMode ?? "fixed",
+    ).map((s) => ({
+      id: s.id,
+      catalogServiceId: s.id,
+      name: s.name,
+      durationMins: s.durationMins,
+      price: s.priceValue,
+      guestId: "p-requester" as string | null,
+      teamMemberId: apiTeam[0]?.id ?? null,
+    }));
+
+    setServices(catalogServices.slice(0, 3));
+    setShopTeamMembers(apiTeam);
+    if (apiTeam[0]?.id) setSelectedTeamMemberId(apiTeam[0].id);
+    setServiceTab(getPreferredServiceTab(catalogServices.slice(0, 3)));
     setProfileHydrated(true);
   }, [
     applyProfileSelection,
@@ -857,7 +808,8 @@ function ClientBookingCreateView() {
     const picked = catalog.find((c) => c.id === addServiceCatalogId);
     if (!picked || !addServiceGuestId) return;
     const newService: Service = {
-      id: `svc-${Date.now()}`,
+      id: UUID_RE.test(picked.id) ? picked.id : `svc-${Date.now()}`,
+      catalogServiceId: UUID_RE.test(picked.id) ? picked.id : extractUuidFromSyntheticId(picked.id),
       name: picked.name,
       durationMins: picked.durationMins,
       price: picked.price,
@@ -936,95 +888,72 @@ function ClientBookingCreateView() {
       locationMode,
     });
 
-    const existingId =
-      !fromProfile && typeof window !== "undefined"
-        ? window.sessionStorage.getItem(ACTIVE_BOOKING_ID_KEY)
-        : null;
     const bookingRef = createBookingRef();
-
     const primaryService = servicesForDraft[0];
+    if (!shop.shopId || !primaryService) {
+      showSnackbar({
+        severity: "error",
+        message: "Select a shop and at least one service before continuing.",
+      });
+      return;
+    }
+
     const bookingDate = toISO(selectedDate);
     const startMinutes = parseTimeLabelToMinutes(selectedTime);
     const endMinutes =
       startMinutes + servicesForDraft.reduce((sum, service) => sum + service.durationMins, 0);
-    const uuidPattern =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-    if (shop.shopId && primaryService) {
-      let savedBookingRef = bookingRef;
-      try {
-        const created = await createBooking({
-          booking_date: bookingDate,
-          business_setup_id: shop.shopId,
-          service_id: uuidPattern.test(primaryService.id) ? primaryService.id : null,
-          team_member_id:
-            primaryService.teamMemberId && uuidPattern.test(primaryService.teamMemberId)
-              ? primaryService.teamMemberId
-              : null,
-          start_time: `${bookingDate}T${fmtMinutesToIsoTime(startMinutes)}:00`,
-          end_time: `${bookingDate}T${fmtMinutesToIsoTime(endMinutes)}:00`,
-          location_type: isDesiredLocation ? "desired" : "fixed",
-          status: "requested",
-          booking_type: "request",
-          unique_code: bookingRef,
-          total_price: total,
-        }).unwrap();
-        savedBookingRef = created.data?.unique_code ?? bookingRef;
-      } catch (error) {
-        showSnackbar({
-          severity: "error",
-          message: getApiErrorMessage(error, "Unable to save booking to server. Please try again."),
-        });
-        return;
-      }
+    const catalogCandidate =
+      primaryService.catalogServiceId ||
+      extractUuidFromSyntheticId(primaryService.id) ||
+      primaryService.id;
+    const resolvedServiceId = businessSetup
+      ? resolveSubcategoryServiceId(businessSetup, catalogCandidate, primaryService.name)
+      : UUID_RE.test(catalogCandidate)
+        ? catalogCandidate
+        : null;
+    const resolvedTeamMemberId = businessSetup
+      ? resolveTeamMemberId(businessSetup, primaryService.teamMemberId)
+      : primaryService.teamMemberId && UUID_RE.test(primaryService.teamMemberId)
+        ? primaryService.teamMemberId
+        : null;
+    const serviceNames = servicesForDraft.map((service) => service.name).filter(Boolean);
+    const notes = serviceNames.length > 1 ? `Services: ${serviceNames.join(", ")}` : null;
 
-      try {
-        window.localStorage.setItem("mollure:booking_draft", JSON.stringify(payload));
-      } catch {
-        // ignore
-      }
-
-      try {
-        if (fromProfile && typeof window !== "undefined") {
-          window.sessionStorage.removeItem(ACTIVE_BOOKING_ID_KEY);
-          window.sessionStorage.removeItem(CHECKOUT_REF_KEY);
-        }
-
-        const requested = {
-          id: existingId ?? `bk_req_${Date.now()}`,
-          bookingRef: savedBookingRef,
-          status,
-          ...(bookingRequestDirection ? { bookingRequestDirection } : {}),
-          shop,
-          draft: payload,
-          createdAt: new Date().toISOString(),
-          requiresPrepayment,
-          prepaymentPercent: requiresPrepayment ? prepaymentPercent : 0,
-          prepaid: false,
-        };
-        upsertRequestedBooking(requested);
-        setActiveBookingSession(requested);
-      } catch {
-        showSnackbar({
-          severity: "error",
-          message: "Booking was saved on the server, but local session could not be updated.",
-        });
-        return;
-      }
-
+    let createdBookingId = "";
+    let savedBookingRef = bookingRef;
+    try {
+      const created = await createBooking({
+        booking_date: bookingDate,
+        business_setup_id: shop.shopId,
+        service_id: resolvedServiceId,
+        team_member_id: resolvedTeamMemberId,
+        start_time: `${bookingDate}T${fmtMinutesToIsoTime(startMinutes)}:00`,
+        end_time: `${bookingDate}T${fmtMinutesToIsoTime(endMinutes)}:00`,
+        location_type: isDesiredLocation ? "desired" : "fixed",
+        status: "requested",
+        booking_type: "request",
+        unique_code: bookingRef,
+        total_price: total,
+        notes,
+        prepayment_status: requiresPrepayment ? "required" : null,
+      }).unwrap();
+      createdBookingId = created.data?.id ?? "";
+      savedBookingRef = created.data?.unique_code ?? bookingRef;
+    } catch (error) {
       showSnackbar({
-        severity: "success",
-        message: requiresPrepayment ? "Booking request sent — continue to prepayment" : "Booking request sent",
+        severity: "error",
+        message: getApiErrorMessage(error, "Unable to save booking to server. Please try again."),
       });
-
-      router.push(resolveCreateCheckoutPath({ locationMode, requiresPrepayment }));
       return;
     }
 
-    try {
-      window.localStorage.setItem("mollure:booking_draft", JSON.stringify(payload));
-    } catch {
-      // ignore
+    if (!createdBookingId) {
+      showSnackbar({
+        severity: "error",
+        message: "Booking was created but no booking id was returned.",
+      });
+      return;
     }
 
     try {
@@ -1033,9 +962,10 @@ function ClientBookingCreateView() {
         window.sessionStorage.removeItem(CHECKOUT_REF_KEY);
       }
 
-      const requested = {
-        id: existingId ?? `bk_req_${Date.now()}`,
-        bookingRef,
+      setActiveBookingSession({
+        id: createdBookingId,
+        apiBookingId: createdBookingId,
+        bookingRef: savedBookingRef,
         status,
         ...(bookingRequestDirection ? { bookingRequestDirection } : {}),
         shop,
@@ -1044,13 +974,11 @@ function ClientBookingCreateView() {
         requiresPrepayment,
         prepaymentPercent: requiresPrepayment ? prepaymentPercent : 0,
         prepaid: false,
-      };
-      upsertRequestedBooking(requested);
-      setActiveBookingSession(requested);
+      });
     } catch {
       showSnackbar({
         severity: "error",
-        message: "Booking was saved on the server, but local session could not be updated.",
+        message: "Booking was saved on the server, but checkout session could not be updated.",
       });
       return;
     }
@@ -1877,39 +1805,77 @@ function ClientBookingCreateView() {
                       </Typography>
                       <Box sx={{ height: 1, bgcolor: alpha(m.navy, 0.08), mt: 1, mb: 1.25 }} />
 
-                      <Box sx={{ display: "flex", alignItems: "center", gap: 1, width: "100%" }}>
-                        {times.map((t) => {
-                          const active = t === selectedTime;
-                          return (
-                            <Button
-                              key={t}
-                              variant={active ? "contained" : "outlined"}
-                              onClick={() => setSelectedTime(t)}
-                              disableElevation
-                              sx={{
-                                flex: 1,
-                                minWidth: 0,
-                                borderRadius: "8px",
-                                textTransform: "none",
-                                height: 32,
-                                fontSize: 11.5,
-                                fontWeight: 900,
-                                whiteSpace: "nowrap",
-                                ...(active
-                                  ? { bgcolor: m.teal, "&:hover": { bgcolor: m.tealDark } }
-                                  : { borderColor: alpha(m.navy, 0.10), bgcolor: "#fff", color: alpha(m.navy, 0.65) }),
-                              }}
-                            >
-                              {t}
-                            </Button>
-                          );
-                        })}
+                      <Stack direction="row" alignItems="center" spacing={0.75}>
                         <IconButton
                           size="small"
+                          onClick={() => scrollTimeSlots("left")}
                           sx={{
                             width: 32,
                             height: 32,
-                            flex: "0 0 32px",
+                            flexShrink: 0,
+                            borderRadius: "10px",
+                            border: `1px solid ${alpha(m.navy, 0.10)}`,
+                            color: alpha(m.navy, 0.55),
+                            bgcolor: "#fff",
+                          }}
+                        >
+                          <ChevronLeftRoundedIcon sx={{ fontSize: 18 }} />
+                        </IconButton>
+
+                        <Box
+                          ref={timeScrollRef}
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 0.75,
+                            flex: 1,
+                            minWidth: 0,
+                            overflowX: "auto",
+                            scrollbarWidth: "none",
+                            "&::-webkit-scrollbar": { display: "none" },
+                            py: 0.25,
+                          }}
+                        >
+                          {times.map((t) => {
+                            const active = t === selectedTime;
+                            return (
+                              <Button
+                                key={t}
+                                variant={active ? "contained" : "outlined"}
+                                onClick={() => setSelectedTime(t)}
+                                disableElevation
+                                sx={{
+                                  flexShrink: 0,
+                                  minWidth: 76,
+                                  px: 1.25,
+                                  borderRadius: "8px",
+                                  textTransform: "none",
+                                  height: 32,
+                                  fontSize: 11.5,
+                                  fontWeight: 900,
+                                  whiteSpace: "nowrap",
+                                  ...(active
+                                    ? { bgcolor: m.teal, "&:hover": { bgcolor: m.tealDark } }
+                                    : {
+                                        borderColor: alpha(m.navy, 0.10),
+                                        bgcolor: "#fff",
+                                        color: alpha(m.navy, 0.65),
+                                      }),
+                                }}
+                              >
+                                {t}
+                              </Button>
+                            );
+                          })}
+                        </Box>
+
+                        <IconButton
+                          size="small"
+                          onClick={() => scrollTimeSlots("right")}
+                          sx={{
+                            width: 32,
+                            height: 32,
+                            flexShrink: 0,
                             borderRadius: "10px",
                             border: `1px solid ${alpha(m.navy, 0.10)}`,
                             color: alpha(m.navy, 0.55),
@@ -1918,7 +1884,7 @@ function ClientBookingCreateView() {
                         >
                           <ChevronRightRoundedIcon sx={{ fontSize: 18 }} />
                         </IconButton>
-                      </Box>
+                      </Stack>
 
                       <Stack alignItems="flex-end" sx={{ mt: 1 }}>
                         <FormControlLabel
@@ -2377,7 +2343,7 @@ function ClientBookingCreateView() {
                             textAlign: "right",
                           }}
                         >
-                          {shop?.addressLabel ?? shop?.municipalityLabel ?? fallbackAddress}
+                          {shop?.addressLabel ?? shop?.municipalityLabel ?? ""}
                         </Typography>
                       </Stack>
                     </Stack>
