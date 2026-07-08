@@ -28,6 +28,8 @@ export function setActiveBookingSession(record: ClientBookingRecord) {
   }
 }
 
-export function getCheckoutPath(record: ClientBookingRecord) {
-  return record.requiresPrepayment ? "/clients/booking/checkout/prepaid" : "/clients/booking/checkout";
+export function getCheckoutPath(record: ClientBookingRecord, listTab?: string) {
+  const base = record.requiresPrepayment ? "/clients/booking/checkout/prepaid" : "/clients/booking/checkout";
+  if (!listTab) return base;
+  return `${base}?tab=${encodeURIComponent(listTab)}`;
 }

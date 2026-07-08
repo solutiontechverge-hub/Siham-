@@ -27,6 +27,10 @@ type Props = {
   locationMode?: "fixed" | "desired";
   isCancelled?: boolean;
   requiresPrepayment?: boolean;
+  /** True when required prepayment has already been paid. */
+  prepaymentPaid?: boolean;
+  /** Past booking still awaiting settlement. */
+  paymentDue?: boolean;
   onEditServices?: () => void;
   onSendBookingRequest?: () => void | Promise<void>;
   onDeleteBooking?: () => void;
@@ -43,6 +47,8 @@ export default function ClientBookingDetailsHeader({
   locationMode = "fixed",
   isCancelled = false,
   requiresPrepayment = false,
+  prepaymentPaid = false,
+  paymentDue = false,
   onEditServices,
   onSendBookingRequest,
   onDeleteBooking,
@@ -91,7 +97,12 @@ export default function ClientBookingDetailsHeader({
     bookingStatus === "requested" &&
     bookingRequestDirection === "outgoing" &&
     locationMode === "desired";
-  const editActionsDisabled = isCancelled || isOutgoingBookingRequest || bookingRequestSent;
+  const isCompleted = bookingStatus === "completed";
+  const waitingForPayment =
+    requiresPrepayment && !prepaymentPaid && !isCompleted && !isCancelled;
+  /** Edit is only available while waiting for payment. */
+  const showEdit = waitingForPayment && !isOutgoingBookingRequest && !bookingRequestSent;
+  const editActionsDisabled = !showEdit;
 
   const headerActionBtnSx = {
     borderRadius: "8px",
@@ -149,41 +160,37 @@ export default function ClientBookingDetailsHeader({
 
           <Stack alignItems={{ xs: "flex-start", md: "flex-end" }} spacing={0.85}>
             <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
-              <Button
-                variant="contained"
-                disableElevation
-                disabled={editActionsDisabled}
-                endIcon={editActionsDisabled ? undefined : <KeyboardArrowDownRoundedIcon sx={{ fontSize: 18 }} />}
-                onClick={(e) => {
-                  if (editActionsDisabled) return;
-                  setEditAnchor(e.currentTarget);
-                }}
-                sx={{
-                  borderRadius: "8px",
-                  textTransform: "none",
-                  fontWeight: 900,
-                  fontSize: 12.5,
-                  px: 2,
-                  height: 34,
-                  bgcolor: m.teal,
-                  "&:hover": { bgcolor: editActionsDisabled ? m.teal : m.tealDark },
-                  ...(editActionsDisabled && {
-                    opacity: 0.45,
-                    color: "#fff",
-                    pointerEvents: "none",
-                  }),
-                }}
-              >
-                Edit
-              </Button>
-              <Button
-                variant="outlined"
-                sx={headerActionBtnSx}
-                disabled={isCancelled}
-                onClick={(e) => setActivityAnchor(e.currentTarget)}
-              >
-                Activity
-              </Button>
+              {showEdit ? (
+                <Button
+                  variant="contained"
+                  disableElevation
+                  disabled={editActionsDisabled}
+                  endIcon={<KeyboardArrowDownRoundedIcon sx={{ fontSize: 18 }} />}
+                  onClick={(e) => setEditAnchor(e.currentTarget)}
+                  sx={{
+                    borderRadius: "8px",
+                    textTransform: "none",
+                    fontWeight: 900,
+                    fontSize: 12.5,
+                    px: 2,
+                    height: 34,
+                    bgcolor: m.teal,
+                    "&:hover": { bgcolor: m.tealDark },
+                  }}
+                >
+                  Edit
+                </Button>
+              ) : null}
+              {!isCompleted ? (
+                <Button
+                  variant="outlined"
+                  sx={headerActionBtnSx}
+                  disabled={isCancelled}
+                  onClick={(e) => setActivityAnchor(e.currentTarget)}
+                >
+                  Activity
+                </Button>
+              ) : null}
               {isOutgoingBookingRequest && onDiscardBookingRequest ? (
                 <Button variant="outlined" onClick={onDiscardBookingRequest} sx={headerActionBtnSx}>
                   Discard
@@ -200,6 +207,8 @@ export default function ClientBookingDetailsHeader({
               bookingRequestSent={bookingRequestSent}
               editRequestPending={editRequest.isPending}
               requiresPrepayment={requiresPrepayment && requestRowMode === "default"}
+              prepaymentPaid={prepaymentPaid}
+              paymentDue={paymentDue}
               bookingRequestDirection={bookingRequestDirection}
               rowMode={requestRowMode}
             />
