@@ -95,8 +95,8 @@ export default function ClientBookingListView({ listTab }: Props) {
                 const time = b.draft?.selectedTime ?? "";
                 const total = b.draft?.total ?? 0;
                 const status = (b.status ?? "confirmed") as ClientBookingStatus;
-                const isRequested = status === "requested";
-                const chipLabel = isRequested ? "Requested" : statusChipLabel(status);
+                const showBrBadge = status === "requested" || Boolean(b.bookingRequestSent);
+                const chipLabel = status === "requested" ? "Requested" : statusChipLabel(status);
                 const chipColors = bookingStatusChipColors(status);
                 return (
                   <ButtonBase
@@ -164,7 +164,13 @@ export default function ClientBookingListView({ listTab }: Props) {
                               border: chipColors.border,
                             }}
                           />
-                          {isRequested ? <BookingRequestBadge variant="compact" iconSize={10} /> : null}
+                          {showBrBadge ? (
+                            <BookingRequestBadge
+                              variant="compact"
+                              iconSize={10}
+                              direction={b.bookingRequestDirection ?? "outgoing"}
+                            />
+                          ) : null}
                         </Stack>
                         <Typography sx={{ fontWeight: 1000, color: alpha(m.navy, 0.85) }}>{total} €</Typography>
                       </Stack>

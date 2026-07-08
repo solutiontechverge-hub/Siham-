@@ -13,6 +13,18 @@ export function isOutgoingBookingRequest(
   return event.details?.requestDirection === "outgoing";
 }
 
+/** Booking created/sent by a client (incoming BR/EBR or online request). */
+export function isClientOriginatedBooking(
+  event: Pick<CalendarEvent, "details" | "bookingScenario" | "bookingType"> | null | undefined,
+) {
+  if (!event) return false;
+  if (event.details?.requestDirection === "outgoing") return false;
+  if (event.details?.requestDirection === "incoming") return true;
+  if (event.bookingScenario === "BR" || event.bookingScenario === "EBR") return true;
+  if (event.bookingType === "Online" || event.bookingType === "Requests") return true;
+  return false;
+}
+
 /** Client sent a booking request (BR) or returned an edited booking request (EBR). */
 export function canRespondToIncomingRequest(
   event: Pick<CalendarEvent, "status" | "bookingScenario" | "details"> | null | undefined,

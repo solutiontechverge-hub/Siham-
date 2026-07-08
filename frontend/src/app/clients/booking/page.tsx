@@ -45,7 +45,7 @@ import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
 import ModeEditOutlineRoundedIcon from "@mui/icons-material/ModeEditOutlineRounded";
 import { AppDropdown, ClientPageTabsBar, clientTopTabsActiveLabel, MarketingSiteFooter, MollureMarketingHeader } from "../../../components/common";
 import { ServiceSummaryMetaLine } from "../../../components/common/ServiceSummaryMetaLine";
-import { fmtMinutesToIsoTime, fmtMinutesToTimeLabel, parseTimeLabelToMinutes, serviceTimeRangeLabel } from "./booking-time";
+import { fmtMinutesToTimeLabel, parseTimeLabelToMinutes, serviceTimeRangeLabel } from "./booking-time";
 import ClientBookingListView from "./ClientBookingListView";
 import ClientBookingPageShell from "./ClientBookingPageShell";
 import { parseBookingListTab } from "./bookingPillTabs";
@@ -56,12 +56,10 @@ import {
   createBookingRef,
   setActiveBookingSession,
 } from "./clientBookingSession";
-import { resolveCreateBookingStatus, resolveCreateCheckoutPath } from "./resolveCreateBookingStatus";
+import { resolveCreateCheckoutPath } from "./resolveCreateBookingStatus";
 import { useSnackbar } from "../../../components/common/AppSnackbar";
-import { getApiErrorMessage } from "../../../lib/api-error";
 import { getServicesForLocationMode, getTeamForLocationMode } from "../../../data/businessPublicProfile.data";
 import { useBusinessPublicProfile } from "../../../hooks/useBusinessPublicProfile";
-import { useCreateBookingMutation } from "../../../store/services/businessApi";
 import { parsePrepaymentPercent } from "../../../components/common/client-booking/parsePrepaymentPercent";
 import { loadPublicProfileBookingSelection } from "../../../data/publicProfileBookingSelection";
 import { useAppSelector } from "../../../store/hooks";
@@ -180,6 +178,12 @@ function isServiceTeamAssigned(service: { teamMemberId: string | null }) {
   return Boolean(service.teamMemberId);
 }
 
+const FIXED_LOCATION_MAX_GUESTS = 1;
+
+function isAdditionalGuest(p: { isRequester: boolean; participantType?: "model" | "planning" | "guest" }) {
+  return !p.isRequester && p.participantType === "guest";
+}
+
 function ClientBookingCreateView() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -204,8 +208,6 @@ function ClientBookingCreateView() {
   } | null>(null);
 
   const { profile: businessProfile } = useBusinessPublicProfile(shop?.shopId);
-  const [createBooking] = useCreateBookingMutation();
-
   const fallbackAddress = "Marina-Park 50, Den Helder, Noord-Holland";
 
   const startOfDay = (d: Date) => {
@@ -373,7 +375,14 @@ function ClientBookingCreateView() {
 
   const locationMode = shop?.locationMode ?? "fixed";
   const isDesiredLocation = locationMode === "desired";
-  const participantLabel = isDesiredLocation ? "Model" : "Guest";
+  const getParticipantLabel = React.useCallback(
+    (person: BookingPerson) => {
+      if (person.participantType === "planning" || person.name === "Planning") return "Planning";
+      if (person.participantType === "guest" || person.name === "Guest") return "Guest";
+      return isDesiredLocation ? "Model" : "Guest";
+    },
+    [isDesiredLocation],
+  );
 
   const catalogByTeamMemberId = React.useMemo<Record<string, CatalogService[]>>(() => {
     if (!shop?.shopId || !profileHydrated || !businessProfile) return defaultCatalogByTeamMemberId;
@@ -409,8 +418,16 @@ function ClientBookingCreateView() {
     [locationMode, shopTeamMembers],
   );
 
-  const guests = React.useMemo(() => people.filter((p) => !p.isRequester), [people]);
-  const hasGuests = guests.length > 0;
+  const additionalGuests = React.useMemo(() => people.filter(isAdditionalGuest), [people]);
+  const canAddFixedLocationGuest =
+    !isDesiredLocation && additionalGuests.length < FIXED_LOCATION_MAX_GUESTS;
+  const serviceAssignees = React.useMemo(() => {
+    if (isDesiredLocation) {
+      return people.filter((p) => !p.isRequester && !isPlanningPerson(p));
+    }
+    return people.filter((p) => p.isRequester || isAdditionalGuest(p));
+  }, [isDesiredLocation, isPlanningPerson, people]);
+  const canAddService = serviceAssignees.length > 0;
 
   const serviceCountLabel = React.useCallback(
     (personId: string) => {
@@ -749,13 +766,20 @@ function ClientBookingCreateView() {
   };
 
   const addParticipant = (cardName: string) => {
-    const id = `p-guest-${Date.now()}`;
     const isPlanning = cardName === "Planning";
+    const isModel = cardName === "Model";
+    const isGuest = cardName === "Guest";
+
+    if (!isDesiredLocation && isGuest && additionalGuests.length >= FIXED_LOCATION_MAX_GUESTS) {
+      return;
+    }
+
+    const id = `p-guest-${Date.now()}`;
     const nextPerson: BookingPerson = {
       id,
       name: cardName,
       isRequester: false,
-      participantType: isPlanning ? "planning" : isDesiredLocation ? "model" : "guest",
+      participantType: isPlanning ? "planning" : isModel ? "model" : "guest",
     };
     setPeople((prev) => [...prev, nextPerson]);
     setParticipantMenuAnchor(null);
@@ -848,7 +872,7 @@ function ClientBookingCreateView() {
   const openAddServiceDialog = () => {
     const catalog = catalogByTeamMemberId[selectedTeamMemberId] ?? [];
     setAddServiceCatalogId(catalog[0]?.id ?? "");
-    setAddServiceGuestId(guests[0]?.id ?? people[0]?.id ?? "");
+    setAddServiceGuestId(serviceAssignees[0]?.id ?? people[0]?.id ?? "");
     setAddServiceDialogOpen(true);
   };
 
@@ -890,7 +914,7 @@ function ClientBookingCreateView() {
     if (!checked) updateServiceTeamMember(serviceId, "");
   };
 
-  const onContinue = async () => {
+  const onContinue = () => {
     if (!shop?.shopId || services.length === 0 || !allServicesAssigned) return;
 
     const peopleForDraft =
@@ -932,94 +956,12 @@ function ClientBookingCreateView() {
 
     const prepaymentPercent = parsePrepaymentPercent(businessProfile?.prepaymentLabel);
     const requiresPrepayment = !isDesiredLocation && prepaymentPercent > 0;
-    const { status, bookingRequestDirection } = resolveCreateBookingStatus({
-      locationMode,
-    });
 
     const existingId =
       !fromProfile && typeof window !== "undefined"
         ? window.sessionStorage.getItem(ACTIVE_BOOKING_ID_KEY)
         : null;
     const bookingRef = createBookingRef();
-
-    const primaryService = servicesForDraft[0];
-    const bookingDate = toISO(selectedDate);
-    const startMinutes = parseTimeLabelToMinutes(selectedTime);
-    const endMinutes =
-      startMinutes + servicesForDraft.reduce((sum, service) => sum + service.durationMins, 0);
-    const uuidPattern =
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-    if (shop.shopId && primaryService) {
-      let savedBookingRef = bookingRef;
-      try {
-        const created = await createBooking({
-          booking_date: bookingDate,
-          business_setup_id: shop.shopId,
-          service_id: uuidPattern.test(primaryService.id) ? primaryService.id : null,
-          team_member_id:
-            primaryService.teamMemberId && uuidPattern.test(primaryService.teamMemberId)
-              ? primaryService.teamMemberId
-              : null,
-          start_time: `${bookingDate}T${fmtMinutesToIsoTime(startMinutes)}:00`,
-          end_time: `${bookingDate}T${fmtMinutesToIsoTime(endMinutes)}:00`,
-          location_type: isDesiredLocation ? "desired" : "fixed",
-          status: "requested",
-          booking_type: "request",
-          unique_code: bookingRef,
-          total_price: total,
-        }).unwrap();
-        savedBookingRef = created.data?.unique_code ?? bookingRef;
-      } catch (error) {
-        showSnackbar({
-          severity: "error",
-          message: getApiErrorMessage(error, "Unable to save booking to server. Please try again."),
-        });
-        return;
-      }
-
-      try {
-        window.localStorage.setItem("mollure:booking_draft", JSON.stringify(payload));
-      } catch {
-        // ignore
-      }
-
-      try {
-        if (fromProfile && typeof window !== "undefined") {
-          window.sessionStorage.removeItem(ACTIVE_BOOKING_ID_KEY);
-          window.sessionStorage.removeItem(CHECKOUT_REF_KEY);
-        }
-
-        const requested = {
-          id: existingId ?? `bk_req_${Date.now()}`,
-          bookingRef: savedBookingRef,
-          status,
-          ...(bookingRequestDirection ? { bookingRequestDirection } : {}),
-          shop,
-          draft: payload,
-          createdAt: new Date().toISOString(),
-          requiresPrepayment,
-          prepaymentPercent: requiresPrepayment ? prepaymentPercent : 0,
-          prepaid: false,
-        };
-        upsertRequestedBooking(requested);
-        setActiveBookingSession(requested);
-      } catch {
-        showSnackbar({
-          severity: "error",
-          message: "Booking was saved on the server, but local session could not be updated.",
-        });
-        return;
-      }
-
-      showSnackbar({
-        severity: "success",
-        message: requiresPrepayment ? "Booking request sent — continue to prepayment" : "Booking request sent",
-      });
-
-      router.push(resolveCreateCheckoutPath({ locationMode, requiresPrepayment }));
-      return;
-    }
 
     try {
       window.localStorage.setItem("mollure:booking_draft", JSON.stringify(payload));
@@ -1033,11 +975,10 @@ function ClientBookingCreateView() {
         window.sessionStorage.removeItem(CHECKOUT_REF_KEY);
       }
 
-      const requested = {
-        id: existingId ?? `bk_req_${Date.now()}`,
+      const draftRecord = {
+        id: existingId ?? `bk_draft_${Date.now()}`,
         bookingRef,
-        status,
-        ...(bookingRequestDirection ? { bookingRequestDirection } : {}),
+        status: "draft" as const,
         shop,
         draft: payload,
         createdAt: new Date().toISOString(),
@@ -1045,28 +986,20 @@ function ClientBookingCreateView() {
         prepaymentPercent: requiresPrepayment ? prepaymentPercent : 0,
         prepaid: false,
       };
-      upsertRequestedBooking(requested);
-      setActiveBookingSession(requested);
+      upsertRequestedBooking(draftRecord);
+      setActiveBookingSession(draftRecord);
     } catch {
       showSnackbar({
         severity: "error",
-        message: "Booking was saved on the server, but local session could not be updated.",
+        message: "Unable to save booking draft. Please try again.",
       });
       return;
     }
 
-    showSnackbar({
-      severity: "success",
-      message: requiresPrepayment ? "Booking request sent — continue to prepayment" : "Booking request sent",
-    });
-
     router.push(resolveCreateCheckoutPath({ locationMode, requiresPrepayment }));
   };
 
-  const continueLabel =
-    parsePrepaymentPercent(businessProfile?.prepaymentLabel) > 0
-      ? "Send request & continue to payment"
-      : "Send booking request";
+  const continueLabel = "Continue";
 
   const planningFieldSx = {
     "& .MuiOutlinedInput-root": {
@@ -1403,15 +1336,15 @@ function ClientBookingCreateView() {
 
       <ButtonBase
         onClick={openAddServiceDialog}
-        disabled={!hasGuests}
+        disabled={!canAddService}
         sx={{
           mt: 1.25,
           display: "flex",
           alignItems: "center",
           gap: 0.75,
           borderRadius: "8px",
-          opacity: hasGuests ? 1 : 0.45,
-          cursor: hasGuests ? "pointer" : "not-allowed",
+          opacity: canAddService ? 1 : 0.45,
+          cursor: canAddService ? "pointer" : "not-allowed",
         }}
       >
         <Box
@@ -1515,7 +1448,7 @@ function ClientBookingCreateView() {
             <AppDropdown
               value={addServiceGuestId}
               onChange={(val) => setAddServiceGuestId(String(val))}
-              options={people.map((p) => ({
+              options={serviceAssignees.map((p) => ({
                 value: p.id,
                 label: p.isRequester ? `${p.name} (Requester)` : p.name,
               }))}
@@ -2049,28 +1982,31 @@ function ClientBookingCreateView() {
                                   ))}
                                 </Stack>
                           </Box>
-                        ) : (
-                          <Chip
-                            icon={<AddRoundedIcon sx={{ fontSize: 16 }} />}
-                            label="Guest"
-                            variant="outlined"
-                            clickable
-                            onClick={() => addParticipant("Guest")}
-                            sx={{
-                              mt: 0.75,
-                              height: 28,
-                              borderRadius: "10px",
-                              fontSize: 11.5,
-                              fontWeight: 900,
-                              borderColor: alpha(m.navy, 0.12),
-                              color: alpha(m.navy, 0.62),
-                              "& .MuiChip-icon": { color: m.teal, ml: 0.8 },
-                              "&:hover": { bgcolor: alpha(m.teal, 0.06), borderColor: alpha(m.teal, 0.35) },
-                            }}
-                          />
-                        )}
+                        ) : null}
                       </Stack>
                     </Paper>
+
+                    {!isDesiredLocation && canAddFixedLocationGuest ? (
+                      <Stack alignItems="flex-end" sx={{ mt: 1 }}>
+                        <Chip
+                          icon={<AddRoundedIcon sx={{ fontSize: 16 }} />}
+                          label="Guest"
+                          variant="outlined"
+                          clickable
+                          onClick={() => addParticipant("Guest")}
+                          sx={{
+                            height: 28,
+                            borderRadius: "10px",
+                            fontSize: 11.5,
+                            fontWeight: 900,
+                            borderColor: alpha(m.navy, 0.12),
+                            color: alpha(m.navy, 0.62),
+                            "& .MuiChip-icon": { color: m.teal, ml: 0.8 },
+                            "&:hover": { bgcolor: alpha(m.teal, 0.06), borderColor: alpha(m.teal, 0.35) },
+                          }}
+                        />
+                      </Stack>
+                    ) : null}
                   </Box>
 
                   <Divider />
@@ -2124,6 +2060,12 @@ function ClientBookingCreateView() {
                           transformOrigin={{ vertical: "top", horizontal: "right" }}
                           PaperProps={{ sx: { borderRadius: "10px", minWidth: 140, mt: 0.5 } }}
                         >
+                          <MenuItem
+                            onClick={() => addParticipant("Guest")}
+                            sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.78) }}
+                          >
+                            Guest
+                          </MenuItem>
                           <MenuItem
                             onClick={() => addParticipant("Model")}
                             sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.78) }}
@@ -2226,7 +2168,7 @@ function ClientBookingCreateView() {
                                     onChange={(e) => updateGuestName(p.id, e.target.value)}
                                     size="small"
                                     inputProps={{
-                                      "aria-label": `${participantLabel} name`,
+                                      "aria-label": `${getParticipantLabel(p)} name`,
                                       sx: {
                                         py: 0.35,
                                         px: 0.5,

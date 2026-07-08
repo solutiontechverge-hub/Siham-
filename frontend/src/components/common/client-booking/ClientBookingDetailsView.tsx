@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { parseBookingListTab } from "../../../app/clients/booking/bookingPillTabs";
 import { Box, Container, Paper } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import { AppPillTabs, ClientPageTabsBar, MarketingSiteFooter, MollureMarketingHeader } from "..";
+import { AppButton, AppPillTabs, ClientPageTabsBar, MarketingSiteFooter, MollureMarketingHeader } from "..";
 import { marketingShellFooter } from "../../../data/marketingShell.data";
 import { useAppSelector } from "../../../store/hooks";
 import {
@@ -45,6 +45,8 @@ import {
 import { usePublicFinanceSettings } from "../finance-documents/usePublicFinanceSettings";
 import type { ClientBookingDraft } from "./types";
 import type { BusinessPublicProfilePolicySection } from "../../../data/businessPublicProfile.data";
+import { submitClientBookingRequest } from "../../../app/clients/booking/submitClientBookingRequest";
+import { useCreateBookingMutation, useGetAllBusinessSetupsQuery } from "../../../store/services/businessApi";
 import { useSyncFinanceTransactionFromBookingMutation } from "../../../store/services/financeApi";
 import { useSnackbar } from "../AppSnackbar";
 import StripePrepaymentDialog from "./StripePrepaymentDialog";
@@ -106,6 +108,11 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
   const m = useTheme().palette.mollure;
   const user = useAppSelector((s) => s.auth.user);
   const { draft, shop, businessProfile, prepaymentPercent, requiresPrepayment } = useClientBookingDraft();
+  const { data: businessSetupsData } = useGetAllBusinessSetupsQuery();
+  const bookingSetup = React.useMemo(
+    () => businessSetupsData?.data?.find((row) => row.id === shop?.shopId) ?? null,
+    [businessSetupsData?.data, shop?.shopId],
+  );
   const { requesterName, requesterAvatarUrl, requesterPhone } = useClientRequesterProfile();
 
   const isPrepaid = variant === "prepaid";
@@ -114,6 +121,8 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
   const { record: activeBooking, refresh: refreshActiveBooking } = useActiveClientBooking();
   const editRequest = useBookingEditRequest(bookingRef);
   const bookingStatus: ClientBookingStatus = activeBooking?.status ?? "confirmed";
+  const isDraft = bookingStatus === "draft";
+  const isBookingRequestSent = Boolean(activeBooking?.bookingRequestSent);
   const isPrepaymentPaid = Boolean(activeBooking?.prepaid);
   const prepaymentState = !requiresPrepayment
     ? ("none" as const)
@@ -129,6 +138,8 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
   const { invoiceSettings: financeSettings, transactionOptions } = usePublicFinanceSettings(shop?.shopId);
   const [activeDocument, setActiveDocument] = React.useState<"invoice" | "receipt" | null>(null);
   const [stripeDialogOpen, setStripeDialogOpen] = React.useState(false);
+  const [createBooking] = useCreateBookingMutation();
+  const [isSubmittingRequest, setIsSubmittingRequest] = React.useState(false);
   const checkoutPaymentOptions = React.useMemo(
     () => resolveCheckoutPaymentOptions(transactionOptions, locationMode),
     [locationMode, transactionOptions],
@@ -271,7 +282,30 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
     });
   }, [bookingRef, draft, financeSettings, prepaymentState, prepaidAmount, requesterName, user?.email]);
 
-  const completePrepayment = React.useCallback(() => {
+  const submitDraftBookingRequest = React.useCallback(async (): Promise<boolean> => {
+    if (!isDraft || !activeBooking) return true;
+    if (activeBooking.bookingRequestSent) return true;
+
+    setIsSubmittingRequest(true);
+    try {
+      const result = await submitClientBookingRequest({
+        record: activeBooking,
+        locationMode,
+        setup: bookingSetup,
+        createBooking,
+      });
+      if (!result.ok) {
+        showSnackbar({ severity: "error", message: result.message });
+        return false;
+      }
+      refreshActiveBooking();
+      return true;
+    } finally {
+      setIsSubmittingRequest(false);
+    }
+  }, [activeBooking, bookingSetup, createBooking, isDraft, locationMode, refreshActiveBooking, showSnackbar]);
+
+  const completePrepayment = React.useCallback(async () => {
     try {
       const activeId = window.sessionStorage.getItem(ACTIVE_BOOKING_ID_KEY);
       if (activeId) {
@@ -308,9 +342,12 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
     syncFinanceFromBooking,
   ]);
 
-  const handlePayNow = React.useCallback(() => {
+  const handlePayNow = React.useCallback(async () => {
+    const submitted = await submitDraftBookingRequest();
+    if (!submitted) return;
+
     if (!checkoutPaymentMethodSupportsPayNow(selectedPaymentMethod)) {
-      completePrepayment();
+      await completePrepayment();
       return;
     }
     if (prepaidAmount <= 0) {
@@ -318,7 +355,13 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
       return;
     }
     setStripeDialogOpen(true);
-  }, [completePrepayment, prepaidAmount, selectedPaymentMethod, showSnackbar]);
+  }, [completePrepayment, prepaidAmount, selectedPaymentMethod, showSnackbar, submitDraftBookingRequest]);
+
+  const handleSendBookingRequest = React.useCallback(async () => {
+    const submitted = await submitDraftBookingRequest();
+    if (!submitted) return;
+    showSnackbar({ severity: "success", message: "Booking request sent" });
+  }, [showSnackbar, submitDraftBookingRequest]);
 
   React.useEffect(() => {
     if (typeof window === "undefined") return;
@@ -428,10 +471,12 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
             bookingRef={bookingRef}
             dateTimeLabel={dateTimeLabel}
             bookingStatus={bookingStatus}
+            bookingRequestSent={isBookingRequestSent}
             bookingRequestDirection={activeBooking?.bookingRequestDirection}
             locationMode={locationMode}
             isCancelled={isCancelled}
             requiresPrepayment={requiresPrepayment}
+            onSendBookingRequest={isDraft && !isBookingRequestSent ? handleSendBookingRequest : undefined}
             onDeleteBooking={() => setDeleteDialogOpen(true)}
             onDiscardBookingRequest={() => setDiscardDialogOpen(true)}
           />
@@ -481,6 +526,27 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
                     value={selectedPaymentMethod}
                     onChange={setSelectedPaymentMethod}
                   />
+                ) : null}
+
+                {isDraft && !isPrepaid && !isBookingRequestSent ? (
+                  <AppButton
+                    fullWidth
+                    variant="contained"
+                    disableElevation
+                    isLoading={isSubmittingRequest}
+                    onClick={handleSendBookingRequest}
+                    sx={{
+                      mt: 2,
+                      borderRadius: "10px",
+                      textTransform: "none",
+                      fontWeight: 900,
+                      height: 40,
+                      bgcolor: m.teal,
+                      "&:hover": { bgcolor: m.tealDark },
+                    }}
+                  >
+                    Send booking request
+                  </AppButton>
                 ) : null}
               </>
             )}

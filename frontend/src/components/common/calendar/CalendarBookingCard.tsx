@@ -10,6 +10,7 @@ import type { CalendarEvent } from "../../../app/professionals/fixed-location/ca
 import { extractBookingId } from "./calendar.utils";
 import { getBookingScenarioIndicators, statusCardAccent, statusChipSxWithOverride, isBookingRequestAccepted, isBookingRequestRejected } from "./bookingStatus";
 import { resolveBookingResponseIndicators } from "./bookingResponseStatus";
+import { resolveProfessionalBookingRequestDirection } from "./BookingRequestBadge";
 import { resolveCalendarPrepaymentStatus, toPrepaymentIconVariant } from "./prepaymentStatus";
 
 export type CalendarBookingCardProps = {
@@ -137,6 +138,7 @@ export default function CalendarBookingCard({
         scenarioBadges={scenarioIndicators.map((label) => ({
           label,
           showRequestSentIcon: label === "BR",
+          requestDirection: label === "BR" ? resolveProfessionalBookingRequestDirection(event) : undefined,
           requestAccepted: label === "BR" && isBookingRequestAccepted(event),
           requestRejected: label === "BR" && isBookingRequestRejected(event),
           responseIndicators: label === "EBR" ? scenarioBadgeResponseIndicators(label, responseIndicators) : [],

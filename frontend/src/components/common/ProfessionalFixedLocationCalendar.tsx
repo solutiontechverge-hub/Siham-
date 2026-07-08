@@ -41,6 +41,7 @@ import {
   canRespondToIncomingRequest,
   detectEditedServiceIds,
   getServiceEditTag,
+  isClientOriginatedBooking,
   resolveOriginalServices,
 } from "./calendar/bookingRequestNegotiation";
 import CalendarBlockTimeModal from "./calendar/CalendarBlockTimeModal";
@@ -64,8 +65,8 @@ import {
 import BookingSelectServicesScreen from "./calendar/BookingSelectServicesScreen";
 import DiscardBrDialog from "./calendar/DiscardBrDialog";
 import DiscardEbrDialog from "./calendar/DiscardEbrDialog";
-import BookingEditedTag from "./calendar/BookingEditedTag";
 import BookingRequestResponseActions from "./calendar/BookingRequestResponseActions";
+import BookingDrawerSelectedItemsSection from "./calendar/BookingDrawerSelectedItemsSection";
 import BookingEditServiceScreen from "./calendar/BookingEditServiceScreen";
 import BookingSelectProductsScreen from "./calendar/BookingSelectProductsScreen";
 import BookingAddUniqueItemScreen from "./calendar/BookingAddUniqueItemScreen";
@@ -148,7 +149,10 @@ import BookingRequestAcceptedPanel from "./calendar/BookingRequestAcceptedPanel"
 import PrepaymentStatusIcon from "./calendar/PrepaymentStatusIcon";
 import { PREPAYMENT_STATUS_LABELS } from "./calendar/PrepaymentStatusIcon";
 import BookingIndicatorIcon, { BOOKING_INDICATOR_LABELS } from "./calendar/BookingIndicatorIcon";
-import BookingRequestBadge, { resolveBookingRequestBadgeState } from "./calendar/BookingRequestBadge";
+import BookingRequestBadge, {
+  resolveBookingRequestBadgeState,
+  resolveProfessionalBookingRequestDirection,
+} from "./calendar/BookingRequestBadge";
 import { resolveBookingResponseIndicators } from "./calendar/bookingResponseStatus";
 import { resolveCalendarPrepaymentStatus, toPrepaymentIconVariant } from "./calendar/prepaymentStatus";
 import type {
@@ -619,6 +623,24 @@ export default function ProfessionalFixedLocationCalendar({
   );
   const isViewingExisting =
     isCompletedBooking || (Boolean(editingEventId) && !isEditingExisting);
+  const lockClientIdentity = isViewingBooking && isClientOriginatedBooking(viewingBookingEvent);
+  const showLineItemRemoveButton = !isViewingExisting;
+  const showClientRemoveButton = showLineItemRemoveButton && !lockClientIdentity;
+  const hideClientBookingFooterActions =
+    slotBookingScreen === "new-booking" && showIncomingRequestActions;
+  const hideClientBookingEditButton = showIncomingRequestActions;
+  const isBookingSubScreen =
+    slotBookingScreen === "select-services" ||
+    slotBookingScreen === "select-products" ||
+    slotBookingScreen === "edit-service" ||
+    slotBookingScreen === "add-unique-item";
+  const drawerPrimaryActionLabel = isBookingSubScreen
+    ? "Save"
+    : incomingRequestEditMode
+      ? "Send EBR"
+      : editingEventId
+        ? "Update"
+        : "Save";
 
   const closeBookingDrawer = React.useCallback(() => {
     setSlotDrawerOpen(false);
@@ -1843,23 +1865,31 @@ export default function ProfessionalFixedLocationCalendar({
 
   const applyServiceSelection = React.useCallback(() => {
     const byId = new Map(serviceCatalog.map((service) => [service.id, service]));
+    const currentServices =
+      selectionTarget === "client"
+        ? selectedServices
+        : bookingGuests.find((item) => item.id === selectionTarget)?.services ?? [];
+    const currentById = new Map(currentServices.map((service) => [service.id, service]));
+
     const nextServices = serviceSelectionDraft
       .map((id) => {
         const catalogService = byId.get(id);
-        if (!catalogService) return null;
-        const override = serviceOverridesDraft[id];
-        if (override) {
-          return buildBookingServiceLineItem(
-            catalogService,
-            buildServiceEditDraftFromCatalog(catalogService, { override }),
-          );
+        if (catalogService) {
+          const override = serviceOverridesDraft[id];
+          if (override) {
+            return buildBookingServiceLineItem(
+              catalogService,
+              buildServiceEditDraftFromCatalog(catalogService, { override }),
+            );
+          }
+          return {
+            id: catalogService.id,
+            name: catalogService.name,
+            price: catalogService.price,
+            durationMins: catalogService.durationMins,
+          } satisfies BookingServiceLineItem;
         }
-        return {
-          id: catalogService.id,
-          name: catalogService.name,
-          price: catalogService.price,
-          durationMins: catalogService.durationMins,
-        } satisfies BookingServiceLineItem;
+        return currentById.get(id) ?? null;
       })
       .filter((service): service is BookingServiceLineItem => Boolean(service));
 
@@ -1872,7 +1902,14 @@ export default function ProfessionalFixedLocationCalendar({
     }
     setSlotBookingScreen("new-booking");
     setSlotSaveAttempted(false);
-  }, [serviceCatalog, selectionTarget, serviceOverridesDraft, serviceSelectionDraft]);
+  }, [
+    bookingGuests,
+    selectedServices,
+    selectionTarget,
+    serviceCatalog,
+    serviceOverridesDraft,
+    serviceSelectionDraft,
+  ]);
 
   const openSelectProducts = React.useCallback(() => {
     setSelectionTarget(addMenuTarget);
@@ -3335,7 +3372,7 @@ export default function ProfessionalFixedLocationCalendar({
                   </Stack>
                 </Popover>
                 <Box sx={{ flex: 1 }} />
-                {slotBookingScreen === "new-booking" && editingEventId && !isCompletedBooking ? (
+                {slotBookingScreen === "new-booking" && editingEventId && !isCompletedBooking && !hideClientBookingEditButton ? (
                   <Button
                     variant="outlined"
                     onClick={() => setIsEditingExisting(true)}
@@ -3355,6 +3392,7 @@ export default function ProfessionalFixedLocationCalendar({
                     Edit
                   </Button>
                 ) : null}
+                {!hideClientBookingFooterActions ? (
                 <Button
                   variant="outlined"
                   onClick={async () => {
@@ -3397,7 +3435,8 @@ export default function ProfessionalFixedLocationCalendar({
                 >
                   {slotBookingScreen === "new-booking" ? "Cancel" : "Back"}
                 </Button>
-                {slotBookingScreen === "new-booking" && isCompletedBooking ? null : (
+                ) : null}
+                {!hideClientBookingFooterActions && (slotBookingScreen === "new-booking" && isCompletedBooking ? null : (
                 <Button
                   variant="contained"
                   disableElevation
@@ -3439,6 +3478,7 @@ export default function ProfessionalFixedLocationCalendar({
                       return;
                     }
                     if (!slotValidation.isValid) return;
+                    if (isBookingSubScreen) return;
                     if (slotBookingScreen === "non-mollure-individual" || slotBookingScreen === "non-mollure-company") {
                       setBookingPhoneDraft({
                         phoneCode: nonMollureDraft.phoneCode,
@@ -3474,9 +3514,9 @@ export default function ProfessionalFixedLocationCalendar({
                     minWidth: 110,
                   }}
                 >
-                  {incomingRequestEditMode ? "Send EBR" : editingEventId ? "Update" : "Save"}
+                  {drawerPrimaryActionLabel}
                 </Button>
-                )}
+                ))}
               </Stack>
             </Box>
           ) : null
@@ -4138,6 +4178,7 @@ export default function ProfessionalFixedLocationCalendar({
                                               variant="inline"
                                               iconSize={12}
                                               state={resolveBookingRequestBadgeState(viewingBookingEvent)}
+                                              direction={resolveProfessionalBookingRequestDirection(viewingBookingEvent)}
                                             />
                                           ) : (
                                             <span>{indicator}</span>
@@ -4367,22 +4408,24 @@ export default function ProfessionalFixedLocationCalendar({
                             boxShadow: `0 0 0 6px ${alpha(m.teal, 0.08)}`,
                           }}
                         >
-                          <AppSearchField
-                            value={slotClientSearch}
-                            onChange={(e) => {
-                              if (isViewingExisting) return;
-                              setSlotClientSearch(e.target.value);
-                            }}
-                            onClear={() => {
-                              if (isViewingExisting) return;
-                              setSlotClientSearch("");
-                            }}
-                            placeholder="Search client..."
-                            size="small"
-                            fullWidth
-                            sx={{ mb: 1 }}
-                            disabled={isViewingExisting}
-                          />
+                          {lockClientIdentity ? null : (
+                            <AppSearchField
+                              value={slotClientSearch}
+                              onChange={(e) => {
+                                if (isViewingExisting) return;
+                                setSlotClientSearch(e.target.value);
+                              }}
+                              onClear={() => {
+                                if (isViewingExisting) return;
+                                setSlotClientSearch("");
+                              }}
+                              placeholder="Search client..."
+                              size="small"
+                              fullWidth
+                              sx={{ mb: 1 }}
+                              disabled={isViewingExisting}
+                            />
+                          )}
 
                           <Stack direction="row" alignItems="center" spacing={1.25}>
                             <Avatar src="/images/testimonial.webp" sx={{ width: 34, height: 34 }}>
@@ -4396,19 +4439,20 @@ export default function ProfessionalFixedLocationCalendar({
                                 {selectedClient?.email ?? ""}
                               </BodyText>
                             </Box>
-                            <IconButton
-                              size="small"
-                              onClick={() => {
-                                if (isViewingExisting) return;
-                                setSlotClientAdded(false);
-                                setSlotClientSearch("");
-                                setSelectedClient(null);
-                              }}
-                              sx={{ color: alpha(m.navy, 0.35) }}
-                              disabled={isViewingExisting}
-                            >
-                              <CloseRoundedIcon sx={{ fontSize: 17 }} />
-                            </IconButton>
+                            {showClientRemoveButton ? (
+                              <IconButton
+                                size="small"
+                                onClick={() => {
+                                  setSlotClientAdded(false);
+                                  setSlotClientSearch("");
+                                  setSelectedClient(null);
+                                }}
+                                sx={{ color: alpha(m.navy, 0.35) }}
+                                aria-label="Remove client"
+                              >
+                                <CloseRoundedIcon sx={{ fontSize: 17 }} />
+                              </IconButton>
+                            ) : null}
                           </Stack>
                         </Box>
                       ) : (
@@ -4469,7 +4513,7 @@ export default function ProfessionalFixedLocationCalendar({
                       <>
                         <ButtonBase
                           ref={addMenuButtonRef}
-                          disabled={isViewingExisting}
+                          disabled={isViewingExisting && !incomingRequestEditMode}
                           onClick={(e) => {
                             const el = e.currentTarget;
                             if (slotAddMenuAnchor && addMenuTarget === "client") {
@@ -4610,119 +4654,33 @@ export default function ProfessionalFixedLocationCalendar({
                           </Stack>
                         </Popover>
 
-                        {selectedServices.length > 0 ? (
-                          <Stack spacing={0.75}>
-                            {selectedServices.map((service) => {
-                              const editTag = resolveServiceEditTag(service.id);
-                              const staffName = data.resources.find((resource) => resource.id === service.staffResourceId)?.name;
-                              const catalogService =
-                                serviceCatalog.find((item) => item.id === service.id) ??
-                                serviceCatalog.find((item) => item.name === service.name);
-                              return (
-                              <Box
-                                key={service.id}
-                                onClick={() => {
-                                  if (!incomingRequestEditMode || !catalogService) return;
-                                  openEditService(catalogService);
-                                }}
-                                sx={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "space-between",
-                                  gap: 1,
-                                  borderRadius: "10px",
-                                  border: `1px solid ${alpha(m.teal, editTag ? 0.28 : 0.10)}`,
-                                  px: 1.25,
-                                  py: 1.1,
-                                  bgcolor: "#fff",
-                                  cursor: incomingRequestEditMode && catalogService ? "pointer" : "default",
-                                }}
-                              >
-                                <Box sx={{ flex: 1, minWidth: 0 }}>
-                                  <BodyText sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.82), lineHeight: 1.25 }}>
-                                    {service.name}
-                                  </BodyText>
-                                  <BodyText sx={{ mt: 0.35, fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.48), lineHeight: 1.2 }}>
-                                    {service.startTime || service.discount
-                                      ? formatBookingServiceLineMeta(service)
-                                      : formatBookingServiceMeta(service)}
-                                  </BodyText>
-                                  {staffName ? (
-                                    <BodyText sx={{ mt: 0.35, fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.42) }}>
-                                      {staffName}
-                                    </BodyText>
-                                  ) : null}
-                                  {editTag ? (
-                                    <Box sx={{ mt: 0.5 }}>
-                                      <BookingEditedTag variant={editTag} />
-                                    </Box>
-                                  ) : null}
-                                </Box>
-                                <Stack direction="row" alignItems="center" spacing={0.5}>
-                                  <BodyText sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.72) }}>
-                                    €{getEffectiveServicePrice(service)}
-                                  </BodyText>
-                                <IconButton
-                                  size="small"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    if (isViewingExisting) return;
-                                    setSelectedServices((prev) => prev.filter((item) => item.id !== service.id));
-                                  }}
-                                  sx={{ color: alpha(m.navy, 0.35) }}
-                                  aria-label={`Remove ${service.name}`}
-                                  disabled={isViewingExisting}
-                                >
-                                  <CloseRoundedIcon sx={{ fontSize: 17 }} />
-                                </IconButton>
-                                </Stack>
-                              </Box>
-                            );
-                            })}
-                          </Stack>
-                        ) : null}
-
-                        {selectedProducts.length > 0 ? (
-                          <Stack spacing={0.75}>
-                            {selectedProducts.map((product) => (
-                              <Box
-                                key={product.id}
-                                sx={{
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "space-between",
-                                  gap: 1,
-                                  borderRadius: "10px",
-                                  border: `1px solid ${alpha(m.navy, 0.10)}`,
-                                  px: 1.25,
-                                  py: 1.1,
-                                  bgcolor: "#fff",
-                                }}
-                              >
-                                <Box sx={{ flex: 1, minWidth: 0 }}>
-                                  <BodyText sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.82), lineHeight: 1.25 }}>
-                                    {product.name}
-                                  </BodyText>
-                                  <BodyText sx={{ mt: 0.35, fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.48), lineHeight: 1.2 }}>
-                                    {formatProductUnitPrice(product.price)}
-                                  </BodyText>
-                                </Box>
-                                <IconButton
-                                  size="small"
-                                  onClick={() => {
-                                    if (isViewingExisting) return;
-                                    setSelectedProducts((prev) => prev.filter((item) => item.id !== product.id));
-                                  }}
-                                  sx={{ color: alpha(m.navy, 0.35) }}
-                                  aria-label={`Remove ${product.name}`}
-                                  disabled={isViewingExisting}
-                                >
-                                  <CloseRoundedIcon sx={{ fontSize: 17 }} />
-                                </IconButton>
-                              </Box>
-                            ))}
-                          </Stack>
-                        ) : null}
+                        <BookingDrawerSelectedItemsSection
+                          services={selectedServices}
+                          products={selectedProducts}
+                          showRemoveButtons={showLineItemRemoveButton}
+                          resolveServiceEditTag={resolveServiceEditTag}
+                          onRemoveService={(serviceId) => {
+                            setSelectedServices((prev) => prev.filter((item) => item.id !== serviceId));
+                            setServiceSelectionDraft((prev) => prev.filter((id) => id !== serviceId));
+                          }}
+                          onRemoveProduct={(productId) => {
+                            setSelectedProducts((prev) => prev.filter((item) => item.id !== productId));
+                            setProductSelectionDraft((prev) => {
+                              if (!prev[productId]) return prev;
+                              return { ...prev, [productId]: { ...prev[productId], selected: false } };
+                            });
+                          }}
+                          onServiceClick={
+                            incomingRequestEditMode
+                              ? (service) => {
+                                  const catalogService =
+                                    serviceCatalog.find((item) => item.id === service.id) ??
+                                    serviceCatalog.find((item) => item.name === service.name);
+                                  if (catalogService) openEditService(catalogService);
+                                }
+                              : undefined
+                          }
+                        />
 
                         {bookingGuests.map((guest) => (
                           <Box
@@ -4756,19 +4714,19 @@ export default function ProfessionalFixedLocationCalendar({
                                   {guest.name}
                                 </Box>
                               </BodyText>
-                              <IconButton
-                                size="small"
-                                onClick={() => {
-                                  if (isViewingExisting) return;
-                                  setBookingGuests((prev) => prev.filter((item) => item.id !== guest.id));
-                                  if (addMenuTarget === guest.id) setSlotAddMenuAnchor(null);
-                                }}
-                                sx={{ color: alpha(m.navy, 0.35) }}
-                                aria-label={`Remove ${guest.name}`}
-                                disabled={isViewingExisting}
-                              >
-                                <CloseRoundedIcon sx={{ fontSize: 17 }} />
-                              </IconButton>
+                              {showClientRemoveButton ? (
+                                <IconButton
+                                  size="small"
+                                  onClick={() => {
+                                    setBookingGuests((prev) => prev.filter((item) => item.id !== guest.id));
+                                    if (addMenuTarget === guest.id) setSlotAddMenuAnchor(null);
+                                  }}
+                                  sx={{ color: alpha(m.navy, 0.35) }}
+                                  aria-label={`Remove ${guest.name}`}
+                                >
+                                  <CloseRoundedIcon sx={{ fontSize: 17 }} />
+                                </IconButton>
+                              ) : null}
                             </Box>
 
                             {guest.services.length > 0 ? (
@@ -4798,24 +4756,24 @@ export default function ProfessionalFixedLocationCalendar({
                                           : formatBookingServiceMeta(service)}
                                       </BodyText>
                                     </Box>
-                                    <IconButton
-                                      size="small"
-                                      onClick={() => {
-                                        if (isViewingExisting) return;
-                                        setBookingGuests((prev) =>
-                                          prev.map((item) =>
-                                            item.id === guest.id
-                                              ? { ...item, services: item.services.filter((svc) => svc.id !== service.id) }
-                                              : item,
-                                          ),
-                                        );
-                                      }}
-                                      sx={{ color: alpha(m.navy, 0.35) }}
-                                      aria-label={`Remove ${service.name}`}
-                                      disabled={isViewingExisting}
-                                    >
-                                      <CloseRoundedIcon sx={{ fontSize: 17 }} />
-                                    </IconButton>
+                                    {showLineItemRemoveButton ? (
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => {
+                                          setBookingGuests((prev) =>
+                                            prev.map((item) =>
+                                              item.id === guest.id
+                                                ? { ...item, services: item.services.filter((svc) => svc.id !== service.id) }
+                                                : item,
+                                            ),
+                                          );
+                                        }}
+                                        sx={{ color: alpha(m.navy, 0.35) }}
+                                        aria-label={`Remove ${service.name}`}
+                                      >
+                                        <CloseRoundedIcon sx={{ fontSize: 17 }} />
+                                      </IconButton>
+                                    ) : null}
                                   </Box>
                                 ))}
                               </Stack>
@@ -4846,24 +4804,24 @@ export default function ProfessionalFixedLocationCalendar({
                                         {formatProductUnitPrice(product.price)}
                                       </BodyText>
                                     </Box>
-                                    <IconButton
-                                      size="small"
-                                      onClick={() => {
-                                        if (isViewingExisting) return;
-                                        setBookingGuests((prev) =>
-                                          prev.map((item) =>
-                                            item.id === guest.id
-                                              ? { ...item, products: item.products.filter((prd) => prd.id !== product.id) }
-                                              : item,
-                                          ),
-                                        );
-                                      }}
-                                      sx={{ color: alpha(m.navy, 0.35) }}
-                                      aria-label={`Remove ${product.name}`}
-                                      disabled={isViewingExisting}
-                                    >
-                                      <CloseRoundedIcon sx={{ fontSize: 17 }} />
-                                    </IconButton>
+                                    {showLineItemRemoveButton ? (
+                                      <IconButton
+                                        size="small"
+                                        onClick={() => {
+                                          setBookingGuests((prev) =>
+                                            prev.map((item) =>
+                                              item.id === guest.id
+                                                ? { ...item, products: item.products.filter((prd) => prd.id !== product.id) }
+                                                : item,
+                                            ),
+                                          );
+                                        }}
+                                        sx={{ color: alpha(m.navy, 0.35) }}
+                                        aria-label={`Remove ${product.name}`}
+                                      >
+                                        <CloseRoundedIcon sx={{ fontSize: 17 }} />
+                                      </IconButton>
+                                    ) : null}
                                   </Box>
                                 ))}
                               </Stack>

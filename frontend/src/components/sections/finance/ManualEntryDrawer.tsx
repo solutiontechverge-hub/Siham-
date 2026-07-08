@@ -29,7 +29,7 @@ import {
   type ManualEntryLineKind,
   type ManualEntrySavePayload,
 } from "./manualEntry.data";
-import ManualEntryCatalogPicker from "./ManualEntryCatalogPicker";
+import ManualEntryCatalogDrawer, { ManualEntryCatalogOpenButton } from "./ManualEntryCatalogDrawer";
 import ManualEntryDiscountModal from "./ManualEntryDiscountModal";
 import ManualEntryLineCard from "./ManualEntryLineCard";
 import ManualEntryLineEditModal from "./ManualEntryLineEditModal";
@@ -64,6 +64,13 @@ export default function ManualEntryDrawer({ open, onClose, onSave }: ManualEntry
   const [guestName, setGuestName] = React.useState("");
   const [step, setStep] = React.useState(0);
   const [uniqueItemOpen, setUniqueItemOpen] = React.useState(false);
+  const [productDrawerOpen, setProductDrawerOpen] = React.useState(false);
+  const [itemDrawerOpen, setItemDrawerOpen] = React.useState(false);
+  const [guestContactError, setGuestContactError] = React.useState(false);
+
+  const hasGuestContact = Boolean(guestName.trim() || guestEmail.trim());
+  const isGuestClientStepValid =
+    clientSelection?.type !== "guest" || hasGuestContact;
 
   React.useEffect(() => {
     if (!open) return;
@@ -80,6 +87,9 @@ export default function ManualEntryDrawer({ open, onClose, onSave }: ManualEntry
     setGuestName("");
     setStep(0);
     setUniqueItemOpen(false);
+    setProductDrawerOpen(false);
+    setItemDrawerOpen(false);
+    setGuestContactError(false);
   }, [open]);
 
   const productOptions = React.useMemo<ManualEntryCatalogOption[]>(
@@ -140,16 +150,21 @@ export default function ManualEntryDrawer({ open, onClose, onSave }: ManualEntry
   const displayClient = selectionLabel(clientSelection) || "Search Client";
 
   const pickGuest = () => {
+    setClientMode("guest");
     setClientSelection({ type: "guest", name: guestName || undefined });
     setClientOpen(false);
   };
 
   const canNext =
-    (step === 0 && Boolean(clientSelection)) ||
+    (step === 0 && Boolean(clientSelection) && isGuestClientStepValid) ||
     (step === 1 && hasItems) ||
     step === 2;
 
   const handlePrimary = () => {
+    if (step === 0 && clientSelection?.type === "guest" && !hasGuestContact) {
+      setGuestContactError(true);
+      return;
+    }
     if (step < 3) {
       if (canNext) setStep((s) => s + 1);
       return;
@@ -171,18 +186,22 @@ export default function ManualEntryDrawer({ open, onClose, onSave }: ManualEntry
   };
 
   const pickListClient = (client: (typeof listResults)[number]) => {
+    setGuestEmail("");
+    setGuestName("");
     setClientSelection({ type: "list", client });
     setClientOpen(false);
   };
 
   const pickPlatformClient = (client: (typeof platformResults)[number]) => {
+    setGuestEmail("");
+    setGuestName("");
     setClientSelection({ type: "platform", client });
     setClientOpen(false);
     setClientQuery("");
   };
 
-  const addLineFromCatalog = (kind: ManualEntryLineKind, option: ManualEntryCatalogOption) => {
-    setLines((prev) => [...prev, createManualEntryLineFromOption(kind, option)]);
+  const addLinesFromCatalog = (kind: ManualEntryLineKind, options: ManualEntryCatalogOption[]) => {
+    setLines((prev) => [...prev, ...options.map((option) => createManualEntryLineFromOption(kind, option))]);
   };
 
   const removeLine = (id: string) => {
@@ -455,17 +474,41 @@ export default function ManualEntryDrawer({ open, onClose, onSave }: ManualEntry
         ) : null}
 
         {clientSelection?.type === "guest" && step === 0 ? (
-          <MollureFormField
-            label="Guest name (optional)"
-            placeholder="Personalize guest name"
-            value={guestName}
-            onChange={(e) => {
-              setGuestName(e.target.value);
-              setClientSelection({ type: "guest", name: e.target.value });
-            }}
-            fullWidth
-            size="small"
-          />
+          <Stack spacing={1.5}>
+            <Typography sx={{ fontSize: 12, fontWeight: 600, color: alpha(m.navy, 0.55) }}>
+              Provide at least a guest name or email to continue.
+            </Typography>
+            <MollureFormField
+              label="Guest name"
+              placeholder="Personalize guest name"
+              value={guestName}
+              onChange={(e) => {
+                setGuestName(e.target.value);
+                setGuestContactError(false);
+                setClientSelection({ type: "guest", name: e.target.value });
+              }}
+              fullWidth
+              size="small"
+              error={guestContactError && !guestName.trim() && !guestEmail.trim()}
+              helperText={
+                guestContactError && !guestName.trim() && !guestEmail.trim()
+                  ? "Enter a name or email"
+                  : undefined
+              }
+            />
+            <MollureFormField
+              label="Guest email"
+              placeholder="Email for invoice and receipt"
+              value={guestEmail}
+              onChange={(e) => {
+                setGuestEmail(e.target.value);
+                setGuestContactError(false);
+              }}
+              fullWidth
+              size="small"
+              error={guestContactError && !guestName.trim() && !guestEmail.trim()}
+            />
+          </Stack>
         ) : null}
 
         {step === 1 ? (
@@ -486,12 +529,7 @@ export default function ManualEntryDrawer({ open, onClose, onSave }: ManualEntry
                     onDelete={() => removeLine(line.id)}
                   />
                 ))}
-                <ManualEntryCatalogPicker
-                  label="Product"
-                  options={productOptions}
-                  emptyLabel="No products configured yet."
-                  onSelect={(option) => addLineFromCatalog("product", option)}
-                />
+                <ManualEntryCatalogOpenButton label="Product" onClick={() => setProductDrawerOpen(true)} />
               </Stack>
             </Box>
 
@@ -508,12 +546,7 @@ export default function ManualEntryDrawer({ open, onClose, onSave }: ManualEntry
                     onDelete={() => removeLine(line.id)}
                   />
                 ))}
-                <ManualEntryCatalogPicker
-                  label="Item"
-                  options={itemOptions}
-                  emptyLabel="No services configured yet."
-                  onSelect={(option) => addLineFromCatalog("item", option)}
-                />
+                <ManualEntryCatalogOpenButton label="Item" onClick={() => setItemDrawerOpen(true)} />
                 <Button
                   variant="outlined"
                   onClick={() => setUniqueItemOpen(true)}
@@ -629,18 +662,6 @@ export default function ManualEntryDrawer({ open, onClose, onSave }: ManualEntry
               </Button>
             ))}
           </Stack>
-          {paymentMethod === "onlineDirect" && clientSelection?.type === "guest" ? (
-            <Box sx={{ mt: 1.25 }}>
-              <MollureFormField
-                label="Guest email"
-                placeholder="Email for invoice and receipt"
-                value={guestEmail}
-                onChange={(e) => setGuestEmail(e.target.value)}
-                size="small"
-                fullWidth
-              />
-            </Box>
-          ) : null}
         </Box>
         ) : null}
 
@@ -659,6 +680,24 @@ export default function ManualEntryDrawer({ open, onClose, onSave }: ManualEntry
           </Stack>
         ) : null}
       </Stack>
+
+      <ManualEntryCatalogDrawer
+        open={productDrawerOpen}
+        onClose={() => setProductDrawerOpen(false)}
+        title="Select products"
+        options={productOptions}
+        emptyLabel="No products configured yet."
+        onSave={(selected) => addLinesFromCatalog("product", selected)}
+      />
+
+      <ManualEntryCatalogDrawer
+        open={itemDrawerOpen}
+        onClose={() => setItemDrawerOpen(false)}
+        title="Select items"
+        options={itemOptions}
+        emptyLabel="No services configured yet."
+        onSave={(selected) => addLinesFromCatalog("item", selected)}
+      />
 
       <ManualEntryUniqueItemModal
         open={uniqueItemOpen}
