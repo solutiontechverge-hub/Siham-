@@ -3,7 +3,6 @@ import type { BusinessSetupListing, CreateBookingRequest } from "../../../store/
 import { parseTimeLabelToMinutes } from "./booking-time";
 import { buildClientBookingApiPayload } from "./clientBookingApi.mapper";
 import type { ClientBookingRecord } from "./clientBookingRecords";
-import { upsertRequestedBooking } from "./clientBookingRecords";
 import { createBookingRef } from "./clientBookingSession";
 import { resolveCreateBookingStatus } from "./resolveCreateBookingStatus";
 
@@ -99,13 +98,13 @@ export async function submitClientBookingRequest(params: {
 
     const updated: ClientBookingRecord = {
       ...params.record,
+      id: created.data?.id != null ? String(created.data.id) : params.record.id,
       bookingRef: savedBookingRef,
       apiBookingId: created.data?.id != null ? String(created.data.id) : params.record.apiBookingId,
       status,
       bookingRequestSent: true,
       ...(bookingRequestDirection ? { bookingRequestDirection } : {}),
     };
-    upsertRequestedBooking(updated);
     return { ok: true, record: updated };
   } catch (error) {
     return {

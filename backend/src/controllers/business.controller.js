@@ -10,6 +10,7 @@ import {
   notifyBookingStatusChange,
   notifyIncomingEditRequest,
 } from "../services/bookingEmail.service.js";
+import { emitBookingChanged } from "../messaging/messagingSocket.js";
 import { normalizeEntityId } from "../utils/business-setup-parsers.js";
 import {
   isValidUuid,
@@ -100,6 +101,14 @@ const parseOptionalInteger = (value) => {
 
 const toIsoDate = (value) => {
   if (!value) return null;
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+    // DATE columns were parsed as local midnight by pg — use local Y-M-D, not UTC.
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, "0");
+    const d = String(value.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
   const wallClock = String(value).match(/^(\d{4}-\d{2}-\d{2})/);
   if (wallClock) return wallClock[1];
   const parsed = new Date(value);
@@ -136,7 +145,7 @@ const calendarEntryInRangeSql = (alias, startParam, endParam) => `(
 )`;
 
 const bookingDateSql = (alias) =>
-  `substring(COALESCE(${alias}.start_time::text, ${alias}.booking_date::text) from 1 for 10)::date`;
+  `substring(COALESCE(${alias}.booking_date::text, ${alias}.start_time::text) from 1 for 10)::date`;
 
 const makeCalendarCode = (prefix = "OF123") => `${prefix}${Date.now()}${Math.random().toString(16).slice(2, 6)}`;
 const calendarStatusSet = new Set(["requested", "cancelled", "completed", "confirmed", "blocked", "no_show"]);
@@ -1131,7 +1140,8 @@ export const getCalendarOverview = async (req, res) => {
              NULLIF(TRIM(ip.display_name), ''),
              NULLIF(TRIM(CONCAT_WS(' ', ip.first_name, ip.last_name)), ''),
              u.email
-           ) AS customer_name
+           ) AS customer_name,
+           u.email AS customer_email
          FROM bookings b
          INNER JOIN business_setups bs ON bs.id = b.business_setup_id
          LEFT JOIN subcategories s ON s.id = b.service_id
@@ -1161,15 +1171,19 @@ export const getCalendarOverview = async (req, res) => {
           start: toTimeLabel(entry.start_time || entry.blocked_time_start),
           end: toTimeLabel(entry.end_time || entry.blocked_time_end),
         })),
-        bookings: bookingsResult.rows.map((booking) => ({
-          ...booking,
-          booking_type:
-            booking.booking_type || (normalizeBookingStatus(booking.status, "confirmed") === "requested" ? "request" : "online"),
-          unique_code: booking.unique_code || `123${booking.id}`,
-          date: toIsoDate(booking.start_time || booking.booking_date),
-          start: toTimeLabel(booking.start_time),
-          end: toTimeLabel(booking.end_time),
-        })),
+        bookings: bookingsResult.rows.map((booking) => {
+          const bookingDate = toIsoDate(booking.booking_date || booking.start_time);
+          return {
+            ...booking,
+            booking_date: bookingDate,
+            booking_type:
+              booking.booking_type || (normalizeBookingStatus(booking.status, "confirmed") === "requested" ? "request" : "online"),
+            unique_code: booking.unique_code || `123${booking.id}`,
+            date: bookingDate,
+            start: toTimeLabel(booking.start_time),
+            end: toTimeLabel(booking.end_time),
+          };
+        }),
         settings: settingsResult.rows[0] || null,
       },
     });
@@ -1255,26 +1269,73 @@ export const listBookings = async (req, res) => {
       }
 
       result = await query(
-        `SELECT *
-         FROM bookings
-         WHERE business_setup_id = $1
-         ORDER BY created_at DESC`,
+        `SELECT
+           b.*,
+           s.title AS service_title,
+           tm.full_name AS team_member_name,
+           bs.business_name,
+           bs.fixed_location_municipality,
+           bs.fixed_location_address,
+           bs.fixed_location_street_number,
+           bs.fixed_location_postal_code,
+           bs.fixed_location_province,
+           COALESCE(
+             NULLIF(TRIM(ip.display_name), ''),
+             NULLIF(TRIM(CONCAT_WS(' ', ip.first_name, ip.last_name)), ''),
+             u.email
+           ) AS customer_name,
+           u.email AS customer_email
+         FROM bookings b
+         INNER JOIN business_setups bs ON bs.id = b.business_setup_id
+         LEFT JOIN subcategories s ON s.id = b.service_id
+         LEFT JOIN business_team_members tm ON tm.id = b.team_member_id
+         LEFT JOIN users u ON u.id = b.customer_id
+         LEFT JOIN individual_profiles ip ON ip.user_id = u.id
+         WHERE b.business_setup_id = $1
+         ORDER BY COALESCE(b.start_time, b.created_at) DESC`,
         [businessSetup.id],
       );
     } else {
       result = await query(
-        `SELECT *
-         FROM bookings
-         WHERE customer_id = $1
-         ORDER BY created_at DESC`,
+        `SELECT
+           b.*,
+           s.title AS service_title,
+           tm.full_name AS team_member_name,
+           bs.business_name,
+           bs.fixed_location_municipality,
+           bs.fixed_location_address,
+           bs.fixed_location_street_number,
+           bs.fixed_location_postal_code,
+           bs.fixed_location_province
+         FROM bookings b
+         INNER JOIN business_setups bs ON bs.id = b.business_setup_id
+         LEFT JOIN subcategories s ON s.id = b.service_id
+         LEFT JOIN business_team_members tm ON tm.id = b.team_member_id
+         WHERE b.customer_id = $1
+         ORDER BY COALESCE(b.start_time, b.created_at) DESC`,
         [req.user.id],
       );
     }
 
+    const bookings = result.rows.map((booking) => {
+      const bookingDate = toIsoDate(booking.booking_date || booking.start_time);
+      return {
+        ...booking,
+        booking_date: bookingDate,
+        date: bookingDate,
+        start: toTimeLabel(booking.start_time),
+        end: toTimeLabel(booking.end_time),
+        booking_type:
+          booking.booking_type ||
+          (normalizeBookingStatus(booking.status, "confirmed") === "requested" ? "request" : "online"),
+        unique_code: booking.unique_code || `123${booking.id}`,
+      };
+    });
+
     return res.status(200).json({
       success: true,
       message: "Bookings fetched successfully.",
-      data: result.rows,
+      data: bookings,
     });
   } catch (error) {
     return res.status(500).json({
@@ -1368,6 +1429,8 @@ export const createBooking = async (req, res) => {
     if (booking?.status === "confirmed") {
       void notifyBookingStatusChange(booking.id, "requested", booking.status);
     }
+
+    emitBookingChanged(booking, "created");
 
     return res.status(201).json({
       success: true,
@@ -1516,6 +1579,140 @@ export const deleteCalendarEntry = async (req, res) => {
   }
 };
 
+export const updateMyBooking = async (req, res) => {
+  try {
+    if (req.user.user_type === "professional") {
+      return res.status(403).json({
+        success: false,
+        message: "Professionals must use the status endpoint for booking updates.",
+        data: null,
+      });
+    }
+
+    const bookingId = parseUuid(req.params.id);
+    if (!bookingId) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid booking id.",
+        data: null,
+      });
+    }
+
+    const hasStatus = req.body.status !== undefined && req.body.status !== null && req.body.status !== "";
+    const hasPrepayment =
+      req.body.prepayment_status !== undefined &&
+      req.body.prepayment_status !== null &&
+      req.body.prepayment_status !== "";
+
+    if (!hasStatus && !hasPrepayment) {
+      return res.status(400).json({
+        success: false,
+        message: "Provide status and/or prepayment_status to update.",
+        data: null,
+      });
+    }
+
+    const existingResult = await query(
+      `SELECT *
+       FROM bookings
+       WHERE id = $1
+         AND customer_id = $2
+       LIMIT 1`,
+      [bookingId, req.user.id],
+    );
+
+    if (!existingResult.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found.",
+        data: null,
+      });
+    }
+
+    const existing = existingResult.rows[0];
+    const previousStatus = existing.status;
+
+    let nextStatus = existing.status;
+    if (hasStatus) {
+      nextStatus = normalizeBookingStatus(req.body.status, existing.status);
+      if (!["cancelled", "confirmed"].includes(nextStatus)) {
+        return res.status(400).json({
+          success: false,
+          message: "Customers may only set booking status to cancelled or confirmed.",
+          data: null,
+        });
+      }
+    }
+
+    let nextPrepayment = existing.prepayment_status;
+    if (hasPrepayment) {
+      const normalizedPrepayment = String(req.body.prepayment_status).trim().toLowerCase();
+      if (!["paid", "pending", "failed", "required"].includes(normalizedPrepayment)) {
+        return res.status(400).json({
+          success: false,
+          message: "prepayment_status must be paid, pending, failed, or required.",
+          data: null,
+        });
+      }
+      nextPrepayment = normalizedPrepayment;
+      if (normalizedPrepayment === "paid" && nextStatus === "requested") {
+        nextStatus = "confirmed";
+      }
+    }
+
+    const result = await query(
+      `UPDATE bookings
+       SET status = $1,
+           prepayment_status = $2,
+           updated_at = NOW()
+       WHERE id = $3
+         AND customer_id = $4
+       RETURNING *`,
+      [nextStatus, nextPrepayment, bookingId, req.user.id],
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found.",
+        data: null,
+      });
+    }
+
+    const booking = result.rows[0];
+    if (["confirmed", "completed"].includes(booking.status)) {
+      try {
+        await syncBookingToFinanceTransaction(booking.id, {
+          paymentPhase: booking.prepayment_status === "paid" ? "prepay" : "full",
+          paymentMethod: booking.booking_type === "offline" ? "offlineDirect" : "onlineDirect",
+        });
+      } catch {
+        // best-effort
+      }
+    }
+
+    if (previousStatus !== booking.status) {
+      void notifyBookingStatusChange(booking.id, previousStatus, booking.status);
+    }
+
+    emitBookingChanged(booking, "updated");
+
+    return res.status(200).json({
+      success: true,
+      message: "Booking updated successfully.",
+      data: booking,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update booking.",
+      data: {
+        error: error.message,
+      },
+    });
+  }
+};
+
 export const updateBookingStatus = async (req, res) => {
   try {
     if (req.user.user_type !== "professional") {
@@ -1599,6 +1796,8 @@ export const updateBookingStatus = async (req, res) => {
     if (req.body.notify_incoming_er === true || req.body.email_scenario === "incoming_er") {
       void notifyIncomingEditRequest(booking.id);
     }
+
+    emitBookingChanged(booking, "updated");
 
     return res.status(200).json({
       success: true,

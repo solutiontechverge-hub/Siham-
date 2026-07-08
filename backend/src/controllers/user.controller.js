@@ -5,6 +5,7 @@ import {
   isS3UploadConfigured,
   uploadProfileMulterFilesToS3,
 } from "../services/s3-upload.service.js";
+import { updateProfessionalValidation } from "../services/authEmail.service.js";
 
 const SALT_ROUNDS = 12;
 
@@ -253,6 +254,54 @@ export const updateProfile = async (req, res) => {
       data: {
         error: error.message,
       },
+    });
+  }
+};
+
+const isAdminRequest = (req) => {
+  const adminKey = process.env.ADMIN_API_KEY;
+  if (!adminKey) return false;
+  return req.headers["x-admin-api-key"] === adminKey;
+};
+
+export const setProfessionalValidation = async (req, res) => {
+  try {
+    if (!isAdminRequest(req)) {
+      return res.status(403).json({
+        success: false,
+        message: "Admin authorization is required.",
+        data: null,
+      });
+    }
+
+    const { validation_status: validationStatus } = req.body;
+    if (!["validated", "not_validated", "pending"].includes(validationStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: "validation_status must be validated, not_validated, or pending.",
+        data: null,
+      });
+    }
+
+    const result = await updateProfessionalValidation(req.params.userId, validationStatus);
+    if (!result.updated) {
+      return res.status(404).json({
+        success: false,
+        message: "Professional profile not found.",
+        data: null,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Professional validation status updated.",
+      data: result,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update professional validation.",
+      data: { error: error.message },
     });
   }
 };

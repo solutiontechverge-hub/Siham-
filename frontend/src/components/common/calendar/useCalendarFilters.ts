@@ -42,10 +42,12 @@ export function useCalendarFilters(
 
     setDraftFilters((prev) => ({
       ...prev,
+      teamAll: true,
       teamIds: mergeTeamIds(prev),
     }));
     setAppliedFilters((prev) => ({
       ...prev,
+      teamAll: true,
       teamIds: mergeTeamIds(prev),
     }));
   }, [resourceKey, resources]);

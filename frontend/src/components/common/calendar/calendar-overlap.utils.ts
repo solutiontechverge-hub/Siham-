@@ -9,11 +9,15 @@ export function eventsOverlap(a: CalendarEvent, b: CalendarEvent): boolean {
   return aStart < bEnd && aEnd > bStart;
 }
 
+function sameStartClusterKey(event: CalendarEvent) {
+  return `${event.date}|${event.resourceId}|${minutesSinceMidnight(event.start)}`;
+}
+
 export function clusterSameStartTimeEvents(events: readonly CalendarEvent[]): CalendarEvent[][] {
   const groups = new Map<string, CalendarEvent[]>();
 
   for (const event of events) {
-    const key = event.start;
+    const key = sameStartClusterKey(event);
     const group = groups.get(key);
     if (group) group.push(event);
     else groups.set(key, [event]);

@@ -32,6 +32,7 @@ import {
   type CalendarOverviewQuery,
 } from "../../../../store/services/businessApi";
 import type { BookingCatalogService } from "../../../../data/bookingServiceCatalog.data";
+import { useBookingRealtimeSync } from "../../../../hooks/useBookingRealtimeSync";
 
 const DEFAULT_TIME_GRID = { startHour: 8, endHour: 22, stepMinutes: 15 } as const;
 
@@ -62,6 +63,8 @@ const mapSetupServicesToCatalog = (services: readonly BusinessServiceDetail[] | 
 
 export default function FixedLocationCalendarPage() {
   const { data: setupData } = useGetBusinessSetupQuery();
+  const businessSetupId = setupData?.data?.id ?? "";
+  useBookingRealtimeSync({ businessSetupId: businessSetupId || undefined });
   const [overviewQuery, setOverviewQuery] = React.useState<CalendarOverviewQuery>(() =>
     getCalendarQueryDateRange(toIsoLocalDate(new Date()), "day"),
   );
@@ -94,6 +97,10 @@ export default function FixedLocationCalendarPage() {
         avatarText: member.full_name?.trim()?.[0]?.toUpperCase() || "T",
       })) ?? [];
 
+    if (!resources.length) {
+      resources.push({ id: "unassigned", name: "Unassigned", avatarText: "U" });
+    }
+
     const supportedLocations: CalendarBookingLocation[] =
       businessSetup?.location_mode === "fixed"
         ? ["FL"]
@@ -101,7 +108,7 @@ export default function FixedLocationCalendarPage() {
           ? ["DL"]
           : ["FL", "DL"];
 
-    const fallbackResourceId = resources[0]?.id ?? "";
+    const fallbackResourceId = resources[0]?.id ?? "unassigned";
     const apiEvents: CalendarEvent[] = mergeCalendarOverviewEvents(
       overview?.entries ?? [],
       overview?.bookings ?? [],
@@ -128,7 +135,7 @@ export default function FixedLocationCalendarPage() {
       subTabs: ["Overview", "Schedule", "Settings"] as const,
       initialSubTab: "Overview" as const,
       initialView: "day" as const,
-      initialDate: new Date().toISOString().slice(0, 10),
+      initialDate: toIsoLocalDate(new Date()),
       resources,
       supportedLocations: calendarLocations,
       availability: [],

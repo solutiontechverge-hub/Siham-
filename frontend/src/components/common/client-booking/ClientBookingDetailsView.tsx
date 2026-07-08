@@ -2,18 +2,23 @@
 
 import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { parseBookingListTab } from "../../../app/clients/booking/bookingPillTabs";
 import { Box, Container, Paper } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { AppButton, AppPillTabs, ClientPageTabsBar, MarketingSiteFooter, MollureMarketingHeader } from "..";
 import { marketingShellFooter } from "../../../data/marketingShell.data";
 import { useAppSelector } from "../../../store/hooks";
+import { parseBookingListTab } from "../../../app/clients/booking/bookingPillTabs";
 import type { BookingListTab } from "../../../app/clients/booking/clientBookingRecords";
 import {
-  clearCheckoutBookingCancelled,
-  isCheckoutBookingCancelled,
-  markCheckoutBookingCancelled,
-} from "./bookingCancellation";
+  isClientBookingPaymentDue,
+  type ClientBookingStatus,
+} from "../../../app/clients/booking/clientBookingRecords";
+import { submitClientBookingRequest } from "../../../app/clients/booking/submitClientBookingRequest";
+import {
+  clearActiveBookingSession,
+  getActiveBookingSession,
+  setActiveBookingSession,
+} from "../../../app/clients/booking/clientBookingSession";
 import ClientBookingCancelDialog from "./ClientBookingCancelDialog";
 import ClientBookingDeleteDialog from "./ClientBookingDeleteDialog";
 import ClientBookingDiscardDialog from "./ClientBookingDiscardDialog";
@@ -27,15 +32,6 @@ import { useClientBookingDraft } from "./useClientBookingDraft";
 import { useClientRequesterProfile } from "./useClientRequesterProfile";
 import { useActiveClientBooking } from "./useActiveClientBooking";
 import { useCheckoutBookingRef } from "./useCheckoutBookingRef";
-import { ACTIVE_BOOKING_ID_KEY, CHECKOUT_REF_KEY } from "../../../app/clients/booking/clientBookingSession";
-import {
-  isClientBookingPaymentDue,
-  markClientBookingCancelled,
-  markClientBookingPrepaid,
-  removeClientBookingById,
-  updateClientBookingStatus,
-  type ClientBookingStatus,
-} from "../../../app/clients/booking/clientBookingRecords";
 import ClientBookingChangeResponsePanel from "./ClientBookingChangeResponsePanel";
 import {
   clientAcceptSuggestedChanges,
@@ -48,10 +44,10 @@ import {
 } from "../finance-documents";
 import { usePublicFinanceSettings } from "../finance-documents/usePublicFinanceSettings";
 import type { ClientBookingDraft } from "./types";
-import type { BusinessPublicProfilePolicySection } from "../../../data/businessPublicProfile.data";
-import { submitClientBookingRequest } from "../../../app/clients/booking/submitClientBookingRequest";
-import { useCreateBookingMutation, useGetAllBusinessSetupsQuery } from "../../../store/services/businessApi";
+import { useCreateBookingMutation, useGetAllBusinessSetupsQuery, useUpdateMyBookingMutation } from "../../../store/services/businessApi";
 import { useSyncFinanceTransactionFromBookingMutation } from "../../../store/services/financeApi";
+import { getApiErrorMessage } from "../../../lib/api-error";
+import { useBookingRealtimeSync } from "../../../hooks/useBookingRealtimeSync";
 import { useSnackbar } from "../AppSnackbar";
 import StripePrepaymentDialog from "./StripePrepaymentDialog";
 import ClientBookingPaymentMethodSelector from "./ClientBookingPaymentMethodSelector";
@@ -66,23 +62,6 @@ const bookingPillTabs = [
   { label: "Past", value: "past" },
   { label: "Ongoing", value: "ongoing" },
   { label: "Upcoming", value: "upcoming" },
-];
-
-const fallbackAddress = "Marina-Park 50, Den Helder, Noord-Holland";
-
-const fallbackPolicySections: BusinessPublicProfilePolicySection[] = [
-  {
-    title: "Cancellation Policy",
-    fields: [],
-    description:
-      "Cancellations made less than 48 hours before the scheduled appointment will be subject to a fee of 50% of the service cost. No-shows will be charged the full service amount.",
-  },
-  {
-    title: "Late Arrival",
-    fields: [],
-    description:
-      "If you are more than 15 minutes late, we may need to reschedule your appointment to avoid impacting subsequent clients. A late cancellation fee may apply.",
-  },
 ];
 
 export type ClientBookingDetailsVariant = "standard" | "prepaid";
@@ -112,6 +91,7 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
   const searchParams = useSearchParams();
   const listTab: BookingListTab = parseBookingListTab(searchParams?.get("tab"));
   const m = useTheme().palette.mollure;
+  useBookingRealtimeSync();
   const user = useAppSelector((s) => s.auth.user);
   const { draft, shop, businessProfile, prepaymentPercent, requiresPrepayment } = useClientBookingDraft();
   const { data: businessSetupsData } = useGetAllBusinessSetupsQuery();
@@ -126,7 +106,7 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
   const bookingRef = useCheckoutBookingRef();
   const { record: activeBooking, refresh: refreshActiveBooking } = useActiveClientBooking();
   const editRequest = useBookingEditRequest(bookingRef);
-  const bookingStatus: ClientBookingStatus = activeBooking?.status ?? "confirmed";
+  const bookingStatus: ClientBookingStatus = activeBooking?.status ?? "draft";
   const isDraft = bookingStatus === "draft";
   const isCompleted = bookingStatus === "completed";
   const isBookingRequestSent = Boolean(activeBooking?.bookingRequestSent);
@@ -137,12 +117,13 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
     : isPrepaymentPaid
       ? ("paid" as const)
       : ("required" as const);
+  const apiBookingId = activeBooking?.apiBookingId ?? activeBooking?.id ?? null;
 
   const [phone, setPhone] = React.useState("");
   const [cancelDialogOpen, setCancelDialogOpen] = React.useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [discardDialogOpen, setDiscardDialogOpen] = React.useState(false);
-  const [isCancelled, setIsCancelled] = React.useState(false);
+  const isCancelled = bookingStatus === "cancelled";
   const canActOnPayment = !isCompleted && !isCancelled && prepaymentState === "required";
   const { invoiceSettings: financeSettings, transactionOptions } = usePublicFinanceSettings(shop?.shopId);
   const [activeDocument, setActiveDocument] = React.useState<"invoice" | "receipt" | null>(null);
@@ -156,6 +137,7 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
   const [selectedPaymentMethod, setSelectedPaymentMethod] = React.useState<CheckoutPaymentMethodId>("onlineDirect");
   const { showSnackbar } = useSnackbar();
   const [syncFinanceFromBooking] = useSyncFinanceTransactionFromBookingMutation();
+  const [updateMyBooking] = useUpdateMyBookingMutation();
 
   React.useEffect(() => {
     if (!checkoutPaymentOptions.length) return;
@@ -169,10 +151,6 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
   }, [phone, requesterPhone]);
 
   React.useEffect(() => {
-    setIsCancelled(isCheckoutBookingCancelled(bookingRef) || bookingStatus === "cancelled");
-  }, [bookingRef, bookingStatus]);
-
-  React.useEffect(() => {
     if (!isPrepaid || !shop?.shopId) return;
     if (!requiresPrepayment) router.replace("/clients/booking/checkout");
   }, [isPrepaid, requiresPrepayment, router, shop?.shopId]);
@@ -184,7 +162,7 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
     shop?.addressLabel ??
     shop?.municipalityLabel ??
     businessProfile?.fixedLocation?.formattedAddress ??
-    fallbackAddress;
+    "";
 
   const bookedDateLabel = React.useMemo(() => {
     if (!draft?.selectedDateISO) return "";
@@ -202,53 +180,66 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
     user?.email ||
     "";
 
-  const policySections =
-    businessProfile?.policySections?.length ? businessProfile.policySections : fallbackPolicySections;
+  const policySections = businessProfile?.policySections ?? [];
 
-  const handleConfirmCancel = () => {
-    markCheckoutBookingCancelled(bookingRef);
-    try {
-      const activeId = window.sessionStorage.getItem(ACTIVE_BOOKING_ID_KEY);
-      if (activeId) markClientBookingCancelled(activeId);
-    } catch {
-      // ignore
+  const clearActiveBookingSessionLocal = React.useCallback(() => {
+    clearActiveBookingSession();
+  }, []);
+
+  const handleConfirmCancel = async () => {
+    if (!apiBookingId) {
+      showSnackbar({ severity: "error", message: "Booking not found on server." });
+      return;
     }
-    setIsCancelled(true);
+    try {
+      await updateMyBooking({ id: apiBookingId, status: "cancelled" }).unwrap();
+      await refreshActiveBooking();
+      showSnackbar({ severity: "success", message: "Booking cancelled" });
+    } catch (error) {
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Unable to cancel booking."),
+      });
+    }
+    setCancelDialogOpen(false);
   };
 
-  const clearActiveBookingSession = React.useCallback(() => {
-    try {
-      window.localStorage.removeItem("mollure:booking_draft");
-      clearCheckoutBookingCancelled(bookingRef);
-      window.sessionStorage.removeItem(CHECKOUT_REF_KEY);
-      window.sessionStorage.removeItem(ACTIVE_BOOKING_ID_KEY);
-    } catch {
-      // ignore
+  const handleDeleteBooking = async () => {
+    if (!apiBookingId) {
+      clearActiveBookingSessionLocal();
+      router.push("/clients/booking?tab=upcoming");
+      return;
     }
-  }, [bookingRef]);
-
-  const handleDeleteBooking = () => {
     try {
-      const activeId = window.sessionStorage.getItem(ACTIVE_BOOKING_ID_KEY);
-      if (activeId) removeClientBookingById(activeId);
-      clearActiveBookingSession();
-    } catch {
-      // ignore
+      await updateMyBooking({ id: apiBookingId, status: "cancelled" }).unwrap();
+      clearActiveBookingSessionLocal();
+      showSnackbar({ severity: "success", message: "Booking cancelled" });
+      router.push("/clients/booking?tab=upcoming");
+    } catch (error) {
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Unable to cancel booking."),
+      });
     }
-    showSnackbar({ severity: "success", message: "Booking deleted" });
-    router.push(`/clients/booking?tab=${listTab}`);
   };
 
-  const handleDiscardBookingRequest = () => {
-    try {
-      const activeId = window.sessionStorage.getItem(ACTIVE_BOOKING_ID_KEY);
-      if (activeId) removeClientBookingById(activeId);
-      clearActiveBookingSession();
-    } catch {
-      // ignore
+  const handleDiscardBookingRequest = async () => {
+    if (!apiBookingId) {
+      clearActiveBookingSessionLocal();
+      router.push("/clients/booking?tab=upcoming");
+      return;
     }
-    showSnackbar({ severity: "success", message: "Booking request discarded" });
-    router.push(`/clients/booking?tab=${listTab}`);
+    try {
+      await updateMyBooking({ id: apiBookingId, status: "cancelled" }).unwrap();
+      clearActiveBookingSessionLocal();
+      showSnackbar({ severity: "success", message: "Booking request discarded" });
+      router.push(`/clients/booking?tab=${listTab}`);
+    } catch (error) {
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Unable to discard booking request."),
+      });
+    }
   };
 
   const prepaidAmount = React.useMemo(() => {
@@ -335,7 +326,8 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
         showSnackbar({ severity: "error", message: result.message });
         return false;
       }
-      refreshActiveBooking();
+      setActiveBookingSession(result.record);
+      await refreshActiveBooking();
       return true;
     } finally {
       setIsSubmittingRequest(false);
@@ -343,40 +335,57 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
   }, [activeBooking, bookingSetup, createBooking, isDraft, locationMode, refreshActiveBooking, showSnackbar]);
 
   const completePrepayment = React.useCallback(async () => {
-    try {
-      const activeId = window.sessionStorage.getItem(ACTIVE_BOOKING_ID_KEY);
-      if (activeId) {
-        markClientBookingPrepaid(activeId);
-        if (locationMode === "fixed") {
-          updateClientBookingStatus(activeId, "confirmed");
-          refreshActiveBooking();
-        }
-        void syncFinanceFromBooking({
-          bookingRef,
-          paymentPhase: "prepay",
-          paymentMethod: checkoutPaymentMethodApiValue(selectedPaymentMethod),
-          amount: prepaidAmount,
-          status: selectedPaymentMethod.includes("Invoice") ? "Payment due" : "Prepaid",
-        });
-      }
-    } catch {
-      // ignore
+    const submitted = await submitDraftBookingRequest();
+    if (!submitted) return;
+
+    const sessionRecord = getActiveBookingSession();
+    const bookingId =
+      sessionRecord?.apiBookingId ??
+      (sessionRecord?.id && !String(sessionRecord.id).startsWith("bk_draft_") ? sessionRecord.id : null) ??
+      apiBookingId;
+    if (!bookingId || String(bookingId).startsWith("bk_draft_")) {
+      showSnackbar({ severity: "error", message: "Booking not found on server." });
+      return;
     }
-    setStripeDialogOpen(false);
-    showSnackbar({
-      severity: "success",
-      message: selectedPaymentMethod.includes("Invoice")
-        ? "Invoice requested. You will receive payment details before the due date."
-        : "Prepayment received. Your booking is confirmed.",
-    });
+
+    try {
+      await updateMyBooking({
+        id: bookingId,
+        prepayment_status: "paid",
+        ...(locationMode === "fixed" ? { status: "confirmed" as const } : {}),
+      }).unwrap();
+      await refreshActiveBooking();
+      void syncFinanceFromBooking({
+        bookingRef,
+        paymentPhase: "prepay",
+        paymentMethod: checkoutPaymentMethodApiValue(selectedPaymentMethod),
+        amount: prepaidAmount,
+        status: selectedPaymentMethod.includes("Invoice") ? "Payment due" : "Prepaid",
+      });
+      setStripeDialogOpen(false);
+      showSnackbar({
+        severity: "success",
+        message: selectedPaymentMethod.includes("Invoice")
+          ? "Invoice requested. You will receive payment details before the due date."
+          : "Prepayment received. Your booking is confirmed.",
+      });
+    } catch (error) {
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Unable to record prepayment."),
+      });
+    }
   }, [
+    apiBookingId,
     bookingRef,
     locationMode,
     prepaidAmount,
     refreshActiveBooking,
     selectedPaymentMethod,
     showSnackbar,
+    submitDraftBookingRequest,
     syncFinanceFromBooking,
+    updateMyBooking,
   ]);
 
   const handlePayNow = React.useCallback(async () => {
@@ -404,7 +413,7 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     if (params.get("payment") !== "success") return;
-    completePrepayment();
+    void completePrepayment();
     const url = new URL(window.location.href);
     url.searchParams.delete("payment");
     url.searchParams.delete("ref");
@@ -430,22 +439,27 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
   }, [bookingTransactionRow, prepaymentReceiptRow, refreshFinanceSettings]);
 
   const returnToBookingDetailsStart = React.useCallback(
-    (mode: "accept_suggested" | "acknowledge_rejected") => {
+    async (mode: "accept_suggested" | "acknowledge_rejected") => {
       if (mode === "accept_suggested") {
         clientAcceptSuggestedChanges(bookingRef);
       } else {
         clientAcknowledgeRejectedEdit(bookingRef);
       }
 
-      try {
-        const activeId = window.sessionStorage.getItem(ACTIVE_BOOKING_ID_KEY);
-        if (activeId) updateClientBookingStatus(activeId, "confirmed");
-      } catch {
-        // ignore
+      if (apiBookingId) {
+        try {
+          await updateMyBooking({ id: apiBookingId, status: "confirmed" }).unwrap();
+          await refreshActiveBooking();
+        } catch (error) {
+          showSnackbar({
+            severity: "error",
+            message: getApiErrorMessage(error, "Unable to confirm booking changes."),
+          });
+          return;
+        }
       }
 
       editRequest.refresh();
-      refreshActiveBooking();
       setActiveDocument(null);
       setStripeDialogOpen(false);
 
@@ -461,7 +475,7 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
             : "Booking details updated.",
       });
     },
-    [bookingRef, editRequest, refreshActiveBooking, showSnackbar],
+    [apiBookingId, bookingRef, editRequest, refreshActiveBooking, showSnackbar, updateMyBooking],
   );
 
   const handleOkSuggestedChanges = React.useCallback(() => {

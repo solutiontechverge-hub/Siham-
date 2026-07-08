@@ -23,6 +23,7 @@ export type CalendarBookingCardProps = {
   statusColor?: string;
   variant?: "default" | "ticket";
   positioned?: boolean;
+  dense?: boolean;
   containerSx?: SxProps<Theme>;
   onOpen: () => void;
   onOpenCalendar: () => void;
@@ -52,6 +53,7 @@ export default function CalendarBookingCard({
   statusColor,
   variant = "default",
   positioned = true,
+  dense = false,
   containerSx,
   onOpen,
   onOpenCalendar,
@@ -62,7 +64,8 @@ export default function CalendarBookingCard({
   const theme = useTheme();
   const m = theme.palette.mollure;
   const isTicket = variant === "ticket";
-  const cardHeight = isTicket ? 72 : Math.max(78, height);
+  const cardHeight = isTicket ? Math.max(34, height) : Math.max(78, height);
+  const isCompactTicket = dense || (isTicket && cardHeight < 48);
   const bookingRef = event.bookingCode ?? extractBookingId(event.id);
   const unreadCount = useProfessionalMessagingUnread(bookingRef);
   const accent = statusCardAccent(event.status, statusColor);
@@ -94,7 +97,7 @@ export default function CalendarBookingCard({
               right,
               height: cardHeight,
               minHeight: cardHeight,
-              zIndex: 4,
+              zIndex: 10,
             }
           : {
               position: "relative",
@@ -125,7 +128,7 @@ export default function CalendarBookingCard({
       <BookingTimelineCard
         idLabel={`ID: ${event.bookingCode ?? extractBookingId(event.id)}`}
         title={event.title}
-        timeLabel={`(${event.start} to ${event.end})`}
+        timeLabel={dense ? "" : `(${event.start} to ${event.end})`}
         locationLabel={event.location}
         status={{
           label: event.status,
@@ -158,9 +161,9 @@ export default function CalendarBookingCard({
               ? undefined
               : responseIndicators
         }
-        titleLineClamp={1}
+        titleLineClamp={dense ? 1 : 1}
         calendarAction={{
-          show: !isTicket,
+          show: !isTicket && !dense,
           tooltip: "Open calendar",
           onClick: onOpenCalendar,
         }}
@@ -189,8 +192,17 @@ export default function CalendarBookingCard({
           borderRadius: isTicket ? "8px" : "4px",
           boxShadow: isTicket ? "0 8px 20px rgba(16, 35, 63, 0.12)" : undefined,
         }}
-        contentSx={isTicket ? { pt: "8px", pb: "5px", pl: "7px", pr: "6px" } : undefined}
-        actionRailSx={isTicket ? { width: 52 } : undefined}
+        contentSx={
+          isTicket
+            ? {
+                pt: isCompactTicket ? "4px" : "8px",
+                pb: isCompactTicket ? "3px" : "5px",
+                pl: isCompactTicket ? "6px" : "7px",
+                pr: isCompactTicket ? "5px" : "6px",
+              }
+            : undefined
+        }
+        actionRailSx={dense ? { width: 40 } : isTicket ? { width: isCompactTicket ? 44 : 52 } : undefined}
       />
     </Box>
   );

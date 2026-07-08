@@ -2,7 +2,11 @@ import "../bootstrap-env.js";
 import pg from "pg";
 import { getDatabaseConnectionString } from "./connectionString.js";
 
-const { Pool } = pg;
+const { Pool, types } = pg;
+
+// Keep Postgres DATE as YYYY-MM-DD strings. Default Date parsing shifts
+// calendar days across timezones (e.g. 2026-07-09 -> 2026-07-08T19:00:00.000Z in UTC+5).
+types.setTypeParser(types.builtins.DATE, (value) => value);
 
 let pool;
 

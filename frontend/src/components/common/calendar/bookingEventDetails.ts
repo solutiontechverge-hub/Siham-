@@ -153,27 +153,22 @@ function buildFallbackService(ev: CalendarEvent) {
   };
 }
 
-function mockClientEmail(name?: string) {
-  if (!name) return "";
-  return `${name.toLowerCase().replace(/\s+/g, ".")}@example.com`;
-}
-
 export function resolveBookingDetailsFromEvent(ev: CalendarEvent): CalendarBookingDetails {
   if (ev.details) return ev.details;
 
   return {
     services: [buildFallbackService(ev)],
-    clientEmail: mockClientEmail(ev.showClientName),
-    phoneCode: "+31",
-    phoneNumber: "612345678",
+    clientEmail: "",
+    phoneCode: "",
+    phoneNumber: "",
     ...(ev.location === "DL"
       ? {
           desiredLocation: {
-            street: "Main Street",
-            number: "12",
-            postalCode: "1012 AB",
-            province: "North Holland",
-            municipality: "Amsterdam",
+            street: "",
+            number: "",
+            postalCode: "",
+            province: "",
+            municipality: "",
           },
         }
       : {}),
@@ -184,7 +179,7 @@ export function hydrateBookingDrawerFromEvent(ev: CalendarEvent): BookingDrawerH
   const details = resolveBookingDetailsFromEvent(ev);
 
   return {
-    clientEmail: details.clientEmail ?? mockClientEmail(ev.showClientName),
+    clientEmail: details.clientEmail ?? "",
     services: details.services ?? [buildFallbackService(ev)],
     products: details.products ?? [],
     guests: details.guests ?? [],

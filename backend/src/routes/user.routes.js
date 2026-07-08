@@ -1,6 +1,6 @@
 import express from "express";
-import { body } from "express-validator";
-import { getProfile, updateProfile } from "../controllers/user.controller.js";
+import { body, param } from "express-validator";
+import { getProfile, setProfessionalValidation, updateProfile } from "../controllers/user.controller.js";
 import { authenticateUser } from "../middleware/auth.middleware.js";
 import { validateRequest } from "../middleware/validate.middleware.js";
 import { upload } from "../middleware/upload.middleware.js";
@@ -41,6 +41,18 @@ router.put(
   ],
   validateRequest,
   updateProfile,
+);
+
+router.patch(
+  "/professionals/:userId/validation",
+  [
+    param("userId").isUUID().withMessage("userId must be a valid UUID."),
+    body("validation_status")
+      .isIn(["validated", "not_validated", "pending"])
+      .withMessage("validation_status must be validated, not_validated, or pending."),
+  ],
+  validateRequest,
+  setProfessionalValidation,
 );
 
 export default router;

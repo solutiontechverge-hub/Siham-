@@ -85,12 +85,18 @@ export function mapCalendarBookingToEvent(
   const clientName = booking.customer_name || booking.client_name || undefined;
   const isRequestBooking =
     isRequested || booking.booking_type === "request" || booking.status?.toLowerCase() === "requested";
+  const teamMemberId =
+    booking.team_member_id != null && String(booking.team_member_id).trim()
+      ? String(booking.team_member_id)
+      : fallbackResourceId || "unassigned";
 
   return {
     id: `b-${booking.id}`,
     bookingCode: booking.unique_code || String(booking.id),
-    resourceId: String(booking.team_member_id ?? fallbackResourceId),
-    date: dateFromValue(booking.date || booking.start_time || booking.booking_date),
+    resourceId: teamMemberId,
+    // Prefer normalized `date` from overview API; raw booking_date used to be a
+    // timezone-shifted Date ISO string (e.g. 2026-07-09 -> 2026-07-08T19:00:00.000Z).
+    date: dateFromValue(booking.date || booking.booking_date || booking.start_time),
     start,
     end,
     title,
@@ -104,7 +110,7 @@ export function mapCalendarBookingToEvent(
     bookingScenario: isRequestBooking ? "BR" : undefined,
     showClientName: clientName,
     details: {
-      clientEmail: "",
+      clientEmail: booking.customer_email ?? "",
       requestDirection: "incoming",
       services: [
         {
@@ -114,6 +120,9 @@ export function mapCalendarBookingToEvent(
           price: Number(booking.total_price) || 0,
         },
       ],
+      phoneNumber: booking.contact_number ?? "",
+      showPrepayment: String(booking.prepayment_status ?? "").toLowerCase() === "paid"
+        || String(booking.prepayment_status ?? "").toLowerCase() === "required",
       ...(parseCalendarEntryNotes(booking.notes) ??
         (booking.notes
           ? {

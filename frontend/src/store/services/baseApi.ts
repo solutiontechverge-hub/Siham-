@@ -58,7 +58,7 @@ const baseQueryWithAuthHandling: BaseQueryFn<string | FetchArgs, unknown, FetchB
 
 export const baseApi = createApi({
   reducerPath: "baseApi",
-  tagTypes: ["Profile", "BusinessSetup", "BusinessSetupsListing", "BusinessCategories", "Calendar", "ProfessionalClients", "FinanceSettings", "FinanceTransactions", "Messaging"],
+  tagTypes: ["Profile", "BusinessSetup", "BusinessSetupsListing", "BusinessCategories", "Calendar", "Bookings", "ProfessionalClients", "FinanceSettings", "FinanceTransactions", "Messaging"],
   baseQuery: baseQueryWithAuthHandling,
   /** Keep cached query data longer after the last subscriber unmounts (seconds). */
   keepUnusedDataFor: 600,

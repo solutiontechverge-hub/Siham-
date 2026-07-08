@@ -1,6 +1,4 @@
 import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
-import { mapApiBookingStatusToClient } from "../../app/clients/booking/clientBookingStatus";
-import { updateClientBookingStatusByRef } from "../../app/clients/booking/clientBookingRecords";
 import { baseApi } from "./baseApi";
 
 type ApiEnvelope<T> = {
@@ -264,13 +262,23 @@ export type CalendarBooking = {
   location_type: "fixed" | "desired" | null;
   notes: string | null;
   status: string;
+  prepayment_status?: string | null;
+  contact_number?: string | null;
   booking_type?: "online" | "offline" | "project" | "request" | null;
   unique_code?: string | null;
   total_price: string | number | null;
   service_title?: string | null;
   team_member_name?: string | null;
   customer_name?: string | null;
+  customer_email?: string | null;
   client_name?: string | null;
+  business_name?: string | null;
+  fixed_location_municipality?: string | null;
+  fixed_location_address?: string | null;
+  fixed_location_street_number?: string | null;
+  fixed_location_postal_code?: string | null;
+  fixed_location_province?: string | null;
+  created_at?: string | null;
   date?: string | null;
   start?: string | null;
   end?: string | null;
@@ -327,6 +335,12 @@ export type UpdateCalendarEntryStatusRequest = {
 export type UpdateBookingStatusRequest = {
   id: string;
   status: "requested" | "cancelled" | "completed" | "confirmed" | "no_show";
+};
+
+export type UpdateMyBookingRequest = {
+  id: string;
+  status?: "cancelled" | "confirmed";
+  prepayment_status?: "paid" | "pending" | "failed" | "required";
 };
 
 export type CreateBookingRequest = {
@@ -606,6 +620,10 @@ export const businessApi = baseApi.injectEndpoints({
         const response = await fetchWithBQ({
           url: `/api/business/calendar/overview?${params.toString()}`,
           method: "GET",
+          headers: {
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+          },
         });
 
         if (response.error) {
@@ -704,6 +722,26 @@ export const businessApi = baseApi.injectEndpoints({
       },
       invalidatesTags: ["Calendar"],
     }),
+    getMyBookings: builder.query<ApiEnvelope<CalendarBooking[]>, void>({
+      async queryFn(_arg, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: "/api/business/bookings",
+          method: "GET",
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<CalendarBooking[]>;
+        if (!data.success) {
+          return { error: customError(data.message || "Unable to load bookings.") };
+        }
+
+        return { data: { ...data, data: Array.isArray(data.data) ? data.data : [] } };
+      },
+      providesTags: ["Bookings"],
+    }),
     createBooking: builder.mutation<ApiEnvelope<CalendarBooking>, CreateBookingRequest>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
         const response = await fetchWithBQ({
@@ -723,7 +761,7 @@ export const businessApi = baseApi.injectEndpoints({
 
         return { data };
       },
-      invalidatesTags: ["Calendar"],
+      invalidatesTags: ["Calendar", "Bookings"],
     }),
     updateBookingStatus: builder.mutation<ApiEnvelope<CalendarBooking>, UpdateBookingStatusRequest>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
@@ -742,15 +780,34 @@ export const businessApi = baseApi.injectEndpoints({
           return { error: customError(data.message || "Unable to update booking status.") };
         }
 
-        const clientStatus = mapApiBookingStatusToClient(data.data.status);
-        const bookingRef = data.data.unique_code;
-        if (clientStatus && bookingRef) {
-          updateClientBookingStatusByRef(bookingRef, clientStatus);
+        return { data };
+      },
+      invalidatesTags: ["Calendar", "Bookings"],
+    }),
+    updateMyBooking: builder.mutation<ApiEnvelope<CalendarBooking>, UpdateMyBookingRequest>({
+      async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
+        const body: Record<string, string> = {};
+        if (payload.status) body.status = payload.status;
+        if (payload.prepayment_status) body.prepayment_status = payload.prepayment_status;
+
+        const response = await fetchWithBQ({
+          url: `/api/business/bookings/${payload.id}`,
+          method: "PATCH",
+          body,
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<CalendarBooking>;
+        if (!data.success || !data.data) {
+          return { error: customError(data.message || "Unable to update booking.") };
         }
 
         return { data };
       },
-      invalidatesTags: ["Calendar"],
+      invalidatesTags: ["Calendar", "Bookings"],
     }),
     uploadBusinessMedia: builder.mutation<ApiEnvelope<{ business_media: string[] }>, File[]>({
       async queryFn(files, _api, _extraOptions, fetchWithBQ) {
@@ -1015,8 +1072,10 @@ export const {
   useUpsertCalendarSettingsMutation,
   useUpdateCalendarEntryStatusMutation,
   useDeleteCalendarEntryMutation,
+  useGetMyBookingsQuery,
   useCreateBookingMutation,
   useUpdateBookingStatusMutation,
+  useUpdateMyBookingMutation,
   useUploadBusinessMediaMutation,
   useUpdateBusinessSetupActiveMutation,
   useCreateBusinessSubcategoryMutation,
