@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import { Badge, Box, Button, Divider, IconButton, Menu, MenuItem, Stack, Typography } from "@mui/material";
@@ -20,13 +19,18 @@ import { useBookingEditRequest } from "./useBookingEditRequest";
 
 type Props = {
   bookingRef: string;
-  dateTimeLabel: string;
+  bookedDateLabel?: string;
+  bookedTimeLabel?: string;
   bookingStatus?: ClientBookingStatus;
   bookingRequestSent?: boolean;
   bookingRequestDirection?: BookingRequestDirection;
   locationMode?: "fixed" | "desired";
   isCancelled?: boolean;
   requiresPrepayment?: boolean;
+  /** True when required prepayment has already been paid. */
+  prepaymentPaid?: boolean;
+  /** Past booking still awaiting settlement. */
+  paymentDue?: boolean;
   onEditServices?: () => void;
   onSendBookingRequest?: () => void | Promise<void>;
   onDeleteBooking?: () => void;
@@ -36,13 +40,16 @@ type Props = {
 
 export default function ClientBookingDetailsHeader({
   bookingRef,
-  dateTimeLabel,
+  bookedDateLabel = "",
+  bookedTimeLabel = "",
   bookingStatus = "confirmed",
   bookingRequestSent = false,
   bookingRequestDirection,
   locationMode = "fixed",
   isCancelled = false,
   requiresPrepayment = false,
+  prepaymentPaid = false,
+  paymentDue = false,
   onEditServices,
   onSendBookingRequest,
   onDeleteBooking,
@@ -91,7 +98,12 @@ export default function ClientBookingDetailsHeader({
     bookingStatus === "requested" &&
     bookingRequestDirection === "outgoing" &&
     locationMode === "desired";
-  const editActionsDisabled = isCancelled || isOutgoingBookingRequest || bookingRequestSent;
+  const isCompleted = bookingStatus === "completed";
+  const waitingForPayment =
+    requiresPrepayment && !prepaymentPaid && !isCompleted && !isCancelled;
+  /** Edit is only available while waiting for payment. */
+  const showEdit = waitingForPayment && !isOutgoingBookingRequest && !bookingRequestSent;
+  const editActionsDisabled = !showEdit;
 
   const headerActionBtnSx = {
     borderRadius: "8px",
@@ -121,61 +133,67 @@ export default function ClientBookingDetailsHeader({
                 #{bookingRef}
               </Box>
             </Typography>
-            <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mt: 0.65 }}>
-              <AccessTimeRoundedIcon sx={{ fontSize: 15, color: alpha(m.navy, 0.45) }} />
-              <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.55) }}>{dateTimeLabel}</Typography>
-              <IconButton
-                size="small"
-                aria-label="Open messaging"
-                onClick={() => messagingWidget?.openMessaging({ bookingRef })}
-                sx={{ ml: 0.25, p: 0.35 }}
-              >
-                {unreadFromProfessional > 0 ? (
-                  <Badge
-                    badgeContent={unreadFromProfessional > 9 ? "9+" : unreadFromProfessional}
-                    color="error"
-                    sx={{
-                      "& .MuiBadge-badge": { fontSize: 10, minWidth: 18, height: 18, fontWeight: 900 },
-                    }}
-                  >
-                    {chatIcon}
-                  </Badge>
-                ) : (
-                  chatIcon
-                )}
-              </IconButton>
-            </Stack>
+            {bookedDateLabel ? (
+              <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mt: 0.65 }}>
+                <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.55) }}>
+                  Booked on{" "}
+                  <Box component="span" sx={{ fontWeight: 900, color: alpha(m.navy, 0.88) }}>
+                    {bookedDateLabel}
+                  </Box>
+                  {bookedTimeLabel ? (
+                    <Box component="span" sx={{ fontWeight: 700, color: alpha(m.navy, 0.55) }}>
+                      {" "}({bookedTimeLabel})
+                    </Box>
+                  ) : null}
+                </Typography>
+                <IconButton
+                  size="small"
+                  aria-label="Open messaging"
+                  onClick={() => messagingWidget?.openMessaging({ bookingRef })}
+                  sx={{ ml: 0.25, p: 0.35 }}
+                >
+                  {unreadFromProfessional > 0 ? (
+                    <Badge
+                      badgeContent={unreadFromProfessional > 9 ? "9+" : unreadFromProfessional}
+                      color="error"
+                      sx={{
+                        "& .MuiBadge-badge": { fontSize: 10, minWidth: 18, height: 18, fontWeight: 900 },
+                      }}
+                    >
+                      {chatIcon}
+                    </Badge>
+                  ) : (
+                    chatIcon
+                  )}
+                </IconButton>
+              </Stack>
+            ) : null}
           </Box>
 
           <Stack alignItems={{ xs: "flex-start", md: "flex-end" }} spacing={0.85}>
             <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
-              <Button
-                variant="contained"
-                disableElevation
-                disabled={editActionsDisabled}
-                endIcon={editActionsDisabled ? undefined : <KeyboardArrowDownRoundedIcon sx={{ fontSize: 18 }} />}
-                onClick={(e) => {
-                  if (editActionsDisabled) return;
-                  setEditAnchor(e.currentTarget);
-                }}
-                sx={{
-                  borderRadius: "8px",
-                  textTransform: "none",
-                  fontWeight: 900,
-                  fontSize: 12.5,
-                  px: 2,
-                  height: 34,
-                  bgcolor: m.teal,
-                  "&:hover": { bgcolor: editActionsDisabled ? m.teal : m.tealDark },
-                  ...(editActionsDisabled && {
-                    opacity: 0.45,
+              {showEdit ? (
+                <Button
+                  variant="contained"
+                  disableElevation
+                  disabled={editActionsDisabled}
+                  endIcon={<KeyboardArrowDownRoundedIcon sx={{ fontSize: 18, color: "#fff" }} />}
+                  onClick={(e) => setEditAnchor(e.currentTarget)}
+                  sx={{
+                    borderRadius: "8px",
+                    textTransform: "none",
+                    fontWeight: 900,
+                    fontSize: 12.5,
+                    px: 2,
+                    height: 34,
                     color: "#fff",
-                    pointerEvents: "none",
-                  }),
-                }}
-              >
-                Edit
-              </Button>
+                    bgcolor: m.teal,
+                    "&:hover": { bgcolor: m.tealDark, color: "#fff" },
+                  }}
+                >
+                  Edit
+                </Button>
+              ) : null}
               <Button
                 variant="outlined"
                 sx={headerActionBtnSx}
@@ -189,7 +207,7 @@ export default function ClientBookingDetailsHeader({
                   Discard
                 </Button>
               ) : null}
-              {isCancelled ? (
+              {isCancelled || isCompleted ? (
                 <Button variant="outlined" onClick={onDeleteBooking} sx={headerActionBtnSx}>
                   Delete
                 </Button>
@@ -200,6 +218,8 @@ export default function ClientBookingDetailsHeader({
               bookingRequestSent={bookingRequestSent}
               editRequestPending={editRequest.isPending}
               requiresPrepayment={requiresPrepayment && requestRowMode === "default"}
+              prepaymentPaid={prepaymentPaid}
+              paymentDue={paymentDue}
               bookingRequestDirection={bookingRequestDirection}
               rowMode={requestRowMode}
             />

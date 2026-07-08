@@ -1,13 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { parseBookingListTab } from "../../../app/clients/booking/bookingPillTabs";
 import { Box, Container, Paper } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { AppButton, AppPillTabs, ClientPageTabsBar, MarketingSiteFooter, MollureMarketingHeader } from "..";
 import { marketingShellFooter } from "../../../data/marketingShell.data";
 import { useAppSelector } from "../../../store/hooks";
+import type { BookingListTab } from "../../../app/clients/booking/clientBookingRecords";
 import {
   clearCheckoutBookingCancelled,
   isCheckoutBookingCancelled,
@@ -19,13 +20,16 @@ import ClientBookingDiscardDialog from "./ClientBookingDiscardDialog";
 import ClientBookingDetailsHeader from "./ClientBookingDetailsHeader";
 import ClientBookingInfoBar from "./ClientBookingInfoBar";
 import ClientBookingPaymentDetailsCard from "./ClientBookingPaymentDetailsCard";
+import ClientBookingPaymentSummary from "./ClientBookingPaymentSummary";
 import ClientBookingPoliciesAccordion from "./ClientBookingPoliciesAccordion";
+import { buildClientBookingPaymentSummary } from "./buildClientBookingPaymentSummary";
 import { useClientBookingDraft } from "./useClientBookingDraft";
 import { useClientRequesterProfile } from "./useClientRequesterProfile";
 import { useActiveClientBooking } from "./useActiveClientBooking";
 import { useCheckoutBookingRef } from "./useCheckoutBookingRef";
 import { ACTIVE_BOOKING_ID_KEY, CHECKOUT_REF_KEY } from "../../../app/clients/booking/clientBookingSession";
 import {
+  isClientBookingPaymentDue,
   markClientBookingCancelled,
   markClientBookingPrepaid,
   removeClientBookingById,
@@ -60,7 +64,7 @@ import {
 
 const bookingPillTabs = [
   { label: "Past", value: "past" },
-  { label: "Outgoing", value: "outgoing" },
+  { label: "Ongoing", value: "ongoing" },
   { label: "Upcoming", value: "upcoming" },
 ];
 
@@ -71,13 +75,13 @@ const fallbackPolicySections: BusinessPublicProfilePolicySection[] = [
     title: "Cancellation Policy",
     fields: [],
     description:
-      "Cancellations made less than 24 hours before the appointment may be subject to a cancellation fee as outlined by the professional.",
+      "Cancellations made less than 48 hours before the scheduled appointment will be subject to a fee of 50% of the service cost. No-shows will be charged the full service amount.",
   },
   {
     title: "Late Arrival",
     fields: [],
     description:
-      "If you arrive more than 15 minutes late, your appointment may be shortened or cancelled at the professional's discretion.",
+      "If you are more than 15 minutes late, we may need to reschedule your appointment to avoid impacting subsequent clients. A late cancellation fee may apply.",
   },
 ];
 
@@ -105,6 +109,8 @@ function resolvePrimaryProfessional(draft: ClientBookingDraft | null) {
 
 export default function ClientBookingDetailsView({ variant }: { variant: ClientBookingDetailsVariant }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const listTab: BookingListTab = parseBookingListTab(searchParams?.get("tab"));
   const m = useTheme().palette.mollure;
   const user = useAppSelector((s) => s.auth.user);
   const { draft, shop, businessProfile, prepaymentPercent, requiresPrepayment } = useClientBookingDraft();
@@ -122,7 +128,9 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
   const editRequest = useBookingEditRequest(bookingRef);
   const bookingStatus: ClientBookingStatus = activeBooking?.status ?? "confirmed";
   const isDraft = bookingStatus === "draft";
+  const isCompleted = bookingStatus === "completed";
   const isBookingRequestSent = Boolean(activeBooking?.bookingRequestSent);
+  const isPaymentDue = Boolean(activeBooking && isClientBookingPaymentDue(activeBooking));
   const isPrepaymentPaid = Boolean(activeBooking?.prepaid);
   const prepaymentState = !requiresPrepayment
     ? ("none" as const)
@@ -135,6 +143,7 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [discardDialogOpen, setDiscardDialogOpen] = React.useState(false);
   const [isCancelled, setIsCancelled] = React.useState(false);
+  const canActOnPayment = !isCompleted && !isCancelled && prepaymentState === "required";
   const { invoiceSettings: financeSettings, transactionOptions } = usePublicFinanceSettings(shop?.shopId);
   const [activeDocument, setActiveDocument] = React.useState<"invoice" | "receipt" | null>(null);
   const [stripeDialogOpen, setStripeDialogOpen] = React.useState(false);
@@ -177,15 +186,15 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
     businessProfile?.fixedLocation?.formattedAddress ??
     fallbackAddress;
 
-  const dateTimeLabel = React.useMemo(() => {
+  const bookedDateLabel = React.useMemo(() => {
     if (!draft?.selectedDateISO) return "";
     const dt = new Date(`${draft.selectedDateISO}T00:00:00`);
-    const datePart = Number.isNaN(dt.getTime())
+    return Number.isNaN(dt.getTime())
       ? draft.selectedDateISO
       : dt.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
-    const timePart = draft.selectedTime ? ` (${draft.selectedTime})` : "";
-    return `Booked on ${datePart}${timePart}`;
-  }, [draft?.selectedDateISO, draft?.selectedTime]);
+  }, [draft?.selectedDateISO]);
+
+  const bookedTimeLabel = draft?.selectedTime ?? "";
 
   const headerName =
     ((user as { display_name?: string })?.display_name as string | undefined) ||
@@ -227,7 +236,7 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
       // ignore
     }
     showSnackbar({ severity: "success", message: "Booking deleted" });
-    router.push("/clients/booking?tab=upcoming");
+    router.push(`/clients/booking?tab=${listTab}`);
   };
 
   const handleDiscardBookingRequest = () => {
@@ -239,7 +248,7 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
       // ignore
     }
     showSnackbar({ severity: "success", message: "Booking request discarded" });
-    router.push("/clients/booking?tab=upcoming");
+    router.push(`/clients/booking?tab=${listTab}`);
   };
 
   const prepaidAmount = React.useMemo(() => {
@@ -281,6 +290,34 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
       documentAmount: prepaidAmount,
     });
   }, [bookingRef, draft, financeSettings, prepaymentState, prepaidAmount, requesterName, user?.email]);
+
+  const paymentSummarySections = React.useMemo(
+    () =>
+      buildClientBookingPaymentSummary({
+        draft,
+        requesterName,
+        prepaid: isPrepaymentPaid,
+        paid: activeBooking?.paid === true,
+        requiresPrepayment: Boolean(activeBooking?.requiresPrepayment ?? requiresPrepayment),
+        prepaymentPercent: activeBooking?.prepaymentPercent ?? prepaymentPercent,
+        paymentDue: isPaymentDue,
+        hasEditPrepayment: editRequest.isSuggested,
+      }),
+    [
+      activeBooking?.paid,
+      activeBooking?.prepaymentPercent,
+      activeBooking?.requiresPrepayment,
+      draft,
+      editRequest.isSuggested,
+      isPaymentDue,
+      isPrepaymentPaid,
+      prepaymentPercent,
+      requesterName,
+      requiresPrepayment,
+    ],
+  );
+
+  const showPaymentSummary = (isCompleted || isPaymentDue) && paymentSummarySections.length > 0;
 
   const submitDraftBookingRequest = React.useCallback(async (): Promise<boolean> => {
     if (!isDraft || !activeBooking) return true;
@@ -441,16 +478,18 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
 
   const showChangeResponsePanel = editRequest.isSuggested || editRequest.isRejected;
   const detailsContentKey = `${bookingRef}-${editRequest.status ?? "none"}-${bookingStatus}`;
+  const isFullyCompleted = isCompleted && activeBooking?.paid === true && !isPaymentDue;
+  const pageBackground = isFullyCompleted ? "#EAECF0" : "#EAF9FB";
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "#EAF9FB" }}>
+    <Box sx={{ minHeight: "100vh", bgcolor: pageBackground }}>
       <MollureMarketingHeader navItems={[]} isAuthed userLabel={user?.email ?? ""} userName={headerName} homeHref="/" />
 
       <ClientPageTabsBar activeLabel="Booking" />
       <Container maxWidth="lg" sx={{ px: { xs: 2, sm: 3, md: 4 }, pb: 0, pt: 1 }}>
         <AppPillTabs
           tabs={bookingPillTabs}
-          active="upcoming"
+          active={listTab}
           alignStart
           onChange={(tab) => router.push(`/clients/booking?tab=${parseBookingListTab(tab)}`)}
         />
@@ -469,13 +508,16 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
         >
           <ClientBookingDetailsHeader
             bookingRef={bookingRef}
-            dateTimeLabel={dateTimeLabel}
+            bookedDateLabel={bookedDateLabel}
+            bookedTimeLabel={bookedTimeLabel}
             bookingStatus={bookingStatus}
             bookingRequestSent={isBookingRequestSent}
             bookingRequestDirection={activeBooking?.bookingRequestDirection}
             locationMode={locationMode}
             isCancelled={isCancelled}
             requiresPrepayment={requiresPrepayment}
+            prepaymentPaid={isPrepaymentPaid}
+            paymentDue={isPaymentDue}
             onSendBookingRequest={isDraft && !isBookingRequestSent ? handleSendBookingRequest : undefined}
             onDeleteBooking={() => setDeleteDialogOpen(true)}
             onDiscardBookingRequest={() => setDiscardDialogOpen(true)}
@@ -507,20 +549,35 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
                   key={detailsContentKey}
                   draft={draft}
                   requesterName={requesterName}
+                  requesterEmail={user?.email}
                   requesterAvatarUrl={requesterAvatarUrl}
-                  prepaymentState={isPrepaid ? prepaymentState : "none"}
+                  prepaymentState={isPrepaid && !isCompleted ? prepaymentState : "none"}
                   prepaymentPercent={prepaymentPercent}
                   payNowLabel={payNowLabel}
-                  onPayNow={prepaymentState === "required" ? handlePayNow : undefined}
-                  onViewInvoice={prepaymentState === "paid" && bookingTransactionRow ? openInvoice : undefined}
+                  onPayNow={canActOnPayment ? handlePayNow : undefined}
+                  onViewInvoice={
+                    !isCompleted && prepaymentState === "paid" && bookingTransactionRow
+                      ? openInvoice
+                      : undefined
+                  }
                   onViewReceipt={
-                    prepaymentState === "paid" && (prepaymentReceiptRow ?? bookingTransactionRow)
+                    !isCompleted &&
+                    prepaymentState === "paid" &&
+                    (prepaymentReceiptRow ?? bookingTransactionRow)
                       ? openReceipt
                       : undefined
                   }
                 />
 
-                {isPrepaid && prepaymentState === "required" ? (
+                {showPaymentSummary ? (
+                  <ClientBookingPaymentSummary
+                    sections={paymentSummarySections}
+                    onViewInvoice={bookingTransactionRow ? openInvoice : undefined}
+                    onViewReceipt={(prepaymentReceiptRow ?? bookingTransactionRow) ? openReceipt : undefined}
+                  />
+                ) : null}
+
+                {isPrepaid && canActOnPayment ? (
                   <ClientBookingPaymentMethodSelector
                     options={checkoutPaymentOptions}
                     value={selectedPaymentMethod}
@@ -571,6 +628,7 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
         open={deleteDialogOpen}
         onClose={() => setDeleteDialogOpen(false)}
         onConfirm={handleDeleteBooking}
+        variant={bookingStatus === "completed" ? "completed" : "cancelled"}
       />
       <ClientBookingDiscardDialog
         open={discardDialogOpen}

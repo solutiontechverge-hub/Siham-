@@ -2498,7 +2498,7 @@ export default function ClientBookingPage() {
   const showCreate = mode === "create";
   const tabParam = searchParams?.get("tab");
   const legacyView = searchParams?.get("view");
-  const activeTab = parseBookingListTab(tabParam ?? (legacyView === "history" ? "outgoing" : undefined));
+  const activeTab = parseBookingListTab(tabParam ?? (legacyView === "history" ? "ongoing" : undefined));
 
   if (showCreate) {
     return (

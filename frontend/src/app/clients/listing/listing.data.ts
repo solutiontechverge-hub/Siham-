@@ -70,9 +70,9 @@ export const listingPageData = {
     sortLabel: "Sort By",
     sortOptions: [
       { label: "Recommended", value: "recommended" },
-      { label: "Rating", value: "rating" },
-      { label: "Price (low to high)", value: "price_asc" },
-      { label: "Price (high to low)", value: "price_desc" },
+      { label: "Alphabetical: A–Z", value: "alpha_asc" },
+      { label: "Alphabetical: Z–A", value: "alpha_desc" },
+      { label: "Highest Rated → Lowest Rated", value: "rating_desc" },
     ],
   },
   cards: [

@@ -78,10 +78,8 @@ export default function ClientListingCard({
     if (canPickDesired && !canPickFixed && mode !== "desired") setMode("desired");
   }, [canPickFixed, canPickDesired, mode]);
   const slides = React.useMemo(() => {
-    if (item.media.length > 0) {
-      return item.media;
-    }
-    return [item.image];
+    const list = item.media.length > 0 ? item.media : [item.image];
+    return list.slice(0, 4);
   }, [item.image, item.media]);
 
   const [activeSlide, setActiveSlide] = React.useState(0);
@@ -255,7 +253,7 @@ export default function ClientListingCard({
             </Typography>
           ))}
 
-          <Typography sx={{ fontWeight: 400, color: alpha(tokens.navy, 0.78), fontSize: 18, lineHeight: 1.35 }}>
+          <Typography sx={{ fontWeight: 700, color: alpha(tokens.navy, 0.78), fontSize: 18, lineHeight: 1.35 }}>
             {item.title}
           </Typography>
 
@@ -266,8 +264,10 @@ export default function ClientListingCard({
           ) : null}
 
           <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.75}>
-            <LocationOnOutlinedIcon sx={{ fontSize: 16, color: alpha(tokens.navy, 0.55) }} />
-            <Typography sx={{ fontSize: 13, color: alpha(tokens.navy, 0.55) }}>{item.municipalityLabel}</Typography>
+            <LocationOnOutlinedIcon sx={{ fontSize: 16, color: alpha(tokens.navy, 0.78) }} />
+            <Typography sx={{ fontSize: 13, fontWeight: 700, color: alpha(tokens.navy, 0.78) }}>
+              {item.municipalityLabel}
+            </Typography>
           </Stack>
 
           <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5 }}>
@@ -349,7 +349,7 @@ export default function ClientListingCard({
 
           <Box sx={{ pt: 0.75, textAlign: "left" }}>
             <Stack spacing={1}>
-              {item.services.map((svc, idx) => (
+              {item.services.slice(0, 3).map((svc, idx) => (
                 <Stack
                   key={`${svc.name}-${idx}`}
                   direction="row"

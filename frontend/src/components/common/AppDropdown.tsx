@@ -8,6 +8,8 @@ import AppTextField from "./AppTextField";
 export type AppDropdownOption = {
   label: string;
   value: string;
+  /** Optional leading icon / logo for the menu row. */
+  icon?: React.ReactNode;
 };
 
 type AppDropdownProps = Omit<TextFieldProps, "select" | "onChange" | "children" | "value"> & {
@@ -86,8 +88,20 @@ export default function AppDropdown({
       {options.map((option) => {
         const selected = Array.isArray(value) ? value.includes(option.value) : value === option.value;
         return (
-          <MenuItem key={option.value} value={option.value} sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            {multiple ? <Checkbox size="small" checked={selected} /> : null}
+          <MenuItem
+            key={option.value}
+            value={option.value}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: option.icon ? 1.75 : 1,
+              minHeight: 40,
+              py: 1,
+              lineHeight: 1.2,
+            }}
+          >
+            {multiple ? <Checkbox size="small" checked={selected} sx={{ p: 0.5 }} /> : null}
+            {option.icon ? option.icon : null}
             {option.label}
           </MenuItem>
         );

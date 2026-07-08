@@ -206,7 +206,8 @@ export const mapBusinessSetupToListingCard = (
 
   const media = (setup.media ?? [])
     .map((url) => (typeof url === "string" ? url.trim() : ""))
-    .filter(Boolean);
+    .filter(Boolean)
+    .slice(0, 4);
 
   const fallbackImage = FALLBACK_IMAGES[index % FALLBACK_IMAGES.length];
   const image = media[0] ?? fallbackImage;

@@ -14,6 +14,7 @@ export type ClientBookingPrepaymentState = "none" | "required" | "paid";
 type Props = {
   draft: ClientBookingDraft | null;
   requesterName: string;
+  requesterEmail?: string;
   requesterAvatarUrl?: string;
   prepaymentState?: ClientBookingPrepaymentState;
   prepaymentPercent?: number;
@@ -26,6 +27,7 @@ type Props = {
 export default function ClientBookingPaymentDetailsCard({
   draft,
   requesterName,
+  requesterEmail,
   requesterAvatarUrl,
   prepaymentState = "none",
   prepaymentPercent = 0,
@@ -122,7 +124,12 @@ export default function ClientBookingPaymentDetailsCard({
           >
             {requesterName.charAt(0).toUpperCase()}
           </Avatar>
-          <Typography sx={{ fontWeight: 900, fontSize: 14, color: alpha(m.navy, 0.88) }}>{requesterName}</Typography>
+          <Stack spacing={0.25}>
+            <Typography sx={{ fontWeight: 900, fontSize: 14, color: alpha(m.navy, 0.88) }}>{requesterName}</Typography>
+            {requesterEmail ? (
+              <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.55) }}>{requesterEmail}</Typography>
+            ) : null}
+          </Stack>
         </Stack>
 
         {draft?.projectDetails?.description ? (

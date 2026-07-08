@@ -175,6 +175,7 @@ export const clientsPageData = {
     description:
       "Join thousands of salon owners and freelancers who are saving time and growing their revenue with Mollure.",
     action: "Partner with Mollure",
+    href: "/professionals/pricing",
     supportingText: "Credit card required - free for first 50 transactions",
   },
   footer: marketingShellFooter,

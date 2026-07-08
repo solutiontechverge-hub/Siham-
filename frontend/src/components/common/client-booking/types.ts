@@ -6,6 +6,8 @@ export type ClientBookingDraftService = {
   guestId?: string | null;
   teamMemberId?: string | null;
   assignedTo?: string | null;
+  /** Services purchased after checkout appear under Add Ons in payment summary. */
+  isAddOn?: boolean;
 };
 
 export type ClientBookingDraftPerson = {

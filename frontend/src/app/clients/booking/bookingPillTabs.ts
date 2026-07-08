@@ -3,11 +3,13 @@ import type { BookingListTab } from "./clientBookingRecords";
 
 export const CLIENT_BOOKING_PILL_TABS: readonly AppPillTab[] = [
   { label: "Past", value: "past" },
-  { label: "Outgoing", value: "outgoing" },
+  { label: "Ongoing", value: "ongoing" },
   { label: "Upcoming", value: "upcoming" },
 ] as const;
 
 export function parseBookingListTab(value: string | null | undefined): BookingListTab {
-  if (value === "past" || value === "outgoing" || value === "upcoming") return value;
+  // Legacy URL support: older links used `outgoing` for the confirmed/today+future tab.
+  if (value === "outgoing" || value === "ongoing") return "ongoing";
+  if (value === "past" || value === "upcoming") return value;
   return "upcoming";
 }
