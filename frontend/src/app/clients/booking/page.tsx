@@ -56,6 +56,7 @@ import {
   setActiveBookingSession,
 } from "./clientBookingSession";
 import { resolveCreateCheckoutPath } from "./resolveCreateBookingStatus";
+import { submitClientBookingRequest } from "./submitClientBookingRequest";
 import { useSnackbar } from "../../../components/common/AppSnackbar";
 import { getServicesForLocationMode, getTeamForLocationMode } from "../../../data/businessPublicProfile.data";
 import { useBusinessPublicProfile } from "../../../hooks/useBusinessPublicProfile";
@@ -70,6 +71,7 @@ import {
   type ProfessionalProfile,
   type ProfileResponse,
 } from "../../../store/services/profileApi";
+import { useCreateBookingMutation } from "../../../store/services/businessApi";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -145,7 +147,13 @@ function ClientBookingCreateView() {
     locationMode?: "fixed" | "desired";
   } | null>(null);
 
-  const { profile: businessProfile } = useBusinessPublicProfile(shop?.shopId);
+  const { profile: businessProfile, setups: businessSetups } = useBusinessPublicProfile(shop?.shopId);
+  const bookingSetup = React.useMemo(
+    () => businessSetups.find((row) => row.id === shop?.shopId) ?? null,
+    [businessSetups, shop?.shopId],
+  );
+  const [createBooking] = useCreateBookingMutation();
+  const [isContinuing, setIsContinuing] = React.useState(false);
 
   const startOfDay = (d: Date) => {
     const next = new Date(d);
@@ -859,8 +867,8 @@ function ClientBookingCreateView() {
     if (!checked) updateServiceTeamMember(serviceId, "");
   };
 
-  const onContinue = () => {
-    if (!shop?.shopId || services.length === 0 || !allServicesAssigned) return;
+  const onContinue = async () => {
+    if (!shop?.shopId || services.length === 0 || !allServicesAssigned || isContinuing) return;
 
     const peopleForDraft =
       planningPersonId != null
@@ -878,6 +886,7 @@ function ClientBookingCreateView() {
     const requesterId = peopleForDraft.find((p) => p.isRequester)?.id ?? peopleForDraft[0]?.id ?? "p-requester";
     const servicesForDraft = services.map((s) => ({
       ...s,
+      catalogServiceId: s.catalogServiceId ?? extractUuidFromSyntheticId(s.id),
       guestId: s.guestId ?? requesterId,
     }));
 
@@ -904,6 +913,7 @@ function ClientBookingCreateView() {
 
     const bookingRef = createBookingRef();
 
+    setIsContinuing(true);
     try {
       if (fromProfile && typeof window !== "undefined") {
         window.sessionStorage.removeItem(ACTIVE_BOOKING_ID_KEY);
@@ -922,15 +932,33 @@ function ClientBookingCreateView() {
         prepaid: false,
       };
       setActiveBookingSession(draftRecord);
+
+      const result = await submitClientBookingRequest({
+        record: draftRecord,
+        locationMode,
+        setup: bookingSetup,
+        createBooking,
+      });
+
+      if (!result.ok) {
+        showSnackbar({ severity: "error", message: result.message });
+        return;
+      }
+
+      setActiveBookingSession(result.record);
+      showSnackbar({ severity: "success", message: "Booking request created" });
+
+      const listTab = parseBookingListTab(searchParams?.get("tab"));
+      const checkoutPath = resolveCreateCheckoutPath({ locationMode, requiresPrepayment });
+      router.push(`${checkoutPath}?tab=${listTab}`);
     } catch {
       showSnackbar({
         severity: "error",
-        message: "Unable to save booking draft. Please try again.",
+        message: "Unable to create booking. Please try again.",
       });
-      return;
+    } finally {
+      setIsContinuing(false);
     }
-
-    router.push(resolveCreateCheckoutPath({ locationMode, requiresPrepayment }));
   };
 
   const continueLabel = "Continue";
@@ -2431,8 +2459,8 @@ function ClientBookingCreateView() {
                         fullWidth
                         variant="contained"
                         disableElevation
-                        disabled={!allServicesAssigned}
-                        onClick={onContinue}
+                        disabled={!allServicesAssigned || isContinuing}
+                        onClick={() => void onContinue()}
                         sx={{
                           mt: 1.25,
                           borderRadius: "10px",
@@ -2441,7 +2469,7 @@ function ClientBookingCreateView() {
                           height: 40,
                           bgcolor: m.teal,
                           "&:hover": { bgcolor: m.tealDark },
-                          ...(allServicesAssigned
+                          ...(allServicesAssigned && !isContinuing
                             ? null
                             : {
                                 bgcolor: alpha(m.navy, 0.10),
@@ -2450,7 +2478,14 @@ function ClientBookingCreateView() {
                               }),
                         }}
                       >
-                        {continueLabel}
+                        {isContinuing ? (
+                          <>
+                            <CircularProgress size={18} sx={{ mr: 1, color: "inherit" }} />
+                            {continueLabel}
+                          </>
+                        ) : (
+                          continueLabel
+                        )}
                       </Button>
                     </Stack>
                   </Box>
