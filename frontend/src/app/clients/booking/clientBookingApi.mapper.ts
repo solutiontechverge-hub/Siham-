@@ -1,6 +1,6 @@
 import type { ClientBookingDraft } from "../../../components/common/client-booking/types";
 import type { ClientBookingRecord, ClientBookingStatus } from "./clientBookingRecords";
-import { fmtMinutesToTimeLabel, parseTimeLabelToMinutes } from "./booking-time";
+import { fmtMinutesToTimeLabel, parseTimeLabelToMinutes, buildWallClockDateTimeIso } from "./booking-time";
 import { wallClockDateFromDateTime, wallClockTimeFromDateTime } from "../../../components/common/calendar/calendar.utils";
 import type { BusinessSetupListing, CalendarBooking, CreateBookingRequest } from "../../../store/services/businessApi";
 import { mapApiBookingStatusToClient } from "./clientBookingStatus";
@@ -82,9 +82,7 @@ export function resolveTeamMemberId(setup: BusinessSetupListing, teamMemberId: s
 }
 
 function buildDateTimeIso(dateIso: string, minutesFromMidnight: number) {
-  const date = new Date(`${dateIso}T00:00:00`);
-  date.setMinutes(date.getMinutes() + minutesFromMidnight);
-  return date.toISOString();
+  return buildWallClockDateTimeIso(dateIso, minutesFromMidnight);
 }
 
 function mapApiStatus(status: ClientBookingStatus): CreateBookingRequest["status"] {
@@ -204,6 +202,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
     apiBookingId: booking.id,
     bookingRef: booking.unique_code ?? undefined,
     status,
+    bookingRequestSent: status === "requested",
     bookingRequestDirection: status === "requested" ? "outgoing" : undefined,
     shop: {
       shopId: booking.business_setup_id,

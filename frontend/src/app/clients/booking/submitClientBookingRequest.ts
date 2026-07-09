@@ -1,7 +1,7 @@
 import { getApiErrorMessage } from "../../../lib/api-error";
 import type { BusinessSetupListing, CreateBookingRequest } from "../../../store/services/businessApi";
-import { parseTimeLabelToMinutes } from "./booking-time";
-import { buildClientBookingApiPayload } from "./clientBookingApi.mapper";
+import { parseTimeLabelToMinutes, buildWallClockDateTimeIso } from "./booking-time";
+import { buildClientBookingApiPayload, extractUuidFromSyntheticId } from "./clientBookingApi.mapper";
 import type { ClientBookingRecord } from "./clientBookingRecords";
 import { createBookingRef } from "./clientBookingSession";
 import { resolveCreateBookingStatus } from "./resolveCreateBookingStatus";
@@ -29,21 +29,22 @@ function buildFallbackCreateBookingPayload(
   const endMinutes =
     startMinutes + (draft.services ?? []).reduce((sum, service) => sum + service.durationMins, 0);
   const bookingRef = record.bookingRef ?? createBookingRef();
-  const startDate = new Date(`${bookingDate}T00:00:00`);
-  startDate.setMinutes(startDate.getMinutes() + startMinutes);
-  const endDate = new Date(`${bookingDate}T00:00:00`);
-  endDate.setMinutes(endDate.getMinutes() + endMinutes);
+  const catalogServiceId =
+    (primaryService as { catalogServiceId?: string | null }).catalogServiceId ?? primaryService.id;
+  const resolvedServiceId =
+    (catalogServiceId && UUID_PATTERN.test(catalogServiceId) ? catalogServiceId : null) ??
+    extractUuidFromSyntheticId(catalogServiceId);
 
   return {
     booking_date: bookingDate,
     business_setup_id: shopId,
-    service_id: UUID_PATTERN.test(primaryService.id) ? primaryService.id : null,
+    service_id: resolvedServiceId,
     team_member_id:
       primaryService.teamMemberId && UUID_PATTERN.test(primaryService.teamMemberId)
         ? primaryService.teamMemberId
-        : null,
-    start_time: startDate.toISOString(),
-    end_time: endDate.toISOString(),
+        : extractUuidFromSyntheticId(primaryService.teamMemberId),
+    start_time: buildWallClockDateTimeIso(bookingDate, startMinutes),
+    end_time: buildWallClockDateTimeIso(bookingDate, endMinutes),
     location_type: locationMode === "desired" ? "desired" : "fixed",
     status: "requested",
     booking_type: locationMode === "desired" ? "project" : "request",
