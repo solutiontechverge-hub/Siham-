@@ -5,6 +5,8 @@ import RemoteAwareImage from "./RemoteAwareImage";
 import type { Swiper as SwiperInstance } from "swiper";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { alpha, useTheme } from "@mui/material/styles";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
 import "swiper/css";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
@@ -16,7 +18,6 @@ import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownR
 import PersonPinCircleRoundedIcon from "@mui/icons-material/PersonPinCircleRounded";
 import RemoveRoundedIcon from "@mui/icons-material/RemoveRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
-import ChildCareRoundedIcon from "@mui/icons-material/ChildCareRounded";
 import FemaleRoundedIcon from "@mui/icons-material/FemaleRounded";
 import MaleRoundedIcon from "@mui/icons-material/MaleRounded";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
@@ -35,7 +36,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import type { BusinessPublicProfileData } from "../../data/businessPublicProfile.data";
+import type { BusinessPublicProfileData, BusinessPublicProfileServiceForItem } from "../../data/businessPublicProfile.data";
 import {
   buildDesiredMunicipalityList,
   buildDesiredProvinceDisplays,
@@ -49,6 +50,8 @@ import {
 import ServiceCategoryBar from "./ServiceCategoryBar";
 import AppDropdown from "./AppDropdown";
 import { serviceMatchesCategoryTab } from "../../data/businessServiceCategorySlider.data";
+import { clientReviewsHref } from "../../data/clientProfessionalReviews";
+import { KidsIcon } from "../../../images";
 
 function toImageSrc(img: unknown) {
   if (!img) return "";
@@ -88,11 +91,13 @@ function SectionCard({
         spacing={1.5}
         sx={{
           px: 2,
-          py: 1.25,
+          py: 1.5,
           borderBottom: `1px solid ${alpha(m.navy, 0.06)}`,
         }}
       >
-        <Typography sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.82) }}>{title}</Typography>
+        <Typography variant="subHeading" sx={{ lineHeight: 1, letterSpacing: 0 }}>
+          {title}
+        </Typography>
         {headerAction ?? null}
       </Stack>
       <Box sx={{ p: 2 }}>{children}</Box>
@@ -144,8 +149,22 @@ function PolicyFieldRow({ label, value }: { label: string; value: string }) {
 const SERVICE_FOR_ICONS = {
   men: MaleRoundedIcon,
   women: FemaleRoundedIcon,
-  kids: ChildCareRoundedIcon,
 } as const;
+
+function ServiceForIcon({ item }: { item: BusinessPublicProfileServiceForItem }) {
+  const m = useTheme().palette.mollure;
+
+  if (item.id === "kids") {
+    return (
+      <Box sx={{ width: 16, height: 16, flexShrink: 0, display: "grid", placeItems: "center" }}>
+        <Image src={KidsIcon} alt="" width={13} height={13} />
+      </Box>
+    );
+  }
+
+  const Icon = SERVICE_FOR_ICONS[item.id];
+  return <Icon sx={{ fontSize: 16, color: alpha(m.navy, 0.45) }} />;
+}
 
 function ProfileHeroSwiper({ images, alt }: { images: string[]; alt: string }) {
   const [activeIndex, setActiveIndex] = React.useState(0);
@@ -478,6 +497,38 @@ function ProfileLocationSection({
   );
 }
 
+function PublicProfilePageShell({ children }: { children: React.ReactNode }) {
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        borderRadius: "12px",
+        bgcolor: "#fff",
+        overflow: "hidden",
+        px: { xs: 1.5, md: 2 },
+        py: { xs: 1.5, md: 2 },
+      }}
+    >
+      {children}
+    </Paper>
+  );
+}
+
+function PublicProfileDetailsGroup({ children }: { children: React.ReactNode }) {
+  const m = useTheme().palette.mollure;
+  return (
+    <Box
+      sx={{
+        borderRadius: "10px",
+        bgcolor: m.fxGrayF2F4F7,
+        p: { xs: 1.25, md: 1.5 },
+      }}
+    >
+      <Stack spacing={2}>{children}</Stack>
+    </Box>
+  );
+}
+
 function PublicProfileTopBar({ title }: { title: string }) {
   const m = useTheme().palette.mollure;
   return (
@@ -625,6 +676,7 @@ export default function BusinessPublicProfile({
 }: BusinessPublicProfileProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
+  const router = useRouter();
   const heroSlides = React.useMemo(() => {
     if (data.heroImages.length > 0) {
       return data.heroImages.map((img) => toImageSrc(img)).filter(Boolean);
@@ -643,7 +695,7 @@ export default function BusinessPublicProfile({
   // Professional setup: project + km apply when offering is Desired or Both (not Fixed-only).
   const showDesiredOfferingContent =
     data.supportsDesiredLocation && (!data.supportsFixedLocation || isDesiredLocation);
-  const showKilometerAllowance = data.supportsDesiredLocation;
+  const showKilometerAllowance = showDesiredOfferingContent;
   const showProjectHeader = showDesiredOfferingContent;
 
   const [projectEnabled, setProjectEnabled] = React.useState(data.projectEnabled);
@@ -775,7 +827,7 @@ export default function BusinessPublicProfile({
   };
 
   return (
-    <Box>
+    <PublicProfilePageShell>
       <PublicProfileTopBar title={publicProfileTitle} />
 
       <Paper
@@ -835,9 +887,22 @@ export default function BusinessPublicProfile({
                 {Array.from({ length: 5 }).map((_, i) => (
                   <StarRoundedIcon key={i} sx={{ fontSize: 18, color: m.star }} />
                 ))}
-                <Typography sx={{ ml: 0.5, fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.55) }}>
-                  ({data.reviewsCount} Reviews)
-                </Typography>
+                <ButtonBase
+                  onClick={() => {
+                    const firstMember = visibleTeamMembers[0];
+                    router.push(clientReviewsHref(data.shopId, firstMember?.id));
+                  }}
+                  sx={{
+                    ml: 0.5,
+                    borderRadius: "6px",
+                    px: 0.35,
+                    "&:hover": { bgcolor: alpha(m.teal, 0.06) },
+                  }}
+                >
+                  <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.55) }}>
+                    ({data.reviewsCount} Reviews)
+                  </Typography>
+                </ButtonBase>
               </Stack>
               <Typography sx={{ mt: 1, fontWeight: 900, fontSize: 22, color: alpha(m.navy, 0.9), lineHeight: 1.2 }}>
                 {data.shopName}
@@ -1004,14 +1069,10 @@ export default function BusinessPublicProfile({
             We love to serve
           </Typography>
           <Stack direction="row" flexWrap="wrap" alignItems="center" useFlexGap spacing={1.25}>
-            {data.serviceFor
-              .filter((item) => item.enabled)
-              .map((item, index, arr) => {
-                const Icon = SERVICE_FOR_ICONS[item.id];
-                return (
+            {data.serviceFor.map((item, index, arr) => (
                   <React.Fragment key={item.id}>
                     <Stack direction="row" alignItems="center" spacing={0.5}>
-                      <Icon sx={{ fontSize: 16, color: alpha(m.navy, 0.45) }} />
+                      <ServiceForIcon item={item} />
                       <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.62) }}>
                         {item.label}
                       </Typography>
@@ -1020,8 +1081,7 @@ export default function BusinessPublicProfile({
                       <Typography sx={{ fontSize: 12.5, fontWeight: 500, color: alpha(m.navy, 0.28) }}>|</Typography>
                     ) : null}
                   </React.Fragment>
-                );
-              })}
+                ))}
           </Stack>
         </SectionCard>
 
@@ -1167,7 +1227,7 @@ export default function BusinessPublicProfile({
             }}
           >
             <Box sx={{ px: 2, py: 1.5 }}>
-              <Typography sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.88), mb: 1.25 }}>
+              <Typography variant="subHeading" sx={{ lineHeight: 1, letterSpacing: 0, mb: 1.25 }}>
                 Project
               </Typography>
               <ProjectReadOnlyField
@@ -1294,9 +1354,19 @@ export default function BusinessPublicProfile({
                             }}
                           />
                         ))}
-                        <Typography sx={{ fontSize: 10.5, fontWeight: 500, color: alpha(m.navy, 0.5), ml: 0.25 }}>
-                          ({member.reviewsCount} Reviews)
-                        </Typography>
+                        <ButtonBase
+                          onClick={() => router.push(clientReviewsHref(data.shopId, member.id))}
+                          sx={{
+                            ml: 0.25,
+                            borderRadius: "6px",
+                            px: 0.25,
+                            "&:hover": { bgcolor: alpha(m.teal, 0.06) },
+                          }}
+                        >
+                          <Typography sx={{ fontSize: 10.5, fontWeight: 500, color: alpha(m.navy, 0.5) }}>
+                            ({member.reviewsCount} Reviews)
+                          </Typography>
+                        </ButtonBase>
                       </Stack>
                     </Box>
                   </Stack>
@@ -1356,87 +1426,89 @@ export default function BusinessPublicProfile({
           </Stack>
         </SectionCard>
 
-        <SectionCard title="General Note">
-          <Box sx={{ borderRadius: "10px", bgcolor: m.fxGrayF2F4F7, p: 1.5 }}>
-            <Typography sx={{ fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.72), mb: 0.75 }}>
-              {data.generalNoteLabel}
-            </Typography>
-            <Box
-              sx={{
-                borderRadius: "8px",
-                bgcolor: "#fff",
-                border: `1px solid ${alpha(m.navy, 0.08)}`,
-                px: 1.25,
-                py: 1,
-              }}
-            >
-              <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: alpha(m.navy, 0.62), lineHeight: 1.55 }}>
-                Additional Notes: {data.generalNote}
+        <PublicProfileDetailsGroup>
+          <SectionCard title="General Note">
+            <Box sx={{ borderRadius: "10px", bgcolor: m.fxGrayF2F4F7, p: 1.5 }}>
+              <Typography sx={{ fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.72), mb: 0.75 }}>
+                {data.generalNoteLabel}
               </Typography>
+              <Box
+                sx={{
+                  borderRadius: "8px",
+                  bgcolor: "#fff",
+                  border: `1px solid ${alpha(m.navy, 0.08)}`,
+                  px: 1.25,
+                  py: 1,
+                }}
+              >
+                <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: alpha(m.navy, 0.62), lineHeight: 1.55 }}>
+                  Additional Notes: {data.generalNote}
+                </Typography>
+              </Box>
             </Box>
-          </Box>
-        </SectionCard>
+          </SectionCard>
 
-        <SectionCard title="Price">
-          <Stack spacing={1.5}>
-            <Box>
-              <Typography sx={{ fontSize: 12.5, color: alpha(m.navy, 0.78), lineHeight: 1.5 }}>
-                <Box component="span" sx={{ fontWeight: 800 }}>
-                  Price Range:
-                </Box>{" "}
-                <Box component="span" sx={{ fontWeight: 600, color: alpha(m.navy, 0.5) }}>
-                  {data.priceRangeLabel}
-                </Box>
-              </Typography>
-            </Box>
-            <Box>
-              <Typography sx={{ fontSize: 12.5, color: alpha(m.navy, 0.78), lineHeight: 1.5 }}>
-                <Box component="span" sx={{ fontWeight: 900 }}>
-                  Prepayment
-                </Box>{" "}
-                {data.prepaymentLabel}
-              </Typography>
-            </Box>
-            {showKilometerAllowance ? (
-              <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78) }}>
-                Kilometer allowance: {data.kilometerAllowanceLabel}
-              </Typography>
-            ) : null}
-            {data.priceDescription ? <MutedInstructionBox>{data.priceDescription}</MutedInstructionBox> : null}
-            {showKilometerAllowance && data.kilometerAllowanceInstructions ? (
-              <MutedInstructionBox>{data.kilometerAllowanceInstructions}</MutedInstructionBox>
-            ) : null}
-          </Stack>
-        </SectionCard>
+          <SectionCard title="Price">
+            <Stack spacing={1.5}>
+              <Box>
+                <Typography sx={{ fontSize: 12.5, color: alpha(m.navy, 0.78), lineHeight: 1.5 }}>
+                  <Box component="span" sx={{ fontWeight: 800 }}>
+                    Price Range:
+                  </Box>{" "}
+                  <Box component="span" sx={{ fontWeight: 600, color: alpha(m.navy, 0.5) }}>
+                    {data.priceRangeLabel}
+                  </Box>
+                </Typography>
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: 12.5, color: alpha(m.navy, 0.78), lineHeight: 1.5 }}>
+                  <Box component="span" sx={{ fontWeight: 900 }}>
+                    Prepayment
+                  </Box>{" "}
+                  {data.prepaymentLabel}
+                </Typography>
+              </Box>
+              {showKilometerAllowance ? (
+                <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78) }}>
+                  Kilometer allowance: {data.kilometerAllowanceLabel}
+                </Typography>
+              ) : null}
+              {data.priceDescription ? <MutedInstructionBox>{data.priceDescription}</MutedInstructionBox> : null}
+              {showKilometerAllowance && data.kilometerAllowanceInstructions ? (
+                <MutedInstructionBox>{data.kilometerAllowanceInstructions}</MutedInstructionBox>
+              ) : null}
+            </Stack>
+          </SectionCard>
 
-        <SectionCard title="Policy">
-          <Stack spacing={2}>
-            {data.policySections.map((section) => (
-              <Box key={section.title}>
-                {section.fields?.length === 1 && section.fields[0].label === section.title ? (
-                  <Stack direction="row" alignItems="baseline" justifyContent="space-between" spacing={2} sx={{ mb: 0.25 }}>
-                    <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78) }}>
+          <SectionCard title="Policy">
+            <Stack spacing={2}>
+              {data.policySections.map((section) => (
+                <Box key={section.title}>
+                  {section.fields?.length === 1 && section.fields[0].label === section.title ? (
+                    <Stack direction="row" alignItems="baseline" justifyContent="space-between" spacing={2} sx={{ mb: 0.25 }}>
+                      <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78) }}>
+                        {section.title}
+                      </Typography>
+                      <Typography sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.78) }}>
+                        {section.fields[0].value}
+                      </Typography>
+                    </Stack>
+                  ) : (
+                    <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78), mb: 0.5 }}>
                       {section.title}
                     </Typography>
-                    <Typography sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.78) }}>
-                      {section.fields[0].value}
-                    </Typography>
-                  </Stack>
-                ) : (
-                  <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78), mb: 0.5 }}>
-                    {section.title}
-                  </Typography>
-                )}
-                {section.fields && section.fields.length > 0 && !(section.fields.length === 1 && section.fields[0].label === section.title)
-                  ? section.fields.map((field) => (
-                      <PolicyFieldRow key={`${section.title}-${field.label}`} label={field.label} value={field.value} />
-                    ))
-                  : null}
-                {section.description ? <MutedInstructionBox>{section.description}</MutedInstructionBox> : null}
-              </Box>
-            ))}
-          </Stack>
-        </SectionCard>
+                  )}
+                  {section.fields && section.fields.length > 0 && !(section.fields.length === 1 && section.fields[0].label === section.title)
+                    ? section.fields.map((field) => (
+                        <PolicyFieldRow key={`${section.title}-${field.label}`} label={field.label} value={field.value} />
+                      ))
+                    : null}
+                  {section.description ? <MutedInstructionBox>{section.description}</MutedInstructionBox> : null}
+                </Box>
+              ))}
+            </Stack>
+          </SectionCard>
+        </PublicProfileDetailsGroup>
 
         <SectionCard title="Portfolio">
           <Grid container spacing={1.25}>
@@ -1515,6 +1587,6 @@ export default function BusinessPublicProfile({
           </Stack>
         </Paper>
       </Stack>
-    </Box>
+    </PublicProfilePageShell>
   );
 }

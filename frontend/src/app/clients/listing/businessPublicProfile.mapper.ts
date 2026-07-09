@@ -387,12 +387,11 @@ function buildBookCombos(setup: BusinessSetupListing): BusinessPublicProfileBook
 
 function buildServiceForItems(setup: BusinessSetupListing): BusinessPublicProfileServiceForItem[] {
   const ids = (setup.serviceFor ?? []).map((v) => String(v).toLowerCase());
-  const known = (["men", "women", "kids"] as const).map((id) => ({
+  return (["men", "women", "kids"] as const).map((id) => ({
     id,
     label: SERVICE_FOR_LABELS[id].label,
     enabled: ids.includes(id),
   }));
-  return known.filter((item) => item.enabled);
 }
 
 function buildPolicySections(setup: BusinessSetupListing): BusinessPublicProfilePolicySection[] {
