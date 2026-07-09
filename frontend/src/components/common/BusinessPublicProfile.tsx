@@ -644,7 +644,7 @@ export default function BusinessPublicProfile({
   const showDesiredOfferingContent =
     data.supportsDesiredLocation && (!data.supportsFixedLocation || isDesiredLocation);
   const showKilometerAllowance = data.supportsDesiredLocation;
-  const showProjectHeader = data.supportsDesiredLocation;
+  const showProjectHeader = showDesiredOfferingContent;
 
   const [projectEnabled, setProjectEnabled] = React.useState(data.projectEnabled);
   const showProjectSection = showDesiredOfferingContent && projectEnabled;
@@ -672,6 +672,12 @@ export default function BusinessPublicProfile({
   React.useEffect(() => {
     setProjectEnabled(data.projectEnabled);
   }, [data.projectEnabled, data.shopId]);
+
+  React.useEffect(() => {
+    if (!showDesiredOfferingContent) {
+      setProjectEnabled(false);
+    }
+  }, [showDesiredOfferingContent]);
 
   React.useEffect(() => {
     setActiveCategory("all");
