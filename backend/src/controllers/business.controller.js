@@ -118,7 +118,8 @@ const toIsoDate = (value) => {
 
 const toTimeLabel = (value) => {
   if (!value) return null;
-  const wallClock = String(value).match(/T(\d{2}:\d{2})/);
+  const iso = value instanceof Date ? value.toISOString() : String(value);
+  const wallClock = iso.match(/T(\d{2}:\d{2})/);
   if (wallClock) return wallClock[1];
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return null;
