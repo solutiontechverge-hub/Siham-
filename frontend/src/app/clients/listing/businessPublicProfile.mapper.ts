@@ -453,6 +453,12 @@ function buildPolicySections(setup: BusinessSetupListing): BusinessPublicProfile
     });
   }
 
+  sections.push({
+    title: "Late Arrival",
+    description:
+      "If you are more than 15 minutes late, we may need to reschedule your appointment to avoid impacting subsequent clients. A late cancellation fee may apply.",
+  });
+
   return sections;
 }
 

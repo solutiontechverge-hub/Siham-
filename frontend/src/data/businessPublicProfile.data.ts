@@ -285,12 +285,12 @@ const defaultTeam: BusinessPublicProfileTeamMember[] = [
   },
 ];
 
-const defaultPolicySections: BusinessPublicProfilePolicySection[] = [
+export const defaultPolicySections: BusinessPublicProfilePolicySection[] = [
   {
     title: "Prepayment/Response Time",
     fields: [{ label: "Prepayment/Response Time", value: "1 hour" }],
     description:
-      "Rejuvenate your hair with our luxury spa treatment followed by a professional styling session.",
+      "Please allow time for the professional to respond to your booking request. Prepayment may be required to confirm your appointment.",
   },
   {
     title: "Reschedule",
@@ -299,22 +299,27 @@ const defaultPolicySections: BusinessPublicProfilePolicySection[] = [
       { label: "Late Reschedule Fee", value: "10%" },
     ],
     description:
-      "Rejuvenate your hair with our luxury spa treatment followed by a professional styling session.",
+      "Please reschedule with enough notice. Late reschedules may be subject to a fee.",
   },
   {
     title: "Cancellation",
     fields: [
-      { label: "Mini: Time Before Appointment", value: "1 h" },
-      { label: "Late Cancellation Fee", value: "10%" },
+      { label: "Mini: Time Before Appointment", value: "48 h" },
+      { label: "Late Cancellation Fee", value: "50%" },
     ],
     description:
-      "Rejuvenate your hair with our luxury spa treatment followed by a professional styling session.",
+      "Cancellations made less than 48 hours before the scheduled appointment will be subject to a fee of 50% of the service cost.",
   },
   {
     title: "No show",
-    fields: [{ label: "No show Fee", value: "10%" }],
+    fields: [{ label: "No show Fee", value: "100%" }],
+    description: "No-shows will be charged the full service amount.",
+  },
+  {
+    title: "Late Arrival",
+    fields: [{ label: "Grace Period", value: "15 min" }],
     description:
-      "Rejuvenate your hair with our luxury spa treatment followed by a professional styling session.",
+      "If you are more than 15 minutes late, we may need to reschedule your appointment to avoid impacting subsequent clients. A late cancellation fee may apply.",
   },
 ];
 

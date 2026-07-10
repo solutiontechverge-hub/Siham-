@@ -6,6 +6,7 @@ import { Box, Container, Paper } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { AppButton, AppPillTabs, ClientPageTabsBar, MarketingSiteFooter, MollureMarketingHeader } from "..";
 import { marketingShellFooter } from "../../../data/marketingShell.data";
+import { defaultPolicySections } from "../../../data/businessPublicProfile.data";
 import { useAppSelector } from "../../../store/hooks";
 import { parseBookingListTab } from "../../../app/clients/booking/bookingPillTabs";
 import type { BookingListTab } from "../../../app/clients/booking/clientBookingRecords";
@@ -219,7 +220,24 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
     user?.email ||
     "";
 
-  const policySections = businessProfile?.policySections ?? [];
+  const policySections = React.useMemo(() => {
+    const fromProfile = businessProfile?.policySections ?? [];
+    const byTitle = new Map(defaultPolicySections.map((section) => [section.title.toLowerCase(), section]));
+    const merged = (fromProfile.length ? fromProfile : defaultPolicySections).map((section) => {
+      const fallback = byTitle.get(section.title.toLowerCase());
+      return {
+        ...section,
+        description: section.description?.trim() || fallback?.description || "",
+        fields: section.fields?.length ? section.fields : fallback?.fields,
+      };
+    });
+    const hasLateArrival = merged.some((section) => section.title.toLowerCase() === "late arrival");
+    if (!hasLateArrival) {
+      const lateArrival = byTitle.get("late arrival");
+      if (lateArrival) merged.push(lateArrival);
+    }
+    return merged;
+  }, [businessProfile?.policySections]);
 
   const clearActiveBookingSessionLocal = React.useCallback(() => {
     clearActiveBookingSession();
