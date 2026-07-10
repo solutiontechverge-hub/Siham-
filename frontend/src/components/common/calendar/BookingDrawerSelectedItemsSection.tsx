@@ -7,7 +7,6 @@ import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../../ui/typography";
 import { ServiceSummaryMetaLine } from "../ServiceSummaryMetaLine";
 import { getEffectiveServicePrice, type BookingServiceLineItem } from "../../../data/bookingServiceEdit.data";
-import { formatProductLineName } from "../../../data/bookingProductCatalog.data";
 import BookingEditedTag from "./BookingEditedTag";
 import type { BookingEditTagVariant } from "./bookingRequestNegotiation";
 
@@ -132,9 +131,14 @@ export default function BookingDrawerSelectedItemsSection({
           {products.map((product) => (
             <Box key={`product-${product.id}`} sx={cardSx}>
               <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1.25}>
-                <BodyText sx={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.86), lineHeight: 1.25 }}>
-                  {formatProductLineName(product.name, product.quantity)}
-                </BodyText>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <BodyText sx={{ fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.86), lineHeight: 1.25 }}>
+                    {product.name}
+                  </BodyText>
+                  <BodyText sx={{ mt: 0.35, fontSize: 10.5, fontWeight: 700, color: alpha(m.navy, 0.48) }}>
+                    Qty {product.quantity} · €{product.unitPrice.toFixed(2)} each
+                  </BodyText>
+                </Box>
                 <Stack direction="row" alignItems="flex-start" spacing={0.35} sx={{ flexShrink: 0 }}>
                   <BodyText sx={{ fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
                     €{product.price.toFixed(2)}

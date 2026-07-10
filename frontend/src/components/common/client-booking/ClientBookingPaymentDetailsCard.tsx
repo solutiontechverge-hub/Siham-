@@ -6,7 +6,9 @@ import { Avatar, Box, Divider, Paper, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { parseTimeLabelToMinutes, serviceTimeRangeLabel } from "../../../app/clients/booking/booking-time";
 import { ServiceSummaryMetaLine } from "../ServiceSummaryMetaLine";
+import BookingEditedTag from "../calendar/BookingEditedTag";
 import { buildBookingSummarySections, resolveTeamMemberFirstName } from "./buildBookingSummarySections";
+import type { BookingEditSuggestedProduct } from "./bookingEditRequest";
 import type { ClientBookingDraft } from "./types";
 
 export type ClientBookingPrepaymentState = "none" | "required" | "paid";
@@ -19,6 +21,9 @@ type Props = {
   prepaymentState?: ClientBookingPrepaymentState;
   prepaymentPercent?: number;
   payNowLabel?: string;
+  editedServiceIds?: readonly string[];
+  products?: readonly BookingEditSuggestedProduct[];
+  editedProductIds?: readonly string[];
   onPayNow?: () => void;
   onViewInvoice?: () => void;
   onViewReceipt?: () => void;
@@ -32,6 +37,9 @@ export default function ClientBookingPaymentDetailsCard({
   prepaymentState = "none",
   prepaymentPercent = 0,
   payNowLabel = "Pay Now",
+  editedServiceIds = [],
+  products = [],
+  editedProductIds = [],
   onPayNow,
   onViewInvoice,
   onViewReceipt,
@@ -42,6 +50,8 @@ export default function ClientBookingPaymentDetailsCard({
     () => (draft?.selectedTime ? parseTimeLabelToMinutes(draft.selectedTime) : 0),
     [draft?.selectedTime],
   );
+  const editedServiceIdSet = React.useMemo(() => new Set(editedServiceIds), [editedServiceIds]);
+  const editedProductIdSet = React.useMemo(() => new Set(editedProductIds), [editedProductIds]);
 
   const total = draft?.total ?? 0;
   const prepaidAmount = Math.round(((total * prepaymentPercent) / 100 + Number.EPSILON) * 100) / 100;
@@ -61,6 +71,7 @@ export default function ClientBookingPaymentDetailsCard({
     const teamFirst = resolveTeamMemberFirstName(service.teamMemberId, draft?.teamMembers);
     const timeRange = draft?.selectedTime ? serviceTimeRangeLabel(scheduleOffset, service.durationMins) : undefined;
     scheduleOffset += service.durationMins;
+    const isEdited = editedServiceIdSet.has(service.id);
 
     return (
       <Box
@@ -75,9 +86,12 @@ export default function ClientBookingPaymentDetailsCard({
       >
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1.5}>
           <Box sx={{ minWidth: 0 }}>
-            <Typography sx={{ fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.82), lineHeight: 1.2 }}>
-              {service.name}
-            </Typography>
+            <Stack direction="row" alignItems="center" spacing={0.75} sx={{ flexWrap: "wrap" }}>
+              <Typography sx={{ fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.82), lineHeight: 1.2 }}>
+                {service.name}
+              </Typography>
+              {isEdited ? <BookingEditedTag variant="edited" /> : null}
+            </Stack>
             <ServiceSummaryMetaLine
               timeRange={timeRange}
               durationLabel={`${service.durationMins} Mins`}
@@ -171,6 +185,37 @@ export default function ClientBookingPaymentDetailsCard({
               <Stack spacing={1}>{section.items.map((service) => renderService(service))}</Stack>
             </Box>
           ))}
+          {products.length > 0 ? (
+            <Box>
+              <Typography sx={{ fontWeight: 800, fontSize: 12, color: alpha(m.navy, 0.55), mb: 1 }}>Product</Typography>
+              <Stack spacing={1}>
+                {products.map((product) => (
+                  <Box
+                    key={product.id}
+                    sx={{
+                      borderRadius: "10px",
+                      border: `1px solid ${alpha(m.navy, 0.08)}`,
+                      px: 1.5,
+                      py: 1.15,
+                      bgcolor: "#fff",
+                    }}
+                  >
+                    <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1.5}>
+                      <Stack direction="row" alignItems="center" spacing={0.75} sx={{ minWidth: 0, flexWrap: "wrap" }}>
+                        <Typography sx={{ fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.82), lineHeight: 1.2 }}>
+                          {product.quantity > 1 ? `${product.name} ×${product.quantity}` : product.name}
+                        </Typography>
+                        {editedProductIdSet.has(product.id) ? <BookingEditedTag variant="edited" /> : null}
+                      </Stack>
+                      <Typography sx={{ fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.82), flexShrink: 0 }}>
+                        €{product.price}
+                      </Typography>
+                    </Stack>
+                  </Box>
+                ))}
+              </Stack>
+            </Box>
+          ) : null}
         </Stack>
 
         {prepaymentState !== "none" ? (

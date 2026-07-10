@@ -3,8 +3,6 @@ import type {
   CalendarEvent,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { ManualEntryDiscount } from "../../sections/finance/manualEntry.data";
-import { allBookingCatalogServices } from "../../../data/bookingServiceCatalog.data";
-import { minutesSinceMidnight } from "./calendar.utils";
 
 const NOTES_META_PREFIX = "---mollure-meta---";
 
@@ -115,49 +113,12 @@ export const emptyDesiredLocation = () => ({
   municipality: "",
 });
 
-function bookingDurationMins(ev: CalendarEvent) {
-  return Math.max(15, minutesSinceMidnight(ev.end) - minutesSinceMidnight(ev.start));
-}
-
-function matchCatalogService(title: string) {
-  const normalized = title.toLowerCase().trim();
-  return (
-    allBookingCatalogServices.find((service) => service.name.toLowerCase() === normalized) ??
-    allBookingCatalogServices.find(
-      (service) =>
-        normalized.includes(service.name.toLowerCase()) || service.name.toLowerCase().includes(normalized),
-    )
-  );
-}
-
-function defaultPriceForTitle(title: string) {
-  const normalized = title.toLowerCase();
-  if (/\bmassage\b/.test(normalized)) return 165;
-  if (/\blash/.test(normalized)) return 85;
-  if (/\bhair\b|\bcut\b/.test(normalized)) return 45;
-  if (/\bmake-?up\b/.test(normalized)) return 60;
-  return 65;
-}
-
-function buildFallbackService(ev: CalendarEvent) {
-  const catalogMatch = matchCatalogService(ev.title);
-  if (catalogMatch) {
-    return { ...catalogMatch };
-  }
-
-  return {
-    id: `svc-${ev.id}`,
-    name: ev.title,
-    durationMins: bookingDurationMins(ev),
-    price: defaultPriceForTitle(ev.title),
-  };
-}
-
 export function resolveBookingDetailsFromEvent(ev: CalendarEvent): CalendarBookingDetails {
   if (ev.details) return ev.details;
 
   return {
-    services: [buildFallbackService(ev)],
+    services: [],
+    products: [],
     clientEmail: "",
     phoneCode: "",
     phoneNumber: "",
@@ -180,7 +141,7 @@ export function hydrateBookingDrawerFromEvent(ev: CalendarEvent): BookingDrawerH
 
   return {
     clientEmail: details.clientEmail ?? "",
-    services: details.services ?? [buildFallbackService(ev)],
+    services: details.services ?? [],
     products: details.products ?? [],
     guests: details.guests ?? [],
     phoneCode: details.phoneCode ?? "",

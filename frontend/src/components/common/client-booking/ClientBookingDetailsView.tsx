@@ -103,8 +103,9 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
 
   const isPrepaid = variant === "prepaid";
   const locationMode = shop?.locationMode ?? "fixed";
-  const bookingRef = useCheckoutBookingRef();
+  const checkoutBookingRef = useCheckoutBookingRef();
   const { record: activeBooking, refresh: refreshActiveBooking } = useActiveClientBooking();
+  const bookingRef = activeBooking?.bookingRef ?? checkoutBookingRef;
   const editRequest = useBookingEditRequest(bookingRef);
   const bookingStatus: ClientBookingStatus = activeBooking?.status ?? "draft";
   const isDraft = bookingStatus === "draft";
@@ -483,17 +484,50 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
   }, [returnToBookingDetailsStart]);
 
   const handleSuggestChange = React.useCallback(() => {
-    router.push("/clients/booking?mode=create");
-  }, [router]);
+    // Suggest Change flow will be added later.
+  }, []);
 
   const handleAcknowledgeRejected = React.useCallback(() => {
     returnToBookingDetailsStart("acknowledge_rejected");
   }, [returnToBookingDetailsStart]);
 
   const showChangeResponsePanel = editRequest.isSuggested || editRequest.isRejected;
+
+  const displayDraft = React.useMemo(() => {
+    if (!draft) return null;
+    if (!editRequest.isSuggested || !editRequest.suggestedServices?.length) return draft;
+
+    const teamMembers = [...(draft.teamMembers ?? [])];
+    for (const service of editRequest.suggestedServices) {
+      if (!service.teamMemberId || !service.teamMemberName) continue;
+      if (teamMembers.some((member) => member.id === service.teamMemberId)) continue;
+      teamMembers.push({ id: service.teamMemberId, name: service.teamMemberName });
+    }
+
+    const services = editRequest.suggestedServices.map((service) => ({
+      id: service.id,
+      name: service.name,
+      durationMins: service.durationMins,
+      price: service.price,
+      guestId: service.guestId ?? null,
+      teamMemberId: service.teamMemberId ?? null,
+    }));
+    const productTotal = (editRequest.suggestedProducts ?? []).reduce((sum, product) => sum + product.price, 0);
+    const serviceTotal = services.reduce((sum, service) => sum + service.price, 0);
+
+    return {
+      ...draft,
+      services,
+      teamMembers,
+      total: serviceTotal + productTotal,
+    };
+  }, [draft, editRequest.isSuggested, editRequest.suggestedProducts, editRequest.suggestedServices]);
+
   const detailsContentKey = `${bookingRef}-${editRequest.status ?? "none"}-${bookingStatus}`;
   const isFullyCompleted = isCompleted && activeBooking?.paid === true && !isPaymentDue;
   const pageBackground = isFullyCompleted ? "#EAECF0" : "#EAF9FB";
+  const displayTotal = displayDraft?.total ?? draft?.total ?? 0;
+  const displayPrepaidAmount = Math.round(((displayTotal * prepaymentPercent) / 100 + Number.EPSILON) * 100) / 100;
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: pageBackground }}>
@@ -547,21 +581,35 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
             />
 
             {showChangeResponsePanel ? (
-              <ClientBookingChangeResponsePanel
-                variant={editRequest.isRejected ? "rejected" : "suggested"}
-                total={draft?.total ?? 0}
-                prepaidAmount={prepaidAmount}
-                prepaymentPaid={prepaymentState === "paid"}
-                onOk={editRequest.isRejected ? handleAcknowledgeRejected : handleOkSuggestedChanges}
-                onSuggestChange={handleSuggestChange}
-                onViewInvoice={bookingTransactionRow ? openInvoice : undefined}
-                onViewReceipt={(prepaymentReceiptRow ?? bookingTransactionRow) ? openReceipt : undefined}
-              />
+              <>
+                <ClientBookingPaymentDetailsCard
+                  key={detailsContentKey}
+                  draft={displayDraft}
+                  requesterName={requesterName}
+                  requesterEmail={user?.email}
+                  requesterAvatarUrl={requesterAvatarUrl}
+                  prepaymentState="none"
+                  editedServiceIds={editRequest.editedServiceIds}
+                  products={editRequest.suggestedProducts}
+                  editedProductIds={editRequest.editedProductIds}
+                />
+                <ClientBookingChangeResponsePanel
+                  variant={editRequest.isRejected ? "rejected" : "suggested"}
+                  total={displayTotal}
+                  prepaidAmount={displayPrepaidAmount}
+                  prepaymentPaid={prepaymentState === "paid"}
+                  onAccept={editRequest.isRejected ? undefined : handleOkSuggestedChanges}
+                  onOk={editRequest.isRejected ? handleAcknowledgeRejected : handleOkSuggestedChanges}
+                  onSuggestChange={editRequest.isRejected ? undefined : handleSuggestChange}
+                  onViewInvoice={bookingTransactionRow ? openInvoice : undefined}
+                  onViewReceipt={(prepaymentReceiptRow ?? bookingTransactionRow) ? openReceipt : undefined}
+                />
+              </>
             ) : (
               <>
                 <ClientBookingPaymentDetailsCard
                   key={detailsContentKey}
-                  draft={draft}
+                  draft={displayDraft}
                   requesterName={requesterName}
                   requesterEmail={user?.email}
                   requesterAvatarUrl={requesterAvatarUrl}

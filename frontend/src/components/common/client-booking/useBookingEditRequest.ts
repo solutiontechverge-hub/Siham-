@@ -20,9 +20,11 @@ export function useBookingEditRequest(bookingRef: string) {
     const onUpdate = () => refresh();
     window.addEventListener(BOOKING_EDIT_REQUEST_UPDATED_EVENT, onUpdate);
     window.addEventListener("storage", onUpdate);
+    window.addEventListener("focus", onUpdate);
     return () => {
       window.removeEventListener(BOOKING_EDIT_REQUEST_UPDATED_EVENT, onUpdate);
       window.removeEventListener("storage", onUpdate);
+      window.removeEventListener("focus", onUpdate);
     };
   }, [refresh]);
 
