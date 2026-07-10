@@ -32,6 +32,7 @@ type StoredBookingNoteMeta = Partial<
     | "prepaymentPercent"
     | "paymentMethod"
     | "showKilometerAllowance"
+    | "kilometerAllowance"
     | "cancellationReason"
     | "responseStatus"
     | "requestDirection"
@@ -41,6 +42,15 @@ type StoredBookingNoteMeta = Partial<
 > & {
   ebr?: StoredEbrNotePayload;
 };
+
+export function resolveKilometerAllowanceAmount(
+  kilometerAllowance?: CalendarBookingDetails["kilometerAllowance"] | null,
+): number {
+  const rate = Number(kilometerAllowance?.eurPerKm);
+  const km = Number(kilometerAllowance?.totalKilometer);
+  if (!Number.isFinite(rate) || !Number.isFinite(km) || rate <= 0 || km <= 0) return 0;
+  return Math.round((rate * km + Number.EPSILON) * 100) / 100;
+}
 
 function metaHasValues(meta: StoredBookingNoteMeta) {
   return Object.entries(meta).some(([key, value]) => {
@@ -66,6 +76,7 @@ export function serializeCalendarEntryNotes(
     prepaymentPercent: details?.prepaymentPercent,
     paymentMethod: details?.paymentMethod,
     showKilometerAllowance: details?.showKilometerAllowance,
+    kilometerAllowance: details?.kilometerAllowance,
     cancellationReason: details?.cancellationReason?.trim() || undefined,
     responseStatus: details?.responseStatus,
     requestDirection: details?.requestDirection,
@@ -117,6 +128,14 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
       prepaymentPercent: meta.prepaymentPercent ?? "",
       paymentMethod: meta.paymentMethod ?? "online",
       showKilometerAllowance: Boolean(meta.showKilometerAllowance),
+      ...(meta.kilometerAllowance
+        ? {
+            kilometerAllowance: {
+              eurPerKm: meta.kilometerAllowance.eurPerKm ?? "",
+              totalKilometer: meta.kilometerAllowance.totalKilometer ?? "",
+            },
+          }
+        : {}),
       ...(meta.cancellationReason?.trim()
         ? { cancellationReason: meta.cancellationReason.trim() }
         : {}),

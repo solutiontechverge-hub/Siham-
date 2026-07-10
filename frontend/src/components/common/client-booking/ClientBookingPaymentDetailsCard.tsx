@@ -21,12 +21,13 @@ type Props = {
   prepaymentState?: ClientBookingPrepaymentState;
   prepaymentPercent?: number;
   payNowLabel?: string;
+  /** Desired-location bookings only — amount from professional kilometer allowance. */
+  showKilometerAllowance?: boolean;
+  kilometerAllowanceAmount?: number;
   editedServiceIds?: readonly string[];
   products?: readonly BookingEditSuggestedProduct[];
   editedProductIds?: readonly string[];
   onPayNow?: () => void;
-  onViewInvoice?: () => void;
-  onViewReceipt?: () => void;
 };
 
 export default function ClientBookingPaymentDetailsCard({
@@ -37,12 +38,12 @@ export default function ClientBookingPaymentDetailsCard({
   prepaymentState = "none",
   prepaymentPercent = 0,
   payNowLabel = "Pay Now",
+  showKilometerAllowance = false,
+  kilometerAllowanceAmount = 0,
   editedServiceIds = [],
   products = [],
   editedProductIds = [],
   onPayNow,
-  onViewInvoice,
-  onViewReceipt,
 }: Props) {
   const m = useTheme().palette.mollure;
   const sections = React.useMemo(() => buildBookingSummarySections(draft), [draft]);
@@ -224,152 +225,168 @@ export default function ClientBookingPaymentDetailsCard({
           ) : null}
         </Stack>
 
-        {prepaymentState !== "none" ? (
-          <Box sx={{ mt: 2 }}>
+        {showKilometerAllowance && kilometerAllowanceAmount > 0 ? (
+          <Box sx={{ mt: 2.25 }}>
+            <Typography
+              sx={{
+                fontWeight: 800,
+                fontSize: 10.5,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                color: alpha(m.navy, 0.48),
+                mb: 0.85,
+              }}
+            >
+              Kilometer Allowance
+            </Typography>
             <Box
               sx={{
                 px: 1.75,
                 py: 1.15,
                 borderRadius: "10px",
-                bgcolor: alpha(m.navy, 0.04),
-                border: `1px solid ${alpha(m.navy, 0.06)}`,
+                bgcolor: "#fff",
+                border: `1px solid ${alpha(m.navy, 0.08)}`,
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
-                mb: 1.25,
               }}
             >
-              <Typography sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.78) }}>Total Price</Typography>
-              <Typography sx={{ fontWeight: 1000, fontSize: 15, color: alpha(m.navy, 0.9) }}>€{total.toFixed(2)}</Typography>
+              <Typography sx={{ fontWeight: 800, fontSize: 13, color: alpha(m.navy, 0.72) }}>
+                Kilometer Allowance
+              </Typography>
+              <Typography sx={{ fontWeight: 900, fontSize: 14, color: alpha(m.navy, 0.88) }}>
+                €{kilometerAllowanceAmount.toFixed(2)}
+              </Typography>
             </Box>
+          </Box>
+        ) : null}
 
-            {prepaymentState === "required" ? (
-              <Paper
-                elevation={0}
-                sx={{
-                  borderRadius: "10px",
-                  border: `1px solid ${alpha(m.navy, 0.08)}`,
-                  bgcolor: "#fff",
-                  px: 1.75,
-                  py: 1.35,
-                }}
+        {/* No prepayment: simple Total Price (image 2) */}
+        {prepaymentState === "none" ? (
+          <Box
+            sx={{
+              mt: showKilometerAllowance && kilometerAllowanceAmount > 0 ? 1.5 : 2,
+              px: 1.75,
+              py: 1.25,
+              borderRadius: "10px",
+              bgcolor: "#fff",
+              border: `1px solid ${alpha(m.navy, 0.08)}`,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <Typography sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.78) }}>Total Price</Typography>
+            <Typography sx={{ fontWeight: 1000, fontSize: 15, color: alpha(m.navy, 0.9) }}>
+              {total.toFixed(0)}€
+            </Typography>
+          </Box>
+        ) : null}
+
+        {/* Prepayment required (not yet paid): Pay Now + remaining */}
+        {prepaymentState === "required" ? (
+          <Box sx={{ mt: showKilometerAllowance && kilometerAllowanceAmount > 0 ? 1.5 : 2 }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.1, px: 0.25 }}>
+              <Typography sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.78) }}>Total Price</Typography>
+              <Typography sx={{ fontWeight: 1000, fontSize: 15, color: alpha(m.navy, 0.9) }}>
+                {total.toFixed(0)}€
+              </Typography>
+            </Stack>
+            <Paper
+              elevation={0}
+              sx={{
+                borderRadius: "10px",
+                border: `1px solid ${alpha(m.navy, 0.08)}`,
+                bgcolor: alpha(m.navy, 0.03),
+                px: 1.75,
+                py: 1.35,
+              }}
+            >
+              <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                spacing={1}
+                sx={{ mb: 1.1 }}
               >
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  justifyContent="space-between"
-                  spacing={1}
-                  sx={{ mb: 1.1 }}
-                >
-                  <Typography sx={{ fontWeight: 800, fontSize: 12.5, color: alpha(m.navy, 0.72), flex: 1, minWidth: 0 }}>
-                    Prepayment Required ({prepaymentPercent}%)
-                  </Typography>
-                  <Stack direction="row" alignItems="center" spacing={1} sx={{ flexShrink: 0 }}>
+                <Typography sx={{ fontWeight: 800, fontSize: 12.5, color: alpha(m.navy, 0.72), flex: 1, minWidth: 0 }}>
+                  Prepayment Required ({prepaymentPercent}%)
+                </Typography>
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ flexShrink: 0 }}>
+                  {onPayNow ? (
                     <Typography
                       component="button"
                       type="button"
                       onClick={onPayNow}
-                      disabled={!onPayNow}
                       sx={{
                         border: 0,
                         bgcolor: "transparent",
                         p: 0,
-                        cursor: onPayNow ? "pointer" : "default",
+                        cursor: "pointer",
                         color: m.teal,
                         fontWeight: 900,
                         fontSize: 12.5,
                         fontFamily: "inherit",
-                        opacity: onPayNow ? 1 : 0.5,
-                        "&:hover": onPayNow ? { color: m.tealDark } : undefined,
+                        "&:hover": { color: m.tealDark },
                       }}
                     >
                       {payNowLabel}
                     </Typography>
-                    <Typography sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.88), minWidth: 72, textAlign: "right" }}>
-                      €{prepaidAmount.toFixed(2)}
-                    </Typography>
-                  </Stack>
-                </Stack>
-                <Stack direction="row" justifyContent="space-between" alignItems="center">
-                  <Typography sx={{ fontWeight: 800, fontSize: 12.5, color: alpha(m.navy, 0.62) }}>
-                    Remaining After Prepayment
+                  ) : null}
+                  <Typography sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.88), minWidth: 72, textAlign: "right" }}>
+                    €{prepaidAmount.toFixed(2)}
                   </Typography>
-                  <Typography sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.88) }}>€{remaining.toFixed(2)}</Typography>
                 </Stack>
-              </Paper>
-            ) : (
-              <Paper elevation={0} sx={{ borderRadius: "10px", border: `1px solid ${alpha(m.navy, 0.08)}`, p: 1.5, bgcolor: alpha(m.navy, 0.02) }}>
-                <Stack spacing={0.85}>
-                  <Stack direction="row" justifyContent="space-between">
-                    <Typography sx={{ fontWeight: 900, fontSize: 12 }}>Prepayment</Typography>
-                    <Typography sx={{ fontWeight: 900, fontSize: 12, color: m.teal }}>€{prepaidAmount.toFixed(2)}</Typography>
-                  </Stack>
-                  <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: alpha(m.navy, 0.48) }}>
-                    Prepaid – {new Date().toLocaleDateString("en-US")} – Online Direct
-                  </Typography>
-                  <Stack direction="row" spacing={2}>
-                    <Typography
-                      component="button"
-                      type="button"
-                      onClick={onViewInvoice}
-                      disabled={!onViewInvoice}
-                      sx={{
-                        fontSize: 11,
-                        fontWeight: 800,
-                        color: m.teal,
-                        cursor: onViewInvoice ? "pointer" : "default",
-                        border: 0,
-                        bgcolor: "transparent",
-                        p: 0,
-                        font: "inherit",
-                        opacity: onViewInvoice ? 1 : 0.5,
-                      }}
-                    >
-                      View Invoice
-                    </Typography>
-                    <Typography
-                      component="button"
-                      type="button"
-                      onClick={onViewReceipt}
-                      disabled={!onViewReceipt}
-                      sx={{
-                        fontSize: 11,
-                        fontWeight: 800,
-                        color: m.teal,
-                        cursor: onViewReceipt ? "pointer" : "default",
-                        border: 0,
-                        bgcolor: "transparent",
-                        p: 0,
-                        font: "inherit",
-                        opacity: onViewReceipt ? 1 : 0.5,
-                      }}
-                    >
-                      View Receipt
-                    </Typography>
-                  </Stack>
-                </Stack>
-              </Paper>
-            )}
+              </Stack>
+              <Stack direction="row" justifyContent="space-between" alignItems="center">
+                <Typography sx={{ fontWeight: 800, fontSize: 12.5, color: alpha(m.navy, 0.62) }}>
+                  Remaining After Prepayment
+                </Typography>
+                <Typography sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.88) }}>
+                  €{remaining.toFixed(2)}
+                </Typography>
+              </Stack>
+            </Paper>
+          </Box>
+        ) : null}
+
+        {/* After prepayment paid: Prepaid + Remaining (image 1), then Payment Summary below */}
+        {prepaymentState === "paid" ? (
+          <Box sx={{ mt: showKilometerAllowance && kilometerAllowanceAmount > 0 ? 1.5 : 2 }}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.1, px: 0.25 }}>
+              <Typography sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.78) }}>Total Price</Typography>
+              <Typography sx={{ fontWeight: 1000, fontSize: 15, color: alpha(m.navy, 0.9) }}>
+                {total.toFixed(0)}€
+              </Typography>
+            </Stack>
+            <Paper
+              elevation={0}
+              sx={{
+                borderRadius: "10px",
+                border: `1px solid ${alpha(m.navy, 0.08)}`,
+                bgcolor: alpha(m.navy, 0.03),
+                px: 1.75,
+                py: 1.35,
+              }}
+            >
+              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.1 }}>
+                <Typography sx={{ fontWeight: 800, fontSize: 12.5, color: alpha(m.navy, 0.72) }}>
+                  Prepaid ({prepaymentPercent}%)
+                </Typography>
+                <Typography sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.88) }}>
+                  -{prepaidAmount.toFixed(2)}€
+                </Typography>
+              </Stack>
+              <Stack direction="row" justifyContent="space-between" alignItems="center">
+                <Typography sx={{ fontWeight: 800, fontSize: 12.5, color: alpha(m.navy, 0.62) }}>Remaining</Typography>
+                <Typography sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.88) }}>
+                  €{remaining.toFixed(2)}
+                </Typography>
+              </Stack>
+            </Paper>
           </Box>
         ) : null}
       </Box>
-
-      {prepaymentState === "none" ? (
-        <Box
-          sx={{
-            px: 2,
-            py: 1.35,
-            bgcolor: "#fff",
-            borderTop: `1px solid ${alpha(m.navy, 0.08)}`,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <Typography sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.78) }}>Total Price</Typography>
-          <Typography sx={{ fontWeight: 1000, fontSize: 17, color: alpha(m.navy, 0.9) }}>€{total.toFixed(2)}</Typography>
-        </Box>
-      ) : null}
     </Paper>
   );
 }

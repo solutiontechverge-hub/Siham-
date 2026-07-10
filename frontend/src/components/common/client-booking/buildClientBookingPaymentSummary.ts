@@ -77,7 +77,7 @@ export function buildClientBookingPaymentSummary(input: BuildInput): PaymentSumm
     if (prepaid && prepaidAmount > 0) {
       prepaymentLines.push({
         id: "prepaid-main",
-        label: `Prepaid (${prepaymentPercent}%) - ${prepaymentDate} - Online Direct`,
+        label: `Prepaid ${prepaymentPercent}% - Online (Direct)`,
         amount: prepaidAmount,
         showInvoice: true,
         showReceipt: true,

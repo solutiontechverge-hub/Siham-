@@ -42,11 +42,16 @@ import {
   clientAcknowledgeRejectedEdit,
   clientRejectSuggestedChanges,
   clientSuggestEbrChanges,
+  clearBookingEditRequest,
   getBookingEditRequest,
   professionalSuggestBookingChanges,
 } from "./bookingEditRequest";
 import { useBookingEditRequest } from "./useBookingEditRequest";
-import { serializeCalendarEntryNotes } from "../calendar/bookingEventDetails";
+import {
+  parseCalendarEntryNotes,
+  resolveKilometerAllowanceAmount,
+  serializeCalendarEntryNotes,
+} from "../calendar/bookingEventDetails";
 import {
   FinanceDocumentPreviewDrawer,
   buildClientBookingTransactionRow,
@@ -136,7 +141,8 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
   const [ebrAction, setEbrAction] = React.useState<ClientEbrActionKind | null>(null);
   const [suggestDrawerOpen, setSuggestDrawerOpen] = React.useState(false);
   const isCancelled = bookingStatus === "cancelled";
-  const isEbrIncoming = editRequest.isSuggested;
+  /** Accept / Suggest / Reject only when professional sent an EBR (API notes). */
+  const isEbrIncoming = activeBooking?.incomingEditRequest?.status === "suggested";
   const canActOnPayment = !isCompleted && !isCancelled && prepaymentState === "required";
   const { invoiceSettings: financeSettings, transactionOptions } = usePublicFinanceSettings(shop?.shopId);
   const [activeDocument, setActiveDocument] = React.useState<"invoice" | "receipt" | null>(null);
@@ -172,19 +178,28 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
   }, []);
 
   // Hydrate local EBR state from API notes so client UI works across browsers/sessions.
+  // Accept / Suggest / Reject only when professional sent EBR — clear stale local suggested state.
   React.useEffect(() => {
+    if (!bookingRef) return;
     const incoming = activeBooking?.incomingEditRequest;
-    if (!bookingRef || !incoming || incoming.status !== "suggested") return;
-    const current = getBookingEditRequest(bookingRef);
-    if (current.status === "suggested") return;
-    professionalSuggestBookingChanges(bookingRef, {
-      professionalNote: incoming.professionalNote,
-      editedServiceIds: incoming.editedServiceIds,
-      editedProductIds: incoming.editedProductIds,
-      suggestedServices: incoming.suggestedServices,
-      suggestedProducts: incoming.suggestedProducts,
-    });
-    editRequest.refresh();
+    if (incoming?.status === "suggested") {
+      const current = getBookingEditRequest(bookingRef);
+      if (current.status !== "suggested") {
+        professionalSuggestBookingChanges(bookingRef, {
+          professionalNote: incoming.professionalNote,
+          editedServiceIds: incoming.editedServiceIds,
+          editedProductIds: incoming.editedProductIds,
+          suggestedServices: incoming.suggestedServices,
+          suggestedProducts: incoming.suggestedProducts,
+        });
+        editRequest.refresh();
+      }
+      return;
+    }
+    if (getBookingEditRequest(bookingRef).status === "suggested") {
+      clearBookingEditRequest(bookingRef);
+      editRequest.refresh();
+    }
     // Only re-run when the API-sourced EBR payload changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeBooking?.incomingEditRequest, bookingRef]);
@@ -323,34 +338,6 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
       documentAmount: prepaidAmount,
     });
   }, [bookingRef, draft, financeSettings, prepaymentState, prepaidAmount, requesterName, user?.email]);
-
-  const paymentSummarySections = React.useMemo(
-    () =>
-      buildClientBookingPaymentSummary({
-        draft,
-        requesterName,
-        prepaid: isPrepaymentPaid,
-        paid: activeBooking?.paid === true,
-        requiresPrepayment: Boolean(activeBooking?.requiresPrepayment ?? requiresPrepayment),
-        prepaymentPercent: activeBooking?.prepaymentPercent ?? prepaymentPercent,
-        paymentDue: isPaymentDue,
-        hasEditPrepayment: editRequest.isSuggested,
-      }),
-    [
-      activeBooking?.paid,
-      activeBooking?.prepaymentPercent,
-      activeBooking?.requiresPrepayment,
-      draft,
-      editRequest.isSuggested,
-      isPaymentDue,
-      isPrepaymentPaid,
-      prepaymentPercent,
-      requesterName,
-      requiresPrepayment,
-    ],
-  );
-
-  const showPaymentSummary = (isCompleted || isPaymentDue) && paymentSummarySections.length > 0;
 
   const submitDraftBookingRequest = React.useCallback(async (): Promise<boolean> => {
     if (!isDraft || !activeBooking) return true;
@@ -679,6 +666,59 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
   const pageBackground = isFullyCompleted ? "#EAECF0" : "#EAF9FB";
   const displayTotal = displayDraft?.total ?? draft?.total ?? 0;
   const displayPrepaidAmount = Math.round(((displayTotal * prepaymentPercent) / 100 + Number.EPSILON) * 100) / 100;
+  const bookingNotesMeta = React.useMemo(
+    () => parseCalendarEntryNotes(activeBooking?.notes),
+    [activeBooking?.notes],
+  );
+  const kilometerAllowanceAmount = React.useMemo(
+    () => resolveKilometerAllowanceAmount(bookingNotesMeta?.kilometerAllowance),
+    [bookingNotesMeta?.kilometerAllowance],
+  );
+  /** Only for desired-location bookings when a kilometer amount was set. */
+  const showKilometerAllowance = locationMode === "desired" && kilometerAllowanceAmount > 0;
+  /** Prepayment breakdown only when the professional requires prepayment. */
+  const paymentCardPrepaymentState =
+    requiresPrepayment && !isCancelled ? prepaymentState : ("none" as const);
+
+  const paymentSummarySections = React.useMemo(
+    () =>
+      buildClientBookingPaymentSummary({
+        draft: displayDraft ?? draft,
+        requesterName,
+        prepaid: isPrepaymentPaid,
+        paid: activeBooking?.paid === true,
+        requiresPrepayment: Boolean(activeBooking?.requiresPrepayment ?? requiresPrepayment),
+        prepaymentPercent: activeBooking?.prepaymentPercent ?? prepaymentPercent,
+        paymentDue: isPaymentDue,
+        hasEditPrepayment: editRequest.isSuggested,
+      }),
+    [
+      activeBooking?.paid,
+      activeBooking?.prepaymentPercent,
+      activeBooking?.requiresPrepayment,
+      displayDraft,
+      draft,
+      editRequest.isSuggested,
+      isPaymentDue,
+      isPrepaymentPaid,
+      prepaymentPercent,
+      requesterName,
+      requiresPrepayment,
+    ],
+  );
+
+  /** After prepayment: show Payment Summary (invoice/receipt). Also on completed / payment due. */
+  const visiblePaymentSummarySections = React.useMemo(() => {
+    if (!paymentSummarySections.length) return [];
+    if (isPrepaymentPaid && !isCompleted && !isPaymentDue) {
+      return paymentSummarySections.filter((section) => section.title === "Prepayment");
+    }
+    return paymentSummarySections;
+  }, [isCompleted, isPaymentDue, isPrepaymentPaid, paymentSummarySections]);
+
+  const showPaymentSummary =
+    visiblePaymentSummarySections.length > 0 &&
+    (prepaymentState === "paid" || isCompleted || isPaymentDue);
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: pageBackground }}>
@@ -762,46 +802,26 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
                   requesterName={requesterName}
                   requesterEmail={user?.email}
                   requesterAvatarUrl={requesterAvatarUrl}
-                  prepaymentState={
-                    isEbrIncoming || (isPrepaid && !isCompleted) ? prepaymentState : "none"
-                  }
+                  prepaymentState={paymentCardPrepaymentState}
                   prepaymentPercent={prepaymentPercent}
                   payNowLabel={payNowLabel}
+                  showKilometerAllowance={showKilometerAllowance}
+                  kilometerAllowanceAmount={kilometerAllowanceAmount}
                   editedServiceIds={isEbrIncoming ? editRequest.editedServiceIds : undefined}
                   products={isEbrIncoming ? editRequest.suggestedProducts : undefined}
                   editedProductIds={isEbrIncoming ? editRequest.editedProductIds : undefined}
-                  onPayNow={!isEbrIncoming && canActOnPayment ? handlePayNow : undefined}
-                  onViewInvoice={
-                    !isCompleted && prepaymentState === "paid" && bookingTransactionRow
-                      ? openInvoice
-                      : undefined
-                  }
-                  onViewReceipt={
-                    !isCompleted &&
-                    prepaymentState === "paid" &&
-                    (prepaymentReceiptRow ?? bookingTransactionRow)
-                      ? openReceipt
-                      : undefined
-                  }
+                  onPayNow={prepaymentState === "required" && canActOnPayment ? handlePayNow : undefined}
                 />
 
-                {showPaymentSummary && !isEbrIncoming ? (
+                {showPaymentSummary ? (
                   <ClientBookingPaymentSummary
-                    sections={paymentSummarySections}
+                    sections={visiblePaymentSummarySections}
                     onViewInvoice={bookingTransactionRow ? openInvoice : undefined}
                     onViewReceipt={(prepaymentReceiptRow ?? bookingTransactionRow) ? openReceipt : undefined}
                   />
                 ) : null}
 
-                {isPrepaid && canActOnPayment && !isEbrIncoming ? (
-                  <ClientBookingPaymentMethodSelector
-                    options={checkoutPaymentOptions}
-                    value={selectedPaymentMethod}
-                    onChange={setSelectedPaymentMethod}
-                  />
-                ) : null}
-
-                {isEbrIncoming && isPrepaid && !isCompleted ? (
+                {canActOnPayment && (isPrepaid || isEbrIncoming) ? (
                   <ClientBookingPaymentMethodSelector
                     options={checkoutPaymentOptions}
                     value={selectedPaymentMethod}

@@ -186,6 +186,15 @@ export function clientRejectSuggestedChanges(bookingRef: string): BookingEditReq
   return next;
 }
 
+export function clearBookingEditRequest(bookingRef: string): void {
+  if (!bookingRef) return;
+  const all = loadAll();
+  const normalized = bookingRef.replace(/^#/, "").trim();
+  delete all[bookingRef];
+  if (normalized && normalized !== bookingRef) delete all[normalized];
+  saveAll(all);
+}
+
 /**
  * Client suggests changes on an EBR — returns a pending BR to the professional
  * with an optional notepad message.
