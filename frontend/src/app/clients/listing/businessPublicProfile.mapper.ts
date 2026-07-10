@@ -412,16 +412,27 @@ function buildPolicySections(setup: BusinessSetupListing): BusinessPublicProfile
   }
 
   const rescheduleBefore = formatTimeBlock(setup.appointmentBefore);
-  if (rescheduleBefore || setup.reschedulePolicy.feePercentage != null) {
+  if (rescheduleBefore || setup.reschedulePolicy.feePercentage != null || setup.reschedulePolicy.instruction) {
+    const feeLabel =
+      setup.reschedulePolicy.feePercentage != null
+        ? formatPercent(setup.reschedulePolicy.feePercentage)
+        : "";
     sections.push({
       title: "Reschedule",
       fields: [
         ...(rescheduleBefore ? [{ label: "Min. Time Before Appointment", value: rescheduleBefore }] : []),
-        ...(setup.reschedulePolicy.feePercentage != null
-          ? [{ label: "Late Reschedule Fee", value: formatPercent(setup.reschedulePolicy.feePercentage) }]
-          : []),
+        ...(feeLabel ? [{ label: "Late Reschedule Fee", value: feeLabel }] : []),
       ],
-      description: setup.reschedulePolicy.instruction || undefined,
+      description:
+        setup.reschedulePolicy.instruction ||
+        (rescheduleBefore || feeLabel
+          ? [
+              rescheduleBefore ? `Please reschedule at least ${rescheduleBefore} before the appointment.` : "",
+              feeLabel ? `Late reschedules may be subject to a fee of ${feeLabel}.` : "",
+            ]
+              .filter(Boolean)
+              .join(" ")
+          : undefined),
     });
   }
 
@@ -430,34 +441,43 @@ function buildPolicySections(setup: BusinessSetupListing): BusinessPublicProfile
     cancel.beforeHours != null || cancel.beforeMinutes != null
       ? formatTimeBlock({ hours: cancel.beforeHours, minutes: cancel.beforeMinutes })
       : "";
-  if (cancelBefore || cancel.feePercentage != null) {
+  if (cancelBefore || cancel.feePercentage != null || cancel.instruction) {
+    const feeLabel = cancel.feePercentage != null ? formatPercent(cancel.feePercentage) : "";
     sections.push({
       title: "Cancellation",
       fields: [
         ...(cancelBefore ? [{ label: "Min. Time Before Appointment", value: cancelBefore }] : []),
-        ...(cancel.feePercentage != null
-          ? [{ label: "Late Cancellation Fee", value: formatPercent(cancel.feePercentage) }]
-          : []),
+        ...(feeLabel ? [{ label: "Late Cancellation Fee", value: feeLabel }] : []),
       ],
-      description: cancel.instruction || undefined,
+      description:
+        cancel.instruction ||
+        (cancelBefore && feeLabel
+          ? `Cancellations made less than ${cancelBefore} before the scheduled appointment will be subject to a fee of ${feeLabel} of the service cost.`
+          : cancelBefore
+            ? `Cancellations made less than ${cancelBefore} before the scheduled appointment may be subject to a fee.`
+            : feeLabel
+              ? `Late cancellations will be subject to a fee of ${feeLabel} of the service cost.`
+              : undefined),
     });
   }
 
   if (setup.noShowPolicy.feePercentage != null || setup.noShowPolicy.instruction) {
+    const feeLabel =
+      setup.noShowPolicy.feePercentage != null ? formatPercent(setup.noShowPolicy.feePercentage) : "";
+    const fullAmount =
+      setup.noShowPolicy.feePercentage != null && Number(setup.noShowPolicy.feePercentage) >= 100;
     sections.push({
       title: "No show",
-      fields: setup.noShowPolicy.feePercentage != null
-        ? [{ label: "No show Fee", value: formatPercent(setup.noShowPolicy.feePercentage) }]
-        : undefined,
-      description: setup.noShowPolicy.instruction || undefined,
+      fields: feeLabel ? [{ label: "No show Fee", value: feeLabel }] : undefined,
+      description:
+        setup.noShowPolicy.instruction ||
+        (fullAmount
+          ? "No-shows will be charged the full service amount."
+          : feeLabel
+            ? `No-shows will be charged a fee of ${feeLabel} of the service cost.`
+            : undefined),
     });
   }
-
-  sections.push({
-    title: "Late Arrival",
-    description:
-      "If you are more than 15 minutes late, we may need to reschedule your appointment to avoid impacting subsequent clients. A late cancellation fee may apply.",
-  });
 
   return sections;
 }
