@@ -6,7 +6,7 @@ import { MOLLURE_HEADING_BODY_GAP_PX } from "../../theme/spacing";
 
 const sectionHeadingSx = {
   fontWeight: 600,
-  fontSize: { xs: "1.5rem", sm: "1.75rem" },
+  textAlign: "center",
   color: "mollure.textcolorgrey700",
 } as const;
 

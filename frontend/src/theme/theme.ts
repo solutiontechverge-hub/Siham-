@@ -2,6 +2,39 @@
 
 import { createTheme } from "@mui/material/styles";
 import { MOLLURE_SNACKBAR_COLORS } from "./mollureSnackbar";
+import {
+  MOLLURE_FONT_CONTENT_PX,
+  MOLLURE_FONT_HEADING_PX,
+  MOLLURE_FONT_SUBHEADING_PX,
+  mollureFontSizes,
+} from "./typography";
+
+const headingStyle = {
+  fontFamily: "inherit",
+  fontWeight: 500,
+  fontSize: mollureFontSizes.heading,
+  lineHeight: 1,
+  letterSpacing: 0,
+  color: "#333333",
+} as const;
+
+const subheadingStyle = {
+  fontFamily: "inherit",
+  fontWeight: 500,
+  fontSize: mollureFontSizes.subheading,
+  lineHeight: 1.2,
+  letterSpacing: 0,
+  color: "#333333",
+} as const;
+
+const contentStyle = {
+  fontFamily: "inherit",
+  fontWeight: 400,
+  fontSize: mollureFontSizes.content,
+  lineHeight: 1.5,
+  letterSpacing: 0,
+  color: "#5A5A5A",
+} as const;
 
 const theme = createTheme({
   palette: {
@@ -105,53 +138,45 @@ const theme = createTheme({
   typography: {
     fontFamily:
       "var(--font-poppins), Poppins, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
+    fontSize: MOLLURE_FONT_CONTENT_PX,
+    h1: { ...headingStyle, fontWeight: 600 },
+    h2: headingStyle,
+    h3: subheadingStyle,
+    h4: subheadingStyle,
+    h5: subheadingStyle,
+    h6: subheadingStyle,
+    subtitle1: subheadingStyle,
+    subtitle2: contentStyle,
+    body1: contentStyle,
+    body2: contentStyle,
+    button: {
+      fontFamily: "inherit",
+      fontWeight: 500,
+      fontSize: mollureFontSizes.content,
+      lineHeight: 1.5,
+      letterSpacing: 0,
+      textTransform: "none" as const,
+    },
     mainHeading: {
-      fontFamily: "inherit",
+      ...headingStyle,
       fontWeight: 600,
-      fontSize: "30px",
-      lineHeight: 1.2,
       color: "#344054",
     },
-    subHeading: {
-      fontFamily: "inherit",
-      fontWeight: 500,
-      fontSize: "24px",
-      lineHeight: "normal",
-      color: "#333333",
-    },
-    description: {
-      fontFamily: "inherit",
-      fontWeight: 400,
-      fontSize: "14px",
-      lineHeight: "normal",
-      color: "#5A5A5A",
-    },
+    subHeading: subheadingStyle,
+    description: contentStyle,
     cardTitle: {
-      fontFamily: "inherit",
-      fontWeight: 500,
-      fontSize: "14px",
-      lineHeight: "20px",
+      ...subheadingStyle,
       color: "#344054",
     },
-    bodyText: {
-      fontFamily: "inherit",
-      fontWeight: 400,
-      fontSize: "14px",
-      lineHeight: "normal",
-      color: "#5A5A5A",
-    },
+    bodyText: contentStyle,
     headerNav: {
-      fontFamily: "inherit",
+      ...contentStyle,
       fontWeight: 500,
-      fontSize: "18px",
-      lineHeight: "22px",
-      letterSpacing: "0.01em",
+      color: "#344A66",
     },
     formLabel: {
-      fontFamily: "inherit",
+      ...contentStyle,
       fontWeight: 500,
-      fontSize: "14px",
-      lineHeight: "normal",
       color: "#71819A",
     },
   },
@@ -169,6 +194,70 @@ const theme = createTheme({
           formLabel: "span",
         },
       },
+      styleOverrides: {
+        root: {
+          letterSpacing: 0,
+        },
+      },
+    },
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          fontSize: mollureFontSizes.content,
+        },
+      },
+    },
+    MuiInputBase: {
+      styleOverrides: {
+        root: {
+          fontSize: mollureFontSizes.content,
+        },
+        input: {
+          fontSize: mollureFontSizes.content,
+        },
+      },
+    },
+    MuiInputLabel: {
+      styleOverrides: {
+        root: {
+          fontSize: mollureFontSizes.content,
+        },
+      },
+    },
+    MuiFormLabel: {
+      styleOverrides: {
+        root: {
+          fontSize: mollureFontSizes.content,
+        },
+      },
+    },
+    MuiMenuItem: {
+      styleOverrides: {
+        root: {
+          fontSize: mollureFontSizes.content,
+        },
+      },
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        root: {
+          fontSize: mollureFontSizes.content,
+        },
+      },
+    },
+    MuiChip: {
+      styleOverrides: {
+        label: {
+          fontSize: mollureFontSizes.content,
+        },
+      },
+    },
+    MuiTab: {
+      styleOverrides: {
+        root: {
+          fontSize: mollureFontSizes.content,
+        },
+      },
     },
     MuiAlert: {
       defaultProps: {
@@ -181,7 +270,7 @@ const theme = createTheme({
           return {
             borderRadius: 14,
             fontWeight: 500,
-            fontSize: "0.875rem",
+            fontSize: mollureFontSizes.content,
             alignItems: "center",
             backgroundColor: colors.background,
             color: colors.foreground,

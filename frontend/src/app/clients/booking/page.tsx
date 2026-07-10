@@ -218,13 +218,35 @@ function ClientBookingCreateView() {
     });
   };
 
-  const times = React.useMemo(() => {
+  const allDayTimes = React.useMemo(() => {
     const slots: string[] = [];
     for (let minutes = 9 * 60; minutes <= 18 * 60; minutes += 30) {
       slots.push(fmtMinutesToTimeLabel(minutes));
     }
     return slots;
   }, []);
+
+  const isSelectedToday = React.useMemo(
+    () => startOfDay(selectedDate).getTime() === today0.getTime(),
+    [selectedDate, today0],
+  );
+
+  const nowMinutes = React.useMemo(() => {
+    const now = new Date();
+    return now.getHours() * 60 + now.getMinutes();
+  }, [selectedDate]);
+
+  const times = allDayTimes;
+
+  const availableTimes = React.useMemo(() => {
+    if (!isSelectedToday) return times;
+    return times.filter((t) => parseTimeLabelToMinutes(t) > nowMinutes);
+  }, [isSelectedToday, nowMinutes, times]);
+
+  const isTimePast = React.useCallback(
+    (t: string) => isSelectedToday && parseTimeLabelToMinutes(t) <= nowMinutes,
+    [isSelectedToday, nowMinutes],
+  );
 
   const timeScrollRef = React.useRef<HTMLDivElement>(null);
   const scrollTimeSlots = React.useCallback((direction: "left" | "right") => {
@@ -289,7 +311,12 @@ function ClientBookingCreateView() {
   const [profileHydrated, setProfileHydrated] = React.useState(false);
   const hydrationSignatureRef = React.useRef<string | null>(null);
 
-  const [selectedTime, setSelectedTime] = React.useState(times[0] ?? "");
+  const [selectedTime, setSelectedTime] = React.useState(() => {
+    const now = new Date();
+    const mins = now.getHours() * 60 + now.getMinutes();
+    const future = allDayTimes.filter((t) => parseTimeLabelToMinutes(t) > mins);
+    return (future[0] ?? allDayTimes[0]) ?? "";
+  });
   const [combineServices, setCombineServices] = React.useState(true);
   const [selectedPersonId, setSelectedPersonId] = React.useState<string>("p-requester");
   const [selectedTeamMemberId, setSelectedTeamMemberId] = React.useState<string>("");
@@ -417,9 +444,10 @@ function ClientBookingCreateView() {
 
   React.useEffect(() => {
     if (!profileHydrated && fromProfile) return;
-    if (serviceTab === "assigned" && assigned.length === 0 && unassigned.length > 0) {
+    // Stay on Unassigned until every service has a team member.
+    if (unassigned.length > 0 && serviceTab === "assigned") {
       setServiceTab("unassigned");
-    } else if (serviceTab === "unassigned" && unassigned.length === 0 && assigned.length > 0) {
+    } else if (unassigned.length === 0 && assigned.length > 0 && serviceTab === "unassigned") {
       setServiceTab("assigned");
     }
   }, [assigned.length, fromProfile, profileHydrated, serviceTab, unassigned.length]);
@@ -510,6 +538,25 @@ function ClientBookingCreateView() {
     // Safety: never allow a past date to remain selected.
     if (isPastDay(selectedDate)) setSelectedDate(today0);
   }, [isPastDay, selectedDate, today0]);
+
+  React.useEffect(() => {
+    // If today has no remaining slots, move to tomorrow.
+    if (isSelectedToday && availableTimes.length === 0) {
+      setSelectedDate(addDays(today0, 1));
+      return;
+    }
+    // Keep selection on a bookable future slot (nearest by default).
+    if (availableTimes.length > 0 && !availableTimes.includes(selectedTime)) {
+      setSelectedTime(availableTimes[0]);
+    }
+  }, [availableTimes, isSelectedToday, selectedTime, today0]);
+
+  React.useEffect(() => {
+    const el = timeScrollRef.current;
+    if (!el || !selectedTime) return;
+    const activeBtn = el.querySelector<HTMLElement>(`[data-time-slot="${selectedTime}"]`);
+    activeBtn?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+  }, [selectedTime, selectedDate]);
 
   React.useEffect(() => {
     try {
@@ -818,7 +865,6 @@ function ClientBookingCreateView() {
       }),
     );
     setSelectedServiceIds({});
-    setServiceTab("assigned");
   };
 
   const openAddServiceDialog = () => {
@@ -859,7 +905,6 @@ function ClientBookingCreateView() {
         };
       }),
     );
-    if (nextTeamMemberId) setServiceTab("assigned");
   };
 
   const toggleServiceSelection = (serviceId: string, checked: boolean) => {
@@ -1071,7 +1116,8 @@ function ClientBookingCreateView() {
 
         <Tabs
           value={serviceTab}
-          onChange={(_, v) => {
+          onChange={(_, v: "assigned" | "unassigned") => {
+            if (v === "assigned" && unassigned.length > 0) return;
             setServiceTab(v);
             setSelectedServiceIds({});
           }}
@@ -1086,6 +1132,7 @@ function ClientBookingCreateView() {
           <Tab
             value="assigned"
             label={`Assigned(${assigned.length})`}
+            disabled={unassigned.length > 0}
             sx={{
               minHeight: 28,
               textTransform: "none",
@@ -1095,6 +1142,7 @@ function ClientBookingCreateView() {
               px: 1.25,
               color: alpha(m.navy, 0.62),
               "&.Mui-selected": { bgcolor: "#fff", color: alpha(m.navy, 0.78) },
+              "&.Mui-disabled": { opacity: 0.45 },
             }}
           />
           <Tab
@@ -1805,11 +1853,17 @@ function ClientBookingCreateView() {
                         >
                           {times.map((t) => {
                             const active = t === selectedTime;
+                            const past = isTimePast(t);
                             return (
                               <Button
                                 key={t}
+                                data-time-slot={t}
                                 variant={active ? "contained" : "outlined"}
-                                onClick={() => setSelectedTime(t)}
+                                onClick={() => {
+                                  if (past) return;
+                                  setSelectedTime(t);
+                                }}
+                                disabled={past}
                                 disableElevation
                                 sx={{
                                   flexShrink: 0,
@@ -1821,13 +1875,24 @@ function ClientBookingCreateView() {
                                   fontSize: 11.5,
                                   fontWeight: 900,
                                   whiteSpace: "nowrap",
-                                  ...(active
-                                    ? { bgcolor: m.teal, "&:hover": { bgcolor: m.tealDark } }
-                                    : {
-                                        borderColor: alpha(m.navy, 0.10),
-                                        bgcolor: "#fff",
-                                        color: alpha(m.navy, 0.65),
-                                      }),
+                                  ...(past
+                                    ? {
+                                        borderColor: alpha(m.navy, 0.08),
+                                        bgcolor: alpha(m.navy, 0.03),
+                                        color: alpha(m.navy, 0.32),
+                                        "&.Mui-disabled": {
+                                          borderColor: alpha(m.navy, 0.08),
+                                          bgcolor: alpha(m.navy, 0.03),
+                                          color: alpha(m.navy, 0.32),
+                                        },
+                                      }
+                                    : active
+                                      ? { bgcolor: m.teal, color: "#fff", "&:hover": { bgcolor: m.tealDark } }
+                                      : {
+                                          borderColor: alpha(m.navy, 0.10),
+                                          bgcolor: "#fff",
+                                          color: alpha(m.navy, 0.65),
+                                        }),
                                 }}
                               >
                                 {t}

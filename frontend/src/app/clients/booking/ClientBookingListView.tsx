@@ -65,7 +65,7 @@ export default function ClientBookingListView({ listTab }: Props) {
           <Typography sx={{ fontWeight: 900, color: alpha(m.navy, 0.86), fontSize: 14 }}>Your Bookings</Typography>
           <Button
             component={Link}
-            href="/clients/booking?tab=upcoming&mode=create"
+            href="/clients/listing"
             variant="contained"
             disableElevation
             sx={{

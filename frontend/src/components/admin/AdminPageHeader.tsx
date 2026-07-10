@@ -22,9 +22,7 @@ export default function AdminPageHeader({ title, description, actions }: AdminPa
       sx={{ mb: 3 }}
     >
       <Stack spacing={0.5}>
-        <Typography variant="mainHeading" sx={{ fontSize: { xs: 24, md: 28 } }}>
-          {title}
-        </Typography>
+        <Typography variant="mainHeading">{title}</Typography>
         {description ? (
           <Typography variant="description" sx={{ color: tokens.bodyText, maxWidth: 640 }}>
             {description}
