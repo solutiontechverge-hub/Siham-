@@ -40,6 +40,8 @@ export type BookingEditRequestRecord = {
   rejectedAt?: string;
   /** Optional note from professional when suggesting changes */
   professionalNote?: string;
+  /** Optional note from client when suggesting changes on an EBR */
+  clientNote?: string;
   editedServiceIds?: string[];
   editedProductIds?: string[];
   suggestedServices?: BookingEditSuggestedService[];
@@ -154,6 +156,56 @@ export function clientAcceptSuggestedChanges(bookingRef: string): BookingEditReq
   const next: BookingEditRequestRecord = {
     status: "none",
     approvedAt: new Date().toISOString(),
+  };
+  const normalized = bookingRef.replace(/^#/, "").trim();
+  all[bookingRef] = next;
+  if (normalized && normalized !== bookingRef) all[normalized] = next;
+  saveAll(all);
+  return next;
+}
+
+/** Client rejects professional's EBR — booking becomes invalid. */
+export function clientRejectSuggestedChanges(bookingRef: string): BookingEditRequestRecord {
+  const all = loadAll();
+  const prev = all[bookingRef] ?? getBookingEditRequest(bookingRef);
+  const next: BookingEditRequestRecord = {
+    status: "rejected",
+    requestedAt: prev?.requestedAt,
+    suggestedAt: prev?.suggestedAt,
+    rejectedAt: new Date().toISOString(),
+    professionalNote: prev?.professionalNote,
+    editedServiceIds: prev?.editedServiceIds,
+    editedProductIds: prev?.editedProductIds,
+    suggestedServices: prev?.suggestedServices,
+    suggestedProducts: prev?.suggestedProducts,
+  };
+  const normalized = bookingRef.replace(/^#/, "").trim();
+  all[bookingRef] = next;
+  if (normalized && normalized !== bookingRef) all[normalized] = next;
+  saveAll(all);
+  return next;
+}
+
+/**
+ * Client suggests changes on an EBR — returns a pending BR to the professional
+ * with an optional notepad message.
+ */
+export function clientSuggestEbrChanges(
+  bookingRef: string,
+  clientNote?: string,
+): BookingEditRequestRecord {
+  const all = loadAll();
+  const prev = all[bookingRef] ?? getBookingEditRequest(bookingRef);
+  const next: BookingEditRequestRecord = {
+    status: "pending",
+    requestedAt: new Date().toISOString(),
+    suggestedAt: prev?.suggestedAt,
+    professionalNote: prev?.professionalNote,
+    clientNote: clientNote?.trim() || undefined,
+    editedServiceIds: prev?.editedServiceIds,
+    editedProductIds: prev?.editedProductIds,
+    suggestedServices: prev?.suggestedServices,
+    suggestedProducts: prev?.suggestedProducts,
   };
   const normalized = bookingRef.replace(/^#/, "").trim();
   all[bookingRef] = next;

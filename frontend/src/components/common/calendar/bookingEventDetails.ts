@@ -6,6 +6,20 @@ import type { ManualEntryDiscount } from "../../sections/finance/manualEntry.dat
 
 const NOTES_META_PREFIX = "---mollure-meta---";
 
+export type StoredEbrNotePayload = {
+  status: "suggested" | "pending" | "rejected" | "none";
+  suggestedAt?: string;
+  professionalNote?: string;
+  clientNote?: string;
+  editedServiceIds?: string[];
+  editedProductIds?: string[];
+  suggestedServices?: NonNullable<CalendarBookingDetails["services"]>;
+  suggestedProducts?: NonNullable<CalendarBookingDetails["products"]>;
+  responseStatus?: CalendarBookingDetails["responseStatus"];
+  requestDirection?: CalendarBookingDetails["requestDirection"];
+  lastEditedBy?: CalendarBookingDetails["lastEditedBy"];
+};
+
 type StoredBookingNoteMeta = Partial<
   Pick<
     CalendarBookingDetails,
@@ -19,10 +33,28 @@ type StoredBookingNoteMeta = Partial<
     | "paymentMethod"
     | "showKilometerAllowance"
     | "cancellationReason"
+    | "responseStatus"
+    | "requestDirection"
+    | "editedServiceIds"
+    | "lastEditedBy"
   >
->;
+> & {
+  ebr?: StoredEbrNotePayload;
+};
 
-export function serializeCalendarEntryNotes(internalNote: string, details?: CalendarBookingDetails): string | null {
+function metaHasValues(meta: StoredBookingNoteMeta) {
+  return Object.entries(meta).some(([key, value]) => {
+    if (key === "ebr") return Boolean(value && typeof value === "object");
+    if (Array.isArray(value)) return value.length > 0;
+    return value != null && value !== false && value !== "";
+  });
+}
+
+export function serializeCalendarEntryNotes(
+  internalNote: string,
+  details?: CalendarBookingDetails,
+  ebr?: StoredEbrNotePayload | null,
+): string | null {
   const trimmed = internalNote.trim();
   const meta: StoredBookingNoteMeta = {
     showInternalNote: Boolean(trimmed) || Boolean(details?.showInternalNote),
@@ -35,11 +67,29 @@ export function serializeCalendarEntryNotes(internalNote: string, details?: Cale
     paymentMethod: details?.paymentMethod,
     showKilometerAllowance: details?.showKilometerAllowance,
     cancellationReason: details?.cancellationReason?.trim() || undefined,
+    responseStatus: details?.responseStatus,
+    requestDirection: details?.requestDirection,
+    editedServiceIds: details?.editedServiceIds,
+    lastEditedBy: details?.lastEditedBy,
+    ...(ebr ? { ebr } : {}),
   };
-  const hasMeta = Object.values(meta).some((value) => value != null && value !== false && value !== "");
+  const hasMeta = metaHasValues(meta);
   if (!trimmed && !hasMeta) return null;
   if (!hasMeta) return trimmed;
   return `${trimmed}${trimmed ? "\n" : ""}${NOTES_META_PREFIX}\n${JSON.stringify(meta)}`;
+}
+
+export function parseStoredEbrFromNotes(notes?: string | null): StoredEbrNotePayload | null {
+  if (!notes?.trim()) return null;
+  const markerIndex = notes.indexOf(NOTES_META_PREFIX);
+  if (markerIndex === -1) return null;
+  const metaRaw = notes.slice(markerIndex + NOTES_META_PREFIX.length).trim();
+  try {
+    const meta = JSON.parse(metaRaw) as StoredBookingNoteMeta;
+    return meta.ebr ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingDetails | undefined {
@@ -55,6 +105,7 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
   const metaRaw = notes.slice(markerIndex + NOTES_META_PREFIX.length).trim();
   try {
     const meta = JSON.parse(metaRaw) as StoredBookingNoteMeta;
+    const ebr = meta.ebr;
     return {
       internalNote,
       showInternalNote: Boolean(internalNote) || Boolean(meta.showInternalNote),
@@ -68,6 +119,15 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
       showKilometerAllowance: Boolean(meta.showKilometerAllowance),
       ...(meta.cancellationReason?.trim()
         ? { cancellationReason: meta.cancellationReason.trim() }
+        : {}),
+      ...(meta.responseStatus ? { responseStatus: meta.responseStatus } : {}),
+      ...(meta.requestDirection ? { requestDirection: meta.requestDirection } : {}),
+      ...(meta.editedServiceIds?.length ? { editedServiceIds: meta.editedServiceIds } : {}),
+      ...(meta.lastEditedBy ? { lastEditedBy: meta.lastEditedBy } : {}),
+      ...(ebr?.suggestedServices?.length ? { services: ebr.suggestedServices } : {}),
+      ...(ebr?.suggestedProducts?.length ? { products: ebr.suggestedProducts } : {}),
+      ...(ebr?.editedServiceIds?.length && !meta.editedServiceIds?.length
+        ? { editedServiceIds: ebr.editedServiceIds }
         : {}),
     };
   } catch {

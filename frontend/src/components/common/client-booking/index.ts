@@ -18,6 +18,8 @@ export {
   professionalSuggestBookingChanges,
   professionalRejectEditRequest,
   clientAcceptSuggestedChanges,
+  clientRejectSuggestedChanges,
+  clientSuggestEbrChanges,
   clientAcknowledgeRejectedEdit,
   getBookingEditRequest,
   isBookingEditApproved,

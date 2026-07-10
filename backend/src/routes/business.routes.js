@@ -323,6 +323,11 @@ router.patch(
       .trim()
       .isIn(bookingStatuses)
       .withMessage("status must be requested, cancelled, completed, confirmed, or no_show."),
+    body("notes").optional({ values: "falsy" }).isString().withMessage("notes must be a string."),
+    body("total_price")
+      .optional({ values: "falsy" })
+      .isFloat({ min: 0 })
+      .withMessage("total_price must be a non-negative number."),
   ],
   validateRequest,
   updateBookingStatus,
@@ -341,6 +346,11 @@ router.patch(
       .trim()
       .isIn(["paid", "pending", "failed", "required"])
       .withMessage("prepayment_status must be paid, pending, failed, or required."),
+    body("notes").optional({ values: "null" }).isString().withMessage("notes must be a string."),
+    body("total_price")
+      .optional({ values: "falsy" })
+      .isFloat({ min: 0 })
+      .withMessage("total_price must be a non-negative number."),
   ],
   validateRequest,
   updateMyBooking,

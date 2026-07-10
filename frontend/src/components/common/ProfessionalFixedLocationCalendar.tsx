@@ -35,6 +35,7 @@ import {
   emptyDesiredLocation,
   hydrateBookingDrawerFromEvent,
   parseApiCalendarEventId,
+  serializeCalendarEntryNotes,
 } from "./calendar/bookingEventDetails";
 import {
   canDiscardEbr,
@@ -200,6 +201,7 @@ export type ProfessionalFixedLocationCalendarProps = {
   onUpdateBookingStatus?: (
     id: string,
     status: "requested" | "cancelled" | "completed" | "confirmed" | "no_show",
+    extras?: { notes?: string | null; total_price?: number | null },
   ) => Promise<void>;
   onUpdateCalendarEntryStatus?: (
     id: string,
@@ -2265,6 +2267,63 @@ export default function ProfessionalFixedLocationCalendar({
         clientEditedServiceIds: [],
         lastEditedBy: "professional",
       });
+      nextDetails.responseStatus = "suggestion_for_change";
+
+      const suggestedServices = selectedServices.map((service) => ({
+        id: service.id,
+        name: service.name,
+        durationMins: service.durationMins,
+        price: getEffectiveServicePrice(service),
+        staffResourceId: service.staffResourceId,
+        startTime: service.startTime,
+        endTime: service.endTime,
+      }));
+      const suggestedProducts: NonNullable<typeof nextDetails.products> = selectedProducts.map((product) => ({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        quantity: product.quantity,
+        unitPrice: product.unitPrice ?? product.price,
+      }));
+      const originalProductIds = new Set((existingEvent.details?.products ?? []).map((product) => product.id));
+      const editedProductIds = selectedProducts
+        .filter((product) => !originalProductIds.has(product.id))
+        .map((product) => product.id);
+      const bookingRef = existingEvent.bookingCode ?? editingEventId;
+      const ebrTotal = suggestedServices.reduce((sum, service) => sum + service.price, 0)
+        + suggestedProducts.reduce((sum, product) => sum + product.price * (product.quantity || 1), 0);
+      const serviceNames = suggestedServices.map((service) => service.name).filter(Boolean);
+      const humanNote = [
+        bookingInternalNote.trim(),
+        serviceNames.length ? `Services: ${serviceNames.join(", ")}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+      const persistedNotes = serializeCalendarEntryNotes(humanNote, nextDetails, {
+        status: "suggested",
+        suggestedAt: new Date().toISOString(),
+        professionalNote: bookingInternalNote.trim() || undefined,
+        editedServiceIds: editedIds,
+        editedProductIds,
+        suggestedServices,
+        suggestedProducts,
+        responseStatus: "suggestion_for_change",
+        requestDirection: "outgoing",
+        lastEditedBy: "professional",
+      });
+
+      const parsedBooking = parseApiCalendarEventId(editingEventId);
+      if (parsedBooking?.kind === "booking" && onUpdateBookingStatus) {
+        try {
+          await onUpdateBookingStatus(parsedBooking.id, "requested", {
+            notes: persistedNotes,
+            total_price: ebrTotal,
+          });
+        } catch {
+          showSnackbar({ severity: "error", message: "Unable to send edited booking request." });
+          return false;
+        }
+      }
 
       setEvents((prev) =>
         prev.map((event) =>
@@ -2284,18 +2343,15 @@ export default function ProfessionalFixedLocationCalendar({
             : event,
         ),
       );
-      const originalProductIds = new Set((existingEvent.details?.products ?? []).map((product) => product.id));
-      professionalSuggestBookingChanges(existingEvent.bookingCode ?? editingEventId, {
+      professionalSuggestBookingChanges(bookingRef, {
         professionalNote: bookingInternalNote.trim() || undefined,
         editedServiceIds: editedIds,
-        editedProductIds: selectedProducts
-          .filter((product) => !originalProductIds.has(product.id))
-          .map((product) => product.id),
-        suggestedServices: selectedServices.map((service) => ({
+        editedProductIds,
+        suggestedServices: suggestedServices.map((service) => ({
           id: service.id,
           name: service.name,
           durationMins: service.durationMins,
-          price: getEffectiveServicePrice(service),
+          price: service.price,
           teamMemberId: service.staffResourceId ?? null,
           teamMemberName: service.staffResourceId
             ? resourceNameById.get(service.staffResourceId)
@@ -2303,7 +2359,7 @@ export default function ProfessionalFixedLocationCalendar({
           startTime: service.startTime,
           endTime: service.endTime,
         })),
-        suggestedProducts: selectedProducts.map((product) => ({
+        suggestedProducts: suggestedProducts.map((product) => ({
           id: product.id,
           name: product.name,
           price: product.price,
@@ -2464,6 +2520,7 @@ export default function ProfessionalFixedLocationCalendar({
     nonMollureDraft.firstName,
     nonMollureDraft.lastName,
     onCreateCalendarEntry,
+    onUpdateBookingStatus,
     originalServicesSnapshot,
     paymentMethod,
     prepaymentPercent,

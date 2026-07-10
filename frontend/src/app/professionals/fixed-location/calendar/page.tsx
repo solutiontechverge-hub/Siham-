@@ -248,8 +248,13 @@ export default function FixedLocationCalendarPage() {
           throw error;
         }
       }}
-      onUpdateBookingStatus={async (id, status) => {
-        await updateBookingStatus({ id, status }).unwrap();
+      onUpdateBookingStatus={async (id, status, extras) => {
+        await updateBookingStatus({
+          id,
+          status,
+          notes: extras?.notes,
+          total_price: extras?.total_price,
+        }).unwrap();
       }}
       onUpdateCalendarEntryStatus={async (id, status) => {
         await updateCalendarEntryStatus({ id, status }).unwrap();

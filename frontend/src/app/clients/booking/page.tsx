@@ -53,6 +53,7 @@ import {
   ACTIVE_BOOKING_ID_KEY,
   CHECKOUT_REF_KEY,
   createBookingRef,
+  getActiveBookingSession,
   setActiveBookingSession,
 } from "./clientBookingSession";
 import { resolveCreateCheckoutPath } from "./resolveCreateBookingStatus";
@@ -129,6 +130,7 @@ function ClientBookingCreateView() {
   const searchParams = useSearchParams();
   const fromProfile = searchParams?.get("from") === "profile";
   const profileHydrationToken = searchParams?.get("t") ?? "";
+  const isEbrSuggest = searchParams?.get("ebrSuggest") === "1";
   const { showSnackbar } = useSnackbar();
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -956,6 +958,36 @@ function ClientBookingCreateView() {
     const prepaymentPercent = parsePrepaymentPercent(businessProfile?.prepaymentLabel);
     const requiresPrepayment = !isDesiredLocation && prepaymentPercent > 0;
 
+    // EBR suggest-edit: update existing booking draft and return to details (no new booking).
+    if (isEbrSuggest) {
+      setIsContinuing(true);
+      try {
+        const existing = getActiveBookingSession();
+        if (!existing?.bookingRef) {
+          showSnackbar({ severity: "error", message: "Booking not found for suggested changes." });
+          return;
+        }
+        setActiveBookingSession({
+          ...existing,
+          draft: payload,
+          requiresPrepayment: existing.requiresPrepayment ?? requiresPrepayment,
+          prepaymentPercent: existing.prepaymentPercent ?? (requiresPrepayment ? prepaymentPercent : 0),
+        });
+        if (typeof window !== "undefined") {
+          window.sessionStorage.setItem("mollure:ebr_suggest_return", "1");
+        }
+        const listTab = parseBookingListTab(searchParams?.get("tab"));
+        const checkoutPath = resolveCreateCheckoutPath({
+          locationMode,
+          requiresPrepayment: Boolean(existing.requiresPrepayment ?? requiresPrepayment),
+        });
+        router.push(`${checkoutPath}?tab=${listTab}`);
+      } finally {
+        setIsContinuing(false);
+      }
+      return;
+    }
+
     const bookingRef = createBookingRef();
 
     setIsContinuing(true);
@@ -1006,7 +1038,7 @@ function ClientBookingCreateView() {
     }
   };
 
-  const continueLabel = "Continue";
+  const continueLabel = isEbrSuggest ? "Save & return" : "Continue";
 
   const planningFieldSx = {
     "& .MuiOutlinedInput-root": {

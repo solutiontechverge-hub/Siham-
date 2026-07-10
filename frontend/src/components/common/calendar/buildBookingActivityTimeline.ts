@@ -177,6 +177,9 @@ export function buildBookingActivityTimeline(input: BookingActivityBuildInput): 
       if (editReq.professionalNote) {
         ebrLines.push({ label: "Note", value: editReq.professionalNote });
       }
+      if (editReq.clientNote) {
+        ebrLines.push({ label: "Client note", value: editReq.clientNote });
+      }
       if (editReq.suggestedServices?.length) {
         ebrLines.push({
           label: "Suggested services",
@@ -209,6 +212,22 @@ export function buildBookingActivityTimeline(input: BookingActivityBuildInput): 
           actorLabel: "Professional",
           title: "Edit Request Suggest Change",
           occurredAt: (parseDate(editReq.suggestedAt) ?? ebrAt).toISOString(),
+          hasDetailArrow: false,
+          detailType: "ebr",
+          detailLines: ebrLines,
+        });
+      }
+
+      if (editReq.status === "pending" && editReq.clientNote) {
+        pushItem(items, {
+          id: `${bookingId}-ebr-client-suggest`,
+          bookingId,
+          bookingCode: code,
+          kind: "edit_request_suggest",
+          actor: "client",
+          actorLabel: clientLabel,
+          title: "Client Suggested Change",
+          occurredAt: (parseDate(editReq.requestedAt) ?? ebrAt).toISOString(),
           hasDetailArrow: false,
           detailType: "ebr",
           detailLines: ebrLines,

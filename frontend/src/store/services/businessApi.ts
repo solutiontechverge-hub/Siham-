@@ -336,12 +336,16 @@ export type UpdateCalendarEntryStatusRequest = {
 export type UpdateBookingStatusRequest = {
   id: string;
   status: "requested" | "cancelled" | "completed" | "confirmed" | "no_show";
+  notes?: string | null;
+  total_price?: number | string | null;
 };
 
 export type UpdateMyBookingRequest = {
   id: string;
   status?: "cancelled" | "confirmed";
   prepayment_status?: "paid" | "pending" | "failed" | "required";
+  notes?: string | null;
+  total_price?: number | string | null;
 };
 
 export type CreateBookingRequest = {
@@ -767,10 +771,16 @@ export const businessApi = baseApi.injectEndpoints({
     }),
     updateBookingStatus: builder.mutation<ApiEnvelope<CalendarBooking>, UpdateBookingStatusRequest>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
+        const body: Record<string, string | number> = { status: payload.status };
+        if (payload.notes !== undefined) body.notes = payload.notes ?? "";
+        if (payload.total_price !== undefined && payload.total_price !== null && payload.total_price !== "") {
+          body.total_price = Number(payload.total_price);
+        }
+
         const response = await fetchWithBQ({
           url: `/api/business/bookings/${payload.id}/status`,
           method: "PATCH",
-          body: { status: payload.status },
+          body,
         });
 
         if (response.error) {
@@ -788,9 +798,13 @@ export const businessApi = baseApi.injectEndpoints({
     }),
     updateMyBooking: builder.mutation<ApiEnvelope<CalendarBooking>, UpdateMyBookingRequest>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
-        const body: Record<string, string> = {};
+        const body: Record<string, string | number> = {};
         if (payload.status) body.status = payload.status;
         if (payload.prepayment_status) body.prepayment_status = payload.prepayment_status;
+        if (payload.notes !== undefined) body.notes = payload.notes ?? "";
+        if (payload.total_price !== undefined && payload.total_price !== null && payload.total_price !== "") {
+          body.total_price = Number(payload.total_price);
+        }
 
         const response = await fetchWithBQ({
           url: `/api/business/bookings/${payload.id}`,
