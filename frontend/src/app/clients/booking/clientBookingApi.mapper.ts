@@ -202,6 +202,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
             durationMins: service.durationMins,
             price: service.price,
             teamMemberId: service.staffResourceId ?? null,
+            guestId: null as string | null,
             startTime: service.startTime,
             endTime: service.endTime,
           })),
