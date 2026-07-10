@@ -1,5 +1,6 @@
 "use client";
 
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import { Box, Chip, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import type { BookingRequestDirection, ClientBookingStatus } from "../../../app/clients/booking/clientBookingRecords";
@@ -67,6 +68,7 @@ export default function BookingRequestStatusRow({
       }
     : bookingStatusChipColors(resolvedStatusForChip, { paymentDue });
   const chipLabel = isEbrRejected ? "Invalid" : bookingStatusLabel(resolvedStatusForChip, { paymentDue });
+  const isConfirmedChip = !isEbrRejected && !paymentDue && resolvedStatusForChip === "confirmed";
 
   return (
     <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
@@ -98,6 +100,11 @@ export default function BookingRequestStatusRow({
       <Chip
         label={chipLabel}
         size="small"
+        icon={
+          isConfirmedChip ? (
+            <CheckCircleRoundedIcon sx={{ fontSize: "15px !important", color: `${chipColors.color} !important` }} />
+          ) : undefined
+        }
         sx={{
           height: 24,
           fontWeight: 900,
@@ -106,6 +113,7 @@ export default function BookingRequestStatusRow({
           bgcolor: chipColors.bgcolor,
           color: chipColors.color,
           border: chipColors.border,
+          "& .MuiChip-icon": { ml: 0.75, mr: -0.25 },
         }}
       />
       {showErPill ? (
