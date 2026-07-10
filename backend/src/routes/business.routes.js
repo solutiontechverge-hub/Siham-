@@ -191,6 +191,22 @@ const businessSetupValidators = [
       .optional({ values: "falsy" })
       .custom((value) => Array.isArray(parseArrayLike(value)))
       .withMessage("team_members must be an array."),
+    body("section_sync_settings")
+      .optional({ values: "falsy" })
+      .custom((value) => {
+        if (value == null || value === "") return true;
+        if (typeof value === "object" && !Array.isArray(value)) return true;
+        if (typeof value === "string") {
+          try {
+            const parsed = JSON.parse(value);
+            return parsed && typeof parsed === "object" && !Array.isArray(parsed);
+          } catch {
+            return false;
+          }
+        }
+        return false;
+      })
+      .withMessage("section_sync_settings must be an object."),
 ];
 
 const saveBusinessSetupHandlers = [

@@ -67,10 +67,12 @@ export function buildBookingSummarySections(draft: ClientBookingDraft | null): C
     return sections;
   }
 
+  // No guests/clients on the draft — treat all services as the main requester (not Guest:Unassigned).
   return [...serviceGroups.entries()].map(([key, items]) => ({
     key,
     title: key === "unassigned" ? "Unassigned" : assigneeTitle(key, people),
     items,
+    isRequester: true,
     teamMemberLabel: teamMemberChipLabelForItems(items),
   }));
 }

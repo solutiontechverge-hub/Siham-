@@ -355,6 +355,7 @@ const getBusinessSetupDetailById = async (setupId, client = { query }) => {
     ...businessSetup,
     service_categories: serviceCategories,
     book_service_combinations: parseJsonArray(businessSetup.book_service_combinations),
+    section_sync_settings: parseJsonValue(businessSetup.section_sync_settings, {}),
     team_members: teamMembers,
     service_details: serviceDetails,
   };
@@ -777,13 +778,22 @@ export const upsertBusinessSetup = async (req, res) => {
       desired_location_area: req.body.desired_location_area ?? null,
       desired_location_province: req.body.desired_location_province ?? null,
       desired_location_services: parseTextArray(req.body.desired_location_services),
+      section_sync_settings: JSON.stringify(
+        parseJsonValue(req.body.section_sync_settings, {}),
+      ),
     };
+
+    const jsonbFields = new Set([
+      "service_categories",
+      "book_service_combinations",
+      "section_sync_settings",
+    ]);
 
     const fields = Object.keys(payload);
     const values = [professionalProfile.id, ...fields.map((field) => payload[field])];
     const updateAssignments = fields
       .map((field, index) => {
-        const castType = ["service_categories", "book_service_combinations"].includes(field) ? "::jsonb" : "";
+        const castType = jsonbFields.has(field) ? "::jsonb" : "";
         return `${field} = $${index + 2}${castType}`;
       })
       .concat("updated_at = NOW()")
@@ -796,7 +806,7 @@ export const upsertBusinessSetup = async (req, res) => {
 
       const insertValues = fields
         .map((field, index) => {
-          const castType = ["service_categories", "book_service_combinations"].includes(field) ? "::jsonb" : "";
+          const castType = jsonbFields.has(field) ? "::jsonb" : "";
           return `$${index + 2}${castType}`;
         })
         .join(", ");

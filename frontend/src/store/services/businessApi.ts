@@ -219,6 +219,7 @@ export type BusinessSetup = {
   desired_location_area: string | null;
   desired_location_province: string | null;
   desired_location_services: string[];
+  section_sync_settings: Record<string, string> | null;
   created_at: string;
   updated_at: string;
   team_members: BusinessTeamMember[];
@@ -409,6 +410,7 @@ export type UpsertBusinessSetupRequest = {
   desired_location_area?: string;
   desired_location_province?: string;
   desired_location_services?: string[];
+  section_sync_settings?: Record<string, string>;
   team_members?: Array<
     BusinessTeamMember & {
       photo_upload_key?: string;

@@ -58,7 +58,13 @@ export default function ClientBookingPaymentDetailsCard({
   const remaining = Math.round((total - prepaidAmount + Number.EPSILON) * 100) / 100;
 
   const requesterSections = sections.filter((s) => s.isRequester);
-  const guestSections = sections.filter((s) => !s.isRequester && !s.key.includes("planning"));
+  // Only show Guest:* blocks when a real guest/client person exists — never for bare "Unassigned".
+  const hasAddedGuestOrClient = (draft?.people?.length ?? 0) > 0;
+  const guestSections = hasAddedGuestOrClient
+    ? sections.filter(
+        (s) => !s.isRequester && !s.key.includes("planning") && s.key !== "unassigned",
+      )
+    : [];
   const fallbackRequesterSection =
     requesterSections.length === 0 && (draft?.services?.length ?? 0) > 0
       ? [{ key: "requester-services", items: draft!.services, isRequester: true as const }]
