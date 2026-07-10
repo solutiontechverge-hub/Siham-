@@ -65,6 +65,8 @@ export type CalendarBookingDetails = {
   showLateRescheduling?: boolean;
   internalNote?: string;
   showInternalNote?: boolean;
+  /** Client-provided reason when cancelling; enables Activity detail arrow */
+  cancellationReason?: string;
   totalDiscount?: {
     type: "fixed" | "percentage";
     amount: number;

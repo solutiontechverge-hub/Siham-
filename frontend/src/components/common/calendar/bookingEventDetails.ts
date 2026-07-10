@@ -18,6 +18,7 @@ type StoredBookingNoteMeta = Partial<
     | "prepaymentPercent"
     | "paymentMethod"
     | "showKilometerAllowance"
+    | "cancellationReason"
   >
 >;
 
@@ -33,6 +34,7 @@ export function serializeCalendarEntryNotes(internalNote: string, details?: Cale
     prepaymentPercent: details?.prepaymentPercent,
     paymentMethod: details?.paymentMethod,
     showKilometerAllowance: details?.showKilometerAllowance,
+    cancellationReason: details?.cancellationReason?.trim() || undefined,
   };
   const hasMeta = Object.values(meta).some((value) => value != null && value !== false && value !== "");
   if (!trimmed && !hasMeta) return null;
@@ -64,6 +66,9 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
       prepaymentPercent: meta.prepaymentPercent ?? "",
       paymentMethod: meta.paymentMethod ?? "online",
       showKilometerAllowance: Boolean(meta.showKilometerAllowance),
+      ...(meta.cancellationReason?.trim()
+        ? { cancellationReason: meta.cancellationReason.trim() }
+        : {}),
     };
   } catch {
     return {

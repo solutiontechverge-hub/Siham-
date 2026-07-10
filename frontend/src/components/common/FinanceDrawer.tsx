@@ -3,10 +3,12 @@
 import * as React from "react";
 import type { SxProps, Theme } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import MollureDrawer from "./MollureDrawer";
+import MollureDrawer, { MOLLURE_DRAWER_WIDTH } from "./MollureDrawer";
 
-export const FINANCE_DRAWER_WIDTH = { xs: "100%", sm: 500 } as const;
-export const FINANCE_DRAWER_WIDE_WIDTH = { xs: "100%", sm: 560 } as const;
+/** @deprecated Use MOLLURE_DRAWER_WIDTH — all finance drawers share one width. */
+export const FINANCE_DRAWER_WIDTH = MOLLURE_DRAWER_WIDTH;
+/** @deprecated Use MOLLURE_DRAWER_WIDTH — all finance drawers share one width. */
+export const FINANCE_DRAWER_WIDE_WIDTH = MOLLURE_DRAWER_WIDTH;
 
 export function financeDrawerContentSx(m: { navy: string }): SxProps<Theme> {
   return {
@@ -20,7 +22,7 @@ type FinanceDrawerProps = Omit<
   React.ComponentProps<typeof MollureDrawer>,
   "anchor" | "panelWidth" | "width" | "contentSx"
 > & {
-  /** default: 500px panel | wide: 560px panel */
+  /** Kept for API compatibility — both sizes use the shared site drawer width. */
   size?: "default" | "wide";
   /** When true, skip the muted finance content background */
   plain?: boolean;
@@ -29,14 +31,13 @@ type FinanceDrawerProps = Omit<
 
 /** Finance section drawer — wraps MollureDrawer with shared width and content styling. */
 export default function FinanceDrawer({
-  size = "default",
+  size: _size = "default",
   plain = false,
   contentSx,
   children,
   ...props
 }: FinanceDrawerProps) {
   const m = useTheme().palette.mollure;
-  const panelWidth = size === "wide" ? FINANCE_DRAWER_WIDE_WIDTH : FINANCE_DRAWER_WIDTH;
   const mergedContentSx = (
     plain
       ? contentSx
@@ -46,7 +47,7 @@ export default function FinanceDrawer({
   ) as SxProps<Theme> | undefined;
 
   return (
-    <MollureDrawer anchor="right" panelWidth={panelWidth} contentSx={mergedContentSx} {...props}>
+    <MollureDrawer anchor="right" panelWidth={MOLLURE_DRAWER_WIDTH} contentSx={mergedContentSx} {...props}>
       {children}
     </MollureDrawer>
   );

@@ -16,6 +16,7 @@ import {
 import { alpha, useTheme } from "@mui/material/styles";
 import { Typography } from "../ui/typography";
 import type { ClientNotificationItem } from "../../data/clientNotifications.data";
+import { MOLLURE_DRAWER_WIDTH } from "./MollureDrawer";
 
 export type ClientNotificationsDrawerProps = {
   open: boolean;
@@ -55,7 +56,7 @@ export default function ClientNotificationsDrawer({
       onClose={onClose}
       PaperProps={{
         sx: {
-          width: { xs: "100%", sm: 420 },
+          width: MOLLURE_DRAWER_WIDTH,
           maxWidth: "100vw",
           bgcolor: "#fff",
           borderTopLeftRadius: 4,

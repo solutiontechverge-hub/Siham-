@@ -67,6 +67,10 @@ import DiscardBrDialog from "./calendar/DiscardBrDialog";
 import DiscardEbrDialog from "./calendar/DiscardEbrDialog";
 import BookingRequestResponseActions from "./calendar/BookingRequestResponseActions";
 import BookingDrawerSelectedItemsSection from "./calendar/BookingDrawerSelectedItemsSection";
+import BookingActivityOverview from "./calendar/BookingActivityOverview";
+import { buildBookingActivityTimeline } from "./calendar/buildBookingActivityTimeline";
+import type { BookingActivityItem } from "./calendar/bookingActivity.types";
+import SalesOverview from "./calendar/SalesOverview";
 import BookingEditServiceScreen from "./calendar/BookingEditServiceScreen";
 import BookingSelectProductsScreen from "./calendar/BookingSelectProductsScreen";
 import BookingAddUniqueItemScreen from "./calendar/BookingAddUniqueItemScreen";
@@ -175,6 +179,7 @@ import {
   mapCalendarEntryToEvent,
 } from "./calendar/calendar-entry.mappers";
 import type { CreateCalendarEntryRequest, CalendarEntry, UpsertCalendarSettingsRequest } from "../../store/services/businessApi";
+import { useGetMyBookingsQuery } from "../../store/services/businessApi";
 import { GENDER_OPTIONS, type GenderOption } from "../../lib/gender-options";
 import { getOptionalPhoneValidationErrors, getPhoneValidationErrors } from "../../lib/phone-validation";
 
@@ -303,6 +308,7 @@ export default function ProfessionalFixedLocationCalendar({
   const [addAnchor, setAddAnchor] = React.useState<HTMLElement | null>(null);
   const [filtersOpen, setFiltersOpen] = React.useState(false);
   const [slotDrawerTab, setSlotDrawerTab] = React.useState<"booking" | "sales" | "activity">("booking");
+  const [activityDetailItem, setActivityDetailItem] = React.useState<BookingActivityItem | null>(null);
   const [slotLocation, setSlotLocation] = React.useState<CalendarBookingLocation>(data.supportedLocations[0] ?? "FL");
   const [slotBookingType, setSlotBookingType] = React.useState<CalendarBookingType>("Requests");
   const [slotStatus, setSlotStatus] = React.useState<
@@ -625,6 +631,78 @@ export default function ProfessionalFixedLocationCalendar({
     kilometerAllowanceDraft,
   ]);
 
+  const { data: myBookingsResponse } = useGetMyBookingsQuery(undefined, {
+    skip: !slotDrawerOpen || (slotDrawerTab !== "activity" && slotDrawerTab !== "sales"),
+  });
+
+  const clientActivityIdentity = React.useMemo(() => {
+    const email =
+      selectedClient?.email?.trim() ||
+      drawerSalesActivityContext?.details?.clientEmail?.trim() ||
+      "";
+    const name =
+      selectedClient?.name?.trim() ||
+      drawerSalesActivityContext?.showClientName?.trim() ||
+      `${guestDraft.firstName} ${guestDraft.lastName}`.trim() ||
+      `${nonMollureDraft.firstName} ${nonMollureDraft.lastName}`.trim() ||
+      "";
+    return { email, name };
+  }, [
+    selectedClient?.email,
+    selectedClient?.name,
+    drawerSalesActivityContext?.details?.clientEmail,
+    drawerSalesActivityContext?.showClientName,
+    guestDraft.firstName,
+    guestDraft.lastName,
+    nonMollureDraft.firstName,
+    nonMollureDraft.lastName,
+  ]);
+
+  const clientBookingsForActivity = React.useMemo(() => {
+    const all = myBookingsResponse?.data ?? [];
+    const currentId = drawerSalesActivityContext
+      ? parseApiCalendarEventId(drawerSalesActivityContext.id)?.id ?? null
+      : null;
+    const currentCode = drawerSalesActivityContext?.bookingCode ?? null;
+    return all.filter((booking) => {
+      if (currentId && String(booking.id) === String(currentId)) return true;
+      if (currentCode && booking.unique_code && booking.unique_code === currentCode) return true;
+      const email = clientActivityIdentity.email.toLowerCase();
+      const name = clientActivityIdentity.name.toLowerCase();
+      const bookingEmail = (booking.customer_email ?? "").trim().toLowerCase();
+      const bookingName = (booking.customer_name || booking.client_name || "").trim().toLowerCase();
+      if (email && bookingEmail && email === bookingEmail) return true;
+      if (name && bookingName && name === bookingName) return true;
+      return false;
+    });
+  }, [clientActivityIdentity.email, clientActivityIdentity.name, drawerSalesActivityContext, myBookingsResponse?.data]);
+
+  const activityTimelineItems = React.useMemo(
+    () =>
+      buildBookingActivityTimeline({
+        bookings: clientBookingsForActivity,
+        clientEmail: clientActivityIdentity.email,
+        clientName: clientActivityIdentity.name,
+        currentBookingId: drawerSalesActivityContext
+          ? parseApiCalendarEventId(drawerSalesActivityContext.id)?.id ?? null
+          : null,
+        currentBookingCode: drawerSalesActivityContext?.bookingCode ?? null,
+        currentScenario: drawerSalesActivityContext?.bookingScenario ?? null,
+        currentStatus: drawerSalesActivityContext?.status ?? null,
+        currentCancellationReason: drawerSalesActivityContext?.details?.cancellationReason ?? null,
+        currentProfessionalName:
+          data.resources.find((r) => r.id === drawerSalesActivityContext?.resourceId)?.name ?? null,
+        mode: "activity",
+      }),
+    [
+      clientActivityIdentity.email,
+      clientActivityIdentity.name,
+      clientBookingsForActivity,
+      data.resources,
+      drawerSalesActivityContext,
+    ],
+  );
+
   const isCompletedBooking = viewingBookingEvent?.status === "Completed";
   const showIncomingRequestActions =
     isViewingBooking && canRespondToIncomingRequest(viewingBookingEvent) && !isEditingExisting;
@@ -667,6 +745,7 @@ export default function ProfessionalFixedLocationCalendar({
     setSlotDrawerOpen(false);
     setEditingEventId(null);
     setIsEditingExisting(false);
+    setActivityDetailItem(null);
   }, []);
 
   const calendarFieldLabel = React.useMemo(() => {
@@ -3308,23 +3387,32 @@ export default function ProfessionalFixedLocationCalendar({
         anchor="right"
         open={slotDrawerOpen}
         onClose={closeBookingDrawer}
-        title={isBookingDetailsSubScreen ? "Booking Details" : ""}
+        title={
+          activityDetailItem
+            ? activityDetailItem.detailType === "cancellation"
+              ? "Activity Details"
+              : "Edit request details"
+            : isBookingDetailsSubScreen
+              ? "Booking Details"
+              : ""
+        }
         onBack={
-          isBookingDetailsSubScreen
-            ? () =>
-                setSlotBookingScreen(
-                  slotBookingScreen === "add-unique-item"
-                    ? "select-products"
-                    : slotBookingScreen === "edit-service"
-                      ? "select-services"
-                      : "new-booking",
-                )
-            : undefined
+          activityDetailItem
+            ? () => setActivityDetailItem(null)
+            : isBookingDetailsSubScreen
+              ? () =>
+                  setSlotBookingScreen(
+                    slotBookingScreen === "add-unique-item"
+                      ? "select-products"
+                      : slotBookingScreen === "edit-service"
+                        ? "select-services"
+                        : "new-booking",
+                  )
+              : undefined
         }
         hideDividers
-        width={{ xs: "100%", sm: 420 }}
         footer={
-          selectedSlot && slotDrawerTab === "booking" ? (
+          selectedSlot && slotDrawerTab === "booking" && !activityDetailItem ? (
             <Box sx={{ px: 2.5, py: 2 }}>
               <Stack direction="row" alignItems="center" spacing={1.25}>
                 {slotBookingScreen === "new-booking" && slotClientAdded && !isViewingExisting ? (
@@ -3612,10 +3700,14 @@ export default function ProfessionalFixedLocationCalendar({
                       onClick={() => {
                         if (disabled) return;
                         setSlotDrawerTab(t.id);
+                        setActivityDetailItem(null);
                       }}
                       onKeyDown={(e) => {
                         if (disabled) return;
-                        if (e.key === "Enter" || e.key === " ") setSlotDrawerTab(t.id);
+                        if (e.key === "Enter" || e.key === " ") {
+                          setSlotDrawerTab(t.id);
+                          setActivityDetailItem(null);
+                        }
                       }}
                       sx={{
                         textAlign: "center",
@@ -5613,93 +5705,29 @@ export default function ProfessionalFixedLocationCalendar({
                 <Box sx={{ pt: 1 }}>
                   {drawerSalesActivityContext ? (
                     slotDrawerTab === "sales" ? (
-                      <Stack spacing={1.25}>
-                        <BodyText sx={{ fontSize: 13, fontWeight: 900, color: m.navy }}>
-                          Sales summary
-                        </BodyText>
-                        {(drawerSalesActivityContext.details?.services ?? selectedServices).map((service) => (
-                          <Stack key={service.id} direction="row" justifyContent="space-between" spacing={2}>
-                            <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.72) }}>{service.name}</BodyText>
-                            <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.82) }}>
-                              €{getEffectiveServicePrice(service)}
-                            </BodyText>
-                          </Stack>
-                        ))}
-                        {(drawerSalesActivityContext.details?.products ?? selectedProducts).map((product) => (
-                          <Stack key={product.id} direction="row" justifyContent="space-between" spacing={2}>
-                            <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.72) }}>{product.name}</BodyText>
-                            <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.82) }}>
-                              €{product.price}
-                            </BodyText>
-                          </Stack>
-                        ))}
-                        <Box sx={{ pt: 1, borderTop: `1px solid ${alpha(m.navy, 0.08)}` }}>
-                          <Stack direction="row" justifyContent="space-between">
-                            <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.62) }}>Subtotal</BodyText>
-                            <BodyText sx={{ fontSize: 14, fontWeight: 900, color: m.navy }}>€{subtotalPrice}</BodyText>
-                          </Stack>
-                          {bookingTotalDiscount ? (
-                            <Stack direction="row" justifyContent="space-between" sx={{ mt: 0.5 }}>
-                              <BodyText sx={{ fontSize: 12, color: alpha(m.navy, 0.55) }}>
-                                {formatManualEntryDiscountLabel(bookingTotalDiscount)}
-                              </BodyText>
-                              <BodyText sx={{ fontSize: 12, fontWeight: 800, color: m.teal }}>
-                                -€{bookingDiscountAmount}
-                              </BodyText>
-                            </Stack>
-                          ) : null}
-                          <Stack direction="row" justifyContent="space-between" sx={{ mt: 0.75 }}>
-                            <BodyText sx={{ fontSize: 13, fontWeight: 900, color: m.navy }}>Total</BodyText>
-                            <BodyText sx={{ fontSize: 16, fontWeight: 950, color: m.navy }}>€{totalPrice}</BodyText>
-                          </Stack>
-                          {showPrepayment ? (
-                            <Stack direction="row" justifyContent="space-between" sx={{ mt: 0.5 }}>
-                              <BodyText sx={{ fontSize: 12, color: alpha(m.navy, 0.55) }}>Prepayment ({prepaymentPercent}%)</BodyText>
-                              <BodyText sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.72) }}>€{prepaymentAmount}</BodyText>
-                            </Stack>
-                          ) : null}
-                        </Box>
-                      </Stack>
+                      <SalesOverview
+                        bookings={clientBookingsForActivity}
+                        currentEvent={drawerSalesActivityContext}
+                        clientName={clientActivityIdentity.name}
+                        clientEmail={clientActivityIdentity.email}
+                        clientPhone={
+                          [bookingPhoneDraft.phoneCode, bookingPhoneDraft.phoneNumber]
+                            .filter(Boolean)
+                            .join(" ")
+                            .trim() ||
+                          drawerSalesActivityContext.details?.phoneNumber ||
+                          ""
+                        }
+                        fallbackResourceId={drawerSalesActivityContext.resourceId || data.resources[0]?.id || "unassigned"}
+                      />
                     ) : (
-                      <Stack spacing={1.25}>
-                        <BodyText sx={{ fontSize: 13, fontWeight: 900, color: m.navy }}>
-                          Activity
-                        </BodyText>
-                        <Stack spacing={0.75}>
-                          <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.72) }}>
-                            Status: <strong>{drawerSalesActivityContext.status}</strong>
-                          </BodyText>
-                          <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.72) }}>
-                            Booking type: {drawerSalesActivityContext.bookingType ?? slotBookingType}
-                          </BodyText>
-                          <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.72) }}>
-                            Location: {drawerSalesActivityContext.location}
-                          </BodyText>
-                          <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.72) }}>
-                            Time: {drawerSalesActivityContext.start} – {drawerSalesActivityContext.end}
-                          </BodyText>
-                          {drawerSalesActivityContext.bookingScenario ? (
-                            <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.72) }}>
-                              Request: {drawerSalesActivityContext.bookingScenario}
-                            </BodyText>
-                          ) : null}
-                          {drawerSalesActivityContext.details?.internalNote ? (
-                            <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.72) }}>
-                              Note: {drawerSalesActivityContext.details.internalNote}
-                            </BodyText>
-                          ) : null}
-                          {showLateCancellation ? (
-                            <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.72) }}>
-                              Late cancellation fee: {lateCancellationFeePercent}% (€{lateCancellationFeeAmount})
-                            </BodyText>
-                          ) : null}
-                          {showLateRescheduling ? (
-                            <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.72) }}>
-                              Late rescheduling fee: {lateRescheduleFeePercent}% (€{lateRescheduleFeeAmount})
-                            </BodyText>
-                          ) : null}
-                        </Stack>
-                      </Stack>
+                      <BookingActivityOverview
+                        title="Activity Overview"
+                        items={activityTimelineItems}
+                        emptyMessage="No activity for this client yet."
+                        selectedDetail={activityDetailItem}
+                        onSelectedDetailChange={setActivityDetailItem}
+                      />
                     )
                   ) : (
                     <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.6) }}>

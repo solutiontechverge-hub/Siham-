@@ -22,6 +22,7 @@ import {
 import ClientBookingCancelDialog from "./ClientBookingCancelDialog";
 import ClientBookingDeleteDialog from "./ClientBookingDeleteDialog";
 import ClientBookingDiscardDialog from "./ClientBookingDiscardDialog";
+import { setBookingCancellationReason } from "./bookingCancellationReason";
 import ClientBookingDetailsHeader from "./ClientBookingDetailsHeader";
 import ClientBookingInfoBar from "./ClientBookingInfoBar";
 import ClientBookingPaymentDetailsCard from "./ClientBookingPaymentDetailsCard";
@@ -187,13 +188,16 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
     clearActiveBookingSession();
   }, []);
 
-  const handleConfirmCancel = async () => {
+  const handleConfirmCancel = async (reason: string) => {
     if (!apiBookingId) {
       showSnackbar({ severity: "error", message: "Booking not found on server." });
       return;
     }
     try {
       await updateMyBooking({ id: apiBookingId, status: "cancelled" }).unwrap();
+      if (reason) {
+        setBookingCancellationReason(bookingRef || apiBookingId, reason);
+      }
       await refreshActiveBooking();
       showSnackbar({ severity: "success", message: "Booking cancelled" });
     } catch (error) {
