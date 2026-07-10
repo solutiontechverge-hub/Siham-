@@ -70,6 +70,7 @@ import BookingDrawerSelectedItemsSection from "./calendar/BookingDrawerSelectedI
 import BookingEditServiceScreen from "./calendar/BookingEditServiceScreen";
 import BookingSelectProductsScreen from "./calendar/BookingSelectProductsScreen";
 import BookingAddUniqueItemScreen from "./calendar/BookingAddUniqueItemScreen";
+import { professionalSuggestBookingChanges } from "./client-booking/bookingEditRequest";
 import { useCalendarFilters } from "./calendar/useCalendarFilters";
 import type { BookingCatalogService } from "../../data/bookingServiceCatalog.data";
 import { formatBookingServiceMeta } from "../../data/bookingServiceCatalog.data";
@@ -2161,7 +2162,8 @@ export default function ProfessionalFixedLocationCalendar({
         bookingTotalDiscount,
         showKilometerAllowance,
         kilometerAllowanceDraft,
-        requestDirection: "incoming",
+        // Keep BR on calendar; only flip arrow to outgoing for the client-facing edit request.
+        requestDirection: "outgoing",
         originalServices,
         editedServiceIds: editedIds,
         clientEditedServiceIds: [],
@@ -2174,7 +2176,7 @@ export default function ProfessionalFixedLocationCalendar({
             ? {
                 ...event,
                 status: "Requested",
-                bookingScenario: "EBR",
+                bookingScenario: "BR",
                 title: selectedServices[0]?.name ?? event.title,
                 details: {
                   ...event.details,
@@ -2185,6 +2187,10 @@ export default function ProfessionalFixedLocationCalendar({
               }
             : event,
         ),
+      );
+      professionalSuggestBookingChanges(
+        existingEvent.bookingCode ?? editingEventId,
+        bookingInternalNote.trim() || undefined,
       );
       setIncomingRequestEditMode(false);
       setIsEditingExisting(false);
@@ -4679,6 +4685,9 @@ export default function ProfessionalFixedLocationCalendar({
                           services={selectedServices}
                           products={selectedProducts}
                           showRemoveButtons={showLineItemRemoveButton}
+                          resolveStaffName={(staffResourceId) =>
+                            staffResourceId ? resourceNameById.get(staffResourceId) : undefined
+                          }
                           resolveServiceEditTag={resolveServiceEditTag}
                           onRemoveService={(serviceId) => {
                             setSelectedServices((prev) => prev.filter((item) => item.id !== serviceId));
