@@ -20,6 +20,7 @@ import PaymentDueIcon from "../../../components/common/client-booking/PaymentDue
 import { getCheckoutPath, setActiveBookingSession } from "./clientBookingSession";
 import { useGetMyBookingsQuery } from "../../../store/services/businessApi";
 import { mapApiBookingToClientRecord } from "./clientBookingApi.mapper";
+import { enrichClientBookingRecord } from "./clientBookingDraftCache";
 
 const emptyCopy: Record<BookingListTab, string> = {
   past: "No past bookings yet.",
@@ -38,12 +39,13 @@ export default function ClientBookingListView({ listTab }: Props) {
 
   const bookings = React.useMemo(() => {
     const rows = data?.data ?? [];
-    return rows.map(mapApiBookingToClientRecord);
+    return rows.map((row) => enrichClientBookingRecord(mapApiBookingToClientRecord(row)));
   }, [data]);
 
   const openBooking = (record: ClientBookingRecord) => {
-    setActiveBookingSession(record);
-    router.push(getCheckoutPath(record, listTab));
+    const enriched = enrichClientBookingRecord(record);
+    setActiveBookingSession(enriched);
+    router.push(getCheckoutPath(enriched, listTab));
   };
 
   const filtered = React.useMemo(() => filterBookingsByTab(bookings, listTab), [bookings, listTab]);

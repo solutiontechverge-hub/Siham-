@@ -38,6 +38,7 @@ type StoredBookingNoteMeta = Partial<
     | "requestDirection"
     | "editedServiceIds"
     | "lastEditedBy"
+    | "clientSnapshot"
   >
 > & {
   ebr?: StoredEbrNotePayload;
@@ -82,6 +83,7 @@ export function serializeCalendarEntryNotes(
     requestDirection: details?.requestDirection,
     editedServiceIds: details?.editedServiceIds,
     lastEditedBy: details?.lastEditedBy,
+    clientSnapshot: details?.clientSnapshot,
     ...(ebr ? { ebr } : {}),
   };
   const hasMeta = metaHasValues(meta);
@@ -143,6 +145,7 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
       ...(meta.requestDirection ? { requestDirection: meta.requestDirection } : {}),
       ...(meta.editedServiceIds?.length ? { editedServiceIds: meta.editedServiceIds } : {}),
       ...(meta.lastEditedBy ? { lastEditedBy: meta.lastEditedBy } : {}),
+      ...(meta.clientSnapshot ? { clientSnapshot: meta.clientSnapshot } : {}),
       ...(ebr?.suggestedServices?.length ? { services: ebr.suggestedServices } : {}),
       ...(ebr?.suggestedProducts?.length ? { products: ebr.suggestedProducts } : {}),
       ...(ebr?.editedServiceIds?.length && !meta.editedServiceIds?.length

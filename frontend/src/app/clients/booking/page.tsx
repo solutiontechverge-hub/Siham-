@@ -1080,7 +1080,11 @@ function ClientBookingCreateView() {
         ? {
             projectDetails: {
               description: projectDescription,
-              uploads: projectUploads.map((u) => ({ id: u.id, name: u.name })),
+              uploads: projectUploads.map((u) => ({
+                id: u.id,
+                name: u.name,
+                previewUrl: u.previewUrl,
+              })),
             },
           }
         : {}),

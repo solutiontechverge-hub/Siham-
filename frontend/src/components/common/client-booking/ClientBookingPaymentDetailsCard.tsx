@@ -9,7 +9,7 @@ import { ServiceSummaryMetaLine } from "../ServiceSummaryMetaLine";
 import BookingEditedTag from "../calendar/BookingEditedTag";
 import { buildBookingSummarySections, resolveTeamMemberFirstName } from "./buildBookingSummarySections";
 import type { BookingEditSuggestedProduct } from "./bookingEditRequest";
-import type { ClientBookingDraft } from "./types";
+import type { ClientBookingDraft, ClientBookingSummarySection } from "./types";
 
 export type ClientBookingPrepaymentState = "none" | "required" | "paid";
 
@@ -58,19 +58,28 @@ export default function ClientBookingPaymentDetailsCard({
   const prepaidAmount = Math.round(((total * prepaymentPercent) / 100 + Number.EPSILON) * 100) / 100;
   const remaining = Math.round((total - prepaidAmount + Number.EPSILON) * 100) / 100;
 
-  const requesterSections = sections.filter((s) => s.isRequester);
-  // Only show Guest:* blocks when a real guest/client person exists — never for bare "Unassigned".
-  const hasAddedGuestOrClient = (draft?.people?.length ?? 0) > 0;
-  const guestSections = hasAddedGuestOrClient
-    ? sections.filter(
-        (s) => !s.isRequester && !s.key.includes("planning") && s.key !== "unassigned",
-      )
-    : [];
-  const fallbackRequesterSection =
-    requesterSections.length === 0 && (draft?.services?.length ?? 0) > 0
-      ? [{ key: "requester-services", items: draft!.services, isRequester: true as const }]
+  const requesterSections = sections.filter((s) => s.isRequester || s.participantType === "requester");
+  const modelSections = sections.filter((s) => s.participantType === "model");
+  const guestSections = sections.filter((s) => s.participantType === "guest");
+  const planningSections = sections.filter((s) => s.participantType === "planning");
+
+  const fallbackRequesterSection: ClientBookingSummarySection[] =
+    requesterSections.length === 0 && (draft?.services?.length ?? 0) > 0 && modelSections.length === 0 && guestSections.length === 0
+      ? [
+          {
+            key: "requester-services",
+            title: requesterName,
+            items: draft!.services,
+            isRequester: true,
+            participantType: "requester",
+          },
+        ]
       : [];
   const clientServiceSections = requesterSections.length ? requesterSections : fallbackRequesterSection;
+
+  const project = draft?.projectDetails;
+  const hasProject =
+    Boolean(project?.description?.trim()) || (project?.uploads?.length ?? 0) > 0;
 
   let scheduleOffset = bookingStartMinutes;
 
@@ -120,6 +129,40 @@ export default function ClientBookingPaymentDetailsCard({
     );
   };
 
+  const renderSectionBlock = (section: ClientBookingSummarySection, heading?: string) => (
+    <Box key={section.key}>
+      {heading ? (
+        <Typography sx={{ fontWeight: 900, fontSize: 12.5, color: alpha(m.navy, 0.72), mb: 1 }}>
+          {heading}
+        </Typography>
+      ) : null}
+      {section.planningItem ? (
+        <Box
+          sx={{
+            borderRadius: "10px",
+            border: `1px solid ${alpha(m.navy, 0.08)}`,
+            px: 1.5,
+            py: 1.15,
+            bgcolor: "#fff",
+            mb: section.items.length ? 1 : 0,
+          }}
+        >
+          {section.planningItem.activity ? (
+            <Typography sx={{ fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.82), mb: 0.35 }}>
+              {section.planningItem.activity}
+            </Typography>
+          ) : null}
+          {section.planningItem.duration ? (
+            <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.48) }}>
+              {section.planningItem.duration}
+            </Typography>
+          ) : null}
+        </Box>
+      ) : null}
+      {section.items.length ? <Stack spacing={1}>{section.items.map((service) => renderService(service))}</Stack> : null}
+    </Box>
+  );
+
   return (
     <Paper
       elevation={0}
@@ -138,7 +181,19 @@ export default function ClientBookingPaymentDetailsCard({
       <Divider />
 
       <Box sx={{ p: 2, bgcolor: "#fff" }}>
-        <Stack direction="row" alignItems="center" spacing={1.25} sx={{ mb: 2 }}>
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={1.25}
+          sx={{
+            mb: 2,
+            px: 1.25,
+            py: 1.1,
+            borderRadius: "10px",
+            border: `1px solid ${alpha(m.navy, 0.08)}`,
+            bgcolor: alpha(m.navy, 0.015),
+          }}
+        >
           <Avatar
             src={requesterAvatarUrl}
             sx={{ width: 44, height: 44, bgcolor: alpha(m.teal, 0.12), color: m.teal, fontWeight: 900, fontSize: 16 }}
@@ -153,45 +208,98 @@ export default function ClientBookingPaymentDetailsCard({
           </Stack>
         </Stack>
 
-        {draft?.projectDetails?.description ? (
-          <Box
-            sx={{
-              mb: 2,
-              borderRadius: "10px",
-              border: `1px solid ${alpha(m.navy, 0.08)}`,
-              bgcolor: alpha(m.navy, 0.02),
-              px: 1.5,
-              py: 1.15,
-            }}
-          >
-            <Typography sx={{ fontWeight: 900, fontSize: 12, color: alpha(m.navy, 0.72), mb: 0.5 }}>
-              Project description
-            </Typography>
-            <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.58), whiteSpace: "pre-wrap" }}>
-              {draft.projectDetails.description}
-            </Typography>
-            {(draft.projectDetails.uploads?.length ?? 0) > 0 ? (
-              <Typography sx={{ mt: 0.75, fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.48) }}>
-                {draft.projectDetails.uploads.length} file{draft.projectDetails.uploads.length === 1 ? "" : "s"} attached
-              </Typography>
+        {hasProject ? (
+          <Box sx={{ mb: 2.25 }}>
+            <Stack direction="row" alignItems="baseline" spacing={1} sx={{ mb: 1 }}>
+              <Typography sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.82) }}>Project</Typography>
+              <Typography sx={{ fontWeight: 800, fontSize: 11.5, color: m.teal }}>Detail</Typography>
+            </Stack>
+            {project?.description?.trim() ? (
+              <Box
+                sx={{
+                  borderRadius: "10px",
+                  border: `1px solid ${alpha(m.navy, 0.08)}`,
+                  bgcolor: alpha(m.navy, 0.02),
+                  px: 1.5,
+                  py: 1.15,
+                  mb: (project.uploads?.length ?? 0) > 0 ? 1.25 : 0,
+                }}
+              >
+                <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.62), whiteSpace: "pre-wrap" }}>
+                  {project.description}
+                </Typography>
+              </Box>
+            ) : null}
+            {(project?.uploads?.length ?? 0) > 0 ? (
+              <Box>
+                <Typography sx={{ fontWeight: 900, fontSize: 12, color: alpha(m.navy, 0.72), mb: 1 }}>
+                  Uploaded
+                </Typography>
+                <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                  {project!.uploads.map((upload) => (
+                    <Box
+                      key={upload.id}
+                      sx={{
+                        width: 72,
+                        borderRadius: "8px",
+                        overflow: "hidden",
+                        border: `1px solid ${alpha(m.navy, 0.1)}`,
+                        bgcolor: alpha(m.navy, 0.03),
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: "100%",
+                          height: 72,
+                          bgcolor: alpha(m.navy, 0.06),
+                          backgroundImage: upload.previewUrl ? `url(${upload.previewUrl})` : undefined,
+                          backgroundSize: "cover",
+                          backgroundPosition: "center",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        {!upload.previewUrl ? (
+                          <Typography sx={{ fontSize: 10, fontWeight: 800, color: alpha(m.navy, 0.45), px: 0.5, textAlign: "center" }}>
+                            IMG
+                          </Typography>
+                        ) : null}
+                      </Box>
+                      <Typography
+                        sx={{
+                          px: 0.5,
+                          py: 0.35,
+                          fontSize: 9.5,
+                          fontWeight: 800,
+                          color: alpha(m.navy, 0.5),
+                          textAlign: "center",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        {upload.name}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Stack>
+              </Box>
             ) : null}
           </Box>
         ) : null}
 
-        <Stack spacing={1.25}>
-          {clientServiceSections.map((section) => (
-            <Stack key={section.key} spacing={1}>
-              {section.items.map((service) => renderService(service))}
-            </Stack>
-          ))}
-          {guestSections.map((section) => (
-            <Box key={section.key}>
-              <Typography sx={{ fontWeight: 800, fontSize: 12, color: alpha(m.navy, 0.55), mb: 1 }}>
-                Guest:{section.title}
-              </Typography>
-              <Stack spacing={1}>{section.items.map((service) => renderService(service))}</Stack>
-            </Box>
-          ))}
+        <Stack spacing={2}>
+          {clientServiceSections.map((section) => renderSectionBlock(section))}
+
+          {modelSections.map((section) => renderSectionBlock(section, section.title))}
+
+          {guestSections.map((section) =>
+            renderSectionBlock(section, section.title.toLowerCase().startsWith("guest") ? section.title : `Guest: ${section.title}`),
+          )}
+
+          {planningSections.map((section) => renderSectionBlock(section, "Planning Details"))}
+
           {products.length > 0 ? (
             <Box>
               <Typography sx={{ fontWeight: 800, fontSize: 12, color: alpha(m.navy, 0.55), mb: 1 }}>Product</Typography>
@@ -261,7 +369,6 @@ export default function ClientBookingPaymentDetailsCard({
           </Box>
         ) : null}
 
-        {/* No prepayment: simple Total Price (image 2) */}
         {prepaymentState === "none" ? (
           <Box
             sx={{
@@ -283,7 +390,6 @@ export default function ClientBookingPaymentDetailsCard({
           </Box>
         ) : null}
 
-        {/* Prepayment required (not yet paid): Pay Now + remaining */}
         {prepaymentState === "required" ? (
           <Box sx={{ mt: showKilometerAllowance && kilometerAllowanceAmount > 0 ? 1.5 : 2 }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.1, px: 0.25 }}>
@@ -302,13 +408,7 @@ export default function ClientBookingPaymentDetailsCard({
                 py: 1.35,
               }}
             >
-              <Stack
-                direction="row"
-                alignItems="center"
-                justifyContent="space-between"
-                spacing={1}
-                sx={{ mb: 1.1 }}
-              >
+              <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1} sx={{ mb: 1.1 }}>
                 <Typography sx={{ fontWeight: 800, fontSize: 12.5, color: alpha(m.navy, 0.72), flex: 1, minWidth: 0 }}>
                   Prepayment Required ({prepaymentPercent}%)
                 </Typography>
@@ -350,7 +450,6 @@ export default function ClientBookingPaymentDetailsCard({
           </Box>
         ) : null}
 
-        {/* After prepayment paid: Prepaid + Remaining (image 1), then Payment Summary below */}
         {prepaymentState === "paid" ? (
           <Box sx={{ mt: showKilometerAllowance && kilometerAllowanceAmount > 0 ? 1.5 : 2 }}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.1, px: 0.25 }}>

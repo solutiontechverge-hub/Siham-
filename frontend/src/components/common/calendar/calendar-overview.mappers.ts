@@ -163,6 +163,7 @@ export function mapCalendarBookingToEvent(
             paymentMethod: parsedNotes.paymentMethod,
             showKilometerAllowance: parsedNotes.showKilometerAllowance,
             ...(parsedNotes.cancellationReason ? { cancellationReason: parsedNotes.cancellationReason } : {}),
+            ...(parsedNotes.clientSnapshot ? { clientSnapshot: parsedNotes.clientSnapshot } : {}),
           }
         : {}),
     },

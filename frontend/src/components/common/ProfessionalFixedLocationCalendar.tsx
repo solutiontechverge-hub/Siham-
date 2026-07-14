@@ -68,6 +68,7 @@ import DiscardBrDialog from "./calendar/DiscardBrDialog";
 import DiscardEbrDialog from "./calendar/DiscardEbrDialog";
 import BookingRequestResponseActions from "./calendar/BookingRequestResponseActions";
 import BookingDrawerSelectedItemsSection from "./calendar/BookingDrawerSelectedItemsSection";
+import BookingDrawerClientSnapshotSection from "./calendar/BookingDrawerClientSnapshotSection";
 import BookingActivityOverview from "./calendar/BookingActivityOverview";
 import { buildBookingActivityTimeline } from "./calendar/buildBookingActivityTimeline";
 import type { BookingActivityItem } from "./calendar/bookingActivity.types";
@@ -2268,16 +2269,27 @@ export default function ProfessionalFixedLocationCalendar({
         lastEditedBy: "professional",
       });
       nextDetails.responseStatus = "suggestion_for_change";
+      // Keep client project/people snapshot so client EBR view stays on Continue layout.
+      if (existingEvent.details?.clientSnapshot) {
+        nextDetails.clientSnapshot = existingEvent.details.clientSnapshot;
+      }
 
-      const suggestedServices = selectedServices.map((service) => ({
-        id: service.id,
-        name: service.name,
-        durationMins: service.durationMins,
-        price: getEffectiveServicePrice(service),
-        staffResourceId: service.staffResourceId,
-        startTime: service.startTime,
-        endTime: service.endTime,
-      }));
+      const snapshotServices = existingEvent.details?.clientSnapshot?.services ?? [];
+      const suggestedServices = selectedServices.map((service) => {
+        const fromSnapshot =
+          snapshotServices.find((row) => row.id === service.id) ??
+          snapshotServices.find((row) => row.name === service.name);
+        return {
+          id: service.id,
+          name: service.name,
+          durationMins: service.durationMins,
+          price: getEffectiveServicePrice(service),
+          staffResourceId: service.staffResourceId,
+          startTime: service.startTime,
+          endTime: service.endTime,
+          guestId: fromSnapshot?.guestId ?? null,
+        };
+      });
       const suggestedProducts: NonNullable<typeof nextDetails.products> = selectedProducts.map((product) => ({
         id: product.id,
         name: product.name,
@@ -2356,6 +2368,7 @@ export default function ProfessionalFixedLocationCalendar({
           teamMemberName: service.staffResourceId
             ? resourceNameById.get(service.staffResourceId)
             : undefined,
+          guestId: service.guestId ?? null,
           startTime: service.startTime,
           endTime: service.endTime,
         })),
@@ -4900,6 +4913,10 @@ export default function ProfessionalFixedLocationCalendar({
                                 }
                               : undefined
                           }
+                        />
+
+                        <BookingDrawerClientSnapshotSection
+                          snapshot={viewingBookingEvent?.details?.clientSnapshot ?? null}
                         />
 
                         {bookingGuests.map((guest) => (

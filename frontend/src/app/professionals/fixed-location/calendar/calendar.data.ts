@@ -38,6 +38,34 @@ export type CalendarBookingGuestItem = {
   name: string;
   services: CalendarBookingServiceItem[];
   products: CalendarBookingProductItem[];
+  participantType?: "model" | "planning" | "guest";
+  planningActivity?: string;
+  planningDuration?: string;
+};
+
+export type CalendarBookingClientSnapshot = {
+  people?: Array<{
+    id: string;
+    name: string;
+    isRequester?: boolean;
+    participantType?: "model" | "planning" | "guest";
+    planningActivity?: string;
+    planningDuration?: string;
+    planningIsLocked?: boolean;
+  }>;
+  services?: Array<{
+    id: string;
+    name: string;
+    price: number;
+    durationMins: number;
+    guestId?: string | null;
+    teamMemberId?: string | null;
+  }>;
+  projectDetails?: {
+    description: string;
+    uploads: Array<{ id: string; name: string; previewUrl?: string }>;
+  };
+  teamMembers?: Array<{ id: string; name: string }>;
 };
 
 export type CalendarBookingDetails = {
@@ -54,6 +82,8 @@ export type CalendarBookingDetails = {
     province: string;
     municipality: string;
   };
+  /** Desired-location project + people snapshot from client booking request. */
+  clientSnapshot?: CalendarBookingClientSnapshot;
   prepaymentPercent?: string;
   showPrepayment?: boolean;
   prepaymentStatus?: "pending" | "confirmed" | "canceled" | "invalid";

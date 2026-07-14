@@ -552,19 +552,26 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
       teamMembers.push({ id: service.teamMemberId, name: service.teamMemberName });
     }
 
-    const services = editRequest.suggestedServices.map((service) => ({
-      id: service.id,
-      name: service.name,
-      durationMins: service.durationMins,
-      price: service.price,
-      guestId: service.guestId ?? null,
-      teamMemberId: service.teamMemberId ?? null,
-    }));
+    const services = editRequest.suggestedServices.map((service) => {
+      const original =
+        draft.services.find((row) => row.id === service.id) ??
+        draft.services.find((row) => row.name === service.name);
+      return {
+        id: service.id,
+        name: service.name,
+        durationMins: service.durationMins,
+        price: service.price,
+        // Keep Model/Guest assignment from original draft when EBR omits guestId.
+        guestId: service.guestId ?? original?.guestId ?? null,
+        teamMemberId: service.teamMemberId ?? original?.teamMemberId ?? null,
+      };
+    });
     const productTotal = (editRequest.suggestedProducts ?? []).reduce((sum, product) => sum + product.price, 0);
     const serviceTotal = services.reduce((sum, service) => sum + service.price, 0);
 
     return {
       ...draft,
+      // Preserve people + projectDetails via spread — EBR only updates service lines/totals.
       services,
       teamMembers,
       total: serviceTotal + productTotal,

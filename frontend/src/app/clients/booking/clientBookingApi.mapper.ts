@@ -2,7 +2,7 @@ import type { ClientBookingDraft } from "../../../components/common/client-booki
 import type { ClientBookingRecord, ClientBookingStatus } from "./clientBookingRecords";
 import { fmtMinutesToTimeLabel, parseTimeLabelToMinutes, buildWallClockDateTimeIso } from "./booking-time";
 import { wallClockDateFromDateTime, wallClockTimeFromDateTime } from "../../../components/common/calendar/calendar.utils";
-import { parseStoredEbrFromNotes } from "../../../components/common/calendar/bookingEventDetails";
+import { parseCalendarEntryNotes, parseStoredEbrFromNotes } from "../../../components/common/calendar/bookingEventDetails";
 import type { BusinessSetupListing, CalendarBooking, CreateBookingRequest } from "../../../store/services/businessApi";
 import { mapApiBookingStatusToClient } from "./clientBookingStatus";
 
@@ -128,7 +128,42 @@ export function buildClientBookingApiPayload(input: {
   );
 
   const serviceNames = services.map((service) => service.name).filter(Boolean);
-  const notes = serviceNames.length > 1 ? `Services: ${serviceNames.join(", ")}` : null;
+  const humanNotes = serviceNames.length > 1 ? `Services: ${serviceNames.join(", ")}` : "";
+
+  const clientSnapshot = {
+    people: (input.draft.people ?? []).map((p) => ({
+      id: p.id,
+      name: p.name,
+      isRequester: Boolean(p.isRequester),
+      participantType: p.participantType,
+      planningActivity: p.planningActivity,
+      planningDuration: p.planningDuration,
+      planningIsLocked: p.planningIsLocked,
+    })),
+    services: services.map((s) => ({
+      id: s.id,
+      name: s.name,
+      price: s.price,
+      durationMins: s.durationMins,
+      guestId: s.guestId ?? null,
+      teamMemberId: s.teamMemberId ?? null,
+    })),
+    projectDetails: input.draft.projectDetails
+      ? {
+          description: input.draft.projectDetails.description ?? "",
+          uploads: (input.draft.projectDetails.uploads ?? []).map((u) => ({
+            id: u.id,
+            name: u.name,
+          })),
+        }
+      : undefined,
+    teamMembers: input.draft.teamMembers ?? [],
+  };
+
+  const notes = `${humanNotes}${humanNotes ? "\n" : ""}---mollure-meta---\n${JSON.stringify({
+    requestDirection: input.asBookingRequest ? "incoming" : undefined,
+    clientSnapshot,
+  })}`;
 
   return {
     booking_date: dateIso,
@@ -187,6 +222,8 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
   const endHhmm = booking.end || wallClockTimeFromDateTime(booking.end_time);
   const startLabel = hhmmToTimeLabel(startHhmm);
   const ebr = parseStoredEbrFromNotes(booking.notes);
+  const notesDetails = parseCalendarEntryNotes(booking.notes);
+  const clientSnapshot = notesDetails?.clientSnapshot;
   const incomingEditRequest =
     ebr && ebr.status !== "none"
       ? {
@@ -263,27 +300,70 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
       selectedDateISO: dateIso,
       selectedTime: startLabel,
       combineServices: names.length > 1,
-      services: incomingEditRequest?.suggestedServices?.length
-        ? incomingEditRequest.suggestedServices.map((service) => ({
+      people: clientSnapshot?.people?.map((p) => ({
+        id: p.id,
+        name: p.name,
+        isRequester: p.isRequester,
+        participantType: p.participantType,
+        planningActivity: p.planningActivity,
+        planningDuration: p.planningDuration,
+        planningIsLocked: p.planningIsLocked,
+      })),
+      services: (() => {
+        const snapshotById = new Map((clientSnapshot?.services ?? []).map((s) => [s.id, s]));
+        const snapshotByName = new Map((clientSnapshot?.services ?? []).map((s) => [s.name, s]));
+        const resolveGuestId = (id: string, name: string, fallback: string | null | undefined) =>
+          fallback ?? snapshotById.get(id)?.guestId ?? snapshotByName.get(name)?.guestId ?? null;
+
+        if (incomingEditRequest?.suggestedServices?.length) {
+          return incomingEditRequest.suggestedServices.map((service) => ({
+            id: service.id,
+            name: service.name,
+            durationMins: service.durationMins,
+            price: service.price,
+            guestId: resolveGuestId(service.id, service.name, service.guestId),
+            teamMemberId: service.teamMemberId ?? booking.team_member_id,
+          }));
+        }
+        if (clientSnapshot?.services?.length) {
+          return clientSnapshot.services.map((service) => ({
             id: service.id,
             name: service.name,
             durationMins: service.durationMins,
             price: service.price,
             guestId: service.guestId ?? null,
             teamMemberId: service.teamMemberId ?? booking.team_member_id,
-          }))
-        : names.map((name, index) => ({
-            id: `${booking.service_id ?? booking.id}-${index}`,
-            name,
-            durationMins: names.length === 1 ? durationMins : Math.round(durationMins / names.length),
-            price: priceEach,
-            guestId: null,
-            teamMemberId: booking.team_member_id,
-          })),
-      teamMembers: booking.team_member_id
-        ? [{ id: booking.team_member_id, name: booking.team_member_name || "Team member" }]
+          }));
+        }
+        return names.map((name, index) => ({
+          id: `${booking.service_id ?? booking.id}-${index}`,
+          name,
+          durationMins: names.length === 1 ? durationMins : Math.round(durationMins / names.length),
+          price: priceEach,
+          guestId: null as string | null,
+          teamMemberId: booking.team_member_id,
+        }));
+      })(),
+      teamMembers: clientSnapshot?.teamMembers?.length
+        ? clientSnapshot.teamMembers
+        : booking.team_member_id
+          ? [{ id: booking.team_member_id, name: booking.team_member_name || "Team member" }]
+          : undefined,
+      projectDetails: clientSnapshot?.projectDetails
+        ? {
+            description: clientSnapshot.projectDetails.description ?? "",
+            uploads: clientSnapshot.projectDetails.uploads ?? [],
+          }
         : undefined,
-      total,
+      total: incomingEditRequest?.suggestedServices?.length
+        ? incomingEditRequest.suggestedServices.reduce((sum, s) => sum + (s.price || 0), 0) +
+          (incomingEditRequest.suggestedProducts ?? []).reduce(
+            (sum, p) => sum + p.price * (p.quantity || 1),
+            0,
+          )
+        : clientSnapshot?.services?.length
+          ? clientSnapshot.services.reduce((sum, s) => sum + (s.price || 0), 0)
+          : total,
     },
     createdAt: booking.created_at ?? undefined,
     prepaid,
