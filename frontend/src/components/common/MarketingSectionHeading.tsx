@@ -29,21 +29,10 @@ export default function MarketingSectionHeading({
           align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start",
       }}
     >
-      <MainHeading
-        sx={{
-          fontSize: { xs: "2rem", md: "2.6rem" },
-          lineHeight: 1.12,
-          letterSpacing: "-0.02em",
-          textAlign: align,
-        }}
-      >
-        {title}
-      </MainHeading>
+      <MainHeading sx={{ textAlign: align }}>{title}</MainHeading>
       {subtitle ? (
         <Description
           sx={{
-            fontSize: { xs: "0.95rem", md: "1.05rem" },
-            lineHeight: 1.7,
             textAlign: align,
             maxWidth: align === "center" ? 820 : undefined,
             mx: align === "center" ? "auto" : undefined,

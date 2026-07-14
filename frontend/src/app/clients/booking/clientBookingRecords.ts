@@ -1,4 +1,5 @@
 import type { ClientBookingDraft } from "../../../components/common/client-booking/types";
+import type { BookingEditRequestRecord } from "../../../components/common/client-booking/bookingEditRequest";
 
 export type ClientBookingStatus =
   | "draft"
@@ -34,6 +35,10 @@ export type ClientBookingRecord = {
   prepaymentPercent?: number;
   requiresPrepayment?: boolean;
   contactPhone?: string;
+  /** Raw booking notes (may include EBR meta). */
+  notes?: string | null;
+  /** Incoming EBR from professional, parsed from booking notes. */
+  incomingEditRequest?: BookingEditRequestRecord | null;
 };
 
 export type BookingListTab = "past" | "ongoing" | "upcoming";

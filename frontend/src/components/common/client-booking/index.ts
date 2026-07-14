@@ -18,10 +18,12 @@ export {
   professionalSuggestBookingChanges,
   professionalRejectEditRequest,
   clientAcceptSuggestedChanges,
+  clientRejectSuggestedChanges,
+  clientSuggestEbrChanges,
   clientAcknowledgeRejectedEdit,
   getBookingEditRequest,
   isBookingEditApproved,
 } from "./bookingEditRequest";
-export type { BookingEditRequestStatus } from "./bookingEditRequest";
+export type { BookingEditRequestStatus, BookingEditSuggestionPayload } from "./bookingEditRequest";
 export type { ClientBookingDetailsVariant } from "./ClientBookingDetailsView";
 export type * from "./types";

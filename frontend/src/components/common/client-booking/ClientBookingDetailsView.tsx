@@ -22,6 +22,7 @@ import {
 import ClientBookingCancelDialog from "./ClientBookingCancelDialog";
 import ClientBookingDeleteDialog from "./ClientBookingDeleteDialog";
 import ClientBookingDiscardDialog from "./ClientBookingDiscardDialog";
+import { setBookingCancellationReason } from "./bookingCancellationReason";
 import ClientBookingDetailsHeader from "./ClientBookingDetailsHeader";
 import ClientBookingInfoBar from "./ClientBookingInfoBar";
 import ClientBookingPaymentDetailsCard from "./ClientBookingPaymentDetailsCard";
@@ -33,11 +34,24 @@ import { useClientRequesterProfile } from "./useClientRequesterProfile";
 import { useActiveClientBooking } from "./useActiveClientBooking";
 import { useCheckoutBookingRef } from "./useCheckoutBookingRef";
 import ClientBookingChangeResponsePanel from "./ClientBookingChangeResponsePanel";
+import ClientEbrResponseActions from "./ClientEbrResponseActions";
+import ClientEbrActionDialog, { type ClientEbrActionKind } from "./ClientEbrActionDialog";
+import ClientEbrSuggestDrawer from "./ClientEbrSuggestDrawer";
 import {
   clientAcceptSuggestedChanges,
   clientAcknowledgeRejectedEdit,
+  clientRejectSuggestedChanges,
+  clientSuggestEbrChanges,
+  clearBookingEditRequest,
+  getBookingEditRequest,
+  professionalSuggestBookingChanges,
 } from "./bookingEditRequest";
 import { useBookingEditRequest } from "./useBookingEditRequest";
+import {
+  parseCalendarEntryNotes,
+  resolveKilometerAllowanceAmount,
+  serializeCalendarEntryNotes,
+} from "../calendar/bookingEventDetails";
 import {
   FinanceDocumentPreviewDrawer,
   buildClientBookingTransactionRow,
@@ -103,8 +117,9 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
 
   const isPrepaid = variant === "prepaid";
   const locationMode = shop?.locationMode ?? "fixed";
-  const bookingRef = useCheckoutBookingRef();
+  const checkoutBookingRef = useCheckoutBookingRef();
   const { record: activeBooking, refresh: refreshActiveBooking } = useActiveClientBooking();
+  const bookingRef = activeBooking?.bookingRef ?? checkoutBookingRef;
   const editRequest = useBookingEditRequest(bookingRef);
   const bookingStatus: ClientBookingStatus = activeBooking?.status ?? "draft";
   const isDraft = bookingStatus === "draft";
@@ -123,7 +138,11 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
   const [cancelDialogOpen, setCancelDialogOpen] = React.useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [discardDialogOpen, setDiscardDialogOpen] = React.useState(false);
+  const [ebrAction, setEbrAction] = React.useState<ClientEbrActionKind | null>(null);
+  const [suggestDrawerOpen, setSuggestDrawerOpen] = React.useState(false);
   const isCancelled = bookingStatus === "cancelled";
+  /** Accept / Suggest / Reject only when professional sent an EBR (API notes). */
+  const isEbrIncoming = activeBooking?.incomingEditRequest?.status === "suggested";
   const canActOnPayment = !isCompleted && !isCancelled && prepaymentState === "required";
   const { invoiceSettings: financeSettings, transactionOptions } = usePublicFinanceSettings(shop?.shopId);
   const [activeDocument, setActiveDocument] = React.useState<"invoice" | "receipt" | null>(null);
@@ -149,6 +168,41 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
   React.useEffect(() => {
     if (requesterPhone && !phone) setPhone(requesterPhone);
   }, [phone, requesterPhone]);
+
+  // After editing services for an EBR suggestion, reopen the suggest drawer.
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.sessionStorage.getItem("mollure:ebr_suggest_return") !== "1") return;
+    window.sessionStorage.removeItem("mollure:ebr_suggest_return");
+    setSuggestDrawerOpen(true);
+  }, []);
+
+  // Hydrate local EBR state from API notes so client UI works across browsers/sessions.
+  // Accept / Suggest / Reject only when professional sent EBR — clear stale local suggested state.
+  React.useEffect(() => {
+    if (!bookingRef) return;
+    const incoming = activeBooking?.incomingEditRequest;
+    if (incoming?.status === "suggested") {
+      const current = getBookingEditRequest(bookingRef);
+      if (current.status !== "suggested") {
+        professionalSuggestBookingChanges(bookingRef, {
+          professionalNote: incoming.professionalNote,
+          editedServiceIds: incoming.editedServiceIds,
+          editedProductIds: incoming.editedProductIds,
+          suggestedServices: incoming.suggestedServices,
+          suggestedProducts: incoming.suggestedProducts,
+        });
+        editRequest.refresh();
+      }
+      return;
+    }
+    if (getBookingEditRequest(bookingRef).status === "suggested") {
+      clearBookingEditRequest(bookingRef);
+      editRequest.refresh();
+    }
+    // Only re-run when the API-sourced EBR payload changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeBooking?.incomingEditRequest, bookingRef]);
 
   React.useEffect(() => {
     if (!isPrepaid || !shop?.shopId) return;
@@ -186,13 +240,16 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
     clearActiveBookingSession();
   }, []);
 
-  const handleConfirmCancel = async () => {
+  const handleConfirmCancel = async (reason: string) => {
     if (!apiBookingId) {
       showSnackbar({ severity: "error", message: "Booking not found on server." });
       return;
     }
     try {
       await updateMyBooking({ id: apiBookingId, status: "cancelled" }).unwrap();
+      if (reason) {
+        setBookingCancellationReason(bookingRef || apiBookingId, reason);
+      }
       await refreshActiveBooking();
       showSnackbar({ severity: "success", message: "Booking cancelled" });
     } catch (error) {
@@ -281,34 +338,6 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
       documentAmount: prepaidAmount,
     });
   }, [bookingRef, draft, financeSettings, prepaymentState, prepaidAmount, requesterName, user?.email]);
-
-  const paymentSummarySections = React.useMemo(
-    () =>
-      buildClientBookingPaymentSummary({
-        draft,
-        requesterName,
-        prepaid: isPrepaymentPaid,
-        paid: activeBooking?.paid === true,
-        requiresPrepayment: Boolean(activeBooking?.requiresPrepayment ?? requiresPrepayment),
-        prepaymentPercent: activeBooking?.prepaymentPercent ?? prepaymentPercent,
-        paymentDue: isPaymentDue,
-        hasEditPrepayment: editRequest.isSuggested,
-      }),
-    [
-      activeBooking?.paid,
-      activeBooking?.prepaymentPercent,
-      activeBooking?.requiresPrepayment,
-      draft,
-      editRequest.isSuggested,
-      isPaymentDue,
-      isPrepaymentPaid,
-      prepaymentPercent,
-      requesterName,
-      requiresPrepayment,
-    ],
-  );
-
-  const showPaymentSummary = (isCompleted || isPaymentDue) && paymentSummarySections.length > 0;
 
   const submitDraftBookingRequest = React.useCallback(async (): Promise<boolean> => {
     if (!isDraft || !activeBooking) return true;
@@ -478,22 +507,225 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
     [apiBookingId, bookingRef, editRequest, refreshActiveBooking, showSnackbar, updateMyBooking],
   );
 
-  const handleOkSuggestedChanges = React.useCallback(() => {
-    returnToBookingDetailsStart("accept_suggested");
+  const handleConfirmEbrAccept = React.useCallback(() => {
+    void returnToBookingDetailsStart("accept_suggested");
   }, [returnToBookingDetailsStart]);
 
-  const handleSuggestChange = React.useCallback(() => {
-    router.push("/clients/booking?mode=create");
-  }, [router]);
+  const handleConfirmEbrReject = React.useCallback(async () => {
+    if (!bookingRef) return;
+    clientRejectSuggestedChanges(bookingRef);
+    if (apiBookingId) {
+      try {
+        await updateMyBooking({ id: apiBookingId, status: "cancelled" }).unwrap();
+        await refreshActiveBooking();
+      } catch (error) {
+        showSnackbar({
+          severity: "error",
+          message: getApiErrorMessage(error, "Unable to reject edited booking request."),
+        });
+        return;
+      }
+    }
+    editRequest.refresh();
+    showSnackbar({ severity: "success", message: "Edited booking request rejected." });
+  }, [apiBookingId, bookingRef, editRequest, refreshActiveBooking, showSnackbar, updateMyBooking]);
+
+  const handleConfirmEbrSuggest = React.useCallback(() => {
+    setSuggestDrawerOpen(true);
+  }, []);
 
   const handleAcknowledgeRejected = React.useCallback(() => {
     returnToBookingDetailsStart("acknowledge_rejected");
   }, [returnToBookingDetailsStart]);
 
-  const showChangeResponsePanel = editRequest.isSuggested || editRequest.isRejected;
+  /** ER rejection acknowledgment panel — not used after EBR reject (booking already Invalid). */
+  const showRejectedResponsePanel = editRequest.isRejected && !isCancelled;
+
+  const displayDraft = React.useMemo(() => {
+    if (!draft) return null;
+    if (!editRequest.isSuggested || !editRequest.suggestedServices?.length) return draft;
+
+    const teamMembers = [...(draft.teamMembers ?? [])];
+    for (const service of editRequest.suggestedServices) {
+      if (!service.teamMemberId || !service.teamMemberName) continue;
+      if (teamMembers.some((member) => member.id === service.teamMemberId)) continue;
+      teamMembers.push({ id: service.teamMemberId, name: service.teamMemberName });
+    }
+
+    const services = editRequest.suggestedServices.map((service) => {
+      const original =
+        draft.services.find((row) => row.id === service.id) ??
+        draft.services.find((row) => row.name === service.name);
+      return {
+        id: service.id,
+        name: service.name,
+        durationMins: service.durationMins,
+        price: service.price,
+        // Keep Model/Guest assignment from original draft when EBR omits guestId.
+        guestId: service.guestId ?? original?.guestId ?? null,
+        teamMemberId: service.teamMemberId ?? original?.teamMemberId ?? null,
+      };
+    });
+    const productTotal = (editRequest.suggestedProducts ?? []).reduce((sum, product) => sum + product.price, 0);
+    const serviceTotal = services.reduce((sum, service) => sum + service.price, 0);
+
+    return {
+      ...draft,
+      // Preserve people + projectDetails via spread — EBR only updates service lines/totals.
+      services,
+      teamMembers,
+      total: serviceTotal + productTotal,
+    };
+  }, [draft, editRequest.isSuggested, editRequest.suggestedProducts, editRequest.suggestedServices]);
+
+  const persistClientEbrSuggestion = React.useCallback(
+    async (note: string) => {
+      if (!bookingRef) return;
+      const services = (displayDraft?.services ?? draft?.services ?? []).map((service) => ({
+        id: service.id,
+        name: service.name,
+        durationMins: service.durationMins,
+        price: service.price,
+        staffResourceId: service.teamMemberId ?? undefined,
+      }));
+      const total = displayDraft?.total ?? draft?.total ?? 0;
+      const serviceNames = services.map((service) => service.name).filter(Boolean);
+      const humanNote = [note.trim(), serviceNames.length ? `Services: ${serviceNames.join(", ")}` : ""]
+        .filter(Boolean)
+        .join("\n");
+      const persistedNotes = serializeCalendarEntryNotes(humanNote, undefined, {
+        status: "pending",
+        suggestedAt: new Date().toISOString(),
+        clientNote: note.trim() || undefined,
+        professionalNote: editRequest.professionalNote,
+        editedServiceIds: editRequest.editedServiceIds,
+        editedProductIds: editRequest.editedProductIds,
+        suggestedServices: services,
+        suggestedProducts: editRequest.suggestedProducts?.map((product) => ({
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          quantity: product.quantity,
+          unitPrice: product.price,
+        })),
+        responseStatus: "suggestion_for_change",
+        requestDirection: "incoming",
+        lastEditedBy: "client",
+      });
+
+      clientSuggestEbrChanges(bookingRef, note);
+      if (apiBookingId) {
+        await updateMyBooking({
+          id: apiBookingId,
+          notes: persistedNotes,
+          total_price: total,
+        }).unwrap();
+        await refreshActiveBooking();
+      }
+      editRequest.refresh();
+      showSnackbar({
+        severity: "success",
+        message: "Suggested changes sent to the professional.",
+      });
+    },
+    [
+      apiBookingId,
+      bookingRef,
+      displayDraft?.services,
+      displayDraft?.total,
+      draft?.services,
+      draft?.total,
+      editRequest,
+      refreshActiveBooking,
+      showSnackbar,
+      updateMyBooking,
+    ],
+  );
+
+  const handleSubmitSuggestFromDrawer = React.useCallback(
+    async (note: string) => {
+      try {
+        await persistClientEbrSuggestion(note);
+        setSuggestDrawerOpen(false);
+      } catch (error) {
+        showSnackbar({
+          severity: "error",
+          message: getApiErrorMessage(error, "Unable to send suggested changes."),
+        });
+      }
+    },
+    [persistClientEbrSuggestion, showSnackbar],
+  );
+
+  const handleEditServicesFromSuggest = React.useCallback(
+    (note: string) => {
+      if (typeof window !== "undefined" && note) {
+        window.sessionStorage.setItem("mollure:ebr_suggest_note", note);
+      }
+      setSuggestDrawerOpen(false);
+      router.push("/clients/booking?mode=create&ebrSuggest=1");
+    },
+    [router],
+  );
+
   const detailsContentKey = `${bookingRef}-${editRequest.status ?? "none"}-${bookingStatus}`;
   const isFullyCompleted = isCompleted && activeBooking?.paid === true && !isPaymentDue;
   const pageBackground = isFullyCompleted ? "#EAECF0" : "#EAF9FB";
+  const displayTotal = displayDraft?.total ?? draft?.total ?? 0;
+  const displayPrepaidAmount = Math.round(((displayTotal * prepaymentPercent) / 100 + Number.EPSILON) * 100) / 100;
+  const bookingNotesMeta = React.useMemo(
+    () => parseCalendarEntryNotes(activeBooking?.notes),
+    [activeBooking?.notes],
+  );
+  const kilometerAllowanceAmount = React.useMemo(
+    () => resolveKilometerAllowanceAmount(bookingNotesMeta?.kilometerAllowance),
+    [bookingNotesMeta?.kilometerAllowance],
+  );
+  /** Only for desired-location bookings when a kilometer amount was set. */
+  const showKilometerAllowance = locationMode === "desired" && kilometerAllowanceAmount > 0;
+  /** Prepayment breakdown only when the professional requires prepayment. */
+  const paymentCardPrepaymentState =
+    requiresPrepayment && !isCancelled ? prepaymentState : ("none" as const);
+
+  const paymentSummarySections = React.useMemo(
+    () =>
+      buildClientBookingPaymentSummary({
+        draft: displayDraft ?? draft,
+        requesterName,
+        prepaid: isPrepaymentPaid,
+        paid: activeBooking?.paid === true,
+        requiresPrepayment: Boolean(activeBooking?.requiresPrepayment ?? requiresPrepayment),
+        prepaymentPercent: activeBooking?.prepaymentPercent ?? prepaymentPercent,
+        paymentDue: isPaymentDue,
+        hasEditPrepayment: editRequest.isSuggested,
+      }),
+    [
+      activeBooking?.paid,
+      activeBooking?.prepaymentPercent,
+      activeBooking?.requiresPrepayment,
+      displayDraft,
+      draft,
+      editRequest.isSuggested,
+      isPaymentDue,
+      isPrepaymentPaid,
+      prepaymentPercent,
+      requesterName,
+      requiresPrepayment,
+    ],
+  );
+
+  /** After prepayment: show Payment Summary (invoice/receipt). Also on completed / payment due. */
+  const visiblePaymentSummarySections = React.useMemo(() => {
+    if (!paymentSummarySections.length) return [];
+    if (isPrepaymentPaid && !isCompleted && !isPaymentDue) {
+      return paymentSummarySections.filter((section) => section.title === "Prepayment");
+    }
+    return paymentSummarySections;
+  }, [isCompleted, isPaymentDue, isPrepaymentPaid, paymentSummarySections]);
+
+  const showPaymentSummary =
+    visiblePaymentSummarySections.length > 0 &&
+    (prepaymentState === "paid" || isCompleted || isPaymentDue);
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: pageBackground }}>
@@ -546,52 +778,57 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
               phone={phone}
             />
 
-            {showChangeResponsePanel ? (
-              <ClientBookingChangeResponsePanel
-                variant={editRequest.isRejected ? "rejected" : "suggested"}
-                total={draft?.total ?? 0}
-                prepaidAmount={prepaidAmount}
-                prepaymentPaid={prepaymentState === "paid"}
-                onOk={editRequest.isRejected ? handleAcknowledgeRejected : handleOkSuggestedChanges}
-                onSuggestChange={handleSuggestChange}
-                onViewInvoice={bookingTransactionRow ? openInvoice : undefined}
-                onViewReceipt={(prepaymentReceiptRow ?? bookingTransactionRow) ? openReceipt : undefined}
-              />
+            {showRejectedResponsePanel ? (
+              <>
+                <ClientBookingPaymentDetailsCard
+                  key={detailsContentKey}
+                  draft={displayDraft}
+                  requesterName={requesterName}
+                  requesterEmail={user?.email}
+                  requesterAvatarUrl={requesterAvatarUrl}
+                  prepaymentState="none"
+                  editedServiceIds={editRequest.editedServiceIds}
+                  products={editRequest.suggestedProducts}
+                  editedProductIds={editRequest.editedProductIds}
+                />
+                <ClientBookingChangeResponsePanel
+                  variant="rejected"
+                  total={displayTotal}
+                  prepaidAmount={displayPrepaidAmount}
+                  prepaymentPaid={prepaymentState === "paid"}
+                  onOk={handleAcknowledgeRejected}
+                  onViewInvoice={bookingTransactionRow ? openInvoice : undefined}
+                  onViewReceipt={(prepaymentReceiptRow ?? bookingTransactionRow) ? openReceipt : undefined}
+                />
+              </>
             ) : (
               <>
                 <ClientBookingPaymentDetailsCard
                   key={detailsContentKey}
-                  draft={draft}
+                  draft={displayDraft}
                   requesterName={requesterName}
                   requesterEmail={user?.email}
                   requesterAvatarUrl={requesterAvatarUrl}
-                  prepaymentState={isPrepaid && !isCompleted ? prepaymentState : "none"}
+                  prepaymentState={paymentCardPrepaymentState}
                   prepaymentPercent={prepaymentPercent}
                   payNowLabel={payNowLabel}
-                  onPayNow={canActOnPayment ? handlePayNow : undefined}
-                  onViewInvoice={
-                    !isCompleted && prepaymentState === "paid" && bookingTransactionRow
-                      ? openInvoice
-                      : undefined
-                  }
-                  onViewReceipt={
-                    !isCompleted &&
-                    prepaymentState === "paid" &&
-                    (prepaymentReceiptRow ?? bookingTransactionRow)
-                      ? openReceipt
-                      : undefined
-                  }
+                  showKilometerAllowance={showKilometerAllowance}
+                  kilometerAllowanceAmount={kilometerAllowanceAmount}
+                  editedServiceIds={isEbrIncoming ? editRequest.editedServiceIds : undefined}
+                  products={isEbrIncoming ? editRequest.suggestedProducts : undefined}
+                  editedProductIds={isEbrIncoming ? editRequest.editedProductIds : undefined}
+                  onPayNow={prepaymentState === "required" && canActOnPayment ? handlePayNow : undefined}
                 />
 
                 {showPaymentSummary ? (
                   <ClientBookingPaymentSummary
-                    sections={paymentSummarySections}
+                    sections={visiblePaymentSummarySections}
                     onViewInvoice={bookingTransactionRow ? openInvoice : undefined}
                     onViewReceipt={(prepaymentReceiptRow ?? bookingTransactionRow) ? openReceipt : undefined}
                   />
                 ) : null}
 
-                {isPrepaid && canActOnPayment ? (
+                {canActOnPayment && (isPrepaid || isEbrIncoming) ? (
                   <ClientBookingPaymentMethodSelector
                     options={checkoutPaymentOptions}
                     value={selectedPaymentMethod}
@@ -599,7 +836,15 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
                   />
                 ) : null}
 
-                {isDraft && !isPrepaid && !isBookingRequestSent ? (
+                {isEbrIncoming ? (
+                  <ClientEbrResponseActions
+                    onAccept={() => setEbrAction("accept")}
+                    onSuggestChange={() => setEbrAction("suggest")}
+                    onReject={() => setEbrAction("reject")}
+                  />
+                ) : null}
+
+                {isDraft && !isPrepaid && !isBookingRequestSent && !isEbrIncoming ? (
                   <AppButton
                     fullWidth
                     variant="contained"
@@ -648,6 +893,25 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
         open={discardDialogOpen}
         onClose={() => setDiscardDialogOpen(false)}
         onConfirm={handleDiscardBookingRequest}
+      />
+
+      <ClientEbrActionDialog
+        open={Boolean(ebrAction)}
+        action={ebrAction}
+        onClose={() => setEbrAction(null)}
+        onConfirm={() => {
+          if (ebrAction === "accept") handleConfirmEbrAccept();
+          else if (ebrAction === "reject") void handleConfirmEbrReject();
+          else if (ebrAction === "suggest") handleConfirmEbrSuggest();
+        }}
+      />
+
+      <ClientEbrSuggestDrawer
+        open={suggestDrawerOpen}
+        draft={displayDraft}
+        onClose={() => setSuggestDrawerOpen(false)}
+        onEditServices={handleEditServicesFromSuggest}
+        onSend={handleSubmitSuggestFromDrawer}
       />
 
       <StripePrepaymentDialog

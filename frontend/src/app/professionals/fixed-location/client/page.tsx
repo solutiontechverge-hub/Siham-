@@ -789,7 +789,6 @@ export default function FixedLocationClientPage() {
         anchor="right"
         open={Boolean(viewClient)}
         onClose={closeClientDetailsDrawer}
-        width={{ xs: "100%", sm: 500 }}
         title={clientDetailsMode === "edit" ? "Edit Client Details" : "Client Details"}
         contentSx={{
           bgcolor: alpha(m.navy, 0.03),
@@ -1346,7 +1345,6 @@ export default function FixedLocationClientPage() {
         anchor="right"
         open={addNonMollureOpen}
         onClose={() => setAddNonMollureOpen(false)}
-        width={{ xs: "100%", sm: 440 }}
         title="Add Non-Mollure Client"
         footer={
           <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ px: 2.5, py: 2 }}>

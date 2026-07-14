@@ -60,7 +60,7 @@ export default function ContentCard({
           }}
         >
           {title && (
-            <SubHeading sx={{ fontSize: "18px", color: "mollure.textcolorgrey700" }}>
+            <SubHeading sx={{ color: "mollure.textcolorgrey700" }}>
               {title}
             </SubHeading>
           )}

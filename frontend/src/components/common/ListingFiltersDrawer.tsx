@@ -100,7 +100,6 @@ export default function ListingFiltersDrawer({ open, onClose, filters, onChange,
       open={open}
       onClose={onClose}
       title="Filters"
-      width={{ xs: "100%", sm: 420 }}
       contentSx={{ px: 2.5, py: 1 }}
       footer={footer}
       hideDividers

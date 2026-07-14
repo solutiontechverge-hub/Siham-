@@ -1,14 +1,18 @@
 "use client";
 
 import * as React from "react";
-import type { ClientBookingRecord } from "../../../app/clients/booking/clientBookingRecords";
 import { mapApiBookingToClientRecord } from "../../../app/clients/booking/clientBookingApi.mapper";
 import {
   ACTIVE_BOOKING_ID_KEY,
   CHECKOUT_REF_KEY,
   getActiveBookingSession,
 } from "../../../app/clients/booking/clientBookingSession";
+import {
+  enrichClientBookingRecord,
+  mergeClientBookingDraftRichness,
+} from "../../../app/clients/booking/clientBookingDraftCache";
 import { useGetMyBookingsQuery } from "../../../store/services/businessApi";
+import type { ClientBookingRecord } from "../../../app/clients/booking/clientBookingRecords";
 
 function matchActiveBooking(
   bookings: ClientBookingRecord[],
@@ -28,6 +32,13 @@ function matchActiveBooking(
     if (byRef) return byRef;
   }
   return null;
+}
+
+function sameBooking(a: ClientBookingRecord, b: ClientBookingRecord) {
+  if (a.apiBookingId && b.apiBookingId && a.apiBookingId === b.apiBookingId) return true;
+  if (a.id && b.id && a.id === b.id) return true;
+  if (a.bookingRef && b.bookingRef && a.bookingRef === b.bookingRef) return true;
+  return false;
 }
 
 export function useActiveClientBooking() {
@@ -62,14 +73,23 @@ export function useActiveClientBooking() {
 
   const bookings = React.useMemo(() => {
     const rows = data?.data ?? [];
-    return rows.map(mapApiBookingToClientRecord);
+    return rows.map((row) => enrichClientBookingRecord(mapApiBookingToClientRecord(row)));
   }, [data]);
 
   const record = React.useMemo(() => {
     const fromApi = matchActiveBooking(bookings, activeId, bookingRef);
-    if (fromApi) return fromApi;
-
     const sessionRecord = getActiveBookingSession();
+
+    if (fromApi && sessionRecord && sameBooking(fromApi, sessionRecord) && sessionRecord.draft && fromApi.draft) {
+      return enrichClientBookingRecord({
+        ...fromApi,
+        draft: mergeClientBookingDraftRichness(fromApi.draft, sessionRecord.draft),
+        incomingEditRequest: fromApi.incomingEditRequest ?? sessionRecord.incomingEditRequest,
+      });
+    }
+
+    if (fromApi) return enrichClientBookingRecord(fromApi);
+
     if (!sessionRecord) return null;
 
     const sessionId = sessionRecord.apiBookingId ?? sessionRecord.id;
@@ -81,7 +101,7 @@ export function useActiveClientBooking() {
       if (recordRef && recordRef !== normalized && sessionId !== normalized) return null;
     }
 
-    return sessionRecord;
+    return enrichClientBookingRecord(sessionRecord);
   }, [activeId, bookingRef, bookings]);
 
   React.useEffect(() => {

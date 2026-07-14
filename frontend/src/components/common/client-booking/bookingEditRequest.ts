@@ -5,6 +5,33 @@ export type BookingEditRequestStatus =
   | "suggested"
   | "rejected";
 
+export type BookingEditSuggestedService = {
+  id: string;
+  name: string;
+  durationMins: number;
+  price: number;
+  teamMemberId?: string | null;
+  teamMemberName?: string;
+  guestId?: string | null;
+  startTime?: string;
+  endTime?: string;
+};
+
+export type BookingEditSuggestedProduct = {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+};
+
+export type BookingEditSuggestionPayload = {
+  professionalNote?: string;
+  editedServiceIds?: string[];
+  editedProductIds?: string[];
+  suggestedServices?: BookingEditSuggestedService[];
+  suggestedProducts?: BookingEditSuggestedProduct[];
+};
+
 export type BookingEditRequestRecord = {
   status: BookingEditRequestStatus;
   requestedAt?: string;
@@ -13,6 +40,12 @@ export type BookingEditRequestRecord = {
   rejectedAt?: string;
   /** Optional note from professional when suggesting changes */
   professionalNote?: string;
+  /** Optional note from client when suggesting changes on an EBR */
+  clientNote?: string;
+  editedServiceIds?: string[];
+  editedProductIds?: string[];
+  suggestedServices?: BookingEditSuggestedService[];
+  suggestedProducts?: BookingEditSuggestedProduct[];
 };
 
 const STORAGE_KEY = "mollure:booking_edit_requests";
@@ -26,7 +59,7 @@ export function notifyBookingEditRequestUpdated() {
 function loadAll(): Record<string, BookingEditRequestRecord> {
   if (typeof window === "undefined") return {};
   try {
-    const raw = window.sessionStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(STORAGE_KEY) ?? window.sessionStorage.getItem(STORAGE_KEY);
     if (!raw) return {};
     return JSON.parse(raw) as Record<string, BookingEditRequestRecord>;
   } catch {
@@ -36,13 +69,18 @@ function loadAll(): Record<string, BookingEditRequestRecord> {
 
 function saveAll(data: Record<string, BookingEditRequestRecord>) {
   if (typeof window === "undefined") return;
-  window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  const raw = JSON.stringify(data);
+  window.localStorage.setItem(STORAGE_KEY, raw);
+  // Keep legacy session copy in sync for same-tab readers.
+  window.sessionStorage.setItem(STORAGE_KEY, raw);
   notifyBookingEditRequestUpdated();
 }
 
 export function getBookingEditRequest(bookingRef: string): BookingEditRequestRecord {
-  const record = loadAll()[bookingRef];
-  return record ?? { status: "none" };
+  if (!bookingRef) return { status: "none" };
+  const all = loadAll();
+  const normalized = bookingRef.replace(/^#/, "").trim();
+  return all[bookingRef] ?? all[normalized] ?? all[`#${normalized}`] ?? { status: "none" };
 }
 
 /** Client sends an edit request to the professional. */
@@ -60,7 +98,7 @@ export function sendBookingEditRequest(bookingRef: string): BookingEditRequestRe
 /** Professional approves the client's edit request. */
 export function approveBookingEditRequest(bookingRef: string): BookingEditRequestRecord {
   const all = loadAll();
-  const prev = all[bookingRef];
+  const prev = all[bookingRef] ?? getBookingEditRequest(bookingRef);
   const next: BookingEditRequestRecord = {
     status: "approved",
     requestedAt: prev?.requestedAt,
@@ -74,15 +112,26 @@ export function approveBookingEditRequest(bookingRef: string): BookingEditReques
 /** Professional suggests changes — client must accept to confirm. */
 export function professionalSuggestBookingChanges(
   bookingRef: string,
-  professionalNote?: string,
+  professionalNoteOrPayload?: string | BookingEditSuggestionPayload,
 ): BookingEditRequestRecord {
+  const payload: BookingEditSuggestionPayload =
+    typeof professionalNoteOrPayload === "string" || professionalNoteOrPayload == null
+      ? { professionalNote: professionalNoteOrPayload }
+      : professionalNoteOrPayload;
+
   const all = loadAll();
   const next: BookingEditRequestRecord = {
     status: "suggested",
     suggestedAt: new Date().toISOString(),
-    professionalNote,
+    professionalNote: payload.professionalNote,
+    editedServiceIds: payload.editedServiceIds ?? [],
+    editedProductIds: payload.editedProductIds ?? [],
+    suggestedServices: payload.suggestedServices,
+    suggestedProducts: payload.suggestedProducts,
   };
+  const normalized = bookingRef.replace(/^#/, "").trim();
   all[bookingRef] = next;
+  if (normalized && normalized !== bookingRef) all[normalized] = next;
   saveAll(all);
   return next;
 }
@@ -90,7 +139,7 @@ export function professionalSuggestBookingChanges(
 /** Professional rejects the client's edit request. */
 export function professionalRejectEditRequest(bookingRef: string): BookingEditRequestRecord {
   const all = loadAll();
-  const prev = all[bookingRef];
+  const prev = all[bookingRef] ?? getBookingEditRequest(bookingRef);
   const next: BookingEditRequestRecord = {
     status: "rejected",
     requestedAt: prev?.requestedAt,
@@ -108,7 +157,68 @@ export function clientAcceptSuggestedChanges(bookingRef: string): BookingEditReq
     status: "none",
     approvedAt: new Date().toISOString(),
   };
+  const normalized = bookingRef.replace(/^#/, "").trim();
   all[bookingRef] = next;
+  if (normalized && normalized !== bookingRef) all[normalized] = next;
+  saveAll(all);
+  return next;
+}
+
+/** Client rejects professional's EBR — booking becomes invalid. */
+export function clientRejectSuggestedChanges(bookingRef: string): BookingEditRequestRecord {
+  const all = loadAll();
+  const prev = all[bookingRef] ?? getBookingEditRequest(bookingRef);
+  const next: BookingEditRequestRecord = {
+    status: "rejected",
+    requestedAt: prev?.requestedAt,
+    suggestedAt: prev?.suggestedAt,
+    rejectedAt: new Date().toISOString(),
+    professionalNote: prev?.professionalNote,
+    editedServiceIds: prev?.editedServiceIds,
+    editedProductIds: prev?.editedProductIds,
+    suggestedServices: prev?.suggestedServices,
+    suggestedProducts: prev?.suggestedProducts,
+  };
+  const normalized = bookingRef.replace(/^#/, "").trim();
+  all[bookingRef] = next;
+  if (normalized && normalized !== bookingRef) all[normalized] = next;
+  saveAll(all);
+  return next;
+}
+
+export function clearBookingEditRequest(bookingRef: string): void {
+  if (!bookingRef) return;
+  const all = loadAll();
+  const normalized = bookingRef.replace(/^#/, "").trim();
+  delete all[bookingRef];
+  if (normalized && normalized !== bookingRef) delete all[normalized];
+  saveAll(all);
+}
+
+/**
+ * Client suggests changes on an EBR — returns a pending BR to the professional
+ * with an optional notepad message.
+ */
+export function clientSuggestEbrChanges(
+  bookingRef: string,
+  clientNote?: string,
+): BookingEditRequestRecord {
+  const all = loadAll();
+  const prev = all[bookingRef] ?? getBookingEditRequest(bookingRef);
+  const next: BookingEditRequestRecord = {
+    status: "pending",
+    requestedAt: new Date().toISOString(),
+    suggestedAt: prev?.suggestedAt,
+    professionalNote: prev?.professionalNote,
+    clientNote: clientNote?.trim() || undefined,
+    editedServiceIds: prev?.editedServiceIds,
+    editedProductIds: prev?.editedProductIds,
+    suggestedServices: prev?.suggestedServices,
+    suggestedProducts: prev?.suggestedProducts,
+  };
+  const normalized = bookingRef.replace(/^#/, "").trim();
+  all[bookingRef] = next;
+  if (normalized && normalized !== bookingRef) all[normalized] = next;
   saveAll(all);
   return next;
 }
@@ -117,7 +227,9 @@ export function clientAcceptSuggestedChanges(bookingRef: string): BookingEditReq
 export function clientAcknowledgeRejectedEdit(bookingRef: string): BookingEditRequestRecord {
   const all = loadAll();
   const next: BookingEditRequestRecord = { status: "none" };
+  const normalized = bookingRef.replace(/^#/, "").trim();
   all[bookingRef] = next;
+  if (normalized && normalized !== bookingRef) all[normalized] = next;
   saveAll(all);
   return next;
 }

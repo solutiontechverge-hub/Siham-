@@ -7,6 +7,7 @@ import { alpha, useTheme } from "@mui/material/styles";
 import MessagingFilterCheckboxList from "./MessagingFilterCheckboxList";
 import MessagingInsetOverlay from "./MessagingInsetOverlay";
 import type { MessagingDrawerFilters, MessagingBookingStatus } from "./messagingTypes";
+import { MOLLURE_DRAWER_WIDTH } from "../MollureDrawer";
 
 const SEARCH_OPTIONS: { key: MessagingDrawerFilters["searchFor"]; label: string; info?: boolean; professionalOnly?: boolean }[] = [
   { key: "all", label: "All" },
@@ -143,7 +144,7 @@ export default function MessagingFiltersDrawer({
         open={open}
         title="Filters"
         onClose={onClose}
-        maxWidth={420}
+        maxWidth={560}
         footer={<FiltersFooter onCancel={onCancel} onApply={onApply} />}
       >
         <FiltersContent filters={filters} onChange={onChange} audience={audience} />
@@ -152,7 +153,7 @@ export default function MessagingFiltersDrawer({
   }
 
   return (
-    <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: { xs: "100%", sm: 360 }, borderRadius: "12px 0 0 12px" } }}>
+    <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: MOLLURE_DRAWER_WIDTH, borderRadius: "12px 0 0 12px" } }}>
       <Box sx={{ p: 2.5, height: "100%", display: "flex", flexDirection: "column" }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
           <Typography sx={{ fontWeight: 900, fontSize: 16, color: alpha(m.navy, 0.88) }}>Filters</Typography>

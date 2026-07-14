@@ -3,10 +3,22 @@ import type {
   CalendarEvent,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { ManualEntryDiscount } from "../../sections/finance/manualEntry.data";
-import { allBookingCatalogServices } from "../../../data/bookingServiceCatalog.data";
-import { minutesSinceMidnight } from "./calendar.utils";
 
 const NOTES_META_PREFIX = "---mollure-meta---";
+
+export type StoredEbrNotePayload = {
+  status: "suggested" | "pending" | "rejected" | "none";
+  suggestedAt?: string;
+  professionalNote?: string;
+  clientNote?: string;
+  editedServiceIds?: string[];
+  editedProductIds?: string[];
+  suggestedServices?: NonNullable<CalendarBookingDetails["services"]>;
+  suggestedProducts?: NonNullable<CalendarBookingDetails["products"]>;
+  responseStatus?: CalendarBookingDetails["responseStatus"];
+  requestDirection?: CalendarBookingDetails["requestDirection"];
+  lastEditedBy?: CalendarBookingDetails["lastEditedBy"];
+};
 
 type StoredBookingNoteMeta = Partial<
   Pick<
@@ -20,10 +32,40 @@ type StoredBookingNoteMeta = Partial<
     | "prepaymentPercent"
     | "paymentMethod"
     | "showKilometerAllowance"
+    | "kilometerAllowance"
+    | "cancellationReason"
+    | "responseStatus"
+    | "requestDirection"
+    | "editedServiceIds"
+    | "lastEditedBy"
+    | "clientSnapshot"
   >
->;
+> & {
+  ebr?: StoredEbrNotePayload;
+};
 
-export function serializeCalendarEntryNotes(internalNote: string, details?: CalendarBookingDetails): string | null {
+export function resolveKilometerAllowanceAmount(
+  kilometerAllowance?: CalendarBookingDetails["kilometerAllowance"] | null,
+): number {
+  const rate = Number(kilometerAllowance?.eurPerKm);
+  const km = Number(kilometerAllowance?.totalKilometer);
+  if (!Number.isFinite(rate) || !Number.isFinite(km) || rate <= 0 || km <= 0) return 0;
+  return Math.round((rate * km + Number.EPSILON) * 100) / 100;
+}
+
+function metaHasValues(meta: StoredBookingNoteMeta) {
+  return Object.entries(meta).some(([key, value]) => {
+    if (key === "ebr") return Boolean(value && typeof value === "object");
+    if (Array.isArray(value)) return value.length > 0;
+    return value != null && value !== false && value !== "";
+  });
+}
+
+export function serializeCalendarEntryNotes(
+  internalNote: string,
+  details?: CalendarBookingDetails,
+  ebr?: StoredEbrNotePayload | null,
+): string | null {
   const trimmed = internalNote.trim();
   const meta: StoredBookingNoteMeta = {
     showInternalNote: Boolean(trimmed) || Boolean(details?.showInternalNote),
@@ -35,11 +77,32 @@ export function serializeCalendarEntryNotes(internalNote: string, details?: Cale
     prepaymentPercent: details?.prepaymentPercent,
     paymentMethod: details?.paymentMethod,
     showKilometerAllowance: details?.showKilometerAllowance,
+    kilometerAllowance: details?.kilometerAllowance,
+    cancellationReason: details?.cancellationReason?.trim() || undefined,
+    responseStatus: details?.responseStatus,
+    requestDirection: details?.requestDirection,
+    editedServiceIds: details?.editedServiceIds,
+    lastEditedBy: details?.lastEditedBy,
+    clientSnapshot: details?.clientSnapshot,
+    ...(ebr ? { ebr } : {}),
   };
-  const hasMeta = Object.values(meta).some((value) => value != null && value !== false && value !== "");
+  const hasMeta = metaHasValues(meta);
   if (!trimmed && !hasMeta) return null;
   if (!hasMeta) return trimmed;
   return `${trimmed}${trimmed ? "\n" : ""}${NOTES_META_PREFIX}\n${JSON.stringify(meta)}`;
+}
+
+export function parseStoredEbrFromNotes(notes?: string | null): StoredEbrNotePayload | null {
+  if (!notes?.trim()) return null;
+  const markerIndex = notes.indexOf(NOTES_META_PREFIX);
+  if (markerIndex === -1) return null;
+  const metaRaw = notes.slice(markerIndex + NOTES_META_PREFIX.length).trim();
+  try {
+    const meta = JSON.parse(metaRaw) as StoredBookingNoteMeta;
+    return meta.ebr ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingDetails | undefined {
@@ -55,6 +118,7 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
   const metaRaw = notes.slice(markerIndex + NOTES_META_PREFIX.length).trim();
   try {
     const meta = JSON.parse(metaRaw) as StoredBookingNoteMeta;
+    const ebr = meta.ebr;
     return {
       internalNote,
       showInternalNote: Boolean(internalNote) || Boolean(meta.showInternalNote),
@@ -66,6 +130,27 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
       prepaymentPercent: meta.prepaymentPercent ?? "",
       paymentMethod: meta.paymentMethod ?? "online",
       showKilometerAllowance: Boolean(meta.showKilometerAllowance),
+      ...(meta.kilometerAllowance
+        ? {
+            kilometerAllowance: {
+              eurPerKm: meta.kilometerAllowance.eurPerKm ?? "",
+              totalKilometer: meta.kilometerAllowance.totalKilometer ?? "",
+            },
+          }
+        : {}),
+      ...(meta.cancellationReason?.trim()
+        ? { cancellationReason: meta.cancellationReason.trim() }
+        : {}),
+      ...(meta.responseStatus ? { responseStatus: meta.responseStatus } : {}),
+      ...(meta.requestDirection ? { requestDirection: meta.requestDirection } : {}),
+      ...(meta.editedServiceIds?.length ? { editedServiceIds: meta.editedServiceIds } : {}),
+      ...(meta.lastEditedBy ? { lastEditedBy: meta.lastEditedBy } : {}),
+      ...(meta.clientSnapshot ? { clientSnapshot: meta.clientSnapshot } : {}),
+      ...(ebr?.suggestedServices?.length ? { services: ebr.suggestedServices } : {}),
+      ...(ebr?.suggestedProducts?.length ? { products: ebr.suggestedProducts } : {}),
+      ...(ebr?.editedServiceIds?.length && !meta.editedServiceIds?.length
+        ? { editedServiceIds: ebr.editedServiceIds }
+        : {}),
     };
   } catch {
     return {
@@ -115,49 +200,12 @@ export const emptyDesiredLocation = () => ({
   municipality: "",
 });
 
-function bookingDurationMins(ev: CalendarEvent) {
-  return Math.max(15, minutesSinceMidnight(ev.end) - minutesSinceMidnight(ev.start));
-}
-
-function matchCatalogService(title: string) {
-  const normalized = title.toLowerCase().trim();
-  return (
-    allBookingCatalogServices.find((service) => service.name.toLowerCase() === normalized) ??
-    allBookingCatalogServices.find(
-      (service) =>
-        normalized.includes(service.name.toLowerCase()) || service.name.toLowerCase().includes(normalized),
-    )
-  );
-}
-
-function defaultPriceForTitle(title: string) {
-  const normalized = title.toLowerCase();
-  if (/\bmassage\b/.test(normalized)) return 165;
-  if (/\blash/.test(normalized)) return 85;
-  if (/\bhair\b|\bcut\b/.test(normalized)) return 45;
-  if (/\bmake-?up\b/.test(normalized)) return 60;
-  return 65;
-}
-
-function buildFallbackService(ev: CalendarEvent) {
-  const catalogMatch = matchCatalogService(ev.title);
-  if (catalogMatch) {
-    return { ...catalogMatch };
-  }
-
-  return {
-    id: `svc-${ev.id}`,
-    name: ev.title,
-    durationMins: bookingDurationMins(ev),
-    price: defaultPriceForTitle(ev.title),
-  };
-}
-
 export function resolveBookingDetailsFromEvent(ev: CalendarEvent): CalendarBookingDetails {
   if (ev.details) return ev.details;
 
   return {
-    services: [buildFallbackService(ev)],
+    services: [],
+    products: [],
     clientEmail: "",
     phoneCode: "",
     phoneNumber: "",
@@ -180,7 +228,7 @@ export function hydrateBookingDrawerFromEvent(ev: CalendarEvent): BookingDrawerH
 
   return {
     clientEmail: details.clientEmail ?? "",
-    services: details.services ?? [buildFallbackService(ev)],
+    services: details.services ?? [],
     products: details.products ?? [],
     guests: details.guests ?? [],
     phoneCode: details.phoneCode ?? "",

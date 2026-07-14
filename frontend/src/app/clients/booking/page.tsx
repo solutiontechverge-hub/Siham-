@@ -53,6 +53,7 @@ import {
   ACTIVE_BOOKING_ID_KEY,
   CHECKOUT_REF_KEY,
   createBookingRef,
+  getActiveBookingSession,
   setActiveBookingSession,
 } from "./clientBookingSession";
 import { resolveCreateCheckoutPath } from "./resolveCreateBookingStatus";
@@ -129,6 +130,7 @@ function ClientBookingCreateView() {
   const searchParams = useSearchParams();
   const fromProfile = searchParams?.get("from") === "profile";
   const profileHydrationToken = searchParams?.get("t") ?? "";
+  const isEbrSuggest = searchParams?.get("ebrSuggest") === "1";
   const { showSnackbar } = useSnackbar();
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -218,13 +220,35 @@ function ClientBookingCreateView() {
     });
   };
 
-  const times = React.useMemo(() => {
+  const allDayTimes = React.useMemo(() => {
     const slots: string[] = [];
     for (let minutes = 9 * 60; minutes <= 18 * 60; minutes += 30) {
       slots.push(fmtMinutesToTimeLabel(minutes));
     }
     return slots;
   }, []);
+
+  const isSelectedToday = React.useMemo(
+    () => startOfDay(selectedDate).getTime() === today0.getTime(),
+    [selectedDate, today0],
+  );
+
+  const nowMinutes = React.useMemo(() => {
+    const now = new Date();
+    return now.getHours() * 60 + now.getMinutes();
+  }, [selectedDate]);
+
+  const times = allDayTimes;
+
+  const availableTimes = React.useMemo(() => {
+    if (!isSelectedToday) return times;
+    return times.filter((t) => parseTimeLabelToMinutes(t) > nowMinutes);
+  }, [isSelectedToday, nowMinutes, times]);
+
+  const isTimePast = React.useCallback(
+    (t: string) => isSelectedToday && parseTimeLabelToMinutes(t) <= nowMinutes,
+    [isSelectedToday, nowMinutes],
+  );
 
   const timeScrollRef = React.useRef<HTMLDivElement>(null);
   const scrollTimeSlots = React.useCallback((direction: "left" | "right") => {
@@ -279,8 +303,8 @@ function ClientBookingCreateView() {
   };
 
   const getPreferredServiceTab = React.useCallback((items: Service[]): "assigned" | "unassigned" => {
-    const hasUnassigned = items.some((s) => !isServiceTeamAssigned(s));
-    const hasAssigned = items.some((s) => isServiceTeamAssigned(s));
+    const hasUnassigned = items.some((s) => !s.guestId);
+    const hasAssigned = items.some((s) => Boolean(s.guestId));
     if (hasUnassigned && !hasAssigned) return "unassigned";
     return "assigned";
   }, []);
@@ -289,7 +313,12 @@ function ClientBookingCreateView() {
   const [profileHydrated, setProfileHydrated] = React.useState(false);
   const hydrationSignatureRef = React.useRef<string | null>(null);
 
-  const [selectedTime, setSelectedTime] = React.useState(times[0] ?? "");
+  const [selectedTime, setSelectedTime] = React.useState(() => {
+    const now = new Date();
+    const mins = now.getHours() * 60 + now.getMinutes();
+    const future = allDayTimes.filter((t) => parseTimeLabelToMinutes(t) > mins);
+    return (future[0] ?? allDayTimes[0]) ?? "";
+  });
   const [combineServices, setCombineServices] = React.useState(true);
   const [selectedPersonId, setSelectedPersonId] = React.useState<string>("p-requester");
   const [selectedTeamMemberId, setSelectedTeamMemberId] = React.useState<string>("");
@@ -299,6 +328,9 @@ function ClientBookingCreateView() {
   const [addServiceDialogOpen, setAddServiceDialogOpen] = React.useState(false);
   const [addServiceCatalogId, setAddServiceCatalogId] = React.useState("");
   const [addServiceGuestId, setAddServiceGuestId] = React.useState("");
+  /** Model/Guest explore picker — never dumps into Unassigned. */
+  const [exploreServicesOpen, setExploreServicesOpen] = React.useState(false);
+  const [exploreCatalogIds, setExploreCatalogIds] = React.useState<Record<string, boolean>>({});
 
   const [projectDescription, setProjectDescription] = React.useState("");
   const [projectUploads, setProjectUploads] = React.useState<Array<{ id: string; name: string; previewUrl: string }>>(
@@ -324,16 +356,44 @@ function ClientBookingCreateView() {
   const catalogByTeamMemberId = React.useMemo<Record<string, CatalogService[]>>(() => {
     if (!shop?.shopId || !profileHydrated || !businessProfile) return {};
 
-    const catalogItems: CatalogService[] = getServicesForLocationMode(businessProfile, locationMode).map((s) => ({
+    const locationCatalog = getServicesForLocationMode(businessProfile, locationMode);
+    const fallbackItems: CatalogService[] = locationCatalog.map((s) => ({
       id: s.id,
       name: s.name,
       durationMins: s.durationMins,
       price: s.priceValue,
     }));
+    const byId = new Map(locationCatalog.map((s) => [s.id, s]));
+    const byName = new Map(locationCatalog.map((s) => [s.name.trim().toLowerCase(), s]));
+    const profileTeam = getTeamForLocationMode(businessProfile, locationMode);
 
     const map: Record<string, CatalogService[]> = {};
     for (const tm of shopTeamMembers) {
-      map[tm.id] = catalogItems;
+      const profileMember = profileTeam.find((m) => m.id === tm.id);
+      const slots = profileMember?.serviceSlots ?? [];
+      if (slots.length === 0) {
+        map[tm.id] = fallbackItems;
+        continue;
+      }
+
+      const seen = new Set<string>();
+      const items: CatalogService[] = [];
+      for (const slot of slots) {
+        for (const opt of slot.options) {
+          const matched =
+            byId.get(opt.value) ?? byName.get(String(opt.label ?? "").trim().toLowerCase());
+          const id = matched?.id ?? opt.value;
+          if (!id || seen.has(id)) continue;
+          seen.add(id);
+          items.push({
+            id,
+            name: matched?.name ?? opt.label,
+            durationMins: matched?.durationMins ?? 30,
+            price: matched?.priceValue ?? 0,
+          });
+        }
+      }
+      map[tm.id] = items.length > 0 ? items : fallbackItems;
     }
     return map;
   }, [businessProfile, locationMode, profileHydrated, shop?.shopId, shopTeamMembers]);
@@ -359,12 +419,10 @@ function ClientBookingCreateView() {
   const canAddFixedLocationGuest =
     !isDesiredLocation && additionalGuests.length < FIXED_LOCATION_MAX_GUESTS;
   const serviceAssignees = React.useMemo(() => {
-    if (isDesiredLocation) {
-      return people.filter((p) => !p.isRequester && !isPlanningPerson(p));
-    }
-    return people.filter((p) => p.isRequester || isAdditionalGuest(p));
-  }, [isDesiredLocation, isPlanningPerson, people]);
-  const canAddService = serviceAssignees.length > 0;
+    // Jane / Model / Guest can all receive services; Planning cannot.
+    return people.filter((p) => !isPlanningPerson(p));
+  }, [isPlanningPerson, people]);
+  const canAddService = serviceAssignees.length > 0 && Boolean(selectedTeamMemberId);
 
   const serviceCountLabel = React.useCallback(
     (personId: string) => {
@@ -380,60 +438,104 @@ function ClientBookingCreateView() {
   );
 
   const planningCardDetails = React.useCallback((person: BookingPerson) => {
-    if (!person.planningIsLocked) return { activity: "", duration: "" };
+    if (!person.planningIsLocked) return { duration: "" };
     return {
-      activity: person.planningActivity?.trim() ?? "",
       duration: person.planningDuration?.trim() ?? "",
     };
   }, []);
 
   const renderPlanningCardSubtitle = (person: BookingPerson) => {
-    const { activity, duration } = planningCardDetails(person);
-    if (!activity && !duration) return null;
+    const { duration } = planningCardDetails(person);
+    if (!duration) return null;
     return (
-      <Stack spacing={0.15} sx={{ mt: 0.2 }}>
-        {activity ? (
-          <Typography sx={{ fontWeight: 700, fontSize: 11, color: alpha(m.navy, 0.48), lineHeight: 1.2 }}>
-            {activity}
-          </Typography>
-        ) : null}
-        {duration ? (
-          <Typography sx={{ fontWeight: 700, fontSize: 11, color: alpha(m.navy, 0.48), lineHeight: 1.2 }}>
-            {duration}
-          </Typography>
-        ) : null}
-      </Stack>
+      <Typography sx={{ fontWeight: 700, fontSize: 11, color: alpha(m.navy, 0.48), lineHeight: 1.2, mt: 0.2 }}>
+        {duration}
+      </Typography>
     );
   };
 
   const selectedServicesCount = React.useMemo(() => Object.values(selectedServiceIds).filter(Boolean).length, [selectedServiceIds]);
   const allServicesAssigned = React.useMemo(
-    () => services.length > 0 && services.every((s) => isServiceTeamAssigned(s)),
-    [services],
+    () =>
+      services.length > 0 &&
+      Boolean(selectedTeamMemberId) &&
+      services.every((s) => Boolean(s.guestId) && Boolean(s.teamMemberId)),
+    [selectedTeamMemberId, services],
   );
 
-  const assigned = services.filter((s) => isServiceTeamAssigned(s));
-  const unassigned = services.filter((s) => !isServiceTeamAssigned(s));
+  /** Services already given to the selected person (Jane / Model / Guest). */
+  const assigned = React.useMemo(
+    () => services.filter((s) => Boolean(s.guestId) && s.guestId === selectedPersonId),
+    [selectedPersonId, services],
+  );
+  /** Pending rows without a person — catalog never lives here. */
+  const unassigned = React.useMemo(() => services.filter((s) => !s.guestId), [services]);
+
+  const isModelOrGuestSelected = Boolean(
+    selectedPerson && !selectedPerson.isRequester && !isPlanningPerson(selectedPerson),
+  );
+
+  const professionalCatalog = React.useMemo(
+    () => catalogByTeamMemberId[selectedTeamMemberId] ?? [],
+    [catalogByTeamMemberId, selectedTeamMemberId],
+  );
+
+  /** Catalog options still available to add for the selected Model/Guest. */
+  const exploreableServices = React.useMemo(() => {
+    if (!isModelOrGuestSelected || !selectedPersonId || !selectedTeamMemberId) return [];
+    const alreadyOnPerson = new Set(
+      services
+        .filter((s) => s.guestId === selectedPersonId)
+        .map((s) => s.catalogServiceId ?? s.id),
+    );
+    return professionalCatalog.filter((c) => !alreadyOnPerson.has(c.id));
+  }, [
+    isModelOrGuestSelected,
+    professionalCatalog,
+    selectedPersonId,
+    selectedTeamMemberId,
+    services,
+  ]);
 
   React.useEffect(() => {
     if (!profileHydrated && fromProfile) return;
-    if (serviceTab === "assigned" && assigned.length === 0 && unassigned.length > 0) {
+    // Model/Guest: stay on Assigned — catalog is via Explore, never Unassigned.
+    if (isModelOrGuestSelected) {
+      if (serviceTab !== "assigned") setServiceTab("assigned");
+      return;
+    }
+    if (unassigned.length > 0 && serviceTab === "assigned") {
       setServiceTab("unassigned");
-    } else if (serviceTab === "unassigned" && unassigned.length === 0 && assigned.length > 0) {
+    } else if (unassigned.length === 0 && assigned.length > 0 && serviceTab === "unassigned") {
       setServiceTab("assigned");
     }
-  }, [assigned.length, fromProfile, profileHydrated, serviceTab, unassigned.length]);
+  }, [
+    assigned.length,
+    fromProfile,
+    isModelOrGuestSelected,
+    profileHydrated,
+    serviceTab,
+    unassigned.length,
+  ]);
 
   const selectedUnassignedServices = React.useMemo(
     () => unassigned.filter((s) => selectedServiceIds[s.id]),
     [unassigned, selectedServiceIds],
   );
-  const canDirectAssign = selectedUnassignedServices.length > 0;
+  const canDirectAssign = Boolean(selectedTeamMemberId) && selectedUnassignedServices.length > 0;
   const visible = serviceTab === "assigned" ? assigned : unassigned;
   const hasUnassigned = unassigned.length > 0;
 
   const allVisibleSelected = visible.length > 0 && visible.every((s) => selectedServiceIds[s.id]);
   const someVisibleSelected = visible.some((s) => selectedServiceIds[s.id]) && !allVisibleSelected;
+  const exploreSelectedCount = React.useMemo(
+    () => Object.values(exploreCatalogIds).filter(Boolean).length,
+    [exploreCatalogIds],
+  );
+  const allExploreSelected =
+    exploreableServices.length > 0 && exploreableServices.every((c) => exploreCatalogIds[c.id]);
+  const someExploreSelected =
+    exploreableServices.some((c) => exploreCatalogIds[c.id]) && !allExploreSelected;
 
   const total = React.useMemo(() => services.reduce((sum, s) => sum + s.price, 0), [services]);
 
@@ -512,6 +614,25 @@ function ClientBookingCreateView() {
   }, [isPastDay, selectedDate, today0]);
 
   React.useEffect(() => {
+    // If today has no remaining slots, move to tomorrow.
+    if (isSelectedToday && availableTimes.length === 0) {
+      setSelectedDate(addDays(today0, 1));
+      return;
+    }
+    // Keep selection on a bookable future slot (nearest by default).
+    if (availableTimes.length > 0 && !availableTimes.includes(selectedTime)) {
+      setSelectedTime(availableTimes[0]);
+    }
+  }, [availableTimes, isSelectedToday, selectedTime, today0]);
+
+  React.useEffect(() => {
+    const el = timeScrollRef.current;
+    if (!el || !selectedTime) return;
+    const activeBtn = el.querySelector<HTMLElement>(`[data-time-slot="${selectedTime}"]`);
+    activeBtn?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+  }, [selectedTime, selectedDate]);
+
+  React.useEffect(() => {
     try {
       const profileSelection = loadPublicProfileBookingSelection();
       const raw = window.sessionStorage.getItem("mollure:selected_shop");
@@ -563,8 +684,9 @@ function ClientBookingCreateView() {
         name: row.name,
         durationMins: row.durationMins,
         price: row.price,
-        guestId: "p-requester",
-        teamMemberId: row.teamMemberId,
+        // Desired: leave person + professional open so Model can pick services via Assign.
+        guestId: profileSelection.locationMode === "desired" ? null : "p-requester",
+        teamMemberId: profileSelection.locationMode === "desired" ? null : row.teamMemberId,
       }));
 
       setServices(profileServices);
@@ -637,17 +759,18 @@ function ClientBookingCreateView() {
         }))
       : [];
 
+    const mode = shop.locationMode ?? "fixed";
     const catalogServices = getServicesForLocationMode(
       businessProfile,
-      shop.locationMode ?? "fixed",
+      mode,
     ).map((s) => ({
       id: s.id,
       catalogServiceId: s.id,
       name: s.name,
       durationMins: s.durationMins,
       price: s.priceValue,
-      guestId: "p-requester" as string | null,
-      teamMemberId: apiTeam[0]?.id ?? null,
+      guestId: (mode === "desired" ? null : "p-requester") as string | null,
+      teamMemberId: mode === "desired" ? null : apiTeam[0]?.id ?? null,
     }));
 
     setServices(catalogServices.slice(0, 3));
@@ -715,6 +838,18 @@ function ClientBookingCreateView() {
     if (planningPersonId) syncPlanningDraftToPerson(planningPersonId, planningActivity, planningDuration);
     setPlanningPersonId(null);
     setSelectedPersonId(personId);
+    setSelectedServiceIds({});
+    setExploreCatalogIds({});
+    setExploreServicesOpen(false);
+    const person = people.find((p) => p.id === personId);
+    const isModelOrGuest = Boolean(person && !person.isRequester && !isPlanningPerson(person));
+    if (isModelOrGuest) {
+      setServiceTab("assigned");
+      return;
+    }
+    const personHasAssigned = services.some((s) => s.guestId === personId);
+    const hasPending = services.some((s) => !s.guestId);
+    setServiceTab(hasPending && !personHasAssigned ? "unassigned" : "assigned");
   };
 
   const addParticipant = (cardName: string) => {
@@ -803,35 +938,81 @@ function ClientBookingCreateView() {
   };
 
   const assignSelectedDirect = () => {
-    if (!canDirectAssign) return;
-    const fallbackTeamMemberId = filteredTeamMembers[0]?.id ?? null;
+    if (!canDirectAssign || !selectedTeamMemberId) return;
     const ids = new Set(selectedUnassignedServices.map((s) => s.id));
     setServices((prev) =>
       prev.map((s) => {
         if (!ids.has(s.id)) return s;
-        const teamMemberId = s.teamMemberId ?? selectedTeamMemberId ?? fallbackTeamMemberId;
         return {
           ...s,
           guestId: selectedPersonId,
-          teamMemberId,
+          teamMemberId: selectedTeamMemberId,
         };
       }),
     );
     setSelectedServiceIds({});
+  };
+
+  const openExploreServices = () => {
+    if (!isModelOrGuestSelected) return;
+    if (!selectedTeamMemberId && filteredTeamMembers[0]?.id) {
+      applySharedTeamMember(filteredTeamMembers[0].id);
+    }
+    setExploreCatalogIds({});
+    setExploreServicesOpen(true);
+  };
+
+  const confirmExploreServices = () => {
+    if (!selectedTeamMemberId || !selectedPersonId || exploreSelectedCount === 0) return;
+    const catalogIds = Object.entries(exploreCatalogIds)
+      .filter(([, checked]) => checked)
+      .map(([id]) => id);
+
+    setServices((prev) => {
+      const next = [...prev];
+      for (const catalogId of catalogIds) {
+        const picked = professionalCatalog.find((c) => c.id === catalogId);
+        if (!picked) continue;
+        if (
+          next.some(
+            (s) =>
+              (s.catalogServiceId ?? s.id) === picked.id && s.guestId === selectedPersonId,
+          )
+        ) {
+          continue;
+        }
+        next.push({
+          id: UUID_RE.test(picked.id) ? `${picked.id}-${Date.now()}` : `svc-${Date.now()}-${picked.id}`,
+          catalogServiceId: UUID_RE.test(picked.id) ? picked.id : extractUuidFromSyntheticId(picked.id),
+          name: picked.name,
+          durationMins: picked.durationMins,
+          price: picked.price,
+          originalPrice: picked.originalPrice,
+          discountPct: picked.discountPct,
+          guestId: selectedPersonId,
+          teamMemberId: selectedTeamMemberId,
+        });
+      }
+      return next;
+    });
+    setExploreCatalogIds({});
+    setExploreServicesOpen(false);
     setServiceTab("assigned");
   };
 
   const openAddServiceDialog = () => {
     const catalog = catalogByTeamMemberId[selectedTeamMemberId] ?? [];
     setAddServiceCatalogId(catalog[0]?.id ?? "");
-    setAddServiceGuestId(serviceAssignees[0]?.id ?? people[0]?.id ?? "");
+    const preferredAssignee =
+      serviceAssignees.find((p) => p.id === selectedPersonId)?.id ?? serviceAssignees[0]?.id ?? people[0]?.id ?? "";
+    setAddServiceGuestId(preferredAssignee);
     setAddServiceDialogOpen(true);
   };
 
   const confirmAddService = () => {
     const catalog = catalogByTeamMemberId[selectedTeamMemberId] ?? [];
     const picked = catalog.find((c) => c.id === addServiceCatalogId);
-    if (!picked || !addServiceGuestId) return;
+    if (!picked || !addServiceGuestId || !selectedTeamMemberId) return;
     const newService: Service = {
       id: UUID_RE.test(picked.id) ? picked.id : `svc-${Date.now()}`,
       catalogServiceId: UUID_RE.test(picked.id) ? picked.id : extractUuidFromSyntheticId(picked.id),
@@ -844,27 +1025,24 @@ function ClientBookingCreateView() {
       teamMemberId: selectedTeamMemberId,
     };
     setServices((prev) => [...prev, newService]);
+    setSelectedPersonId(addServiceGuestId);
+    setServiceTab("assigned");
     setAddServiceDialogOpen(false);
   };
 
-  const updateServiceTeamMember = (serviceId: string, teamMemberId: string) => {
-    const nextTeamMemberId = teamMemberId || null;
-    setServices((prev) =>
-      prev.map((s) => {
-        if (s.id !== serviceId) return s;
-        return {
-          ...s,
-          teamMemberId: nextTeamMemberId,
-          guestId: nextTeamMemberId ? (s.guestId ?? selectedPersonId) : null,
-        };
-      }),
-    );
-    if (nextTeamMemberId) setServiceTab("assigned");
+  const applySharedTeamMember = (teamMemberId: string) => {
+    setSelectedTeamMemberId(teamMemberId);
+    setExploreCatalogIds({});
+    if (!teamMemberId) return;
+    setServices((prev) => prev.map((s) => ({ ...s, teamMemberId })));
   };
 
   const toggleServiceSelection = (serviceId: string, checked: boolean) => {
     setSelectedServiceIds((prev) => ({ ...prev, [serviceId]: checked }));
-    if (!checked) updateServiceTeamMember(serviceId, "");
+  };
+
+  const toggleExploreCatalogSelection = (catalogId: string, checked: boolean) => {
+    setExploreCatalogIds((prev) => ({ ...prev, [catalogId]: checked }));
   };
 
   const onContinue = async () => {
@@ -902,7 +1080,11 @@ function ClientBookingCreateView() {
         ? {
             projectDetails: {
               description: projectDescription,
-              uploads: projectUploads.map((u) => ({ id: u.id, name: u.name })),
+              uploads: projectUploads.map((u) => ({
+                id: u.id,
+                name: u.name,
+                previewUrl: u.previewUrl,
+              })),
             },
           }
         : {}),
@@ -910,6 +1092,36 @@ function ClientBookingCreateView() {
 
     const prepaymentPercent = parsePrepaymentPercent(businessProfile?.prepaymentLabel);
     const requiresPrepayment = !isDesiredLocation && prepaymentPercent > 0;
+
+    // EBR suggest-edit: update existing booking draft and return to details (no new booking).
+    if (isEbrSuggest) {
+      setIsContinuing(true);
+      try {
+        const existing = getActiveBookingSession();
+        if (!existing?.bookingRef) {
+          showSnackbar({ severity: "error", message: "Booking not found for suggested changes." });
+          return;
+        }
+        setActiveBookingSession({
+          ...existing,
+          draft: payload,
+          requiresPrepayment: existing.requiresPrepayment ?? requiresPrepayment,
+          prepaymentPercent: existing.prepaymentPercent ?? (requiresPrepayment ? prepaymentPercent : 0),
+        });
+        if (typeof window !== "undefined") {
+          window.sessionStorage.setItem("mollure:ebr_suggest_return", "1");
+        }
+        const listTab = parseBookingListTab(searchParams?.get("tab"));
+        const checkoutPath = resolveCreateCheckoutPath({
+          locationMode,
+          requiresPrepayment: Boolean(existing.requiresPrepayment ?? requiresPrepayment),
+        });
+        router.push(`${checkoutPath}?tab=${listTab}`);
+      } finally {
+        setIsContinuing(false);
+      }
+      return;
+    }
 
     const bookingRef = createBookingRef();
 
@@ -961,7 +1173,7 @@ function ClientBookingCreateView() {
     }
   };
 
-  const continueLabel = "Continue";
+  const continueLabel = isEbrSuggest ? "Save & return" : "Continue";
 
   const planningFieldSx = {
     "& .MuiOutlinedInput-root": {
@@ -1071,7 +1283,8 @@ function ClientBookingCreateView() {
 
         <Tabs
           value={serviceTab}
-          onChange={(_, v) => {
+          onChange={(_, v: "assigned" | "unassigned") => {
+            if (v === "assigned" && unassigned.length > 0) return;
             setServiceTab(v);
             setSelectedServiceIds({});
           }}
@@ -1086,6 +1299,7 @@ function ClientBookingCreateView() {
           <Tab
             value="assigned"
             label={`Assigned(${assigned.length})`}
+            disabled={unassigned.length > 0 && !isModelOrGuestSelected}
             sx={{
               minHeight: 28,
               textTransform: "none",
@@ -1095,6 +1309,7 @@ function ClientBookingCreateView() {
               px: 1.25,
               color: alpha(m.navy, 0.62),
               "&.Mui-selected": { bgcolor: "#fff", color: alpha(m.navy, 0.78) },
+              "&.Mui-disabled": { opacity: 0.45 },
             }}
           />
           <Tab
@@ -1113,6 +1328,38 @@ function ClientBookingCreateView() {
           />
         </Tabs>
       </Stack>
+
+      {filteredTeamMembers.length > 0 ? (
+        <Box sx={{ mb: 1.25 }} onClick={(e) => e.stopPropagation()}>
+          <AppDropdown
+            value={selectedTeamMemberId}
+            onChange={(val) => applySharedTeamMember(String(val ?? ""))}
+            options={filteredTeamMembers.map((tm) => ({
+              value: tm.id,
+              label: tm.name,
+            }))}
+            placeholder="Select team member"
+            size="small"
+            fullWidth
+            InputProps={{
+              startAdornment: (
+                <PersonOutlineRoundedIcon
+                  sx={{ fontSize: 18, color: alpha(m.navy, 0.45), ml: 0.5, mr: 0.25 }}
+                />
+              ),
+            }}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "10px",
+                bgcolor: "#fff",
+                fontSize: 12,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.62),
+              },
+            }}
+          />
+        </Box>
+      ) : null}
 
       {hasUnassigned && serviceTab === "unassigned" ? (
         <Stack direction="row" alignItems="center" justifyContent="flex-end" sx={{ mb: 1 }}>
@@ -1211,35 +1458,6 @@ function ClientBookingCreateView() {
                     ) : null}
                   </Stack>
                 ) : null}
-                <Box sx={{ mt: 0.85 }} onClick={(e) => e.stopPropagation()}>
-                  <AppDropdown
-                    value={s.teamMemberId ?? ""}
-                    onChange={(val) => updateServiceTeamMember(s.id, String(val))}
-                    options={filteredTeamMembers.map((tm) => ({
-                      value: tm.id,
-                      label: tm.name,
-                    }))}
-                    placeholder="Select team member"
-                    size="small"
-                    fullWidth
-                    disabled={serviceTab === "unassigned" && !selectedServiceIds[s.id]}
-                    InputProps={{
-                      startAdornment: (
-                        <PersonOutlineRoundedIcon
-                          sx={{ fontSize: 18, color: alpha(m.navy, 0.45), ml: 0.5, mr: 0.25 }}
-                        />
-                      ),
-                    }}
-                    sx={{
-                      "& .MuiOutlinedInput-root": {
-                        borderRadius: "10px",
-                        bgcolor: alpha(m.navy, 0.015),
-                        fontSize: 11.5,
-                        fontWeight: 800,
-                      },
-                    }}
-                  />
-                </Box>
               </Box>
 
               <Stack direction="row" alignItems="center" spacing={0.25}>
@@ -1273,6 +1491,16 @@ function ClientBookingCreateView() {
             </Stack>
           </Paper>
         ))}
+
+        {visible.length === 0 ? (
+          <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.45), py: 1 }}>
+            {serviceTab === "unassigned"
+              ? "No unassigned services."
+              : isModelOrGuestSelected
+                ? "No services selected yet. Use Explore services below."
+                : "No services assigned to this person yet."}
+          </Typography>
+        ) : null}
       </Stack>
 
       {serviceTab === "unassigned" && canDirectAssign ? (
@@ -1296,39 +1524,59 @@ function ClientBookingCreateView() {
         </Box>
       ) : null}
 
-      <ButtonBase
-        onClick={openAddServiceDialog}
-        disabled={!canAddService}
-        sx={{
-          mt: 1.25,
-          display: "flex",
-          alignItems: "center",
-          gap: 0.75,
-          borderRadius: "8px",
-          opacity: canAddService ? 1 : 0.45,
-          cursor: canAddService ? "pointer" : "not-allowed",
-        }}
-      >
-        <Box
+      {isModelOrGuestSelected ? (
+        <Button
+          fullWidth
+          variant="outlined"
+          onClick={openExploreServices}
           sx={{
-            width: 18,
-            height: 18,
-            borderRadius: "999px",
-            bgcolor: m.teal,
-            color: "#fff",
-            display: "grid",
-            placeItems: "center",
-            fontSize: 14,
+            mt: 1.25,
+            borderRadius: "10px",
+            textTransform: "none",
             fontWeight: 900,
-            lineHeight: 1,
+            height: 40,
+            borderColor: alpha(m.navy, 0.12),
+            color: alpha(m.navy, 0.72),
+            bgcolor: "#fff",
+            "&:hover": { borderColor: alpha(m.teal, 0.45), bgcolor: alpha(m.teal, 0.04) },
           }}
         >
-          +
-        </Box>
-        <Typography sx={{ fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.48) }}>
-          Service to assignment list
-        </Typography>
-      </ButtonBase>
+          Explore services
+        </Button>
+      ) : (
+        <ButtonBase
+          onClick={openAddServiceDialog}
+          disabled={!canAddService}
+          sx={{
+            mt: 1.25,
+            display: "flex",
+            alignItems: "center",
+            gap: 0.75,
+            borderRadius: "8px",
+            opacity: canAddService ? 1 : 0.45,
+            cursor: canAddService ? "pointer" : "not-allowed",
+          }}
+        >
+          <Box
+            sx={{
+              width: 18,
+              height: 18,
+              borderRadius: "999px",
+              bgcolor: m.teal,
+              color: "#fff",
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              lineHeight: 0,
+            }}
+          >
+            <AddRoundedIcon sx={{ fontSize: 14 }} />
+          </Box>
+          <Typography sx={{ fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.48) }}>
+            Service to assignment list
+          </Typography>
+        </ButtonBase>
+      )}
     </Box>
   );
 
@@ -1359,9 +1607,41 @@ function ClientBookingCreateView() {
             Add service to assignment list
           </DialogTitle>
           <DialogContent sx={{ pt: 0.5 }}>
-            <Typography sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.55), mb: 1.25 }}>
-              {`Professional: ${teamMemberNameById.get(selectedTeamMemberId) ?? "—"}`}
+            <Typography sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.72), mb: 0.75 }}>
+              Professional
             </Typography>
+            <AppDropdown
+              value={selectedTeamMemberId}
+              onChange={(val) => {
+                const nextId = String(val ?? "");
+                applySharedTeamMember(nextId);
+                const nextCatalog = catalogByTeamMemberId[nextId] ?? [];
+                setAddServiceCatalogId(nextCatalog[0]?.id ?? "");
+              }}
+              options={filteredTeamMembers.map((tm) => ({
+                value: tm.id,
+                label: tm.name,
+              }))}
+              placeholder="Select team member"
+              size="small"
+              fullWidth
+              InputProps={{
+                startAdornment: (
+                  <PersonOutlineRoundedIcon
+                    sx={{ fontSize: 18, color: alpha(m.navy, 0.45), ml: 0.5, mr: 0.25 }}
+                  />
+                ),
+              }}
+              sx={{
+                mb: 1.5,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "10px",
+                  bgcolor: alpha(m.navy, 0.015),
+                  fontSize: 12,
+                  fontWeight: 700,
+                },
+              }}
+            />
 
             <Typography sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.72), mb: 0.75 }}>
               Services
@@ -1405,16 +1685,18 @@ function ClientBookingCreateView() {
             </RadioGroup>
 
             <Typography sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.72), mb: 0.75 }}>
-              {isDesiredLocation ? "Assign to model" : "Assign to guest"}
+              Assign to
             </Typography>
             <AppDropdown
               value={addServiceGuestId}
               onChange={(val) => setAddServiceGuestId(String(val))}
               options={serviceAssignees.map((p) => ({
                 value: p.id,
-                label: p.isRequester ? `${p.name} (Requester)` : p.name,
+                label: p.isRequester
+                  ? `${p.name} (Requester)`
+                  : `${p.name} (${getParticipantLabel(p)})`,
               }))}
-              placeholder={isDesiredLocation ? "Select model" : "Select guest"}
+              placeholder="Select person"
               size="small"
               fullWidth
               sx={{
@@ -1453,6 +1735,136 @@ function ClientBookingCreateView() {
               }}
             >
               Add service
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <Dialog
+          open={exploreServicesOpen}
+          onClose={() => {
+            setExploreServicesOpen(false);
+            setExploreCatalogIds({});
+          }}
+          fullWidth
+          maxWidth="sm"
+          PaperProps={{
+            sx: {
+              borderRadius: "14px",
+              border: `1px solid ${alpha(m.navy, 0.08)}`,
+            },
+          }}
+        >
+          <DialogTitle sx={{ fontWeight: 900, color: alpha(m.navy, 0.82), pb: 1 }}>
+            Explore services
+          </DialogTitle>
+          <DialogContent sx={{ pt: 0.5 }}>
+            <Typography sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.55), mb: 1.25 }}>
+              {`Professional: ${teamMemberNameById.get(selectedTeamMemberId) ?? "—"} · ${
+                selectedPerson?.name ?? "Model"
+              }`}
+            </Typography>
+
+            {exploreableServices.length > 0 ? (
+              <Stack direction="row" justifyContent="flex-end" sx={{ mb: 1 }}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={allExploreSelected}
+                      indeterminate={someExploreSelected}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        const next: Record<string, boolean> = {};
+                        for (const c of exploreableServices) next[c.id] = checked;
+                        setExploreCatalogIds(next);
+                      }}
+                      sx={{ "&.Mui-checked": { color: m.teal }, color: alpha(m.navy, 0.35) }}
+                    />
+                  }
+                  label={
+                    <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: alpha(m.navy, 0.62) }}>
+                      Select All
+                    </Typography>
+                  }
+                  sx={{ mr: 0 }}
+                />
+              </Stack>
+            ) : null}
+
+            <Stack spacing={1}>
+              {exploreableServices.map((item) => (
+                <Paper
+                  key={item.id}
+                  elevation={0}
+                  sx={{
+                    borderRadius: "10px",
+                    border: `1px solid ${alpha(m.navy, 0.10)}`,
+                    px: 1.25,
+                    py: 1,
+                    bgcolor: alpha(m.navy, 0.015),
+                  }}
+                >
+                  <Stack direction="row" alignItems="center" spacing={1.25}>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Stack direction="row" justifyContent="space-between" spacing={1}>
+                        <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78) }}>
+                          {item.name}
+                        </Typography>
+                        <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78) }}>
+                          {item.price} €
+                        </Typography>
+                      </Stack>
+                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.48) }}>
+                        {item.durationMins} Mins
+                      </Typography>
+                    </Box>
+                    <Checkbox
+                      size="small"
+                      checked={Boolean(exploreCatalogIds[item.id])}
+                      onChange={(e) => toggleExploreCatalogSelection(item.id, e.target.checked)}
+                      sx={{ "&.Mui-checked": { color: m.teal }, color: alpha(m.navy, 0.35) }}
+                    />
+                  </Stack>
+                </Paper>
+              ))}
+              {exploreableServices.length === 0 ? (
+                <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.48), py: 1 }}>
+                  All available services are already selected for this person.
+                </Typography>
+              ) : null}
+            </Stack>
+          </DialogContent>
+          <DialogActions sx={{ px: 2.5, pb: 2.25 }}>
+            <Button
+              onClick={() => {
+                setExploreServicesOpen(false);
+                setExploreCatalogIds({});
+              }}
+              variant="outlined"
+              sx={{
+                borderRadius: "10px",
+                textTransform: "none",
+                fontWeight: 900,
+                borderColor: alpha(m.navy, 0.12),
+                color: alpha(m.navy, 0.72),
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmExploreServices}
+              variant="contained"
+              disableElevation
+              disabled={exploreSelectedCount === 0}
+              sx={{
+                borderRadius: "10px",
+                textTransform: "none",
+                fontWeight: 900,
+                bgcolor: m.teal,
+                "&:hover": { bgcolor: m.tealDark },
+              }}
+            >
+              Add selected
             </Button>
           </DialogActions>
         </Dialog>
@@ -1805,11 +2217,17 @@ function ClientBookingCreateView() {
                         >
                           {times.map((t) => {
                             const active = t === selectedTime;
+                            const past = isTimePast(t);
                             return (
                               <Button
                                 key={t}
+                                data-time-slot={t}
                                 variant={active ? "contained" : "outlined"}
-                                onClick={() => setSelectedTime(t)}
+                                onClick={() => {
+                                  if (past) return;
+                                  setSelectedTime(t);
+                                }}
+                                disabled={past}
                                 disableElevation
                                 sx={{
                                   flexShrink: 0,
@@ -1821,13 +2239,24 @@ function ClientBookingCreateView() {
                                   fontSize: 11.5,
                                   fontWeight: 900,
                                   whiteSpace: "nowrap",
-                                  ...(active
-                                    ? { bgcolor: m.teal, "&:hover": { bgcolor: m.tealDark } }
-                                    : {
-                                        borderColor: alpha(m.navy, 0.10),
-                                        bgcolor: "#fff",
-                                        color: alpha(m.navy, 0.65),
-                                      }),
+                                  ...(past
+                                    ? {
+                                        borderColor: alpha(m.navy, 0.08),
+                                        bgcolor: alpha(m.navy, 0.03),
+                                        color: alpha(m.navy, 0.32),
+                                        "&.Mui-disabled": {
+                                          borderColor: alpha(m.navy, 0.08),
+                                          bgcolor: alpha(m.navy, 0.03),
+                                          color: alpha(m.navy, 0.32),
+                                        },
+                                      }
+                                    : active
+                                      ? { bgcolor: m.teal, color: "#fff", "&:hover": { bgcolor: m.tealDark } }
+                                      : {
+                                          borderColor: alpha(m.navy, 0.10),
+                                          bgcolor: "#fff",
+                                          color: alpha(m.navy, 0.65),
+                                        }),
                                 }}
                               >
                                 {t}
@@ -2017,9 +2446,10 @@ function ClientBookingCreateView() {
                       <Stack direction="row" alignItems="center" justifyContent="flex-end" sx={{ mb: 1 }}>
                         <Button
                           variant="outlined"
-                          endIcon={<KeyboardArrowDownRoundedIcon sx={{ fontSize: 18 }} />}
+                          endIcon={<KeyboardArrowDownRoundedIcon sx={{ fontSize: 16 }} />}
                           startIcon={
                             <Box
+                              component="span"
                               sx={{
                                 width: 18,
                                 height: 18,
@@ -2027,27 +2457,43 @@ function ClientBookingCreateView() {
                                 bgcolor: m.addSoftBg,
                                 color: m.addSoftFg,
                                 border: `1px solid ${m.addSoftBorder}`,
-                                display: "grid",
-                                placeItems: "center",
-                                fontSize: 14,
-                                fontWeight: 900,
-                                lineHeight: 1,
-                                mr: -0.25,
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flexShrink: 0,
+                                lineHeight: 0,
                               }}
                             >
-                              +
+                              <AddRoundedIcon sx={{ fontSize: 14, display: "block" }} />
                             </Box>
                           }
                           onClick={(e) => setParticipantMenuAnchor(e.currentTarget)}
                           sx={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
                             borderRadius: "10px",
                             textTransform: "none",
                             fontWeight: 900,
                             fontSize: 11.5,
+                            lineHeight: 1,
                             height: 32,
+                            minHeight: 32,
+                            py: 0,
+                            px: 1.25,
                             borderColor: alpha(m.navy, 0.12),
                             color: alpha(m.navy, 0.62),
                             bgcolor: "#fff",
+                            "& .MuiButton-startIcon, & .MuiButton-endIcon": {
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              marginTop: 0,
+                              marginBottom: 0,
+                            },
+                            "& .MuiButton-startIcon": { mr: 0.75, ml: 0 },
+                            "& .MuiButton-endIcon": { ml: 0.35, mr: 0 },
+                            "& .MuiButton-startIcon > *:nth-of-type(1)": { fontSize: "inherit" },
                           }}
                         >
                           Add
@@ -2113,12 +2559,14 @@ function ClientBookingCreateView() {
                               borderRadius: "10px",
                               border: `1px solid ${active ? alpha(m.teal, 0.7) : alpha(m.navy, 0.10)}`,
                               bgcolor: "#fff",
-                              px: 1.25,
-                              py: 1.05,
+                              px: 1,
+                              pt: 1.05,
+                              pb: 0.75,
                               cursor: "pointer",
                               boxShadow: active ? `0 0 0 4px ${alpha(m.teal, 0.08)}` : "none",
                               position: "relative",
-                              minHeight: 66,
+                              minHeight: 72,
+                              overflow: "visible",
                               ...(draggingPersonId === p.id
                                 ? { opacity: 0.7 }
                                 : draggingPersonId
@@ -2142,27 +2590,35 @@ function ClientBookingCreateView() {
                                 }}
                                 sx={{
                                   position: "absolute",
-                                  right: 8,
-                                  top: 8,
-                                  width: 26,
-                                  height: 26,
+                                  right: 4,
+                                  bottom: 4,
+                                  zIndex: 2,
+                                  width: 22,
+                                  height: 22,
                                   borderRadius: "999px",
-                                  bgcolor: alpha(m.navy, 0.03),
-                                  color: alpha(m.navy, 0.45),
+                                  bgcolor: alpha(m.navy, 0.04),
+                                  color: alpha(m.navy, 0.5),
+                                  "&:hover": {
+                                    bgcolor: alpha(m.navy, 0.08),
+                                    color: alpha(m.navy, 0.72),
+                                  },
                                 }}
                                 aria-label={`Remove ${p.name}`}
                               >
-                                <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
+                                <DeleteOutlineRoundedIcon sx={{ fontSize: 14 }} />
                               </IconButton>
                             ) : null}
 
-                            <Stack spacing={0.55}>
+                            <Stack spacing={0.55} sx={{ pb: p.isRequester ? 0 : 2.25, alignItems: "center" }}>
                               {p.isRequester ? (
                                 <Typography sx={{ fontWeight: 900, fontSize: 12.5, color: alpha(m.navy, 0.82) }}>
                                   {p.name}
                                 </Typography>
                               ) : (
-                                <Box sx={{ display: "flex", justifyContent: "center" }} onClick={(e) => e.stopPropagation()}>
+                                <Box
+                                  sx={{ display: "flex", justifyContent: "center", width: "100%" }}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
                                   <TextField
                                     value={p.name}
                                     onChange={(e) => updateGuestName(p.id, e.target.value)}
@@ -2179,7 +2635,7 @@ function ClientBookingCreateView() {
                                     }}
                                     sx={{
                                       width: "100%",
-                                      maxWidth: 120,
+                                      maxWidth: 96,
                                       "& .MuiOutlinedInput-root": {
                                         height: 22,
                                         borderRadius: "8px",
@@ -2195,7 +2651,15 @@ function ClientBookingCreateView() {
                               {isPlanningPerson(p) ? (
                                 renderPlanningCardSubtitle(p)
                               ) : (
-                                <Typography sx={{ fontWeight: 700, fontSize: 11, color: alpha(m.navy, 0.48), mt: 0.2 }}>
+                                <Typography
+                                  sx={{
+                                    fontWeight: 700,
+                                    fontSize: 11,
+                                    color: alpha(m.navy, 0.48),
+                                    mt: 0.2,
+                                    textAlign: "center",
+                                  }}
+                                >
                                   {personCardSubtitle(p)}
                                 </Typography>
                               )}

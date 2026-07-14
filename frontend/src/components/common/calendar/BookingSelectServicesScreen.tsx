@@ -9,6 +9,7 @@ import {
   bookingServiceCatalog,
   formatBookingServiceMeta,
   type BookingCatalogService,
+  type BookingServiceCategory,
 } from "../../../data/bookingServiceCatalog.data";
 import {
   formatBookingServiceLineMeta,
@@ -17,6 +18,7 @@ import {
 
 type BookingSelectServicesScreenProps = {
   selectedIds: readonly string[];
+  catalog?: readonly BookingServiceCategory[];
   serviceOverrides?: Readonly<Record<string, Partial<BookingServiceLineItem>>>;
   onToggle: (service: BookingCatalogService) => void;
   onEdit?: (service: BookingCatalogService) => void;
@@ -25,6 +27,7 @@ type BookingSelectServicesScreenProps = {
 
 export default function BookingSelectServicesScreen({
   selectedIds,
+  catalog = bookingServiceCatalog,
   serviceOverrides = {},
   onToggle,
   onEdit,
@@ -33,6 +36,7 @@ export default function BookingSelectServicesScreen({
   const theme = useTheme();
   const m = theme.palette.mollure;
   const selectedSet = React.useMemo(() => new Set(selectedIds), [selectedIds]);
+  const groups = catalog.length > 0 ? catalog : bookingServiceCatalog;
 
   const getServiceMeta = React.useCallback(
     (service: BookingCatalogService) => {
@@ -65,7 +69,7 @@ export default function BookingSelectServicesScreen({
       </BodyText>
 
       <Stack spacing={1.25}>
-        {bookingServiceCatalog.map((group) => (
+        {groups.map((group) => (
           <Box key={group.category}>
             <Box
               sx={{

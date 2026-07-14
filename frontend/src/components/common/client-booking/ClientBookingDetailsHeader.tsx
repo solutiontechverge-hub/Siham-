@@ -99,10 +99,12 @@ export default function ClientBookingDetailsHeader({
     bookingRequestDirection === "outgoing" &&
     locationMode === "desired";
   const isCompleted = bookingStatus === "completed";
+  const isConfirmed = bookingStatus === "confirmed";
   const waitingForPayment =
     requiresPrepayment && !prepaymentPaid && !isCompleted && !isCancelled;
-  /** Edit is only available while waiting for payment. */
-  const showEdit = waitingForPayment && !isOutgoingBookingRequest && !bookingRequestSent;
+  /** Edit is only available while waiting for payment — never after confirmed. */
+  const showEdit =
+    waitingForPayment && !isConfirmed && !isOutgoingBookingRequest && !bookingRequestSent;
   const editActionsDisabled = !showEdit;
 
   const headerActionBtnSx = {

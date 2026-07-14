@@ -355,6 +355,7 @@ const getBusinessSetupDetailById = async (setupId, client = { query }) => {
     ...businessSetup,
     service_categories: serviceCategories,
     book_service_combinations: parseJsonArray(businessSetup.book_service_combinations),
+    section_sync_settings: parseJsonValue(businessSetup.section_sync_settings, {}),
     team_members: teamMembers,
     service_details: serviceDetails,
   };
@@ -777,13 +778,22 @@ export const upsertBusinessSetup = async (req, res) => {
       desired_location_area: req.body.desired_location_area ?? null,
       desired_location_province: req.body.desired_location_province ?? null,
       desired_location_services: parseTextArray(req.body.desired_location_services),
+      section_sync_settings: JSON.stringify(
+        parseJsonValue(req.body.section_sync_settings, {}),
+      ),
     };
+
+    const jsonbFields = new Set([
+      "service_categories",
+      "book_service_combinations",
+      "section_sync_settings",
+    ]);
 
     const fields = Object.keys(payload);
     const values = [professionalProfile.id, ...fields.map((field) => payload[field])];
     const updateAssignments = fields
       .map((field, index) => {
-        const castType = ["service_categories", "book_service_combinations"].includes(field) ? "::jsonb" : "";
+        const castType = jsonbFields.has(field) ? "::jsonb" : "";
         return `${field} = $${index + 2}${castType}`;
       })
       .concat("updated_at = NOW()")
@@ -796,7 +806,7 @@ export const upsertBusinessSetup = async (req, res) => {
 
       const insertValues = fields
         .map((field, index) => {
-          const castType = ["service_categories", "book_service_combinations"].includes(field) ? "::jsonb" : "";
+          const castType = jsonbFields.has(field) ? "::jsonb" : "";
           return `$${index + 2}${castType}`;
         })
         .join(", ");
@@ -1604,11 +1614,12 @@ export const updateMyBooking = async (req, res) => {
       req.body.prepayment_status !== undefined &&
       req.body.prepayment_status !== null &&
       req.body.prepayment_status !== "";
+    const hasNotes = req.body.notes !== undefined && req.body.notes !== null;
 
-    if (!hasStatus && !hasPrepayment) {
+    if (!hasStatus && !hasPrepayment && !hasNotes) {
       return res.status(400).json({
         success: false,
-        message: "Provide status and/or prepayment_status to update.",
+        message: "Provide status, prepayment_status, and/or notes to update.",
         data: null,
       });
     }
@@ -1661,15 +1672,30 @@ export const updateMyBooking = async (req, res) => {
       }
     }
 
+    const nextNotes = hasNotes ? String(req.body.notes) : existing.notes;
+    const nextTotalPrice =
+      req.body.total_price !== undefined && req.body.total_price !== null && req.body.total_price !== ""
+        ? Number(req.body.total_price)
+        : existing.total_price;
+
     const result = await query(
       `UPDATE bookings
        SET status = $1,
            prepayment_status = $2,
+           notes = $3,
+           total_price = $4,
            updated_at = NOW()
-       WHERE id = $3
-         AND customer_id = $4
+       WHERE id = $5
+         AND customer_id = $6
        RETURNING *`,
-      [nextStatus, nextPrepayment, bookingId, req.user.id],
+      [
+        nextStatus,
+        nextPrepayment,
+        nextNotes,
+        Number.isFinite(nextTotalPrice) ? nextTotalPrice : existing.total_price,
+        bookingId,
+        req.user.id,
+      ],
     );
 
     if (!result.rows.length) {
@@ -1745,7 +1771,7 @@ export const updateBookingStatus = async (req, res) => {
     const status = normalizeBookingStatus(req.body.status, "requested");
 
     const existingResult = await query(
-      `SELECT status
+      `SELECT status, notes, total_price
        FROM bookings
        WHERE id = $1
          AND business_setup_id = $2
@@ -1762,15 +1788,25 @@ export const updateBookingStatus = async (req, res) => {
     }
 
     const previousStatus = existingResult.rows[0].status;
+    const nextNotes =
+      req.body.notes !== undefined && req.body.notes !== null
+        ? String(req.body.notes)
+        : existingResult.rows[0].notes;
+    const nextTotalPrice =
+      req.body.total_price !== undefined && req.body.total_price !== null && req.body.total_price !== ""
+        ? Number(req.body.total_price)
+        : existingResult.rows[0].total_price;
 
     const result = await query(
       `UPDATE bookings
        SET status = $1,
+           notes = $2,
+           total_price = $3,
            updated_at = NOW()
-       WHERE id = $2
-         AND business_setup_id = $3
+       WHERE id = $4
+         AND business_setup_id = $5
        RETURNING *`,
-      [status, bookingId, businessSetup.id],
+      [status, nextNotes, Number.isFinite(nextTotalPrice) ? nextTotalPrice : existingResult.rows[0].total_price, bookingId, businessSetup.id],
     );
 
     if (!result.rows.length) {

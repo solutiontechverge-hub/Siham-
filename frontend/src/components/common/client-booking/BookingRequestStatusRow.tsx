@@ -1,10 +1,12 @@
 "use client";
 
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import { Box, Chip, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import type { BookingRequestDirection, ClientBookingStatus } from "../../../app/clients/booking/clientBookingRecords";
 import { bookingStatusChipColors, bookingStatusLabel } from "../../../app/clients/booking/clientBookingStatus";
 import BookingRequestBadge from "../calendar/BookingRequestBadge";
+import BookingRequestReceivedIcon from "../calendar/BookingRequestReceivedIcon";
 import EditRequestIndicatorIcon from "./EditRequestIndicatorIcon";
 import PrepaymentPayNowIcon from "./PrepaymentPayNowIcon";
 import PaymentDueIcon from "./PaymentDueIcon";
@@ -35,36 +37,74 @@ export default function BookingRequestStatusRow({
   rowMode = "default",
 }: Props) {
   const m = useTheme().palette.mollure;
-  const showErPill = rowMode === "professional_suggested" || rowMode === "professional_rejected";
+  const isEbrIncoming = rowMode === "professional_suggested";
+  const isEbrRejected = rowMode === "professional_rejected" && bookingStatus === "cancelled";
+  const showErPill = rowMode === "professional_rejected" && !isEbrRejected;
   const isDraft = bookingStatus === "draft";
   const isCompleted = bookingStatus === "completed";
   const waitingForPrepayment =
     requiresPrepayment && !prepaymentPaid && !isCompleted && bookingStatus !== "cancelled";
   const showPaymentIcon = waitingForPrepayment || paymentDue;
 
-  // Completed without payment due: status chip only — no BR / payment icons.
-  // Waiting for payment: waiting-payment icon only (no BR).
   const showBrPill =
     !isCompleted &&
     !showPaymentIcon &&
+    !isEbrIncoming &&
+    !isEbrRejected &&
     bookingStatus !== "cancelled" &&
     rowMode === "default" &&
     (isDraft
       ? bookingRequestSent || editRequestPending
-      : bookingRequestSent || bookingStatus === "requested");
+      : bookingRequestSent || bookingStatus === "requested" || editRequestPending);
   const brAccepted = bookingStatus === "confirmed";
-  const brRejected = bookingStatus === "cancelled";
+  const brRejected = bookingStatus === "cancelled" || isEbrRejected;
 
-  const statusForChip: ClientBookingStatus =
-    rowMode === "professional_suggested" ? "confirmed" : bookingStatus;
-  const chipColors = bookingStatusChipColors(statusForChip, { paymentDue });
-  const chipLabel = bookingStatusLabel(statusForChip, { paymentDue });
+  const resolvedStatusForChip: ClientBookingStatus = isEbrIncoming ? "requested" : bookingStatus;
+  const chipColors = isEbrRejected
+    ? {
+        bgcolor: "rgba(229, 115, 115, 0.22)",
+        color: "#C62828",
+        border: "1px solid rgba(229, 115, 115, 0.35)",
+      }
+    : bookingStatusChipColors(resolvedStatusForChip, { paymentDue });
+  const chipLabel = isEbrRejected ? "Invalid" : bookingStatusLabel(resolvedStatusForChip, { paymentDue });
+  const isConfirmedChip = !isEbrRejected && !paymentDue && resolvedStatusForChip === "confirmed";
 
   return (
     <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
+      {isEbrIncoming ? (
+        <Box
+          sx={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 0.6,
+            height: 24,
+            pl: 1.1,
+            pr: 0.85,
+            borderRadius: "999px",
+            bgcolor: m.teal,
+            color: "#fff",
+            border: `1px solid ${m.tealDark}`,
+          }}
+          title="Edited booking request incoming"
+          aria-label="EBR Incoming"
+        >
+          <Typography sx={{ fontWeight: 900, fontSize: 11, color: "#fff", lineHeight: 1, letterSpacing: "0.01em" }}>
+            EBR Incoming
+          </Typography>
+          <Box sx={{ display: "grid", placeItems: "center", "& svg path": { stroke: "#fff" } }}>
+            <BookingRequestReceivedIcon size={11} />
+          </Box>
+        </Box>
+      ) : null}
       <Chip
         label={chipLabel}
         size="small"
+        icon={
+          isConfirmedChip ? (
+            <CheckCircleRoundedIcon sx={{ fontSize: "15px !important", color: `${chipColors.color} !important` }} />
+          ) : undefined
+        }
         sx={{
           height: 24,
           fontWeight: 900,
@@ -73,6 +113,7 @@ export default function BookingRequestStatusRow({
           bgcolor: chipColors.bgcolor,
           color: chipColors.color,
           border: chipColors.border,
+          "& .MuiChip-icon": { ml: 0.75, mr: -0.25 },
         }}
       />
       {showErPill ? (
@@ -91,7 +132,7 @@ export default function BookingRequestStatusRow({
           <Typography sx={{ fontWeight: 900, fontSize: 12.5, color: alpha(m.navy, 0.55), letterSpacing: "0.02em" }}>
             ER
           </Typography>
-          <EditRequestIndicatorIcon variant={rowMode === "professional_rejected" ? "rejected" : "arrow"} />
+          <EditRequestIndicatorIcon variant="rejected" />
         </Box>
       ) : null}
       {showPaymentIcon ? (

@@ -15,7 +15,11 @@ function parseRecipients(searchParams: URLSearchParams) {
   return emails.map((email, i) => ({ email, name: names[i] ?? email }));
 }
 
-export default function AdminMessagingPage() {
+type AdminMessagingPageProps = {
+  embedded?: boolean;
+};
+
+export default function AdminMessagingPage({ embedded = false }: AdminMessagingPageProps) {
   const theme = useTheme();
   const tokens = theme.palette.mollure;
   const searchParams = useSearchParams();
@@ -50,10 +54,12 @@ export default function AdminMessagingPage() {
 
   return (
     <>
-      <AdminPageHeader
-        title="Messaging & email"
-        description="Incoming Contact Us messages and outgoing email replies."
-      />
+      {!embedded ? (
+        <AdminPageHeader
+          title="Messaging & email"
+          description="Incoming Contact Us messages and outgoing email replies."
+        />
+      ) : null}
 
       {prefilledRecipients.length > 0 ? (
         <AdminSectionCard title="Send email to clients" sx={{ mb: 2.5 }}>

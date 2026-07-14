@@ -27,7 +27,7 @@ export type ClientBookingDraftTeamMember = {
 
 export type ClientBookingDraftProjectDetails = {
   description: string;
-  uploads: Array<{ id: string; name: string }>;
+  uploads: Array<{ id: string; name: string; previewUrl?: string }>;
 };
 
 export type ClientBookingDraft = {
@@ -56,4 +56,5 @@ export type ClientBookingSummarySection = {
   planningItem?: { activity: string; duration: string };
   teamMemberLabel?: string;
   isRequester?: boolean;
+  participantType?: "model" | "planning" | "guest" | "requester";
 };

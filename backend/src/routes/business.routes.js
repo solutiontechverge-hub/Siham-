@@ -191,6 +191,22 @@ const businessSetupValidators = [
       .optional({ values: "falsy" })
       .custom((value) => Array.isArray(parseArrayLike(value)))
       .withMessage("team_members must be an array."),
+    body("section_sync_settings")
+      .optional({ values: "falsy" })
+      .custom((value) => {
+        if (value == null || value === "") return true;
+        if (typeof value === "object" && !Array.isArray(value)) return true;
+        if (typeof value === "string") {
+          try {
+            const parsed = JSON.parse(value);
+            return parsed && typeof parsed === "object" && !Array.isArray(parsed);
+          } catch {
+            return false;
+          }
+        }
+        return false;
+      })
+      .withMessage("section_sync_settings must be an object."),
 ];
 
 const saveBusinessSetupHandlers = [
@@ -307,6 +323,11 @@ router.patch(
       .trim()
       .isIn(bookingStatuses)
       .withMessage("status must be requested, cancelled, completed, confirmed, or no_show."),
+    body("notes").optional({ values: "falsy" }).isString().withMessage("notes must be a string."),
+    body("total_price")
+      .optional({ values: "falsy" })
+      .isFloat({ min: 0 })
+      .withMessage("total_price must be a non-negative number."),
   ],
   validateRequest,
   updateBookingStatus,
@@ -325,6 +346,11 @@ router.patch(
       .trim()
       .isIn(["paid", "pending", "failed", "required"])
       .withMessage("prepayment_status must be paid, pending, failed, or required."),
+    body("notes").optional({ values: "null" }).isString().withMessage("notes must be a string."),
+    body("total_price")
+      .optional({ values: "falsy" })
+      .isFloat({ min: 0 })
+      .withMessage("total_price must be a non-negative number."),
   ],
   validateRequest,
   updateMyBooking,

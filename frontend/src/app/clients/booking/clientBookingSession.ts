@@ -1,5 +1,6 @@
 import type { ClientBookingSelectedShop } from "../../../components/common/client-booking/types";
 import type { ClientBookingRecord } from "./clientBookingRecords";
+import { cacheClientBookingDraftSnapshot } from "./clientBookingDraftCache";
 
 export const CHECKOUT_REF_KEY = "mollure:checkout_booking_ref";
 export const ACTIVE_BOOKING_ID_KEY = "mollure:active_booking_id";
@@ -33,6 +34,7 @@ export function setActiveBookingSession(record: ClientBookingRecord) {
   if (record.bookingRef) window.sessionStorage.setItem(CHECKOUT_REF_KEY, record.bookingRef);
   window.sessionStorage.setItem(ACTIVE_BOOKING_ID_KEY, record.apiBookingId ?? record.id);
   window.sessionStorage.setItem(ACTIVE_BOOKING_RECORD_KEY, JSON.stringify(record));
+  cacheClientBookingDraftSnapshot(record);
   const shop = record.shop;
   if (shop?.shopId && shop.shopName) {
     const payload: ClientBookingSelectedShop = {

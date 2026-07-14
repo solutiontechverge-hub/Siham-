@@ -15,6 +15,10 @@ type AdminKpiCardProps = {
   trend?: number;
   trendLabel?: string;
   icon?: SvgIconComponent;
+  iconColor?: string;
+  iconBg?: string;
+  /** When true, a positive trend is shown as negative (e.g. reported users). */
+  invertTrend?: boolean;
   compact?: boolean;
 };
 
@@ -25,11 +29,14 @@ export default function AdminKpiCard({
   trend,
   trendLabel = "vs prior period",
   icon: Icon,
+  iconColor,
+  iconBg,
+  invertTrend = false,
   compact = false,
 }: AdminKpiCardProps) {
   const theme = useTheme();
   const tokens = theme.palette.mollure;
-  const trendUp = trend !== undefined && trend >= 0;
+  const trendUp = trend !== undefined && (invertTrend ? trend < 0 : trend >= 0);
 
   return (
     <AppCard
@@ -88,8 +95,8 @@ export default function AdminKpiCard({
               borderRadius: 2,
               display: "grid",
               placeItems: "center",
-              bgcolor: alpha(tokens.teal, 0.12),
-              color: tokens.teal,
+              bgcolor: iconBg ?? alpha(tokens.teal, 0.12),
+              color: iconColor ?? tokens.teal,
               flexShrink: 0,
             }}
           >
