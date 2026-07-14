@@ -11,7 +11,7 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
-import { useTheme } from "@mui/material/styles";
+import { alpha, useTheme } from "@mui/material/styles";
 import { ADMIN_CARD_PADDING as pad } from "./adminCardPadding";
 
 export type AdminTableColumn<T> = {
@@ -28,6 +28,8 @@ type AdminDataTableProps<T> = {
   getRowId: (row: T) => string;
   emptyMessage?: string;
   dense?: boolean;
+  /** Highlights rows whose ids appear in this set (e.g. after export selection). */
+  highlightedIds?: Set<string>;
 };
 
 export default function AdminDataTable<T>({
@@ -36,6 +38,7 @@ export default function AdminDataTable<T>({
   getRowId,
   emptyMessage = "No records found.",
   dense = false,
+  highlightedIds,
 }: AdminDataTableProps<T>) {
   const theme = useTheme();
   const tokens = theme.palette.mollure;
@@ -72,13 +75,18 @@ export default function AdminDataTable<T>({
               </TableCell>
             </TableRow>
           ) : (
-            rows.map((row) => (
+            rows.map((row) => {
+              const rowId = getRowId(row);
+              const highlighted = highlightedIds?.has(rowId);
+              return (
               <TableRow
-                key={getRowId(row)}
+                key={rowId}
                 hover
                 sx={{
                   "&:last-child td": { borderBottom: 0 },
-                  "&:hover": { bgcolor: tokens.surface },
+                  bgcolor: highlighted ? alpha(tokens.teal, 0.08) : undefined,
+                  "&:hover": { bgcolor: highlighted ? alpha(tokens.teal, 0.12) : tokens.surface },
+                  transition: "background-color 200ms ease",
                 }}
               >
                 {columns.map((col) => (
@@ -98,7 +106,8 @@ export default function AdminDataTable<T>({
                   </TableCell>
                 ))}
               </TableRow>
-            ))
+            );
+            })
           )}
         </TableBody>
       </Table>
