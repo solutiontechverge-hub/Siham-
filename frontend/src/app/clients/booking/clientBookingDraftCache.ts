@@ -72,7 +72,12 @@ export function cacheClientBookingDraftSnapshot(record: ClientBookingRecord) {
   const keys = keysForRecord(record);
   if (!keys.length) return;
   const store = readStore();
-  const snapshot = toSnapshot(record.draft);
+  const previous =
+    keys.map((key) => store[key]).find((snap) => snap && (hasPeople(snap) || hasProject(snap) || servicesHaveGuestIds(snap))) ??
+    keys.map((key) => store[key]).find(Boolean) ??
+    null;
+  // Never let a stripped API draft erase Models/Guests/Project from local storage.
+  const snapshot = toSnapshot(mergeClientBookingDraftRichness(record.draft, previous));
   for (const key of keys) store[key] = snapshot;
   writeStore(store);
 }
@@ -119,19 +124,42 @@ export function mergeClientBookingDraftRichness(
     : fallback.teamMembers ?? primary.teamMembers;
 
   let services = primary.services ?? [];
-  if (!servicesHaveGuestIds(primary) && (fallback.services?.length ?? 0) > 0) {
-    const byId = new Map((fallback.services ?? []).map((s) => [s.id, s]));
-    const byName = new Map((fallback.services ?? []).map((s) => [s.name, s]));
+  const fallbackServices = fallback.services ?? [];
+  const primaryAssignedCount = (primary.services ?? []).filter((s) => Boolean(s.guestId)).length;
+  const fallbackAssignedCount = fallbackServices.filter((s) => Boolean(s.guestId)).length;
+  const fallbackIsRicher =
+    fallbackServices.length > (primary.services?.length ?? 0) ||
+    fallbackAssignedCount > primaryAssignedCount ||
+    ((fallback.people?.length ?? 0) > (primary.people?.length ?? 0) &&
+      fallbackAssignedCount >= primaryAssignedCount &&
+      fallbackServices.length > 0);
+
+  // Desired Model/Guest reopen: prefer the local/API snapshot when it still has
+  // person assignments the stripped notes draft no longer carries.
+  if (fallbackIsRicher && fallbackServices.length > 0) {
+    services = fallbackServices.map((service) => ({
+      id: service.id,
+      name: service.name,
+      durationMins: service.durationMins,
+      price: service.price,
+      guestId: service.guestId ?? null,
+      teamMemberId: service.teamMemberId ?? null,
+      isAddOn: service.isAddOn,
+    }));
+  } else if (!servicesHaveGuestIds(primary) && fallbackServices.length > 0) {
+    const byId = new Map(fallbackServices.map((s) => [s.id, s]));
+    const byName = new Map(fallbackServices.map((s) => [s.name, s]));
     services = services.map((service) => {
       const match = byId.get(service.id) ?? byName.get(service.name);
       return {
         ...service,
         guestId: service.guestId ?? match?.guestId ?? null,
+        teamMemberId: service.teamMemberId ?? match?.teamMemberId ?? null,
       };
     });
     // If API flattened to fewer rows, keep richer snapshot services when primary has no guest mapping.
-    if (!services.some((s) => s.guestId) && fallback.services?.length) {
-      services = fallback.services.map((service) => ({
+    if (!services.some((s) => s.guestId) && fallbackServices.length) {
+      services = fallbackServices.map((service) => ({
         id: service.id,
         name: service.name,
         durationMins: service.durationMins,

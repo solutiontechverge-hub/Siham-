@@ -7,14 +7,26 @@ import type { ManualEntryDiscount } from "../../sections/finance/manualEntry.dat
 const NOTES_META_PREFIX = "---mollure-meta---";
 
 export type StoredEbrNotePayload = {
-  status: "suggested" | "pending" | "rejected" | "none";
+  status: "suggested" | "pending" | "rejected" | "accepted" | "none";
   suggestedAt?: string;
   professionalNote?: string;
   clientNote?: string;
   editedServiceIds?: string[];
   editedProductIds?: string[];
+  /** Preferred for client→pro rounds so the drawer can show “Edited”. */
+  clientEditedServiceIds?: string[];
   suggestedServices?: NonNullable<CalendarBookingDetails["services"]>;
   suggestedProducts?: NonNullable<CalendarBookingDetails["products"]>;
+  /** Proposed schedule — booking columns stay original until professional Accept. */
+  suggestedDateISO?: string;
+  suggestedTime?: string;
+  suggestedStart?: string;
+  suggestedEnd?: string;
+  /** Confirmed booking schedule before this client EBR (for outcome diffs). */
+  originalDateISO?: string;
+  originalTime?: string;
+  suggestedTotalPrice?: number;
+  suggestedProjectDetails?: NonNullable<CalendarBookingDetails["clientSnapshot"]>["projectDetails"];
   responseStatus?: CalendarBookingDetails["responseStatus"];
   requestDirection?: CalendarBookingDetails["requestDirection"];
   lastEditedBy?: CalendarBookingDetails["lastEditedBy"];
@@ -105,6 +117,119 @@ export function parseStoredEbrFromNotes(notes?: string | null): StoredEbrNotePay
   }
 }
 
+/** Keep suggested changes but mark EBR as rejected (booking columns stay original). */
+export function markClientEbrRejectedInNotes(notes?: string | null): string | null {
+  const details = parseCalendarEntryNotes(notes);
+  const ebr = parseStoredEbrFromNotes(notes);
+  const internalNote = (details?.internalNote ?? "").trim();
+  if (!ebr) {
+    return clearEbrSuggestionsFromNotes(notes, {
+      internalNote,
+      requestDirection: details?.requestDirection,
+      clientSnapshot: details?.clientSnapshot,
+    });
+  }
+  return serializeCalendarEntryNotes(
+    internalNote,
+    {
+      showInternalNote: Boolean(internalNote) || Boolean(details?.showInternalNote),
+      showLateRescheduling: details?.showLateRescheduling,
+      lateRescheduleFeePercent: details?.lateRescheduleFeePercent,
+      showLateCancellation: details?.showLateCancellation,
+      lateCancellationFeePercent: details?.lateCancellationFeePercent,
+      showPrepayment: details?.showPrepayment,
+      prepaymentPercent: details?.prepaymentPercent,
+      paymentMethod: details?.paymentMethod,
+      showKilometerAllowance: details?.showKilometerAllowance,
+      kilometerAllowance: details?.kilometerAllowance,
+      cancellationReason: details?.cancellationReason,
+      requestDirection: details?.requestDirection,
+      clientSnapshot: details?.clientSnapshot,
+    },
+    {
+      ...ebr,
+      status: "rejected",
+      lastEditedBy: ebr.lastEditedBy ?? "client",
+      responseStatus: undefined,
+    },
+  );
+}
+
+/** Apply accepted changes into clientSnapshot, keep ebr status=accepted for client outcome banner. */
+export function markClientEbrAcceptedInNotes(
+  notes?: string | null,
+  applied?: Partial<CalendarBookingDetails> | null,
+): string | null {
+  const details = parseCalendarEntryNotes(notes);
+  const ebr = parseStoredEbrFromNotes(notes);
+  const internalNote = (applied?.internalNote ?? details?.internalNote ?? "").trim();
+  if (!ebr) {
+    return clearEbrSuggestionsFromNotes(notes, applied);
+  }
+
+  const nextSnapshot = {
+    ...(details?.clientSnapshot ?? {}),
+    ...(applied?.clientSnapshot ?? {}),
+  };
+
+  return serializeCalendarEntryNotes(
+    internalNote,
+    {
+      showInternalNote: Boolean(internalNote) || Boolean(details?.showInternalNote),
+      showLateRescheduling: details?.showLateRescheduling,
+      lateRescheduleFeePercent: details?.lateRescheduleFeePercent,
+      showLateCancellation: details?.showLateCancellation,
+      lateCancellationFeePercent: details?.lateCancellationFeePercent,
+      showPrepayment: details?.showPrepayment,
+      prepaymentPercent: details?.prepaymentPercent,
+      paymentMethod: details?.paymentMethod,
+      showKilometerAllowance: details?.showKilometerAllowance,
+      kilometerAllowance: details?.kilometerAllowance,
+      cancellationReason: details?.cancellationReason,
+      requestDirection: details?.requestDirection,
+      clientSnapshot: nextSnapshot,
+      ...(applied?.services ? { services: applied.services } : {}),
+      ...(applied?.products ? { products: applied.products } : {}),
+    },
+    {
+      ...ebr,
+      status: "accepted",
+      lastEditedBy: ebr.lastEditedBy ?? "client",
+      responseStatus: undefined,
+    },
+  );
+}
+
+/** Rebuild notes without pending EBR suggestions (optionally with applied booking details). */
+export function clearEbrSuggestionsFromNotes(
+  notes?: string | null,
+  applied?: Partial<CalendarBookingDetails> | null,
+): string | null {
+  const details = parseCalendarEntryNotes(notes);
+  const internalNote = (applied?.internalNote ?? details?.internalNote ?? "").trim();
+  const nextDetails: CalendarBookingDetails = {
+    ...(details ?? {}),
+    ...(applied ?? {}),
+    // Drop negotiation markers after accept/reject/cancel.
+    responseStatus: undefined,
+    lastEditedBy: undefined,
+    requestDirection: undefined,
+    editedServiceIds: applied?.editedServiceIds,
+    clientEditedServiceIds: undefined,
+    ...(applied?.cancellationReason?.trim()
+      ? { cancellationReason: applied.cancellationReason.trim() }
+      : details?.cancellationReason?.trim()
+        ? { cancellationReason: details.cancellationReason.trim() }
+        : {}),
+  };
+  // When clearing without applying, do not keep suggested service overlays as permanent lines.
+  if (!applied?.services) {
+    delete nextDetails.services;
+    delete nextDetails.products;
+  }
+  return serializeCalendarEntryNotes(internalNote, nextDetails, null);
+}
+
 export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingDetails | undefined {
   if (!notes?.trim()) return undefined;
   const markerIndex = notes.indexOf(NOTES_META_PREFIX);
@@ -146,10 +271,18 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
       ...(meta.editedServiceIds?.length ? { editedServiceIds: meta.editedServiceIds } : {}),
       ...(meta.lastEditedBy ? { lastEditedBy: meta.lastEditedBy } : {}),
       ...(meta.clientSnapshot ? { clientSnapshot: meta.clientSnapshot } : {}),
-      ...(ebr?.suggestedServices?.length ? { services: ebr.suggestedServices } : {}),
-      ...(ebr?.suggestedProducts?.length ? { products: ebr.suggestedProducts } : {}),
-      ...(ebr?.editedServiceIds?.length && !meta.editedServiceIds?.length
+      ...(ebr?.status !== "rejected" && ebr?.suggestedServices?.length ? { services: ebr.suggestedServices } : {}),
+      ...(ebr?.status !== "rejected" && ebr?.suggestedProducts?.length ? { products: ebr.suggestedProducts } : {}),
+      ...(ebr?.status !== "rejected" && ebr?.editedServiceIds?.length && !meta.editedServiceIds?.length
         ? { editedServiceIds: ebr.editedServiceIds }
+        : {}),
+      ...(ebr?.status !== "rejected" && ebr?.suggestedProjectDetails
+        ? {
+            clientSnapshot: {
+              ...(meta.clientSnapshot ?? {}),
+              projectDetails: ebr.suggestedProjectDetails,
+            },
+          }
         : {}),
     };
   } catch {

@@ -137,6 +137,8 @@ export type CalendarEvent = {
   bookingType?: CalendarBookingType;
   /** Online booking scenario indicator (BR, EBR, ER, E). */
   bookingScenario?: CalendarBookingScenario;
+  /** Raw booking notes (includes mollure EBR meta) for accept/reject apply. */
+  notes?: string | null;
   showClientName?: string;
   details?: CalendarBookingDetails;
 };

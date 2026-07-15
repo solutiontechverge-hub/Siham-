@@ -91,14 +91,18 @@ export function mapCalendarBookingToEvent(
     booking.team_member_id != null && String(booking.team_member_id).trim()
       ? String(booking.team_member_id)
       : fallbackResourceId || "unassigned";
+  const ebrMeta = status === "Cancelled" ? null : parseStoredEbrFromNotes(booking.notes);
   const isOutgoingEbr =
+    status !== "Cancelled" &&
     parsedNotes?.lastEditedBy === "professional" &&
     (parsedNotes?.requestDirection === "outgoing" || parsedNotes?.responseStatus === "suggestion_for_change");
   const isIncomingClientEbr =
-    parsedNotes?.lastEditedBy === "client" ||
-    (parseStoredEbrFromNotes(booking.notes)?.status === "pending" &&
-      Boolean(parseStoredEbrFromNotes(booking.notes)?.clientNote));
-  const ebrMeta = parseStoredEbrFromNotes(booking.notes);
+    status !== "Cancelled" &&
+    Boolean(ebrMeta) &&
+    (ebrMeta!.status === "pending" || ebrMeta!.status === "suggested") &&
+    (ebrMeta!.lastEditedBy === "client" ||
+      Boolean(ebrMeta!.clientNote) ||
+      parsedNotes?.lastEditedBy === "client");
   const clientNote = ebrMeta?.clientNote?.trim() || "";
   const noteText = clientNote || parsedNotes?.internalNote?.trim() || "";
 
@@ -121,6 +125,7 @@ export function mapCalendarBookingToEvent(
         : "Online",
     bookingScenario: isIncomingClientEbr ? "EBR" : isRequestBooking ? "BR" : undefined,
     showClientName: clientName,
+    notes: booking.notes ?? null,
     details: {
       clientEmail: booking.customer_email ?? "",
       requestDirection: isOutgoingEbr ? "outgoing" : "incoming",

@@ -24,6 +24,9 @@ type Props = {
   bookingRef: string;
   onClose: () => void;
   onSuccess: () => void;
+  title?: string;
+  subtitlePrefix?: string;
+  paymentType?: "booking_prepayment" | "booking_cancellation_fee";
 };
 
 function PaymentForm({
@@ -112,7 +115,16 @@ function PaymentForm({
   );
 }
 
-export default function StripePrepaymentDialog({ open, amount, bookingRef, onClose, onSuccess }: Props) {
+export default function StripePrepaymentDialog({
+  open,
+  amount,
+  bookingRef,
+  onClose,
+  onSuccess,
+  title = "Pay prepayment",
+  subtitlePrefix = "Secure payment for booking",
+  paymentType = "booking_prepayment",
+}: Props) {
   const m = useTheme().palette.mollure;
   const [clientSecret, setClientSecret] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
@@ -138,6 +150,7 @@ export default function StripePrepaymentDialog({ open, amount, bookingRef, onClo
         amount,
         currency: "eur",
         bookingRef,
+        type: paymentType,
       }),
     })
       .then(async (res) => {
@@ -162,7 +175,7 @@ export default function StripePrepaymentDialog({ open, amount, bookingRef, onClo
     return () => {
       cancelled = true;
     };
-  }, [open, amount, bookingRef]);
+  }, [open, amount, bookingRef, paymentType]);
 
   const elementsOptions: StripeElementsOptions | undefined = clientSecret
     ? {
@@ -196,14 +209,14 @@ export default function StripePrepaymentDialog({ open, amount, bookingRef, onClo
           pr: 1,
         }}
       >
-        Pay prepayment
+        {title}
         <IconButton aria-label="Close" onClick={onClose} size="small" disabled={loading}>
           <CloseRoundedIcon />
         </IconButton>
       </DialogTitle>
       <DialogContent sx={{ pt: 0, pb: 2.5 }}>
         <Typography sx={{ mb: 2, fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.55) }}>
-          Secure payment for booking #{bookingRef} · €{amount.toFixed(2)}
+          {subtitlePrefix} #{bookingRef} · €{amount.toFixed(2)}
         </Typography>
 
         {loading ? (

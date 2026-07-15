@@ -117,12 +117,21 @@ export default function MessagingModalShell({
   );
 }
 
-export function MessagingModalCancelButton({ onClick, label = "Cancel" }: { onClick: () => void; label?: string }) {
+export function MessagingModalCancelButton({
+  onClick,
+  label = "Cancel",
+  disabled,
+}: {
+  onClick: () => void;
+  label?: string;
+  disabled?: boolean;
+}) {
   const m = useTheme().palette.mollure;
   return (
     <Button
       variant="outlined"
       onClick={onClick}
+      disabled={disabled}
       sx={{
         textTransform: "none",
         fontWeight: 800,

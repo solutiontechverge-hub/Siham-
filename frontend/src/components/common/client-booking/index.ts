@@ -6,6 +6,8 @@ export { default as ClientBookingPaymentSummary } from "./ClientBookingPaymentSu
 export { buildClientBookingPaymentSummary } from "./buildClientBookingPaymentSummary";
 export { default as StripePrepaymentDialog } from "./StripePrepaymentDialog";
 export { default as ClientBookingPoliciesAccordion } from "./ClientBookingPoliciesAccordion";
+export { default as ClientBookingCancelFeeDialog } from "./ClientBookingCancelFeeDialog";
+export { settleCancellationFee } from "./settleCancellationFee";
 export { buildBookingSummarySections, resolveTeamMemberFirstName } from "./buildBookingSummarySections";
 export { parsePrepaymentPercent } from "./parsePrepaymentPercent";
 export { useClientBookingDraft } from "./useClientBookingDraft";
@@ -26,4 +28,5 @@ export {
 } from "./bookingEditRequest";
 export type { BookingEditRequestStatus, BookingEditSuggestionPayload } from "./bookingEditRequest";
 export type { ClientBookingDetailsVariant } from "./ClientBookingDetailsView";
+export type { CancellationFeeSettlement } from "./settleCancellationFee";
 export type * from "./types";

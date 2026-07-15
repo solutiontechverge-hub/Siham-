@@ -55,6 +55,7 @@ declare module "@mui/material/styles" {
     logoAccent: string;
     logoText: string;
     bgshadow: string;
+    cancelledSurface: string;
     sectionSurface: string;
     sectionSurfaceShadow: string;
     cardbg: string;

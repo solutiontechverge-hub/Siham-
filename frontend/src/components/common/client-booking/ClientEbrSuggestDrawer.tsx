@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Box, Button, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import MollureDrawer from "../MollureDrawer";
+import AppDrawer from "../AppDrawer";
 import AppTextField from "../AppTextField";
 import type { ClientBookingDraft } from "./types";
 
@@ -15,7 +15,7 @@ type Props = {
   onSend: (note: string) => void | Promise<void>;
 };
 
-/** Client EBR suggest drawer — note + edit services/products (existing booking editor). */
+/** Client EBR suggest drawer — note + edit services/products (shared AppDrawer shell). */
 export default function ClientEbrSuggestDrawer({ open, draft, onClose, onEditServices, onSend }: Props) {
   const m = useTheme().palette.mollure;
   const [note, setNote] = React.useState("");
@@ -35,57 +35,14 @@ export default function ClientEbrSuggestDrawer({ open, draft, onClose, onEditSer
   const services = draft?.services ?? [];
 
   return (
-    <MollureDrawer
+    <AppDrawer
+      anchor="right"
       open={open}
       onClose={onClose}
       title="Suggest changes"
-      footer={
-        <Stack direction="row" spacing={1.25} sx={{ width: "100%" }}>
-          <Button
-            fullWidth
-            variant="outlined"
-            onClick={onClose}
-            sx={{
-              textTransform: "none",
-              fontWeight: 800,
-              borderRadius: "10px",
-              borderColor: alpha(m.navy, 0.18),
-              color: alpha(m.navy, 0.65),
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            fullWidth
-            variant="contained"
-            disableElevation
-            disabled={sending}
-            onClick={async () => {
-              setSending(true);
-              try {
-                await onSend(note.trim());
-              } finally {
-                setSending(false);
-              }
-            }}
-            sx={{
-              textTransform: "none",
-              fontWeight: 800,
-              borderRadius: "10px",
-              bgcolor: m.teal,
-              "&:hover": { bgcolor: m.tealDark },
-            }}
-          >
-            Send
-          </Button>
-        </Stack>
-      }
+      subtitle="Write a note for the professional, then edit services or products if needed."
     >
-      <Stack spacing={2} sx={{ py: 0.5 }}>
-        <Typography sx={{ fontWeight: 800, fontSize: 13, color: alpha(m.navy, 0.72), lineHeight: 1.45 }}>
-          Write a note for the professional, then edit services or products if needed.
-        </Typography>
-
+      <Stack spacing={2.5}>
         <AppTextField
           fullWidth
           multiline
@@ -146,7 +103,49 @@ export default function ClientEbrSuggestDrawer({ open, draft, onClose, onEditSer
         >
           Edit services &amp; products
         </Button>
+
+        <Stack direction="row" spacing={1.25} sx={{ pt: 0.5 }}>
+          <Button
+            fullWidth
+            variant="outlined"
+            onClick={onClose}
+            sx={{
+              textTransform: "none",
+              fontWeight: 800,
+              borderRadius: "10px",
+              height: 40,
+              borderColor: alpha(m.navy, 0.18),
+              color: alpha(m.navy, 0.65),
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            fullWidth
+            variant="contained"
+            disableElevation
+            disabled={sending}
+            onClick={async () => {
+              setSending(true);
+              try {
+                await onSend(note.trim());
+              } finally {
+                setSending(false);
+              }
+            }}
+            sx={{
+              textTransform: "none",
+              fontWeight: 800,
+              borderRadius: "10px",
+              height: 40,
+              bgcolor: m.teal,
+              "&:hover": { bgcolor: m.tealDark },
+            }}
+          >
+            Send
+          </Button>
+        </Stack>
       </Stack>
-    </MollureDrawer>
+    </AppDrawer>
   );
 }

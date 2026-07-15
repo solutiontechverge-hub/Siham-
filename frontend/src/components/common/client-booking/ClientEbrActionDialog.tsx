@@ -23,7 +23,7 @@ const COPY: Record<
 > = {
   accept: {
     title: "Accept EBR",
-    body: "By accepting, the EBR will be confirmed",
+    body: "Confirm to accept these changes. They will be applied to your booking.",
     confirmLabel: "Accept",
   },
   suggest: {
@@ -33,7 +33,7 @@ const COPY: Record<
   },
   reject: {
     title: "Reject EBR",
-    body: "By rejecting, the EBR will be invalid",
+    body: "Confirm to reject these changes. They will not be applied to your booking.",
     confirmLabel: "Reject",
     showWarning: true,
   },

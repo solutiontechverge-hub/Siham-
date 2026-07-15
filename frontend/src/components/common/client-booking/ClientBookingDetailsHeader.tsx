@@ -5,7 +5,6 @@ import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineR
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import { Badge, Box, Button, Divider, IconButton, Menu, MenuItem, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import { useRouter } from "next/navigation";
 import { useSnackbar } from "../AppSnackbar";
 import { getMessagingHref, useClientMessagingUnread, useMessagingWidgetOptional } from "../messaging";
 import type { BookingRequestDirection, ClientBookingStatus } from "../../../app/clients/booking/clientBookingRecords";
@@ -31,11 +30,12 @@ type Props = {
   prepaymentPaid?: boolean;
   /** Past booking still awaiting settlement. */
   paymentDue?: boolean;
-  onEditServices?: () => void;
+  onEditDateTime?: () => void;
+  onEditBookingDetails?: () => void;
+  onEditProject?: () => void;
   onSendBookingRequest?: () => void | Promise<void>;
   onDeleteBooking?: () => void;
   onDiscardBookingRequest?: () => void;
-  messagingHref?: string;
 };
 
 export default function ClientBookingDetailsHeader({
@@ -50,14 +50,14 @@ export default function ClientBookingDetailsHeader({
   requiresPrepayment = false,
   prepaymentPaid = false,
   paymentDue = false,
-  onEditServices,
+  onEditDateTime,
+  onEditBookingDetails,
+  onEditProject,
   onSendBookingRequest,
   onDeleteBooking,
   onDiscardBookingRequest,
-  messagingHref,
 }: Props) {
   const m = useTheme().palette.mollure;
-  const router = useRouter();
   const { showSnackbar } = useSnackbar();
   const messagingWidget = useMessagingWidgetOptional();
   const [editAnchor, setEditAnchor] = React.useState<HTMLElement | null>(null);
@@ -84,7 +84,13 @@ export default function ClientBookingDetailsHeader({
     void onSendBookingRequest?.();
   };
 
-  const menuItemSx = { fontSize: 12.5, fontWeight: 800 };
+  const menuItemSx = {
+    fontSize: 12.5,
+    fontWeight: 800,
+    color: alpha(m.navy, 0.62),
+    py: "10px",
+    px: 1.5,
+  };
 
   const displayStatus: ClientBookingStatus = isCancelled ? "cancelled" : bookingStatus;
 
@@ -102,10 +108,16 @@ export default function ClientBookingDetailsHeader({
   const isConfirmed = bookingStatus === "confirmed";
   const waitingForPayment =
     requiresPrepayment && !prepaymentPaid && !isCompleted && !isCancelled;
-  /** Edit is only available while waiting for payment — never after confirmed. */
+  /** Edit after confirm (EBR menu) or while waiting for unpaid prepayment. */
   const showEdit =
-    waitingForPayment && !isConfirmed && !isOutgoingBookingRequest && !bookingRequestSent;
+    !isCancelled &&
+    !isCompleted &&
+    !isOutgoingBookingRequest &&
+    !bookingRequestSent &&
+    (isConfirmed || waitingForPayment);
   const editActionsDisabled = !showEdit;
+  const showConfirmedEditMenu =
+    isConfirmed && Boolean(onEditDateTime || onEditBookingDetails || onEditProject);
 
   const headerActionBtnSx = {
     borderRadius: "8px",
@@ -268,39 +280,57 @@ export default function ClientBookingDetailsHeader({
         onClose={() => setEditAnchor(null)}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         transformOrigin={{ vertical: "top", horizontal: "right" }}
-        PaperProps={{ sx: { borderRadius: "10px", minWidth: 220, mt: 0.5 } }}
+        PaperProps={{ sx: { borderRadius: "10px", minWidth: 200, mt: 0.5, py: 0.5 } }}
       >
-        {editRequest.isApproved ? (
+        {showConfirmedEditMenu ? (
           <>
-            <MenuItem
-              onClick={() => {
-                setEditAnchor(null);
-                onEditServices?.();
-                router.push("/clients/booking?mode=create");
-              }}
-              sx={menuItemSx}
-            >
-              Edit services
-            </MenuItem>
-            <MenuItem
-              onClick={() => {
-                setEditAnchor(null);
-                router.push("/clients/booking?mode=create");
-              }}
-              sx={menuItemSx}
-            >
-              Change date &amp; time
-            </MenuItem>
+            {onEditDateTime ? (
+              <MenuItem
+                onClick={() => {
+                  setEditAnchor(null);
+                  onEditDateTime();
+                }}
+                sx={menuItemSx}
+              >
+                Date &amp; Time
+              </MenuItem>
+            ) : null}
+            {onEditDateTime && onEditBookingDetails ? <Divider sx={{ my: 0 }} /> : null}
+            {onEditBookingDetails ? (
+              <MenuItem
+                onClick={() => {
+                  setEditAnchor(null);
+                  onEditBookingDetails();
+                }}
+                sx={menuItemSx}
+              >
+                Booking Details
+              </MenuItem>
+            ) : null}
+            {locationMode === "desired" && onEditProject ? (
+              <>
+                <Divider sx={{ my: 0 }} />
+                <MenuItem
+                  onClick={() => {
+                    setEditAnchor(null);
+                    onEditProject();
+                  }}
+                  sx={menuItemSx}
+                >
+                  Project
+                </MenuItem>
+              </>
+            ) : null}
           </>
         ) : bookingRequestSent ? (
-          <MenuItem disabled sx={{ ...menuItemSx, whiteSpace: "normal", py: 1.25, opacity: 1 }}>
+          <MenuItem disabled sx={{ ...menuItemSx, whiteSpace: "normal", opacity: 1 }}>
             Booking request sent — awaiting professional approval
           </MenuItem>
         ) : editRequest.isPending ? (
-          <MenuItem disabled sx={{ ...menuItemSx, whiteSpace: "normal", py: 1.25, opacity: 1 }}>
+          <MenuItem disabled sx={{ ...menuItemSx, whiteSpace: "normal", opacity: 1 }}>
             Edit request sent — awaiting professional approval
           </MenuItem>
-        ) : bookingStatus === "draft" && onSendBookingRequest ? (
+        ) : onSendBookingRequest ? (
           <MenuItem onClick={handleSendBookingRequestFromEdit} sx={menuItemSx}>
             Send booking request to professional
           </MenuItem>

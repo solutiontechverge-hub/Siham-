@@ -1684,24 +1684,26 @@ export default function ProfessionalFixedLocationSetup({
         book_service_notes: sourceBiz.bookComboInstructions,
         book_service_combinations: sourceBiz.bookCombos
           .map((combo) => {
-            const category = businessCategories.find((item) => String(item.id) === combo.categoryId);
-            const service = category
-              ? category.subcategories.find((item) => String(item.id) === combo.serviceId)
-              : businessCategories
-                  .flatMap((item) => item.subcategories)
-                  .find((item) => String(item.id) === combo.serviceId);
-            const categoryId = String(combo.categoryId ?? "").trim();
-            const serviceId = String(combo.serviceId ?? "").trim();
+            const allSubs = businessCategories.flatMap((category) =>
+              category.subcategories.map((subcategory) => ({
+                id: String(subcategory.id),
+                title: subcategory.title,
+              })),
+            );
+            const firstServiceId = String(combo.categoryId ?? "").trim();
+            const secondServiceId = String(combo.serviceId ?? "").trim();
+            const first = allSubs.find((item) => item.id === firstServiceId);
+            const second = allSubs.find((item) => item.id === secondServiceId);
 
-            if (!categoryId || !serviceId) {
+            if (!firstServiceId || !secondServiceId) {
               return null;
             }
 
             return {
-              category_id: categoryId,
-              category_title: category?.title ?? null,
-              service_id: serviceId,
-              service_title: service?.title ?? null,
+              category_id: firstServiceId,
+              category_title: first?.title ?? null,
+              service_id: secondServiceId,
+              service_title: second?.title ?? null,
             };
           })
           .filter((combo): combo is NonNullable<typeof combo> => combo !== null),
@@ -3189,12 +3191,17 @@ export default function ProfessionalFixedLocationSetup({
   );
 
 
-  const bookingCategoryOptions = React.useMemo(
+  /** Flat catalog of billable services (subcategories) for combo A + B picks. */
+  const allBookingServiceOptions = React.useMemo(
     () =>
-      businessCategories.map((category) => ({
-        value: String(category.id),
-        label: category.title,
-      })),
+      businessCategories.flatMap((category) =>
+        category.subcategories.map((subcategory) => ({
+          value: String(subcategory.id),
+          label: subcategory.title,
+          categoryId: String(category.id),
+          categoryLabel: category.title,
+        })),
+      ),
     [businessCategories],
   );
 
@@ -3203,43 +3210,43 @@ export default function ProfessionalFixedLocationSetup({
 
   const getBookingServiceOptions = React.useCallback(
     (categoryId: string) => {
-      const selectedCategory = businessCategories.find((category) => String(category.id) === categoryId);
-      const subcategories = selectedCategory
-        ? selectedCategory.subcategories
-        : businessCategories.flatMap((category) => category.subcategories);
-
-      return subcategories.map((subcategory) => ({
-        value: String(subcategory.id),
-        label: subcategory.title,
-      }));
+      if (!categoryId) return allBookingServiceOptions;
+      return allBookingServiceOptions.filter((option) => option.categoryId === categoryId);
     },
-    [businessCategories],
+    [allBookingServiceOptions],
   );
 
   const bookingServiceOptions = React.useMemo(
-    () => getBookingServiceOptions(fixedBiz.bookCategory),
-    [fixedBiz.bookCategory, getBookingServiceOptions],
+    () => allBookingServiceOptions,
+    [allBookingServiceOptions],
   );
 
   const resolveBookingComboLabels = React.useCallback(
-    (categoryId: string, serviceId: string) => {
-      const categoryLabel =
-        bookingCategoryOptions.find((option) => option.value === categoryId)?.label ?? "Category";
-      const serviceLabel =
-        getBookingServiceOptions(categoryId).find((option) => option.value === serviceId)?.label ?? "Service";
-      return { categoryLabel, serviceLabel };
+    (firstServiceId: string, secondServiceId: string) => {
+      const first =
+        allBookingServiceOptions.find((option) => option.value === firstServiceId)?.label ?? "Service";
+      const second =
+        allBookingServiceOptions.find((option) => option.value === secondServiceId)?.label ?? "Service";
+      return { categoryLabel: first, serviceLabel: second };
     },
-    [bookingCategoryOptions, getBookingServiceOptions],
+    [allBookingServiceOptions],
   );
 
   const addBookingCombo = React.useCallback(() => {
-    const categoryId = fixedBiz.bookCategory || bookingCategoryOptions[0]?.value || "";
-    const serviceOptions = getBookingServiceOptions(categoryId);
-    const serviceId = fixedBiz.bookService || serviceOptions[0]?.value || "";
-    if (!categoryId || !serviceId) return;
+    const firstServiceId = fixedBiz.bookCategory || allBookingServiceOptions[0]?.value || "";
+    const secondServiceId =
+      fixedBiz.bookService ||
+      allBookingServiceOptions.find((option) => option.value !== firstServiceId)?.value ||
+      "";
+    if (!firstServiceId || !secondServiceId || firstServiceId === secondServiceId) {
+      showSnackbar({ severity: "info", message: "Pick two different services for a combination." });
+      return;
+    }
 
     const alreadyExists = fixedBiz.bookCombos.some(
-      (combo) => combo.categoryId === categoryId && combo.serviceId === serviceId,
+      (combo) =>
+        (combo.categoryId === firstServiceId && combo.serviceId === secondServiceId) ||
+        (combo.categoryId === secondServiceId && combo.serviceId === firstServiceId),
     );
     if (alreadyExists) {
       showSnackbar({ severity: "info", message: "This service combination is already added." });
@@ -3248,13 +3255,15 @@ export default function ProfessionalFixedLocationSetup({
 
     const id = `combo-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     setBookingComboEditId(null);
-    setFixedBizField("bookCombos", [...fixedBiz.bookCombos, { id, categoryId, serviceId }]);
+    setFixedBizField("bookCombos", [
+      ...fixedBiz.bookCombos,
+      { id, categoryId: firstServiceId, serviceId: secondServiceId },
+    ]);
   }, [
+    allBookingServiceOptions,
     fixedBiz.bookCategory,
     fixedBiz.bookCombos,
     fixedBiz.bookService,
-    bookingCategoryOptions,
-    getBookingServiceOptions,
     setFixedBizField,
     showSnackbar,
   ]);
@@ -3265,20 +3274,11 @@ export default function ProfessionalFixedLocationSetup({
         "bookCombos",
         fixedBiz.bookCombos.map((combo) => {
           if (combo.id !== id) return combo;
-
-          const next = { ...combo, ...patch };
-          if (patch.categoryId) {
-            const serviceOptions = getBookingServiceOptions(patch.categoryId);
-            next.serviceId = serviceOptions.some((option) => option.value === next.serviceId)
-              ? next.serviceId
-              : serviceOptions[0]?.value || "";
-          }
-
-          return next;
+          return { ...combo, ...patch };
         }),
       );
     },
-    [fixedBiz.bookCombos, getBookingServiceOptions, setFixedBizField],
+    [fixedBiz.bookCombos, setFixedBizField],
   );
 
   const deleteBookingCombo = React.useCallback(
@@ -4317,7 +4317,7 @@ export default function ProfessionalFixedLocationSetup({
               Book Services
             </Typography>
             <Typography sx={{ mt: 0.35, color: alpha(m.navy, 0.55), fontSize: 12, lineHeight: 1.45 }}>
-              Pick a category and service, then tap + to create a combo card you can edit or delete.
+              Pick two services, then tap + to create a combo card you can edit or delete.
             </Typography>
           </Box>
 
@@ -4335,27 +4335,27 @@ export default function ProfessionalFixedLocationSetup({
               <Grid container spacing={1.5} alignItems="center">
                 <Grid item xs={12} md={5}>
                   <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.6 }}>
-                    Select category
+                    Select first service
                   </Typography>
                   <MollureFormField
                     select
                     value={fixedBiz.bookCategory}
                     onChange={(e) => {
-                      const categoryId = e.target.value;
-                      setFixedBizField("bookCategory", categoryId);
-                      const nextServices = getBookingServiceOptions(categoryId);
-                      setFixedBizField(
-                        "bookService",
-                        nextServices.some((option) => option.value === fixedBiz.bookService)
-                          ? fixedBiz.bookService
-                          : nextServices[0]?.value || "",
-                      );
+                      const firstServiceId = e.target.value;
+                      setFixedBizField("bookCategory", firstServiceId);
+                      if (fixedBiz.bookService === firstServiceId) {
+                        setFixedBizField(
+                          "bookService",
+                          allBookingServiceOptions.find((option) => option.value !== firstServiceId)?.value ||
+                            "",
+                        );
+                      }
                     }}
                     sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     disabled={servicesDetailsDisabled}
                   >
-                    <MenuItem value="">Select category</MenuItem>
-                    {bookingCategoryOptions.map((opt) => (
+                    <MenuItem value="">Select first service</MenuItem>
+                    {allBookingServiceOptions.map((opt) => (
                       <MenuItem key={opt.value} value={opt.value}>
                         {opt.label}
                       </MenuItem>
@@ -4364,7 +4364,7 @@ export default function ProfessionalFixedLocationSetup({
                 </Grid>
                 <Grid item xs={12} md={5}>
                   <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.6 }}>
-                    Select service
+                    Select second service
                   </Typography>
                   <MollureFormField
                     select
@@ -4373,18 +4373,25 @@ export default function ProfessionalFixedLocationSetup({
                     sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     disabled={servicesDetailsDisabled}
                   >
-                    <MenuItem value="">Select service</MenuItem>
-                    {bookingServiceOptions.map((opt) => (
-                      <MenuItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </MenuItem>
-                    ))}
+                    <MenuItem value="">Select second service</MenuItem>
+                    {bookingServiceOptions
+                      .filter((opt) => opt.value !== fixedBiz.bookCategory)
+                      .map((opt) => (
+                        <MenuItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </MenuItem>
+                      ))}
                   </MollureFormField>
                 </Grid>
                 <Grid item xs={12} md={2} sx={{ display: "flex", justifyContent: { md: "flex-end" }, pr: { md: 0.5 } }}>
                   <IconButton
                     onClick={addBookingCombo}
-                    disabled={servicesDetailsDisabled || !fixedBiz.bookCategory || !fixedBiz.bookService}
+                    disabled={
+                      servicesDetailsDisabled ||
+                      !fixedBiz.bookCategory ||
+                      !fixedBiz.bookService ||
+                      fixedBiz.bookCategory === fixedBiz.bookService
+                    }
                     sx={addSoftIconButtonSx(m, 34)}
                   >
                     <AddRoundedIcon />
@@ -4408,7 +4415,7 @@ export default function ProfessionalFixedLocationSetup({
                   </Typography>
                   {fixedBiz.bookCombos.length === 0 ? (
                     <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: alpha(m.navy, 0.5), py: 0.5 }}>
-                      Select a category and service above, then tap + to add a combination.
+                      Select two services above, then tap + to add a combination.
                     </Typography>
                   ) : (
                     <Stack
@@ -4420,7 +4427,6 @@ export default function ProfessionalFixedLocationSetup({
                     >
                       {fixedBiz.bookCombos.map((c) => {
                         const isEditing = bookingComboEditId === c.id;
-                        const comboServiceOptions = getBookingServiceOptions(c.categoryId);
                         const { categoryLabel, serviceLabel } = resolveBookingComboLabels(c.categoryId, c.serviceId);
                         const comboFieldsDisabled = servicesDetailsDisabled;
 
@@ -4457,7 +4463,7 @@ export default function ProfessionalFixedLocationSetup({
                                       "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" },
                                     }}
                                   >
-                                    {bookingCategoryOptions.map((opt) => (
+                                    {allBookingServiceOptions.map((opt) => (
                                       <MenuItem key={opt.value} value={opt.value}>
                                         {opt.label}
                                       </MenuItem>
@@ -4484,11 +4490,13 @@ export default function ProfessionalFixedLocationSetup({
                                       "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" },
                                     }}
                                   >
-                                    {comboServiceOptions.map((opt) => (
-                                      <MenuItem key={opt.value} value={opt.value}>
-                                        {opt.label}
-                                      </MenuItem>
-                                    ))}
+                                    {allBookingServiceOptions
+                                      .filter((opt) => opt.value !== c.categoryId)
+                                      .map((opt) => (
+                                        <MenuItem key={opt.value} value={opt.value}>
+                                          {opt.label}
+                                        </MenuItem>
+                                      ))}
                                   </MollureFormField>
                                 </Stack>
                                 <Stack direction="row" spacing={0.5} justifyContent="flex-end">
