@@ -96,6 +96,8 @@ const theme = createTheme({
       logoAccent: "#A7E9A8",
       logoText: "#62758A",
       bgshadow: "#F9FAFB",
+      /** Booking details card when status is cancelled */
+      cancelledSurface: "#F9FAFB",
       /** Muted section panels (e.g. How it works — Changes Without Approval) */
       sectionSurface: "#F9FAFB",
       sectionSurfaceShadow: "0 10px 28px rgba(16, 35, 63, 0.10)",

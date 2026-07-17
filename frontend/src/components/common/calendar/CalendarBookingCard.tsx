@@ -85,6 +85,9 @@ export default function CalendarBookingCard({
         ? accent.border
         : accent.border;
   const cardPattern = isDesiredLocation ? "dots" : isFixedLocation ? "lines" : "none";
+  const isIncomingEbr =
+    event.bookingScenario === "EBR" && event.details?.requestDirection !== "outgoing";
+  const emphasizeRequest = isIncomingEbr || event.bookingScenario === "BR";
 
   return (
     <Box
@@ -128,11 +131,15 @@ export default function CalendarBookingCard({
       <BookingTimelineCard
         idLabel={`ID: ${event.bookingCode ?? extractBookingId(event.id)}`}
         title={event.title}
+        titleBold={emphasizeRequest}
         timeLabel={dense ? "" : `(${event.start} to ${event.end})`}
         locationLabel={event.location}
         status={{
           label: event.status,
-          sx: statusChipSxWithOverride(event.status, statusColor),
+          sx: {
+            ...statusChipSxWithOverride(event.status, statusColor),
+            ...(emphasizeRequest ? { fontWeight: 900 } : null),
+          },
         }}
         accentColor={accentColor}
         borderColor={borderColor}
@@ -152,6 +159,7 @@ export default function CalendarBookingCard({
                 : prepaymentIconVariant
               : undefined,
           showExternalLink: label === "ER",
+          bold: label === "EBR" || label === "BR",
         }))}
         prepaymentStatus={prepaymentIconVariant}
         responseIndicators={

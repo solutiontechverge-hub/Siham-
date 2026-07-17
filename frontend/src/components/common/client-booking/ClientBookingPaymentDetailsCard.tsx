@@ -13,6 +13,96 @@ import type { ClientBookingDraft, ClientBookingSummarySection } from "./types";
 
 export type ClientBookingPrepaymentState = "none" | "required" | "paid";
 
+type OutcomeChangesNote = {
+  scheduleLabel?: string;
+  services?: Array<{ name: string; price: number }>;
+  products?: Array<{ name: string; price: number }>;
+};
+
+function OutcomeChangesNoteBlock({
+  note,
+  variant,
+}: {
+  note: OutcomeChangesNote;
+  variant: "accepted" | "rejected";
+}) {
+  const m = useTheme().palette.mollure;
+  const isAccepted = variant === "accepted";
+  const accent = isAccepted ? m.success : "#C67A00";
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        mt: 1.25,
+        borderRadius: "10px",
+        border: `1px solid ${alpha(accent, 0.28)}`,
+        bgcolor: alpha(accent, 0.06),
+        px: 1.75,
+        py: 1.35,
+      }}
+    >
+      <Typography sx={{ fontWeight: 900, fontSize: 12.5, color: alpha(m.navy, 0.82), mb: 0.85 }}>
+        {isAccepted
+          ? "Professional has accepted your new changes"
+          : "Professional has rejected your new changes"}
+      </Typography>
+      {note.scheduleLabel ? (
+        <Typography sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.68), mb: 0.5 }}>
+          {isAccepted ? "Updated time" : "Requested time"}: {note.scheduleLabel}
+        </Typography>
+      ) : null}
+      {note.services?.length ? (
+        <Box sx={{ mt: 0.35 }}>
+          <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: alpha(m.navy, 0.55), mb: 0.35 }}>
+            {isAccepted ? "Updated services" : "Requested services"}
+          </Typography>
+          <Stack spacing={0.35}>
+            {note.services.map((service, index) => (
+              <Stack
+                key={`${service.name}-${index}`}
+                direction="row"
+                justifyContent="space-between"
+                spacing={1}
+              >
+                <Typography sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.72) }}>
+                  {service.name}
+                </Typography>
+                <Typography sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.72) }}>
+                  €{service.price}
+                </Typography>
+              </Stack>
+            ))}
+          </Stack>
+        </Box>
+      ) : null}
+      {note.products?.length ? (
+        <Box sx={{ mt: 0.75 }}>
+          <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: alpha(m.navy, 0.55), mb: 0.35 }}>
+            {isAccepted ? "Updated products" : "Requested products"}
+          </Typography>
+          <Stack spacing={0.35}>
+            {note.products.map((product, index) => (
+              <Stack
+                key={`${product.name}-${index}`}
+                direction="row"
+                justifyContent="space-between"
+                spacing={1}
+              >
+                <Typography sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.72) }}>
+                  {product.name}
+                </Typography>
+                <Typography sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.72) }}>
+                  €{product.price}
+                </Typography>
+              </Stack>
+            ))}
+          </Stack>
+        </Box>
+      ) : null}
+    </Paper>
+  );
+}
+
 type Props = {
   draft: ClientBookingDraft | null;
   requesterName: string;
@@ -28,6 +118,10 @@ type Props = {
   products?: readonly BookingEditSuggestedProduct[];
   editedProductIds?: readonly string[];
   onPayNow?: () => void;
+  /** Shown under Total Price when professional accepted the client's post-confirm EBR. */
+  acceptedChangesNote?: OutcomeChangesNote | null;
+  /** Shown under Total Price when professional rejected the client's post-confirm EBR. */
+  rejectedChangesNote?: OutcomeChangesNote | null;
 };
 
 export default function ClientBookingPaymentDetailsCard({
@@ -44,6 +138,8 @@ export default function ClientBookingPaymentDetailsCard({
   products = [],
   editedProductIds = [],
   onPayNow,
+  acceptedChangesNote = null,
+  rejectedChangesNote = null,
 }: Props) {
   const m = useTheme().palette.mollure;
   const sections = React.useMemo(() => buildBookingSummarySections(draft), [draft]);
@@ -370,23 +466,30 @@ export default function ClientBookingPaymentDetailsCard({
         ) : null}
 
         {prepaymentState === "none" ? (
-          <Box
-            sx={{
-              mt: showKilometerAllowance && kilometerAllowanceAmount > 0 ? 1.5 : 2,
-              px: 1.75,
-              py: 1.25,
-              borderRadius: "10px",
-              bgcolor: "#fff",
-              border: `1px solid ${alpha(m.navy, 0.08)}`,
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <Typography sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.78) }}>Total Price</Typography>
-            <Typography sx={{ fontWeight: 1000, fontSize: 15, color: alpha(m.navy, 0.9) }}>
-              {total.toFixed(0)}€
-            </Typography>
+          <Box sx={{ mt: showKilometerAllowance && kilometerAllowanceAmount > 0 ? 1.5 : 2 }}>
+            <Box
+              sx={{
+                px: 1.75,
+                py: 1.25,
+                borderRadius: "10px",
+                bgcolor: "#fff",
+                border: `1px solid ${alpha(m.navy, 0.08)}`,
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Typography sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.78) }}>Total Price</Typography>
+              <Typography sx={{ fontWeight: 1000, fontSize: 15, color: alpha(m.navy, 0.9) }}>
+                {total.toFixed(0)}€
+              </Typography>
+            </Box>
+            {acceptedChangesNote ? (
+              <OutcomeChangesNoteBlock note={acceptedChangesNote} variant="accepted" />
+            ) : null}
+            {rejectedChangesNote ? (
+              <OutcomeChangesNoteBlock note={rejectedChangesNote} variant="rejected" />
+            ) : null}
           </Box>
         ) : null}
 
@@ -398,6 +501,12 @@ export default function ClientBookingPaymentDetailsCard({
                 {total.toFixed(0)}€
               </Typography>
             </Stack>
+            {acceptedChangesNote ? (
+              <OutcomeChangesNoteBlock note={acceptedChangesNote} variant="accepted" />
+            ) : null}
+            {rejectedChangesNote ? (
+              <OutcomeChangesNoteBlock note={rejectedChangesNote} variant="rejected" />
+            ) : null}
             <Paper
               elevation={0}
               sx={{
@@ -406,6 +515,7 @@ export default function ClientBookingPaymentDetailsCard({
                 bgcolor: alpha(m.navy, 0.03),
                 px: 1.75,
                 py: 1.35,
+                mt: acceptedChangesNote || rejectedChangesNote ? 1.25 : 0,
               }}
             >
               <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1} sx={{ mb: 1.1 }}>
@@ -458,6 +568,12 @@ export default function ClientBookingPaymentDetailsCard({
                 {total.toFixed(0)}€
               </Typography>
             </Stack>
+            {acceptedChangesNote ? (
+              <OutcomeChangesNoteBlock note={acceptedChangesNote} variant="accepted" />
+            ) : null}
+            {rejectedChangesNote ? (
+              <OutcomeChangesNoteBlock note={rejectedChangesNote} variant="rejected" />
+            ) : null}
             <Paper
               elevation={0}
               sx={{
@@ -466,6 +582,7 @@ export default function ClientBookingPaymentDetailsCard({
                 bgcolor: alpha(m.navy, 0.03),
                 px: 1.75,
                 py: 1.35,
+                mt: acceptedChangesNote || rejectedChangesNote ? 1.25 : 0,
               }}
             >
               <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.1 }}>

@@ -254,6 +254,9 @@ export default function FixedLocationCalendarPage() {
           status,
           notes: extras?.notes,
           total_price: extras?.total_price,
+          booking_date: extras?.booking_date,
+          start_time: extras?.start_time,
+          end_time: extras?.end_time,
         }).unwrap();
       }}
       onUpdateCalendarEntryStatus={async (id, status) => {

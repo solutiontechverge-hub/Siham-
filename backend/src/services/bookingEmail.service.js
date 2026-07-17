@@ -225,6 +225,29 @@ export const notifyRespondToRequestReminder = async (bookingId) => {
   }
 };
 
+/** Email the professional when a client (re)sends a booking request. */
+export const notifyIncomingBookingRequest = async (bookingId) => {
+  try {
+    const ctx = await loadProfessionalEmailContext(bookingId);
+    if (!ctx?.professionalEmail) {
+      return { sent: false, reason: "professional_email_not_found" };
+    }
+
+    const { html, text } = buildRespondToRequestReminderEmail(ctx);
+    await sendMail({
+      to: ctx.professionalEmail,
+      subject: "Incoming booking request",
+      html,
+      text,
+    });
+
+    return { sent: true, to: ctx.professionalEmail };
+  } catch (error) {
+    console.error(`[booking-email] Failed incoming booking request for booking ${bookingId}:`, error.message);
+    return { sent: false, reason: "error", error: error.message };
+  }
+};
+
 export const notifyBookingStatusChange = async (bookingId, previousStatus, nextStatus) => {
   if (previousStatus === nextStatus) return;
 

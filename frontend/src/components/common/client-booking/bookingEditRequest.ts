@@ -3,7 +3,8 @@ export type BookingEditRequestStatus =
   | "pending"
   | "approved"
   | "suggested"
-  | "rejected";
+  | "rejected"
+  | "accepted";
 
 export type BookingEditSuggestedService = {
   id: string;
@@ -38,6 +39,7 @@ export type BookingEditRequestRecord = {
   approvedAt?: string;
   suggestedAt?: string;
   rejectedAt?: string;
+  acceptedAt?: string;
   /** Optional note from professional when suggesting changes */
   professionalNote?: string;
   /** Optional note from client when suggesting changes on an EBR */
@@ -46,6 +48,11 @@ export type BookingEditRequestRecord = {
   editedProductIds?: string[];
   suggestedServices?: BookingEditSuggestedService[];
   suggestedProducts?: BookingEditSuggestedProduct[];
+  /** Client-requested schedule kept when professional rejects an EBR. */
+  suggestedDateISO?: string;
+  suggestedTime?: string;
+  originalDateISO?: string;
+  originalTime?: string;
 };
 
 const STORAGE_KEY = "mollure:booking_edit_requests";
@@ -136,16 +143,84 @@ export function professionalSuggestBookingChanges(
   return next;
 }
 
-/** Professional rejects the client's edit request. */
-export function professionalRejectEditRequest(bookingRef: string): BookingEditRequestRecord {
+/** Professional rejects the client's edit request (optionally keep what the client asked for). */
+export function professionalRejectEditRequest(
+  bookingRef: string,
+  payload?: Partial<
+    Pick<
+      BookingEditRequestRecord,
+      | "clientNote"
+      | "editedServiceIds"
+      | "editedProductIds"
+      | "suggestedServices"
+      | "suggestedProducts"
+      | "suggestedDateISO"
+      | "suggestedTime"
+      | "originalDateISO"
+      | "originalTime"
+    >
+  >,
+): BookingEditRequestRecord {
   const all = loadAll();
   const prev = all[bookingRef] ?? getBookingEditRequest(bookingRef);
   const next: BookingEditRequestRecord = {
     status: "rejected",
     requestedAt: prev?.requestedAt,
     rejectedAt: new Date().toISOString(),
+    clientNote: payload?.clientNote ?? prev?.clientNote,
+    editedServiceIds: payload?.editedServiceIds ?? prev?.editedServiceIds,
+    editedProductIds: payload?.editedProductIds ?? prev?.editedProductIds,
+    suggestedServices: payload?.suggestedServices ?? prev?.suggestedServices,
+    suggestedProducts: payload?.suggestedProducts ?? prev?.suggestedProducts,
+    suggestedDateISO: payload?.suggestedDateISO ?? prev?.suggestedDateISO,
+    suggestedTime: payload?.suggestedTime ?? prev?.suggestedTime,
+    originalDateISO: payload?.originalDateISO ?? prev?.originalDateISO,
+    originalTime: payload?.originalTime ?? prev?.originalTime,
   };
+  const normalized = bookingRef.replace(/^#/, "").trim();
   all[bookingRef] = next;
+  if (normalized && normalized !== bookingRef) all[normalized] = next;
+  saveAll(all);
+  return next;
+}
+
+/** Professional accepted the client's post-confirm EBR (outcome banner on client). */
+export function professionalAcceptClientEditRequest(
+  bookingRef: string,
+  payload?: Partial<
+    Pick<
+      BookingEditRequestRecord,
+      | "clientNote"
+      | "editedServiceIds"
+      | "editedProductIds"
+      | "suggestedServices"
+      | "suggestedProducts"
+      | "suggestedDateISO"
+      | "suggestedTime"
+      | "originalDateISO"
+      | "originalTime"
+    >
+  >,
+): BookingEditRequestRecord {
+  const all = loadAll();
+  const prev = all[bookingRef] ?? getBookingEditRequest(bookingRef);
+  const next: BookingEditRequestRecord = {
+    status: "accepted",
+    requestedAt: prev?.requestedAt,
+    acceptedAt: new Date().toISOString(),
+    clientNote: payload?.clientNote ?? prev?.clientNote,
+    editedServiceIds: payload?.editedServiceIds ?? prev?.editedServiceIds,
+    editedProductIds: payload?.editedProductIds ?? prev?.editedProductIds,
+    suggestedServices: payload?.suggestedServices ?? prev?.suggestedServices,
+    suggestedProducts: payload?.suggestedProducts ?? prev?.suggestedProducts,
+    suggestedDateISO: payload?.suggestedDateISO ?? prev?.suggestedDateISO,
+    suggestedTime: payload?.suggestedTime ?? prev?.suggestedTime,
+    originalDateISO: payload?.originalDateISO ?? prev?.originalDateISO,
+    originalTime: payload?.originalTime ?? prev?.originalTime,
+  };
+  const normalized = bookingRef.replace(/^#/, "").trim();
+  all[bookingRef] = next;
+  if (normalized && normalized !== bookingRef) all[normalized] = next;
   saveAll(all);
   return next;
 }
@@ -197,12 +272,17 @@ export function clearBookingEditRequest(bookingRef: string): void {
 
 /**
  * Client suggests changes on an EBR — returns a pending BR to the professional
- * with an optional notepad message.
+ * with an optional notepad message and edited line ids.
  */
 export function clientSuggestEbrChanges(
   bookingRef: string,
-  clientNote?: string,
+  clientNoteOrPayload?: string | (BookingEditSuggestionPayload & { clientNote?: string }),
 ): BookingEditRequestRecord {
+  const payload: BookingEditSuggestionPayload & { clientNote?: string } =
+    typeof clientNoteOrPayload === "string" || clientNoteOrPayload == null
+      ? { clientNote: clientNoteOrPayload ?? undefined }
+      : clientNoteOrPayload;
+
   const all = loadAll();
   const prev = all[bookingRef] ?? getBookingEditRequest(bookingRef);
   const next: BookingEditRequestRecord = {
@@ -210,11 +290,11 @@ export function clientSuggestEbrChanges(
     requestedAt: new Date().toISOString(),
     suggestedAt: prev?.suggestedAt,
     professionalNote: prev?.professionalNote,
-    clientNote: clientNote?.trim() || undefined,
-    editedServiceIds: prev?.editedServiceIds,
-    editedProductIds: prev?.editedProductIds,
-    suggestedServices: prev?.suggestedServices,
-    suggestedProducts: prev?.suggestedProducts,
+    clientNote: payload.clientNote?.trim() || undefined,
+    editedServiceIds: payload.editedServiceIds ?? prev?.editedServiceIds,
+    editedProductIds: payload.editedProductIds ?? prev?.editedProductIds,
+    suggestedServices: payload.suggestedServices ?? prev?.suggestedServices,
+    suggestedProducts: payload.suggestedProducts ?? prev?.suggestedProducts,
   };
   const normalized = bookingRef.replace(/^#/, "").trim();
   all[bookingRef] = next;

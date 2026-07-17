@@ -48,7 +48,18 @@ export default function ClientBookingListView({ listTab }: Props) {
     router.push(getCheckoutPath(enriched, listTab));
   };
 
-  const filtered = React.useMemo(() => filterBookingsByTab(bookings, listTab), [bookings, listTab]);
+  // Re-evaluate booking folders/status every minute so a booking whose service
+  // window has passed moves to Past (and shows Completed) without a refresh.
+  const [tick, setTick] = React.useState(0);
+  React.useEffect(() => {
+    const id = window.setInterval(() => setTick((t) => t + 1), 60 * 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const filtered = React.useMemo(
+    () => filterBookingsByTab(bookings, listTab),
+    [bookings, listTab, tick],
+  );
   const loading = isLoading || isFetching;
 
   return (

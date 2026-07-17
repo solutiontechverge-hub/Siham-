@@ -42,6 +42,7 @@ export type BookingTimelineCardScenarioBadge = {
   requestAccepted?: boolean;
   requestRejected?: boolean;
   showExternalLink?: boolean;
+  bold?: boolean;
   sx?: SxProps<Theme>;
 };
 
@@ -88,6 +89,7 @@ export type BookingTimelineCardProps = {
   contentSx?: SxProps<Theme>;
   actionRailSx?: SxProps<Theme>;
   titleLineClamp?: number;
+  titleBold?: boolean;
 };
 
 function resolvePattern(pattern: BookingTimelineCardPattern, accentColor: string, bg: string, navy: string) {
@@ -178,7 +180,16 @@ function renderScenarioBadge(
         ...(Array.isArray(badge.sx) ? badge.sx : [badge.sx]),
       ]}
     >
-      <BodyText sx={{ fontSize: 9.5, fontWeight: 700, color: "inherit", lineHeight: 1 }}>{badge.label}</BodyText>
+      <BodyText
+        sx={{
+          fontSize: 9.5,
+          fontWeight: badge.bold ? 900 : 700,
+          color: "inherit",
+          lineHeight: 1,
+        }}
+      >
+        {badge.label}
+      </BodyText>
       {!badge.showRequestSentIcon && badge.responseIndicators?.length
         ? renderResponseIndicators(badge.responseIndicators)
         : !badge.showRequestSentIcon && badge.showAcceptedIcon
@@ -245,6 +256,7 @@ export default function BookingTimelineCard({
   timeLabel,
   title,
   titleLineClamp = 2,
+  titleBold = false,
 }: BookingTimelineCardProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -365,7 +377,7 @@ export default function BookingTimelineCard({
         <BodyText
           sx={{
             fontSize: 14,
-            fontWeight: 500,
+            fontWeight: titleBold ? 900 : 500,
             color: "#3B3E45",
             lineHeight: "16px",
             overflow: "hidden",

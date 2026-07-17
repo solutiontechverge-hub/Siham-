@@ -3,10 +3,13 @@ import { getStripe } from "../../../../lib/stripe/server";
 
 export const dynamic = "force-dynamic";
 
+type PaymentIntentType = "booking_prepayment" | "booking_cancellation_fee";
+
 type CreatePaymentIntentBody = {
   amount?: number;
   currency?: string;
   bookingRef?: string;
+  type?: PaymentIntentType;
 };
 
 export async function POST(request: Request) {
@@ -25,6 +28,12 @@ export async function POST(request: Request) {
 
     const currency = (body.currency ?? "eur").toLowerCase();
     const bookingRef = body.bookingRef?.trim() || "booking";
+    const type: PaymentIntentType =
+      body.type === "booking_cancellation_fee" ? "booking_cancellation_fee" : "booking_prepayment";
+    const description =
+      type === "booking_cancellation_fee"
+        ? `Booking cancellation fee #${bookingRef}`
+        : `Booking prepayment #${bookingRef}`;
 
     const stripe = getStripe();
     const paymentIntent = await stripe.paymentIntents.create({
@@ -33,9 +42,9 @@ export async function POST(request: Request) {
       automatic_payment_methods: { enabled: true },
       metadata: {
         bookingRef,
-        type: "booking_prepayment",
+        type,
       },
-      description: `Booking prepayment #${bookingRef}`,
+      description,
     });
 
     if (!paymentIntent.client_secret) {

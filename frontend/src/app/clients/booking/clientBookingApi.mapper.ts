@@ -224,8 +224,11 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
   const ebr = parseStoredEbrFromNotes(booking.notes);
   const notesDetails = parseCalendarEntryNotes(booking.notes);
   const clientSnapshot = notesDetails?.clientSnapshot;
+  const bookingCancelled = String(booking.status ?? "").toLowerCase() === "cancelled";
+  const activeEbr =
+    !bookingCancelled && ebr && (ebr.status === "suggested" || ebr.status === "pending") ? ebr : null;
   const incomingEditRequest =
-    ebr && ebr.status !== "none"
+    !bookingCancelled && ebr && ebr.status !== "none"
       ? {
           status: ebr.status,
           suggestedAt: ebr.suggestedAt,
@@ -244,30 +247,34 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
             endTime: service.endTime,
           })),
           suggestedProducts: ebr.suggestedProducts,
+          suggestedDateISO: ebr.suggestedDateISO,
+          suggestedTime: ebr.suggestedTime,
+          originalDateISO: ebr.originalDateISO,
+          originalTime: ebr.originalTime,
         }
       : null;
   const serviceNames = parseServiceNamesFromNotes(
-    incomingEditRequest?.suggestedServices?.length
-      ? `Services: ${incomingEditRequest.suggestedServices.map((s) => s.name).join(", ")}`
+    activeEbr?.suggestedServices?.length
+      ? `Services: ${activeEbr.suggestedServices.map((s) => s.name).join(", ")}`
       : booking.notes,
   );
   const title =
-    incomingEditRequest?.suggestedServices?.[0]?.name ||
+    activeEbr?.suggestedServices?.[0]?.name ||
     booking.service_title ||
     serviceNames[0] ||
     "Booking";
-  const names = incomingEditRequest?.suggestedServices?.length
-    ? incomingEditRequest.suggestedServices.map((s) => s.name)
+  const names = activeEbr?.suggestedServices?.length
+    ? activeEbr.suggestedServices.map((s) => s.name)
     : serviceNames.length
       ? serviceNames
       : [title];
-  const total = incomingEditRequest?.suggestedServices?.length
-    ? incomingEditRequest.suggestedServices.reduce((sum, s) => sum + (s.price || 0), 0) +
-      (incomingEditRequest.suggestedProducts ?? []).reduce((sum, p) => sum + p.price * (p.quantity || 1), 0)
+  const total = activeEbr?.suggestedServices?.length
+    ? activeEbr.suggestedServices.reduce((sum, s) => sum + (s.price || 0), 0) +
+      (activeEbr.suggestedProducts ?? []).reduce((sum, p) => sum + p.price * (p.quantity || 1), 0)
     : Number(booking.total_price) || 0;
   const durationMins = (() => {
-    if (incomingEditRequest?.suggestedServices?.length) {
-      return incomingEditRequest.suggestedServices.reduce((sum, s) => sum + (s.durationMins || 0), 0) || 60;
+    if (activeEbr?.suggestedServices?.length) {
+      return activeEbr.suggestedServices.reduce((sum, s) => sum + (s.durationMins || 0), 0) || 60;
     }
     if (!startHhmm || !endHhmm) return 60;
     const [sh, sm] = startHhmm.split(":").map(Number);
@@ -315,14 +322,14 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
         const resolveGuestId = (id: string, name: string, fallback: string | null | undefined) =>
           fallback ?? snapshotById.get(id)?.guestId ?? snapshotByName.get(name)?.guestId ?? null;
 
-        if (incomingEditRequest?.suggestedServices?.length) {
-          return incomingEditRequest.suggestedServices.map((service) => ({
+        if (activeEbr?.suggestedServices?.length) {
+          return activeEbr.suggestedServices.map((service) => ({
             id: service.id,
             name: service.name,
             durationMins: service.durationMins,
             price: service.price,
-            guestId: resolveGuestId(service.id, service.name, service.guestId),
-            teamMemberId: service.teamMemberId ?? booking.team_member_id,
+            guestId: resolveGuestId(service.id, service.name, null),
+            teamMemberId: service.staffResourceId ?? booking.team_member_id,
           }));
         }
         if (clientSnapshot?.services?.length) {
@@ -355,9 +362,9 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
             uploads: clientSnapshot.projectDetails.uploads ?? [],
           }
         : undefined,
-      total: incomingEditRequest?.suggestedServices?.length
-        ? incomingEditRequest.suggestedServices.reduce((sum, s) => sum + (s.price || 0), 0) +
-          (incomingEditRequest.suggestedProducts ?? []).reduce(
+      total: activeEbr?.suggestedServices?.length
+        ? activeEbr.suggestedServices.reduce((sum, s) => sum + (s.price || 0), 0) +
+          (activeEbr.suggestedProducts ?? []).reduce(
             (sum, p) => sum + p.price * (p.quantity || 1),
             0,
           )

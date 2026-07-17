@@ -702,6 +702,7 @@ export default function BusinessPublicProfile({
 
   const [projectEnabled, setProjectEnabled] = React.useState(data.projectEnabled);
   const showProjectSection = showDesiredOfferingContent && projectEnabled;
+  const showBookCombosSection = data.bookCombos.length > 0;
 
   const [portfolioLightboxIndex, setPortfolioLightboxIndex] = React.useState<number | null>(null);
   const [activeCategory, setActiveCategory] = React.useState("all");
@@ -751,12 +752,6 @@ export default function BusinessPublicProfile({
     }
     setMemberSlotSelections(next);
   }, [visibleTeamMembers]);
-
-  React.useEffect(() => {
-    if (!projectEnabled) {
-      setSelectedComboIds({});
-    }
-  }, [projectEnabled]);
 
   React.useEffect(() => {
     setSelectedScheduleId(data.defaultScheduleOptionId);
@@ -1240,8 +1235,8 @@ export default function BusinessPublicProfile({
           </Paper>
         ) : null}
 
-        {showProjectSection ? (
-        <SectionCard title="Book Service">
+        {showBookCombosSection ? (
+        <SectionCard title="Services combo">
           <Stack spacing={1}>
             {data.bookCombos.map((combo) => {
               const checked = Boolean(selectedComboIds[combo.id]);

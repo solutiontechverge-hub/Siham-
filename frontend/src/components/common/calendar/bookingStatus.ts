@@ -20,6 +20,7 @@ export type BookingScenarioIndicator = "BR" | "EBR" | "ER" | "E";
 export const ONLINE_BOOKING_STATUSES: readonly CalendarBookingStatus[] = [
   "Confirmed",
   "Requested",
+  "In Progress",
   "Completed",
   "Cancelled",
   "Invalid",
@@ -28,6 +29,7 @@ export const ONLINE_BOOKING_STATUSES: readonly CalendarBookingStatus[] = [
 
 export const OFFLINE_BOOKING_STATUSES: readonly CalendarBookingStatus[] = [
   "Confirmed",
+  "In Progress",
   "Completed",
   "Cancelled",
   "No Show",
@@ -65,6 +67,14 @@ export const BOOKING_STATUS_THEME: Record<CalendarBookingStatus, StatusTheme> = 
     chipBg: "#FFFFFF",
     chipColor: "#22B573",
     chipBorder: "#75D9A6",
+  },
+  "In Progress": {
+    accent: "#21B8BF",
+    cardBg: "#E9F8F9",
+    cardBorder: alpha("#21B8BF", 0.35),
+    chipBg: alpha("#21B8BF", 0.1),
+    chipColor: "#149CA7",
+    chipBorder: alpha("#21B8BF", 0.35),
   },
   Completed: {
     accent: "#74839A",

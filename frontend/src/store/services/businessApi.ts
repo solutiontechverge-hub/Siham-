@@ -50,8 +50,10 @@ export type BusinessTeamMember = {
 };
 
 export type BusinessBookServiceCombination = {
+  /** First service id in the combo (always a service — field name is legacy). */
   category_id: string;
   category_title?: string | null;
+  /** Second service id in the combo. */
   service_id: string;
   service_title?: string | null;
 };
@@ -230,7 +232,7 @@ export type CalendarEntry = {
   id: string;
   professional_profile_id: string;
   team_member_id: string | null;
-  status: "requested" | "cancelled" | "completed" | "confirmed" | "blocked" | "no_show";
+  status: "requested" | "cancelled" | "completed" | "confirmed" | "blocked" | "in_progress" | "no_show";
   title: string;
   unique_code: string;
   start_time: string | null;
@@ -330,22 +332,28 @@ export type UpsertCalendarSettingsRequest = {
 
 export type UpdateCalendarEntryStatusRequest = {
   id: string;
-  status: "requested" | "cancelled" | "completed" | "confirmed" | "no_show";
+  status: "requested" | "cancelled" | "completed" | "confirmed" | "in_progress" | "no_show";
 };
 
 export type UpdateBookingStatusRequest = {
   id: string;
-  status: "requested" | "cancelled" | "completed" | "confirmed" | "no_show";
+  status: "requested" | "cancelled" | "completed" | "confirmed" | "in_progress" | "no_show";
   notes?: string | null;
   total_price?: number | string | null;
+  booking_date?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
 };
 
 export type UpdateMyBookingRequest = {
   id: string;
-  status?: "cancelled" | "confirmed";
+  status?: "cancelled" | "confirmed" | "requested";
   prepayment_status?: "paid" | "pending" | "failed" | "required";
   notes?: string | null;
   total_price?: number | string | null;
+  booking_date?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
 };
 
 export type CreateBookingRequest = {
@@ -359,7 +367,7 @@ export type CreateBookingRequest = {
   location_details?: Record<string, unknown>;
   notes?: string | null;
   prepayment_status?: string | null;
-  status?: "requested" | "cancelled" | "completed" | "confirmed" | "no_show";
+  status?: "requested" | "cancelled" | "completed" | "confirmed" | "in_progress" | "no_show";
   booking_type?: "online" | "offline" | "project" | "request";
   unique_code?: string | null;
   total_price?: number | string | null;
@@ -776,6 +784,9 @@ export const businessApi = baseApi.injectEndpoints({
         if (payload.total_price !== undefined && payload.total_price !== null && payload.total_price !== "") {
           body.total_price = Number(payload.total_price);
         }
+        if (payload.booking_date) body.booking_date = payload.booking_date;
+        if (payload.start_time) body.start_time = payload.start_time;
+        if (payload.end_time) body.end_time = payload.end_time;
 
         const response = await fetchWithBQ({
           url: `/api/business/bookings/${payload.id}/status`,
@@ -805,6 +816,9 @@ export const businessApi = baseApi.injectEndpoints({
         if (payload.total_price !== undefined && payload.total_price !== null && payload.total_price !== "") {
           body.total_price = Number(payload.total_price);
         }
+        if (payload.booking_date) body.booking_date = payload.booking_date;
+        if (payload.start_time) body.start_time = payload.start_time;
+        if (payload.end_time) body.end_time = payload.end_time;
 
         const response = await fetchWithBQ({
           url: `/api/business/bookings/${payload.id}`,
