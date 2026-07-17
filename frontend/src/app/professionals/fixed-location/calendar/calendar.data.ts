@@ -24,6 +24,8 @@ export type CalendarBookingServiceItem = {
   startTime?: string;
   endTime?: string;
   staffResourceId?: string;
+  guestId?: string | null;
+  teamMemberId?: string | null;
 };
 
 export type CalendarBookingProductItem = {

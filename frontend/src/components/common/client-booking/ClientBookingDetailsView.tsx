@@ -982,7 +982,10 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
       if (typeof window !== "undefined") {
         try {
           const raw = window.sessionStorage.getItem("mollure:ebr_baseline_schedule");
-          if (raw) baselineSchedule = JSON.parse(raw) as { dateISO?: string; time?: string };
+          if (raw) {
+            const parsed = JSON.parse(raw) as { dateISO?: string; time?: string };
+            baselineSchedule = { dateISO: parsed.dateISO ?? "", time: parsed.time ?? "" };
+          }
         } catch {
           // ignore
         }
