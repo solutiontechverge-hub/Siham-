@@ -44,10 +44,11 @@ export function buildBookingSummarySections(draft: ClientBookingDraft | null): C
     }
 
     const sections: ClientBookingSummarySection[] = [];
+    let modelOrdinal = 0;
     for (const p of people) {
       const items = serviceGroups.get(p.id) ?? [];
       const planningItem =
-        isPlanningPerson(p) && p.planningIsLocked
+        isPlanningPerson(p) && (p.planningIsLocked || Boolean(p.planningActivity || p.planningDuration))
           ? {
               activity: p.planningActivity?.trim() ?? "",
               duration: p.planningDuration?.trim() ?? "",
@@ -55,11 +56,31 @@ export function buildBookingSummarySections(draft: ClientBookingDraft | null): C
           : undefined;
       const hasPlanning = Boolean(planningItem?.activity || planningItem?.duration);
       if (!items.length && !hasPlanning) continue;
+
+      const participantType: ClientBookingSummarySection["participantType"] = p.isRequester
+        ? "requester"
+        : isPlanningPerson(p)
+          ? "planning"
+          : p.participantType === "model"
+            ? "model"
+            : "guest";
+
+      let title = p.name;
+      if (participantType === "model") {
+        modelOrdinal += 1;
+        title = p.name.trim() && p.name.trim().toLowerCase() !== "model" ? p.name : `Model ${modelOrdinal}`;
+      } else if (participantType === "planning") {
+        title = "Planning Details";
+      } else if (participantType === "guest") {
+        title = p.name.trim() && p.name.trim().toLowerCase() !== "guest" ? p.name : "Guest";
+      }
+
       sections.push({
         key: p.id,
-        title: p.name,
+        title,
         items,
         isRequester: Boolean(p.isRequester),
+        participantType,
         teamMemberLabel: teamMemberChipLabelForItems(items),
         ...(hasPlanning ? { planningItem } : {}),
       });
@@ -67,10 +88,12 @@ export function buildBookingSummarySections(draft: ClientBookingDraft | null): C
     return sections;
   }
 
+  // No guests/clients on the draft — treat all services as the main requester (not Guest:Unassigned).
   return [...serviceGroups.entries()].map(([key, items]) => ({
     key,
     title: key === "unassigned" ? "Unassigned" : assigneeTitle(key, people),
     items,
+    isRequester: true,
     teamMemberLabel: teamMemberChipLabelForItems(items),
   }));
 }

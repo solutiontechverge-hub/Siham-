@@ -7,43 +7,119 @@ import { alpha, useTheme } from "@mui/material/styles";
 import AppDropdown from "../AppDropdown";
 import MollureModal from "../MollureModal";
 import { BodyText } from "../../ui/typography";
+import { BUSINESS_SERVICE_CATEGORY_CATALOG } from "../../../data/businessServiceCategorySlider.data";
+import type { CalendarBookingStatus } from "../../../app/professionals/fixed-location/calendar/calendar.data";
+import { BOOKING_STATUS_THEME } from "./bookingStatus";
 
 export type CalendarDesignDraft = {
-  scope: "Categories";
+  scope: "Categories" | "Services" | "Status" | "Team Members";
   colorsByCategory: Record<string, string>;
+  colorsByService?: Record<string, string>;
+  colorsByStatus?: Partial<Record<CalendarBookingStatus, string>>;
+  colorsByTeamMember?: Record<string, string>;
 };
 
 type CalendarDesignModalProps = {
   open: boolean;
   onClose: () => void;
   onApply: () => void;
+  onColorSelect?: (key: string, color: string) => void;
   draft: CalendarDesignDraft;
   setDraft: React.Dispatch<React.SetStateAction<CalendarDesignDraft>>;
+  serviceOptions?: readonly string[];
+  teamMemberOptions?: readonly { id: string; name: string }[];
 };
 
-const categoryRows = ["Hair", "Nails", "Face treatments", "Body treatments"] as const;
+export function getCalendarDesignServiceLabel(key: string): string {
+  const entry = BUSINESS_SERVICE_CATEGORY_CATALOG.find((item) => item.key === key);
+  if (!entry) return key;
+  if (entry.key === "hair") return "Haar";
+  return entry.label;
+}
 
-export default function CalendarDesignModal({ open, onClose, onApply, draft, setDraft }: CalendarDesignModalProps) {
+type ColorRow = { key: string; label: string };
+
+export default function CalendarDesignModal({
+  open,
+  onClose,
+  onApply,
+  onColorSelect,
+  draft,
+  setDraft,
+  serviceOptions = [],
+  teamMemberOptions = [],
+}: CalendarDesignModalProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
+  const isServices = draft.scope === "Services";
+  const isStatus = draft.scope === "Status";
+  const isTeamMembers = draft.scope === "Team Members";
+
+  const colorRows = React.useMemo<ColorRow[]>(() => {
+    if (isTeamMembers) {
+      return teamMemberOptions.map((member) => ({ key: member.id, label: member.name }));
+    }
+    if (isStatus) {
+      return (Object.keys(BOOKING_STATUS_THEME) as CalendarBookingStatus[]).map((status) => ({
+        key: status,
+        label: status,
+      }));
+    }
+    if (isServices) {
+      return serviceOptions.map((label) => ({ key: label, label }));
+    }
+    return BUSINESS_SERVICE_CATEGORY_CATALOG.map((entry) => ({
+      key: entry.key,
+      label: getCalendarDesignServiceLabel(entry.key),
+    }));
+  }, [isServices, isStatus, isTeamMembers, serviceOptions, teamMemberOptions]);
 
   const setColor = React.useCallback(
     (key: string, hex: string) => {
       const safe = hex?.startsWith("#") ? hex : `#${hex}`;
-      setDraft((p) => ({ ...p, colorsByCategory: { ...p.colorsByCategory, [key]: safe } }));
+      setDraft((p) => {
+        if (isTeamMembers) {
+          return { ...p, colorsByTeamMember: { ...(p.colorsByTeamMember ?? {}), [key]: safe } };
+        }
+        if (isStatus) {
+          return {
+            ...p,
+            colorsByStatus: { ...(p.colorsByStatus ?? {}), [key as CalendarBookingStatus]: safe },
+          };
+        }
+        if (isServices) {
+          return { ...p, colorsByService: { ...(p.colorsByService ?? {}), [key]: safe } };
+        }
+        return { ...p, colorsByCategory: { ...p.colorsByCategory, [key]: safe } };
+      });
     },
-    [setDraft],
+    [isServices, isStatus, isTeamMembers, setDraft],
   );
 
   const clearColor = React.useCallback(
     (key: string) => {
       setDraft((p) => {
+        if (isTeamMembers) {
+          const next = { ...(p.colorsByTeamMember ?? {}) };
+          delete next[key];
+          return { ...p, colorsByTeamMember: next };
+        }
+        if (isStatus) {
+          const next = { ...(p.colorsByStatus ?? {}) };
+          delete next[key as CalendarBookingStatus];
+          return { ...p, colorsByStatus: next };
+        }
+        if (isServices) {
+          const next = { ...(p.colorsByService ?? {}) };
+          delete next[key];
+          return { ...p, colorsByService: next };
+        }
         const next = { ...p.colorsByCategory };
         delete next[key];
         return { ...p, colorsByCategory: next };
       });
     },
-    [setDraft],
+    [isServices, isStatus, isTeamMembers, setDraft],
   );
 
   return (
@@ -117,7 +193,12 @@ export default function CalendarDesignModal({ open, onClose, onApply, draft, set
             label=""
             value={draft.scope}
             onChange={(val) => setDraft((p) => ({ ...p, scope: String(val) as CalendarDesignDraft["scope"] }))}
-            options={[{ label: "Categories", value: "Categories" }]}
+            options={[
+              { label: "Categories", value: "Categories" },
+              { label: "Services", value: "Services" },
+              { label: "Status", value: "Status" },
+              { label: "Team Members", value: "Team Members" },
+            ]}
             placeholder="Categories"
             fullWidth
           />
@@ -130,11 +211,17 @@ export default function CalendarDesignModal({ open, onClose, onApply, draft, set
               overflow: "hidden",
             }}
           >
-            {categoryRows.map((label) => {
-              const color = draft.colorsByCategory[label] ?? "";
+            {colorRows.map(({ key, label }) => {
+              const color = isTeamMembers
+                ? draft.colorsByTeamMember?.[key]
+                : isStatus
+                  ? draft.colorsByStatus?.[key as CalendarBookingStatus]
+                  : isServices
+                    ? draft.colorsByService?.[key]
+                    : draft.colorsByCategory[key];
               return (
                 <Box
-                  key={label}
+                  key={key}
                   sx={{
                     display: "grid",
                     gridTemplateColumns: "1fr auto auto",
@@ -175,7 +262,7 @@ export default function CalendarDesignModal({ open, onClose, onApply, draft, set
                           height: 16,
                           borderRadius: "4px",
                           bgcolor: color || alpha(m.navy, 0.08),
-                          border: `1px solid ${alpha(m.navy, color ? 0.18 : 0.10)}`,
+                          border: `1px solid ${alpha(m.navy, color ? 0.18 : 0.1)}`,
                         }}
                       />
                       <span>Choose color</span>
@@ -183,19 +270,26 @@ export default function CalendarDesignModal({ open, onClose, onApply, draft, set
                     <input
                       type="color"
                       value={color || "#22B8A7"}
-                      onChange={(e) => setColor(label, e.target.value)}
+                      onChange={(e) => {
+                        const nextColor = e.target.value;
+                        setColor(key, nextColor);
+                        if (!isServices && !isStatus && !isTeamMembers) {
+                          onColorSelect?.(key, nextColor);
+                        }
+                        e.currentTarget.blur();
+                      }}
                       style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }}
                     />
                   </Button>
 
                   <IconButton
                     size="small"
-                    onClick={() => clearColor(label)}
+                    onClick={() => clearColor(key)}
                     sx={{
                       width: 30,
                       height: 30,
                       borderRadius: "10px",
-                      border: `1px solid ${alpha(m.navy, 0.10)}`,
+                      border: `1px solid ${alpha(m.navy, 0.1)}`,
                       bgcolor: "#fff",
                       color: alpha(m.navy, 0.55),
                       "&:hover": { bgcolor: alpha(m.navy, 0.03) },
@@ -212,4 +306,3 @@ export default function CalendarDesignModal({ open, onClose, onApply, draft, set
     </MollureModal>
   );
 }
-

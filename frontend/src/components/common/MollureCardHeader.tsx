@@ -23,11 +23,9 @@ export default function MollureCardHeader({ title, subtitle, tone = "default" }:
         bgcolor: tone === "tinted" ? m.surface : "transparent",
       }}
     >
-      <SubHeading sx={{ fontSize: 18, lineHeight: 1.15, color: alpha(m.navy, 0.88) }}>
-        {title}
-      </SubHeading>
+      <SubHeading sx={{ color: alpha(m.navy, 0.88) }}>{title}</SubHeading>
       {subtitle ? (
-        <BodyText sx={{ mt: 0.4, color: alpha(m.navy, 0.55), fontSize: 12.5, lineHeight: 1.4 }}>
+        <BodyText sx={{ mt: 0.4, color: alpha(m.navy, 0.55) }}>
           {subtitle}
         </BodyText>
       ) : null}

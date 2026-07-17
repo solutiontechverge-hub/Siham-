@@ -5,6 +5,7 @@ import { Box, Stack, type PaperProps } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import AppCard from "./AppCard";
 import { BodyText, SubHeading } from "../ui/typography";
+import { MOLLURE_HEADING_BODY_GAP_PX } from "../../theme/spacing";
 
 type ContentCardProps = Omit<PaperProps, "title"> & {
   title?: React.ReactNode;
@@ -52,25 +53,31 @@ export default function ContentCard({
 
         {/* ✅ CONDITIONAL PADDING */}
         <Stack
-          spacing={2.5}
+          spacing={0}
           sx={{
             p: 3,
             pl: withAccent ? (t) => `calc(${t.spacing(3)} + 12px)` : 3,
           }}
         >
           {title && (
-            <SubHeading sx={{ fontSize: "18px", color: "mollure.textcolorgrey700" }}>
+            <SubHeading sx={{ color: "mollure.textcolorgrey700" }}>
               {title}
             </SubHeading>
           )}
 
           {description && (
-            <BodyText sx={{ lineHeight: 1.65 }} color="text.secondary">
+            <BodyText
+              sx={{
+                mt: title ? `${MOLLURE_HEADING_BODY_GAP_PX}px` : 0,
+                lineHeight: 1.65,
+              }}
+              color="text.secondary"
+            >
               {description}
             </BodyText>
           )}
 
-          {children}
+          {children ? <Box sx={{ mt: title || description ? `${MOLLURE_HEADING_BODY_GAP_PX}px` : 0 }}>{children}</Box> : null}
           {actions}
         </Stack>
       </Box>

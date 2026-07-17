@@ -1,5 +1,6 @@
 import { alpha } from "@mui/material/styles";
 import type {
+  CalendarBlock,
   CalendarBookingLocation,
   CalendarBookingStatus,
   CalendarBookingType,
@@ -37,20 +38,10 @@ export type BlockTimeDraft = {
   endTime: string;
 };
 
-export function statusChipSx(status: CalendarBookingStatus, m: { navy: string }) {
-  switch (status) {
-    case "Requested":
-      return { bgcolor: alpha("#F4A100", 0.12), color: "#C87800", borderColor: alpha("#F4A100", 0.5) };
-    case "Cancelled":
-      return { bgcolor: alpha("#D32F2F", 0.1), color: "#B71C1C", borderColor: alpha("#D32F2F", 0.4) };
-    case "Confirmed":
-      return { bgcolor: alpha("#2E7D32", 0.1), color: "#1B5E20", borderColor: alpha("#2E7D32", 0.4) };
-    case "Completed":
-      return { bgcolor: alpha(m.navy, 0.06), color: alpha(m.navy, 0.7), borderColor: alpha(m.navy, 0.2) };
-    case "No Show":
-    default:
-      return { bgcolor: alpha(m.navy, 0.06), color: alpha(m.navy, 0.7), borderColor: alpha(m.navy, 0.2) };
-  }
+import { statusChipSx as bookingStatusChipSx } from "./bookingStatus";
+
+export function statusChipSx(status: CalendarBookingStatus, _m?: { navy: string }) {
+  return bookingStatusChipSx(status);
 }
 
 export function extractBookingId(rawId: string) {
@@ -82,6 +73,22 @@ export function parseIsoDate(iso: string) {
 
 export function toIsoLocalDate(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Extract YYYY-MM-DD without UTC timezone shifts (for API timestamps). */
+export function wallClockDateFromDateTime(value?: string | null) {
+  if (!value) return null;
+  const match = String(value).match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : null;
+}
+
+/** Extract HH:mm without UTC timezone shifts (for API timestamps). */
+export function wallClockTimeFromDateTime(value?: string | null) {
+  if (!value) return null;
+  const match = String(value).match(/T(\d{2}:\d{2})/);
+  if (match) return match[1];
+  if (/^\d{2}:\d{2}/.test(value)) return value.slice(0, 5);
+  return null;
 }
 
 export function formatLongDateUtc(iso: string) {
@@ -132,6 +139,32 @@ export function startOfWeekIso(iso: string) {
   return addDaysIso(iso, -((dow + 6) % 7));
 }
 
+export type CalendarQueryViewMode = "day" | "week" | "month";
+
+export type CalendarQueryDateRange = {
+  startDate: string;
+  endDate: string;
+};
+
+/** Maps the visible calendar range to API query params for /calendar/overview. */
+export function getCalendarQueryDateRange(
+  activeDateIso: string,
+  viewMode: CalendarQueryViewMode,
+): CalendarQueryDateRange {
+  if (viewMode === "day") {
+    return { startDate: activeDateIso, endDate: activeDateIso };
+  }
+
+  if (viewMode === "week") {
+    const startDate = startOfWeekIso(activeDateIso);
+    return { startDate, endDate: addDaysIso(startDate, 6) };
+  }
+
+  const monthStart = toMonthIso(activeDateIso);
+  const gridStart = startOfWeekIso(monthStart);
+  return { startDate: gridStart, endDate: addDaysIso(gridStart, 41) };
+}
+
 export function mergeIntervals(intervals: readonly Interval[]) {
   const sorted = [...intervals].sort((a, b) => a.startMin - b.startMin);
   const out: Interval[] = [];
@@ -168,4 +201,48 @@ export function fmtMinToTime(min: number) {
 
 export function sumIntervalsMins(intervals: readonly Interval[]) {
   return intervals.reduce((acc, it) => acc + Math.max(0, it.endMin - it.startMin), 0);
+}
+
+const blockDayNameToDow: Record<BlockTimeDraft["dayFrom"], number> = {
+  Sunday: 0,
+  Monday: 1,
+  Tuesday: 2,
+  Wednesday: 3,
+  Thursday: 4,
+  Friday: 5,
+  Saturday: 6,
+};
+
+const isBlockDayAllowed = (dow: number, dayFrom: BlockTimeDraft["dayFrom"], dayTo: BlockTimeDraft["dayTo"]) => {
+  const fromDow = blockDayNameToDow[dayFrom];
+  const toDow = blockDayNameToDow[dayTo];
+  if (fromDow <= toDow) return dow >= fromDow && dow <= toDow;
+  return dow >= fromDow || dow <= toDow;
+};
+
+export function buildBlocksFromDraft(draft: BlockTimeDraft, teamIds: readonly string[]): CalendarBlock[] {
+  const endDate = draft.dateTo || draft.dateFrom;
+  const singleDay = draft.dateFrom === endDate;
+  const blocks: CalendarBlock[] = [];
+  let cursor = draft.dateFrom;
+
+  while (cursor <= endDate) {
+    const dow = parseIsoDate(cursor).getUTCDay();
+    if (singleDay || isBlockDayAllowed(dow, draft.dayFrom, draft.dayTo)) {
+      for (const teamId of teamIds) {
+        blocks.push({
+          id: `blk-local-${teamId}-${cursor}-${draft.startTime}-${draft.endTime}-${blocks.length}`,
+          resourceId: teamId,
+          date: cursor,
+          start: draft.startTime,
+          end: draft.endTime,
+          title: draft.title,
+          kind: "unavailable",
+        });
+      }
+    }
+    cursor = addDaysIso(cursor, 1);
+  }
+
+  return blocks;
 }

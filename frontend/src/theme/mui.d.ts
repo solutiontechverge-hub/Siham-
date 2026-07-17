@@ -55,11 +55,16 @@ declare module "@mui/material/styles" {
     logoAccent: string;
     logoText: string;
     bgshadow: string;
+    cancelledSurface: string;
+    sectionSurface: string;
+    sectionSurfaceShadow: string;
     cardbg: string;
     textcolorgrey700: string;
     headingText: string;
     descriptionText: string;
     warmwarning: string;
+    requestAccent: string;
+    requestAccentSoft: string;
     white: string;
     fxLavenderTint: string;
     fxMintTint: string;
@@ -78,6 +83,8 @@ declare module "@mui/material/styles" {
     salesVolumeStackMid: string;
     salesVolumeStackLight: string;
     salesVolumeStackPale: string;
+    sectionGapPx: number;
+    headingBodyGapPx: number;
   }
 
   interface Palette {

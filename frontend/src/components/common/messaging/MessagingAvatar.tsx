@@ -3,7 +3,25 @@
 import { Avatar } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 
-export default function MessagingAvatar({ seed, size = 40, src }: { seed: string; size?: number; src?: string }) {
+export default function MessagingAvatar({
+  seed,
+  label,
+  size = 40,
+  src,
+}: {
+  seed: string;
+  label?: string;
+  size?: number;
+  src?: string;
+}) {
+  const initialsSource = (label ?? seed).trim() || seed;
+  const initials = initialsSource
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? "")
+    .join("");
+
   return (
     <Avatar
       src={src}
@@ -16,7 +34,7 @@ export default function MessagingAvatar({ seed, size = 40, src }: { seed: string
         color: "#285C70",
       }}
     >
-      {seed.slice(0, 2).toUpperCase()}
+      {initials || seed.slice(0, 2).toUpperCase()}
     </Avatar>
   );
 }

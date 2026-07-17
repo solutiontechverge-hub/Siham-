@@ -5,10 +5,13 @@ import RemoteAwareImage from "./RemoteAwareImage";
 import type { Swiper as SwiperInstance } from "swiper";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { alpha, useTheme } from "@mui/material/styles";
+import { useRouter } from "next/navigation";
+import Image from "next/image";
 import "swiper/css";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import EventSeatRoundedIcon from "@mui/icons-material/EventSeatRounded";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
@@ -16,7 +19,6 @@ import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownR
 import PersonPinCircleRoundedIcon from "@mui/icons-material/PersonPinCircleRounded";
 import RemoveRoundedIcon from "@mui/icons-material/RemoveRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
-import ChildCareRoundedIcon from "@mui/icons-material/ChildCareRounded";
 import FemaleRoundedIcon from "@mui/icons-material/FemaleRounded";
 import MaleRoundedIcon from "@mui/icons-material/MaleRounded";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
@@ -26,6 +28,7 @@ import {
   ButtonBase,
   Checkbox,
   ClickAwayListener,
+  Dialog,
   Divider,
   Grid,
   IconButton,
@@ -35,7 +38,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import type { BusinessPublicProfileData } from "../../data/businessPublicProfile.data";
+import type { BusinessPublicProfileData, BusinessPublicProfileServiceForItem } from "../../data/businessPublicProfile.data";
 import {
   buildDesiredMunicipalityList,
   buildDesiredProvinceDisplays,
@@ -49,6 +52,8 @@ import {
 import ServiceCategoryBar from "./ServiceCategoryBar";
 import AppDropdown from "./AppDropdown";
 import { serviceMatchesCategoryTab } from "../../data/businessServiceCategorySlider.data";
+import { clientReviewsHref } from "../../data/clientProfessionalReviews";
+import { KidsIcon } from "../../../images";
 
 function toImageSrc(img: unknown) {
   if (!img) return "";
@@ -88,11 +93,13 @@ function SectionCard({
         spacing={1.5}
         sx={{
           px: 2,
-          py: 1.25,
+          py: 1.5,
           borderBottom: `1px solid ${alpha(m.navy, 0.06)}`,
         }}
       >
-        <Typography sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.82) }}>{title}</Typography>
+        <Typography variant="mainHeading" sx={{ lineHeight: 1, letterSpacing: 0 }}>
+          {title}
+        </Typography>
         {headerAction ?? null}
       </Stack>
       <Box sx={{ p: 2 }}>{children}</Box>
@@ -144,8 +151,22 @@ function PolicyFieldRow({ label, value }: { label: string; value: string }) {
 const SERVICE_FOR_ICONS = {
   men: MaleRoundedIcon,
   women: FemaleRoundedIcon,
-  kids: ChildCareRoundedIcon,
 } as const;
+
+function ServiceForIcon({ item }: { item: BusinessPublicProfileServiceForItem }) {
+  const m = useTheme().palette.mollure;
+
+  if (item.id === "kids") {
+    return (
+      <Box sx={{ width: 16, height: 16, flexShrink: 0, display: "grid", placeItems: "center" }}>
+        <Image src={KidsIcon} alt="" width={13} height={13} />
+      </Box>
+    );
+  }
+
+  const Icon = SERVICE_FOR_ICONS[item.id];
+  return <Icon sx={{ fontSize: 16, color: alpha(m.navy, 0.45) }} />;
+}
 
 function ProfileHeroSwiper({ images, alt }: { images: string[]; alt: string }) {
   const [activeIndex, setActiveIndex] = React.useState(0);
@@ -478,6 +499,38 @@ function ProfileLocationSection({
   );
 }
 
+function PublicProfilePageShell({ children }: { children: React.ReactNode }) {
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        borderRadius: "12px",
+        bgcolor: "#fff",
+        overflow: "hidden",
+        px: { xs: 1.5, md: 2 },
+        py: { xs: 1.5, md: 2 },
+      }}
+    >
+      {children}
+    </Paper>
+  );
+}
+
+function PublicProfileDetailsGroup({ children }: { children: React.ReactNode }) {
+  const m = useTheme().palette.mollure;
+  return (
+    <Box
+      sx={{
+        borderRadius: "10px",
+        bgcolor: m.fxGrayF2F4F7,
+        p: { xs: 1.25, md: 1.5 },
+      }}
+    >
+      <Stack spacing={2}>{children}</Stack>
+    </Box>
+  );
+}
+
 function PublicProfileTopBar({ title }: { title: string }) {
   const m = useTheme().palette.mollure;
   return (
@@ -625,6 +678,7 @@ export default function BusinessPublicProfile({
 }: BusinessPublicProfileProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
+  const router = useRouter();
   const heroSlides = React.useMemo(() => {
     if (data.heroImages.length > 0) {
       return data.heroImages.map((img) => toImageSrc(img)).filter(Boolean);
@@ -643,12 +697,14 @@ export default function BusinessPublicProfile({
   // Professional setup: project + km apply when offering is Desired or Both (not Fixed-only).
   const showDesiredOfferingContent =
     data.supportsDesiredLocation && (!data.supportsFixedLocation || isDesiredLocation);
-  const showKilometerAllowance = data.supportsDesiredLocation;
-  const showProjectHeader = data.supportsDesiredLocation;
+  const showKilometerAllowance = showDesiredOfferingContent;
+  const showProjectHeader = showDesiredOfferingContent;
 
   const [projectEnabled, setProjectEnabled] = React.useState(data.projectEnabled);
   const showProjectSection = showDesiredOfferingContent && projectEnabled;
+  const showBookCombosSection = data.bookCombos.length > 0;
 
+  const [portfolioLightboxIndex, setPortfolioLightboxIndex] = React.useState<number | null>(null);
   const [activeCategory, setActiveCategory] = React.useState("all");
   const [search, setSearch] = React.useState("");
   const [scheduleOpen, setScheduleOpen] = React.useState(false);
@@ -657,9 +713,7 @@ export default function BusinessPublicProfile({
   const [serviceQty, setServiceQty] = React.useState<Record<string, number>>({});
   const [selectedServiceIds, setSelectedServiceIds] = React.useState<Record<string, boolean>>({});
   const [selectedComboIds, setSelectedComboIds] = React.useState<Record<string, boolean>>({});
-  const [teamAssignments, setTeamAssignments] = React.useState<Record<string, readonly string[]>>({});
-  const [teamDraftAssignments, setTeamDraftAssignments] = React.useState<Record<string, readonly string[]>>({});
-  const [teamAssignLocked, setTeamAssignLocked] = React.useState<Record<string, boolean>>({});
+  const [memberSlotSelections, setMemberSlotSelections] = React.useState<Record<string, string>>({});
 
   const activeServices = React.useMemo(
     () => getServicesForLocationMode(data, effectiveLocationMode),
@@ -676,21 +730,28 @@ export default function BusinessPublicProfile({
   }, [data.projectEnabled, data.shopId]);
 
   React.useEffect(() => {
+    if (!showDesiredOfferingContent) {
+      setProjectEnabled(false);
+    }
+  }, [showDesiredOfferingContent]);
+
+  React.useEffect(() => {
     setActiveCategory("all");
     setSearch("");
     setSelectedServiceIds({});
     setSelectedComboIds({});
     setServiceQty({});
-    setTeamAssignments({});
-    setTeamDraftAssignments({});
-    setTeamAssignLocked({});
   }, [locationMode]);
 
   React.useEffect(() => {
-    if (!projectEnabled) {
-      setSelectedComboIds({});
+    const next: Record<string, string> = {};
+    for (const member of visibleTeamMembers) {
+      for (const slot of member.serviceSlots) {
+        next[`${member.id}:${slot.id}`] = slot.defaultValue;
+      }
     }
-  }, [projectEnabled]);
+    setMemberSlotSelections(next);
+  }, [visibleTeamMembers]);
 
   React.useEffect(() => {
     setSelectedScheduleId(data.defaultScheduleOptionId);
@@ -763,98 +824,8 @@ export default function BusinessPublicProfile({
     });
   };
 
-  const assignmentOptions = React.useMemo(() => {
-    const comboOptions = selectedCombos.map((combo) => ({
-      value: `combo:${combo.id}`,
-      label: `${combo.categoryLabel} + ${combo.serviceLabel}`,
-    }));
-    const serviceOptions = selectedServices.map((service) => ({
-      value: `svc:${service.id}`,
-      label: service.name,
-    }));
-    return [...comboOptions, ...serviceOptions];
-  }, [selectedCombos, selectedServices]);
-
-  const hasAssignableSelection = assignmentOptions.length > 0;
-
-  const getClaimedByOtherMembers = React.useCallback(
-    (memberId: string, assignments: Record<string, readonly string[]>) => {
-      const claimed = new Set<string>();
-      for (const [id, ids] of Object.entries(assignments)) {
-        if (id !== memberId) ids.forEach((value) => claimed.add(value));
-      }
-      return claimed;
-    },
-    [],
-  );
-
-  const getAssignmentOptionsForMember = React.useCallback(
-    (memberId: string) => {
-      const claimedByOthers = getClaimedByOtherMembers(memberId, teamAssignments);
-      const memberDraft = teamDraftAssignments[memberId] ?? teamAssignments[memberId] ?? [];
-      const keepVisible = new Set(memberDraft);
-      return assignmentOptions.filter(
-        (opt) => keepVisible.has(opt.value) || !claimedByOthers.has(opt.value),
-      );
-    },
-    [assignmentOptions, getClaimedByOtherMembers, teamAssignments, teamDraftAssignments],
-  );
-
-  const commitAssignToMember = (memberId: string) => {
-    const draft = [...(teamDraftAssignments[memberId] ?? [])];
-    if (!draft.length) return;
-    const claimed = new Set(draft);
-
-    setTeamAssignments((prev) => {
-      const next: Record<string, readonly string[]> = { ...prev, [memberId]: draft };
-      for (const id of Object.keys(next)) {
-        if (id === memberId) continue;
-        next[id] = (next[id] ?? []).filter((value) => !claimed.has(value));
-      }
-
-      setTeamAssignLocked((locks) => {
-        const lockNext: Record<string, boolean> = { ...locks, [memberId]: true };
-        for (const id of Object.keys(prev)) {
-          if (id === memberId) continue;
-          const hadOverlap = (prev[id] ?? []).some((value) => claimed.has(value));
-          if (hadOverlap) lockNext[id] = false;
-        }
-        return lockNext;
-      });
-
-      return next;
-    });
-
-    setTeamDraftAssignments((prev) => {
-      const next: Record<string, readonly string[]> = { ...prev, [memberId]: draft };
-      for (const id of Object.keys(prev)) {
-        if (id === memberId) continue;
-        next[id] = (prev[id] ?? []).filter((value) => !claimed.has(value));
-      }
-      return next;
-    });
-  };
-
-  React.useEffect(() => {
-    const validIds = new Set(assignmentOptions.map((opt) => opt.value));
-    const cleanRecord = (record: Record<string, readonly string[]>) => {
-      const next: Record<string, readonly string[]> = {};
-      let changed = false;
-      for (const [memberId, ids] of Object.entries(record)) {
-        const filtered = ids.filter((id) => validIds.has(id));
-        next[memberId] = filtered;
-        if (filtered.length !== ids.length) changed = true;
-      }
-      return changed ? next : record;
-    };
-
-    setTeamAssignments((prev) => cleanRecord(prev));
-    setTeamDraftAssignments((prev) => cleanRecord(prev));
-    setTeamAssignLocked({});
-  }, [assignmentOptions]);
-
   return (
-    <Box>
+    <PublicProfilePageShell>
       <PublicProfileTopBar title={publicProfileTitle} />
 
       <Paper
@@ -914,9 +885,22 @@ export default function BusinessPublicProfile({
                 {Array.from({ length: 5 }).map((_, i) => (
                   <StarRoundedIcon key={i} sx={{ fontSize: 18, color: m.star }} />
                 ))}
-                <Typography sx={{ ml: 0.5, fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.55) }}>
-                  ({data.reviewsCount} Reviews)
-                </Typography>
+                <ButtonBase
+                  onClick={() => {
+                    const firstMember = visibleTeamMembers[0];
+                    router.push(clientReviewsHref(data.shopId, firstMember?.id));
+                  }}
+                  sx={{
+                    ml: 0.5,
+                    borderRadius: "6px",
+                    px: 0.35,
+                    "&:hover": { bgcolor: alpha(m.teal, 0.06) },
+                  }}
+                >
+                  <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.55) }}>
+                    ({data.reviewsCount} Reviews)
+                  </Typography>
+                </ButtonBase>
               </Stack>
               <Typography sx={{ mt: 1, fontWeight: 900, fontSize: 22, color: alpha(m.navy, 0.9), lineHeight: 1.2 }}>
                 {data.shopName}
@@ -1083,14 +1067,10 @@ export default function BusinessPublicProfile({
             We love to serve
           </Typography>
           <Stack direction="row" flexWrap="wrap" alignItems="center" useFlexGap spacing={1.25}>
-            {data.serviceFor
-              .filter((item) => item.enabled)
-              .map((item, index, arr) => {
-                const Icon = SERVICE_FOR_ICONS[item.id];
-                return (
+            {data.serviceFor.map((item, index, arr) => (
                   <React.Fragment key={item.id}>
                     <Stack direction="row" alignItems="center" spacing={0.5}>
-                      <Icon sx={{ fontSize: 16, color: alpha(m.navy, 0.45) }} />
+                      <ServiceForIcon item={item} />
                       <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.62) }}>
                         {item.label}
                       </Typography>
@@ -1099,8 +1079,7 @@ export default function BusinessPublicProfile({
                       <Typography sx={{ fontSize: 12.5, fontWeight: 500, color: alpha(m.navy, 0.28) }}>|</Typography>
                     ) : null}
                   </React.Fragment>
-                );
-              })}
+                ))}
           </Stack>
         </SectionCard>
 
@@ -1246,7 +1225,7 @@ export default function BusinessPublicProfile({
             }}
           >
             <Box sx={{ px: 2, py: 1.5 }}>
-              <Typography sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.88), mb: 1.25 }}>
+              <Typography variant="subHeading" sx={{ lineHeight: 1, letterSpacing: 0, mb: 1.25 }}>
                 Project
               </Typography>
               <ProjectReadOnlyField
@@ -1256,8 +1235,8 @@ export default function BusinessPublicProfile({
           </Paper>
         ) : null}
 
-        {showProjectSection ? (
-        <SectionCard title="Book Service">
+        {showBookCombosSection ? (
+        <SectionCard title="Services combo">
           <Stack spacing={1}>
             {data.bookCombos.map((combo) => {
               const checked = Boolean(selectedComboIds[combo.id]);
@@ -1308,11 +1287,6 @@ export default function BusinessPublicProfile({
         ) : null}
 
         <SectionCard title="Our Professional Team">
-          {!hasAssignableSelection ? (
-            <Typography sx={{ fontSize: 12, fontWeight: 600, color: alpha(m.navy, 0.5), mb: 1.25 }}>
-              Select services in Services Details or combos in Book Service, then use Assign on a team member.
-            </Typography>
-          ) : null}
           <Stack spacing={1.25}>
             {visibleTeamMembers.length === 0 ? (
               <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.5) }}>
@@ -1378,94 +1352,70 @@ export default function BusinessPublicProfile({
                             }}
                           />
                         ))}
-                        <Typography sx={{ fontSize: 10.5, fontWeight: 500, color: alpha(m.navy, 0.5), ml: 0.25 }}>
-                          ({member.reviewsCount} Reviews)
-                        </Typography>
+                        <ButtonBase
+                          onClick={() => router.push(clientReviewsHref(data.shopId, member.id))}
+                          sx={{
+                            ml: 0.25,
+                            borderRadius: "6px",
+                            px: 0.25,
+                            "&:hover": { bgcolor: alpha(m.teal, 0.06) },
+                          }}
+                        >
+                          <Typography sx={{ fontSize: 10.5, fontWeight: 500, color: alpha(m.navy, 0.5) }}>
+                            ({member.reviewsCount} Reviews)
+                          </Typography>
+                        </ButtonBase>
                       </Stack>
                     </Box>
                   </Stack>
 
                   <Box sx={{ flex: 1, minWidth: 0, px: { md: 2 }, py: { xs: 0, md: 0.25 } }}>
-                    {hasAssignableSelection ? (
-                      (() => {
-                        const memberOptions = getAssignmentOptionsForMember(member.id);
-                        const draftValues = teamDraftAssignments[member.id] ?? teamAssignments[member.id] ?? [];
-                        const committedValues = teamAssignments[member.id] ?? [];
-                        const draftKey = [...draftValues].sort().join("|");
-                        const committedKey = [...committedValues].sort().join("|");
-                        const hasPendingChanges = draftKey !== committedKey;
-                        const isAssignConfirmed =
-                          Boolean(teamAssignLocked[member.id]) && committedValues.length > 0 && !hasPendingChanges;
-                        const canAssign = draftValues.length > 0 && hasPendingChanges;
-
-                        return (
-                          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
-                            <Box sx={{ flex: 1, width: "100%" }}>
-                              <AppDropdown
-                                multiple
-                                value={draftValues}
-                                onChange={(val) => {
-                                  const next = Array.isArray(val) ? val : val ? [String(val)] : [];
-                                  setTeamDraftAssignments((prev) => ({ ...prev, [member.id]: next }));
-                                  setTeamAssignLocked((prev) => ({ ...prev, [member.id]: false }));
-                                }}
-                                options={memberOptions}
-                                placeholder={member.allCategoriesPlaceholder ?? "Select service or combo"}
-                                size="small"
-                                fullWidth
-                                renderValue={(selected) => {
-                                  const ids = Array.isArray(selected) ? selected : [];
-                                  if (!ids.length) {
-                                    return (
-                                      <span style={{ opacity: 0.6 }}>
-                                        {member.allCategoriesPlaceholder ?? "Select service or combo"}
-                                      </span>
-                                    );
-                                  }
-                                  return ids
-                                    .map((id) => assignmentOptions.find((opt) => opt.value === id)?.label)
-                                    .filter(Boolean)
-                                    .join(", ");
-                                }}
-                              />
-                            </Box>
-                            <Button
-                              variant="contained"
-                              disableElevation
-                              disabled={!canAssign && !isAssignConfirmed}
-                              onClick={() => commitAssignToMember(member.id)}
+                    {member.serviceSlots.length > 0 ? (
+                      <Stack
+                        direction={{ xs: "column", sm: "row" }}
+                        spacing={1}
+                        useFlexGap
+                        flexWrap="wrap"
+                      >
+                        {member.serviceSlots.map((slot) => {
+                          const slotKey = `${member.id}:${slot.id}`;
+                          return (
+                            <Box
+                              key={slot.id}
                               sx={{
-                                flexShrink: 0,
-                                alignSelf: { xs: "flex-start", sm: "center" },
-                                borderRadius: "10px",
-                                textTransform: "none",
-                                fontWeight: 900,
-                                fontSize: 12.5,
-                                minWidth: 96,
-                                height: 40,
-                                px: 2,
-                                bgcolor: isAssignConfirmed ? m.fxGrayDCDFE3 : m.teal,
-                                color: isAssignConfirmed ? alpha(m.navy, 0.55) : "#fff",
-                                boxShadow: "none",
-                                "&:hover": {
-                                  bgcolor: isAssignConfirmed ? m.fxGrayF2F4F7 : m.tealDark,
-                                  boxShadow: "none",
-                                },
-                                "&.Mui-disabled": {
-                                  bgcolor: isAssignConfirmed ? m.fxGrayDCDFE3 : alpha(m.teal, 0.35),
-                                  color: isAssignConfirmed ? alpha(m.navy, 0.55) : alpha("#fff", 0.85),
-                                },
+                                flex: { sm: member.serviceSlots.length > 1 ? "1 1 calc(50% - 8px)" : "1 1 100%" },
+                                minWidth: { sm: member.serviceSlots.length > 1 ? 0 : "100%" },
+                                width: "100%",
                               }}
                             >
-                              {isAssignConfirmed ? "Assigned" : "Assign"}
-                            </Button>
-                          </Stack>
-                        );
-                      })()
+                              <AppDropdown
+                                value={memberSlotSelections[slotKey] ?? slot.defaultValue}
+                                onChange={(val) => {
+                                  const next = Array.isArray(val) ? val[0] : String(val ?? "");
+                                  setMemberSlotSelections((prev) => ({ ...prev, [slotKey]: next }));
+                                }}
+                                options={slot.options}
+                                placeholder={slot.label}
+                                size="small"
+                                fullWidth
+                                renderValue={() => (
+                                  <span style={{ color: alpha(m.navy, 0.62) }}>{slot.label}</span>
+                                )}
+                              />
+                            </Box>
+                          );
+                        })}
+                      </Stack>
                     ) : (
-                      <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: alpha(m.navy, 0.42) }}>
-                        {member.allCategoriesPlaceholder ?? "Select services above to assign"}
-                      </Typography>
+                      <AppDropdown
+                        value=""
+                        onChange={() => {}}
+                        options={[]}
+                        placeholder={member.allCategoriesPlaceholder ?? "All Categories and services"}
+                        size="small"
+                        fullWidth
+                        disabled
+                      />
                     )}
                   </Box>
                 </Stack>
@@ -1474,87 +1424,89 @@ export default function BusinessPublicProfile({
           </Stack>
         </SectionCard>
 
-        <SectionCard title="General Note">
-          <Box sx={{ borderRadius: "10px", bgcolor: m.fxGrayF2F4F7, p: 1.5 }}>
-            <Typography sx={{ fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.72), mb: 0.75 }}>
-              {data.generalNoteLabel}
-            </Typography>
-            <Box
-              sx={{
-                borderRadius: "8px",
-                bgcolor: "#fff",
-                border: `1px solid ${alpha(m.navy, 0.08)}`,
-                px: 1.25,
-                py: 1,
-              }}
-            >
-              <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: alpha(m.navy, 0.62), lineHeight: 1.55 }}>
-                Additional Notes: {data.generalNote}
+        <PublicProfileDetailsGroup>
+          <SectionCard title="General Note">
+            <Box sx={{ borderRadius: "10px", bgcolor: m.fxGrayF2F4F7, p: 1.5 }}>
+              <Typography sx={{ fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.72), mb: 0.75 }}>
+                {data.generalNoteLabel}
               </Typography>
+              <Box
+                sx={{
+                  borderRadius: "8px",
+                  bgcolor: "#fff",
+                  border: `1px solid ${alpha(m.navy, 0.08)}`,
+                  px: 1.25,
+                  py: 1,
+                }}
+              >
+                <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: alpha(m.navy, 0.62), lineHeight: 1.55 }}>
+                  Additional Notes: {data.generalNote}
+                </Typography>
+              </Box>
             </Box>
-          </Box>
-        </SectionCard>
+          </SectionCard>
 
-        <SectionCard title="Price">
-          <Stack spacing={1.5}>
-            <Box>
-              <Typography sx={{ fontSize: 12.5, color: alpha(m.navy, 0.78), lineHeight: 1.5 }}>
-                <Box component="span" sx={{ fontWeight: 800 }}>
-                  Price Range:
-                </Box>{" "}
-                <Box component="span" sx={{ fontWeight: 600, color: alpha(m.navy, 0.5) }}>
-                  {data.priceRangeLabel}
-                </Box>
-              </Typography>
-            </Box>
-            <Box>
-              <Typography sx={{ fontSize: 12.5, color: alpha(m.navy, 0.78), lineHeight: 1.5 }}>
-                <Box component="span" sx={{ fontWeight: 900 }}>
-                  Prepayment
-                </Box>{" "}
-                {data.prepaymentLabel}
-              </Typography>
-            </Box>
-            {showKilometerAllowance ? (
-              <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78) }}>
-                Kilometer allowance: {data.kilometerAllowanceLabel}
-              </Typography>
-            ) : null}
-            {data.priceDescription ? <MutedInstructionBox>{data.priceDescription}</MutedInstructionBox> : null}
-            {showKilometerAllowance && data.kilometerAllowanceInstructions ? (
-              <MutedInstructionBox>{data.kilometerAllowanceInstructions}</MutedInstructionBox>
-            ) : null}
-          </Stack>
-        </SectionCard>
+          <SectionCard title="Price">
+            <Stack spacing={1.5}>
+              <Box>
+                <Typography sx={{ fontSize: 12.5, color: alpha(m.navy, 0.78), lineHeight: 1.5 }}>
+                  <Box component="span" sx={{ fontWeight: 800 }}>
+                    Price Range:
+                  </Box>{" "}
+                  <Box component="span" sx={{ fontWeight: 600, color: alpha(m.navy, 0.5) }}>
+                    {data.priceRangeLabel}
+                  </Box>
+                </Typography>
+              </Box>
+              <Box>
+                <Typography sx={{ fontSize: 12.5, color: alpha(m.navy, 0.78), lineHeight: 1.5 }}>
+                  <Box component="span" sx={{ fontWeight: 900 }}>
+                    Prepayment
+                  </Box>{" "}
+                  {data.prepaymentLabel}
+                </Typography>
+              </Box>
+              {showKilometerAllowance ? (
+                <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78) }}>
+                  Kilometer allowance: {data.kilometerAllowanceLabel}
+                </Typography>
+              ) : null}
+              {data.priceDescription ? <MutedInstructionBox>{data.priceDescription}</MutedInstructionBox> : null}
+              {showKilometerAllowance && data.kilometerAllowanceInstructions ? (
+                <MutedInstructionBox>{data.kilometerAllowanceInstructions}</MutedInstructionBox>
+              ) : null}
+            </Stack>
+          </SectionCard>
 
-        <SectionCard title="Policy">
-          <Stack spacing={2}>
-            {data.policySections.map((section) => (
-              <Box key={section.title}>
-                {section.fields?.length === 1 && section.fields[0].label === section.title ? (
-                  <Stack direction="row" alignItems="baseline" justifyContent="space-between" spacing={2} sx={{ mb: 0.25 }}>
-                    <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78) }}>
+          <SectionCard title="Policy">
+            <Stack spacing={2}>
+              {data.policySections.map((section) => (
+                <Box key={section.title}>
+                  {section.fields?.length === 1 && section.fields[0].label === section.title ? (
+                    <Stack direction="row" alignItems="baseline" justifyContent="space-between" spacing={2} sx={{ mb: 0.25 }}>
+                      <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78) }}>
+                        {section.title}
+                      </Typography>
+                      <Typography sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.78) }}>
+                        {section.fields[0].value}
+                      </Typography>
+                    </Stack>
+                  ) : (
+                    <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78), mb: 0.5 }}>
                       {section.title}
                     </Typography>
-                    <Typography sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.78) }}>
-                      {section.fields[0].value}
-                    </Typography>
-                  </Stack>
-                ) : (
-                  <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78), mb: 0.5 }}>
-                    {section.title}
-                  </Typography>
-                )}
-                {section.fields && section.fields.length > 0 && !(section.fields.length === 1 && section.fields[0].label === section.title)
-                  ? section.fields.map((field) => (
-                      <PolicyFieldRow key={`${section.title}-${field.label}`} label={field.label} value={field.value} />
-                    ))
-                  : null}
-                {section.description ? <MutedInstructionBox>{section.description}</MutedInstructionBox> : null}
-              </Box>
-            ))}
-          </Stack>
-        </SectionCard>
+                  )}
+                  {section.fields && section.fields.length > 0 && !(section.fields.length === 1 && section.fields[0].label === section.title)
+                    ? section.fields.map((field) => (
+                        <PolicyFieldRow key={`${section.title}-${field.label}`} label={field.label} value={field.value} />
+                      ))
+                    : null}
+                  {section.description ? <MutedInstructionBox>{section.description}</MutedInstructionBox> : null}
+                </Box>
+              ))}
+            </Stack>
+          </SectionCard>
+        </PublicProfileDetailsGroup>
 
         <SectionCard title="Portfolio">
           <Grid container spacing={1.25}>
@@ -1562,9 +1514,32 @@ export default function BusinessPublicProfile({
               const src = toImageSrc(img);
               return (
                 <Grid item xs={6} sm={3} key={`${idx}-${src}`}>
-                  <Box sx={{ position: "relative", borderRadius: "10px", overflow: "hidden", pt: "100%" }}>
+                  <Box
+                    component={src ? "button" : "div"}
+                    type={src ? "button" : undefined}
+                    onClick={src ? () => setPortfolioLightboxIndex(idx) : undefined}
+                    sx={{
+                      position: "relative",
+                      display: "block",
+                      width: "100%",
+                      p: 0,
+                      m: 0,
+                      border: "none",
+                      borderRadius: "10px",
+                      overflow: "hidden",
+                      pt: "100%",
+                      bgcolor: "transparent",
+                      cursor: src ? "pointer" : "default",
+                      appearance: "none",
+                      WebkitAppearance: "none",
+                      "&:focus-visible": {
+                        outline: `2px solid ${m.teal}`,
+                        outlineOffset: 2,
+                      },
+                    }}
+                  >
                     {src ? (
-                      <RemoteAwareImage src={src} alt="" fill style={{ objectFit: "cover" }} />
+                      <RemoteAwareImage src={src} alt={`Portfolio ${idx + 1}`} fill style={{ objectFit: "cover" }} />
                     ) : (
                       <Box sx={{ position: "absolute", inset: 0, bgcolor: alpha(m.navy, 0.06) }} />
                     )}
@@ -1574,6 +1549,115 @@ export default function BusinessPublicProfile({
             })}
           </Grid>
         </SectionCard>
+
+        <Dialog
+          open={portfolioLightboxIndex !== null}
+          onClose={() => setPortfolioLightboxIndex(null)}
+          fullScreen
+          PaperProps={{
+            sx: {
+              bgcolor: "rgba(0,0,0,0.92)",
+              boxShadow: "none",
+            },
+          }}
+        >
+          <IconButton
+            aria-label="Close"
+            onClick={() => setPortfolioLightboxIndex(null)}
+            sx={{
+              position: "absolute",
+              top: 12,
+              right: 12,
+              zIndex: 2,
+              color: "#fff",
+              bgcolor: "rgba(255,255,255,0.12)",
+              "&:hover": { bgcolor: "rgba(255,255,255,0.22)" },
+            }}
+          >
+            <CloseRoundedIcon />
+          </IconButton>
+
+          {data.portfolioImages.length > 1 ? (
+            <>
+              <IconButton
+                aria-label="Previous image"
+                onClick={() =>
+                  setPortfolioLightboxIndex((current) => {
+                    if (current === null) return current;
+                    const total = data.portfolioImages.length;
+                    return (current - 1 + total) % total;
+                  })
+                }
+                sx={{
+                  position: "absolute",
+                  left: { xs: 8, sm: 16 },
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  zIndex: 2,
+                  color: "#fff",
+                  bgcolor: "rgba(255,255,255,0.12)",
+                  "&:hover": { bgcolor: "rgba(255,255,255,0.22)" },
+                }}
+              >
+                <ChevronLeftRoundedIcon />
+              </IconButton>
+              <IconButton
+                aria-label="Next image"
+                onClick={() =>
+                  setPortfolioLightboxIndex((current) => {
+                    if (current === null) return current;
+                    return (current + 1) % data.portfolioImages.length;
+                  })
+                }
+                sx={{
+                  position: "absolute",
+                  right: { xs: 8, sm: 16 },
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  zIndex: 2,
+                  color: "#fff",
+                  bgcolor: "rgba(255,255,255,0.12)",
+                  "&:hover": { bgcolor: "rgba(255,255,255,0.22)" },
+                }}
+              >
+                <ChevronRightRoundedIcon />
+              </IconButton>
+            </>
+          ) : null}
+
+          <Box
+            onClick={() => setPortfolioLightboxIndex(null)}
+            sx={{
+              position: "relative",
+              width: "100%",
+              height: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              px: { xs: 5, sm: 8 },
+              py: 6,
+            }}
+          >
+            {portfolioLightboxIndex !== null && toImageSrc(data.portfolioImages[portfolioLightboxIndex]) ? (
+              <Box
+                onClick={(event) => event.stopPropagation()}
+                sx={{
+                  position: "relative",
+                  width: "100%",
+                  height: "100%",
+                  maxWidth: 1100,
+                }}
+              >
+                <RemoteAwareImage
+                  src={toImageSrc(data.portfolioImages[portfolioLightboxIndex])}
+                  alt={`Portfolio ${portfolioLightboxIndex + 1}`}
+                  fill
+                  style={{ objectFit: "contain" }}
+                />
+              </Box>
+            ) : null}
+          </Box>
+        </Dialog>
 
         <Paper
           elevation={0}
@@ -1605,8 +1689,7 @@ export default function BusinessPublicProfile({
                     selectedServiceIds,
                     serviceQty,
                     selectedComboIds,
-                    teamAssignments,
-                    teamDraftAssignments,
+                    teamAssignments: {},
                     projectEnabled,
                   }),
                 );
@@ -1634,6 +1717,6 @@ export default function BusinessPublicProfile({
           </Stack>
         </Paper>
       </Stack>
-    </Box>
+    </PublicProfilePageShell>
   );
 }

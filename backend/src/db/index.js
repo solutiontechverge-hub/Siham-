@@ -2,7 +2,11 @@ import "../bootstrap-env.js";
 import pg from "pg";
 import { getDatabaseConnectionString } from "./connectionString.js";
 
-const { Pool } = pg;
+const { Pool, types } = pg;
+
+// Keep Postgres DATE as YYYY-MM-DD strings. Default Date parsing shifts
+// calendar days across timezones (e.g. 2026-07-09 -> 2026-07-08T19:00:00.000Z in UTC+5).
+types.setTypeParser(types.builtins.DATE, (value) => value);
 
 let pool;
 
@@ -27,6 +31,12 @@ function getPool() {
   pool = new Pool({
     connectionString,
     ssl: shouldUseSsl ? { rejectUnauthorized: false } : undefined,
+    idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT_MS || 30_000),
+    connectionTimeoutMillis: Number(process.env.DB_CONNECTION_TIMEOUT_MS || 10_000),
+  });
+
+  pool.on("error", (error) => {
+    console.error("[db] Idle pool connection error:", error.message || error);
   });
 
   return pool;

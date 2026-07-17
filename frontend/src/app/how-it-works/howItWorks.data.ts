@@ -1,10 +1,9 @@
-import type { SvgIconComponent } from "@mui/icons-material";
 import {
-  LocationOnOutlined,
-  TuneOutlined,
-  ErrorOutlineOutlined,
-  BoltOutlined,
-} from "@mui/icons-material";
+  HowItWorksChangesApprovalIcon,
+  HowItWorksChangesWithoutApprovalIcon,
+  HowItWorksClientCreatedIcon,
+  HowItWorksProfessionalCreatedIcon,
+} from "../../../images";
 
 export type HowItWorksInfoRow = {
   title: string;
@@ -14,7 +13,12 @@ export type HowItWorksInfoRow = {
 export type HowItWorksKeyPrinciple = {
   title: string;
   description: string;
-  Icon: SvgIconComponent;
+  icon: typeof HowItWorksClientCreatedIcon;
+};
+
+export type HowItWorksServiceCategory = {
+  label: string;
+  iconId: "hair" | "makeup" | "lashes" | "brows" | "facial" | "body" | "waxing";
 };
 
 export const howItWorksData = {
@@ -41,30 +45,57 @@ export const howItWorksData = {
     note:
       "Client profile information is controlled by the client. Professional can view relevant details once a booking is confirmed and the client has been added to the client list of the professional, but professional cannot edit client user information.",
   },
+  professionalGettingStarted: {
+    requirements: {
+      intro: "To get listed on Mollure, professionals must meet the following requirements:",
+      points: [
+        "Be based in the Netherlands",
+        "Be a registered professional with a valid KvK and VAT number",
+        "Offer services in at least one supported category:",
+      ],
+      categories: [
+        { label: "Hair", iconId: "hair" },
+        { label: "Make-Up", iconId: "makeup" },
+        { label: "Lashes", iconId: "lashes" },
+        { label: "Eyebrows", iconId: "brows" },
+        { label: "Face Treatments", iconId: "facial" },
+        { label: "Body Treatments", iconId: "body" },
+        { label: "Hair Removal", iconId: "waxing" },
+      ] satisfies readonly HowItWorksServiceCategory[],
+    },
+    validation: {
+      intro: "Mollure uses a one-step validation process to keep onboarding fast and secure.",
+      points: [
+        "After signing up, your details are reviewed to confirm you are a legitimate professional.",
+        "Once approved, you set up your monthly subscription set up and Stripe onboarding to receive online payments",
+        "After you can set up your business profile for fixed location and or desired location and go live",
+      ],
+    },
+  },
   keyPrinciples: [
     {
       title: "Client-Created Bookings",
       description:
         "Fixed location bookings are confirmed instantly. Desired location bookings are always sent as a booking request when created by a client.",
-      Icon: LocationOnOutlined,
+      icon: HowItWorksClientCreatedIcon,
     },
     {
       title: "Professional-Created Bookings",
       description:
         "Bookings created by professionals are always sent as a booking request, regardless of location.",
-      Icon: TuneOutlined,
+      icon: HowItWorksProfessionalCreatedIcon,
     },
     {
       title: "Changes Requiring Approval",
       description:
         "Major changes require approval, so nothing important changes without you knowing.",
-      Icon: ErrorOutlineOutlined,
+      icon: HowItWorksChangesApprovalIcon,
     },
     {
       title: "Changes Without Approval",
       description:
         "Some changes are applied directly and clearly marked. When relevant, you'll be notified that the booking has been edited.",
-      Icon: BoltOutlined,
+      icon: HowItWorksChangesWithoutApprovalIcon,
     },
   ] satisfies readonly HowItWorksKeyPrinciple[],
   bookingTypes: {
@@ -99,4 +130,3 @@ export const howItWorksData = {
     ] satisfies readonly HowItWorksInfoRow[],
   },
 } as const;
-

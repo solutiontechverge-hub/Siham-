@@ -224,7 +224,15 @@ export default function ProfessionalSignupPage() {
           result.message || "Professional account created successfully. Please check your email.",
       });
       setForm(initialForm);
-      router.push("/auth/professional/login");
+      try {
+        window.sessionStorage.setItem("mollure_signup_email", form.contactEmail.trim().toLowerCase());
+        window.sessionStorage.setItem("mollure_signup_user_type", "professional");
+      } catch {
+        // ignore
+      }
+      router.push(
+        `/auth/check-email?email=${encodeURIComponent(form.contactEmail.trim().toLowerCase())}&type=professional`,
+      );
     } catch (error) {
       showSnackbar({
         severity: "error",

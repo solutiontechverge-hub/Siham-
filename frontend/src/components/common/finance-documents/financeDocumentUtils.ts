@@ -116,9 +116,13 @@ export function formatPaymentMethod(row?: TransactionRow | null) {
 }
 
 export function receiptTitleForStatus(status?: TransactionRow["status"]) {
-  return status === "Refunded" ? "Refund Receipt" : "Receipt";
+  return status === "Refunded" ? "Credit Note" : "Receipt";
 }
 
 export function receiptItemsTitleForStatus(status?: TransactionRow["status"]) {
   return status === "Refunded" ? "Refunded Items" : "Paid Items";
+}
+
+export function receiptNumberLabelForStatus(status?: TransactionRow["status"]) {
+  return status === "Refunded" ? "Credit note number" : "Receipt number";
 }

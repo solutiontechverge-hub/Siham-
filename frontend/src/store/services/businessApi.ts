@@ -1,6 +1,4 @@
 import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
-import { mapApiBookingStatusToClient } from "../../app/clients/booking/clientBookingStatus";
-import { updateClientBookingStatusByRef } from "../../app/clients/booking/clientBookingRecords";
 import { baseApi } from "./baseApi";
 
 type ApiEnvelope<T> = {
@@ -52,8 +50,10 @@ export type BusinessTeamMember = {
 };
 
 export type BusinessBookServiceCombination = {
+  /** First service id in the combo (always a service — field name is legacy). */
   category_id: string;
   category_title?: string | null;
+  /** Second service id in the combo. */
   service_id: string;
   service_title?: string | null;
 };
@@ -221,6 +221,7 @@ export type BusinessSetup = {
   desired_location_area: string | null;
   desired_location_province: string | null;
   desired_location_services: string[];
+  section_sync_settings: Record<string, string> | null;
   created_at: string;
   updated_at: string;
   team_members: BusinessTeamMember[];
@@ -231,7 +232,7 @@ export type CalendarEntry = {
   id: string;
   professional_profile_id: string;
   team_member_id: string | null;
-  status: "requested" | "cancelled" | "completed" | "confirmed" | "blocked" | "no_show";
+  status: "requested" | "cancelled" | "completed" | "confirmed" | "blocked" | "in_progress" | "no_show";
   title: string;
   unique_code: string;
   start_time: string | null;
@@ -264,11 +265,23 @@ export type CalendarBooking = {
   location_type: "fixed" | "desired" | null;
   notes: string | null;
   status: string;
+  prepayment_status?: string | null;
+  contact_number?: string | null;
   booking_type?: "online" | "offline" | "project" | "request" | null;
   unique_code?: string | null;
   total_price: string | number | null;
   service_title?: string | null;
   team_member_name?: string | null;
+  customer_name?: string | null;
+  customer_email?: string | null;
+  client_name?: string | null;
+  business_name?: string | null;
+  fixed_location_municipality?: string | null;
+  fixed_location_address?: string | null;
+  fixed_location_street_number?: string | null;
+  fixed_location_postal_code?: string | null;
+  fixed_location_province?: string | null;
+  created_at?: string | null;
   date?: string | null;
   start?: string | null;
   end?: string | null;
@@ -287,6 +300,11 @@ export type CalendarOverview = {
   entries: CalendarEntry[];
   bookings: CalendarBooking[];
   settings: CalendarSettings | null;
+};
+
+export type CalendarOverviewQuery = {
+  startDate: string;
+  endDate: string;
 };
 
 export type CreateCalendarEntryRequest = {
@@ -314,12 +332,46 @@ export type UpsertCalendarSettingsRequest = {
 
 export type UpdateCalendarEntryStatusRequest = {
   id: string;
-  status: "requested" | "cancelled" | "completed" | "confirmed" | "no_show";
+  status: "requested" | "cancelled" | "completed" | "confirmed" | "in_progress" | "no_show";
 };
 
 export type UpdateBookingStatusRequest = {
   id: string;
-  status: "requested" | "cancelled" | "completed" | "confirmed" | "no_show";
+  status: "requested" | "cancelled" | "completed" | "confirmed" | "in_progress" | "no_show";
+  notes?: string | null;
+  total_price?: number | string | null;
+  booking_date?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+};
+
+export type UpdateMyBookingRequest = {
+  id: string;
+  status?: "cancelled" | "confirmed" | "requested";
+  prepayment_status?: "paid" | "pending" | "failed" | "required";
+  notes?: string | null;
+  total_price?: number | string | null;
+  booking_date?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+};
+
+export type CreateBookingRequest = {
+  booking_date: string;
+  business_setup_id: string;
+  service_id?: string | null;
+  team_member_id?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  location_type?: "fixed" | "desired" | null;
+  location_details?: Record<string, unknown>;
+  notes?: string | null;
+  prepayment_status?: string | null;
+  status?: "requested" | "cancelled" | "completed" | "confirmed" | "in_progress" | "no_show";
+  booking_type?: "online" | "offline" | "project" | "request";
+  unique_code?: string | null;
+  total_price?: number | string | null;
+  contact_number?: string | null;
 };
 
 export type UpdateBusinessSetupActiveRequest = {
@@ -370,6 +422,7 @@ export type UpsertBusinessSetupRequest = {
   desired_location_area?: string;
   desired_location_province?: string;
   desired_location_services?: string[];
+  section_sync_settings?: Record<string, string>;
   team_members?: Array<
     BusinessTeamMember & {
       photo_upload_key?: string;
@@ -378,6 +431,89 @@ export type UpsertBusinessSetupRequest = {
 };
 
 export type UpsertBusinessSetupPayload = UpsertBusinessSetupRequest | FormData;
+
+export type ApiProfessionalClient = {
+  id: string;
+  client_kind: "individual" | "company";
+  is_mollure: boolean;
+  mollure_user_id: string | null;
+  display_name: string;
+  email: string;
+  phone: string;
+  technical_note: string | null;
+  is_blocked: boolean;
+  has_no_show: boolean;
+  total_sales: number;
+  total_sales_label: string;
+  last_booking_date: string | null;
+  last_booking_label: string;
+  stats_last_booking?: string;
+  bookings_completed: number;
+  average_booking_value: number;
+  average_booking_value_label: string;
+  recent_services: Array<{ name: string; price: string }>;
+  booking_history: Array<{ period: string; bookings: number }>;
+  first_name: string | null;
+  last_name: string | null;
+  gender: string | null;
+  date_of_birth: string | null;
+  residential_address: string | null;
+  legal_name: string | null;
+  coc: string | null;
+  vat: string | null;
+  contact_person_name: string | null;
+  business_address: string | null;
+  detail_email: string | null;
+  added_on: string;
+  created_at: string;
+};
+
+export type MollureClientDirectoryEntry = {
+  id: string;
+  name: string;
+  email: string;
+  has_eligible_booking: boolean;
+};
+
+export type CreateProfessionalClientRequest =
+  | { mollure_user_id: string }
+  | {
+      client_kind: "individual" | "company";
+      email: string;
+      first_name?: string;
+      last_name?: string;
+      legal_name?: string;
+      country_code?: string;
+      phone?: string;
+      gender?: string;
+      date_of_birth?: string;
+      residential_address?: string;
+      coc?: string;
+      vat?: string;
+      contact_person_name?: string;
+      business_address?: string;
+      detail_email?: string;
+      technical_note?: string;
+    };
+
+export type UpdateProfessionalClientRequest = {
+  id: string;
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+  legal_name?: string;
+  country_code?: string;
+  phone?: string;
+  gender?: string;
+  date_of_birth?: string;
+  residential_address?: string;
+  coc?: string;
+  vat?: string;
+  contact_person_name?: string;
+  business_address?: string;
+  detail_email?: string;
+  technical_note?: string;
+};
 
 export const buildUpsertBusinessSetupBody = (
   payload: UpsertBusinessSetupRequest,
@@ -489,11 +625,19 @@ export const businessApi = baseApi.injectEndpoints({
       },
       providesTags: ["BusinessSetup"],
     }),
-    getCalendarOverview: builder.query<ApiEnvelope<CalendarOverview>, void>({
-      async queryFn(_arg, _api, _extraOptions, fetchWithBQ) {
+    getCalendarOverview: builder.query<ApiEnvelope<CalendarOverview>, CalendarOverviewQuery>({
+      async queryFn(arg, _api, _extraOptions, fetchWithBQ) {
+        const params = new URLSearchParams({
+          startDate: arg.startDate,
+          endDate: arg.endDate,
+        });
         const response = await fetchWithBQ({
-          url: "/api/business/calendar/overview",
+          url: `/api/business/calendar/overview?${params.toString()}`,
           method: "GET",
+          headers: {
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+          },
         });
 
         if (response.error) {
@@ -572,12 +716,82 @@ export const businessApi = baseApi.injectEndpoints({
       },
       invalidatesTags: ["Calendar"],
     }),
+    deleteCalendarEntry: builder.mutation<ApiEnvelope<{ id: string }>, string>({
+      async queryFn(id, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: `/api/business/calendar/${id}`,
+          method: "DELETE",
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<{ id: string }>;
+        if (!data.success) {
+          return { error: customError(data.message || "Unable to delete calendar entry.") };
+        }
+
+        return { data };
+      },
+      invalidatesTags: ["Calendar"],
+    }),
+    getMyBookings: builder.query<ApiEnvelope<CalendarBooking[]>, void>({
+      async queryFn(_arg, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: "/api/business/bookings",
+          method: "GET",
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<CalendarBooking[]>;
+        if (!data.success) {
+          return { error: customError(data.message || "Unable to load bookings.") };
+        }
+
+        return { data: { ...data, data: Array.isArray(data.data) ? data.data : [] } };
+      },
+      providesTags: ["Bookings"],
+    }),
+    createBooking: builder.mutation<ApiEnvelope<CalendarBooking>, CreateBookingRequest>({
+      async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: "/api/business/bookings",
+          method: "POST",
+          body: payload,
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<CalendarBooking>;
+        if (!data.success || !data.data) {
+          return { error: customError(data.message || "Unable to create booking.") };
+        }
+
+        return { data };
+      },
+      invalidatesTags: ["Calendar", "Bookings"],
+    }),
     updateBookingStatus: builder.mutation<ApiEnvelope<CalendarBooking>, UpdateBookingStatusRequest>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
+        const body: Record<string, string | number> = { status: payload.status };
+        if (payload.notes !== undefined) body.notes = payload.notes ?? "";
+        if (payload.total_price !== undefined && payload.total_price !== null && payload.total_price !== "") {
+          body.total_price = Number(payload.total_price);
+        }
+        if (payload.booking_date) body.booking_date = payload.booking_date;
+        if (payload.start_time) body.start_time = payload.start_time;
+        if (payload.end_time) body.end_time = payload.end_time;
+
         const response = await fetchWithBQ({
           url: `/api/business/bookings/${payload.id}/status`,
           method: "PATCH",
-          body: { status: payload.status },
+          body,
         });
 
         if (response.error) {
@@ -589,15 +803,41 @@ export const businessApi = baseApi.injectEndpoints({
           return { error: customError(data.message || "Unable to update booking status.") };
         }
 
-        const clientStatus = mapApiBookingStatusToClient(data.data.status);
-        const bookingRef = data.data.unique_code;
-        if (clientStatus && bookingRef) {
-          updateClientBookingStatusByRef(bookingRef, clientStatus);
+        return { data };
+      },
+      invalidatesTags: ["Calendar", "Bookings"],
+    }),
+    updateMyBooking: builder.mutation<ApiEnvelope<CalendarBooking>, UpdateMyBookingRequest>({
+      async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
+        const body: Record<string, string | number> = {};
+        if (payload.status) body.status = payload.status;
+        if (payload.prepayment_status) body.prepayment_status = payload.prepayment_status;
+        if (payload.notes !== undefined) body.notes = payload.notes ?? "";
+        if (payload.total_price !== undefined && payload.total_price !== null && payload.total_price !== "") {
+          body.total_price = Number(payload.total_price);
+        }
+        if (payload.booking_date) body.booking_date = payload.booking_date;
+        if (payload.start_time) body.start_time = payload.start_time;
+        if (payload.end_time) body.end_time = payload.end_time;
+
+        const response = await fetchWithBQ({
+          url: `/api/business/bookings/${payload.id}`,
+          method: "PATCH",
+          body,
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<CalendarBooking>;
+        if (!data.success || !data.data) {
+          return { error: customError(data.message || "Unable to update booking.") };
         }
 
         return { data };
       },
-      invalidatesTags: ["Calendar"],
+      invalidatesTags: ["Calendar", "Bookings"],
     }),
     uploadBusinessMedia: builder.mutation<ApiEnvelope<{ business_media: string[] }>, File[]>({
       async queryFn(files, _api, _extraOptions, fetchWithBQ) {
@@ -698,6 +938,157 @@ export const businessApi = baseApi.injectEndpoints({
       },
       invalidatesTags: ["BusinessSetup"],
     }),
+    getProfessionalClients: builder.query<ApiEnvelope<ApiProfessionalClient[]>, void>({
+      async queryFn(_arg, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: "/api/business/clients",
+          method: "GET",
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<ApiProfessionalClient[]>;
+        if (!data.success || !Array.isArray(data.data)) {
+          return { error: customError(data.message || "Unable to fetch clients.") };
+        }
+
+        return { data };
+      },
+      providesTags: ["ProfessionalClients"],
+    }),
+    getMollureClientDirectory: builder.query<ApiEnvelope<MollureClientDirectoryEntry[]>, { q?: string } | void>({
+      async queryFn(arg, _api, _extraOptions, fetchWithBQ) {
+        const q = arg?.q?.trim();
+        const response = await fetchWithBQ({
+          url: q ? `/api/business/clients/mollure-directory?q=${encodeURIComponent(q)}` : "/api/business/clients/mollure-directory",
+          method: "GET",
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<MollureClientDirectoryEntry[]>;
+        if (!data.success || !Array.isArray(data.data)) {
+          return { error: customError(data.message || "Unable to fetch Mollure directory.") };
+        }
+
+        return { data };
+      },
+      providesTags: ["ProfessionalClients"],
+    }),
+    createProfessionalClient: builder.mutation<ApiEnvelope<ApiProfessionalClient>, CreateProfessionalClientRequest>({
+      async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: "/api/business/clients",
+          method: "POST",
+          body: payload,
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<ApiProfessionalClient>;
+        if (!data.success || !data.data) {
+          return { error: customError(data.message || "Unable to add client.") };
+        }
+
+        return { data };
+      },
+      invalidatesTags: ["ProfessionalClients"],
+    }),
+    updateProfessionalClient: builder.mutation<ApiEnvelope<ApiProfessionalClient>, UpdateProfessionalClientRequest>({
+      async queryFn({ id, ...body }, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: `/api/business/clients/${id}`,
+          method: "PATCH",
+          body,
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<ApiProfessionalClient>;
+        if (!data.success || !data.data) {
+          return { error: customError(data.message || "Unable to update client.") };
+        }
+
+        return { data };
+      },
+      invalidatesTags: ["ProfessionalClients"],
+    }),
+    updateProfessionalClientTechnicalNote: builder.mutation<
+      ApiEnvelope<ApiProfessionalClient>,
+      { id: string; technical_note: string }
+    >({
+      async queryFn({ id, technical_note }, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: `/api/business/clients/${id}/technical-note`,
+          method: "PATCH",
+          body: { technical_note },
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<ApiProfessionalClient>;
+        if (!data.success || !data.data) {
+          return { error: customError(data.message || "Unable to save technical note.") };
+        }
+
+        return { data };
+      },
+      invalidatesTags: ["ProfessionalClients"],
+    }),
+    setProfessionalClientBlocked: builder.mutation<
+      ApiEnvelope<ApiProfessionalClient>,
+      { id: string; is_blocked: boolean }
+    >({
+      async queryFn({ id, is_blocked }, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: `/api/business/clients/${id}/block`,
+          method: "PATCH",
+          body: { is_blocked },
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<ApiProfessionalClient>;
+        if (!data.success || !data.data) {
+          return { error: customError(data.message || "Unable to update block status.") };
+        }
+
+        return { data };
+      },
+      invalidatesTags: ["ProfessionalClients"],
+    }),
+    deleteProfessionalClient: builder.mutation<ApiEnvelope<null>, string>({
+      async queryFn(id, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: `/api/business/clients/${id}`,
+          method: "DELETE",
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<null>;
+        if (!data.success) {
+          return { error: customError(data.message || "Unable to delete client.") };
+        }
+
+        return { data };
+      },
+      invalidatesTags: ["ProfessionalClients"],
+    }),
   }),
   overrideExisting: false,
 });
@@ -710,9 +1101,20 @@ export const {
   useCreateCalendarEntryMutation,
   useUpsertCalendarSettingsMutation,
   useUpdateCalendarEntryStatusMutation,
+  useDeleteCalendarEntryMutation,
+  useGetMyBookingsQuery,
+  useCreateBookingMutation,
   useUpdateBookingStatusMutation,
+  useUpdateMyBookingMutation,
   useUploadBusinessMediaMutation,
   useUpdateBusinessSetupActiveMutation,
   useCreateBusinessSubcategoryMutation,
   useUpsertBusinessSetupMutation,
+  useGetProfessionalClientsQuery,
+  useGetMollureClientDirectoryQuery,
+  useCreateProfessionalClientMutation,
+  useUpdateProfessionalClientMutation,
+  useUpdateProfessionalClientTechnicalNoteMutation,
+  useSetProfessionalClientBlockedMutation,
+  useDeleteProfessionalClientMutation,
 } = businessApi;

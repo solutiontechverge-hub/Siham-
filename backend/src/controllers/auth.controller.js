@@ -6,6 +6,11 @@ import {
   sendVerificationEmail,
 } from "../helpers/email.helper.js";
 import {
+  notifyAccountUnderReview,
+  notifyPostVerificationPro,
+  notifySignupConfirmation,
+} from "../services/authEmail.service.js";
+import {
   generateAccessToken,
   generateRefreshToken,
 } from "../helpers/jwt.helper.js";
@@ -130,9 +135,23 @@ const getUserWithProfile = async (userId) => {
     [userId],
   );
 
+  const profile = profileResult.rows[0] || null;
+  let stripe_connect_status = null;
+
+  if (user.user_type === "professional" && profile?.id) {
+    const financeResult = await query(
+      `SELECT stripe_connect_status
+       FROM professional_finance_settings
+       WHERE professional_profile_id = $1`,
+      [profile.id],
+    );
+    stripe_connect_status = financeResult.rows[0]?.stripe_connect_status ?? "not_connected";
+  }
+
   return {
     ...user,
-    profile: profileResult.rows[0] || null,
+    profile,
+    ...(stripe_connect_status ? { stripe_connect_status } : {}),
   };
 };
 
@@ -228,16 +247,29 @@ export const register = async (req, res) => {
       [user.id, hashToken(rawVerificationToken), false],
     );
 
-    await sendVerificationEmail({
-      email: user.email,
-      token: rawVerificationToken,
-    });
-
     await client.query("COMMIT");
+
+    let verificationEmailSent = true;
+    try {
+      await sendVerificationEmail({
+        email: user.email,
+        token: rawVerificationToken,
+      });
+    } catch (emailError) {
+      verificationEmailSent = false;
+      console.error(
+        `[auth] Verification email failed for ${user.email}:`,
+        emailError.message,
+      );
+    }
+
+    void notifySignupConfirmation(user.id);
 
     return res.status(201).json({
       success: true,
-      message: "User registered successfully. Verification email sent.",
+      message: verificationEmailSent
+        ? "User registered successfully. Verification email sent."
+        : "User registered successfully, but the verification email could not be sent.",
       data: await getUserWithProfile(user.id),
     });
   } catch (error) {
@@ -618,7 +650,18 @@ export const verifyEmail = async (req, res) => {
       [verification.user_id],
     );
 
+    const userResult = await client.query(
+      `SELECT id, user_type FROM users WHERE id = $1`,
+      [verification.user_id],
+    );
+    const verifiedUser = userResult.rows[0];
+
     await client.query("COMMIT");
+
+    if (verifiedUser?.user_type === "professional") {
+      void notifyPostVerificationPro(verifiedUser.id);
+      void notifyAccountUnderReview(verifiedUser.id);
+    }
 
     return res.status(200).json({
       success: true,

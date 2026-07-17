@@ -40,6 +40,8 @@ import {
 } from "../../../../../components/sections/finance/useFinanceInvoiceSettings";
 import { useGetProfileQuery } from "../../../../../store/services/profileApi";
 import { useProfessionalStripeStatus } from "../useProfessionalStripeStatus";
+import { useFinanceTransactionOptions } from "../../../../../components/common/finance-documents/useFinanceTransactionOptions";
+import { useProcessFinanceInvoiceReissuesMutation } from "../../../../../store/services/financeApi";
 
 type SettingsTab = "stripe" | "transaction" | "invoice";
 
@@ -167,8 +169,45 @@ function StripeSettings() {
     return null;
   }
 
+  const showOnboardingBanner = subscriptionActive && !paymentsConnected;
+  const showDisconnectedBanner = !subscriptionActive && !paymentsConnected;
+
   return (
     <Stack spacing={2}>
+      {showOnboardingBanner ? (
+        <Paper
+          elevation={0}
+          sx={{
+            borderRadius: "10px",
+            border: `1px solid ${alpha("#E65100", 0.25)}`,
+            bgcolor: alpha("#E65100", 0.06),
+            px: 2,
+            py: 1.4,
+          }}
+        >
+          <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: "#E65100" }}>
+            Onboarding not completed — please proceed with your onboarding process.
+          </BodyText>
+        </Paper>
+      ) : null}
+
+      {showDisconnectedBanner ? (
+        <Paper
+          elevation={0}
+          sx={{
+            borderRadius: "10px",
+            border: `1px solid ${alpha("#C62828", 0.3)}`,
+            bgcolor: alpha("#C62828", 0.06),
+            px: 2,
+            py: 1.4,
+          }}
+        >
+          <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: "#C62828" }}>
+            Public profile has temporarily been deactivated — Status: Not Connected
+          </BodyText>
+        </Paper>
+      ) : null}
+
       <Paper
         elevation={0}
         sx={{
@@ -271,7 +310,7 @@ function StripeSettings() {
                 showSnackbar({ severity: "success", message: "Stripe account connected." });
               }}
             >
-              {paymentsConnected ? "Stripe Dashboard" : "Start Onboarding"}
+              {paymentsConnected ? "Stripe Mollure Dashboard" : subscriptionActive ? "Complete Onboarding" : "Start Onboarding"}
             </Button>
           </Box>
 
@@ -349,14 +388,15 @@ function StripeSettings() {
 function TransactionOptionsSettings() {
   const theme = useTheme();
   const m = theme.palette.mollure;
+  const { showSnackbar } = useSnackbar();
+  const { options, setOptions, hydrated } = useFinanceTransactionOptions();
 
   const [editing, setEditing] = React.useState(false);
-  const [methods, setMethods] = React.useState({
-    onlineDirect: true,
-    onlineNonDirectCcOnly: true,
-    offlineDirect: true,
-    offlineNonDirectCcOnly: false,
-  });
+  const [draft, setDraft] = React.useState(options);
+
+  React.useEffect(() => {
+    if (hydrated) setDraft(options);
+  }, [hydrated, options]);
 
   const cardSx = {
     borderRadius: "10px",
@@ -378,15 +418,21 @@ function TransactionOptionsSettings() {
       >
         <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1.5}>
           <Box sx={{ flex: 1 }}>
-            <SubHeading sx={{ color: alpha(m.navy, 0.86) }}>Payment Methods</SubHeading>
+            <SubHeading sx={{ color: alpha(m.navy, 0.86) }}>Post-booking payment methods</SubHeading>
             <BodyText sx={{ mt: 0.35, color: alpha(m.navy, 0.55), fontSize: 12.5 }}>
-              View bookings, sales, performance and review analytics.
+              Select transaction options featured at checkout for post-booking.
             </BodyText>
           </Box>
 
           <IconButton
             size="small"
-            onClick={() => setEditing((v) => !v)}
+            onClick={() => {
+              if (editing) {
+                setOptions(draft);
+                showSnackbar({ severity: "success", message: "Transaction options saved." });
+              }
+              setEditing((v) => !v);
+            }}
             sx={{
               mt: 0.25,
               width: 28,
@@ -408,61 +454,43 @@ function TransactionOptionsSettings() {
           <CardTitle sx={{ color: alpha(m.navy, 0.86) }}>Post-Booking</CardTitle>
         </Stack>
         <BodyText sx={{ mt: 0.4, color: alpha(m.navy, 0.55), fontSize: 12 }}>
-          Select transaction option that are facture at checkout
+          Options available at checkout after a booking is made.
         </BodyText>
 
         <Stack spacing={0.25} sx={{ mt: 1 }}>
-          <Stack direction="row" spacing={1} alignItems="center">
+          {(
+            [
+              {
+                key: "onlineImmediate" as const,
+                label: "Online (immediate – payment window – 15 min)",
+              },
+              {
+                key: "onlineInvoiceDueDate" as const,
+                label: "Online (Invoice with a due date – for BC clients and IC for fee charges)",
+              },
+              {
+                key: "offlineImmediate" as const,
+                label: "Offline (Immediate)",
+              },
+              {
+                key: "offlineInvoiceDueDate" as const,
+                label: "Offline (Invoice with a due date – for BC clients and IC for fee charges)",
+              },
+            ] as const
+          ).map((item) => (
+          <Stack key={item.key} direction="row" spacing={1} alignItems="center">
             <Checkbox
-              checked={methods.onlineDirect}
+              checked={draft[item.key]}
               disabled={!editing}
-              onChange={(e) => setMethods((p) => ({ ...p, onlineDirect: e.target.checked }))}
+              onChange={(e) => setDraft((p) => ({ ...p, [item.key]: e.target.checked }))}
               size="small"
               sx={{ p: 0.5 }}
             />
             <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, editing ? 0.75 : 0.45), fontWeight: 700 }}>
-              Online direct (by default selected)
+              {item.label}
             </BodyText>
           </Stack>
-
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Checkbox
-              checked={methods.onlineNonDirectCcOnly}
-              disabled={!editing}
-              onChange={(e) => setMethods((p) => ({ ...p, onlineNonDirectCcOnly: e.target.checked }))}
-              size="small"
-              sx={{ p: 0.5 }}
-            />
-            <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, editing ? 0.75 : 0.45), fontWeight: 700 }}>
-              Online non-direct (only for CC)
-            </BodyText>
-          </Stack>
-
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Checkbox
-              checked={methods.offlineDirect}
-              disabled={!editing}
-              onChange={(e) => setMethods((p) => ({ ...p, offlineDirect: e.target.checked }))}
-              size="small"
-              sx={{ p: 0.5 }}
-            />
-            <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, editing ? 0.75 : 0.45), fontWeight: 700 }}>
-              Offline direct
-            </BodyText>
-          </Stack>
-
-          <Stack direction="row" spacing={1} alignItems="center">
-            <Checkbox
-              checked={methods.offlineNonDirectCcOnly}
-              disabled={!editing}
-              onChange={(e) => setMethods((p) => ({ ...p, offlineNonDirectCcOnly: e.target.checked }))}
-              size="small"
-              sx={{ p: 0.5 }}
-            />
-            <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, editing ? 0.75 : 0.45), fontWeight: 700 }}>
-              Offline non-direct (only for CC)
-            </BodyText>
-          </Stack>
+          ))}
         </Stack>
       </Box>
     </Paper>
@@ -474,18 +502,37 @@ function InvoiceSettings() {
   const m = theme.palette.mollure;
   const { showSnackbar } = useSnackbar();
   const { settings, setSettings } = useFinanceInvoiceSettings();
+  const { options: txOptions } = useFinanceTransactionOptions();
   const { data: profileResponse } = useGetProfileQuery();
+  const [processReissues, { isLoading: isProcessingReissues }] = useProcessFinanceInvoiceReissuesMutation();
+  const showDueDateSettings = txOptions.onlineInvoiceDueDate || txOptions.offlineInvoiceDueDate;
   const [paymentsEditing, setPaymentsEditing] = React.useState(false);
   const [addProductOpen, setAddProductOpen] = React.useState(false);
   const [editingProductId, setEditingProductId] = React.useState<string | null>(null);
   const [addProductDraft, setAddProductDraft] = React.useState({
     productName: "Hair Protein",
-    vat: "20%",
+    vat: "21%",
     price: "0",
   });
   const [addServiceOpen, setAddServiceOpen] = React.useState(false);
   const [editingServiceId, setEditingServiceId] = React.useState<string | null>(null);
   const [addServiceDraft, setAddServiceDraft] = React.useState({ service: "Hair Protein", vat: "20%" });
+
+  const handleProcessReissues = React.useCallback(async () => {
+    try {
+      const result = await processReissues().unwrap();
+      const created = result.data?.created ?? 0;
+      showSnackbar({
+        severity: "success",
+        message:
+          created > 0
+            ? `Created ${created} re-issued invoice${created === 1 ? "" : "s"} for overdue payments.`
+            : "No overdue invoices required re-issuing.",
+      });
+    } catch {
+      showSnackbar({ severity: "error", message: "Could not process invoice re-issues." });
+    }
+  }, [processReissues, showSnackbar]);
 
   const logoInputRef = React.useRef<HTMLInputElement | null>(null);
   const [invoiceDrawerOpen, setInvoiceDrawerOpen] = React.useState(false);
@@ -593,7 +640,7 @@ function InvoiceSettings() {
 
   const openAddProduct = () => {
     setEditingProductId(null);
-    setAddProductDraft({ productName: "Hair Protein", vat: "20%", price: "0" });
+    setAddProductDraft({ productName: "Hair Protein", vat: "21%", price: "0" });
     setAddProductOpen(true);
   };
 
@@ -1073,7 +1120,7 @@ function InvoiceSettings() {
               </Box>
             </Box>
 
-            <Box sx={{ ...sectionCardSx, boxShadow: "none" }}>
+            <Box sx={{ ...sectionCardSx, boxShadow: "none", display: showDueDateSettings ? "block" : "none" }}>
               <Box sx={headerSx}>
                 <Stack direction="row" alignItems="center" justifyContent="space-between">
                   <CardTitle sx={{ color: alpha(m.navy, 0.86) }}>Payments And Reminders</CardTitle>
@@ -1260,6 +1307,33 @@ function InvoiceSettings() {
                       </Stack>
                     </Box>
                   </Box>
+
+                  {showDueDateSettings ? (
+                    <Box>
+                      <CardTitle sx={{ color: alpha(m.navy, 0.86) }}>Overdue Invoice Re-issues</CardTitle>
+                      <Box sx={{ mt: 1.25, ...formPanelSx, bgcolor: "#fff" }}>
+                        <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.58), fontWeight: 700 }}>
+                          Manually process overdue invoices and create re-issued invoices with updated due dates and
+                          penalty fees per your payment terms.
+                        </BodyText>
+                        <Button
+                          variant="outlined"
+                          disabled={isProcessingReissues}
+                          onClick={() => void handleProcessReissues()}
+                          sx={{
+                            mt: 1.5,
+                            borderRadius: "10px",
+                            textTransform: "none",
+                            fontWeight: 900,
+                            borderColor: alpha(m.navy, 0.16),
+                            color: alpha(m.navy, 0.72),
+                          }}
+                        >
+                          {isProcessingReissues ? "Processing…" : "Process overdue re-issues"}
+                        </Button>
+                      </Box>
+                    </Box>
+                  ) : null}
                 </Stack>
               </Box>
             </Box>

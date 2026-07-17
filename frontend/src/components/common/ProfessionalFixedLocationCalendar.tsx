@@ -6,38 +6,147 @@ import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
-import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
-import LocationOnRoundedIcon from "@mui/icons-material/LocationOnRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
-import StickyNote2OutlinedIcon from "@mui/icons-material/StickyNote2Outlined";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
-import { Avatar, Box, Button, ButtonBase, Chip, IconButton, Paper, Popover, Stack, Tooltip } from "@mui/material";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+import StickyNote2OutlinedIcon from "@mui/icons-material/StickyNote2Outlined";
+import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
+import { Avatar, Box, Button, ButtonBase, Chip, Divider, IconButton, Menu, MenuItem, Paper, Popover, Stack, Tooltip } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../ui/typography";
 import { useSnackbar } from "./AppSnackbar";
+import { getApiErrorMessage } from "../../lib/api-error";
 import AppPillTabs from "./AppPillTabs";
 import MollureDrawer from "./MollureDrawer";
 import AppSearchField from "./AppSearchField";
 import AppDatePicker from "./AppDatePicker";
 import { AppCalendarPanel } from "./AppDatePicker";
 import AppTextField from "./AppTextField";
+import AppCountryPhoneFields from "./AppCountryPhoneFields";
 import AppDropdown from "./AppDropdown";
 import CalendarAddMenu from "./calendar/CalendarAddMenu";
+import CalendarNoShowModal from "./calendar/CalendarNoShowModal";
+import CalendarCancelBookingModal from "./calendar/CalendarCancelBookingModal";
+import CalendarBookingActionConfirmDialog, {
+  type CalendarBookingAction,
+} from "./calendar/CalendarBookingActionConfirmDialog";
+import CalendarBookingCard from "./calendar/CalendarBookingCard";
+import BookingEditedTag from "./calendar/BookingEditedTag";
+import CalendarBookingTicketStack from "./calendar/CalendarBookingTicketStack";
+import { clusterSameStartTimeEvents, getClusterTimeBounds } from "./calendar/calendar-overlap.utils";
+import { useMessagingWidget } from "./messaging/MessagingWidgetContext";
+import {
+  buildBookingDetailsSnapshot,
+  clearEbrSuggestionsFromNotes,
+  markClientEbrAcceptedInNotes,
+  markClientEbrRejectedInNotes,
+  emptyDesiredLocation,
+  hydrateBookingDrawerFromEvent,
+  parseApiCalendarEventId,
+  parseStoredEbrFromNotes,
+  serializeCalendarEntryNotes,
+} from "./calendar/bookingEventDetails";
+import {
+  canDiscardEbr,
+  canRespondToIncomingRequest,
+  detectEditedServiceIds,
+  getServiceEditTag,
+  isClientOriginatedBooking,
+  resolveOriginalServices,
+} from "./calendar/bookingRequestNegotiation";
 import CalendarBlockTimeModal from "./calendar/CalendarBlockTimeModal";
 import CalendarDesignModal, { type CalendarDesignDraft } from "./calendar/CalendarDesignModal";
 import CalendarPublicBusinessHoursModal, {
   type PublicBusinessHoursDraft,
 } from "./calendar/CalendarPublicBusinessHoursModal";
 import CalendarFiltersDrawer from "./calendar/CalendarFiltersDrawer";
+import CalendarSchedulePanel from "./calendar/CalendarSchedulePanel";
+import CalendarHoursRulesPanel from "./calendar/CalendarHoursRulesPanel";
+import CalendarEditAvailabilityModal, {
+  type EditAvailabilityDraft,
+} from "./calendar/CalendarEditAvailabilityModal";
+import CalendarServiceOrderModal from "./calendar/CalendarServiceOrderModal";
+import ManualEntryDiscountModal from "../sections/finance/ManualEntryDiscountModal";
+import {
+  calculateManualEntryDiscountAmount,
+  formatManualEntryDiscountLabel,
+  type ManualEntryDiscount,
+} from "../sections/finance/manualEntry.data";
+import BookingSelectServicesScreen from "./calendar/BookingSelectServicesScreen";
+import DiscardBrDialog from "./calendar/DiscardBrDialog";
+import DiscardEbrDialog from "./calendar/DiscardEbrDialog";
+import BookingRequestConfirmDialog from "./calendar/BookingRequestConfirmDialog";
+import BookingRequestResponseActions from "./calendar/BookingRequestResponseActions";
+import BookingDrawerSelectedItemsSection from "./calendar/BookingDrawerSelectedItemsSection";
+import BookingDrawerClientSnapshotSection from "./calendar/BookingDrawerClientSnapshotSection";
+import BookingActivityOverview from "./calendar/BookingActivityOverview";
+import { buildBookingActivityTimeline } from "./calendar/buildBookingActivityTimeline";
+import type { BookingActivityItem } from "./calendar/bookingActivity.types";
+import SalesOverview from "./calendar/SalesOverview";
+import BookingEditServiceScreen from "./calendar/BookingEditServiceScreen";
+import BookingSelectProductsScreen from "./calendar/BookingSelectProductsScreen";
+import BookingAddUniqueItemScreen from "./calendar/BookingAddUniqueItemScreen";
+import { professionalSuggestBookingChanges } from "./client-booking/bookingEditRequest";
 import { useCalendarFilters } from "./calendar/useCalendarFilters";
+import type { BookingCatalogService } from "../../data/bookingServiceCatalog.data";
+import {
+  allBookingCatalogServices,
+  bookingServiceCatalog,
+  formatBookingServiceMeta,
+} from "../../data/bookingServiceCatalog.data";
+import {
+  buildBookingServiceLineItem,
+  buildServiceEditDraftFromCatalog,
+  emptyBookingServiceEditDraft,
+  formatBookingServiceLineMeta,
+  getBookingServiceEditErrors,
+  getEffectiveServicePrice,
+  lineItemToOverride,
+  type BookingServiceEditDraft,
+  type BookingServiceLineItem,
+} from "../../data/bookingServiceEdit.data";
+import {
+  bookingProductCatalog,
+  createEmptyProductSelectionDraft,
+  formatProductLineName,
+  formatProductUnitPrice,
+  getProductBaseName,
+  type BookingCatalogProduct,
+  type BookingProductSelectionDraft,
+} from "../../data/bookingProductCatalog.data";
+import {
+  buildUniqueItemLine,
+  emptyBookingUniqueItemDraft,
+  getUniqueItemDraftErrors,
+  type BookingUniqueItemDraft,
+} from "../../data/bookingUniqueItem.data";
+import {
+  getCombinedAvailabilityIntervals,
+  getLocationAvailabilityIntervals,
+  makeScheduleRowId,
+} from "./calendar/calendar-schedule.utils";
+import {
+  defaultBookingRules,
+  normalizeServiceOrderSettings,
+  type BookingRules,
+  type ParsedCalendarSettings,
+  type ScheduleAvailabilityRow,
+  type ServiceOrderSettings,
+} from "./calendar/calendar-settings.types";
 import {
   addDaysIso,
+  addMonthsIso,
   extractBookingId,
   fmtMinToTime,
   fmtTimeLabel,
   formatLongDateUtc,
   formatMdyDate,
+  formatMonthYearUtc,
+  buildBlocksFromDraft,
+  getCalendarQueryDateRange,
+  type CalendarQueryDateRange,
   type BlockTimeDraft,
   type Interval,
   mergeIntervals,
@@ -48,9 +157,29 @@ import {
   statusChipSx,
   subtractIntervals,
   sumIntervalsMins,
+  toMonthIso,
   toIsoLocalDate,
 } from "./calendar/calendar.utils";
+import {
+  BOOKING_SCENARIO_LABELS,
+  canDiscardBookingRequest,
+  getBookingScenarioIndicators,
+  isBookingRequestAccepted,
+  statusAccentColor,
+} from "./calendar/bookingStatus";
+import BookingRequestAcceptedPanel from "./calendar/BookingRequestAcceptedPanel";
+import PrepaymentStatusIcon from "./calendar/PrepaymentStatusIcon";
+import { PREPAYMENT_STATUS_LABELS } from "./calendar/PrepaymentStatusIcon";
+import BookingIndicatorIcon, { BOOKING_INDICATOR_LABELS } from "./calendar/BookingIndicatorIcon";
+import BookingRequestBadge, {
+  resolveBookingRequestBadgeState,
+  resolveProfessionalBookingRequestDirection,
+} from "./calendar/BookingRequestBadge";
+import { resolveBookingResponseIndicators } from "./calendar/bookingResponseStatus";
+import { resolveCalendarPrepaymentStatus, toPrepaymentIconVariant } from "./calendar/prepaymentStatus";
 import type {
+  CalendarBlock,
+  CalendarBookingStatus,
   CalendarBookingType,
   CalendarBookingLocation,
   CalendarEvent,
@@ -58,78 +187,203 @@ import type {
   CalendarViewMode,
   ProfessionalFixedLocationCalendarData,
 } from "../../app/professionals/fixed-location/calendar/calendar.data";
-import type { CreateCalendarEntryRequest, UpsertCalendarSettingsRequest } from "../../store/services/businessApi";
+import {
+  buildCreateCalendarEntryPayload,
+  isApiCalendarEventId,
+  mapCalendarEntryToEvent,
+} from "./calendar/calendar-entry.mappers";
+import type { CreateCalendarEntryRequest, CalendarEntry, UpsertCalendarSettingsRequest } from "../../store/services/businessApi";
+import { useGetMyBookingsQuery } from "../../store/services/businessApi";
+import { GENDER_OPTIONS, type GenderOption } from "../../lib/gender-options";
+import { getOptionalPhoneValidationErrors, getPhoneValidationErrors } from "../../lib/phone-validation";
 
 export type ProfessionalFixedLocationCalendarProps = {
   data: ProfessionalFixedLocationCalendarData;
+  calendarSettings?: ParsedCalendarSettings | null;
+  serviceOptions?: string[];
+  serviceCatalog?: readonly BookingCatalogService[];
+  serviceOrderDefaults?: ServiceOrderSettings;
+  fixedLocationAddress?: string;
+  lateRescheduleFeePercentDefault?: string;
+  clientOptions?: readonly { name: string; email: string }[];
+  platformClientOptions?: readonly { name: string; email: string }[];
   isSaving?: boolean;
-  onCreateCalendarEntry?: (payload: CreateCalendarEntryRequest) => Promise<void>;
+  onCreateCalendarEntry?: (payload: CreateCalendarEntryRequest) => Promise<CalendarEntry | void>;
   onSaveCalendarSettings?: (payload: UpsertCalendarSettingsRequest) => Promise<void>;
+  onDeleteCalendarEntry?: (id: string) => Promise<void>;
+  onUpdateBookingStatus?: (
+    id: string,
+    status: "requested" | "cancelled" | "completed" | "confirmed" | "in_progress" | "no_show",
+    extras?: {
+      notes?: string | null;
+      total_price?: number | null;
+      booking_date?: string | null;
+      start_time?: string | null;
+      end_time?: string | null;
+    },
+  ) => Promise<void>;
+  onUpdateCalendarEntryStatus?: (
+    id: string,
+    status: "requested" | "cancelled" | "completed" | "confirmed" | "in_progress" | "no_show",
+  ) => Promise<void>;
+  onDateRangeChange?: (range: CalendarQueryDateRange) => void;
 };
 
 const toDateTimeInput = (date: string, time: string) => `${date}T${time}:00`;
 const locationToApi = (location: CalendarBookingLocation) => (location === "DL" ? "desired" : "fixed");
+const isMinuteInAvailability = (minute: number, windows: readonly Interval[]) =>
+  windows.some((w) => minute >= w.startMin && minute < w.endMin);
+const formatWeekDayName = (iso: string) =>
+  parseIsoDate(iso).toLocaleDateString("en-US", { weekday: "short", timeZone: "UTC" });
+const formatWeekDayDate = (iso: string) =>
+  parseIsoDate(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 
 export default function ProfessionalFixedLocationCalendar({
   data,
+  calendarSettings,
+  serviceOptions = [],
+  serviceCatalog = [],
+  serviceOrderDefaults,
+  fixedLocationAddress,
+  lateRescheduleFeePercentDefault,
+  clientOptions = [],
+  platformClientOptions = [],
   isSaving = false,
   onCreateCalendarEntry,
   onSaveCalendarSettings,
+  onDeleteCalendarEntry,
+  onUpdateBookingStatus,
+  onUpdateCalendarEntryStatus,
+  onDateRangeChange,
 }: ProfessionalFixedLocationCalendarProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
   const { showSnackbar } = useSnackbar();
 
+  /** Same list shown in Select Services and used when saving the selection. */
+  const selectableServiceCatalog = React.useMemo(
+    () => (serviceCatalog.length > 0 ? serviceCatalog : [...allBookingCatalogServices]),
+    [serviceCatalog],
+  );
+  const selectableServiceCategories = React.useMemo(() => {
+    if (serviceCatalog.length > 0) {
+      return [{ category: "Services", services: serviceCatalog }];
+    }
+    return bookingServiceCatalog;
+  }, [serviceCatalog]);
+  const { openMessaging } = useMessagingWidget();
+
+  const openBookingMessages = React.useCallback(
+    (ev: CalendarEvent) => {
+      const bookingRef = ev.bookingCode ?? extractBookingId(ev.id);
+      const clientName = ev.showClientName?.trim();
+      openMessaging({
+        bookingRef,
+        searchPrefill: clientName || undefined,
+      });
+    },
+    [openMessaging],
+  );
+
   const [events, setEvents] = React.useState<readonly CalendarEvent[]>(() => [...data.events]);
   const [editingEventId, setEditingEventId] = React.useState<string | null>(null);
   const [isEditingExisting, setIsEditingExisting] = React.useState(false);
 
-  const isViewingExisting = Boolean(editingEventId) && !isEditingExisting;
+  // Sync whenever overview payload changes (ids or content). String key catches RTK/304 reuse quirks.
+  const overviewEventKey = React.useMemo(
+    () => data.events.map((event) => `${event.id}:${event.date}:${event.start}:${event.resourceId}`).join("|"),
+    [data.events],
+  );
+  React.useEffect(() => {
+    setEvents([...data.events]);
+  }, [overviewEventKey, data.events]);
+
+  const [blocks, setBlocks] = React.useState<readonly CalendarBlock[]>(() => [...data.blocks]);
+  React.useEffect(() => {
+    setBlocks((prev) => {
+      const apiKeys = new Set(data.blocks.map((block) => `${block.resourceId}-${block.date}-${block.start}-${block.end}`));
+      const localBlocks = prev.filter(
+        (block) => block.id.startsWith("blk-local-") && !apiKeys.has(`${block.resourceId}-${block.date}-${block.start}-${block.end}`),
+      );
+      return [...data.blocks, ...localBlocks];
+    });
+  }, [data.blocks]);
+
   const addMenuButtonRef = React.useRef<HTMLButtonElement | null>(null);
 
-  const serviceCatalog = React.useMemo(
-    () =>
-      [
-        { id: "svc-haircut", name: "Haircut", price: 60 },
-        { id: "svc-color", name: "Hair Color", price: 95 },
-        { id: "svc-styling", name: "Hair Styling", price: 45 },
-        { id: "svc-facemask", name: "Face Mask", price: 35 },
-      ] as const,
-    [],
-  );
-  const productCatalog = React.useMemo(
-    () =>
-      [
-        { id: "prd-hair", name: "Hair Product", price: 25 },
-        { id: "prd-mask", name: "Face Mask", price: 18 },
-        { id: "prd-serum", name: "Hair Serum", price: 22 },
-      ] as const,
-    [],
-  );
+  const productCatalog = React.useMemo(() => [...bookingProductCatalog], []);
 
   const defaultDateIso = React.useMemo(() => toIsoLocalDate(new Date()), []);
   const [activeSubTab, setActiveSubTab] = React.useState<CalendarSubTab>(data.initialSubTab);
-  const [viewMode, setViewMode] = React.useState<CalendarViewMode>(data.initialView);
+  const [viewMode, setViewMode] = React.useState<CalendarViewMode>("day");
   const [activeDateIso, setActiveDateIso] = React.useState(defaultDateIso);
-  const [selectedResourceId, setSelectedResourceId] = React.useState(data.resources[0]?.id ?? "");
+
+  React.useEffect(() => {
+    onDateRangeChange?.(getCalendarQueryDateRange(activeDateIso, viewMode));
+  }, [activeDateIso, onDateRangeChange, viewMode]);
+
+  const [selectedResourceId, setSelectedResourceId] = React.useState("");
+  const [teamActionAnchor, setTeamActionAnchor] = React.useState<HTMLElement | null>(null);
+  const [teamMenuResourceId, setTeamMenuResourceId] = React.useState("");
   const [datePickerAnchor, setDatePickerAnchor] = React.useState<HTMLElement | null>(null);
   const [addAnchor, setAddAnchor] = React.useState<HTMLElement | null>(null);
   const [filtersOpen, setFiltersOpen] = React.useState(false);
   const [slotDrawerTab, setSlotDrawerTab] = React.useState<"booking" | "sales" | "activity">("booking");
+  const [activityDetailItem, setActivityDetailItem] = React.useState<BookingActivityItem | null>(null);
   const [slotLocation, setSlotLocation] = React.useState<CalendarBookingLocation>(data.supportedLocations[0] ?? "FL");
-  const [slotBookingType, setSlotBookingType] = React.useState<CalendarBookingType>("Offline");
-  const [slotStatus, setSlotStatus] = React.useState<"Confirmed" | "Requested" | "No Show" | "Completed" | "Cancelled">(
-    "Confirmed",
+  const [slotBookingType, setSlotBookingType] = React.useState<CalendarBookingType>("Requests");
+  const [slotStatus, setSlotStatus] = React.useState<
+    "Confirmed" | "Requested" | "No Show" | "Completed" | "Cancelled" | "Invalid"
+  >(
+    "Requested",
   );
   const [slotClientAdded, setSlotClientAdded] = React.useState(false);
+  const [slotCalendarOpen, setSlotCalendarOpen] = React.useState(false);
+  const [slotCalendarTouched, setSlotCalendarTouched] = React.useState(false);
+  const [discardBrOpen, setDiscardBrOpen] = React.useState(false);
+  const [discardEbrOpen, setDiscardEbrOpen] = React.useState(false);
+  const [incomingConfirmAction, setIncomingConfirmAction] = React.useState<"accept" | "reject" | null>(
+    null,
+  );
+  const [incomingRequestEditMode, setIncomingRequestEditMode] = React.useState(false);
+  const [originalServicesSnapshot, setOriginalServicesSnapshot] = React.useState<BookingServiceLineItem[]>([]);
   const [slotClientSearch, setSlotClientSearch] = React.useState("");
   const [slotAddMenuAnchor, setSlotAddMenuAnchor] = React.useState<HTMLElement | null>(null);
-  const [servicePickerOpen, setServicePickerOpen] = React.useState(false);
-  const [productPickerOpen, setProductPickerOpen] = React.useState(false);
-  const [selectedServiceId, setSelectedServiceId] = React.useState("");
-  const [selectedProductId, setSelectedProductId] = React.useState("");
-  const [selectedServices, setSelectedServices] = React.useState<Array<{ id: string; name: string; price: number }>>([]);
-  const [selectedProducts, setSelectedProducts] = React.useState<Array<{ id: string; name: string; price: number }>>([]);
+  const [bookingActionAnchor, setBookingActionAnchor] = React.useState<HTMLElement | null>(null);
+  const [noShowModalOpen, setNoShowModalOpen] = React.useState(false);
+  const [cancelModalOpen, setCancelModalOpen] = React.useState(false);
+  const [pendingBookingAction, setPendingBookingAction] = React.useState<CalendarBookingAction | null>(
+    null,
+  );
+  const [addMenuTarget, setAddMenuTarget] = React.useState<"client" | string>("client");
+  const [selectionTarget, setSelectionTarget] = React.useState<"client" | string>("client");
+  const [selectedServices, setSelectedServices] = React.useState<BookingServiceLineItem[]>([]);
+  const [serviceSelectionDraft, setServiceSelectionDraft] = React.useState<string[]>([]);
+  const [serviceOverridesDraft, setServiceOverridesDraft] = React.useState<
+    Record<string, Partial<BookingServiceLineItem>>
+  >({});
+  const [serviceEditDraft, setServiceEditDraft] = React.useState<BookingServiceEditDraft>(() =>
+    emptyBookingServiceEditDraft(),
+  );
+  const [serviceEditAttempted, setServiceEditAttempted] = React.useState(false);
+  const [selectedProducts, setSelectedProducts] = React.useState<
+    Array<{ id: string; name: string; price: number; quantity: number; unitPrice: number }>
+  >([]);
+  const [productSelectionDraft, setProductSelectionDraft] = React.useState<BookingProductSelectionDraft>(() =>
+    createEmptyProductSelectionDraft(),
+  );
+  const [uniqueItemDraft, setUniqueItemDraft] = React.useState<BookingUniqueItemDraft>(() => emptyBookingUniqueItemDraft());
+  const [customBookingProducts, setCustomBookingProducts] = React.useState<BookingCatalogProduct[]>([]);
+  const [showInlineGuestField, setShowInlineGuestField] = React.useState(false);
+  const [inlineGuestDraft, setInlineGuestDraft] = React.useState({ firstName: "", lastName: "" });
+  const [bookingGuests, setBookingGuests] = React.useState<
+    Array<{
+      id: string;
+      name: string;
+      services: BookingServiceLineItem[];
+      products: Array<{ id: string; name: string; price: number; quantity: number; unitPrice: number }>;
+    }>
+  >([]);
   const [desiredLocationDraft, setDesiredLocationDraft] = React.useState<{
     street: string;
     number: string;
@@ -145,6 +399,14 @@ export default function ProfessionalFixedLocationCalendar({
   }));
   const [showPrepayment, setShowPrepayment] = React.useState(false);
   const [prepaymentPercent, setPrepaymentPercent] = React.useState("");
+  const [bookingTotalDiscount, setBookingTotalDiscount] = React.useState<ManualEntryDiscount | null>(null);
+  const [bookingDiscountModalOpen, setBookingDiscountModalOpen] = React.useState(false);
+  const [showLateCancellation, setShowLateCancellation] = React.useState(false);
+  const [lateCancellationFeePercent, setLateCancellationFeePercent] = React.useState("");
+  const [showLateRescheduling, setShowLateRescheduling] = React.useState(false);
+  const [lateRescheduleFeePercent, setLateRescheduleFeePercent] = React.useState("");
+  const [showInternalNote, setShowInternalNote] = React.useState(false);
+  const [bookingInternalNote, setBookingInternalNote] = React.useState("");
   const [paymentMethod, setPaymentMethod] = React.useState<"online" | "offline">("online");
   const [showKilometerAllowance, setShowKilometerAllowance] = React.useState(false);
   const [kilometerAllowanceDraft, setKilometerAllowanceDraft] = React.useState<{
@@ -168,6 +430,10 @@ export default function ProfessionalFixedLocationCalendar({
     | "non-mollure-individual"
     | "non-mollure-company"
     | "guest"
+    | "select-services"
+    | "edit-service"
+    | "select-products"
+    | "add-unique-item"
   >("new-booking");
   const [nonMollureClientType, setNonMollureClientType] = React.useState<"" | "individual" | "company">("");
   const [slotSaveAttempted, setSlotSaveAttempted] = React.useState(false);
@@ -187,36 +453,51 @@ export default function ProfessionalFixedLocationCalendar({
     setAddClientSource("");
   }, [slotBookingScreen]);
 
-  const clientList = React.useMemo(
-    () =>
-      [
-        { name: "Sara Johnson", email: "sarajohnson@gmail.com" },
-        { name: "Emma Stone", email: "emma.stone@gmail.com" },
-        { name: "Noah Parker", email: "noah.parker@gmail.com" },
-        { name: "Priya Shah", email: "priya.shah@gmail.com" },
-      ] as const,
-    [],
-  );
-  const mollurePlatformClients = React.useMemo(
-    () =>
-      [
-        { name: "Alex Morgan", email: "alex.morgan@mollure.com" },
-        { name: "Yuki Tanaka", email: "yuki.tanaka@mollure.com" },
-        { name: "Liam Roberts", email: "liam.roberts@mollure.com" },
-        { name: "Ava Kim", email: "ava.kim@mollure.com" },
-      ] as const,
-    [],
-  );
+  const clientList = clientOptions;
+  const mollurePlatformClients = platformClientOptions;
 
-  const servicesTotal = React.useMemo(() => selectedServices.reduce((sum, s) => sum + s.price, 0), [selectedServices]);
+  const servicesTotal = React.useMemo(
+    () => selectedServices.reduce((sum, service) => sum + getEffectiveServicePrice(service), 0),
+    [selectedServices],
+  );
   const productsTotal = React.useMemo(() => selectedProducts.reduce((sum, p) => sum + p.price, 0), [selectedProducts]);
-  const totalPrice = servicesTotal + productsTotal;
+  const guestsTotal = React.useMemo(
+    () =>
+      bookingGuests.reduce(
+        (sum, guest) =>
+          sum +
+          guest.services.reduce((serviceSum, service) => serviceSum + getEffectiveServicePrice(service), 0) +
+          guest.products.reduce((productSum, product) => productSum + product.price, 0),
+        0,
+      ),
+    [bookingGuests],
+  );
+  const subtotalPrice = servicesTotal + productsTotal + guestsTotal;
+  const bookingDiscountAmount = React.useMemo(
+    () => calculateManualEntryDiscountAmount(subtotalPrice, bookingTotalDiscount),
+    [bookingTotalDiscount, subtotalPrice],
+  );
+  const totalPrice = Math.max(0, subtotalPrice - bookingDiscountAmount);
+  const lateCancellationFeeAmount = React.useMemo(() => {
+    const pct = Number(lateCancellationFeePercent);
+    if (!Number.isFinite(pct) || pct <= 0) return 0;
+    return Math.round((subtotalPrice * pct) / 100);
+  }, [lateCancellationFeePercent, subtotalPrice]);
+  const lateRescheduleFeeAmount = React.useMemo(() => {
+    const pct = Number(lateRescheduleFeePercent);
+    if (!Number.isFinite(pct) || pct <= 0) return 0;
+    return Math.round((subtotalPrice * pct) / 100);
+  }, [lateRescheduleFeePercent, subtotalPrice]);
   const prepaymentAmount = React.useMemo(() => {
     const pct = Number(prepaymentPercent);
     if (!Number.isFinite(pct) || pct <= 0) return 0;
     return Math.round((totalPrice * pct) / 100);
   }, [prepaymentPercent, totalPrice]);
   const remainingAfterPrepayment = Math.max(0, totalPrice - prepaymentAmount);
+  const [bookingPhoneDraft, setBookingPhoneDraft] = React.useState<{ phoneCode: string; phoneNumber: string }>(() => ({
+    phoneCode: "",
+    phoneNumber: "",
+  }));
   const [guestDraft, setGuestDraft] = React.useState<{
     firstName: string;
     lastName: string;
@@ -234,7 +515,7 @@ export default function ProfessionalFixedLocationCalendar({
     firstName: string;
     lastName: string;
     email: string;
-    gender: "" | "male" | "female" | "other";
+    gender: "" | GenderOption;
     dob: string;
     phoneCode: string;
     phoneNumber: string;
@@ -295,11 +576,318 @@ export default function ProfessionalFixedLocationCalendar({
     () =>
       [
         { id: "booking" as const, label: "Booking" },
-        { id: "activity" as const, label: "Activity" },
         { id: "sales" as const, label: "Sales" },
+        { id: "activity" as const, label: "Activity" },
       ] as const,
     [],
   );
+
+  const isViewingBooking = Boolean(editingEventId);
+
+  const viewingBookingEvent = React.useMemo(
+    () => (editingEventId ? events.find((event) => event.id === editingEventId) ?? null : null),
+    [editingEventId, events],
+  );
+
+  const drawerSalesActivityContext = React.useMemo<CalendarEvent | null>(() => {
+    if (viewingBookingEvent) return viewingBookingEvent;
+    if (!selectedSlot) return null;
+
+    return {
+      id: editingEventId ?? "draft",
+      resourceId: selectedSlot.resourceId,
+      date: selectedSlot.date,
+      start: selectedSlot.start,
+      end: selectedSlot.end,
+      title: selectedServices[0]?.name ?? selectedProducts[0]?.name ?? "Booking",
+      status: slotStatus,
+      location: slotLocation,
+      bookingType: slotBookingType,
+      bookingScenario: slotStatus === "Requested" ? "BR" : undefined,
+      showClientName:
+        selectedClient?.name ||
+        `${guestDraft.firstName} ${guestDraft.lastName}`.trim() ||
+        `${nonMollureDraft.firstName} ${nonMollureDraft.lastName}`.trim() ||
+        undefined,
+      details: buildBookingDetailsSnapshot({
+        selectedClient,
+        selectedServices,
+        selectedProducts,
+        bookingGuests,
+        bookingPhoneDraft,
+        desiredLocationDraft,
+        showPrepayment,
+        prepaymentPercent,
+        paymentMethod,
+        showLateCancellation,
+        lateCancellationFeePercent,
+        showLateRescheduling,
+        lateRescheduleFeePercent,
+        showInternalNote,
+        bookingInternalNote,
+        bookingTotalDiscount,
+        showKilometerAllowance,
+        kilometerAllowanceDraft,
+      }),
+    };
+  }, [
+    viewingBookingEvent,
+    selectedSlot,
+    editingEventId,
+    selectedServices,
+    selectedProducts,
+    slotStatus,
+    slotLocation,
+    slotBookingType,
+    selectedClient,
+    guestDraft.firstName,
+    guestDraft.lastName,
+    nonMollureDraft.firstName,
+    nonMollureDraft.lastName,
+    bookingGuests,
+    bookingPhoneDraft,
+    desiredLocationDraft,
+    showPrepayment,
+    prepaymentPercent,
+    paymentMethod,
+    showLateCancellation,
+    lateCancellationFeePercent,
+    showLateRescheduling,
+    lateRescheduleFeePercent,
+    showInternalNote,
+    bookingInternalNote,
+    bookingTotalDiscount,
+    showKilometerAllowance,
+    kilometerAllowanceDraft,
+  ]);
+
+  const { data: myBookingsResponse } = useGetMyBookingsQuery(undefined, {
+    skip: !slotDrawerOpen || (slotDrawerTab !== "activity" && slotDrawerTab !== "sales"),
+  });
+
+  const clientActivityIdentity = React.useMemo(() => {
+    const email =
+      selectedClient?.email?.trim() ||
+      drawerSalesActivityContext?.details?.clientEmail?.trim() ||
+      "";
+    const name =
+      selectedClient?.name?.trim() ||
+      drawerSalesActivityContext?.showClientName?.trim() ||
+      `${guestDraft.firstName} ${guestDraft.lastName}`.trim() ||
+      `${nonMollureDraft.firstName} ${nonMollureDraft.lastName}`.trim() ||
+      "";
+    return { email, name };
+  }, [
+    selectedClient?.email,
+    selectedClient?.name,
+    drawerSalesActivityContext?.details?.clientEmail,
+    drawerSalesActivityContext?.showClientName,
+    guestDraft.firstName,
+    guestDraft.lastName,
+    nonMollureDraft.firstName,
+    nonMollureDraft.lastName,
+  ]);
+
+  const clientBookingsForActivity = React.useMemo(() => {
+    const all = myBookingsResponse?.data ?? [];
+    const currentId = drawerSalesActivityContext
+      ? parseApiCalendarEventId(drawerSalesActivityContext.id)?.id ?? null
+      : null;
+    const currentCode = drawerSalesActivityContext?.bookingCode ?? null;
+    return all.filter((booking) => {
+      if (currentId && String(booking.id) === String(currentId)) return true;
+      if (currentCode && booking.unique_code && booking.unique_code === currentCode) return true;
+      const email = clientActivityIdentity.email.toLowerCase();
+      const name = clientActivityIdentity.name.toLowerCase();
+      const bookingEmail = (booking.customer_email ?? "").trim().toLowerCase();
+      const bookingName = (booking.customer_name || booking.client_name || "").trim().toLowerCase();
+      if (email && bookingEmail && email === bookingEmail) return true;
+      if (name && bookingName && name === bookingName) return true;
+      return false;
+    });
+  }, [clientActivityIdentity.email, clientActivityIdentity.name, drawerSalesActivityContext, myBookingsResponse?.data]);
+
+  const activityTimelineItems = React.useMemo(
+    () =>
+      buildBookingActivityTimeline({
+        bookings: clientBookingsForActivity,
+        clientEmail: clientActivityIdentity.email,
+        clientName: clientActivityIdentity.name,
+        currentBookingId: drawerSalesActivityContext
+          ? parseApiCalendarEventId(drawerSalesActivityContext.id)?.id ?? null
+          : null,
+        currentBookingCode: drawerSalesActivityContext?.bookingCode ?? null,
+        currentScenario: drawerSalesActivityContext?.bookingScenario ?? null,
+        currentStatus: drawerSalesActivityContext?.status ?? null,
+        currentCancellationReason: drawerSalesActivityContext?.details?.cancellationReason ?? null,
+        currentProfessionalName:
+          data.resources.find((r) => r.id === drawerSalesActivityContext?.resourceId)?.name ?? null,
+        mode: "activity",
+      }),
+    [
+      clientActivityIdentity.email,
+      clientActivityIdentity.name,
+      clientBookingsForActivity,
+      data.resources,
+      drawerSalesActivityContext,
+    ],
+  );
+
+  const isCompletedBooking = viewingBookingEvent?.status === "Completed";
+
+  const noShowParticipants = React.useMemo(() => {
+    if (!viewingBookingEvent) return [];
+    const list: { id: string; name: string }[] = [];
+    const clientName = viewingBookingEvent.showClientName?.trim();
+    if (clientName) list.push({ id: "client", name: clientName });
+
+    const people = viewingBookingEvent.details?.clientSnapshot?.people ?? [];
+    let modelOrdinal = 0;
+    for (const person of people) {
+      if (person.isRequester) continue;
+      if (person.participantType === "planning" || person.name?.trim() === "Planning") continue;
+      const trimmed = person.name?.trim() ?? "";
+      let name: string;
+      if (person.participantType === "model") {
+        modelOrdinal += 1;
+        name = trimmed && trimmed.toLowerCase() !== "model" ? trimmed : `Model ${modelOrdinal}`;
+      } else {
+        name = trimmed && trimmed.toLowerCase() !== "guest" ? trimmed : "Guest";
+      }
+      list.push({ id: person.id, name });
+    }
+    if (list.length === 0) list.push({ id: "client", name: "Client" });
+    return list;
+  }, [viewingBookingEvent]);
+
+  const showIncomingRequestActions =
+    isViewingBooking && canRespondToIncomingRequest(viewingBookingEvent) && !isEditingExisting;
+  const showDiscardEbr = isViewingBooking && canDiscardEbr(viewingBookingEvent) && !isEditingExisting;
+  const negotiationDetails = viewingBookingEvent?.details;
+  const liveEditedServiceIds = React.useMemo(() => {
+    if (!incomingRequestEditMode) return new Set<string>();
+    return new Set(detectEditedServiceIds(originalServicesSnapshot, selectedServices));
+  }, [incomingRequestEditMode, originalServicesSnapshot, selectedServices]);
+
+  const resolveServiceEditTag = React.useCallback(
+    (serviceId: string) => {
+      if (incomingRequestEditMode && liveEditedServiceIds.has(serviceId)) return "edited" as const;
+      return getServiceEditTag(serviceId, negotiationDetails);
+    },
+    [incomingRequestEditMode, liveEditedServiceIds, negotiationDetails],
+  );
+  const isViewingExisting =
+    isCompletedBooking || (Boolean(editingEventId) && !isEditingExisting);
+
+  const bookingEditSignature = React.useMemo(
+    () =>
+      JSON.stringify({
+        services: selectedServices,
+        products: selectedProducts,
+        slot: selectedSlot,
+        client: selectedClient,
+        guests: bookingGuests,
+        phone: bookingPhoneDraft,
+        desiredLocation: desiredLocationDraft,
+        location: slotLocation,
+        status: slotStatus,
+        showPrepayment,
+        prepaymentPercent,
+        paymentMethod,
+        showLateCancellation,
+        lateCancellationFeePercent,
+        showLateRescheduling,
+        lateRescheduleFeePercent,
+        showInternalNote,
+        internalNote: bookingInternalNote,
+        totalDiscount: bookingTotalDiscount,
+        showKilometerAllowance,
+        kilometerAllowance: kilometerAllowanceDraft,
+      }),
+    [
+      selectedServices,
+      selectedProducts,
+      selectedSlot,
+      selectedClient,
+      bookingGuests,
+      bookingPhoneDraft,
+      desiredLocationDraft,
+      slotLocation,
+      slotStatus,
+      showPrepayment,
+      prepaymentPercent,
+      paymentMethod,
+      showLateCancellation,
+      lateCancellationFeePercent,
+      showLateRescheduling,
+      lateRescheduleFeePercent,
+      showInternalNote,
+      bookingInternalNote,
+      bookingTotalDiscount,
+      showKilometerAllowance,
+      kilometerAllowanceDraft,
+    ],
+  );
+  const [editBaselineSignature, setEditBaselineSignature] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (isEditingExisting) {
+      setEditBaselineSignature((prev) => (prev === null ? bookingEditSignature : prev));
+    } else {
+      setEditBaselineSignature(null);
+    }
+  }, [isEditingExisting, bookingEditSignature]);
+  const isBookingDirty =
+    isEditingExisting &&
+    editBaselineSignature !== null &&
+    bookingEditSignature !== editBaselineSignature;
+
+  const lockClientIdentity = isViewingBooking && isClientOriginatedBooking(viewingBookingEvent);
+  const showLineItemRemoveButton = !isViewingExisting;
+  const showClientRemoveButton = showLineItemRemoveButton && !lockClientIdentity;
+  const hideClientBookingFooterActions =
+    slotBookingScreen === "new-booking" && showIncomingRequestActions;
+  const hideClientBookingEditButton = showIncomingRequestActions;
+  const isBookingSubScreen =
+    slotBookingScreen === "select-services" ||
+    slotBookingScreen === "select-products" ||
+    slotBookingScreen === "edit-service" ||
+    slotBookingScreen === "add-unique-item";
+  const drawerPrimaryActionLabel = isBookingSubScreen
+    ? "Save"
+    : incomingRequestEditMode
+      ? "Send EBR"
+      : editingEventId
+        ? "Update"
+        : "Save";
+
+  const closeBookingDrawer = React.useCallback(() => {
+    setSlotDrawerOpen(false);
+    setEditingEventId(null);
+    setIsEditingExisting(false);
+    setActivityDetailItem(null);
+  }, []);
+
+  const calendarFieldLabel = React.useMemo(() => {
+    if ((isViewingBooking || slotCalendarTouched) && selectedSlot?.date) {
+      const locLabel = slotLocation === "FL" ? "Fixed Location" : "Desired Location";
+      return `${locLabel} · ${formatMdyDate(selectedSlot.date)}`;
+    }
+    return "Select calender";
+  }, [isViewingBooking, slotCalendarTouched, selectedSlot?.date, slotLocation]);
+
+  const clientEbrSuggestion = React.useMemo(() => {
+    if (!viewingBookingEvent || viewingBookingEvent.bookingScenario !== "EBR") return null;
+    const ebr = parseStoredEbrFromNotes(viewingBookingEvent.notes);
+    if (!ebr || ebr.lastEditedBy !== "client") return null;
+    return ebr;
+  }, [viewingBookingEvent]);
+
+  const requestedScheduleLabel = React.useMemo(() => {
+    if (!clientEbrSuggestion?.suggestedDateISO) return "";
+    const datePart = formatMdyDate(clientEbrSuggestion.suggestedDateISO);
+    const timePart = clientEbrSuggestion.suggestedTime?.trim() || "";
+    return [datePart, timePart].filter(Boolean).join(" · ");
+  }, [clientEbrSuggestion]);
 
   const [blockDraft, setBlockDraft] = React.useState<BlockTimeDraft>(() => ({
     title: "Meeting",
@@ -326,21 +914,221 @@ export default function ProfessionalFixedLocationCalendar({
   const [designDraft, setDesignDraft] = React.useState<CalendarDesignDraft>(() => ({
     scope: "Categories",
     colorsByCategory: {},
+    colorsByService: {},
+    colorsByStatus: {},
+    colorsByTeamMember: {},
   }));
   const [appliedDesign, setAppliedDesign] = React.useState<CalendarDesignDraft>(() => ({
     scope: "Categories",
     colorsByCategory: {},
+    colorsByService: {},
+    colorsByStatus: {},
+    colorsByTeamMember: {},
   }));
+  const [bookingRules, setBookingRules] = React.useState<BookingRules>(() => defaultBookingRules());
+  const [scheduleRows, setScheduleRows] = React.useState<ScheduleAvailabilityRow[]>([]);
+  const [dateOverrides, setDateOverrides] = React.useState<ParsedCalendarSettings["availability"]["dateOverrides"]>([]);
+  const [serviceOrderDraft, setServiceOrderDraft] = React.useState<ServiceOrderSettings>(() =>
+    normalizeServiceOrderSettings(undefined, {
+      categories: serviceOrderDefaults?.categories ?? [],
+      servicesByCategory: serviceOrderDefaults?.servicesByCategory ?? {},
+    }),
+  );
+  const [serviceOrderOpen, setServiceOrderOpen] = React.useState(false);
+  const [scheduleResourceFilter, setScheduleResourceFilter] = React.useState<string[]>([]);
+  const [editAvailabilityOpen, setEditAvailabilityOpen] = React.useState(false);
+  const [editAvailabilityDraft, setEditAvailabilityDraft] = React.useState<EditAvailabilityDraft>(() => ({
+    resourceId: "",
+    date: "",
+    locations: [...data.supportedLocations],
+    shifts: [{ start: "09:00", end: "17:00" }],
+  }));
+
+  React.useEffect(() => {
+    if (!calendarSettings) return;
+    setBookingRules(calendarSettings.availability.bookingRules ?? defaultBookingRules());
+    setScheduleRows(calendarSettings.availability.scheduleAvailability ?? []);
+    setDateOverrides(calendarSettings.availability.dateOverrides ?? []);
+    setAppliedDesign(calendarSettings.design);
+    setDesignDraft(calendarSettings.design);
+    if (calendarSettings.availability.serviceOrder) {
+      setServiceOrderDraft(
+        normalizeServiceOrderSettings(calendarSettings.availability.serviceOrder, serviceOrderDefaults),
+      );
+    } else if (serviceOrderDefaults) {
+      setServiceOrderDraft(normalizeServiceOrderSettings(serviceOrderDefaults));
+    }
+  }, [calendarSettings, serviceOrderDefaults]);
+
+  const persistAvailabilitySettings = React.useCallback(
+    async (next: {
+      bookingRules?: BookingRules;
+      scheduleAvailability?: ScheduleAvailabilityRow[];
+      dateOverrides?: ParsedCalendarSettings["availability"]["dateOverrides"];
+      serviceOrder?: ServiceOrderSettings;
+      publicBusinessHours?: PublicBusinessHoursDraft[];
+      design?: CalendarDesignDraft;
+    }) => {
+      await onSaveCalendarSettings?.({
+        availability: {
+          bookingRules: next.bookingRules ?? bookingRules,
+          scheduleAvailability: next.scheduleAvailability ?? scheduleRows,
+          dateOverrides: next.dateOverrides ?? dateOverrides,
+          serviceOrder: next.serviceOrder ?? serviceOrderDraft,
+          publicBusinessHours: next.publicBusinessHours ?? calendarSettings?.availability.publicBusinessHours,
+        },
+        design: next.design ?? appliedDesign,
+      });
+    },
+    [
+      appliedDesign,
+      bookingRules,
+      calendarSettings?.availability.publicBusinessHours,
+      dateOverrides,
+      onSaveCalendarSettings,
+      scheduleRows,
+      serviceOrderDraft,
+    ],
+  );
 
   const getServiceCategory = React.useCallback((title: string) => {
     const t = String(title ?? "").toLowerCase();
-    // Heuristic mapping (mock): lets the Design modal color the grid right away.
-    if (/\b(nail|manicure|pedicure)\b/.test(t)) return "Nails";
-    if (/\b(facial|brow|lash|lashes|make-?up|makeup)\b/.test(t)) return "Face treatments";
-    if (/\b(massage|spa|body)\b/.test(t)) return "Body treatments";
-    if (/\b(hair|cut|wash|blow|color|colour|keratin|style|styling)\b/.test(t)) return "Hair";
+    if (/\b(nail|manicure|pedicure)\b/.test(t)) return "nails";
+    if (/\b(facial|brow|lash|lashes|make-?up|makeup)\b/.test(t)) return "face-treatments";
+    if (/\b(massage|spa|body)\b/.test(t)) return "body-treatments";
+    if (/\b(hair|cut|wash|blow|color|colour|keratin|style|styling)\b/.test(t)) return "hair";
     return null;
   }, []);
+
+  const resolveEventColors = React.useCallback(
+    (event: CalendarEvent) => {
+      const cardServiceCategory = getServiceCategory(event.title);
+      const serviceColor =
+        appliedDesign.scope === "Services"
+          ? appliedDesign.colorsByService?.[event.title]
+          : cardServiceCategory
+            ? appliedDesign.colorsByCategory[cardServiceCategory]
+            : undefined;
+      const teamColor = appliedDesign.colorsByTeamMember?.[event.resourceId];
+      const statusColor = appliedDesign.colorsByStatus?.[event.status];
+      return {
+        serviceColor: teamColor ?? serviceColor,
+        statusColor,
+      };
+    },
+    [appliedDesign, getServiceCategory],
+  );
+
+  const persistEventStatus = React.useCallback(
+    async (eventId: string, status: CalendarEvent["status"]) => {
+      const parsed = parseApiCalendarEventId(eventId);
+      if (!parsed) return;
+      const apiStatus =
+        status === "Requested"
+          ? "requested"
+          : status === "Confirmed"
+            ? "confirmed"
+            : status === "In Progress"
+              ? "in_progress"
+              : status === "Completed"
+                ? "completed"
+                : status === "No Show"
+                  ? "no_show"
+                  : "cancelled";
+      if (parsed.kind === "booking") {
+        if (onUpdateBookingStatus) {
+          await onUpdateBookingStatus(parsed.id, apiStatus);
+        }
+        return;
+      }
+      if (onUpdateCalendarEntryStatus) {
+        await onUpdateCalendarEntryStatus(parsed.id, apiStatus);
+      }
+    },
+    [onUpdateBookingStatus, onUpdateCalendarEntryStatus],
+  );
+
+  const handleBookingActionSelect = React.useCallback(
+    async (action: "edit" | "in_progress" | "no_show" | "cancel") => {
+      setBookingActionAnchor(null);
+      if (!editingEventId) return;
+
+      if (action === "edit") {
+        setIsEditingExisting(true);
+        return;
+      }
+
+      if (action === "no_show") {
+        setNoShowModalOpen(true);
+        return;
+      }
+
+      if (action === "cancel") {
+        setCancelModalOpen(true);
+        return;
+      }
+
+      setPendingBookingAction(action);
+    },
+    [editingEventId],
+  );
+
+  const handleConfirmCancel = React.useCallback(async () => {
+    setCancelModalOpen(false);
+    if (!editingEventId) return;
+    try {
+      await persistEventStatus(editingEventId, "Cancelled");
+      setEvents((prev) =>
+        prev.map((event) => (event.id === editingEventId ? { ...event, status: "Cancelled" } : event)),
+      );
+      showSnackbar({ severity: "success", message: "Booking cancelled." });
+    } catch (error) {
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Unable to update booking status."),
+      });
+    }
+  }, [editingEventId, persistEventStatus, showSnackbar]);
+
+  const handleConfirmBookingAction = React.useCallback(async () => {
+    const action = pendingBookingAction;
+    setPendingBookingAction(null);
+    if (!action || !editingEventId) return;
+
+    const nextStatus: CalendarEvent["status"] =
+      action === "in_progress" ? "In Progress" : "Cancelled";
+    const successMessage =
+      action === "in_progress" ? "Booking marked in progress." : "Booking cancelled.";
+    try {
+      await persistEventStatus(editingEventId, nextStatus);
+      setEvents((prev) =>
+        prev.map((event) => (event.id === editingEventId ? { ...event, status: nextStatus } : event)),
+      );
+      showSnackbar({ severity: "success", message: successMessage });
+    } catch (error) {
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Unable to update booking status."),
+      });
+    }
+  }, [editingEventId, pendingBookingAction, persistEventStatus, showSnackbar]);
+
+  const handleConfirmNoShow = React.useCallback(async () => {
+    setNoShowModalOpen(false);
+    if (!editingEventId) return;
+    try {
+      await persistEventStatus(editingEventId, "No Show");
+      setEvents((prev) =>
+        prev.map((event) => (event.id === editingEventId ? { ...event, status: "No Show" } : event)),
+      );
+      showSnackbar({ severity: "success", message: "Booking marked as no show." });
+    } catch (error) {
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Unable to update booking status."),
+      });
+    }
+  }, [editingEventId, persistEventStatus, showSnackbar]);
 
   React.useEffect(() => {
     setBlockDraft((prev) => {
@@ -359,13 +1147,25 @@ export default function ProfessionalFixedLocationCalendar({
     });
     return map;
   }, [data.resources]);
+  const resourceNameById = React.useMemo(() => {
+    const map = new Map<string, string>();
+    data.resources.forEach((r) => map.set(r.id, r.name));
+    return map;
+  }, [data.resources]);
 
   const grid = data.timeGrid;
-  const startMin = grid.startHour * 60;
-  const endMin = grid.endHour * 60;
+  const { startMin, endMin } = React.useMemo(
+    () => ({
+      startMin: grid.startHour * 60,
+      endMin: grid.endHour * 60,
+    }),
+    [grid.endHour, grid.startHour],
+  );
   const rows = Math.floor((endMin - startMin) / grid.stepMinutes) + 1;
-  const rowPx = 48;
-  const laneHeaderPx = 44;
+  const rowPx = 78;
+  const laneHeaderPx = 48;
+  const timelineHeaderRows = viewMode === "week" ? 2 : 1;
+  const timelineHeaderPx = laneHeaderPx * timelineHeaderRows;
 
   const slotLines = React.useMemo(() => {
     const out: number[] = [];
@@ -383,21 +1183,79 @@ export default function ProfessionalFixedLocationCalendar({
     return [activeDateIso];
   }, [activeDateIso, viewMode]);
 
+  React.useEffect(() => {
+    if (filteredResources.length === 0) {
+      setSelectedResourceId("");
+      return;
+    }
+    setSelectedResourceId((current) => {
+      const stillValid = current && filteredResources.some((resource) => resource.id === current);
+      return stillValid ? current : filteredResources[0].id;
+    });
+  }, [filteredResources]);
+
   const activeResource = React.useMemo(
     () => filteredResources.find((r) => r.id === selectedResourceId) ?? filteredResources[0],
     [filteredResources, selectedResourceId],
   );
-  const displayedResources = React.useMemo(
-    () => (viewMode === "week" ? (activeResource ? [activeResource] : []) : filteredResources),
-    [activeResource, filteredResources, viewMode],
+
+  const closeTeamMenu = React.useCallback(() => {
+    setTeamActionAnchor(null);
+    setTeamMenuResourceId("");
+  }, []);
+
+  const openTeamMenu = React.useCallback((resourceId: string, anchor: HTMLElement) => {
+    setTeamMenuResourceId(resourceId);
+    setTeamActionAnchor(anchor);
+  }, []);
+
+  const selectTeamMember = React.useCallback(
+    (resourceId: string) => {
+      const normalizedId = String(resourceId);
+      if (!data.resources.some((resource) => String(resource.id) === normalizedId)) return;
+
+      // Day view shows one active lane but must keep all-date bookings visible.
+      // Only switch the active header — do not focus-filter by team (client bookings
+      // often have null team_member_id and would disappear).
+      setSelectedResourceId(normalizedId);
+      closeTeamMenu();
+    },
+    [closeTeamMenu, data.resources],
+  );
+
+  const teamMenuResource = React.useMemo(
+    () => data.resources.find((resource) => resource.id === teamMenuResourceId) ?? activeResource,
+    [activeResource, data.resources, teamMenuResourceId],
+  );
+
+  const displayedResources = React.useMemo(() => {
+    if (viewMode === "week") return activeResource ? [activeResource] : [];
+    // Day view: one body lane for the active (or first) team member.
+    // Headers still list everyone; teamAll shows all events on this lane.
+    if (viewMode === "day") return activeResource ? [activeResource] : [];
+    return filteredResources;
+  }, [activeResource, filteredResources, viewMode]);
+
+  const knownResourceIds = React.useMemo(
+    () => new Set(data.resources.map((resource) => String(resource.id))),
+    [data.resources],
   );
 
   const eventsInRange = React.useMemo(
     () => {
       const base = events.filter((e) => visibleDates.includes(e.date));
-      const byTeam = appliedFilters.teamAll
-        ? base
-        : base.filter((e) => appliedFilters.teamIds[e.resourceId]);
+      // Day view: never drop bookings by team focus. Client bookings often have
+      // null team_member_id and get assigned to the first resource; focusing another
+      // team member must not hide them.
+      const byTeam =
+        viewMode === "day" || appliedFilters.teamAll
+          ? base
+          : base.filter(
+              (e) =>
+                appliedFilters.teamIds[e.resourceId] ||
+                !e.resourceId ||
+                !knownResourceIds.has(e.resourceId),
+            );
       const byLocation = appliedFilters.locationAll
         ? byTeam
         : byTeam.filter((e) => appliedFilters.locations[e.location]);
@@ -417,19 +1275,90 @@ export default function ProfessionalFixedLocationCalendar({
       appliedFilters.teamAll,
       appliedFilters.teamIds,
       events,
+      knownResourceIds,
+      viewMode,
       visibleDates,
     ],
   );
+  const todayIso = defaultDateIso;
+  const [nowMin, setNowMin] = React.useState(() => {
+    const now = new Date();
+    return now.getHours() * 60 + now.getMinutes();
+  });
+  React.useEffect(() => {
+    const tick = () => {
+      const now = new Date();
+      setNowMin(now.getHours() * 60 + now.getMinutes());
+    };
+    tick();
+    const id = window.setInterval(tick, 60_000);
+    return () => window.clearInterval(id);
+  }, []);
+  const showNowLine = activeDateIso === todayIso && nowMin >= startMin && nowMin <= endMin;
+  const nowLineTop = ((nowMin - startMin) / grid.stepMinutes) * rowPx;
+  const activeMonthIso = React.useMemo(() => toMonthIso(activeDateIso), [activeDateIso]);
+  const monthEvents = React.useMemo(
+    () => {
+      const base = events.filter((e) => toMonthIso(e.date) === activeMonthIso);
+      const byTeam = appliedFilters.teamAll
+        ? base
+        : base.filter((e) => appliedFilters.teamIds[e.resourceId]);
+      const byLocation = appliedFilters.locationAll
+        ? byTeam
+        : byTeam.filter((e) => appliedFilters.locations[e.location]);
+      const byBooking = appliedFilters.bookingAll
+        ? byLocation
+        : byLocation.filter((e) => {
+            const bt = (e.bookingType ?? (e.status === "Requested" ? "Requests" : "Online")) as CalendarBookingType;
+            return appliedFilters.booking[bt];
+          });
+      return byBooking;
+    },
+    [
+      activeMonthIso,
+      appliedFilters.booking,
+      appliedFilters.bookingAll,
+      appliedFilters.locationAll,
+      appliedFilters.locations,
+      appliedFilters.teamAll,
+      appliedFilters.teamIds,
+      events,
+    ],
+  );
+  const monthCells = React.useMemo(() => {
+    const first = parseIsoDate(activeMonthIso);
+    const year = first.getUTCFullYear();
+    const monthIndex = first.getUTCMonth();
+    const gridStartIso = startOfWeekIso(activeMonthIso);
+
+    return Array.from({ length: 42 }, (_, idx) => {
+      const iso = addDaysIso(gridStartIso, idx);
+      const dayDate = parseIsoDate(iso);
+      const inMonth = dayDate.getUTCMonth() === monthIndex;
+      const dayEvents = monthEvents
+        .filter((event) => event.date === iso)
+        .sort((a, b) => `${a.start}-${a.resourceId}`.localeCompare(`${b.start}-${b.resourceId}`));
+
+      return {
+        iso,
+        dateNumber: dayDate.getUTCDate(),
+        inMonth,
+        isToday: iso === todayIso,
+        isSelected: iso === activeDateIso,
+        isPast: iso < todayIso,
+        dayEvents,
+        hiddenCount: Math.max(0, dayEvents.length - 3),
+      };
+    });
+  }, [activeDateIso, activeMonthIso, monthEvents, todayIso]);
   const blocksInRange = React.useMemo(
     () => {
-      const base = data.blocks.filter((b) => visibleDates.includes(b.date));
+      const base = blocks.filter((b) => visibleDates.includes(b.date));
       if (appliedFilters.teamAll) return base;
       return base.filter((b) => appliedFilters.teamIds[b.resourceId]);
     },
-    [appliedFilters.teamAll, appliedFilters.teamIds, data.blocks, visibleDates],
+    [appliedFilters.teamAll, appliedFilters.teamIds, blocks, visibleDates],
   );
-
-  const todayIso = defaultDateIso;
 
   const slotValidation = React.useMemo(() => {
     const isBlank = (v: string) => v.trim().length === 0;
@@ -439,6 +1368,8 @@ export default function ProfessionalFixedLocationCalendar({
         | "nonMollureClientType"
         | "guestFirstName"
         | "guestLastName"
+        | "guestPhoneCode"
+        | "guestPhoneNumber"
         | "nonMollureFirstName"
         | "nonMollureLastName"
         | "nonMollureGender"
@@ -456,7 +1387,11 @@ export default function ProfessionalFixedLocationCalendar({
         | "nonMollurePostalCode"
         | "nonMollureProvince"
         | "nonMollureMunicipality"
-        | "bookingClient",
+        | "bookingClient"
+        | "bookingPhoneCode"
+        | "bookingPhoneNumber"
+        | "uniqueItemProductName"
+        | "uniqueItemPrice",
         string
       >
     > = {};
@@ -471,6 +1406,44 @@ export default function ProfessionalFixedLocationCalendar({
       return { isValid: false as const, errors };
     }
 
+    if (slotBookingScreen === "edit-service") {
+      const editErrors = getBookingServiceEditErrors(serviceEditDraft);
+      if (Object.keys(editErrors).length > 0) {
+        isValid = false;
+      }
+      return { isValid, errors };
+    }
+
+    if (slotBookingScreen === "select-services") {
+      if (serviceSelectionDraft.length === 0) {
+        isValid = false;
+        errors.bookingClient = "Select at least one service.";
+      }
+      return { isValid, errors };
+    }
+
+    if (slotBookingScreen === "select-products") {
+      const hasSelected = Object.values(productSelectionDraft).some((item) => item.selected);
+      if (!hasSelected) {
+        isValid = false;
+        errors.bookingClient = "Select at least one product.";
+      }
+      return { isValid, errors };
+    }
+
+    if (slotBookingScreen === "add-unique-item") {
+      const uniqueErrors = getUniqueItemDraftErrors(uniqueItemDraft);
+      if (uniqueErrors.productName) {
+        isValid = false;
+        errors.uniqueItemProductName = uniqueErrors.productName;
+      }
+      if (uniqueErrors.price) {
+        isValid = false;
+        errors.uniqueItemPrice = uniqueErrors.price;
+      }
+      return { isValid, errors };
+    }
+
     if (slotBookingScreen === "guest") {
       if (isBlank(guestDraft.firstName)) {
         isValid = false;
@@ -479,6 +1452,15 @@ export default function ProfessionalFixedLocationCalendar({
       if (isBlank(guestDraft.lastName)) {
         isValid = false;
         errors.guestLastName = "Last name is required.";
+      }
+      const guestPhoneErrors = getOptionalPhoneValidationErrors(guestDraft.phoneCode, guestDraft.phoneNumber);
+      if (guestPhoneErrors.countryCode) {
+        isValid = false;
+        errors.guestPhoneCode = guestPhoneErrors.countryCode;
+      }
+      if (guestPhoneErrors.phone) {
+        isValid = false;
+        errors.guestPhoneNumber = guestPhoneErrors.phone;
       }
       return { isValid, errors };
     }
@@ -500,13 +1482,14 @@ export default function ProfessionalFixedLocationCalendar({
         isValid = false;
         errors.nonMollureDob = "Date of birth is required.";
       }
-      if (isBlank(nonMollureDraft.phoneCode)) {
+      const phoneErrors = getPhoneValidationErrors(nonMollureDraft.phoneCode, nonMollureDraft.phoneNumber);
+      if (phoneErrors.countryCode) {
         isValid = false;
-        errors.nonMollurePhoneCode = "Country code is required.";
+        errors.nonMollurePhoneCode = phoneErrors.countryCode;
       }
-      if (isBlank(nonMollureDraft.phoneNumber)) {
+      if (phoneErrors.phone) {
         isValid = false;
-        errors.nonMollurePhoneNumber = "Phone number is required.";
+        errors.nonMollurePhoneNumber = phoneErrors.phone;
       }
       if (isBlank(nonMollureDraft.email)) {
         isValid = false;
@@ -560,6 +1543,15 @@ export default function ProfessionalFixedLocationCalendar({
         isValid = false;
         errors.nonMollureMunicipality = "Municipality is required.";
       }
+      const companyPhoneErrors = getPhoneValidationErrors(nonMollureDraft.phoneCode, nonMollureDraft.phoneNumber);
+      if (companyPhoneErrors.countryCode) {
+        isValid = false;
+        errors.nonMollurePhoneCode = companyPhoneErrors.countryCode;
+      }
+      if (companyPhoneErrors.phone) {
+        isValid = false;
+        errors.nonMollurePhoneNumber = companyPhoneErrors.phone;
+      }
       if (isBlank(nonMollureDraft.email)) {
         isValid = false;
         errors.nonMollureEmail = "Email is required.";
@@ -572,56 +1564,96 @@ export default function ProfessionalFixedLocationCalendar({
       isValid = false;
       errors.bookingClient = "Client is required.";
     }
-    if (selectedServices.length === 0 && selectedProducts.length === 0) {
+    if (selectedSlot?.date && selectedSlot.date < todayIso && !editingEventId) {
+      isValid = false;
+      errors.bookingClient = errors.bookingClient ?? "Cannot create a booking on a past date.";
+    }
+    if (selectedServices.length === 0 && selectedProducts.length === 0 && guestsTotal === 0) {
       isValid = false;
       errors.bookingClient = errors.bookingClient ?? "Select at least one item/service or product.";
     }
+    const bookingPhoneErrors = getOptionalPhoneValidationErrors(
+      bookingPhoneDraft.phoneCode,
+      bookingPhoneDraft.phoneNumber,
+    );
+    if (bookingPhoneErrors.countryCode) {
+      isValid = false;
+      errors.bookingPhoneCode = bookingPhoneErrors.countryCode;
+    }
+    if (bookingPhoneErrors.phone) {
+      isValid = false;
+      errors.bookingPhoneNumber = bookingPhoneErrors.phone;
+    }
     return { isValid, errors };
   }, [
+    bookingPhoneDraft.phoneCode,
+    bookingPhoneDraft.phoneNumber,
     guestDraft.firstName,
     guestDraft.lastName,
+    guestDraft.phoneCode,
+    guestDraft.phoneNumber,
     nonMollureClientType,
     nonMollureDraft,
     selectedProducts.length,
     selectedServices.length,
+    guestsTotal,
+    selectedSlot?.date,
+    editingEventId,
+    todayIso,
     slotBookingScreen,
     slotClientAdded,
     slotDrawerTab,
+    serviceSelectionDraft,
+    serviceEditDraft,
+    productSelectionDraft,
+    uniqueItemDraft,
   ]);
 
   const slotErrors = React.useMemo(() => (slotSaveAttempted ? slotValidation.errors : {}), [slotSaveAttempted, slotValidation.errors]);
 
   const prevCandidateIso = React.useMemo(() => {
     if (viewMode === "week") return addDaysIso(activeDateIso, -7);
-    if (viewMode === "month") return addDaysIso(activeDateIso, -30);
+    if (viewMode === "month") return addMonthsIso(activeMonthIso, -1);
     return addDaysIso(activeDateIso, -1);
-  }, [activeDateIso, viewMode]);
-
-  const canGoPrev = prevCandidateIso >= todayIso;
+  }, [activeDateIso, activeMonthIso, viewMode]);
 
   const onToday = () => {
     setActiveDateIso(todayIso);
+    setViewMode("day");
+    setSelectedResourceId("");
   };
 
   const onPrev = () => {
-    setActiveDateIso(canGoPrev ? prevCandidateIso : todayIso);
+    setActiveDateIso(prevCandidateIso);
   };
 
   const onNext = () => {
     if (viewMode === "week") setActiveDateIso(addDaysIso(activeDateIso, 7));
-    else if (viewMode === "month") setActiveDateIso(addDaysIso(activeDateIso, 30));
+    else if (viewMode === "month") setActiveDateIso(addMonthsIso(activeMonthIso, 1));
     else setActiveDateIso(addDaysIso(activeDateIso, 1));
   };
 
   const getAvailabilityFor = React.useCallback(
     (resourceId: string, iso: string): Interval[] => {
+      const fromSchedule = getCombinedAvailabilityIntervals(resourceId, iso, scheduleRows, dateOverrides ?? []);
+      if (fromSchedule.length) return fromSchedule;
+
       const av = data.availability.find((a) => a.resourceId === resourceId);
       if (!av) return [];
       const dow = parseIsoDate(iso).getUTCDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6;
       const windows = av.weekly[dow] ?? [];
       return windows.map((w) => ({ startMin: minutesSinceMidnight(w.start), endMin: minutesSinceMidnight(w.end) }));
     },
-    [data.availability],
+    [data.availability, dateOverrides, scheduleRows],
+  );
+
+  const getLocationAvailability = React.useCallback(
+    (resourceId: string, iso: string, location: CalendarBookingLocation): Interval[] => {
+      const fromSchedule = getLocationAvailabilityIntervals(resourceId, iso, location, scheduleRows, dateOverrides ?? []);
+      if (fromSchedule.length) return fromSchedule;
+      return getAvailabilityFor(resourceId, iso);
+    },
+    [dateOverrides, getAvailabilityFor, scheduleRows],
   );
 
   const getBusyFor = React.useCallback(
@@ -631,13 +1663,13 @@ export default function ProfessionalFixedLocationCalendar({
         if (e.resourceId !== resourceId || e.date !== iso) continue;
         busy.push({ startMin: minutesSinceMidnight(e.start), endMin: minutesSinceMidnight(e.end) });
       }
-      for (const b of data.blocks) {
+      for (const b of blocks) {
         if (b.resourceId !== resourceId || b.date !== iso) continue;
         busy.push({ startMin: minutesSinceMidnight(b.start), endMin: minutesSinceMidnight(b.end) });
       }
       return busy;
     },
-    [data.blocks, events],
+    [blocks, events],
   );
 
   const getDailyBookingRatio = React.useCallback(
@@ -652,18 +1684,278 @@ export default function ProfessionalFixedLocationCalendar({
     [getAvailabilityFor, getBusyFor],
   );
 
+  const timeColumnAvailability = React.useMemo(() => {
+    if (viewMode !== "day" || !activeResource) return [];
+    return getAvailabilityFor(activeResource.id, activeDateIso);
+  }, [activeDateIso, activeResource, getAvailabilityFor, viewMode]);
+
+  const renderTeamCapacityBar = (resourceId: string) => {
+    const bookedPct = Math.round(getDailyBookingRatio(resourceId, activeDateIso) * 100);
+    return (
+      <Box
+        sx={{
+          mt: 0.35,
+          height: 3,
+          width: 76,
+          borderRadius: "999px",
+          bgcolor: m.fxGrayF2F4F7,
+          overflow: "hidden",
+        }}
+      >
+        <Box
+          sx={{
+            height: "100%",
+            width: `${bookedPct}%`,
+            bgcolor: m.teal,
+            borderRadius: "999px",
+            transition: "width 0.2s ease",
+          }}
+        />
+      </Box>
+    );
+  };
+
+  const renderTeamMemberHeader = (laneResource?: (typeof filteredResources)[number]) => {
+    const headerResources =
+      viewMode === "day" && appliedFilters.teamAll && laneResource ? [laneResource] : filteredResources;
+    const menuResourceId =
+      viewMode === "day" && appliedFilters.teamAll && laneResource ? laneResource.id : activeResource?.id;
+
+    return (
+      <Box
+        sx={{
+          minHeight: laneHeaderPx,
+          display: "flex",
+          alignItems: "center",
+          px: 1.5,
+          gap: 2.5,
+          bgcolor: "#fff",
+          borderBottom: `1px solid ${alpha(m.navy, 0.07)}`,
+          overflowX: "auto",
+          flexWrap: "nowrap",
+        }}
+      >
+        {headerResources.map((resource) => {
+          const isActive = resource.id === menuResourceId;
+          const teamAvatarSx = {
+            width: 22,
+            height: 22,
+            bgcolor: alpha(m.teal, 0.14),
+            color: m.teal,
+            fontWeight: 700,
+            fontSize: 9.5,
+            flexShrink: 0,
+          };
+          const teamNameSx = {
+            fontWeight: 600,
+            fontSize: 11.5,
+            color: alpha(m.navy, 0.78),
+            lineHeight: 1.2,
+            whiteSpace: "nowrap" as const,
+          };
+
+          if (isActive) {
+            return (
+              <Box
+                key={resource.id}
+                role="button"
+                tabIndex={0}
+                onClick={(e) => openTeamMenu(resource.id, e.currentTarget)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") openTeamMenu(resource.id, e.currentTarget);
+                }}
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.65,
+                  px: 1.15,
+                  py: 0.5,
+                  borderRadius: "999px",
+                  bgcolor: alpha(m.navy, 0.04),
+                  cursor: "pointer",
+                  flexShrink: 0,
+                  "&:hover": { bgcolor: alpha(m.teal, 0.06) },
+                }}
+              >
+                <Avatar sx={teamAvatarSx}>{resource.avatarText}</Avatar>
+                <Box sx={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
+                  <Stack direction="row" alignItems="center" spacing={0.2} sx={{ minWidth: 0 }}>
+                    <BodyText sx={teamNameSx}>{resource.name}</BodyText>
+                    <KeyboardArrowDownRoundedIcon sx={{ fontSize: 15, color: alpha(m.navy, 0.45), flexShrink: 0 }} />
+                  </Stack>
+                  {renderTeamCapacityBar(resource.id)}
+                </Box>
+              </Box>
+            );
+          }
+
+          return (
+            <ButtonBase
+              key={resource.id}
+              onClick={() => selectTeamMember(resource.id)}
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 0.65,
+                flexShrink: 0,
+                borderRadius: "4px",
+                px: 0.25,
+                py: 0.35,
+              }}
+            >
+              <Avatar sx={teamAvatarSx}>{resource.avatarText}</Avatar>
+              <Box sx={{ display: "flex", flexDirection: "column", minWidth: 0, alignItems: "flex-start" }}>
+                <BodyText sx={teamNameSx}>{resource.name}</BodyText>
+                {renderTeamCapacityBar(resource.id)}
+              </Box>
+            </ButtonBase>
+          );
+        })}
+      </Box>
+    );
+  };
+
+  const renderTeamActionPopover = () => (
+    <Popover
+      open={Boolean(teamActionAnchor)}
+      anchorEl={teamActionAnchor}
+      onClose={closeTeamMenu}
+      anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
+      transformOrigin={{ vertical: "top", horizontal: "left" }}
+      PaperProps={{
+        sx: {
+          mt: 0.75,
+          borderRadius: "10px",
+          border: `1px solid ${alpha(m.navy, 0.10)}`,
+          boxShadow: "0 8px 24px rgba(16, 35, 63, 0.12)",
+          minWidth: 200,
+          py: 0.75,
+          px: 0.5,
+        },
+      }}
+    >
+      <ButtonBase
+        onClick={() => {
+          closeTeamMenu();
+          showSnackbar({ severity: "info", message: "Client profile panel opened." });
+        }}
+        sx={{ width: "100%", px: 1, py: 0.75, justifyContent: "flex-start", borderRadius: "8px" }}
+      >
+        <BodyText sx={{ fontWeight: 700, fontSize: 11.5, color: alpha(m.navy, 0.78) }}>View profile</BodyText>
+      </ButtonBase>
+      <ButtonBase
+        disabled={viewMode !== "day" || !teamMenuResource}
+        onClick={() => {
+          if (!teamMenuResource) return;
+          const shifts =
+            getCombinedAvailabilityIntervals(teamMenuResource.id, activeDateIso, scheduleRows, dateOverrides ?? []).length > 0
+              ? getCombinedAvailabilityIntervals(teamMenuResource.id, activeDateIso, scheduleRows, dateOverrides ?? []).map((interval) => ({
+                  start: fmtMinToTime(interval.startMin),
+                  end: fmtMinToTime(interval.endMin),
+                }))
+              : [{ start: "09:00", end: "17:00" }];
+          setEditAvailabilityDraft({
+            resourceId: teamMenuResource.id,
+            date: activeDateIso,
+            locations: [...data.supportedLocations],
+            shifts,
+          });
+          setEditAvailabilityOpen(true);
+          closeTeamMenu();
+        }}
+        sx={{ width: "100%", px: 1, py: 0.75, justifyContent: "flex-start", borderRadius: "8px", opacity: viewMode !== "day" ? 0.5 : 1 }}
+      >
+        <BodyText sx={{ fontWeight: 700, fontSize: 11.5, color: alpha(m.navy, 0.78) }}>Edit availability</BodyText>
+      </ButtonBase>
+      <Box sx={{ my: 0.5, borderTop: `1px solid ${alpha(m.navy, 0.08)}` }} />
+      {data.resources.map((resource) => {
+        const focusedId = selectedResourceId || activeResource?.id;
+        const isActive = String(resource.id) === String(focusedId);
+        return (
+          <ButtonBase
+            key={resource.id}
+            onClick={() => selectTeamMember(resource.id)}
+            sx={{
+              width: "100%",
+              px: 1,
+              py: 0.65,
+              display: "flex",
+              alignItems: "center",
+              gap: 0.75,
+              justifyContent: "flex-start",
+              borderRadius: "8px",
+              bgcolor: isActive ? alpha(m.teal, 0.06) : "transparent",
+              "&:hover": { bgcolor: alpha(m.teal, 0.04) },
+            }}
+          >
+            <Avatar
+              sx={{
+                width: 22,
+                height: 22,
+                bgcolor: alpha(m.teal, 0.14),
+                color: m.teal,
+                fontWeight: 700,
+                fontSize: 9.5,
+              }}
+            >
+              {resource.avatarText}
+            </Avatar>
+            {isActive ? (
+              <BodyText sx={{ fontWeight: 600, fontSize: 11.5, color: alpha(m.navy, 0.78) }}>{resource.name}</BodyText>
+            ) : (
+              <Box sx={{ borderBottom: `1px solid ${alpha(m.navy, 0.2)}`, pb: 0.15 }}>
+                <BodyText sx={{ fontWeight: 600, fontSize: 11.5, color: alpha(m.navy, 0.78) }}>{resource.name}</BodyText>
+              </Box>
+            )}
+          </ButtonBase>
+        );
+      })}
+    </Popover>
+  );
+
   const openBookingDrawer = React.useCallback(
     (payload: SelectedSlot) => {
       setSelectedSlot(payload);
       setSlotDrawerTab("booking");
       setSlotBookingScreen("new-booking");
-      setSlotLocation("FL");
+      setSlotLocation(data.supportedLocations[0] ?? "FL");
+      setSlotBookingType("Requests");
+      setSlotStatus("Requested");
       setSlotClientAdded(false);
+      setSlotCalendarOpen(false);
+      setSlotCalendarTouched(false);
       setSelectedClient(null);
       setSelectedServices([]);
       setSelectedProducts([]);
+      setServiceSelectionDraft([]);
+      setServiceOverridesDraft({});
+      setServiceEditDraft(emptyBookingServiceEditDraft());
+      setServiceEditAttempted(false);
+      setProductSelectionDraft(createEmptyProductSelectionDraft());
+      setUniqueItemDraft(emptyBookingUniqueItemDraft());
+      setCustomBookingProducts([]);
       setEditingEventId(null);
       setIsEditingExisting(false);
+      setBookingGuests([]);
+      setShowInlineGuestField(false);
+      setBookingTotalDiscount(null);
+      setBookingDiscountModalOpen(false);
+      setShowLateCancellation(false);
+      setLateCancellationFeePercent("");
+      setShowLateRescheduling(false);
+      setLateRescheduleFeePercent(lateRescheduleFeePercentDefault ?? "");
+      setShowInternalNote(false);
+      setBookingInternalNote("");
+      setShowPrepayment(false);
+      setPrepaymentPercent("");
+      setPaymentMethod("online");
+      setShowKilometerAllowance(false);
+      setKilometerAllowanceDraft({ eurPerKm: "", totalKilometer: "" });
+      setDesiredLocationDraft(emptyDesiredLocation());
+      setInlineGuestDraft({ firstName: "", lastName: "" });
+      setAddMenuTarget("client");
+      setSelectionTarget("client");
+      setSlotAddMenuAnchor(null);
       setGuestDraft({
         firstName: "",
         lastName: "",
@@ -671,6 +1963,7 @@ export default function ProfessionalFixedLocationCalendar({
         phoneCode: "",
         phoneNumber: "",
       });
+      setBookingPhoneDraft({ phoneCode: "", phoneNumber: "" });
       setNonMollureClientType("");
       setNonMollureDraft({
         firstName: "",
@@ -692,13 +1985,19 @@ export default function ProfessionalFixedLocationCalendar({
         province: "",
         municipality: "",
       });
+      setIncomingRequestEditMode(false);
+      setOriginalServicesSnapshot([]);
+      setDiscardBrOpen(false);
+      setDiscardEbrOpen(false);
       setSlotDrawerOpen(true);
     },
-    [],
+    [data.supportedLocations, lateRescheduleFeePercentDefault],
   );
 
   const openExistingBooking = React.useCallback(
     (ev: CalendarEvent) => {
+      const hydration = hydrateBookingDrawerFromEvent(ev);
+
       setSelectedSlot({
         resourceId: ev.resourceId,
         date: ev.date,
@@ -710,19 +2009,608 @@ export default function ProfessionalFixedLocationCalendar({
       setSlotDrawerTab("booking");
       setSlotBookingScreen("new-booking");
       setSlotLocation(ev.location);
+      setSlotBookingType(ev.bookingType ?? "Requests");
       setSlotClientAdded(true);
-      setSelectedClient({ name: ev.showClientName ?? "Client", email: "" });
-      setSelectedServices([]);
-      setSelectedProducts([]);
+      setSlotCalendarOpen(false);
+      setSlotCalendarTouched(true);
+      setSlotClientSearch("");
+      setSelectedClient({ name: ev.showClientName ?? "Client", email: hydration.clientEmail });
+      setSelectedServices(hydration.services);
+      setSelectedProducts(hydration.products);
+      setServiceSelectionDraft(hydration.services.map((service) => service.id));
+      setProductSelectionDraft(createEmptyProductSelectionDraft());
+      setUniqueItemDraft(emptyBookingUniqueItemDraft());
+      setCustomBookingProducts([]);
+      setBookingGuests(hydration.guests);
+      setShowInlineGuestField(false);
+      setBookingPhoneDraft({ phoneCode: hydration.phoneCode, phoneNumber: hydration.phoneNumber });
+      setDesiredLocationDraft(hydration.desiredLocation);
+      setShowPrepayment(hydration.showPrepayment);
+      setPrepaymentPercent(hydration.prepaymentPercent);
+      setPaymentMethod(hydration.paymentMethod);
+      setShowLateCancellation(hydration.showLateCancellation);
+      setLateCancellationFeePercent(hydration.lateCancellationFeePercent);
+      setShowLateRescheduling(hydration.showLateRescheduling);
+      setLateRescheduleFeePercent(hydration.lateRescheduleFeePercent);
+      setShowInternalNote(hydration.showInternalNote);
+      setBookingInternalNote(hydration.internalNote);
+      setBookingTotalDiscount(hydration.totalDiscount);
+      setBookingDiscountModalOpen(false);
+      setShowKilometerAllowance(hydration.showKilometerAllowance);
+      setKilometerAllowanceDraft(hydration.kilometerAllowance);
       setEditingEventId(ev.id);
+      setSlotStatus(ev.status);
       setIsEditingExisting(false);
+      setIncomingRequestEditMode(false);
+      setOriginalServicesSnapshot(resolveOriginalServices(ev, hydration.services));
+      setSlotSaveAttempted(false);
+      setAddMenuTarget("client");
+      setSelectionTarget("client");
+      setSlotAddMenuAnchor(null);
+      setBookingMoreAnchor(null);
       setSlotDrawerOpen(true);
     },
     [],
   );
 
+  const handleDiscardBr = React.useCallback(async () => {
+    if (!editingEventId) return;
+    try {
+      await persistEventStatus(editingEventId, "Invalid");
+    } catch {
+      showSnackbar({ severity: "error", message: "Unable to discard booking request." });
+      return;
+    }
+    setEvents((prev) =>
+      prev.map((event) =>
+        event.id === editingEventId ? { ...event, status: "Invalid", bookingScenario: undefined } : event,
+      ),
+    );
+    setSlotStatus("Invalid");
+    showSnackbar({ severity: "success", message: "Booking request discarded." });
+  }, [editingEventId, persistEventStatus, showSnackbar]);
+
+  const handleAcknowledgeAcceptedBr = React.useCallback(() => {
+    if (!editingEventId) return;
+    setEvents((prev) =>
+      prev.map((event) => (event.id === editingEventId ? { ...event, bookingScenario: undefined } : event)),
+    );
+    showSnackbar({ severity: "success", message: "Booking request acknowledged." });
+  }, [editingEventId, showSnackbar]);
+
+  const handleAcceptIncomingRequest = React.useCallback(async () => {
+    if (!editingEventId || !viewingBookingEvent) return;
+    const parsed = parseApiCalendarEventId(editingEventId);
+    if (!parsed || parsed.kind !== "booking" || !onUpdateBookingStatus) {
+      try {
+        await persistEventStatus(editingEventId, "Confirmed");
+      } catch (error) {
+        showSnackbar({
+          severity: "error",
+          message: getApiErrorMessage(error, "Unable to accept booking request."),
+        });
+        return;
+      }
+      setEvents((prev) =>
+        prev.map((event) => (event.id === editingEventId ? { ...event, status: "Confirmed" } : event)),
+      );
+      setSlotStatus("Confirmed");
+      setIncomingRequestEditMode(false);
+      showSnackbar({ severity: "success", message: "Booking request accepted." });
+      return;
+    }
+
+    try {
+      const ebr = parseStoredEbrFromNotes(viewingBookingEvent.notes);
+      const isClientEbr =
+        viewingBookingEvent.bookingScenario === "EBR" &&
+        Boolean(ebr) &&
+        (ebr.status === "pending" || ebr.status === "suggested") &&
+        (ebr.lastEditedBy === "client" || viewingBookingEvent.details?.lastEditedBy === "client");
+
+      const suggestedServices = ebr?.suggestedServices?.length
+        ? ebr.suggestedServices
+        : viewingBookingEvent.details?.services;
+      const suggestedProducts = ebr?.suggestedProducts?.length
+        ? ebr.suggestedProducts
+        : viewingBookingEvent.details?.products;
+      const suggestedTotal =
+        ebr?.suggestedTotalPrice ??
+        suggestedServices?.reduce((sum, s) => sum + (Number(s.price) || 0), 0);
+      const suggestedProject = ebr?.suggestedProjectDetails;
+      const suggestedDate = ebr?.suggestedDateISO;
+      const suggestedStart = ebr?.suggestedStart;
+      const suggestedEnd = ebr?.suggestedEnd;
+
+      let nextNotes: string | null | undefined;
+      let scheduleExtras: {
+        booking_date?: string;
+        start_time?: string;
+        end_time?: string;
+      } = {};
+
+    // Client change request: apply suggested schedule/services and keep accepted outcome for client UI.
+      if (isClientEbr) {
+        const appliedNote = (ebr?.clientNote || viewingBookingEvent.details?.internalNote || "").trim();
+        nextNotes = markClientEbrAcceptedInNotes(viewingBookingEvent.notes, {
+          internalNote: appliedNote,
+          services: suggestedServices,
+          products: suggestedProducts,
+          clientSnapshot: {
+            ...(viewingBookingEvent.details?.clientSnapshot ?? {}),
+            ...(suggestedServices?.length
+              ? {
+                  services: suggestedServices.map((s) => ({
+                    id: s.id,
+                    name: s.name,
+                    price: s.price,
+                    durationMins: s.durationMins,
+                    guestId: s.guestId,
+                    teamMemberId: s.teamMemberId,
+                  })),
+                }
+              : {}),
+            ...(suggestedProject ? { projectDetails: suggestedProject } : {}),
+          },
+          requestDirection: "incoming",
+        });
+        if (
+          suggestedDate &&
+          suggestedStart &&
+          suggestedEnd &&
+          /^\d{2}:\d{2}$/.test(suggestedStart) &&
+          /^\d{2}:\d{2}$/.test(suggestedEnd)
+        ) {
+          scheduleExtras = {
+            booking_date: suggestedDate,
+            start_time: `${suggestedDate}T${suggestedStart}:00`,
+            end_time: `${suggestedDate}T${suggestedEnd}:00`,
+          };
+        }
+      }
+
+      await onUpdateBookingStatus(parsed.id, "confirmed", {
+        ...(nextNotes !== undefined ? { notes: nextNotes } : {}),
+        ...(typeof suggestedTotal === "number" && isClientEbr ? { total_price: suggestedTotal } : {}),
+        ...scheduleExtras,
+      });
+
+      setEvents((prev) =>
+        prev.map((event) => {
+          if (event.id !== editingEventId) return event;
+          return {
+            ...event,
+            status: "Confirmed" as const,
+            bookingScenario: undefined,
+            notes: nextNotes ?? event.notes,
+            ...(scheduleExtras.booking_date
+              ? {
+                  date: scheduleExtras.booking_date,
+                  start: suggestedStart || event.start,
+                  end: suggestedEnd || event.end,
+                }
+              : {}),
+            details: {
+              ...event.details,
+              responseStatus: undefined,
+              lastEditedBy: undefined,
+              editedServiceIds: undefined,
+              clientEditedServiceIds: undefined,
+              ...(suggestedServices?.length ? { services: suggestedServices } : {}),
+              ...(suggestedProducts?.length ? { products: suggestedProducts } : {}),
+            },
+          };
+        }),
+      );
+      if (scheduleExtras.booking_date && selectedSlot) {
+        setSelectedSlot({
+          ...selectedSlot,
+          date: scheduleExtras.booking_date,
+          start: suggestedStart || selectedSlot.start,
+          end: suggestedEnd || selectedSlot.end,
+        });
+      }
+      setSlotStatus("Confirmed");
+      setIncomingRequestEditMode(false);
+      showSnackbar({ severity: "success", message: "Booking request accepted." });
+    } catch (error) {
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Unable to accept booking request."),
+      });
+    }
+  }, [
+    editingEventId,
+    onUpdateBookingStatus,
+    persistEventStatus,
+    selectedSlot,
+    showSnackbar,
+    viewingBookingEvent,
+  ]);
+
+  const handleRejectIncomingRequest = React.useCallback(async () => {
+    if (!editingEventId || !viewingBookingEvent) return;
+    const ebr = parseStoredEbrFromNotes(viewingBookingEvent.notes);
+    const isClientEbr =
+      viewingBookingEvent.bookingScenario === "EBR" &&
+      Boolean(ebr) &&
+      (ebr.status === "pending" || ebr.status === "suggested") &&
+      (ebr.lastEditedBy === "client" || viewingBookingEvent.details?.lastEditedBy === "client");
+
+    // Client change request: keep original booking confirmed; keep rejected proposal for client UI.
+    if (isClientEbr) {
+      const parsed = parseApiCalendarEventId(editingEventId);
+      if (!parsed || parsed.kind !== "booking" || !onUpdateBookingStatus) {
+        showSnackbar({ severity: "error", message: "Unable to reject booking request." });
+        return;
+      }
+      try {
+        const rejectedNotes = markClientEbrRejectedInNotes(viewingBookingEvent.notes);
+        await onUpdateBookingStatus(parsed.id, "confirmed", {
+          notes: rejectedNotes,
+        });
+        setEvents((prev) =>
+          prev.map((event) =>
+            event.id === editingEventId
+              ? {
+                  ...event,
+                  status: "Confirmed" as const,
+                  bookingScenario: undefined,
+                  notes: rejectedNotes,
+                  details: {
+                    ...event.details,
+                    responseStatus: undefined,
+                    lastEditedBy: undefined,
+                    editedServiceIds: undefined,
+                    clientEditedServiceIds: undefined,
+                  },
+                }
+              : event,
+          ),
+        );
+        setSlotStatus("Confirmed");
+        setIncomingRequestEditMode(false);
+        setIsEditingExisting(false);
+        showSnackbar({ severity: "success", message: "Edit request rejected. Booking unchanged." });
+      } catch (error) {
+        showSnackbar({
+          severity: "error",
+          message: getApiErrorMessage(error, "Unable to reject booking request."),
+        });
+      }
+      return;
+    }
+
+    try {
+      const parsed = parseApiCalendarEventId(editingEventId);
+      if (parsed?.kind === "booking" && onUpdateBookingStatus) {
+        await onUpdateBookingStatus(parsed.id, "cancelled");
+      } else {
+        await persistEventStatus(editingEventId, "Invalid");
+      }
+    } catch (error) {
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Unable to reject booking request."),
+      });
+      return;
+    }
+    setEvents((prev) =>
+      prev.map((event) => (event.id === editingEventId ? { ...event, status: "Invalid" } : event)),
+    );
+    setSlotStatus("Invalid");
+    setIncomingRequestEditMode(false);
+    setIsEditingExisting(false);
+    showSnackbar({ severity: "success", message: "Booking request rejected." });
+  }, [editingEventId, onUpdateBookingStatus, persistEventStatus, showSnackbar, viewingBookingEvent]);
+
+  const handleStartIncomingEdit = React.useCallback(() => {
+    if (!viewingBookingEvent) return;
+    const hydration = hydrateBookingDrawerFromEvent(viewingBookingEvent);
+    setOriginalServicesSnapshot(resolveOriginalServices(viewingBookingEvent, hydration.services));
+    setIncomingRequestEditMode(true);
+    setIsEditingExisting(true);
+  }, [viewingBookingEvent]);
+
+  const handleDiscardEbr = React.useCallback(async () => {
+    if (!editingEventId) return;
+    try {
+      await persistEventStatus(editingEventId, "Invalid");
+    } catch {
+      showSnackbar({ severity: "error", message: "Unable to discard edited booking request." });
+      return;
+    }
+    setEvents((prev) =>
+      prev.map((event) =>
+        event.id === editingEventId ? { ...event, status: "Invalid", bookingScenario: undefined } : event,
+      ),
+    );
+    setSlotStatus("Invalid");
+    setIncomingRequestEditMode(false);
+    showSnackbar({ severity: "success", message: "Edited booking request discarded." });
+  }, [editingEventId, persistEventStatus, showSnackbar]);
+
+  const openSelectServices = React.useCallback(() => {
+    setSelectionTarget(addMenuTarget);
+    // Add flow: start with no preselection — only what the user picks is added.
+    setServiceOverridesDraft({});
+    setServiceSelectionDraft([]);
+    setServiceEditDraft(emptyBookingServiceEditDraft());
+    setServiceEditAttempted(false);
+    setSlotAddMenuAnchor(null);
+    setSlotBookingScreen("select-services");
+  }, [addMenuTarget]);
+
+  const openEditService = React.useCallback(
+    (service: BookingCatalogService) => {
+      const override = serviceOverridesDraft[service.id];
+      setServiceEditDraft(
+        buildServiceEditDraftFromCatalog(service, {
+          override,
+          defaultStartTime: selectedSlot?.start,
+          defaultStaffResourceId: selectedSlot?.resourceId ?? data.resources[0]?.id ?? "",
+        }),
+      );
+      setServiceEditAttempted(false);
+      setSlotBookingScreen("edit-service");
+    },
+    [data.resources, selectedSlot?.resourceId, selectedSlot?.start, serviceOverridesDraft],
+  );
+
+  const applyServiceEdit = React.useCallback(() => {
+    const catalogService = selectableServiceCatalog.find((service) => service.id === serviceEditDraft.serviceId);
+    if (!catalogService) return false;
+
+    const lineItem = buildBookingServiceLineItem(catalogService, serviceEditDraft);
+    setServiceOverridesDraft((prev) => ({
+      ...prev,
+      [lineItem.id]: lineItemToOverride(lineItem),
+    }));
+    setServiceSelectionDraft((prev) => (prev.includes(lineItem.id) ? prev : [...prev, lineItem.id]));
+    setServiceEditAttempted(false);
+    setSlotBookingScreen("select-services");
+    return true;
+  }, [selectableServiceCatalog, serviceEditDraft]);
+
+  const toggleServiceSelectionDraft = React.useCallback((serviceId: string) => {
+    if (isViewingExisting) return;
+    setServiceSelectionDraft((prev) =>
+      prev.includes(serviceId) ? prev.filter((id) => id !== serviceId) : [...prev, serviceId],
+    );
+  }, [isViewingExisting]);
+
+  const applyServiceSelection = React.useCallback(() => {
+    const byId = new Map(selectableServiceCatalog.map((service) => [service.id, service]));
+    const currentServices =
+      selectionTarget === "client"
+        ? selectedServices
+        : bookingGuests.find((item) => item.id === selectionTarget)?.services ?? [];
+    const currentById = new Map(currentServices.map((service) => [service.id, service]));
+
+    const pickedServices = serviceSelectionDraft
+      .map((id) => {
+        const catalogService = byId.get(id);
+        if (catalogService) {
+          const override = serviceOverridesDraft[id];
+          if (override) {
+            return buildBookingServiceLineItem(
+              catalogService,
+              buildServiceEditDraftFromCatalog(catalogService, { override }),
+            );
+          }
+          return {
+            id: catalogService.id,
+            name: catalogService.name,
+            price: catalogService.price,
+            durationMins: catalogService.durationMins,
+            startTime: selectedSlot?.start,
+            endTime: selectedSlot?.end,
+            staffResourceId: selectedSlot?.resourceId,
+          } satisfies BookingServiceLineItem;
+        }
+        return currentById.get(id) ?? null;
+      })
+      .filter((service): service is BookingServiceLineItem => Boolean(service));
+
+    // Always keep already-added services; only append newly selected ones.
+    const mergedById = new Map<string, BookingServiceLineItem>();
+    for (const service of currentServices) mergedById.set(service.id, service);
+    // Also keep original booking services so nothing disappears while editing.
+    if (selectionTarget === "client") {
+      for (const service of originalServicesSnapshot) {
+        if (!mergedById.has(service.id)) mergedById.set(service.id, service);
+      }
+    }
+    for (const service of pickedServices) mergedById.set(service.id, service);
+    const nextServices = Array.from(mergedById.values());
+
+    if (selectionTarget === "client") {
+      setSelectedServices(nextServices);
+    } else {
+      setBookingGuests((prev) =>
+        prev.map((guest) => (guest.id === selectionTarget ? { ...guest, services: nextServices } : guest)),
+      );
+    }
+    setSlotBookingScreen("new-booking");
+    setSlotSaveAttempted(false);
+  }, [
+    bookingGuests,
+    originalServicesSnapshot,
+    selectedServices,
+    selectedSlot?.end,
+    selectedSlot?.resourceId,
+    selectedSlot?.start,
+    selectionTarget,
+    selectableServiceCatalog,
+    serviceOverridesDraft,
+    serviceSelectionDraft,
+  ]);
+
+  const openSelectProducts = React.useCallback(() => {
+    setSelectionTarget(addMenuTarget);
+    const currentProducts =
+      addMenuTarget === "client"
+        ? selectedProducts
+        : bookingGuests.find((item) => item.id === addMenuTarget)?.products ?? [];
+
+    const customFromSelection = currentProducts
+      .filter((product) => product.id.startsWith("unique-"))
+      .map((product) => ({
+        id: product.id,
+        name: getProductBaseName(product.name, product.quantity),
+        price: product.unitPrice,
+      }));
+
+    setCustomBookingProducts((prev) => {
+      const merged = new Map<string, BookingCatalogProduct>();
+      prev.forEach((product) => merged.set(product.id, product));
+      customFromSelection.forEach((product) => merged.set(product.id, product));
+      return Array.from(merged.values());
+    });
+
+    // Add flow: nothing preselected — only what the user picks is added.
+    setProductSelectionDraft(createEmptyProductSelectionDraft());
+
+    setSlotAddMenuAnchor(null);
+    setSlotBookingScreen("select-products");
+  }, [addMenuTarget, bookingGuests, selectedProducts]);
+
+  const toggleProductSelectionDraft = React.useCallback((productId: string) => {
+    if (isViewingExisting) return;
+    setProductSelectionDraft((prev) => {
+      const current = prev[productId] ?? { selected: false, quantity: 1 };
+      return {
+        ...prev,
+        [productId]: { ...current, selected: !current.selected },
+      };
+    });
+  }, [isViewingExisting]);
+
+  const adjustProductQuantityDraft = React.useCallback((productId: string, delta: number) => {
+    if (isViewingExisting) return;
+    setProductSelectionDraft((prev) => {
+      const current = prev[productId] ?? { selected: false, quantity: 1 };
+      if (!current.selected) return prev;
+      const nextQty = Math.max(1, current.quantity + delta);
+      return {
+        ...prev,
+        [productId]: { ...current, quantity: nextQty },
+      };
+    });
+  }, [isViewingExisting]);
+
+  const applyProductSelection = React.useCallback(() => {
+    const catalogProducts = productCatalog
+      .filter((product) => productSelectionDraft[product.id]?.selected)
+      .map((product) => {
+        const quantity = productSelectionDraft[product.id]?.quantity ?? 1;
+        return {
+          id: product.id,
+          name: formatProductLineName(product.name, quantity),
+          unitPrice: product.price,
+          price: product.price * quantity,
+          quantity,
+        };
+      });
+
+    const customProducts = customBookingProducts
+      .filter((product) => productSelectionDraft[product.id]?.selected)
+      .map((product) => {
+        const quantity = productSelectionDraft[product.id]?.quantity ?? 1;
+        return {
+          id: product.id,
+          name: formatProductLineName(product.name, quantity),
+          unitPrice: product.price,
+          price: product.price * quantity,
+          quantity,
+        };
+      });
+
+    const nextProducts = [...catalogProducts, ...customProducts];
+    const currentProducts =
+      selectionTarget === "client"
+        ? selectedProducts
+        : bookingGuests.find((item) => item.id === selectionTarget)?.products ?? [];
+
+    // Merge newly picked products into the current list (no defaults, no wipe).
+    const mergedById = new Map(currentProducts.map((product) => [product.id, product]));
+    for (const product of nextProducts) {
+      mergedById.set(product.id, product);
+    }
+    const mergedProducts = Array.from(mergedById.values());
+
+    if (selectionTarget === "client") {
+      setSelectedProducts(mergedProducts);
+    } else {
+      setBookingGuests((prev) =>
+        prev.map((guest) => (guest.id === selectionTarget ? { ...guest, products: mergedProducts } : guest)),
+      );
+    }
+    setSlotBookingScreen("new-booking");
+    setSlotSaveAttempted(false);
+  }, [bookingGuests, customBookingProducts, productCatalog, productSelectionDraft, selectedProducts, selectionTarget]);
+
+  const openAddUniqueItem = React.useCallback(() => {
+    setUniqueItemDraft(emptyBookingUniqueItemDraft());
+    setSlotBookingScreen("add-unique-item");
+  }, []);
+
+  const applyUniqueItem = React.useCallback(() => {
+    const line = buildUniqueItemLine(uniqueItemDraft);
+    if (!line) return;
+
+    const customProduct: BookingCatalogProduct = {
+      id: line.id,
+      name: uniqueItemDraft.productName.trim(),
+      price: line.unitPrice,
+    };
+
+    setCustomBookingProducts((prev) => [...prev, customProduct]);
+    setProductSelectionDraft((prev) => ({
+      ...prev,
+      [line.id]: { selected: true, quantity: line.quantity },
+    }));
+    setUniqueItemDraft(emptyBookingUniqueItemDraft());
+    setSlotBookingScreen("select-products");
+    setSlotSaveAttempted(false);
+  }, [uniqueItemDraft]);
+
+  const isBookingDetailsSubScreen =
+    slotBookingScreen === "select-services" ||
+    slotBookingScreen === "edit-service" ||
+    slotBookingScreen === "select-products" ||
+    slotBookingScreen === "add-unique-item";
+
+  const serviceEditErrors = React.useMemo(
+    () => (serviceEditAttempted ? getBookingServiceEditErrors(serviceEditDraft) : {}),
+    [serviceEditAttempted, serviceEditDraft],
+  );
+
+  const addInlineGuest = React.useCallback(() => {
+    const guestName = `${inlineGuestDraft.firstName.trim()} ${inlineGuestDraft.lastName.trim()}`.trim();
+    if (!guestName) {
+      showSnackbar({ severity: "warning", message: "Guest name is required." });
+      return;
+    }
+    setBookingGuests((prev) => [
+      ...prev,
+      { id: `guest-${Date.now()}`, name: guestName, services: [], products: [] },
+    ]);
+    setInlineGuestDraft({ firstName: "", lastName: "" });
+    setShowInlineGuestField(false);
+  }, [inlineGuestDraft.firstName, inlineGuestDraft.lastName, showSnackbar]);
+
+  const hasProductDraftSelection = React.useMemo(
+    () => Object.values(productSelectionDraft).some((item) => item.selected),
+    [productSelectionDraft],
+  );
+
   const onEmptyClick = React.useCallback(
     (resourceId: string, iso: string, minutes: number) => {
+      if (iso < todayIso) {
+        showSnackbar({ severity: "info", message: "Cannot create a new booking on a past date." });
+        return;
+      }
       const availability = getAvailabilityFor(resourceId, iso);
       if (!availability.length) {
         showSnackbar({ severity: "info", message: "No availability set for this team member on this day." });
@@ -739,11 +2627,10 @@ export default function ProfessionalFixedLocationCalendar({
       const snap = Math.round((minutes - startMin) / grid.stepMinutes) * grid.stepMinutes + startMin;
       const start = Math.max(segment.startMin, snap);
       const end = segment.endMin;
-      const drawerDateIso = iso < todayIso ? todayIso : iso;
 
       const payload = {
         resourceId,
-        date: drawerDateIso,
+        date: iso,
         start: fmtMinToTime(start),
         end: fmtMinToTime(Math.min(end, start + grid.stepMinutes)),
         freeStart: fmtMinToTime(segment.startMin),
@@ -754,74 +2641,336 @@ export default function ProfessionalFixedLocationCalendar({
     [getAvailabilityFor, getBusyFor, grid.stepMinutes, openBookingDrawer, showSnackbar, startMin, todayIso],
   );
 
-  const saveSelectedBooking = React.useCallback(
-    async (clientNameOverride?: string) => {
-      if (!selectedSlot) return;
+  const persistBookingFromDrawer = React.useCallback(async (): Promise<boolean> => {
+    if (!selectedSlot) return false;
 
+    const existingEvent = editingEventId ? events.find((event) => event.id === editingEventId) : null;
+
+    if (incomingRequestEditMode && editingEventId && existingEvent) {
+      const editedIds = detectEditedServiceIds(originalServicesSnapshot, selectedServices);
+      const originalServices = existingEvent.details?.originalServices ?? originalServicesSnapshot;
+      const nextDetails = buildBookingDetailsSnapshot({
+        selectedClient,
+        selectedServices,
+        selectedProducts,
+        bookingGuests,
+        bookingPhoneDraft,
+        desiredLocationDraft,
+        showPrepayment,
+        prepaymentPercent,
+        paymentMethod,
+        showLateCancellation,
+        lateCancellationFeePercent,
+        showLateRescheduling,
+        lateRescheduleFeePercent,
+        showInternalNote,
+        bookingInternalNote,
+        bookingTotalDiscount,
+        showKilometerAllowance,
+        kilometerAllowanceDraft,
+        // Keep BR on calendar; only flip arrow to outgoing for the client-facing edit request.
+        requestDirection: "outgoing",
+        originalServices,
+        editedServiceIds: editedIds,
+        clientEditedServiceIds: [],
+        lastEditedBy: "professional",
+      });
+      nextDetails.responseStatus = "suggestion_for_change";
+      // Keep client project/people snapshot so client EBR view stays on Continue layout.
+      if (existingEvent.details?.clientSnapshot) {
+        nextDetails.clientSnapshot = existingEvent.details.clientSnapshot;
+      }
+
+      const snapshotServices = existingEvent.details?.clientSnapshot?.services ?? [];
+      const suggestedServices = selectedServices.map((service) => {
+        const fromSnapshot =
+          snapshotServices.find((row) => row.id === service.id) ??
+          snapshotServices.find((row) => row.name === service.name);
+        return {
+          id: service.id,
+          name: service.name,
+          durationMins: service.durationMins,
+          price: getEffectiveServicePrice(service),
+          staffResourceId: service.staffResourceId,
+          startTime: service.startTime,
+          endTime: service.endTime,
+          guestId: fromSnapshot?.guestId ?? null,
+        };
+      });
+      const suggestedProducts: NonNullable<typeof nextDetails.products> = selectedProducts.map((product) => ({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        quantity: product.quantity,
+        unitPrice: product.unitPrice ?? product.price,
+      }));
+      const originalProductIds = new Set((existingEvent.details?.products ?? []).map((product) => product.id));
+      const editedProductIds = selectedProducts
+        .filter((product) => !originalProductIds.has(product.id))
+        .map((product) => product.id);
+      const bookingRef = existingEvent.bookingCode ?? editingEventId;
+      const ebrTotal = suggestedServices.reduce((sum, service) => sum + service.price, 0)
+        + suggestedProducts.reduce((sum, product) => sum + product.price * (product.quantity || 1), 0);
+      const serviceNames = suggestedServices.map((service) => service.name).filter(Boolean);
+      const humanNote = [
+        bookingInternalNote.trim(),
+        serviceNames.length ? `Services: ${serviceNames.join(", ")}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+      const persistedNotes = serializeCalendarEntryNotes(humanNote, nextDetails, {
+        status: "suggested",
+        suggestedAt: new Date().toISOString(),
+        professionalNote: bookingInternalNote.trim() || undefined,
+        editedServiceIds: editedIds,
+        editedProductIds,
+        suggestedServices,
+        suggestedProducts,
+        responseStatus: "suggestion_for_change",
+        requestDirection: "outgoing",
+        lastEditedBy: "professional",
+      });
+
+      const parsedBooking = parseApiCalendarEventId(editingEventId);
+      if (parsedBooking?.kind === "booking" && onUpdateBookingStatus) {
+        try {
+          await onUpdateBookingStatus(parsedBooking.id, "requested", {
+            notes: persistedNotes,
+            total_price: ebrTotal,
+          });
+        } catch {
+          showSnackbar({ severity: "error", message: "Unable to send edited booking request." });
+          return false;
+        }
+      }
+
+      setEvents((prev) =>
+        prev.map((event) =>
+          event.id === editingEventId
+            ? {
+                ...event,
+                status: "Requested",
+                bookingScenario: "BR",
+                title: selectedServices[0]?.name ?? event.title,
+                details: {
+                  ...event.details,
+                  ...nextDetails,
+                  prepaymentStatus: event.details?.prepaymentStatus,
+                  responseStatus: "suggestion_for_change",
+                },
+              }
+            : event,
+        ),
+      );
+      professionalSuggestBookingChanges(bookingRef, {
+        professionalNote: bookingInternalNote.trim() || undefined,
+        editedServiceIds: editedIds,
+        editedProductIds,
+        suggestedServices: suggestedServices.map((service) => ({
+          id: service.id,
+          name: service.name,
+          durationMins: service.durationMins,
+          price: service.price,
+          teamMemberId: service.staffResourceId ?? null,
+          teamMemberName: service.staffResourceId
+            ? resourceNameById.get(service.staffResourceId)
+            : undefined,
+          guestId: service.guestId ?? null,
+          startTime: service.startTime,
+          endTime: service.endTime,
+        })),
+        suggestedProducts: suggestedProducts.map((product) => ({
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          quantity: product.quantity,
+        })),
+      });
+      setIncomingRequestEditMode(false);
+      setIsEditingExisting(false);
+      setSlotStatus("Requested");
+      showSnackbar({ severity: "success", message: "Edited booking request sent to client." });
+      setSlotSaveAttempted(false);
+      return true;
+    }
+
+    const title = selectedServices[0]?.name ?? selectedProducts[0]?.name ?? "Booking";
+    const clientName =
+      selectedClient?.name?.trim() ||
+      `${guestDraft.firstName} ${guestDraft.lastName}`.trim() ||
+      `${nonMollureDraft.firstName} ${nonMollureDraft.lastName}`.trim() ||
+      "Client";
+    const isNewManualBooking = !editingEventId;
+    const shouldPersistToApi = isNewManualBooking || !isApiCalendarEventId(editingEventId);
+
+    const details = buildBookingDetailsSnapshot({
+      selectedClient,
+      selectedServices,
+      selectedProducts,
+      bookingGuests,
+      bookingPhoneDraft,
+      desiredLocationDraft,
+      showPrepayment,
+      prepaymentPercent,
+      paymentMethod,
+      showLateCancellation,
+      lateCancellationFeePercent,
+      showLateRescheduling,
+      lateRescheduleFeePercent,
+      showInternalNote,
+      bookingInternalNote,
+      bookingTotalDiscount,
+      showKilometerAllowance,
+      kilometerAllowanceDraft,
+      ...(isNewManualBooking
+        ? {
+            requestDirection: "outgoing" as const,
+            originalServices: selectedServices,
+          }
+        : {}),
+    });
+
+    const resolvedStatus = existingEvent?.status ?? (isNewManualBooking ? "Requested" : slotStatus);
+    const resolvedBookingType = existingEvent?.bookingType ?? (isNewManualBooking ? "Requests" : slotBookingType);
+
+    const buildLocalEvent = (id: string, bookingCode: string): CalendarEvent => ({
+      id,
+      bookingCode,
+      resourceId: selectedSlot.resourceId,
+      date: selectedSlot.date,
+      start: selectedSlot.start,
+      end: selectedSlot.end,
+      title,
+      status: resolvedStatus,
+      location: slotLocation,
+      bookingType: resolvedBookingType,
+      bookingScenario: resolvedStatus === "Requested" ? existingEvent?.bookingScenario ?? "BR" : existingEvent?.bookingScenario,
+      showClientName: clientName,
+      details,
+    });
+
+    if (shouldPersistToApi) {
       if (!onCreateCalendarEntry) {
         showSnackbar({ severity: "error", message: "Calendar API is not connected." });
-        return;
+        return false;
       }
-
-      const clientName =
-        clientNameOverride ||
-        (slotClientAdded && guestDraft.firstName.trim()
-          ? `${guestDraft.firstName.trim()} ${guestDraft.lastName.trim()}`.trim()
-          : nonMollureDraft.firstName.trim()
-            ? `${nonMollureDraft.firstName.trim()} ${nonMollureDraft.lastName.trim()}`.trim()
-            : "Walk-in client");
-      const teamMemberId = selectedSlot.resourceId?.trim() || null;
-      const statusToApi: Record<typeof slotStatus, CreateCalendarEntryRequest["status"]> = {
-        Confirmed: "confirmed",
-        Requested: "requested",
-        "No Show": "no_show",
-        Completed: "completed",
-        Cancelled: "cancelled",
-      };
-      const bookingTypeToApi: Record<CalendarBookingType, NonNullable<CreateCalendarEntryRequest["booking_type"]>> = {
-        Online: "online",
-        Offline: "offline",
-        Project: "project",
-        Requests: "request",
-      };
-      const apiStatus = statusToApi[slotStatus];
-      const apiBookingType = bookingTypeToApi[slotBookingType];
 
       try {
-        await onCreateCalendarEntry({
-          team_member_id: teamMemberId,
-          status: apiStatus,
-          title: `${slotBookingType} booking`,
-          start_time: toDateTimeInput(selectedSlot.date, selectedSlot.start),
-          end_time: toDateTimeInput(selectedSlot.date, selectedSlot.end),
-          location_type: locationToApi(slotLocation),
-          booking_type: apiBookingType,
-          client_name: clientName,
-          notes: slotLocation,
+        const created = await onCreateCalendarEntry(
+          buildCreateCalendarEntryPayload({
+            selectedSlot,
+            title,
+            clientName,
+            status: resolvedStatus,
+            bookingType: resolvedBookingType,
+            location: slotLocation,
+            serviceIds: selectedServices.map((service) => service.id),
+            details,
+          }),
+        );
+
+        const nextEvent = created
+          ? {
+              ...mapCalendarEntryToEvent(created, selectedSlot.resourceId),
+              title,
+              status: resolvedStatus,
+              bookingType: resolvedBookingType,
+              bookingScenario: resolvedStatus === "Requested" ? existingEvent?.bookingScenario ?? "BR" : existingEvent?.bookingScenario,
+              showClientName: clientName,
+              details,
+            }
+          : buildLocalEvent(
+              editingEventId ?? `b-${Date.now()}-a`,
+              existingEvent?.bookingCode ?? String(Math.floor(10000 + Math.random() * 90000)),
+            );
+
+        setEvents((prev) => {
+          if (editingEventId && !isApiCalendarEventId(editingEventId)) {
+            return prev.map((event) => (event.id === editingEventId ? nextEvent : event));
+          }
+          if (editingEventId && isApiCalendarEventId(editingEventId)) {
+            return prev.map((event) => (event.id === editingEventId ? { ...event, ...nextEvent, id: event.id } : event));
+          }
+          return [...prev, nextEvent];
         });
-        showSnackbar({ severity: "success", message: "Booking saved." });
-        setSlotDrawerOpen(false);
+
+        setEditingEventId(nextEvent.id);
+        setSlotStatus(nextEvent.status);
+        setIsEditingExisting(false);
+        showSnackbar({
+          severity: "success",
+          message: isNewManualBooking ? "Booking saved." : "Booking updated.",
+        });
+        setSlotSaveAttempted(false);
+        return true;
       } catch {
         showSnackbar({ severity: "error", message: "Unable to save booking." });
+        return false;
       }
-    },
-    [
-      guestDraft.firstName,
-      guestDraft.lastName,
-      nonMollureDraft.firstName,
-      nonMollureDraft.lastName,
-      onCreateCalendarEntry,
-      selectedSlot,
-      showSnackbar,
-      slotClientAdded,
-      slotBookingType,
-      slotStatus,
-      slotLocation,
-    ],
-  );
+    }
+
+    const nextEvent = buildLocalEvent(
+      editingEventId ?? `b-${Date.now()}-a`,
+      existingEvent?.bookingCode ?? String(Math.floor(10000 + Math.random() * 90000)),
+    );
+
+    setEvents((prev) => {
+      if (!editingEventId) return [...prev, nextEvent];
+      return prev.map((event) => (event.id === editingEventId ? nextEvent : event));
+    });
+    setEditingEventId(nextEvent.id);
+    setSlotStatus(nextEvent.status);
+    setIsEditingExisting(false);
+    showSnackbar({ severity: "success", message: "Booking updated." });
+    setSlotSaveAttempted(false);
+    return true;
+  }, [
+    bookingGuests,
+    bookingInternalNote,
+    bookingPhoneDraft,
+    bookingTotalDiscount,
+    desiredLocationDraft,
+    editingEventId,
+    events,
+    guestDraft.firstName,
+    guestDraft.lastName,
+    incomingRequestEditMode,
+    kilometerAllowanceDraft,
+    lateCancellationFeePercent,
+    nonMollureDraft.firstName,
+    nonMollureDraft.lastName,
+    onCreateCalendarEntry,
+    onUpdateBookingStatus,
+    originalServicesSnapshot,
+    paymentMethod,
+    prepaymentPercent,
+    selectedClient,
+    selectedProducts,
+    selectedServices,
+    selectedSlot,
+    showInternalNote,
+    showKilometerAllowance,
+    showLateCancellation,
+    showLateRescheduling,
+    lateRescheduleFeePercent,
+    showPrepayment,
+    showSnackbar,
+    slotBookingType,
+    slotLocation,
+    slotStatus,
+    resourceNameById,
+  ]);
 
   return (
-    <Stack spacing={2}>
+    <Stack
+      spacing={1.5}
+      sx={{
+        bgcolor: alpha(m.teal, 0.12),
+        px: { xs: 1.25, md: 3 },
+        py: { xs: 1.5, md: 2.5 },
+        borderRadius: "2px",
+      }}
+    >
       <AppPillTabs
         tabs={data.subTabs.map((label) => ({ label }))}
         active={activeSubTab}
@@ -829,34 +2978,35 @@ export default function ProfessionalFixedLocationCalendar({
         alignStart={false}
       />
 
+
+      {activeSubTab === "Overview" ? (
       <Paper
         elevation={0}
         sx={{
-          borderRadius: "4px",
+          borderRadius: "2px",
           border: 0,
-          boxShadow: "0 12px 28px rgba(16, 35, 63, 0.04)",
-          bgcolor: theme.palette.background.paper,
+          boxShadow: "none",
+          bgcolor: "#fff",
           overflow: "hidden",
         }}
       >
         {/* Toolbar */}
-        <Box sx={{ px: 1.5, py: 1.1, bgcolor: "#fff" }}>
+        <Box sx={{ px: 2, py: 1.25, bgcolor: "#fff" }}>
           <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
             <Stack direction="row" spacing={0.75} alignItems="center">
               <IconButton
                 size="small"
                 onClick={onPrev}
-                disabled={!canGoPrev}
                 sx={{
-                  width: 26,
-                  height: 26,
-                  borderRadius: "6px",
-                  border: `1px solid ${alpha(m.navy, 0.14)}`,
+                  width: 22,
+                  height: 22,
+                  borderRadius: "5px",
+                  border: `1px solid ${alpha(m.navy, 0.12)}`,
                   color: alpha(m.navy, 0.6),
                   bgcolor: "#fff",
                 }}
               >
-                <ChevronLeftRoundedIcon sx={{ fontSize: 18 }} />
+                <ChevronLeftRoundedIcon sx={{ fontSize: 15 }} />
               </IconButton>
 
               <Button
@@ -864,18 +3014,19 @@ export default function ProfessionalFixedLocationCalendar({
                 startIcon={<CalendarMonthRoundedIcon sx={{ fontSize: 18 }} />}
                 onClick={(e) => setDatePickerAnchor(e.currentTarget)}
                 sx={{
-                  borderRadius: "8px",
+                  borderRadius: "6px",
                   textTransform: "none",
-                  fontWeight: 800,
-                  fontSize: 12,
-                  borderColor: alpha(m.navy, 0.14),
+                  fontWeight: 700,
+                  fontSize: 10.5,
+                  borderColor: alpha(m.navy, 0.12),
                   color: alpha(m.navy, 0.78),
                   bgcolor: "#fff",
-                  height: 30,
-                  px: 1.25,
+                  height: 24,
+                  px: 1,
+                  "& .MuiButton-startIcon": { mr: 0.45 },
                 }}
               >
-                {formatLongDateUtc(activeDateIso)}
+                {viewMode === "month" ? formatMonthYearUtc(activeMonthIso) : formatLongDateUtc(activeDateIso)}
               </Button>
 
               <Popover
@@ -897,8 +3048,11 @@ export default function ProfessionalFixedLocationCalendar({
               >
                 <AppCalendarPanel
                   value={activeDateIso}
-                  onChange={setActiveDateIso}
-                  min={todayIso}
+                  onChange={(iso) => {
+                    setActiveDateIso(iso);
+                    setViewMode("day");
+                    setSelectedResourceId("");
+                  }}
                   onDaySelect={() => setDatePickerAnchor(null)}
                 />
               </Popover>
@@ -907,15 +3061,15 @@ export default function ProfessionalFixedLocationCalendar({
                 size="small"
                 onClick={onNext}
                 sx={{
-                  width: 26,
-                  height: 26,
-                  borderRadius: "6px",
-                  border: `1px solid ${alpha(m.navy, 0.14)}`,
+                  width: 22,
+                  height: 22,
+                  borderRadius: "5px",
+                  border: `1px solid ${alpha(m.navy, 0.12)}`,
                   color: alpha(m.navy, 0.6),
                   bgcolor: "#fff",
                 }}
               >
-                <ChevronRightRoundedIcon sx={{ fontSize: 18 }} />
+                <ChevronRightRoundedIcon sx={{ fontSize: 15 }} />
               </IconButton>
             </Stack>
 
@@ -925,15 +3079,15 @@ export default function ProfessionalFixedLocationCalendar({
               variant="outlined"
               onClick={onToday}
               sx={{
-                borderRadius: "6px",
+                borderRadius: "5px",
                 textTransform: "none",
-                fontWeight: 800,
-                fontSize: 12,
-                borderColor: alpha(m.navy, 0.14),
+                fontWeight: 700,
+                fontSize: 10.5,
+                borderColor: alpha(m.navy, 0.12),
                 color: alpha(m.navy, 0.78),
                 bgcolor: "#fff",
-                height: 30,
-                px: 1.25,
+                height: 24,
+                px: 1,
               }}
             >
               Today
@@ -942,30 +3096,33 @@ export default function ProfessionalFixedLocationCalendar({
             <Box
               sx={{
                 display: "flex",
-                borderRadius: "8px",
+                borderRadius: "5px",
                 overflow: "hidden",
-                border: `1px solid ${alpha(m.navy, 0.14)}`,
+                border: `1px solid ${alpha(m.navy, 0.12)}`,
                 bgcolor: "#fff",
               }}
             >
-              {(["day", "week", "month"] as const).map((v) => {
+              {(["day", "week"] as const).map((v) => {
                 const active = v === viewMode;
                 return (
                   <Button
                     key={v}
-                    onClick={() => setViewMode(v)}
+                    onClick={() => {
+                      setViewMode(v);
+                      if (v === "day") setSelectedResourceId("");
+                    }}
                     sx={{
                       borderRadius: 0,
-                      minWidth: 44,
-                      height: 28,
+                      minWidth: 38,
+                      height: 22,
                       textTransform: "none",
-                      fontWeight: 800,
-                      fontSize: 12,
-                      bgcolor: active ? alpha(m.navy, 0.04) : "#fff",
+                      fontWeight: 700,
+                      fontSize: 10.5,
+                      bgcolor: active ? alpha(m.teal, 0.08) : "#fff",
                       color: alpha(m.navy, 0.78),
                     }}
                   >
-                    {v === "day" ? "Day" : v === "week" ? "Week" : "Month"}
+                    {v === "day" ? "Day" : "Week"}
                   </Button>
                 );
               })}
@@ -976,15 +3133,16 @@ export default function ProfessionalFixedLocationCalendar({
               startIcon={<FilterListRoundedIcon sx={{ fontSize: 18 }} />}
               onClick={() => setFiltersOpen(true)}
               sx={{
-                borderRadius: "6px",
+                borderRadius: "5px",
                 textTransform: "none",
-                fontWeight: 800,
-                fontSize: 12,
-                borderColor: alpha(m.navy, 0.14),
+                fontWeight: 700,
+                fontSize: 10.5,
+                borderColor: alpha(m.navy, 0.12),
                 color: alpha(m.navy, 0.78),
                 bgcolor: "#fff",
-                height: 30,
-                px: 1.25,
+                height: 24,
+                px: 1,
+                "& .MuiButton-startIcon": { mr: 0.45 },
               }}
             >
               Filters
@@ -996,12 +3154,12 @@ export default function ProfessionalFixedLocationCalendar({
               endIcon={<KeyboardArrowDownRoundedIcon />}
               onClick={(e) => setAddAnchor(e.currentTarget)}
               sx={{
-                borderRadius: "8px",
+                borderRadius: "5px",
                 textTransform: "none",
-                fontWeight: 800,
-                fontSize: 12,
-                height: 30,
-                px: 1.5,
+                fontWeight: 700,
+                fontSize: 10.5,
+                height: 24,
+                px: 1.1,
                 bgcolor: m.teal,
                 "&:hover": { bgcolor: m.tealDark },
               }}
@@ -1010,9 +3168,21 @@ export default function ProfessionalFixedLocationCalendar({
             </Button>
             <CalendarAddMenu
               anchorEl={addAnchor}
-              onBlockedTime={() => setBlockTimeOpen(true)}
+              onBlockedTime={() => {
+                setBlockDraft((prev) => ({
+                  ...prev,
+                  dateFrom: activeDateIso,
+                  dateTo: activeDateIso,
+                  teamIds: activeResource ? [activeResource.id] : prev.teamIds,
+                }));
+                setBlockTimeOpen(true);
+              }}
               onBooking={() => {
-                const bookingDate = activeDateIso < todayIso ? todayIso : activeDateIso;
+                if (activeDateIso < todayIso) {
+                  showSnackbar({ severity: "info", message: "Cannot create a new booking on a past date." });
+                  return;
+                }
+                const bookingDate = activeDateIso;
                 const resourceId = activeResource?.id ?? selectedResourceId ?? data.resources[0]?.id ?? "";
                 const availability = resourceId ? getAvailabilityFor(resourceId, bookingDate) : [];
                 const segment = availability[0] ?? { startMin, endMin: Math.min(endMin, startMin + grid.stepMinutes) };
@@ -1032,62 +3202,270 @@ export default function ProfessionalFixedLocationCalendar({
                 setDesignOpen(true);
               }}
               onClose={() => setAddAnchor(null)}
-              onMockAction={(label) => showSnackbar({ severity: "info", message: `${label} (mock).` })}
+              onMockAction={(label) => showSnackbar({ severity: "info", message: label })}
             />
           </Stack>
         </Box>
 
         {/* Timeline grid */}
-        <Box sx={{ px: 1.5, pb: 1.5, bgcolor: "#fff" }}>
+        <Box sx={{ px: 2, pb: 2, bgcolor: "#fff" }}>
           {viewMode === "month" ? (
             <Paper
               elevation={0}
               sx={{
-                borderRadius: "10px",
+                borderRadius: "6px",
                 border: `1px solid ${alpha(m.navy, 0.08)}`,
                 overflow: "hidden",
               }}
             >
-              <Box sx={{ p: 2 }}>
-                <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.85) }}>
-                  Month view (summary)
-                </BodyText>
-                <BodyText sx={{ mt: 0.5, color: alpha(m.navy, 0.6), fontSize: 12.5 }}>
-                  Weekly/day timeline is already functional. Next we can render a full month grid with per-day counts per team member.
-                </BodyText>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(7, minmax(118px, 1fr))",
+                  borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
+                  bgcolor: alpha(m.navy, 0.02),
+                }}
+              >
+                {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((day) => (
+                  <Box
+                    key={day}
+                    sx={{
+                      px: 1.25,
+                      py: 1,
+                      borderLeft: day !== "Mon" ? `1px solid ${alpha(m.navy, 0.07)}` : undefined,
+                    }}
+                  >
+                    <BodyText sx={{ fontSize: 11, fontWeight: 900, color: alpha(m.navy, 0.58), lineHeight: 1 }}>
+                      {day}
+                    </BodyText>
+                  </Box>
+                ))}
+              </Box>
+
+              <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(118px, 1fr))" }}>
+                {monthCells.map((cell, idx) => {
+                  const hasBookings = cell.dayEvents.length > 0;
+
+                  return (
+                    <ButtonBase
+                      key={cell.iso}
+                      onClick={() => {
+                        setActiveDateIso(cell.iso);
+                        setSelectedResourceId("");
+                        setViewMode("day");
+                      }}
+                      sx={{
+                        minHeight: 132,
+                        alignItems: "stretch",
+                        justifyContent: "stretch",
+                        textAlign: "left",
+                        borderLeft: idx % 7 === 0 ? undefined : `1px solid ${alpha(m.navy, 0.07)}`,
+                        borderTop: idx < 7 ? undefined : `1px solid ${alpha(m.navy, 0.07)}`,
+                        bgcolor: cell.isSelected
+                          ? alpha(m.teal, 0.055)
+                          : cell.inMonth
+                            ? "#fff"
+                            : alpha(m.navy, 0.018),
+                        opacity: cell.isPast ? 0.66 : cell.inMonth ? 1 : 0.72,
+                        cursor: "pointer",
+                        "&:hover": {
+                          bgcolor: hasBookings ? alpha(m.teal, 0.045) : alpha(m.navy, 0.025),
+                        },
+                      }}
+                    >
+                      <Box sx={{ width: "100%", minWidth: 0, p: 1, display: "flex", flexDirection: "column", gap: 0.75 }}>
+                        <Stack direction="row" alignItems="center" spacing={0.75}>
+                          <Box
+                            sx={{
+                              width: 24,
+                              height: 24,
+                              borderRadius: "999px",
+                              display: "grid",
+                              placeItems: "center",
+                              fontSize: 11,
+                              fontWeight: 900,
+                              color: cell.isToday ? "#fff" : alpha(m.navy, cell.inMonth ? 0.82 : 0.42),
+                              bgcolor: cell.isToday ? m.teal : "transparent",
+                              border: cell.isSelected && !cell.isToday ? `1px solid ${alpha(m.teal, 0.45)}` : "1px solid transparent",
+                            }}
+                          >
+                            {cell.dateNumber}
+                          </Box>
+                          {hasBookings ? (
+                            <Chip
+                              size="small"
+                              label={`${cell.dayEvents.length} booking${cell.dayEvents.length === 1 ? "" : "s"}`}
+                              sx={{
+                                height: 20,
+                                borderRadius: "999px",
+                                fontSize: 9.5,
+                                fontWeight: 900,
+                                color: m.tealDark,
+                                bgcolor: alpha(m.teal, 0.1),
+                                border: `1px solid ${alpha(m.teal, 0.18)}`,
+                                "& .MuiChip-label": { px: 0.85 },
+                              }}
+                            />
+                          ) : null}
+                        </Stack>
+
+                        <Stack spacing={0.45} sx={{ minWidth: 0 }}>
+                          {cell.dayEvents.slice(0, 3).map((event) => {
+                            const resourceName = resourceNameById.get(event.resourceId) ?? "Team member";
+                            const eventAccent = statusAccentColor(event.status);
+
+                            return (
+                              <Box
+                                key={event.id}
+                                sx={{
+                                  minWidth: 0,
+                                  borderRadius: "4px",
+                                  border: `1px solid ${alpha(eventAccent, 0.2)}`,
+                                  borderLeft: `3px solid ${eventAccent}`,
+                                  bgcolor: alpha(eventAccent, 0.055),
+                                  px: 0.75,
+                                  py: 0.55,
+                                }}
+                              >
+                                <Stack direction="row" spacing={0.5} alignItems="center" sx={{ minWidth: 0 }}>
+                                  <BodyText
+                                    sx={{
+                                      fontSize: 10,
+                                      fontWeight: 900,
+                                      color: alpha(m.navy, 0.78),
+                                      lineHeight: 1,
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    {event.start}
+                                  </BodyText>
+                                  <Chip
+                                    size="small"
+                                    label={event.location}
+                                    sx={{
+                                      height: 15,
+                                      borderRadius: "4px",
+                                      fontSize: 8,
+                                      fontWeight: 900,
+                                      color: alpha(m.navy, 0.65),
+                                      bgcolor: alpha("#fff", 0.72),
+                                      border: `1px solid ${alpha(m.navy, 0.1)}`,
+                                      "& .MuiChip-label": { px: 0.55 },
+                                    }}
+                                  />
+                                </Stack>
+                                <BodyText
+                                  sx={{
+                                    mt: 0.25,
+                                    fontSize: 10.5,
+                                    fontWeight: 800,
+                                    color: alpha(m.navy, 0.8),
+                                    lineHeight: 1.15,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {event.title}
+                                </BodyText>
+                                <BodyText
+                                  sx={{
+                                    mt: 0.2,
+                                    fontSize: 9.5,
+                                    fontWeight: 700,
+                                    color: alpha(m.navy, 0.54),
+                                    lineHeight: 1,
+                                    overflow: "hidden",
+                                    textOverflow: "ellipsis",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {resourceName} - ID: {extractBookingId(event.id)}
+                                </BodyText>
+                              </Box>
+                            );
+                          })}
+                          {cell.hiddenCount > 0 ? (
+                            <BodyText sx={{ fontSize: 10.5, fontWeight: 900, color: alpha(m.tealDark, 0.9), px: 0.3 }}>
+                              +{cell.hiddenCount} more
+                            </BodyText>
+                          ) : null}
+                        </Stack>
+                      </Box>
+                    </ButtonBase>
+                  );
+                })}
               </Box>
             </Paper>
           ) : (
             <Box
               sx={{
-                borderRadius: "2px",
-                border: `1px solid ${alpha(m.navy, 0.10)}`,
-                overflow: "hidden",
+                borderRadius: "1px",
+                border: `1px solid ${alpha(m.navy, 0.08)}`,
+                overflowX: "hidden",
+                overflowY: "visible",
                 bgcolor: "#fff",
               }}
             >
-              <Box sx={{ display: "grid", gridTemplateColumns: "58px 1fr", bgcolor: m.fxSurface }}>
+              <Box sx={{ display: "grid", gridTemplateColumns: "48px 1fr", bgcolor: m.fxSurface, position: "relative" }}>
+                {showNowLine ? (
+                  <>
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        left: 36,
+                        top: timelineHeaderPx + nowLineTop - 4,
+                        width: 8,
+                        height: 8,
+                        borderRadius: "999px",
+                        bgcolor: "#FF2F64",
+                        border: "1px solid #fff",
+                        zIndex: 6,
+                        pointerEvents: "none",
+                      }}
+                    />
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        left: 48,
+                        right: 0,
+                        top: timelineHeaderPx + nowLineTop,
+                        height: 2,
+                        bgcolor: "#FF2F64",
+                        zIndex: 5,
+                        pointerEvents: "none",
+                      }}
+                    />
+                  </>
+                ) : null}
                 {/* Time column */}
                 <Box sx={{ bgcolor: "#fff" }}>
-                  <Box sx={{ height: laneHeaderPx, borderBottom: `1px solid ${alpha(m.navy, 0.08)}` }} />
-                  {slotLines.map((t, idx) => (
-                    <Box
-                      key={t}
-                      sx={{
-                        height: rowPx,
-                        px: 1,
-                        display: "flex",
-                        alignItems: "flex-start",
-                        justifyContent: "flex-end",
-                        pt: idx === 0 ? 1.15 : 1,
-                        borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
-                      }}
-                    >
-                      <BodyText sx={{ fontSize: 10, fontWeight: 800, color: alpha(m.navy, 0.5) }}>
-                        {fmtTimeLabel(t)}
-                      </BodyText>
-                    </Box>
-                  ))}
+                  <Box sx={{ height: timelineHeaderPx, borderBottom: `1px solid ${alpha(m.navy, 0.07)}` }} />
+                  {slotLines.map((t, idx) => {
+                    const isAvailable =
+                      viewMode === "day" && timeColumnAvailability.length
+                        ? isMinuteInAvailability(t, timeColumnAvailability)
+                        : viewMode !== "day";
+                    return (
+                      <Box
+                        key={t}
+                        sx={{
+                          height: rowPx,
+                          px: 0.45,
+                          display: "flex",
+                          alignItems: "flex-start",
+                          justifyContent: "flex-end",
+                          pt: idx === 0 ? 1.15 : 1,
+                          borderBottom: `1px solid ${alpha(m.navy, 0.07)}`,
+                          bgcolor: isAvailable ? "#fff" : m.fxGrayF2F4F7,
+                        }}
+                      >
+                        <BodyText sx={{ fontSize: 9.5, fontWeight: 600, color: alpha(m.navy, 0.58), lineHeight: 1 }}>
+                          {fmtTimeLabel(t)}
+                        </BodyText>
+                      </Box>
+                    );
+                  })}
                 </Box>
 
                 {/* Events canvas */}
@@ -1101,6 +3479,9 @@ export default function ProfessionalFixedLocationCalendar({
                 >
                   {displayedResources.map((res, laneIdx) => {
                     const laneDates = viewMode === "week" ? visibleDates : [activeDateIso];
+                    const laneColumns = viewMode === "day"
+                      ? [{ key: res.id, resource: res, date: activeDateIso }]
+                      : laneDates.map((date) => ({ key: date, resource: res, date }));
                     return (
                       <Box
                         key={res.id}
@@ -1109,107 +3490,59 @@ export default function ProfessionalFixedLocationCalendar({
                         }}
                       >
                         {/* Lane header */}
-                        <Box
-                          sx={{
-                            height: laneHeaderPx,
-                            px: 1.1,
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 0.8,
-                            bgcolor: "#fff",
-                            borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
-                          }}
-                        >
-                          <Stack direction="row" alignItems="center" spacing={2} sx={{ minWidth: 0, overflowX: "auto", py: 0.25 }}>
-                            {filteredResources.map((member) => {
-                              const isActiveMember = member.id === res.id;
-                              const ratio = Math.round(
-                                (viewMode === "week"
-                                  ? laneDates.reduce((acc, iso) => acc + getDailyBookingRatio(member.id, iso), 0) / Math.max(1, laneDates.length)
-                                  : getDailyBookingRatio(member.id, activeDateIso)) * 100,
-                              );
+                        {renderTeamMemberHeader(viewMode === "day" ? undefined : res)}
+                        {viewMode === "week" ? (
+                          <Box
+                            sx={{
+                              height: laneHeaderPx,
+                              display: "grid",
+                              gridTemplateColumns: "repeat(7, minmax(110px, 1fr))",
+                              bgcolor: "#fff",
+                              borderBottom: `1px solid ${alpha(m.navy, 0.07)}`,
+                              overflow: "hidden",
+                            }}
+                          >
+                            {laneDates.map((date, colIdx) => {
+                              const isActiveDay = date === activeDateIso;
+                              const ratio = Math.round(getDailyBookingRatio(res.id, date) * 100);
 
                               return (
                                 <Box
-                                  key={member.id}
-                                  role="button"
-                                  tabIndex={0}
-                                  onClick={() => setSelectedResourceId(member.id)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter" || e.key === " ") setSelectedResourceId(member.id);
-                                  }}
+                                  key={`week-day-${date}`}
                                   sx={{
+                                    minWidth: 110,
+                                    px: 1,
                                     display: "flex",
                                     alignItems: "center",
-                                    gap: 0.8,
-                                    minWidth: 126,
-                                    cursor: "pointer",
-                                    borderRadius: "8px",
-                                    px: 0.4,
-                                    py: 0.35,
-                                    bgcolor: isActiveMember ? alpha(m.teal, 0.04) : "transparent",
-                                    "&:hover": { bgcolor: alpha(m.teal, 0.06) },
+                                    justifyContent: "center",
+                                    flexDirection: "column",
+                                    borderLeft: colIdx > 0 ? `1px solid ${alpha(m.navy, 0.07)}` : undefined,
+                                    bgcolor: isActiveDay ? alpha(m.teal, 0.035) : "#fff",
                                   }}
                                 >
-                                  <Avatar
+                                  <BodyText sx={{ fontSize: 11, fontWeight: 900, color: alpha(m.navy, 0.78), lineHeight: 1.1 }}>
+                                    {formatWeekDayName(date)}
+                                  </BodyText>
+                                  <BodyText sx={{ mt: 0.3, fontSize: 10, fontWeight: 700, color: alpha(m.navy, 0.5), lineHeight: 1 }}>
+                                    {formatWeekDayDate(date)}
+                                  </BodyText>
+                                  <Box
                                     sx={{
-                                      width: 24,
-                                      height: 24,
-                                      bgcolor: alpha(m.teal, isActiveMember ? 0.2 : 0.12),
-                                      color: m.teal,
-                                      fontWeight: 900,
-                                      fontSize: 11,
+                                      mt: 0.45,
+                                      height: 3,
+                                      width: 58,
+                                      borderRadius: "999px",
+                                      bgcolor: m.fxGrayF2F4F7,
+                                      overflow: "hidden",
                                     }}
                                   >
-                                    {member.avatarText}
-                                  </Avatar>
-                                  <Box sx={{ display: "flex", flexDirection: "column", minWidth: 0 }}>
-                                    <BodyText
-                                      sx={{
-                                        fontWeight: 900,
-                                        color: isActiveMember ? alpha(m.navy, 0.82) : alpha(m.navy, 0.58),
-                                        lineHeight: 1.1,
-                                        fontSize: 12,
-                                        whiteSpace: "nowrap",
-                                      }}
-                                    >
-                                      {member.name}
-                                    </BodyText>
-                                    <Box
-                                      sx={{
-                                        mt: 0.45,
-                                        height: 3,
-                                        width: 72,
-                                        borderRadius: "999px",
-                                        bgcolor: m.fxGrayF2F4F7,
-                                        overflow: "hidden",
-                                      }}
-                                    >
-                                      <Box sx={{ height: "100%", width: `${ratio}%`, bgcolor: isActiveMember ? m.teal : alpha(m.navy, 0.24) }} />
-                                    </Box>
+                                    <Box sx={{ height: "100%", width: `${ratio}%`, bgcolor: isActiveDay ? m.teal : alpha(m.navy, 0.24) }} />
                                   </Box>
                                 </Box>
                               );
                             })}
-                          </Stack>
-                          <Box sx={{ flex: 1 }} />
-                          <Tooltip title="Team notes" placement="left">
-                            <IconButton
-                              size="small"
-                              onClick={() => showSnackbar({ severity: "info", message: `Notes for ${res.name}` })}
-                              sx={{
-                                width: 24,
-                                height: 24,
-                                borderRadius: "6px",
-                                color: alpha(m.navy, 0.46),
-                                "&:hover": { bgcolor: alpha(m.navy, 0.06), color: alpha(m.navy, 0.72) },
-                              }}
-                            >
-                              <StickyNote2OutlinedIcon sx={{ fontSize: 16 }} />
-                            </IconButton>
-                          </Tooltip>
-                          <KeyboardArrowDownRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.42) }} />
-                        </Box>
+                          </Box>
+                        ) : null}
 
                         {/* Lane body */}
                         <Box
@@ -1220,33 +3553,49 @@ export default function ProfessionalFixedLocationCalendar({
                             bgcolor: "#fff",
                           }}
                         >
-                          {laneDates.map((iso, colIdx) => {
-                            const laneEvents = eventsInRange.filter((e) => e.resourceId === res.id && e.date === iso);
-                            const laneBlocks = blocksInRange.filter((b) => b.resourceId === res.id && b.date === iso);
+                          {laneColumns.map(({ key, resource, date }, colIdx) => {
+                            const laneEvents = eventsInRange.filter((event) => {
+                              if (event.date !== date) return false;
+                              // Day view uses a single active lane — show every booking for that date.
+                              if (viewMode === "day") return true;
+                              if (!event.resourceId || !knownResourceIds.has(event.resourceId)) return true;
+                              return event.resourceId === resource.id;
+                            });
+                            const laneBlocks = blocksInRange.filter((block) => {
+                              if (block.date !== date) return false;
+                              if (viewMode === "day") return true;
+                              if (!block.resourceId || !knownResourceIds.has(block.resourceId)) return true;
+                              return block.resourceId === resource.id;
+                            });
 
                             // Unavailable overlay (everything outside availability windows)
-                            const availability = getAvailabilityFor(res.id, iso);
+                            const availability = getAvailabilityFor(resource.id, date);
 
                             return (
                               <Box
-                                key={`${res.id}-${iso}`}
+                                key={key}
                                 sx={{
                                   position: "relative",
-                                  borderLeft: viewMode === "week" && colIdx > 0 ? `1px solid ${alpha(m.navy, 0.08)}` : undefined,
+                                  borderLeft: colIdx > 0 ? `1px solid ${alpha(m.navy, 0.07)}` : undefined,
                                   height: rows * rowPx,
-                                  bgcolor: "#fff",
-                                  backgroundColor: "#fff",
+                                  bgcolor: m.fxGrayF2F4F7,
+                                  overflow: "visible",
                                 }}
                               >
-                                {/* Click layer */}
+                                {/* Click layer — below booking cards */}
                                 <Box
                                   onClick={(e) => {
                                     const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
                                     const y = e.clientY - rect.top;
                                     const minutes = startMin + Math.floor(y / rowPx) * grid.stepMinutes;
-                                    onEmptyClick(res.id, iso, minutes);
+                                    onEmptyClick(resource.id, date, minutes);
                                   }}
-                                  sx={{ position: "absolute", inset: 0, cursor: "pointer" }}
+                                  sx={{
+                                    position: "absolute",
+                                    inset: 0,
+                                    cursor: date < todayIso ? "default" : "pointer",
+                                    zIndex: 1,
+                                  }}
                                 />
 
                                 {/* Outside availability tint */}
@@ -1261,7 +3610,6 @@ export default function ProfessionalFixedLocationCalendar({
                                           right: 0,
                                           top: 0,
                                           height: ((Math.min(...availability.map((a) => a.startMin)) - startMin) / grid.stepMinutes) * rowPx,
-                                          // Free slot background should stay white everywhere.
                                           bgcolor: "#fff",
                                           pointerEvents: "none",
                                         }}
@@ -1276,7 +3624,6 @@ export default function ProfessionalFixedLocationCalendar({
                                           right: 0,
                                           top: ((Math.max(...availability.map((a) => a.endMin)) - startMin) / grid.stepMinutes) * rowPx,
                                           height: ((endMin - Math.max(...availability.map((a) => a.endMin))) / grid.stepMinutes) * rowPx,
-                                          // Free slot background should stay white everywhere.
                                           bgcolor: "#fff",
                                           pointerEvents: "none",
                                         }}
@@ -1287,17 +3634,48 @@ export default function ProfessionalFixedLocationCalendar({
                                   <Box sx={{ position: "absolute", inset: 0, bgcolor: "#fff", pointerEvents: "none" }} />
                                 )}
 
+                                {data.supportedLocations.map((location) => {
+                                  const locationIntervals = getLocationAvailability(resource.id, date, location);
+                                  return locationIntervals.map((interval, intervalIdx) => {
+                                    const top = ((interval.startMin - startMin) / grid.stepMinutes) * rowPx;
+                                    const height = ((interval.endMin - interval.startMin) / grid.stepMinutes) * rowPx;
+                                    const flOnly = location === "FL";
+                                    const dlOnly = location === "DL";
+                                    const tooltipTitle = flOnly
+                                      ? "FL Availability: Available for booking at a fixed location."
+                                      : "DL Availability: Available for booking at a desired location.";
+
+                                    return (
+                                      <Tooltip key={`${location}-${intervalIdx}`} title={tooltipTitle} placement="top">
+                                        <Box
+                                          sx={{
+                                            position: "absolute",
+                                            left: 0,
+                                            right: 0,
+                                            top,
+                                            height,
+                                            pointerEvents: "none",
+                                            zIndex: 1,
+                                            bgcolor: "#fff",
+                                            borderLeft: dlOnly ? `2px solid ${alpha(m.teal, 0.12)}` : undefined,
+                                          }}
+                                        />
+                                      </Tooltip>
+                                    );
+                                  });
+                                })}
+
                                 {/* Horizontal grid lines */}
                                 {slotLines.map((t) => (
                                   <Box
-                                    key={`line-${res.id}-${iso}-${t}`}
+                                    key={`line-${resource.id}-${date}-${t}`}
                                     sx={{
                                       position: "absolute",
                                       left: 0,
                                       right: 0,
                                       top: ((t - startMin) / grid.stepMinutes) * rowPx,
                                       height: 1,
-                                      bgcolor: alpha(m.navy, 0.08),
+                                      bgcolor: alpha(m.navy, 0.065),
                                       pointerEvents: "none",
                                     }}
                                   />
@@ -1306,237 +3684,105 @@ export default function ProfessionalFixedLocationCalendar({
                                 {/* Blocks */}
                                 {laneBlocks.map((b) => {
                                   const top = ((minutesSinceMidnight(b.start) - startMin) / grid.stepMinutes) * rowPx;
-                                  const height = ((minutesSinceMidnight(b.end) - minutesSinceMidnight(b.start)) / grid.stepMinutes) * rowPx;
-                                  const isUnavail = b.kind === "unavailable";
-                                  return (
-                                    <Paper
-                                      key={b.id}
-                                      elevation={0}
-                                      sx={{
-                                        position: "absolute",
-                                        left: 0,
-                                        right: 0,
-                                        top,
-                                        height,
-                                        borderRadius: 0,
-                                        bgcolor: isUnavail ? alpha(m.navy, 0.035) : alpha(m.navy, 0.025),
-                                        border: 0,
-                                        borderTop: `1px solid ${alpha(m.navy, 0.04)}`,
-                                        borderBottom: `1px solid ${alpha(m.navy, 0.04)}`,
-                                        px: 1.2,
-                                        py: 0.75,
-                                        pointerEvents: "none",
-                                      }}
-                                    >
-                                      <BodyText sx={{ fontWeight: 900, fontSize: 10, color: alpha(m.navy, 0.6), lineHeight: 1.1 }}>
-                                        {b.start} to {b.end}
-                                      </BodyText>
-                                      <BodyText sx={{ fontSize: 10.5, fontWeight: 800, color: alpha(m.navy, 0.58), lineHeight: 1.1 }}>
-                                        {b.title}
-                                      </BodyText>
-                                    </Paper>
+                                  const height = Math.max(
+                                    2,
+                                    ((minutesSinceMidnight(b.end) - minutesSinceMidnight(b.start)) / grid.stepMinutes) * rowPx,
                                   );
+                                  const isBlockedTime = true;
+
+                                  if (isBlockedTime) {
+                                    return (
+                                      <Box
+                                        key={b.id}
+                                        sx={{
+                                          position: "absolute",
+                                          left: 0,
+                                          right: 0,
+                                          top,
+                                          height,
+                                          pointerEvents: "none",
+                                          zIndex: 3,
+                                        }}
+                                      >
+                                        <Box
+                                          sx={{
+                                            position: "absolute",
+                                            left: 0,
+                                            right: 0,
+                                            top: "50%",
+                                            height: 2,
+                                            bgcolor: "#FF2F64",
+                                            transform: "translateY(-50%)",
+                                          }}
+                                        />
+                                        {height >= 40 ? (
+                                          <Box sx={{ position: "absolute", left: 8, top: 6, pointerEvents: "none" }}>
+                                            <BodyText sx={{ fontWeight: 900, fontSize: 10, color: alpha(m.navy, 0.62), lineHeight: 1.1 }}>
+                                              {b.start} to {b.end}
+                                            </BodyText>
+                                            <BodyText sx={{ fontSize: 10.5, fontWeight: 800, color: alpha(m.navy, 0.58), lineHeight: 1.1 }}>
+                                              {b.title}
+                                            </BodyText>
+                                          </Box>
+                                        ) : null}
+                                      </Box>
+                                    );
+                                  }
+
+                                  return null;
                                 })}
 
                                 {/* Events */}
-                                {laneEvents.map((ev, idx) => {
-                                  const evStart = minutesSinceMidnight(ev.start);
-                                  const evEnd = minutesSinceMidnight(ev.end);
-                                  const top = ((evStart - startMin) / grid.stepMinutes) * rowPx + 1;
-                                  const height = Math.max(44, ((evEnd - evStart) / grid.stepMinutes) * rowPx - 2);
-                                  const overlapping = laneEvents
-                                    .filter((other) => {
-                                      const otherStart = minutesSinceMidnight(other.start);
-                                      const otherEnd = minutesSinceMidnight(other.end);
-                                      return evStart < otherEnd && evEnd > otherStart;
-                                    })
-                                    .sort((a, b) => a.id.localeCompare(b.id));
-                                  const overlapIndex = Math.max(0, overlapping.findIndex((other) => other.id === ev.id));
-                                  const overlapCount = Math.max(1, overlapping.length);
-                                  const isSplit = overlapCount > 1;
-                                  const widthPct = 100 / overlapCount;
-                                  const left = isSplit ? `calc(${overlapIndex * widthPct}% + 4px)` : 4;
-                                  const right = isSplit ? `calc(${(overlapCount - overlapIndex - 1) * widthPct}% + 4px)` : 4;
+                                {clusterSameStartTimeEvents(laneEvents).map((cluster) => {
+                                  const { startMin: clusterStart, endMin: clusterEnd } = getClusterTimeBounds(cluster);
+                                  const top = ((clusterStart - startMin) / grid.stepMinutes) * rowPx + 0.15;
+                                  const height = Math.max(78, ((clusterEnd - clusterStart) / grid.stepMinutes) * rowPx - 0.3);
+                                  const resolveServiceColor = (ev: (typeof cluster)[number]) =>
+                                    resolveEventColors(ev).serviceColor;
+                                  const resolveStatusColor = (ev: (typeof cluster)[number]) =>
+                                    resolveEventColors(ev).statusColor;
+                                  const eventHandlers = {
+                                    onOpen: openExistingBooking,
+                                    onOpenCalendar: (ev: (typeof cluster)[number]) =>
+                                      showSnackbar({ severity: "info", message: `Calendar for booking ${extractBookingId(ev.id)}` }),
+                                    onOpenNotes: (ev: (typeof cluster)[number]) => openExistingBooking(ev),
+                                    onOpenClient: (ev: (typeof cluster)[number]) =>
+                                      showSnackbar({ severity: "info", message: `Client drawer: ${ev.showClientName ?? "Client"}` }),
+                                    onOpenMessages: openBookingMessages,
+                                  };
 
-                                  const statusTone =
-                                    ev.status === "Requested"
-                                      ? { bar: "#FFA800", bg: "linear-gradient(90deg, rgba(255,168,0,0.11) 0%, rgba(255,168,0,0.035) 48%, rgba(33,184,191,0.045) 100%)" }
-                                      : ev.status === "Cancelled"
-                                        ? { bar: "#FF6B6B", bg: "#F0F2F5" }
-                                        : ev.status === "Confirmed"
-                                          ? { bar: "#2EAD73", bg: alpha(m.teal, 0.10) }
-                                          : ev.status === "Completed"
-                                            ? { bar: "#7C8AA0", bg: "#F0F2F5" }
-                                            : { bar: "#5D7FA5", bg: "#F0F2F5" };
+                                  if (cluster.length > 1) {
+                                    return (
+                                      <CalendarBookingTicketStack
+                                        key={cluster.map((event) => event.id).join("-")}
+                                        events={cluster}
+                                        top={top}
+                                        rowPx={rowPx}
+                                        slotHeight={height}
+                                        getServiceColor={resolveServiceColor}
+                                        getStatusColor={resolveStatusColor}
+                                        {...eventHandlers}
+                                      />
+                                    );
+                                  }
 
-                                  const RAIL_W = 78;
-                                  const serviceCategory = getServiceCategory(ev.title);
-                                  const serviceColor = serviceCategory ? appliedDesign.colorsByCategory[serviceCategory] : undefined;
-                                  const serviceBg = serviceColor ? alpha(serviceColor, 0.14) : undefined;
-                                  const serviceBorder = serviceColor ? alpha(serviceColor, 0.35) : undefined;
-
+                                  const ev = cluster[0];
                                   return (
-                                    <Box
+                                    <CalendarBookingCard
                                       key={ev.id}
-                                      onClick={() => openExistingBooking(ev)}
-                                      sx={{
-                                        position: "absolute",
-                                        top,
-                                        left,
-                                        right,
-                                        height,
-                                        borderRadius: "2px",
-                                        background: serviceBg ?? statusTone.bg,
-                                        border: `1px solid ${serviceBorder ?? alpha(m.navy, 0.08)}`,
-                                        overflow: "hidden",
-                                        display: "flex",
-                                        flexDirection: "row",
-                                        // left accent bar via box-shadow so we avoid pseudo-element clipping issues
-                                        boxShadow: `inset 4px 0 0 0 ${statusTone.bar}`,
-                                        zIndex: 4,
-                                        cursor: "pointer",
-                                      }}
-                                    >
-                                      {/* ── LEFT content (non-interactive) ── */}
-                                      <Box
-                                        sx={{
-                                          flex: 1,
-                                          minWidth: 0,
-                                          pl: 1.3,
-                                          pr: 0.5,
-                                          py: 0.35,
-                                          pointerEvents: "none",
-                                          overflow: "hidden",
-                                        }}
-                                      >
-                                        <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mb: 0.35 }}>
-                                          <BodyText sx={{ fontSize: 10.5, fontWeight: 500, color: alpha(m.navy, 0.78), lineHeight: 1 }}>
-                                            ID: {extractBookingId(ev.id)}
-                                          </BodyText>
-                                          <Chip
-                                            size="small"
-                                            label={ev.status}
-                                            sx={{
-                                              height: 16,
-                                              borderRadius: "7px",
-                                              fontSize: 8.5,
-                                              fontWeight: 800,
-                                              border: "1px solid",
-                                              "& .MuiChip-label": { px: 0.9 },
-                                              ...statusChipSx(ev.status, m),
-                                            }}
-                                          />
-                                        </Stack>
-                                        <BodyText
-                                          sx={{
-                                            fontSize: 10.5,
-                                            fontWeight: 500,
-                                            color: alpha(m.navy, 0.82),
-                                            lineHeight: 1.1,
-                                            overflow: "hidden",
-                                            display: "-webkit-box",
-                                            WebkitLineClamp: 2,
-                                            WebkitBoxOrient: "vertical",
-                                          }}
-                                        >
-                                          {ev.title}
-                                        </BodyText>
-                                        <BodyText sx={{ fontSize: 10.5, color: alpha(m.navy, 0.74), mt: 0.15, lineHeight: 1.05 }}>
-                                          ({ev.start} to {ev.end})
-                                        </BodyText>
-                                        <Stack direction="row" spacing={0.25} alignItems="center" sx={{ mt: 0.15 }}>
-                                          <LocationOnRoundedIcon sx={{ fontSize: 15, color: alpha(m.navy, 0.62), flexShrink: 0 }} />
-                                          <BodyText sx={{ fontSize: 10.5, fontWeight: 500, color: alpha(m.navy, 0.68), lineHeight: 1 }}>
-                                            {ev.location}
-                                          </BodyText>
-                                        </Stack>
-                                      </Box>
-
-                                      {/* ── RIGHT rail (clickable icons) ── */}
-                                      <Box
-                                        sx={{
-                                          width: RAIL_W,
-                                          flexShrink: 0,
-                                          bgcolor: "transparent",
-                                          borderLeft: `1px solid ${alpha(m.navy, 0.06)}`,
-                                          display: "grid",
-                                          gridTemplateRows: "15px 15px 1fr",
-                                          justifyItems: "center",
-                                          alignItems: "center",
-                                          py: 0.2,
-                                        }}
-                                      >
-                                        <Tooltip title="Open calendar" placement="left">
-                                          <IconButton
-                                            size="small"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              showSnackbar({ severity: "info", message: `Calendar for booking ${extractBookingId(ev.id)}` });
-                                            }}
-                                            sx={{ p: 0.1, borderRadius: "5px", color: alpha(m.navy, 0.58), "&:hover": { bgcolor: alpha(m.navy, 0.06), color: m.navy } }}
-                                          >
-                                            <CalendarMonthRoundedIcon sx={{ fontSize: 14 }} />
-                                          </IconButton>
-                                        </Tooltip>
-                                        <Tooltip title="Open notes" placement="left">
-                                          <IconButton
-                                            size="small"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              showSnackbar({ severity: "info", message: `Notes for booking ${extractBookingId(ev.id)}` });
-                                            }}
-                                            sx={{
-                                              p: 0.1,
-                                              borderRadius: "5px",
-                                              color: alpha(m.navy, 0.58),
-                                              "&:hover": { bgcolor: alpha(m.navy, 0.06), color: m.navy },
-                                            }}
-                                          >
-                                            <StickyNote2OutlinedIcon sx={{ fontSize: 14 }} />
-                                          </IconButton>
-                                        </Tooltip>
-
-                                        {/* Person + name */}
-                                        <Tooltip title={`Open profile: ${ev.showClientName ?? "Client"}`} placement="left">
-                                          <Box
-                                            component="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              showSnackbar({ severity: "info", message: `Client drawer: ${ev.showClientName ?? "Client"}` });
-                                            }}
-                                            sx={{
-                                              all: "unset",
-                                              cursor: "pointer",
-                                              display: "flex",
-                                              flexDirection: "column",
-                                              alignItems: "center",
-                                              gap: 0.1,
-                                              px: 0,
-                                              py: 0.2,
-                                              borderRadius: "5px",
-                                              "&:hover": { bgcolor: alpha(m.navy, 0.06) },
-                                            }}
-                                          >
-                                            <PersonOutlineRoundedIcon sx={{ fontSize: 13, color: alpha(m.navy, 0.58) }} />
-                                            <BodyText
-                                              sx={{
-                                                fontSize: 8.5,
-                                                fontWeight: 700,
-                                                color: alpha(m.navy, 0.62),
-                                                lineHeight: 1,
-                                                maxWidth: RAIL_W - 8,
-                                                textAlign: "center",
-                                                whiteSpace: "nowrap",
-                                                overflow: "hidden",
-                                                textOverflow: "ellipsis",
-                                              }}
-                                            >
-                                              {ev.showClientName ?? "Client"}
-                                            </BodyText>
-                                          </Box>
-                                        </Tooltip>
-                                      </Box>
-                                    </Box>
+                                      event={ev}
+                                      top={top}
+                                      height={height}
+                                      left={0}
+                                      right={0}
+                                      serviceColor={resolveServiceColor(ev)}
+                                      statusColor={resolveStatusColor(ev)}
+                                      onOpen={() => eventHandlers.onOpen(ev)}
+                                      onOpenCalendar={() => eventHandlers.onOpenCalendar(ev)}
+                                      onOpenNotes={() => eventHandlers.onOpenNotes(ev)}
+                                      onOpenClient={() => eventHandlers.onOpenClient(ev)}
+                                      onOpenMessages={() => eventHandlers.onOpenMessages(ev)}
+                                    />
                                   );
                                 })}
                               </Box>
@@ -1552,18 +3798,101 @@ export default function ProfessionalFixedLocationCalendar({
           )}
         </Box>
       </Paper>
+      ) : null}
+
+      {activeSubTab === "Schedule" ? (
+        <CalendarSchedulePanel
+          activeDateIso={activeDateIso}
+          availableLocations={data.supportedLocations}
+          blocks={blocks}
+          isSaving={isSaving}
+          onActiveDateChange={setActiveDateIso}
+          onCreateBlockedTime={async (draft) => {
+            const nextBlocks = buildBlocksFromDraft(draft, draft.teamIds);
+            setBlocks((prev) => [...prev, ...nextBlocks]);
+            if (!onCreateCalendarEntry) return;
+            for (const teamId of draft.teamIds) {
+              for (const location of draft.locations) {
+                await onCreateCalendarEntry({
+                  team_member_id: String(teamId).trim() || null,
+                  status: "blocked",
+                  title: draft.title || "Blocked time",
+                  blocked_time_start: toDateTimeInput(draft.dateFrom, draft.startTime),
+                  blocked_time_end: toDateTimeInput(draft.dateTo || draft.dateFrom, draft.endTime),
+                  start_date: draft.dateFrom,
+                  end_date: draft.dateTo || draft.dateFrom,
+                  location_type: locationToApi(location),
+                  notes: `${draft.dayFrom}${draft.dayTo ? ` - ${draft.dayTo}` : ""}`.trim() || null,
+                });
+              }
+            }
+            showSnackbar({ severity: "success", message: "Blocked time added." });
+          }}
+          onDeleteBlockedEntry={onDeleteCalendarEntry}
+          onSaveScheduleRows={async (rows) => {
+            setScheduleRows(rows);
+            await persistAvailabilitySettings({ scheduleAvailability: rows });
+            showSnackbar({ severity: "success", message: "Availability saved." });
+          }}
+          resources={data.resources}
+          scheduleRows={scheduleRows}
+          selectedResourceIds={scheduleResourceFilter}
+          onSelectedResourceIdsChange={setScheduleResourceFilter}
+        />
+      ) : null}
+
+      {activeSubTab === "Settings" ? (
+        <CalendarHoursRulesPanel
+          availableLocations={data.supportedLocations}
+          bookingRules={bookingRules}
+          isSaving={isSaving}
+          onBookingRulesChange={setBookingRules}
+          onOpenDesign={() => {
+            setDesignDraft(appliedDesign);
+            setDesignOpen(true);
+          }}
+          onOpenPublicHours={() => setPublicBusinessHoursOpen(true)}
+          onOpenServiceOrder={() => setServiceOrderOpen(true)}
+          onSaveBookingRules={async () => {
+            await persistAvailabilitySettings({ bookingRules });
+            showSnackbar({ severity: "success", message: "Booking rules saved." });
+          }}
+        />
+      ) : null}
 
       <MollureDrawer
         anchor="right"
         open={slotDrawerOpen}
-        onClose={() => setSlotDrawerOpen(false)}
-        title="Free time"
-        width={{ xs: "100%", sm: 420 }}
+        onClose={closeBookingDrawer}
+        title={
+          activityDetailItem
+            ? activityDetailItem.detailType === "cancellation"
+              ? "Activity Details"
+              : "Edit request details"
+            : isBookingDetailsSubScreen
+              ? "Booking Details"
+              : ""
+        }
+        onBack={
+          activityDetailItem
+            ? () => setActivityDetailItem(null)
+            : isBookingDetailsSubScreen
+              ? () =>
+                  setSlotBookingScreen(
+                    slotBookingScreen === "add-unique-item"
+                      ? "select-products"
+                      : slotBookingScreen === "edit-service"
+                        ? "select-services"
+                        : "new-booking",
+                  )
+              : undefined
+        }
+        hideDividers
         footer={
-          selectedSlot && slotDrawerTab === "booking" ? (
+          selectedSlot && slotDrawerTab === "booking" && !activityDetailItem ? (
             <Box sx={{ px: 2.5, py: 2 }}>
               <Stack direction="row" alignItems="center" spacing={1.25}>
-                {slotBookingScreen === "new-booking" && slotClientAdded ? (
+                {slotBookingScreen === "new-booking" && slotClientAdded && !isViewingExisting ? (
                   <IconButton
                     size="small"
                     onClick={(e) => setBookingMoreAnchor(e.currentTarget)}
@@ -1617,10 +3946,37 @@ export default function ProfessionalFixedLocationCalendar({
                             },
                           ] as const)
                         : []),
-                      { label: "Add Discount to Total", onClick: () => showSnackbar({ severity: "info", message: "Add Discount to Total (mock)." }) },
-                      { label: "Add Late Cancellation", onClick: () => showSnackbar({ severity: "info", message: "Add Late Cancellation (mock)." }) },
-                      { label: "Add Late Rescheduling", onClick: () => showSnackbar({ severity: "info", message: "Add Late Rescheduling (mock)." }) },
-                      { label: "Add Note", onClick: () => showSnackbar({ severity: "info", message: "Add Note (mock)." }) },
+                      {
+                        label: "Add Discount to Total",
+                        onClick: () => {
+                          if (isViewingExisting) return;
+                          setBookingDiscountModalOpen(true);
+                        },
+                      },
+                      {
+                        label: "Add Late Cancellation",
+                        onClick: () => {
+                          if (isViewingExisting) return;
+                          setShowLateCancellation(true);
+                        },
+                      },
+                      {
+                        label: "Add Late Rescheduling",
+                        onClick: () => {
+                          if (isViewingExisting) return;
+                          setShowLateRescheduling(true);
+                          if (!lateRescheduleFeePercent && lateRescheduleFeePercentDefault) {
+                            setLateRescheduleFeePercent(lateRescheduleFeePercentDefault);
+                          }
+                        },
+                      },
+                      {
+                        label: "Add Note",
+                        onClick: () => {
+                          if (isViewingExisting) return;
+                          setShowInternalNote(true);
+                        },
+                      },
                     ].map((item) => (
                       <Box
                         key={item.label}
@@ -1648,7 +4004,7 @@ export default function ProfessionalFixedLocationCalendar({
                   </Stack>
                 </Popover>
                 <Box sx={{ flex: 1 }} />
-                {slotBookingScreen === "new-booking" && editingEventId ? (
+                {slotBookingScreen === "new-booking" && editingEventId && !isCompletedBooking && !hideClientBookingEditButton ? (
                   <Button
                     variant="outlined"
                     onClick={() => setIsEditingExisting(true)}
@@ -1668,9 +4024,22 @@ export default function ProfessionalFixedLocationCalendar({
                     Edit
                   </Button>
                 ) : null}
+                {!hideClientBookingFooterActions ? (
                 <Button
                   variant="outlined"
                   onClick={async () => {
+                    if (slotBookingScreen === "add-unique-item") {
+                      setSlotBookingScreen("select-products");
+                      return;
+                    }
+                    if (slotBookingScreen === "edit-service") {
+                      setSlotBookingScreen("select-services");
+                      return;
+                    }
+                    if (slotBookingScreen === "select-services" || slotBookingScreen === "select-products") {
+                      setSlotBookingScreen("new-booking");
+                      return;
+                    }
                     if (slotBookingScreen === "non-mollure-individual" || slotBookingScreen === "non-mollure-company") {
                       setSlotBookingScreen("add-client-choice");
                       return;
@@ -1683,7 +4052,7 @@ export default function ProfessionalFixedLocationCalendar({
                       setSlotBookingScreen("new-booking");
                       return;
                     }
-                    setSlotDrawerOpen(false);
+                    closeBookingDrawer();
                   }}
                   sx={{
                     borderRadius: "10px",
@@ -1698,56 +4067,75 @@ export default function ProfessionalFixedLocationCalendar({
                 >
                   {slotBookingScreen === "new-booking" ? "Cancel" : "Back"}
                 </Button>
+                ) : null}
+                {!hideClientBookingFooterActions && (slotBookingScreen === "new-booking" && isCompletedBooking ? null : (
                 <Button
                   variant="contained"
                   disableElevation
                   disabled={
-                    isSaving || !slotValidation.isValid || (Boolean(editingEventId) && !isEditingExisting)
+                    isSaving ||
+                    (slotBookingScreen === "edit-service"
+                      ? isViewingExisting || !slotValidation.isValid
+                      : slotBookingScreen === "select-services"
+                      ? isViewingExisting || serviceSelectionDraft.length === 0
+                      : slotBookingScreen === "select-products"
+                        ? isViewingExisting || !hasProductDraftSelection
+                        : slotBookingScreen === "add-unique-item"
+                          ? isViewingExisting || !slotValidation.isValid
+                          : !slotValidation.isValid || isViewingExisting) ||
+                    (drawerPrimaryActionLabel === "Update" && isEditingExisting && !isBookingDirty)
                   }
                   onClick={() => {
+                    if (isCompletedBooking) return;
                     setSlotSaveAttempted(true);
+                    if (slotBookingScreen === "edit-service") {
+                      if (isViewingExisting) return;
+                      setServiceEditAttempted(true);
+                      if (!slotValidation.isValid) return;
+                      applyServiceEdit();
+                      return;
+                    }
+                    if (slotBookingScreen === "select-services") {
+                      if (isViewingExisting || serviceSelectionDraft.length === 0) return;
+                      applyServiceSelection();
+                      return;
+                    }
+                    if (slotBookingScreen === "select-products") {
+                      if (isViewingExisting || !hasProductDraftSelection) return;
+                      applyProductSelection();
+                      return;
+                    }
+                    if (slotBookingScreen === "add-unique-item") {
+                      if (isViewingExisting || !slotValidation.isValid) return;
+                      applyUniqueItem();
+                      return;
+                    }
                     if (!slotValidation.isValid) return;
+                    if (isBookingSubScreen) return;
                     if (slotBookingScreen === "non-mollure-individual" || slotBookingScreen === "non-mollure-company") {
-                      showSnackbar({ severity: "success", message: "Saved (mock)." });
+                      setBookingPhoneDraft({
+                        phoneCode: nonMollureDraft.phoneCode,
+                        phoneNumber: nonMollureDraft.phoneNumber,
+                      });
+                      setSlotClientAdded(true);
+                      showSnackbar({ severity: "success", message: "Client details saved." });
                       setSlotBookingScreen("new-booking");
                       setSlotSaveAttempted(false);
                       return;
                     }
                     if (slotBookingScreen === "guest") {
-                      showSnackbar({ severity: "success", message: "Guest added (mock)." });
+                      setBookingPhoneDraft({
+                        phoneCode: guestDraft.phoneCode,
+                        phoneNumber: guestDraft.phoneNumber,
+                      });
+                      setSlotClientAdded(true);
+                      showSnackbar({ severity: "success", message: "Guest added." });
                       setSlotBookingScreen("new-booking");
                       setSlotSaveAttempted(false);
                       return;
                     }
                     if (!selectedSlot) return;
-
-                    const title =
-                      selectedServices[0]?.name ??
-                      selectedProducts[0]?.name ??
-                      "Booking";
-                    const clientName = selectedClient?.name ?? `${guestDraft.firstName} ${guestDraft.lastName}`.trim() ?? "Client";
-
-                    const nextEvent: CalendarEvent = {
-                      id: editingEventId ?? `b-${Date.now()}-a`,
-                      resourceId: selectedSlot.resourceId,
-                      date: selectedSlot.date,
-                      start: selectedSlot.start,
-                      end: selectedSlot.end,
-                      title,
-                      status: "Confirmed",
-                      location: slotLocation,
-                      bookingType: "Offline",
-                      showClientName: clientName || "Client",
-                    };
-
-                    setEvents((prev) => {
-                      if (!editingEventId) return [...prev, nextEvent];
-                      return prev.map((e) => (e.id === editingEventId ? nextEvent : e));
-                    });
-                    showSnackbar({ severity: "success", message: editingEventId ? "Booking updated." : "Booking saved." });
-                    // Keep the drawer open on the booking tab; the calendar behind will now show the booking on that slot.
-                    setSlotSaveAttempted(false);
-                    if (editingEventId) setIsEditingExisting(false);
+                    void persistBookingFromDrawer();
                   }}
                   sx={{
                     borderRadius: "10px",
@@ -1759,14 +4147,15 @@ export default function ProfessionalFixedLocationCalendar({
                     minWidth: 110,
                   }}
                 >
-                  {editingEventId ? "Update" : "Save"}
+                  {drawerPrimaryActionLabel}
                 </Button>
+                ))}
               </Stack>
             </Box>
           ) : null
         }
       >
-        <Box sx={{ px: 2.5, pt: 2.25, pb: 2.5 }}>
+        <Box sx={{ px: 2.5, pt: 0.5, pb: 2.5 }}>
           {selectedSlot ? (
             <>
               {/* Top tabs (underline style) */}
@@ -1780,24 +4169,34 @@ export default function ProfessionalFixedLocationCalendar({
               >
                 {slotTabs.map((t) => {
                   const active = t.id === slotDrawerTab;
+                  const disabled = false;
                   return (
                     <Box
                       key={t.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => setSlotDrawerTab(t.id)}
+                      role={disabled ? undefined : "button"}
+                      tabIndex={disabled ? -1 : 0}
+                      onClick={() => {
+                        if (disabled) return;
+                        setSlotDrawerTab(t.id);
+                        setActivityDetailItem(null);
+                      }}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") setSlotDrawerTab(t.id);
+                        if (disabled) return;
+                        if (e.key === "Enter" || e.key === " ") {
+                          setSlotDrawerTab(t.id);
+                          setActivityDetailItem(null);
+                        }
                       }}
                       sx={{
                         textAlign: "center",
                         py: 1.25,
-                        cursor: "pointer",
+                        cursor: disabled ? "default" : "pointer",
                         position: "relative",
                         userSelect: "none",
-                        color: active ? m.teal : alpha(m.navy, 0.55),
+                        color: active ? m.teal : disabled ? alpha(m.navy, 0.32) : alpha(m.navy, 0.55),
                         fontWeight: 900,
                         fontSize: 13.5,
+                        pointerEvents: disabled ? "none" : "auto",
                         "&:after": {
                           content: '""',
                           position: "absolute",
@@ -1816,7 +4215,43 @@ export default function ProfessionalFixedLocationCalendar({
               </Box>
 
               {slotDrawerTab === "booking" ? (
-                slotBookingScreen === "add-client-choice" ? (
+                slotBookingScreen === "select-services" ? (
+                  <BookingSelectServicesScreen
+                    catalog={selectableServiceCategories}
+                    selectedIds={serviceSelectionDraft}
+                    serviceOverrides={serviceOverridesDraft}
+                    onToggle={(service) => toggleServiceSelectionDraft(service.id)}
+                    onEdit={(service) => openEditService(service)}
+                    disabled={isViewingExisting}
+                  />
+                ) : slotBookingScreen === "edit-service" ? (
+                  <BookingEditServiceScreen
+                    draft={serviceEditDraft}
+                    staffOptions={data.resources}
+                    errors={serviceEditErrors}
+                    onChange={(patch) => setServiceEditDraft((prev) => ({ ...prev, ...patch }))}
+                    disabled={isViewingExisting}
+                  />
+                ) : slotBookingScreen === "select-products" ? (
+                  <BookingSelectProductsScreen
+                    draft={productSelectionDraft}
+                    customProducts={customBookingProducts}
+                    onToggle={(product) => toggleProductSelectionDraft(product.id)}
+                    onQuantityChange={adjustProductQuantityDraft}
+                    onAddProduct={isViewingExisting ? undefined : openAddUniqueItem}
+                    disabled={isViewingExisting}
+                  />
+                ) : slotBookingScreen === "add-unique-item" ? (
+                  <BookingAddUniqueItemScreen
+                    draft={uniqueItemDraft}
+                    errors={{
+                      productName: slotErrors.uniqueItemProductName,
+                      price: slotErrors.uniqueItemPrice,
+                    }}
+                    onChange={(patch) => setUniqueItemDraft((prev) => ({ ...prev, ...patch }))}
+                    disabled={isViewingExisting}
+                  />
+                ) : slotBookingScreen === "add-client-choice" ? (
                   <Stack spacing={1.6}>
                     <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 15 }}>
                       Add Client
@@ -1831,24 +4266,8 @@ export default function ProfessionalFixedLocationCalendar({
                       ] as const
                     ).map((item) => (
                       <React.Fragment key={item.key}>
-                        <Box
-                          role="button"
-                          tabIndex={0}
+                        <ButtonBase
                           onClick={() => {
-                            if (item.key === "client-list" || item.key === "mollure-platform") {
-                              setAddClientSource((p) => (p === item.key ? "" : item.key));
-                              return;
-                            }
-                            if (item.key === "non-mollure") {
-                              // Default to Individual Client
-                              setNonMollureClientType("individual");
-                              setSlotBookingScreen("non-mollure-individual");
-                              return;
-                            }
-                            setSlotBookingScreen("guest");
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key !== "Enter" && e.key !== " ") return;
                             if (item.key === "client-list" || item.key === "mollure-platform") {
                               setAddClientSource((p) => (p === item.key ? "" : item.key));
                               return;
@@ -1861,17 +4280,18 @@ export default function ProfessionalFixedLocationCalendar({
                             setSlotBookingScreen("guest");
                           }}
                           sx={{
+                            width: "100%",
                             border: `1px solid ${alpha(m.navy, 0.14)}`,
                             borderRadius: "10px",
-                            height: 46,
+                            height: 44,
                             display: "flex",
                             alignItems: "center",
+                            justifyContent: "flex-start",
                             gap: 1.25,
                             px: 1.5,
-                            cursor: "pointer",
                             bgcolor: "#fff",
-                            boxShadow: "0 4px 14px rgba(16, 35, 63, 0.06)",
-                            "&:hover": { bgcolor: alpha(m.navy, 0.02) },
+                            transition: "border-color 0.15s, background-color 0.15s",
+                            "&:hover": { bgcolor: alpha(m.navy, 0.02), borderColor: m.teal },
                           }}
                         >
                           <Box
@@ -1881,20 +4301,28 @@ export default function ProfessionalFixedLocationCalendar({
                               borderRadius: "999px",
                               bgcolor: alpha(m.teal, 0.12),
                               color: m.teal,
-                              display: "grid",
-                              placeItems: "center",
-                              fontWeight: 900,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
                               flexShrink: 0,
-                              fontSize: 18,
                               border: `1px solid ${alpha(m.teal, 0.22)}`,
                             }}
                           >
-                            +
+                            <AddRoundedIcon sx={{ fontSize: 16 }} />
                           </Box>
-                          <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.72) }}>
+                          <BodyText
+                            component="span"
+                            sx={{
+                              fontSize: 12.5,
+                              fontWeight: 800,
+                              color: alpha(m.navy, 0.72),
+                              lineHeight: 1,
+                              textAlign: "left",
+                            }}
+                          >
                             {item.label}
                           </BodyText>
-                        </Box>
+                        </ButtonBase>
 
                         {item.key === "client-list" && addClientSource === "client-list" ? (
                           <AppDropdown
@@ -2015,11 +4443,7 @@ export default function ProfessionalFixedLocationCalendar({
                       label=""
                       value={nonMollureDraft.gender}
                       onChange={(val) => setNonMollureDraft((p) => ({ ...p, gender: val as any }))}
-                      options={[
-                        { label: "Male", value: "male" },
-                        { label: "Female", value: "female" },
-                        { label: "Other", value: "other" },
-                      ]}
+                      options={[...GENDER_OPTIONS]}
                       fullWidth
                       placeholder="Select Gender"
                       error={Boolean(slotErrors.nonMollureGender)}
@@ -2043,37 +4467,15 @@ export default function ProfessionalFixedLocationCalendar({
                       ) : null}
                     </Box>
 
-                    <Box>
-                      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
-                        Contact Number
-                      </BodyText>
-                      <Stack direction="row" spacing={1.25}>
-                        <AppDropdown
-                          label=""
-                          value={nonMollureDraft.phoneCode}
-                          onChange={(val) => setNonMollureDraft((p) => ({ ...p, phoneCode: val as string }))}
-                          options={[
-                            { label: "Select Country Code", value: "" },
-                            { label: "+1", value: "+1" },
-                            { label: "+44", value: "+44" },
-                            { label: "+92", value: "+92" },
-                          ]}
-                          fullWidth
-                          sx={{ maxWidth: 140 }}
-                          placeholder="Select Country Code"
-                          error={Boolean(slotErrors.nonMollurePhoneCode)}
-                          helperText={slotErrors.nonMollurePhoneCode}
-                        />
-                        <AppTextField
-                          placeholder="+442xxxxxxxxxx"
-                          value={nonMollureDraft.phoneNumber}
-                          onChange={(e) => setNonMollureDraft((p) => ({ ...p, phoneNumber: e.target.value }))}
-                          fullWidth
-                          error={Boolean(slotErrors.nonMollurePhoneNumber)}
-                          helperText={slotErrors.nonMollurePhoneNumber}
-                        />
-                      </Stack>
-                    </Box>
+                    <AppCountryPhoneFields
+                      countryCode={nonMollureDraft.phoneCode}
+                      phone={nonMollureDraft.phoneNumber}
+                      onCountryCodeChange={(dialCode) => setNonMollureDraft((p) => ({ ...p, phoneCode: dialCode }))}
+                      onPhoneChange={(phone) => setNonMollureDraft((p) => ({ ...p, phoneNumber: phone }))}
+                      countryCodeError={slotErrors.nonMollurePhoneCode}
+                      phoneError={slotErrors.nonMollurePhoneNumber}
+                      phonePlaceholder="+442xxxxxxxxxx"
+                    />
 
                     <AppTextField
                       placeholder="Email Address"
@@ -2176,11 +4578,7 @@ export default function ProfessionalFixedLocationCalendar({
                       label=""
                       value={nonMollureDraft.gender}
                       onChange={(val) => setNonMollureDraft((p) => ({ ...p, gender: val as any }))}
-                      options={[
-                        { label: "Male", value: "male" },
-                        { label: "Female", value: "female" },
-                        { label: "Other", value: "other" },
-                      ]}
+                      options={[...GENDER_OPTIONS]}
                       fullWidth
                       placeholder="Select Gender"
                       error={Boolean(slotErrors.nonMollureGender)}
@@ -2251,33 +4649,15 @@ export default function ProfessionalFixedLocationCalendar({
                       </Stack>
                     </Box>
 
-                    <Box>
-                      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
-                        Contact Number
-                      </BodyText>
-                      <Stack direction="row" spacing={1.25}>
-                        <AppDropdown
-                          label=""
-                          value={nonMollureDraft.phoneCode}
-                          onChange={(val) => setNonMollureDraft((p) => ({ ...p, phoneCode: val as string }))}
-                          options={[
-                            { label: "Country Code", value: "" },
-                            { label: "+1", value: "+1" },
-                            { label: "+44", value: "+44" },
-                            { label: "+92", value: "+92" },
-                          ]}
-                          fullWidth
-                          sx={{ maxWidth: 140 }}
-                          placeholder="Country Code"
-                        />
-                        <AppTextField
-                          placeholder="+442xxxxxxxxxx"
-                          value={nonMollureDraft.phoneNumber}
-                          onChange={(e) => setNonMollureDraft((p) => ({ ...p, phoneNumber: e.target.value }))}
-                          fullWidth
-                        />
-                      </Stack>
-                    </Box>
+                    <AppCountryPhoneFields
+                      countryCode={nonMollureDraft.phoneCode}
+                      phone={nonMollureDraft.phoneNumber}
+                      onCountryCodeChange={(dialCode) => setNonMollureDraft((p) => ({ ...p, phoneCode: dialCode }))}
+                      onPhoneChange={(phone) => setNonMollureDraft((p) => ({ ...p, phoneNumber: phone }))}
+                      countryCodeError={slotErrors.nonMollurePhoneCode}
+                      phoneError={slotErrors.nonMollurePhoneNumber}
+                      phonePlaceholder="+442xxxxxxxxxx"
+                    />
 
                     <AppTextField
                       placeholder="Email Address"
@@ -2339,49 +4719,274 @@ export default function ProfessionalFixedLocationCalendar({
                       fullWidth
                     />
 
-                    <Box>
-                      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
-                        Contact Number (optional)
-                      </BodyText>
-                      <Stack direction="row" spacing={1.25}>
-                        <AppDropdown
-                          label=""
-                          value={guestDraft.phoneCode}
-                          onChange={(val) => setGuestDraft((p) => ({ ...p, phoneCode: val as string }))}
-                          options={[
-                            { label: "Country Code", value: "" },
-                            { label: "+1", value: "+1" },
-                            { label: "+44", value: "+44" },
-                            { label: "+92", value: "+92" },
-                          ]}
-                          fullWidth
-                          sx={{ maxWidth: 140 }}
-                          placeholder="Country Code"
-                        />
-                        <AppTextField
-                          placeholder="Phone number"
-                          value={guestDraft.phoneNumber}
-                          onChange={(e) => setGuestDraft((p) => ({ ...p, phoneNumber: e.target.value }))}
-                          fullWidth
-                        />
-                      </Stack>
-                    </Box>
+                    <AppCountryPhoneFields
+                      countryCode={guestDraft.phoneCode}
+                      phone={guestDraft.phoneNumber}
+                      onCountryCodeChange={(dialCode) => setGuestDraft((p) => ({ ...p, phoneCode: dialCode }))}
+                      onPhoneChange={(phone) => setGuestDraft((p) => ({ ...p, phoneNumber: phone }))}
+                      countryCodeError={slotErrors.guestPhoneCode}
+                      phoneError={slotErrors.guestPhoneNumber}
+                      label="Contact Number (optional)"
+                      phonePlaceholder="Phone number"
+                      required={false}
+                    />
 
                     <Box sx={{ flex: 1, minHeight: 200 }} />
                   </Stack>
                 ) : (
                   <Stack spacing={1.6}>
-                    <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 15 }}>
-                      New Booking
-                    </BodyText>
+                    {isViewingBooking && viewingBookingEvent ? (
+                      <Box>
+                        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+                          <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 16, letterSpacing: "-0.01em" }}>
+                            Booking Details
+                          </BodyText>
+                          {viewingBookingEvent.status === "Confirmed" ? (
+                            <>
+                              <Button
+                                onClick={(e) => setBookingActionAnchor(e.currentTarget)}
+                                endIcon={<KeyboardArrowDownRoundedIcon sx={{ fontSize: 18 }} />}
+                                sx={{
+                                  borderRadius: "10px",
+                                  textTransform: "none",
+                                  fontWeight: 800,
+                                  height: 34,
+                                  px: 1.5,
+                                  color: alpha(m.navy, 0.72),
+                                  bgcolor: alpha(m.navy, 0.04),
+                                  "&:hover": { bgcolor: alpha(m.navy, 0.08) },
+                                }}
+                              >
+                                Action
+                              </Button>
+                              <Menu
+                                anchorEl={bookingActionAnchor}
+                                open={Boolean(bookingActionAnchor)}
+                                onClose={() => setBookingActionAnchor(null)}
+                                anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                                transformOrigin={{ vertical: "top", horizontal: "right" }}
+                                slotProps={{
+                                  paper: {
+                                    sx: {
+                                      mt: 0.5,
+                                      minWidth: 180,
+                                      borderRadius: "12px",
+                                      border: `1px solid ${alpha(m.navy, 0.1)}`,
+                                      boxShadow: "0 14px 30px rgba(16, 35, 63, 0.12)",
+                                    },
+                                  },
+                                }}
+                              >
+                                <MenuItem
+                                  onClick={() => void handleBookingActionSelect("edit")}
+                                  sx={{ fontWeight: 800, fontSize: 13.5, color: alpha(m.navy, 0.78), py: 1.1 }}
+                                >
+                                  Edit Booking
+                                </MenuItem>
+                                <Divider sx={{ my: "0 !important" }} />
+                                <MenuItem
+                                  onClick={() => void handleBookingActionSelect("cancel")}
+                                  sx={{ fontWeight: 800, fontSize: 13.5, color: alpha(m.navy, 0.78), py: 1.1 }}
+                                >
+                                  Cancel Booking
+                                </MenuItem>
+                                <Divider sx={{ my: "0 !important" }} />
+                                <MenuItem
+                                  onClick={() => void handleBookingActionSelect("in_progress")}
+                                  sx={{ fontWeight: 800, fontSize: 13.5, color: alpha(m.navy, 0.78), py: 1.1 }}
+                                >
+                                  In Progress
+                                </MenuItem>
+                                <Divider sx={{ my: "0 !important" }} />
+                                <MenuItem
+                                  onClick={() => void handleBookingActionSelect("no_show")}
+                                  sx={{ fontWeight: 800, fontSize: 13.5, color: alpha(m.navy, 0.78), py: 1.1 }}
+                                >
+                                  No Show
+                                </MenuItem>
+                              </Menu>
+                            </>
+                          ) : null}
+                        </Stack>
+
+                        <Stack spacing={1.25} sx={{ mt: 1.25 }}>
+                          <Box>
+                            <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
+                              Booking ID
+                            </BodyText>
+                            <Box
+                              sx={{
+                                width: "100%",
+                                border: `1px solid ${alpha(m.navy, 0.14)}`,
+                                borderRadius: "10px",
+                                minHeight: 40,
+                                px: 1.5,
+                                display: "flex",
+                                alignItems: "center",
+                                bgcolor: alpha(m.navy, 0.02),
+                              }}
+                            >
+                              <BodyText sx={{ fontSize: 12.5, fontWeight: 600, color: alpha(m.navy, 0.45) }}>
+                                {viewingBookingEvent.bookingCode ?? extractBookingId(viewingBookingEvent.id)}
+                              </BodyText>
+                            </Box>
+                          </Box>
+
+                          <Box>
+                            <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
+                              Status
+                            </BodyText>
+                            <Box
+                              sx={{
+                                width: "100%",
+                                border: `1px solid ${alpha(m.navy, 0.14)}`,
+                                borderRadius: "10px",
+                                minHeight: 40,
+                                px: 1.25,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 0.75,
+                                flexWrap: "wrap",
+                                bgcolor: "#fff",
+                              }}
+                            >
+                              <Chip
+                                size="small"
+                                label={viewingBookingEvent.status}
+                                sx={{
+                                  height: 24,
+                                  fontSize: 11,
+                                  fontWeight: 800,
+                                  border: "1px solid",
+                                  "& .MuiChip-label": { px: 1 },
+                                  ...statusChipSx(viewingBookingEvent.status, m),
+                                }}
+                              />
+                              {getBookingScenarioIndicators(viewingBookingEvent).map((indicator) => {
+                                const responseIndicators = resolveBookingResponseIndicators(viewingBookingEvent);
+                                const prepayment = resolveCalendarPrepaymentStatus(viewingBookingEvent);
+                                const prepaymentVariant = prepayment ? toPrepaymentIconVariant(prepayment) : undefined;
+                                const badgeResponses =
+                                  indicator === "EBR"
+                                    ? responseIndicators
+                                    : indicator === "ER" || indicator === "E"
+                                      ? responseIndicators.filter((item) => item === "overdue_response")
+                                      : [];
+
+                                return (
+                                  <Tooltip key={indicator} title={BOOKING_SCENARIO_LABELS[indicator]} placement="top">
+                                    <Chip
+                                      size="small"
+                                      label={
+                                        <Stack direction="row" alignItems="center" spacing={0.35}>
+                                          {indicator === "BR" ? (
+                                            <BookingRequestBadge
+                                              variant="inline"
+                                              iconSize={12}
+                                              state={resolveBookingRequestBadgeState(viewingBookingEvent)}
+                                              direction={resolveProfessionalBookingRequestDirection(viewingBookingEvent)}
+                                            />
+                                          ) : (
+                                            <span>{indicator}</span>
+                                          )}
+                                          {badgeResponses.map((item) => (
+                                            <Tooltip key={item} title={BOOKING_INDICATOR_LABELS[item]} placement="top">
+                                              <Box sx={{ display: "grid", placeItems: "center", lineHeight: 0 }}>
+                                                <BookingIndicatorIcon variant={item} size={18} />
+                                              </Box>
+                                            </Tooltip>
+                                          ))}
+                                          {indicator === "ER" ? <OpenInNewRoundedIcon sx={{ fontSize: 12 }} /> : null}
+                                          {indicator === "EBR" && prepaymentVariant && prepaymentVariant !== "pending" ? (
+                                            <PrepaymentStatusIcon variant={prepaymentVariant} size={18} />
+                                          ) : null}
+                                        </Stack>
+                                      }
+                                      sx={{
+                                        height: 24,
+                                        fontSize: 11,
+                                        fontWeight: 800,
+                                        bgcolor: alpha(m.navy, 0.06),
+                                        color: alpha(m.navy, 0.62),
+                                        border: `1px solid ${alpha(m.navy, 0.14)}`,
+                                        "& .MuiChip-label": { px: 0.85 },
+                                      }}
+                                    />
+                                  </Tooltip>
+                                );
+                              })}
+                              {(() => {
+                                const scenarioIndicators = getBookingScenarioIndicators(viewingBookingEvent);
+                                const responseIndicators = resolveBookingResponseIndicators(viewingBookingEvent);
+                                const prepayment = resolveCalendarPrepaymentStatus(viewingBookingEvent);
+                                const hasBr = scenarioIndicators.includes("BR");
+
+                                if (scenarioIndicators.length && !hasBr) {
+                                  if (!responseIndicators.includes("overdue_response")) return null;
+                                  if (scenarioIndicators.some((indicator) => indicator === "ER" || indicator === "E")) {
+                                    return null;
+                                  }
+                                }
+
+                                const standaloneResponses = hasBr
+                                  ? responseIndicators
+                                  : scenarioIndicators.length === 0
+                                    ? responseIndicators
+                                    : [];
+
+                                const standalonePrepayment =
+                                  prepayment && (scenarioIndicators.length === 0 || hasBr) ? prepayment : undefined;
+
+                                if (!standaloneResponses.length && !standalonePrepayment) return null;
+
+                                return (
+                                  <Stack direction="row" alignItems="center" spacing={0.5}>
+                                    {standaloneResponses.map((item) => (
+                                      <Tooltip key={item} title={BOOKING_INDICATOR_LABELS[item]} placement="top">
+                                        <Box sx={{ display: "grid", placeItems: "center", lineHeight: 0 }}>
+                                          <BookingIndicatorIcon variant={item} size={18} />
+                                        </Box>
+                                      </Tooltip>
+                                    ))}
+                                    {standalonePrepayment ? (
+                                      <Tooltip
+                                        title={PREPAYMENT_STATUS_LABELS[toPrepaymentIconVariant(standalonePrepayment)]}
+                                        placement="top"
+                                      >
+                                        <Box sx={{ display: "grid", placeItems: "center", lineHeight: 0 }}>
+                                          <PrepaymentStatusIcon
+                                            variant={toPrepaymentIconVariant(standalonePrepayment)}
+                                            size={18}
+                                          />
+                                        </Box>
+                                      </Tooltip>
+                                    ) : null}
+                                  </Stack>
+                                );
+                              })()}
+                            </Box>
+                          </Box>
+                        </Stack>
+                      </Box>
+                    ) : (
+                      <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 16, letterSpacing: "-0.01em" }}>
+                        New Booking
+                      </BodyText>
+                    )}
 
                     {/* Calendar selector */}
                     <Box>
                       <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>
                         Calendar
                       </BodyText>
-                      <Box
+                      <ButtonBase
+                        onClick={() => {
+                          if (isViewingExisting) return;
+                          setSlotCalendarOpen((prev) => !prev);
+                        }}
+                        disabled={isViewingExisting}
                         sx={{
+                          width: "100%",
                           border: `1px solid ${alpha(m.navy, 0.14)}`,
                           borderRadius: "10px",
                           minHeight: 40,
@@ -2389,19 +4994,48 @@ export default function ProfessionalFixedLocationCalendar({
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "space-between",
-                          bgcolor: "#fff",
-                          color: alpha(m.navy, 0.74),
-                          fontSize: 12.5,
-                          fontWeight: 800,
+                          bgcolor: isViewingExisting ? alpha(m.navy, 0.02) : "#fff",
+                          textAlign: "left",
+                          cursor: isViewingExisting ? "default" : "pointer",
+                          transition: "border-color 0.15s",
+                          "&:hover": {
+                            borderColor: isViewingExisting ? alpha(m.navy, 0.14) : m.teal,
+                          },
                         }}
                       >
-                        <Box component="span">
-                          {selectedSlot ? `${slotLocation}: ${formatMdyDate(selectedSlot.date)}` : "Select calendar"}
-                        </Box>
-                        <KeyboardArrowDownRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.45) }} />
-                      </Box>
+                        <BodyText
+                          sx={{
+                            fontSize: 12.5,
+                            fontWeight: 800,
+                            color:
+                              isViewingBooking || slotCalendarTouched
+                                ? alpha(m.navy, 0.74)
+                                : alpha(m.navy, 0.45),
+                          }}
+                        >
+                          {calendarFieldLabel}
+                        </BodyText>
+                        <KeyboardArrowDownRoundedIcon
+                          sx={{
+                            fontSize: 18,
+                            color: slotCalendarOpen ? m.teal : alpha(m.navy, 0.45),
+                            transform: slotCalendarOpen ? "rotate(180deg)" : "none",
+                            transition: "transform 0.15s",
+                            flexShrink: 0,
+                          }}
+                        />
+                      </ButtonBase>
 
-                      {!slotClientAdded ? (
+                      {requestedScheduleLabel ? (
+                        <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mt: 1, px: 0.25 }}>
+                          <BodyText sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.72) }}>
+                            Requested: {requestedScheduleLabel}
+                          </BodyText>
+                          <BookingEditedTag variant="edited" />
+                        </Stack>
+                      ) : null}
+
+                      {slotCalendarOpen ? (
                         <Paper
                           elevation={0}
                           sx={{
@@ -2416,40 +5050,6 @@ export default function ProfessionalFixedLocationCalendar({
                           }}
                         >
                           <Box sx={{ p: 1.5 }}>
-                            <Stack direction="row" spacing={1} sx={{ mb: 1.2 }}>
-                              <AppDropdown
-                                label=""
-                                value={slotBookingType}
-                                onChange={(value) => {
-                                  const next = value as CalendarBookingType;
-                                  setSlotBookingType(next);
-                                  if (next === "Requests") setSlotStatus("Requested");
-                                  if (next === "Offline" && slotStatus === "Requested") setSlotStatus("Confirmed");
-                                }}
-                                options={[
-                                  { label: "Online", value: "Online" },
-                                  { label: "Offline", value: "Offline" },
-                                  { label: "Project", value: "Project" },
-                                  { label: "Requests", value: "Requests" },
-                                ]}
-                                fullWidth
-                                placeholder="Booking Type"
-                              />
-                              <AppDropdown
-                                label=""
-                                value={slotStatus}
-                                onChange={(value) => setSlotStatus(value as typeof slotStatus)}
-                                options={[
-                                  { label: "Confirmed", value: "Confirmed" },
-                                  { label: "Requested", value: "Requested" },
-                                  { label: "Completed", value: "Completed" },
-                                  { label: "Cancelled", value: "Cancelled" },
-                                  { label: "No Show", value: "No Show" },
-                                ]}
-                                fullWidth
-                                placeholder="Status"
-                              />
-                            </Stack>
                             <Box
                               sx={{
                                 display: "grid",
@@ -2470,6 +5070,7 @@ export default function ProfessionalFixedLocationCalendar({
                                     onClick={() => {
                                       if (isViewingExisting) return;
                                       setSlotLocation(loc);
+                                      setSlotCalendarTouched(true);
                                     }}
                                     sx={{
                                       height: 28,
@@ -2493,8 +5094,11 @@ export default function ProfessionalFixedLocationCalendar({
                               <AppCalendarPanel
                                 compact
                                 value={selectedSlot?.date ?? defaultDateIso}
-                                onChange={(iso) => setSelectedSlot((p) => (p ? { ...p, date: iso } : p))}
-                                min={todayIso}
+                                onChange={(iso) => {
+                                  setSelectedSlot((p) => (p ? { ...p, date: iso } : p));
+                                  setSlotCalendarTouched(true);
+                                }}
+                                min={isViewingBooking ? undefined : todayIso}
                               />
                             </Box>
                           </Box>
@@ -2519,22 +5123,24 @@ export default function ProfessionalFixedLocationCalendar({
                             boxShadow: `0 0 0 6px ${alpha(m.teal, 0.08)}`,
                           }}
                         >
-                          <AppSearchField
-                            value={slotClientSearch}
-                            onChange={(e) => {
-                              if (isViewingExisting) return;
-                              setSlotClientSearch(e.target.value);
-                            }}
-                            onClear={() => {
-                              if (isViewingExisting) return;
-                              setSlotClientSearch("");
-                            }}
-                            placeholder="Search client..."
-                            size="small"
-                            fullWidth
-                            sx={{ mb: 1 }}
-                            disabled={isViewingExisting}
-                          />
+                          {lockClientIdentity ? null : (
+                            <AppSearchField
+                              value={slotClientSearch}
+                              onChange={(e) => {
+                                if (isViewingExisting) return;
+                                setSlotClientSearch(e.target.value);
+                              }}
+                              onClear={() => {
+                                if (isViewingExisting) return;
+                                setSlotClientSearch("");
+                              }}
+                              placeholder="Search client..."
+                              size="small"
+                              fullWidth
+                              sx={{ mb: 1 }}
+                              disabled={isViewingExisting}
+                            />
+                          )}
 
                           <Stack direction="row" alignItems="center" spacing={1.25}>
                             <Avatar src="/images/testimonial.webp" sx={{ width: 34, height: 34 }}>
@@ -2548,41 +5154,38 @@ export default function ProfessionalFixedLocationCalendar({
                                 {selectedClient?.email ?? ""}
                               </BodyText>
                             </Box>
-                            <IconButton
-                              size="small"
-                              onClick={() => {
-                                if (isViewingExisting) return;
-                                setSlotClientAdded(false);
-                                setSlotClientSearch("");
-                                setSelectedClient(null);
-                              }}
-                              sx={{ color: alpha(m.navy, 0.35) }}
-                              disabled={isViewingExisting}
-                            >
-                              <CloseRoundedIcon sx={{ fontSize: 17 }} />
-                            </IconButton>
+                            {showClientRemoveButton ? (
+                              <IconButton
+                                size="small"
+                                onClick={() => {
+                                  setSlotClientAdded(false);
+                                  setSlotClientSearch("");
+                                  setSelectedClient(null);
+                                }}
+                                sx={{ color: alpha(m.navy, 0.35) }}
+                                aria-label="Remove client"
+                              >
+                                <CloseRoundedIcon sx={{ fontSize: 17 }} />
+                              </IconButton>
+                            ) : null}
                           </Stack>
                         </Box>
                       ) : (
-                        <Box
-                          role="button"
-                          tabIndex={0}
+                        <ButtonBase
                           onClick={() => setSlotBookingScreen("add-client-choice")}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") setSlotBookingScreen("add-client-choice");
-                          }}
                           sx={{
+                            width: "100%",
                             border: `1px solid ${alpha(m.navy, 0.14)}`,
                             borderRadius: "10px",
-                            height: 46,
+                            height: 44,
                             display: "flex",
                             alignItems: "center",
+                            justifyContent: "flex-start",
                             gap: 1.25,
                             px: 1.5,
-                            cursor: "pointer",
                             bgcolor: "#fff",
-                            boxShadow: "0 4px 14px rgba(16, 35, 63, 0.06)",
-                            "&:hover": { bgcolor: alpha(m.navy, 0.02) },
+                            transition: "border-color 0.15s, background-color 0.15s",
+                            "&:hover": { bgcolor: alpha(m.navy, 0.02), borderColor: m.teal },
                           }}
                         >
                           <Box
@@ -2592,20 +5195,27 @@ export default function ProfessionalFixedLocationCalendar({
                               borderRadius: "999px",
                               bgcolor: alpha(m.teal, 0.12),
                               color: m.teal,
-                              display: "grid",
-                              placeItems: "center",
-                              fontWeight: 900,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
                               flexShrink: 0,
-                              fontSize: 18,
                               border: `1px solid ${alpha(m.teal, 0.22)}`,
                             }}
                           >
-                            +
+                            <AddRoundedIcon sx={{ fontSize: 16 }} />
                           </Box>
-                          <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.72) }}>
+                          <BodyText
+                            component="span"
+                            sx={{
+                              fontSize: 12.5,
+                              fontWeight: 800,
+                              color: alpha(m.navy, 0.72),
+                              lineHeight: 1,
+                            }}
+                          >
                             Add Client
                           </BodyText>
-                        </Box>
+                        </ButtonBase>
                       )}
                       {slotErrors.bookingClient ? (
                         <BodyText sx={{ mt: 0.6, fontSize: 11.5, fontWeight: 800, color: theme.palette.error.main }}>
@@ -2616,79 +5226,82 @@ export default function ProfessionalFixedLocationCalendar({
 
                     {slotClientAdded ? (
                       <>
-                        <Box
-                          onClickCapture={(e) => {
-                            // Only the arrow button should open the menu.
-                            // If the click wasn't inside the arrow button, swallow it.
-                            const t = e.target as unknown;
-                            if (t && typeof t === "object" && "closest" in (t as any)) {
-                              const el = t as Element;
-                              if (el.closest('[data-add-menu-arrow="true"]')) return;
+                        <ButtonBase
+                          ref={addMenuButtonRef}
+                          disabled={isViewingExisting && !incomingRequestEditMode}
+                          onClick={(e) => {
+                            const el = e.currentTarget;
+                            if (slotAddMenuAnchor && addMenuTarget === "client") {
+                              setSlotAddMenuAnchor(null);
+                              return;
                             }
-                            e.preventDefault();
-                            e.stopPropagation();
+                            setAddMenuTarget("client");
+                            setSlotAddMenuAnchor(el);
                           }}
+                          aria-label="Add menu"
                           sx={{
+                            width: "100%",
+                            maxWidth: 220,
                             border: `1px solid ${alpha(m.navy, 0.14)}`,
                             borderRadius: "10px",
-                            height: 38,
-                            width: 132,
+                            height: 44,
+                            px: 1.5,
                             display: "flex",
                             alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 1.25,
                             bgcolor: "#fff",
-                            overflow: "hidden",
-                            boxShadow: "0 4px 14px rgba(16, 35, 63, 0.06)",
-                            position: "relative",
+                            textAlign: "left",
+                            transition: "border-color 0.15s, background-color 0.15s",
+                            "&:hover": {
+                              bgcolor: isViewingExisting ? "#fff" : alpha(m.navy, 0.02),
+                              borderColor: isViewingExisting ? alpha(m.navy, 0.14) : m.teal,
+                            },
+                            "&.Mui-disabled": {
+                              opacity: 0.55,
+                              cursor: "not-allowed",
+                            },
                           }}
                         >
-                          <Box
-                            sx={{
-                              flex: 1,
-                              height: "100%",
-                              px: 1.2,
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 0.95,
-                              justifyContent: "flex-start",
-                              userSelect: "none",
-                              cursor: "default",
-                              opacity: isViewingExisting ? 0.55 : 1,
-                            }}
-                          >
-                            <Box sx={{ width: 22, height: 22, borderRadius: "999px", bgcolor: alpha(m.teal, 0.18), color: m.teal, display: "grid", placeItems: "center", fontSize: 17, fontWeight: 900 }}>
-                              +
+                          <Box sx={{ display: "flex", alignItems: "center", gap: 1.1, minWidth: 0 }}>
+                            <Box
+                              sx={{
+                                width: 26,
+                                height: 26,
+                                borderRadius: "999px",
+                                bgcolor: alpha(m.teal, 0.12),
+                                color: m.teal,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flexShrink: 0,
+                                border: `1px solid ${alpha(m.teal, 0.22)}`,
+                              }}
+                            >
+                              <AddRoundedIcon sx={{ fontSize: 16 }} />
                             </Box>
-                            <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.62), flex: 1, lineHeight: 1 }}>
+                            <BodyText
+                              component="span"
+                              sx={{
+                                fontSize: 12.5,
+                                fontWeight: 800,
+                                color: alpha(m.navy, 0.72),
+                                lineHeight: 1,
+                              }}
+                            >
                               Add
                             </BodyText>
                           </Box>
-
-                          <Box sx={{ width: 1, height: "100%", bgcolor: alpha(m.navy, 0.10) }} />
-
-                          <IconButton
-                            size="small"
-                            ref={addMenuButtonRef}
-                            onClick={(e) => setSlotAddMenuAnchor(e.currentTarget)}
-                            data-add-menu-arrow="true"
+                          <KeyboardArrowDownRoundedIcon
                             sx={{
-                              width: 38,
-                              height: 38,
-                              flex: "0 0 38px",
-                              borderRadius: 0,
-                              p: 0,
-                              m: 0,
-                              color: alpha(m.navy, 0.45),
-                              display: "grid",
-                              placeItems: "center",
-                              "&:hover": { bgcolor: alpha(m.navy, 0.04) },
-                              zIndex: 1,
+                              fontSize: 18,
+                              color: slotAddMenuAnchor && addMenuTarget === "client" ? m.teal : alpha(m.navy, 0.45),
+                              flexShrink: 0,
+                              transform: slotAddMenuAnchor && addMenuTarget === "client" ? "rotate(180deg)" : "none",
+                              transition: "transform 0.15s, color 0.15s",
                             }}
-                            aria-label="Add menu"
-                            disabled={isViewingExisting}
-                          >
-                            <KeyboardArrowDownRoundedIcon sx={{ fontSize: 18 }} />
-                          </IconButton>
-                        </Box>
+                          />
+                        </ButtonBase>
 
                         <Popover
                           open={Boolean(slotAddMenuAnchor)}
@@ -2696,246 +5309,390 @@ export default function ProfessionalFixedLocationCalendar({
                           onClose={() => setSlotAddMenuAnchor(null)}
                           anchorOrigin={{ vertical: "bottom", horizontal: "left" }}
                           transformOrigin={{ vertical: "top", horizontal: "left" }}
-                          PaperProps={{
-                            sx: {
-                              mt: 0.8,
-                              borderRadius: "12px",
-                              border: `1px solid ${alpha(m.navy, 0.08)}`,
-                              boxShadow: "0 16px 44px rgba(16, 35, 63, 0.18)",
-                              overflow: "hidden",
-                              minWidth: 210,
+                          slotProps={{
+                            paper: {
+                              sx: {
+                                mt: 0.75,
+                                borderRadius: "10px",
+                                border: `1px solid ${alpha(m.navy, 0.10)}`,
+                                boxShadow: "0 10px 24px rgba(16, 35, 63, 0.12)",
+                                overflow: "hidden",
+                                width: slotAddMenuAnchor?.offsetWidth ?? addMenuButtonRef.current?.offsetWidth ?? 220,
+                              },
                             },
                           }}
                         >
-                          <Stack sx={{ p: 0.75 }}>
-                            {[
-                              { key: "service", label: "Add item" },
-                              { key: "service-2", label: "Add service" },
-                              { key: "product", label: "Add product" },
-                            ].map((item) => (
-                              <ButtonBase
-                                key={item.key}
-                                onClick={() => {
-                                  setSlotAddMenuAnchor(null);
-                                  if (item.key === "service" || item.key === "service-2") {
-                                    setProductPickerOpen(false);
-                                    setServicePickerOpen(true);
-                                  }
-                                  if (item.key === "product") {
-                                    setServicePickerOpen(false);
-                                    setProductPickerOpen(true);
-                                  }
-                                }}
-                                sx={{
-                                  width: "100%",
-                                  textAlign: "left",
-                                  borderRadius: "10px",
-                                  px: 1.25,
-                                  py: 1,
-                                  display: "flex",
-                                  alignItems: "center",
-                                  gap: 1,
-                                  "&:hover": { bgcolor: alpha(m.navy, 0.035) },
-                                }}
+                          <Stack sx={{ py: 0.5 }}>
+                            <ButtonBase
+                              onClick={() => {
+                                setSlotAddMenuAnchor(null);
+                                openSelectServices();
+                              }}
+                              sx={{
+                                width: "100%",
+                                textAlign: "left",
+                                px: 1.5,
+                                py: 1.1,
+                                display: "block",
+                                "&:hover": { bgcolor: alpha(m.navy, 0.04) },
+                              }}
+                            >
+                              <BodyText
+                                component="span"
+                                sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.72), lineHeight: 1 }}
                               >
-                                <Box
-                                  sx={{
-                                    width: 30,
-                                    height: 30,
-                                    borderRadius: "999px",
-                                    bgcolor: alpha(m.teal, 0.12),
-                                    color: m.teal,
-                                    display: "grid",
-                                    placeItems: "center",
-                                    fontWeight: 900,
-                                    flexShrink: 0,
-                                    fontSize: 18,
-                                    border: `1px solid ${alpha(m.teal, 0.22)}`,
-                                  }}
-                                >
-                                  +
-                                </Box>
-                                <BodyText sx={{ fontSize: 12.5, fontWeight: 850, color: alpha(m.navy, 0.76) }}>
-                                  {item.label}
-                                </BodyText>
-                              </ButtonBase>
-                            ))}
+                                Services
+                              </BodyText>
+                            </ButtonBase>
+                            <Box sx={{ height: 1, bgcolor: alpha(m.navy, 0.08), mx: 1 }} />
+                            <ButtonBase
+                              onClick={() => {
+                                setSlotAddMenuAnchor(null);
+                                openSelectProducts();
+                              }}
+                              sx={{
+                                width: "100%",
+                                textAlign: "left",
+                                px: 1.5,
+                                py: 1.1,
+                                display: "block",
+                                "&:hover": { bgcolor: alpha(m.navy, 0.04) },
+                              }}
+                            >
+                              <BodyText
+                                component="span"
+                                sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.72), lineHeight: 1 }}
+                              >
+                                Product/Items
+                              </BodyText>
+                            </ButtonBase>
                           </Stack>
                         </Popover>
 
-                        {servicePickerOpen ? (
+                        <BookingDrawerSelectedItemsSection
+                          services={selectedServices}
+                          products={selectedProducts}
+                          showRemoveButtons={showLineItemRemoveButton}
+                          resolveStaffName={(staffResourceId) =>
+                            staffResourceId ? resourceNameById.get(staffResourceId) : undefined
+                          }
+                          resolveServiceEditTag={resolveServiceEditTag}
+                          onRemoveService={(serviceId) => {
+                            setSelectedServices((prev) => prev.filter((item) => item.id !== serviceId));
+                            setServiceSelectionDraft((prev) => prev.filter((id) => id !== serviceId));
+                          }}
+                          onRemoveProduct={(productId) => {
+                            setSelectedProducts((prev) => prev.filter((item) => item.id !== productId));
+                            setProductSelectionDraft((prev) => {
+                              if (!prev[productId]) return prev;
+                              return { ...prev, [productId]: { ...prev[productId], selected: false } };
+                            });
+                          }}
+                          onServiceClick={
+                            incomingRequestEditMode
+                              ? (service) => {
+                                  const catalogService =
+                                    selectableServiceCatalog.find((item) => item.id === service.id) ??
+                                    selectableServiceCatalog.find((item) => item.name === service.name);
+                                  if (catalogService) openEditService(catalogService);
+                                }
+                              : undefined
+                          }
+                        />
+
+                        <BookingDrawerClientSnapshotSection
+                          snapshot={viewingBookingEvent?.details?.clientSnapshot ?? null}
+                        />
+
+                        {bookingGuests.map((guest) => (
                           <Box
+                            key={guest.id}
                             sx={{
                               borderRadius: "12px",
-                              bgcolor: "#fff",
-                              border: `1px solid ${alpha(m.navy, 0.08)}`,
-                              boxShadow: "0 10px 26px rgba(16, 35, 63, 0.08)",
+                              bgcolor: alpha(m.teal, 0.06),
+                              border: `1px solid ${alpha(m.teal, 0.14)}`,
                               p: 1.5,
                             }}
                           >
-                            <Stack direction="row" alignItems="center" spacing={1}>
-                              <BodyText sx={{ flex: 1, fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
-                                Services
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                gap: 1,
+                                borderRadius: "10px",
+                                border: `1px solid ${alpha(m.navy, 0.10)}`,
+                                px: 1.25,
+                                py: 1,
+                                bgcolor: "#fff",
+                                mb: 1,
+                              }}
+                            >
+                              <BodyText sx={{ fontSize: 12.5, lineHeight: 1.25 }}>
+                                <Box component="span" sx={{ fontWeight: 700, color: alpha(m.navy, 0.52) }}>
+                                  Guest:{" "}
+                                </Box>
+                                <Box component="span" sx={{ fontWeight: 900, color: alpha(m.navy, 0.82) }}>
+                                  {guest.name}
+                                </Box>
                               </BodyText>
-                              <IconButton size="small" onClick={() => setServicePickerOpen(false)} sx={{ color: alpha(m.navy, 0.35) }}>
-                                <CloseRoundedIcon sx={{ fontSize: 17 }} />
-                              </IconButton>
-                            </Stack>
+                              {showClientRemoveButton ? (
+                                <IconButton
+                                  size="small"
+                                  onClick={() => {
+                                    setBookingGuests((prev) => prev.filter((item) => item.id !== guest.id));
+                                    if (addMenuTarget === guest.id) setSlotAddMenuAnchor(null);
+                                  }}
+                                  sx={{ color: alpha(m.navy, 0.35) }}
+                                  aria-label={`Remove ${guest.name}`}
+                                >
+                                  <CloseRoundedIcon sx={{ fontSize: 17 }} />
+                                </IconButton>
+                              ) : null}
+                            </Box>
 
-                            <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                              <AppDropdown
-                                label=""
-                                value={selectedServiceId}
-                                onChange={(val) => {
-                                  if (isViewingExisting) return;
-                                  setSelectedServiceId(val as string);
-                                }}
-                                options={[
-                                  { label: "Select service", value: "" },
-                                  ...serviceCatalog.map((s) => ({ label: `${s.name} — €${s.price}`, value: s.id })),
-                                ]}
-                                fullWidth
-                                placeholder="Select service"
-                                disabled={isViewingExisting}
-                              />
-                              <Button
-                                variant="outlined"
-                                disabled={!selectedServiceId}
-                                onClick={() => {
-                                  if (isViewingExisting) return;
-                                  const s = serviceCatalog.find((x) => x.id === selectedServiceId);
-                                  if (!s) return;
-                                  setSelectedServices((p) => (p.some((it) => it.id === s.id) ? p : [...p, { id: s.id, name: s.name, price: s.price }]));
-                                  setSelectedServiceId("");
-                                }}
-                                sx={{ borderRadius: "10px", textTransform: "none", fontWeight: 850, minWidth: 90 }}
-                              >
-                                Add
-                              </Button>
-                            </Stack>
-
-                            {selectedServices.length ? (
-                              <Stack spacing={0.75} sx={{ mt: 1.25 }}>
-                                {selectedServices.map((s) => (
+                            {guest.services.length > 0 ? (
+                              <Stack spacing={0.75} sx={{ mb: guest.products.length > 0 ? 0.75 : 1 }}>
+                                {guest.services.map((service) => (
                                   <Box
-                                    key={s.id}
+                                    key={service.id}
                                     sx={{
                                       display: "flex",
                                       alignItems: "center",
                                       justifyContent: "space-between",
+                                      gap: 1,
                                       borderRadius: "10px",
-                                      border: `1px solid ${alpha(m.navy, 0.08)}`,
+                                      border: `1px solid ${alpha(m.navy, 0.10)}`,
                                       px: 1.25,
-                                      py: 0.85,
+                                      py: 1.1,
+                                      bgcolor: "#fff",
                                     }}
                                   >
-                                    <BodyText sx={{ fontSize: 12.5, fontWeight: 850, color: alpha(m.navy, 0.72) }}>{s.name}</BodyText>
-                                    <Stack direction="row" alignItems="center" spacing={0.5}>
-                                      <BodyText sx={{ fontSize: 12.5, fontWeight: 950, color: alpha(m.navy, 0.82) }}>€{s.price}</BodyText>
+                                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                                      <BodyText sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.82), lineHeight: 1.25 }}>
+                                        {service.name}
+                                      </BodyText>
+                                      <BodyText sx={{ mt: 0.35, fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.48), lineHeight: 1.2 }}>
+                                        {service.startTime || service.discount
+                                          ? formatBookingServiceLineMeta(service)
+                                          : formatBookingServiceMeta(service)}
+                                      </BodyText>
+                                    </Box>
+                                    {showLineItemRemoveButton ? (
                                       <IconButton
                                         size="small"
-                                        onClick={() => setSelectedServices((p) => p.filter((x) => x.id !== s.id))}
-                                        sx={{ color: alpha(m.navy, 0.3) }}
-                                        aria-label={`Remove ${s.name}`}
-                                        disabled={isViewingExisting}
+                                        onClick={() => {
+                                          setBookingGuests((prev) =>
+                                            prev.map((item) =>
+                                              item.id === guest.id
+                                                ? { ...item, services: item.services.filter((svc) => svc.id !== service.id) }
+                                                : item,
+                                            ),
+                                          );
+                                        }}
+                                        sx={{ color: alpha(m.navy, 0.35) }}
+                                        aria-label={`Remove ${service.name}`}
                                       >
-                                        <CloseRoundedIcon sx={{ fontSize: 16 }} />
+                                        <CloseRoundedIcon sx={{ fontSize: 17 }} />
                                       </IconButton>
-                                    </Stack>
+                                    ) : null}
                                   </Box>
                                 ))}
                               </Stack>
                             ) : null}
-                          </Box>
-                        ) : null}
 
-                        {productPickerOpen ? (
-                          <Box
-                            sx={{
-                              borderRadius: "12px",
-                              bgcolor: "#fff",
-                              border: `1px solid ${alpha(m.navy, 0.08)}`,
-                              boxShadow: "0 10px 26px rgba(16, 35, 63, 0.08)",
-                              p: 1.5,
-                            }}
-                          >
-                            <Stack direction="row" alignItems="center" spacing={1}>
-                              <BodyText sx={{ flex: 1, fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
-                                Products
-                              </BodyText>
-                              <IconButton size="small" onClick={() => setProductPickerOpen(false)} sx={{ color: alpha(m.navy, 0.35) }}>
-                                <CloseRoundedIcon sx={{ fontSize: 17 }} />
-                              </IconButton>
-                            </Stack>
-
-                            <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                              <AppDropdown
-                                label=""
-                                value={selectedProductId}
-                                onChange={(val) => {
-                                  if (isViewingExisting) return;
-                                  setSelectedProductId(val as string);
-                                }}
-                                options={[
-                                  { label: "Select product", value: "" },
-                                  ...productCatalog.map((p) => ({ label: `${p.name} — €${p.price}`, value: p.id })),
-                                ]}
-                                fullWidth
-                                placeholder="Select product"
-                                disabled={isViewingExisting}
-                              />
-                              <Button
-                                variant="outlined"
-                                disabled={!selectedProductId}
-                                onClick={() => {
-                                  if (isViewingExisting) return;
-                                  const p = productCatalog.find((x) => x.id === selectedProductId);
-                                  if (!p) return;
-                                  setSelectedProducts((prev) => (prev.some((it) => it.id === p.id) ? prev : [...prev, { id: p.id, name: p.name, price: p.price }]));
-                                  setSelectedProductId("");
-                                }}
-                                sx={{ borderRadius: "10px", textTransform: "none", fontWeight: 850, minWidth: 90 }}
-                              >
-                                Add
-                              </Button>
-                            </Stack>
-
-                            {selectedProducts.length ? (
-                              <Stack spacing={0.75} sx={{ mt: 1.25 }}>
-                                {selectedProducts.map((p) => (
+                            {guest.products.length > 0 ? (
+                              <Stack spacing={0.75} sx={{ mb: 1 }}>
+                                {guest.products.map((product) => (
                                   <Box
-                                    key={p.id}
+                                    key={product.id}
                                     sx={{
                                       display: "flex",
                                       alignItems: "center",
                                       justifyContent: "space-between",
+                                      gap: 1,
                                       borderRadius: "10px",
-                                      border: `1px solid ${alpha(m.navy, 0.08)}`,
+                                      border: `1px solid ${alpha(m.navy, 0.10)}`,
                                       px: 1.25,
-                                      py: 0.85,
+                                      py: 1.1,
+                                      bgcolor: "#fff",
                                     }}
                                   >
-                                    <BodyText sx={{ fontSize: 12.5, fontWeight: 850, color: alpha(m.navy, 0.72) }}>{p.name}</BodyText>
-                                    <Stack direction="row" alignItems="center" spacing={0.5}>
-                                      <BodyText sx={{ fontSize: 12.5, fontWeight: 950, color: alpha(m.navy, 0.82) }}>€{p.price}</BodyText>
+                                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                                      <BodyText sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.82), lineHeight: 1.25 }}>
+                                        {product.name}
+                                      </BodyText>
+                                      <BodyText sx={{ mt: 0.35, fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.48), lineHeight: 1.2 }}>
+                                        {formatProductUnitPrice(product.price)}
+                                      </BodyText>
+                                    </Box>
+                                    {showLineItemRemoveButton ? (
                                       <IconButton
                                         size="small"
-                                        onClick={() => setSelectedProducts((prev) => prev.filter((x) => x.id !== p.id))}
-                                        sx={{ color: alpha(m.navy, 0.3) }}
-                                        aria-label={`Remove ${p.name}`}
-                                        disabled={isViewingExisting}
+                                        onClick={() => {
+                                          setBookingGuests((prev) =>
+                                            prev.map((item) =>
+                                              item.id === guest.id
+                                                ? { ...item, products: item.products.filter((prd) => prd.id !== product.id) }
+                                                : item,
+                                            ),
+                                          );
+                                        }}
+                                        sx={{ color: alpha(m.navy, 0.35) }}
+                                        aria-label={`Remove ${product.name}`}
                                       >
-                                        <CloseRoundedIcon sx={{ fontSize: 16 }} />
+                                        <CloseRoundedIcon sx={{ fontSize: 17 }} />
                                       </IconButton>
-                                    </Stack>
+                                    ) : null}
                                   </Box>
                                 ))}
                               </Stack>
                             ) : null}
+
+                            <ButtonBase
+                              disabled={isViewingExisting}
+                              onClick={(e) => {
+                                const el = e.currentTarget;
+                                if (slotAddMenuAnchor && addMenuTarget === guest.id) {
+                                  setSlotAddMenuAnchor(null);
+                                  return;
+                                }
+                                setAddMenuTarget(guest.id);
+                                setSlotAddMenuAnchor(el);
+                              }}
+                              aria-label={`Add items for ${guest.name}`}
+                              sx={{
+                                width: "100%",
+                                maxWidth: 220,
+                                border: `1px solid ${alpha(m.navy, 0.14)}`,
+                                borderRadius: "10px",
+                                height: 44,
+                                px: 1.5,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                gap: 1.25,
+                                bgcolor: "#fff",
+                                textAlign: "left",
+                                transition: "border-color 0.15s, background-color 0.15s",
+                                "&:hover": {
+                                  bgcolor: isViewingExisting ? "#fff" : alpha(m.navy, 0.02),
+                                  borderColor: isViewingExisting ? alpha(m.navy, 0.14) : m.teal,
+                                },
+                                "&.Mui-disabled": {
+                                  opacity: 0.55,
+                                  cursor: "not-allowed",
+                                },
+                              }}
+                            >
+                              <Box sx={{ display: "flex", alignItems: "center", gap: 1.1, minWidth: 0 }}>
+                                <Box
+                                  sx={{
+                                    width: 26,
+                                    height: 26,
+                                    borderRadius: "999px",
+                                    bgcolor: alpha(m.teal, 0.12),
+                                    color: m.teal,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    flexShrink: 0,
+                                    border: `1px solid ${alpha(m.teal, 0.22)}`,
+                                  }}
+                                >
+                                  <AddRoundedIcon sx={{ fontSize: 16 }} />
+                                </Box>
+                                <BodyText
+                                  component="span"
+                                  sx={{
+                                    fontSize: 12.5,
+                                    fontWeight: 800,
+                                    color: alpha(m.navy, 0.72),
+                                    lineHeight: 1,
+                                  }}
+                                >
+                                  Add
+                                </BodyText>
+                              </Box>
+                              <KeyboardArrowDownRoundedIcon
+                                sx={{
+                                  fontSize: 18,
+                                  color: slotAddMenuAnchor && addMenuTarget === guest.id ? m.teal : alpha(m.navy, 0.45),
+                                  flexShrink: 0,
+                                  transform: slotAddMenuAnchor && addMenuTarget === guest.id ? "rotate(180deg)" : "none",
+                                  transition: "transform 0.15s, color 0.15s",
+                                }}
+                              />
+                            </ButtonBase>
+                          </Box>
+                        ))}
+
+                        {showInlineGuestField ? (
+                          <Box
+                            sx={{
+                              borderRadius: "12px",
+                              bgcolor: alpha(m.navy, 0.025),
+                              border: `1px solid ${alpha(m.navy, 0.08)}`,
+                              p: 1.5,
+                            }}
+                          >
+                            <BodyText sx={{ fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.82), mb: 1.25 }}>
+                              Guest
+                            </BodyText>
+                            <Stack direction="row" spacing={1.25} sx={{ mb: 1.25 }}>
+                              <AppTextField
+                                placeholder="First Name*"
+                                value={inlineGuestDraft.firstName}
+                                onChange={(e) => setInlineGuestDraft((prev) => ({ ...prev, firstName: e.target.value }))}
+                                fullWidth
+                                disabled={isViewingExisting}
+                              />
+                              <AppTextField
+                                placeholder="Last Name*"
+                                value={inlineGuestDraft.lastName}
+                                onChange={(e) => setInlineGuestDraft((prev) => ({ ...prev, lastName: e.target.value }))}
+                                fullWidth
+                                disabled={isViewingExisting}
+                              />
+                            </Stack>
+                            <Button
+                              variant="contained"
+                              disableElevation
+                              onClick={addInlineGuest}
+                              disabled={isViewingExisting}
+                              sx={{
+                                borderRadius: "10px",
+                                textTransform: "none",
+                                fontWeight: 900,
+                                height: 38,
+                                bgcolor: m.teal,
+                                "&:hover": { bgcolor: m.tealDark },
+                                minWidth: 96,
+                              }}
+                            >
+                              Add
+                            </Button>
                           </Box>
                         ) : null}
 
-                        <Box sx={{ borderRadius: "10px", bgcolor: alpha(m.navy, 0.025), p: 1.5 }}>
+                        <Box
+                          sx={{
+                            borderRadius: "10px",
+                            bgcolor: alpha(m.navy, 0.025),
+                            p: 1.5,
+                            ...(slotLocation === "FL"
+                              ? {
+                                  backgroundImage: `repeating-linear-gradient(90deg, ${alpha(m.teal, 0.1)} 0 2px, transparent 2px 13px)`,
+                                  backgroundSize: "15px 100%",
+                                }
+                              : slotLocation === "DL"
+                                ? {
+                                    backgroundImage: `radial-gradient(${alpha(m.navy, 0.14)} 1px, transparent 1.35px)`,
+                                    backgroundSize: "17px 17px",
+                                  }
+                                : {}),
+                          }}
+                        >
                           <BodyText sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.76), mb: 1 }}>
                             Location
                           </BodyText>
@@ -2945,7 +5702,7 @@ export default function ProfessionalFixedLocationCalendar({
                                 Fixed Location
                               </BodyText>
                               <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.42) }}>
-                                St. Salon 123
+                                {fixedLocationAddress || "Fixed location address"}
                               </BodyText>
                             </Stack>
                           ) : (
@@ -3063,39 +5820,218 @@ export default function ProfessionalFixedLocationCalendar({
                           )}
                         </Box>
 
-                        <Box>
-                          <BodyText sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.72), mb: 0.75 }}>
-                            Contact Number
-                          </BodyText>
-                          <Stack direction="row" spacing={1}>
-                            <AppDropdown
-                              label=""
-                              value=""
-                              onChange={() => undefined}
-                              options={[{ label: "Select Code", value: "" }, { label: "+44", value: "+44" }, { label: "+92", value: "+92" }]}
-                              fullWidth
-                              sx={{ maxWidth: 120 }}
-                              placeholder="Select Code"
-                            />
-                            <AppTextField placeholder="+442xxxxxxxxxx" fullWidth />
-                          </Stack>
-                        </Box>
+                        <AppCountryPhoneFields
+                          countryCode={bookingPhoneDraft.phoneCode}
+                          phone={bookingPhoneDraft.phoneNumber}
+                          onCountryCodeChange={(dialCode) =>
+                            setBookingPhoneDraft((p) => ({ ...p, phoneCode: dialCode }))
+                          }
+                          onPhoneChange={(phone) => setBookingPhoneDraft((p) => ({ ...p, phoneNumber: phone }))}
+                          countryCodeError={slotErrors.bookingPhoneCode}
+                          phoneError={slotErrors.bookingPhoneNumber}
+                          phonePlaceholder="+442xxxxxxxxxx"
+                          required={false}
+                          disabled={isViewingExisting}
+                        />
 
-                        <Box
-                          sx={{
-                            borderRadius: "10px",
-                            border: `1px solid ${alpha(m.navy, 0.16)}`,
-                            bgcolor: "#fff",
-                            px: 2,
-                            py: 1.6,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                          }}
-                        >
-                          <BodyText sx={{ fontSize: 16, fontWeight: 950, color: alpha(m.navy, 0.78) }}>Total Price:</BodyText>
-                          <BodyText sx={{ fontSize: 18, fontWeight: 950, color: alpha(m.navy, 0.9) }}>€{totalPrice}</BodyText>
-                        </Box>
+                        {isViewingBooking && isBookingRequestAccepted(viewingBookingEvent) ? (
+                          <BookingRequestAcceptedPanel
+                            totalPrice={totalPrice}
+                            prepaymentPercent={Number(prepaymentPercent) || undefined}
+                            prepaymentAmount={prepaymentAmount}
+                            remainingAmount={remainingAfterPrepayment}
+                            onOk={handleAcknowledgeAcceptedBr}
+                          />
+                        ) : (
+                          <Box
+                            sx={{
+                              borderRadius: "10px",
+                              border: `1px solid ${alpha(m.navy, 0.16)}`,
+                              bgcolor: "#fff",
+                              px: 2,
+                              py: 1.6,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              gap: 1.5,
+                            }}
+                          >
+                            <BodyText sx={{ fontSize: 16, fontWeight: 950, color: alpha(m.navy, 0.78), flexShrink: 0 }}>
+                              Total Price:
+                            </BodyText>
+                            {bookingDiscountAmount > 0 && bookingTotalDiscount ? (
+                              <Stack direction="row" alignItems="baseline" spacing={1} sx={{ flexWrap: "wrap", justifyContent: "flex-end" }}>
+                                <BodyText
+                                  sx={{
+                                    fontSize: 16,
+                                    fontWeight: 800,
+                                    color: alpha(m.navy, 0.42),
+                                    textDecoration: "line-through",
+                                    lineHeight: 1.2,
+                                  }}
+                                >
+                                  {subtotalPrice}€
+                                </BodyText>
+                                <BodyText sx={{ fontSize: 18, fontWeight: 950, color: alpha(m.navy, 0.9), lineHeight: 1.2 }}>
+                                  {totalPrice}€
+                                </BodyText>
+                                <BodyText sx={{ fontSize: 12, fontWeight: 800, color: m.teal, lineHeight: 1.2 }}>
+                                  {bookingTotalDiscount.type === "percentage"
+                                    ? `${bookingTotalDiscount.amount}% Discount`
+                                    : `${formatManualEntryDiscountLabel(bookingTotalDiscount)} Discount`}
+                                </BodyText>
+                              </Stack>
+                            ) : (
+                              <BodyText sx={{ fontSize: 18, fontWeight: 950, color: alpha(m.navy, 0.9) }}>€{totalPrice}</BodyText>
+                            )}
+                          </Box>
+                        )}
+
+                        {isViewingBooking && canDiscardBookingRequest(viewingBookingEvent) ? (
+                          <ButtonBase
+                            onClick={() => setDiscardBrOpen(true)}
+                            sx={{
+                              width: "100%",
+                              borderRadius: "10px",
+                              border: `1px solid ${alpha(m.navy, 0.12)}`,
+                              bgcolor: alpha(m.navy, 0.04),
+                              minHeight: 44,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: 0.75,
+                              color: alpha(m.navy, 0.68),
+                              transition: "background-color 0.15s, border-color 0.15s",
+                              "&:hover": {
+                                bgcolor: alpha(m.navy, 0.07),
+                                borderColor: alpha(m.navy, 0.18),
+                              },
+                            }}
+                          >
+                            <CloseRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
+                            <BodyText sx={{ fontSize: 13, fontWeight: 800, color: "inherit" }}>Discard BR</BodyText>
+                          </ButtonBase>
+                        ) : null}
+
+                        {showLateCancellation ? (
+                          <Box
+                            sx={{
+                              borderRadius: "12px",
+                              bgcolor: "#fff",
+                              border: `1px solid ${alpha(m.navy, 0.08)}`,
+                              boxShadow: "0 10px 26px rgba(16, 35, 63, 0.08)",
+                              p: 1.5,
+                            }}
+                          >
+                            <Stack direction="row" alignItems="center" spacing={1}>
+                              <BodyText sx={{ flex: 1, fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
+                                Late Cancellation
+                              </BodyText>
+                              <IconButton
+                                size="small"
+                                onClick={() => {
+                                  if (isViewingExisting) return;
+                                  setShowLateCancellation(false);
+                                  setLateCancellationFeePercent("");
+                                }}
+                                sx={{ color: alpha(m.navy, 0.35) }}
+                                aria-label="Remove late cancellation"
+                                disabled={isViewingExisting}
+                              >
+                                <CloseRoundedIcon sx={{ fontSize: 17 }} />
+                              </IconButton>
+                            </Stack>
+
+                            <BodyText sx={{ mt: 0.5, fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.48), lineHeight: 1.35 }}>
+                              1 Min Past Required 24h Notice
+                            </BodyText>
+
+                            <Stack direction="row" alignItems="center" spacing={1.25} sx={{ mt: 1.25 }}>
+                              <Stack direction="row" alignItems="center" spacing={0.5} sx={{ minWidth: 52 }}>
+                                <BodyText sx={{ fontSize: 12.5, fontWeight: 850, color: alpha(m.navy, 0.62) }}>Fee</BodyText>
+                                <InfoOutlinedIcon sx={{ fontSize: 15, color: m.teal }} />
+                              </Stack>
+                              <AppTextField
+                                placeholder="%"
+                                value={lateCancellationFeePercent}
+                                onChange={(e) => setLateCancellationFeePercent(e.target.value)}
+                                disabled={isViewingExisting}
+                                sx={{ width: 72, flexShrink: 0 }}
+                              />
+                              <BodyText
+                                sx={{
+                                  flex: 1,
+                                  textAlign: "right",
+                                  fontSize: 16,
+                                  fontWeight: 950,
+                                  color: alpha(m.navy, 0.85),
+                                }}
+                              >
+                                €{lateCancellationFeeAmount}
+                              </BodyText>
+                            </Stack>
+                          </Box>
+                        ) : null}
+
+                        {showLateRescheduling ? (
+                          <Box
+                            sx={{
+                              borderRadius: "12px",
+                              bgcolor: "#fff",
+                              border: `1px solid ${alpha(m.navy, 0.08)}`,
+                              boxShadow: "0 10px 26px rgba(16, 35, 63, 0.08)",
+                              p: 1.5,
+                            }}
+                          >
+                            <Stack direction="row" alignItems="center" spacing={1}>
+                              <BodyText sx={{ flex: 1, fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
+                                Late Rescheduling
+                              </BodyText>
+                              <IconButton
+                                size="small"
+                                onClick={() => {
+                                  if (isViewingExisting) return;
+                                  setShowLateRescheduling(false);
+                                  setLateRescheduleFeePercent("");
+                                }}
+                                sx={{ color: alpha(m.navy, 0.35) }}
+                                aria-label="Remove late rescheduling"
+                                disabled={isViewingExisting}
+                              >
+                                <CloseRoundedIcon sx={{ fontSize: 17 }} />
+                              </IconButton>
+                            </Stack>
+
+                            <BodyText sx={{ mt: 0.5, fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.48), lineHeight: 1.35 }}>
+                              Fee applies when rescheduling after the allowed notice period
+                            </BodyText>
+
+                            <Stack direction="row" alignItems="center" spacing={1.25} sx={{ mt: 1.25 }}>
+                              <Stack direction="row" alignItems="center" spacing={0.5} sx={{ minWidth: 52 }}>
+                                <BodyText sx={{ fontSize: 12.5, fontWeight: 850, color: alpha(m.navy, 0.62) }}>Fee</BodyText>
+                                <InfoOutlinedIcon sx={{ fontSize: 15, color: m.teal }} />
+                              </Stack>
+                              <AppTextField
+                                placeholder="%"
+                                value={lateRescheduleFeePercent}
+                                onChange={(e) => setLateRescheduleFeePercent(e.target.value)}
+                                disabled={isViewingExisting}
+                                sx={{ width: 72, flexShrink: 0 }}
+                              />
+                              <BodyText
+                                sx={{
+                                  flex: 1,
+                                  textAlign: "right",
+                                  fontSize: 16,
+                                  fontWeight: 950,
+                                  color: alpha(m.navy, 0.85),
+                                }}
+                              >
+                                €{lateRescheduleFeeAmount}
+                              </BodyText>
+                            </Stack>
+                          </Box>
+                        ) : null}
 
                         {showPrepayment ? (
                           <>
@@ -3200,27 +6136,123 @@ export default function ProfessionalFixedLocationCalendar({
                           </>
                         ) : null}
 
-                        <Box sx={{ borderRadius: "10px", bgcolor: alpha(m.navy, 0.025), p: 1.5 }}>
-                          <Button
-                            variant="outlined"
-                            startIcon={
-                              <Box sx={{ width: 20, height: 20, borderRadius: "999px", bgcolor: alpha(m.navy, 0.06), color: alpha(m.navy, 0.45), display: "grid", placeItems: "center", fontWeight: 900 }}>
-                                +
-                              </Box>
-                            }
+                        {showIncomingRequestActions ? (
+                          <BookingRequestResponseActions
+                            onAccept={() => setIncomingConfirmAction("accept")}
+                            onEdit={handleStartIncomingEdit}
+                            onReject={() => setIncomingConfirmAction("reject")}
+                          />
+                        ) : null}
+
+                        {showDiscardEbr ? (
+                          <ButtonBase
+                            onClick={() => setDiscardEbrOpen(true)}
                             sx={{
-                              borderRadius: "8px",
-                              textTransform: "none",
-                              fontWeight: 800,
-                              color: alpha(m.navy, 0.6),
-                              borderColor: alpha(m.navy, 0.14),
-                              bgcolor: "#fff",
-                              minWidth: 112,
+                              width: "100%",
+                              borderRadius: "10px",
+                              border: `1px solid ${alpha(m.navy, 0.12)}`,
+                              bgcolor: alpha(m.navy, 0.04),
+                              minHeight: 44,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: 0.75,
+                              color: alpha(m.navy, 0.68),
+                              transition: "background-color 0.15s, border-color 0.15s",
+                              "&:hover": {
+                                bgcolor: alpha(m.navy, 0.07),
+                                borderColor: alpha(m.navy, 0.18),
+                              },
                             }}
                           >
-                            Guest
-                          </Button>
+                            <CloseRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
+                            <BodyText sx={{ fontSize: 13, fontWeight: 800, color: "inherit" }}>Discard EBR</BodyText>
+                          </ButtonBase>
+                        ) : null}
+
+                        {showInternalNote ? (
+                          <Box>
+                            <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.75 }}>
+                              <StickyNote2OutlinedIcon sx={{ fontSize: 16, color: m.teal }} />
+                              <BodyText sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78) }}>
+                                Internal Note
+                              </BodyText>
+                            </Stack>
+                            <AppTextField
+                              placeholder="Description"
+                              value={bookingInternalNote}
+                              onChange={(e) => setBookingInternalNote(e.target.value)}
+                              disabled={isViewingExisting}
+                              multiline
+                              minRows={4}
+                              fullWidth
+                              sx={{
+                                "& .MuiOutlinedInput-root": {
+                                  bgcolor: "#fff",
+                                  borderRadius: "10px",
+                                },
+                              }}
+                            />
+                            <Box sx={{ mt: 1.5, borderTop: `1px solid ${alpha(m.navy, 0.1)}` }} />
+                          </Box>
+                        ) : null}
+
+                        <Box sx={{ borderRadius: "10px", bgcolor: alpha(m.navy, 0.025), p: 1.5 }}>
+                          <ButtonBase
+                            onClick={() => {
+                              if (isViewingExisting || showInlineGuestField) return;
+                              setShowInlineGuestField(true);
+                            }}
+                            disabled={isViewingExisting || showInlineGuestField}
+                            sx={{
+                              border: `1px solid ${alpha(m.navy, 0.14)}`,
+                              borderRadius: "10px",
+                              height: 44,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "flex-start",
+                              gap: 1.25,
+                              px: 1.5,
+                              bgcolor: "#fff",
+                              transition: "border-color 0.15s, background-color 0.15s",
+                              "&:hover": {
+                                bgcolor: isViewingExisting || showInlineGuestField ? "#fff" : alpha(m.navy, 0.02),
+                              },
+                              "&.Mui-disabled": {
+                                opacity: 0.55,
+                                cursor: "not-allowed",
+                              },
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                width: 26,
+                                height: 26,
+                                borderRadius: "999px",
+                                bgcolor: alpha(m.navy, 0.06),
+                                color: alpha(m.navy, 0.45),
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flexShrink: 0,
+                              }}
+                            >
+                              <AddRoundedIcon sx={{ fontSize: 16 }} />
+                            </Box>
+                            <BodyText
+                              component="span"
+                              sx={{
+                                fontSize: 12.5,
+                                fontWeight: 800,
+                                color: alpha(m.navy, 0.6),
+                                lineHeight: 1,
+                              }}
+                            >
+                              Guest
+                            </BodyText>
+                          </ButtonBase>
                         </Box>
+
                         <Box sx={{ flex: 1, minHeight: 40 }} />
                       </>
                     ) : (
@@ -3230,9 +6262,37 @@ export default function ProfessionalFixedLocationCalendar({
                 )
               ) : (
                 <Box sx={{ pt: 1 }}>
-                  <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.6) }}>
-                    {slotDrawerTab === "sales" ? "Sales tab (mock)." : "Activity tab (mock)."}
-                  </BodyText>
+                  {drawerSalesActivityContext ? (
+                    slotDrawerTab === "sales" ? (
+                      <SalesOverview
+                        bookings={clientBookingsForActivity}
+                        currentEvent={drawerSalesActivityContext}
+                        clientName={clientActivityIdentity.name}
+                        clientEmail={clientActivityIdentity.email}
+                        clientPhone={
+                          [bookingPhoneDraft.phoneCode, bookingPhoneDraft.phoneNumber]
+                            .filter(Boolean)
+                            .join(" ")
+                            .trim() ||
+                          drawerSalesActivityContext.details?.phoneNumber ||
+                          ""
+                        }
+                        fallbackResourceId={drawerSalesActivityContext.resourceId || data.resources[0]?.id || "unassigned"}
+                      />
+                    ) : (
+                      <BookingActivityOverview
+                        title="Activity Overview"
+                        items={activityTimelineItems}
+                        emptyMessage="No activity for this client yet."
+                        selectedDetail={activityDetailItem}
+                        onSelectedDetailChange={setActivityDetailItem}
+                      />
+                    )
+                  ) : (
+                    <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.6) }}>
+                      Add booking details to view {slotDrawerTab === "sales" ? "sales" : "activity"}.
+                    </BodyText>
+                  )}
                 </Box>
               )}
             </>
@@ -3243,6 +6303,7 @@ export default function ProfessionalFixedLocationCalendar({
           )}
         </Box>
       </MollureDrawer>
+      {renderTeamActionPopover()}
       <CalendarFiltersDrawer
         appliedFilters={appliedFilters}
         bookingTypes={bookingTypes}
@@ -3266,11 +6327,39 @@ export default function ProfessionalFixedLocationCalendar({
             showSnackbar({ severity: "warning", message: "Select team member and location." });
             return;
           }
+          const nextBlocks = buildBlocksFromDraft(blockDraft, blockDraft.teamIds);
+          if (!nextBlocks.length) {
+            showSnackbar({
+              severity: "warning",
+              message: "No dates matched your selection. Check the date range and day filters.",
+            });
+            return;
+          }
+
+          setBlocks((prev) => {
+            const seen = new Set(prev.map((block) => `${block.resourceId}-${block.date}-${block.start}-${block.end}`));
+            const unique = nextBlocks.filter((block) => {
+              const key = `${block.resourceId}-${block.date}-${block.start}-${block.end}`;
+              if (seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            });
+            return [...prev, ...unique];
+          });
+          setActiveDateIso(blockDraft.dateFrom);
+          if (blockDraft.teamIds.length === 1) {
+            setSelectedResourceId(blockDraft.teamIds[0]);
+          }
+          setBlockTimeOpen(false);
+          showSnackbar({ severity: "success", message: "Blocked time added." });
+
+          if (!onCreateCalendarEntry) return;
+
           try {
             for (const teamId of blockDraft.teamIds) {
               const teamMemberId = String(teamId).trim() || null;
               for (const location of blockDraft.locations) {
-                await onCreateCalendarEntry?.({
+                await onCreateCalendarEntry({
                   team_member_id: teamMemberId,
                   status: "blocked",
                   title: blockDraft.title || "Blocked time",
@@ -3283,10 +6372,11 @@ export default function ProfessionalFixedLocationCalendar({
                 });
               }
             }
-            showSnackbar({ severity: "success", message: "Blocked time added." });
-            setBlockTimeOpen(false);
           } catch {
-            showSnackbar({ severity: "error", message: "Unable to add blocked time." });
+            showSnackbar({
+              severity: "warning",
+              message: "Blocked time shown on calendar, but it could not be saved to the server.",
+            });
           }
         }}
         onClose={() => setBlockTimeOpen(false)}
@@ -3300,14 +6390,23 @@ export default function ProfessionalFixedLocationCalendar({
         onClose={() => setPublicBusinessHoursOpen(false)}
         onApply={async () => {
           try {
-            await onSaveCalendarSettings?.({
-              availability: {
-                publicBusinessHours: publicBusinessHoursDraft,
-              },
-              design: appliedDesign,
+            await persistAvailabilitySettings({
+              publicBusinessHours: [
+                ...(calendarSettings?.availability.publicBusinessHours ?? []),
+                publicBusinessHoursDraft,
+              ],
             });
-            showSnackbar({ severity: "success", message: "Public business hours saved." });
+            showSnackbar({ severity: "success", message: "Public business hours added." });
             setPublicBusinessHoursOpen(false);
+            setPublicBusinessHoursDraft({
+              location: publicBusinessHoursDraft.location,
+              schedule: publicBusinessHoursDraft.schedule,
+              day: "",
+              startTime: "08:00",
+              endTime: "18:00",
+              notAvailable: false,
+              note: "",
+            });
           } catch {
             showSnackbar({ severity: "error", message: "Unable to save public business hours." });
           }
@@ -3318,15 +6417,39 @@ export default function ProfessionalFixedLocationCalendar({
       <CalendarDesignModal
         open={designOpen}
         onClose={() => setDesignOpen(false)}
+        onColorSelect={async (key, color) => {
+          const nextDesign: CalendarDesignDraft =
+            designDraft.scope === "Status"
+              ? {
+                  ...designDraft,
+                  colorsByStatus: {
+                    ...(designDraft.colorsByStatus ?? {}),
+                    [key as CalendarBookingStatus]: color,
+                  },
+                }
+              : designDraft.scope === "Team Members"
+                ? {
+                    ...designDraft,
+                    colorsByTeamMember: { ...(designDraft.colorsByTeamMember ?? {}), [key]: color },
+                  }
+                : {
+                    ...designDraft,
+                    colorsByCategory: { ...designDraft.colorsByCategory, [key]: color },
+                  };
+          setDesignDraft(nextDesign);
+          setAppliedDesign(nextDesign);
+          setDesignOpen(false);
+          try {
+            await persistAvailabilitySettings({ design: nextDesign });
+            showSnackbar({ severity: "success", message: "Calendar colour saved." });
+          } catch {
+            showSnackbar({ severity: "error", message: "Unable to save calendar colour." });
+          }
+        }}
         onApply={async () => {
           try {
             setAppliedDesign(designDraft);
-            await onSaveCalendarSettings?.({
-              availability: {
-                publicBusinessHours: publicBusinessHoursDraft,
-              },
-              design: designDraft,
-            });
+            await persistAvailabilitySettings({ design: designDraft });
             showSnackbar({ severity: "success", message: "Design saved." });
             setDesignOpen(false);
           } catch {
@@ -3335,6 +6458,86 @@ export default function ProfessionalFixedLocationCalendar({
         }}
         draft={designDraft}
         setDraft={setDesignDraft}
+        serviceOptions={serviceOptions}
+        teamMemberOptions={data.resources.map((resource) => ({ id: resource.id, name: resource.name }))}
+      />
+      <CalendarServiceOrderModal
+        draft={serviceOrderDraft}
+        onApply={async () => {
+          try {
+            await persistAvailabilitySettings({ serviceOrder: serviceOrderDraft });
+            showSnackbar({ severity: "success", message: "Service order saved." });
+            setServiceOrderOpen(false);
+          } catch {
+            showSnackbar({ severity: "error", message: "Unable to save service order." });
+          }
+        }}
+        onClose={() => setServiceOrderOpen(false)}
+        open={serviceOrderOpen}
+        setDraft={setServiceOrderDraft}
+      />
+      <CalendarEditAvailabilityModal
+        availableLocations={data.supportedLocations}
+        draft={editAvailabilityDraft}
+        onApply={async () => {
+          const nextOverrides = [
+            ...(dateOverrides ?? []).filter(
+              (item) => !(item.resourceId === editAvailabilityDraft.resourceId && item.date === editAvailabilityDraft.date),
+            ),
+            {
+              id: makeScheduleRowId(),
+              resourceId: editAvailabilityDraft.resourceId,
+              date: editAvailabilityDraft.date,
+              locations: editAvailabilityDraft.locations,
+              shifts: editAvailabilityDraft.shifts,
+            },
+          ];
+          setDateOverrides(nextOverrides);
+          await persistAvailabilitySettings({ dateOverrides: nextOverrides });
+          showSnackbar({ severity: "success", message: "Availability updated." });
+          setEditAvailabilityOpen(false);
+        }}
+        onClose={() => setEditAvailabilityOpen(false)}
+        open={editAvailabilityOpen}
+        resource={data.resources.find((resource) => resource.id === editAvailabilityDraft.resourceId)}
+        setDraft={setEditAvailabilityDraft}
+      />
+      <ManualEntryDiscountModal
+        open={bookingDiscountModalOpen}
+        initialValue={bookingTotalDiscount}
+        onClose={() => setBookingDiscountModalOpen(false)}
+        onApply={(discount) => {
+          setBookingTotalDiscount(discount.amount > 0 ? discount : null);
+          showSnackbar({ severity: "success", message: "Discount applied." });
+        }}
+      />
+      <DiscardBrDialog open={discardBrOpen} onClose={() => setDiscardBrOpen(false)} onConfirm={handleDiscardBr} />
+      <DiscardEbrDialog open={discardEbrOpen} onClose={() => setDiscardEbrOpen(false)} onConfirm={handleDiscardEbr} />
+      <BookingRequestConfirmDialog
+        open={Boolean(incomingConfirmAction)}
+        action={incomingConfirmAction}
+        onClose={() => setIncomingConfirmAction(null)}
+        onConfirm={() => {
+          if (incomingConfirmAction === "accept") void handleAcceptIncomingRequest();
+          else if (incomingConfirmAction === "reject") void handleRejectIncomingRequest();
+        }}
+      />
+      <CalendarNoShowModal
+        open={noShowModalOpen}
+        participants={noShowParticipants}
+        onClose={() => setNoShowModalOpen(false)}
+        onConfirm={() => void handleConfirmNoShow()}
+      />
+      <CalendarCancelBookingModal
+        open={cancelModalOpen}
+        onClose={() => setCancelModalOpen(false)}
+        onConfirm={() => void handleConfirmCancel()}
+      />
+      <CalendarBookingActionConfirmDialog
+        open={Boolean(pendingBookingAction)}
+        action={pendingBookingAction}
+        onClose={() => setPendingBookingAction(null)}
+        onConfirm={() => void handleConfirmBookingAction()}
       />
     </Stack>
   );

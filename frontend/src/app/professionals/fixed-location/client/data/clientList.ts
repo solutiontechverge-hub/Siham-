@@ -33,6 +33,8 @@ export type ClientRecord = {
   statsLastBooking?: string;
   /** Blocked clients stay in the list but cannot book */
   isBlocked?: boolean;
+  /** Client or guest no-show flagged on calendar */
+  hasNoShow?: boolean;
   technicalNote?: string;
 };
 
@@ -94,6 +96,7 @@ export const mockClientRecords: ClientRecord[] = [
       { period: "April 2025", bookings: 2 },
       { period: "May 2025", bookings: 4 },
     ],
+    hasNoShow: true,
   },
   {
     id: "c3",
@@ -112,6 +115,7 @@ export const mockClientRecords: ClientRecord[] = [
     averageBookingValue: "€62",
     recentServices: [{ name: "Color treatment", price: "€120" }],
     bookingHistory: [{ period: "June 2025", bookings: 2 }],
+    isBlocked: true,
   },
   {
     id: "c4",
@@ -236,10 +240,12 @@ export type MollureDirectoryRow = {
   name: string;
   email: string;
   tags?: Array<"Mollure">;
+  /** Confirmed or completed booking with this professional */
+  hasEligibleBooking?: boolean;
 };
 
 export const mockMollureDirectory: MollureDirectoryRow[] = [
-  { id: "m1", name: "Sara Johnson", email: "sarajohnson@gmail.com", tags: ["Mollure"] },
-  { id: "m2", name: "Alex Martin", email: "alexmartin@gmail.com", tags: ["Mollure"] },
-  { id: "m3", name: "Emma Stone", email: "emmastone@gmail.com", tags: ["Mollure"] },
+  { id: "m1", name: "Sara Johnson", email: "sarajohnson@gmail.com", tags: ["Mollure"], hasEligibleBooking: true },
+  { id: "m2", name: "Alex Martin", email: "alexmartin@gmail.com", tags: ["Mollure"], hasEligibleBooking: true },
+  { id: "m3", name: "Emma Stone", email: "emmastone@gmail.com", tags: ["Mollure"], hasEligibleBooking: false },
 ];

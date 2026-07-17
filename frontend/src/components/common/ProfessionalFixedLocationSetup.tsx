@@ -34,7 +34,7 @@ import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
-import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
+import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 import type { FixedLocationPageData } from "../../app/professionals/fixed-location/fixedLocation.data";
 import { useFixedLocationForm, type FixedLocationFormState } from "../../app/professionals/fixed-location/fixedLocation.use";
@@ -59,6 +59,16 @@ import { useSnackbar } from "./AppSnackbar";
 import AppMultiSelect from "./AppMultiSelect";
 import MollureFormField from "./MollureFormField";
 import MollureModal from "./MollureModal";
+import AppDrawer from "./AppDrawer";
+import TemplateSyncSettingsForm from "./TemplateSyncSettingsForm";
+import {
+  blankSectionFields,
+  createDefaultTemplateSyncSettings,
+  normalizeTemplateSyncSettings,
+  pickSectionFields,
+  shouldLiveSyncField,
+  type TemplateSyncSettings,
+} from "./businessSetupTemplateSync";
 import {
   MollureLabeledField,
   MollureLabeledPasswordField,
@@ -489,8 +499,6 @@ export default function ProfessionalFixedLocationSetup({
   const { showSnackbar } = useSnackbar();
   const [updateBusinessSetupActive, { isLoading: isBusinessProfileStatusSaving }] =
     useUpdateBusinessSetupActiveMutation();
-  const [businessProfileMenuAnchor, setBusinessProfileMenuAnchor] = React.useState<null | HTMLElement>(null);
-  const [permanentDeactivateConfirmOpen, setPermanentDeactivateConfirmOpen] = React.useState(false);
 
   const isBusinessProfileActive = businessSetupData?.is_active !== false;
   type ProfileValidationField =
@@ -534,12 +542,34 @@ export default function ProfessionalFixedLocationSetup({
 
   // ── Portfolio ─────────────────────────────────────────────────────────────
   const portfolioInputRef = React.useRef<HTMLInputElement | null>(null);
-  const [portfolioItems, setPortfolioItems] = React.useState<Array<{ id: string; src: string }>>([
+  const [portfolioItemsFixed, setPortfolioItemsFixed] = React.useState<Array<{ id: string; src: string }>>([
     { id: "pf-1", src: "/professionals/hero.png" },
     { id: "pf-2", src: "/professionals/hero.png" },
     { id: "pf-3", src: "/professionals/hero.png" },
     { id: "pf-4", src: "/professionals/hero.png" },
   ]);
+  const [portfolioItemsDesired, setPortfolioItemsDesired] = React.useState<Array<{ id: string; src: string }>>([]);
+  const activePortfolioTargetRef = React.useRef<"fixed" | "desired">("fixed");
+  const portfolioLiveSyncRef = React.useRef(false);
+
+  const setPortfolioItems = React.useCallback((value: React.SetStateAction<Array<{ id: string; src: string }>>) => {
+    const resolve = (prev: Array<{ id: string; src: string }>) =>
+      typeof value === "function" ? value(prev) : value;
+    if (activePortfolioTargetRef.current === "desired") {
+      setPortfolioItemsDesired((prev) => {
+        const next = resolve(prev);
+        if (portfolioLiveSyncRef.current) setPortfolioItemsFixed(next.map((item) => ({ ...item })));
+        return next;
+      });
+      return;
+    }
+    setPortfolioItemsFixed((prev) => {
+      const next = resolve(prev);
+      if (portfolioLiveSyncRef.current) setPortfolioItemsDesired(next.map((item) => ({ ...item })));
+      return next;
+    });
+  }, []);
+
   const [selectedPortfolioIds, setSelectedPortfolioIds] = React.useState<Record<string, boolean>>({});
   const portfolioBlobUrlsRef = React.useRef<string[]>([]);
   React.useEffect(() => {
@@ -716,7 +746,32 @@ export default function ProfessionalFixedLocationSetup({
     [],
   );
 
-  const [teamMembers, setTeamMembers] = React.useState<TeamMemberUi[]>([]);
+  const [teamMembersFixed, setTeamMembersFixed] = React.useState<TeamMemberUi[]>([]);
+  const [teamMembersDesired, setTeamMembersDesired] = React.useState<TeamMemberUi[]>([]);
+  const activeTeamTargetRef = React.useRef<"fixed" | "desired">("fixed");
+  const teamLiveSyncRef = React.useRef(false);
+
+  const setTeamMembers = React.useCallback((value: React.SetStateAction<TeamMemberUi[]>) => {
+    const resolve = (prev: TeamMemberUi[]) => (typeof value === "function" ? value(prev) : value);
+    if (activeTeamTargetRef.current === "desired") {
+      setTeamMembersDesired((prev) => {
+        const next = resolve(prev);
+        if (teamLiveSyncRef.current) {
+          setTeamMembersFixed(next.map((member) => ({ ...member, pendingPhotoFile: null })));
+        }
+        return next;
+      });
+      return;
+    }
+    setTeamMembersFixed((prev) => {
+      const next = resolve(prev);
+      if (teamLiveSyncRef.current) {
+        setTeamMembersDesired(next.map((member) => ({ ...member, pendingPhotoFile: null })));
+      }
+      return next;
+    });
+  }, []);
+
   const [teamServiceMenu, setTeamServiceMenu] = React.useState<{
     anchorEl: HTMLElement;
     menuKey: string;
@@ -922,18 +977,6 @@ export default function ProfessionalFixedLocationSetup({
   const isBusinessSectionDisabled = (sectionId: BusinessSetupSectionId) =>
     isBusinessSetupSaving || !editingBusinessSections.has(sectionId);
   const businessFormDisabled = isBusinessSetupSaving;
-  const locationDisabled = isBusinessSectionDisabled("location");
-  const profileDisabled = isBusinessSectionDisabled("profile");
-  const serviceForDisabled = isBusinessSectionDisabled("serviceFor");
-  const servicesDetailsDisabled = isBusinessSectionDisabled("servicesDetails");
-  const manageTeamDisabled = isBusinessSectionDisabled("manageTeam");
-  const generalNotesDisabled = isBusinessSectionDisabled("generalNotes");
-  const priceDisabled = isBusinessSectionDisabled("price");
-  const policyDisabled = isBusinessSectionDisabled("policy");
-  const reschedulingPolicyDisabled = isBusinessSectionDisabled("reschedulingPolicy");
-  const cancellationPolicyDisabled = isBusinessSectionDisabled("cancellationPolicy");
-  const noShowPolicyDisabled = isBusinessSectionDisabled("noShowPolicy");
-  const portfolioDisabled = isBusinessSectionDisabled("portfolio");
   const templateOptions = React.useMemo(() => ["Fixed Location", "Desired Location"] as const, []);
   type OfferingOption = (typeof templateOptions)[number];
   type OfferingSelectOption = OfferingOption | "Both";
@@ -944,12 +987,64 @@ export default function ProfessionalFixedLocationSetup({
   const [businessOfferingSelect, setBusinessOfferingSelect] =
     React.useState<OfferingSelectOption>("Fixed Location");
   const [activeBusinessTemplate, setActiveBusinessTemplate] = React.useState<OfferingOption>("Fixed Location");
-  const [useSameInfoForBothTemplates, setUseSameInfoForBothTemplates] = React.useState(false);
+  const [templateSyncSettings, setTemplateSyncSettings] = React.useState<TemplateSyncSettings>(() =>
+    createDefaultTemplateSyncSettings(),
+  );
+  const [templateSyncDraft, setTemplateSyncDraft] = React.useState<TemplateSyncSettings>(() =>
+    createDefaultTemplateSyncSettings(),
+  );
+  const [templateSyncDrawerOpen, setTemplateSyncDrawerOpen] = React.useState(false);
+  const [templateSyncModalOpen, setTemplateSyncModalOpen] = React.useState(false);
   const isBothOffering = businessOfferingSelect === "Both";
   const isFixedTemplateView =
     businessOfferingSelect === "Fixed Location" || (isBothOffering && activeBusinessTemplate === "Fixed Location");
   const isDesiredTemplateView =
     businessOfferingSelect === "Desired Location" || (isBothOffering && activeBusinessTemplate === "Desired Location");
+
+  activeTeamTargetRef.current =
+    isBothOffering && activeBusinessTemplate === "Desired Location" && templateSyncSettings.manageTeam !== "sync"
+      ? "desired"
+      : "fixed";
+  teamLiveSyncRef.current = isBothOffering && templateSyncSettings.manageTeam === "sync";
+
+  activePortfolioTargetRef.current =
+    isBothOffering && activeBusinessTemplate === "Desired Location" && templateSyncSettings.portfolio !== "sync"
+      ? "desired"
+      : "fixed";
+  portfolioLiveSyncRef.current = isBothOffering && templateSyncSettings.portfolio === "sync";
+
+  const teamMembers =
+    activeTeamTargetRef.current === "desired" ? teamMembersDesired : teamMembersFixed;
+  const portfolioItems =
+    activePortfolioTargetRef.current === "desired" ? portfolioItemsDesired : portfolioItemsFixed;
+
+  const isDesiredSyncLocked = React.useCallback(
+    (sectionId: "profile" | "serviceFor" | "servicesDetails" | "manageTeam" | "infoAndPolicy" | "portfolio") => {
+      if (!isBothOffering || activeBusinessTemplate !== "Desired Location") return false;
+      if (sectionId === "profile") return true;
+      return templateSyncSettings[sectionId] === "sync";
+    },
+    [activeBusinessTemplate, isBothOffering, templateSyncSettings],
+  );
+  const locationDisabled = isBusinessSectionDisabled("location");
+  const profileDisabled =
+    isBusinessSectionDisabled("profile") || isDesiredSyncLocked("profile");
+  const serviceForDisabled =
+    isBusinessSectionDisabled("serviceFor") || isDesiredSyncLocked("serviceFor");
+  const servicesDetailsDisabled =
+    isBusinessSectionDisabled("servicesDetails") || isDesiredSyncLocked("servicesDetails");
+  const manageTeamDisabled =
+    isBusinessSectionDisabled("manageTeam") || isDesiredSyncLocked("manageTeam");
+  const generalNotesDisabled =
+    isBusinessSectionDisabled("generalNotes") || isDesiredSyncLocked("infoAndPolicy");
+  const priceDisabled =
+    isBusinessSectionDisabled("price") || isDesiredSyncLocked("infoAndPolicy");
+  const policyDisabled = isBusinessSectionDisabled("policy");
+  const reschedulingPolicyDisabled = isBusinessSectionDisabled("reschedulingPolicy");
+  const cancellationPolicyDisabled = isBusinessSectionDisabled("cancellationPolicy");
+  const noShowPolicyDisabled = isBusinessSectionDisabled("noShowPolicy");
+  const portfolioDisabled =
+    isBusinessSectionDisabled("portfolio") || isDesiredSyncLocked("portfolio");
 
   const showFixedLocationSection = isFixedTemplateView;
   const showDesiredLocationSection = isDesiredTemplateView;
@@ -1011,12 +1106,11 @@ export default function ProfessionalFixedLocationSetup({
         "keywords",
         "serviceFor",
         "amenities",
-        "salonName",
-        "streetAddress",
-        "streetNumber",
-        "postalCode",
-        "province",
-        "municipalities",
+        "notes",
+        "priceRangeFrom",
+        "priceRangeTo",
+        "prepaymentPercent",
+        "prepaymentInstructions",
       ] as const,
     [],
   );
@@ -1029,27 +1123,10 @@ export default function ProfessionalFixedLocationSetup({
     [sharedTemplateSyncFields],
   );
 
-  const pickSharedTemplateFields = React.useCallback(
-    (state: BusinessTemplateState): Pick<BusinessTemplateState, SharedTemplateSyncField> =>
-      Object.fromEntries(sharedTemplateSyncFields.map((key) => [key, state[key]])) as Pick<
-        BusinessTemplateState,
-        SharedTemplateSyncField
-      >,
-    [sharedTemplateSyncFields],
-  );
-
-  const syncOtherTemplateFromSource = React.useCallback(
-    (source: BusinessTemplateState, sourceTemplate: OfferingOption) => {
-      const patch = pickSharedTemplateFields(source);
-      if (sourceTemplate === "Fixed Location") {
-        setDesiredBusiness((prev) => ({ ...prev, ...patch }));
-      } else {
-        for (const key of sharedTemplateSyncFields) {
-          setField(key as keyof FixedLocationFormState, patch[key] as never);
-        }
-      }
-    },
-    [pickSharedTemplateFields, setField, sharedTemplateSyncFields],
+  const shouldMirrorSyncField = React.useCallback(
+    (key: keyof BusinessTemplateState) =>
+      isBothOffering && isSharedTemplateSyncField(key) && shouldLiveSyncField(templateSyncSettings, key),
+    [isBothOffering, isSharedTemplateSyncField, templateSyncSettings],
   );
 
   const getCurrentBusinessState = React.useCallback((): BusinessTemplateState => {
@@ -1089,18 +1166,36 @@ export default function ProfessionalFixedLocationSetup({
 
   const [desiredBusiness, setDesiredBusiness] = React.useState<BusinessTemplateState>(() => getCurrentBusinessState());
 
-  const biz = activeBusinessTemplate === "Fixed Location" ? getCurrentBusinessState() : desiredBusiness;
-
   const fixedBiz = getCurrentBusinessState();
+  const biz = React.useMemo((): BusinessTemplateState => {
+    if (activeBusinessTemplate === "Fixed Location" || !isBothOffering) {
+      return activeBusinessTemplate === "Fixed Location" ? fixedBiz : desiredBusiness;
+    }
+    let merged: BusinessTemplateState = { ...desiredBusiness };
+    for (const key of sharedTemplateSyncFields) {
+      if (shouldLiveSyncField(templateSyncSettings, key)) {
+        merged = { ...merged, [key]: fixedBiz[key] };
+      }
+    }
+    return merged;
+  }, [
+    activeBusinessTemplate,
+    desiredBusiness,
+    fixedBiz,
+    isBothOffering,
+    sharedTemplateSyncFields,
+    templateSyncSettings,
+  ]);
+
   const setFixedBizField = React.useCallback(
     <K extends keyof BusinessTemplateState>(key: K, value: BusinessTemplateState[K]) => {
       setIsBusinessPublishEnabled(true);
-      setField(key as any, value as any);
-      if (useSameInfoForBothTemplates && isBothOffering && isSharedTemplateSyncField(key)) {
+      setField(key as keyof FixedLocationFormState, value as never);
+      if (shouldMirrorSyncField(key)) {
         setDesiredBusiness((prev) => ({ ...prev, [key]: value }));
       }
     },
-    [isBothOffering, isSharedTemplateSyncField, setField, useSameInfoForBothTemplates],
+    [setField, shouldMirrorSyncField],
   );
 
   const desiredProvinceOptions = React.useMemo(
@@ -1450,18 +1545,18 @@ export default function ProfessionalFixedLocationSetup({
       setIsBusinessPublishEnabled(true);
 
       if (activeBusinessTemplate === "Fixed Location") {
-        setField(key as any, value as any);
-        if (useSameInfoForBothTemplates && isBothOffering && isSharedTemplateSyncField(key)) {
+        setField(key as keyof FixedLocationFormState, value as never);
+        if (shouldMirrorSyncField(key)) {
           setDesiredBusiness((prev) => ({ ...prev, [key]: value }));
         }
       } else {
         setDesiredBusiness((p) => ({ ...p, [key]: value }));
-        if (useSameInfoForBothTemplates && isBothOffering && isSharedTemplateSyncField(key)) {
-          setField(key as any, value as any);
+        if (shouldMirrorSyncField(key)) {
+          setField(key as keyof FixedLocationFormState, value as never);
         }
       }
     },
-    [activeBusinessTemplate, isBothOffering, isSharedTemplateSyncField, setField, useSameInfoForBothTemplates],
+    [activeBusinessTemplate, setField, shouldMirrorSyncField],
   );
 
   const addBizKeyword = React.useCallback(() => {
@@ -1501,8 +1596,6 @@ export default function ProfessionalFixedLocationSetup({
 
   const setBusinessProfileActive = React.useCallback(
     async (nextActive: boolean, successMessage?: string) => {
-      setBusinessProfileMenuAnchor(null);
-
       try {
         const result = await updateBusinessSetupActive({ is_active: nextActive }).unwrap();
         showSnackbar({
@@ -1521,19 +1614,6 @@ export default function ProfessionalFixedLocationSetup({
     },
     [showSnackbar, updateBusinessSetupActive],
   );
-
-  const onActivateBusinessProfile = React.useCallback(() => {
-    void setBusinessProfileActive(true);
-  }, [setBusinessProfileActive]);
-
-  const onTemporarilyDeactivateBusinessProfile = React.useCallback(() => {
-    void setBusinessProfileActive(false, "Business profile temporarily deactivated.");
-  }, [setBusinessProfileActive]);
-
-  const onConfirmPermanentDeactivate = React.useCallback(() => {
-    setPermanentDeactivateConfirmOpen(false);
-    void setBusinessProfileActive(false, "Business profile permanently deactivated.");
-  }, [setBusinessProfileActive]);
 
   const onToggleBusinessProfileActive = React.useCallback(async () => {
     await setBusinessProfileActive(!isBusinessProfileActive);
@@ -1596,28 +1676,34 @@ export default function ProfessionalFixedLocationSetup({
           .filter(([, enabled]) => enabled)
           .map(([key]) => key),
         service_categories: mapServiceItemsToCategories(serviceItems),
-        project: sourceBiz.projectEnabled ? sourceBiz.projectInstructions : "",
+        project: (() => {
+          const projectSource =
+            businessOfferingSelect === "Fixed Location" ? fixedBiz : desiredBusiness;
+          return projectSource.projectEnabled ? projectSource.projectInstructions : "";
+        })(),
         book_service_notes: sourceBiz.bookComboInstructions,
         book_service_combinations: sourceBiz.bookCombos
           .map((combo) => {
-            const category = businessCategories.find((item) => String(item.id) === combo.categoryId);
-            const service = category
-              ? category.subcategories.find((item) => String(item.id) === combo.serviceId)
-              : businessCategories
-                  .flatMap((item) => item.subcategories)
-                  .find((item) => String(item.id) === combo.serviceId);
-            const categoryId = String(combo.categoryId ?? "").trim();
-            const serviceId = String(combo.serviceId ?? "").trim();
+            const allSubs = businessCategories.flatMap((category) =>
+              category.subcategories.map((subcategory) => ({
+                id: String(subcategory.id),
+                title: subcategory.title,
+              })),
+            );
+            const firstServiceId = String(combo.categoryId ?? "").trim();
+            const secondServiceId = String(combo.serviceId ?? "").trim();
+            const first = allSubs.find((item) => item.id === firstServiceId);
+            const second = allSubs.find((item) => item.id === secondServiceId);
 
-            if (!categoryId || !serviceId) {
+            if (!firstServiceId || !secondServiceId) {
               return null;
             }
 
             return {
-              category_id: categoryId,
-              category_title: category?.title ?? null,
-              service_id: serviceId,
-              service_title: service?.title ?? null,
+              category_id: firstServiceId,
+              category_title: first?.title ?? null,
+              service_id: secondServiceId,
+              service_title: second?.title ?? null,
             };
           })
           .filter((combo): combo is NonNullable<typeof combo> => combo !== null),
@@ -1643,6 +1729,7 @@ export default function ProfessionalFixedLocationSetup({
         desired_location_area: desiredAreaText,
         desired_location_province: desiredProvinceText,
         desired_location_services: serviceItems.map((item) => item.name),
+        section_sync_settings: templateSyncSettings,
         team_members: members.map((member, index) => ({
           id: toPersistedTeamMemberId(member.id),
           photo_upload_key: member.pendingPhotoFile ? member.id : undefined,
@@ -1666,6 +1753,7 @@ export default function ProfessionalFixedLocationSetup({
       desiredBusiness,
       fixedBiz,
       mediaSlides,
+      templateSyncSettings,
       toPersistedTeamMemberId,
       toTeamServicePayload,
       values,
@@ -1688,14 +1776,24 @@ export default function ProfessionalFixedLocationSetup({
   );
 
   const clearPendingTeamMemberPhotos = React.useCallback(() => {
-    setTeamMembers((prev) => prev.map((member) => ({ ...member, pendingPhotoFile: null })));
+    setTeamMembersFixed((prev) => prev.map((member) => ({ ...member, pendingPhotoFile: null })));
+    setTeamMembersDesired((prev) => prev.map((member) => ({ ...member, pendingPhotoFile: null })));
   }, []);
 
   const saveBusinessSetupData = React.useCallback(async () => {
     if (!onSaveBusinessSetup) return;
-    await onSaveBusinessSetup(buildBusinessSetupSaveBody(teamMembers));
+    const teamForSave =
+      businessOfferingSelect === "Desired Location" ? teamMembersDesired : teamMembersFixed;
+    await onSaveBusinessSetup(buildBusinessSetupSaveBody(teamForSave));
     clearPendingTeamMemberPhotos();
-  }, [buildBusinessSetupSaveBody, clearPendingTeamMemberPhotos, onSaveBusinessSetup, teamMembers]);
+  }, [
+    buildBusinessSetupSaveBody,
+    businessOfferingSelect,
+    clearPendingTeamMemberPhotos,
+    onSaveBusinessSetup,
+    teamMembersDesired,
+    teamMembersFixed,
+  ]);
 
   const onPublishBusinessSetup = React.useCallback(async () => {
     if (!onSaveBusinessSetup) {
@@ -1704,7 +1802,9 @@ export default function ProfessionalFixedLocationSetup({
     }
 
     try {
-      await onSaveBusinessSetup(buildBusinessSetupSaveBody(teamMembers));
+      const teamForSave =
+        businessOfferingSelect === "Desired Location" ? teamMembersDesired : teamMembersFixed;
+      await onSaveBusinessSetup(buildBusinessSetupSaveBody(teamForSave));
       clearPendingTeamMemberPhotos();
       await updateBusinessSetupActive({ is_active: true }).unwrap();
       setIsBusinessPublishEnabled(false);
@@ -1718,10 +1818,12 @@ export default function ProfessionalFixedLocationSetup({
     }
   }, [
     buildBusinessSetupSaveBody,
+    businessOfferingSelect,
     clearPendingTeamMemberPhotos,
     onSaveBusinessSetup,
     showSnackbar,
-    teamMembers,
+    teamMembersDesired,
+    teamMembersFixed,
     updateBusinessSetupActive,
   ]);
 
@@ -1845,9 +1947,12 @@ export default function ProfessionalFixedLocationSetup({
     };
 
     Object.entries(hydratedTemplateState).forEach(([key, value]) => {
-      setField(key as any, value as any);
+      setField(key as keyof FixedLocationFormState, value as never);
     });
     setDesiredBusiness(hydratedTemplateState);
+    const nextSyncSettings = normalizeTemplateSyncSettings(businessSetupData.section_sync_settings);
+    setTemplateSyncSettings(nextSyncSettings);
+    setTemplateSyncDraft(nextSyncSettings);
     setField("policyResponseHours", toDisplayNumber(businessSetupData.response_time_hours));
     setField("policyResponseMinutes", toDisplayNumber(businessSetupData.response_time_minutes));
     setField("policyInstructions", businessSetupData.policy_custom_instruction || "");
@@ -1912,19 +2017,20 @@ export default function ProfessionalFixedLocationSetup({
     setServicesDesired(hydratedServices.subs);
 
     if (businessSetupData.team_members.length > 0) {
-      setTeamMembers(
-        businessSetupData.team_members.map((member) => ({
-          id: String(member.id ?? `tm-${member.display_order}`),
-          name: member.full_name,
-          role: member.role,
-          photoSrc: member.profile_photo || "/professionals/hero.png",
-          rating: 4.5,
-          reviewsLabel: "(0 Reviews)",
-          services: defaultServices(member.assigned_services),
-        })),
-      );
+      const hydratedTeam = businessSetupData.team_members.map((member) => ({
+        id: String(member.id ?? `tm-${member.display_order}`),
+        name: member.full_name,
+        role: member.role,
+        photoSrc: member.profile_photo || "/professionals/hero.png",
+        rating: 4.5,
+        reviewsLabel: "(0 Reviews)",
+        services: defaultServices(member.assigned_services),
+      }));
+      setTeamMembersFixed(hydratedTeam);
+      setTeamMembersDesired(hydratedTeam.map((member) => ({ ...member, pendingPhotoFile: null })));
     } else {
-      setTeamMembers([]);
+      setTeamMembersFixed([]);
+      setTeamMembersDesired([]);
     }
 
     hydratedBusinessRef.current = hydrationKey;
@@ -1941,23 +2047,118 @@ export default function ProfessionalFixedLocationSetup({
     values.discountValue,
   ]);
 
-  const activeServices = activeBusinessTemplate === "Fixed Location" ? servicesFixed : servicesDesired;
-  const activeMainServices = activeBusinessTemplate === "Fixed Location" ? mainServicesFixed : mainServicesDesired;
+  const activeServices =
+    activeBusinessTemplate === "Fixed Location" ||
+    (isBothOffering && templateSyncSettings.servicesDetails === "sync")
+      ? servicesFixed
+      : servicesDesired;
+  const activeMainServices =
+    activeBusinessTemplate === "Fixed Location" ||
+    (isBothOffering && templateSyncSettings.servicesDetails === "sync")
+      ? mainServicesFixed
+      : mainServicesDesired;
   const setActiveServices = React.useCallback(
     (value: React.SetStateAction<ServiceDetailUiItem[]>) => {
       setIsBusinessPublishEnabled(true);
-      if (activeBusinessTemplate === "Fixed Location") setServicesFixed(value);
-      else setServicesDesired(value);
+      const liveSync = isBothOffering && templateSyncSettings.servicesDetails === "sync";
+      if (activeBusinessTemplate === "Fixed Location") {
+        setServicesFixed((prev) => {
+          const next = typeof value === "function" ? value(prev) : value;
+          if (liveSync) setServicesDesired(next);
+          return next;
+        });
+      } else {
+        setServicesDesired((prev) => {
+          const next = typeof value === "function" ? value(prev) : value;
+          if (liveSync) setServicesFixed(next);
+          return next;
+        });
+      }
     },
-    [activeBusinessTemplate],
+    [activeBusinessTemplate, isBothOffering, templateSyncSettings.servicesDetails],
   );
   const setActiveMainServices = React.useCallback(
     (value: React.SetStateAction<BusinessMainServiceUi[]>) => {
       setIsBusinessPublishEnabled(true);
-      if (activeBusinessTemplate === "Fixed Location") setMainServicesFixed(value);
-      else setMainServicesDesired(value);
+      const liveSync = isBothOffering && templateSyncSettings.servicesDetails === "sync";
+      if (activeBusinessTemplate === "Fixed Location") {
+        setMainServicesFixed((prev) => {
+          const next = typeof value === "function" ? value(prev) : value;
+          if (liveSync) setMainServicesDesired(next);
+          return next;
+        });
+      } else {
+        setMainServicesDesired((prev) => {
+          const next = typeof value === "function" ? value(prev) : value;
+          if (liveSync) setMainServicesFixed(next);
+          return next;
+        });
+      }
     },
-    [activeBusinessTemplate],
+    [activeBusinessTemplate, isBothOffering, templateSyncSettings.servicesDetails],
+  );
+
+  const applyTemplateSyncSettings = React.useCallback(
+    (settings: TemplateSyncSettings) => {
+      const normalized = normalizeTemplateSyncSettings(settings);
+      const source = getCurrentBusinessState();
+
+      setDesiredBusiness((prev) => {
+        let next: BusinessTemplateState = {
+          ...prev,
+          // Profile is always synced from Fixed.
+          ...pickSectionFields(source as Record<string, unknown>, "profile"),
+        };
+
+        const applySection = (sectionId: "serviceFor" | "infoAndPolicy") => {
+          const mode = normalized[sectionId];
+          if (mode === "sync" || mode === "syncAndEdit") {
+            // Sync / Sync and edit: Desired fields are filled from Fixed.
+            next = {
+              ...next,
+              ...pickSectionFields(source as Record<string, unknown>, sectionId),
+            };
+          } else {
+            // Independent: Desired fields start blank.
+            next = {
+              ...next,
+              ...blankSectionFields(source as Record<string, unknown>, sectionId),
+            };
+          }
+        };
+
+        applySection("serviceFor");
+        applySection("infoAndPolicy");
+        return next;
+      });
+
+      if (normalized.servicesDetails === "sync" || normalized.servicesDetails === "syncAndEdit") {
+        // Filled from Fixed, then editable if syncAndEdit.
+        setServicesDesired(servicesFixed.map((item) => ({ ...item })));
+        setMainServicesDesired(mainServicesFixed.map((item) => ({ ...item })));
+      } else {
+        // Independent: start blank on Desired.
+        setServicesDesired([]);
+        setMainServicesDesired([]);
+      }
+
+      if (normalized.manageTeam === "sync" || normalized.manageTeam === "syncAndEdit") {
+        setTeamMembersDesired(teamMembersFixed.map((member) => ({ ...member, pendingPhotoFile: null })));
+      } else {
+        setTeamMembersDesired([]);
+      }
+
+      if (normalized.portfolio === "sync" || normalized.portfolio === "syncAndEdit") {
+        setPortfolioItemsDesired(portfolioItemsFixed.map((item) => ({ ...item })));
+      } else {
+        setPortfolioItemsDesired([]);
+      }
+
+      setTemplateSyncSettings(normalized);
+      setTemplateSyncDraft(normalized);
+      setIsBusinessPublishEnabled(true);
+    },
+    [getCurrentBusinessState, mainServicesFixed, portfolioItemsFixed, servicesFixed, teamMembersFixed],
   );
 
   const serviceCategoryTabs = React.useMemo(
@@ -2990,12 +3191,17 @@ export default function ProfessionalFixedLocationSetup({
   );
 
 
-  const bookingCategoryOptions = React.useMemo(
+  /** Flat catalog of billable services (subcategories) for combo A + B picks. */
+  const allBookingServiceOptions = React.useMemo(
     () =>
-      businessCategories.map((category) => ({
-        value: String(category.id),
-        label: category.title,
-      })),
+      businessCategories.flatMap((category) =>
+        category.subcategories.map((subcategory) => ({
+          value: String(subcategory.id),
+          label: subcategory.title,
+          categoryId: String(category.id),
+          categoryLabel: category.title,
+        })),
+      ),
     [businessCategories],
   );
 
@@ -3004,43 +3210,43 @@ export default function ProfessionalFixedLocationSetup({
 
   const getBookingServiceOptions = React.useCallback(
     (categoryId: string) => {
-      const selectedCategory = businessCategories.find((category) => String(category.id) === categoryId);
-      const subcategories = selectedCategory
-        ? selectedCategory.subcategories
-        : businessCategories.flatMap((category) => category.subcategories);
-
-      return subcategories.map((subcategory) => ({
-        value: String(subcategory.id),
-        label: subcategory.title,
-      }));
+      if (!categoryId) return allBookingServiceOptions;
+      return allBookingServiceOptions.filter((option) => option.categoryId === categoryId);
     },
-    [businessCategories],
+    [allBookingServiceOptions],
   );
 
   const bookingServiceOptions = React.useMemo(
-    () => getBookingServiceOptions(fixedBiz.bookCategory),
-    [fixedBiz.bookCategory, getBookingServiceOptions],
+    () => allBookingServiceOptions,
+    [allBookingServiceOptions],
   );
 
   const resolveBookingComboLabels = React.useCallback(
-    (categoryId: string, serviceId: string) => {
-      const categoryLabel =
-        bookingCategoryOptions.find((option) => option.value === categoryId)?.label ?? "Category";
-      const serviceLabel =
-        getBookingServiceOptions(categoryId).find((option) => option.value === serviceId)?.label ?? "Service";
-      return { categoryLabel, serviceLabel };
+    (firstServiceId: string, secondServiceId: string) => {
+      const first =
+        allBookingServiceOptions.find((option) => option.value === firstServiceId)?.label ?? "Service";
+      const second =
+        allBookingServiceOptions.find((option) => option.value === secondServiceId)?.label ?? "Service";
+      return { categoryLabel: first, serviceLabel: second };
     },
-    [bookingCategoryOptions, getBookingServiceOptions],
+    [allBookingServiceOptions],
   );
 
   const addBookingCombo = React.useCallback(() => {
-    const categoryId = fixedBiz.bookCategory || bookingCategoryOptions[0]?.value || "";
-    const serviceOptions = getBookingServiceOptions(categoryId);
-    const serviceId = fixedBiz.bookService || serviceOptions[0]?.value || "";
-    if (!categoryId || !serviceId) return;
+    const firstServiceId = fixedBiz.bookCategory || allBookingServiceOptions[0]?.value || "";
+    const secondServiceId =
+      fixedBiz.bookService ||
+      allBookingServiceOptions.find((option) => option.value !== firstServiceId)?.value ||
+      "";
+    if (!firstServiceId || !secondServiceId || firstServiceId === secondServiceId) {
+      showSnackbar({ severity: "info", message: "Pick two different services for a combination." });
+      return;
+    }
 
     const alreadyExists = fixedBiz.bookCombos.some(
-      (combo) => combo.categoryId === categoryId && combo.serviceId === serviceId,
+      (combo) =>
+        (combo.categoryId === firstServiceId && combo.serviceId === secondServiceId) ||
+        (combo.categoryId === secondServiceId && combo.serviceId === firstServiceId),
     );
     if (alreadyExists) {
       showSnackbar({ severity: "info", message: "This service combination is already added." });
@@ -3049,13 +3255,15 @@ export default function ProfessionalFixedLocationSetup({
 
     const id = `combo-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     setBookingComboEditId(null);
-    setFixedBizField("bookCombos", [...fixedBiz.bookCombos, { id, categoryId, serviceId }]);
+    setFixedBizField("bookCombos", [
+      ...fixedBiz.bookCombos,
+      { id, categoryId: firstServiceId, serviceId: secondServiceId },
+    ]);
   }, [
+    allBookingServiceOptions,
     fixedBiz.bookCategory,
     fixedBiz.bookCombos,
     fixedBiz.bookService,
-    bookingCategoryOptions,
-    getBookingServiceOptions,
     setFixedBizField,
     showSnackbar,
   ]);
@@ -3066,20 +3274,11 @@ export default function ProfessionalFixedLocationSetup({
         "bookCombos",
         fixedBiz.bookCombos.map((combo) => {
           if (combo.id !== id) return combo;
-
-          const next = { ...combo, ...patch };
-          if (patch.categoryId) {
-            const serviceOptions = getBookingServiceOptions(patch.categoryId);
-            next.serviceId = serviceOptions.some((option) => option.value === next.serviceId)
-              ? next.serviceId
-              : serviceOptions[0]?.value || "";
-          }
-
-          return next;
+          return { ...combo, ...patch };
         }),
       );
     },
-    [fixedBiz.bookCombos, getBookingServiceOptions, setFixedBizField],
+    [fixedBiz.bookCombos, setFixedBizField],
   );
 
   const deleteBookingCombo = React.useCallback(
@@ -3340,13 +3539,12 @@ export default function ProfessionalFixedLocationSetup({
                 value={businessOfferingSelect}
                 onChange={(e) => {
                   const v = String(e.target.value) as OfferingSelectOption;
-                  setBusinessOfferingSelect(v);
-                  if (v !== "Both") {
-                    setUseSameInfoForBothTemplates(false);
-                    onSwitchActiveBusinessTemplate(v);
-                  } else {
-                    onSwitchActiveBusinessTemplate("Fixed Location");
+                  if (v === "Both") {
+                    setTemplateSyncModalOpen(true);
+                    return;
                   }
+                  setBusinessOfferingSelect(v);
+                  onSwitchActiveBusinessTemplate(v);
                   setIsBusinessPublishEnabled(true);
                 }}
                 disabled={businessFormDisabled}
@@ -3369,40 +3567,6 @@ export default function ProfessionalFixedLocationSetup({
                 ))}
               </MollureFormField>
             </Box>
-
-            {isBothOffering ? (
-              <FormControlLabel
-                sx={{ m: 0, flexShrink: 0, alignItems: "center" }}
-                control={
-                  <Checkbox
-                    checked={useSameInfoForBothTemplates}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setUseSameInfoForBothTemplates(checked);
-                      setIsBusinessPublishEnabled(true);
-                      if (checked) {
-                        syncOtherTemplateFromSource(
-                          activeBusinessTemplate === "Fixed Location"
-                            ? getCurrentBusinessState()
-                            : desiredBusiness,
-                          activeBusinessTemplate,
-                        );
-                      }
-                    }}
-                    disabled={businessFormDisabled}
-                    sx={{
-                      color: alpha(m.navy, 0.28),
-                      "&.Mui-checked": { color: "primary.main" },
-                    }}
-                  />
-                }
-                label={
-                  <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: alpha(m.navy, 0.72), lineHeight: 1.35 }}>
-                    Use same information for both templates
-                  </Typography>
-                }
-              />
-            ) : null}
           </Stack>
 
           {isBothOffering ? (
@@ -3467,25 +3631,54 @@ export default function ProfessionalFixedLocationSetup({
             </Box>
           ) : null}
         </Box>
-        <Button
-          variant="contained"
-          disableElevation
-          onClick={onPublishBusinessSetup}
-          disabled={!isBusinessPublishEnabled || isBusinessSetupSaving}
-          sx={{
-            borderRadius: "6px",
-            textTransform: "none",
-            fontWeight: 700,
-            fontSize: 13,
-            minHeight: 40,
-            px: 2.5,
-            bgcolor: "primary.main",
-            "&:hover": { bgcolor: "mollure.tealDark" },
-            alignSelf: { xs: "flex-start", md: "flex-end" },
-          }}
+        <Stack
+          direction="row"
+          spacing={1}
+          alignItems="center"
+          sx={{ alignSelf: { xs: "flex-start", md: "flex-end" }, flexShrink: 0 }}
         >
-          {isBusinessSetupSaving ? "Saving..." : data.publishLabel}
-        </Button>
+          {isBothOffering ? (
+            <IconButton
+              size="small"
+              aria-label="Template sync settings"
+              disabled={businessFormDisabled}
+              onClick={() => {
+                setTemplateSyncDraft(templateSyncSettings);
+                setTemplateSyncDrawerOpen(true);
+              }}
+              sx={{
+                width: 40,
+                height: 40,
+                flexShrink: 0,
+                borderRadius: "8px",
+                border: `1px solid ${alpha(m.navy, 0.12)}`,
+                bgcolor: "#fff",
+                color: "primary.main",
+                "&:hover": { bgcolor: alpha(m.navy, 0.03) },
+              }}
+            >
+              <SettingsRoundedIcon sx={{ fontSize: 20 }} />
+            </IconButton>
+          ) : null}
+          <Button
+            variant="contained"
+            disableElevation
+            onClick={onPublishBusinessSetup}
+            disabled={!isBusinessPublishEnabled || isBusinessSetupSaving}
+            sx={{
+              borderRadius: "6px",
+              textTransform: "none",
+              fontWeight: 700,
+              fontSize: 13,
+              minHeight: 40,
+              px: 2.5,
+              bgcolor: "primary.main",
+              "&:hover": { bgcolor: "mollure.tealDark" },
+            }}
+          >
+            {isBusinessSetupSaving ? "Saving..." : data.publishLabel}
+          </Button>
+        </Stack>
       </Stack>
 
       {!isBusinessProfileActive ? (
@@ -3551,146 +3744,132 @@ export default function ProfessionalFixedLocationSetup({
         </Paper>
       ) : null}
 
-      <Stack direction="row" spacing={1} alignItems="center" justifyContent="flex-end">
-        <IconButton
-          size="small"
-          aria-label="Business profile options"
-          aria-haspopup="menu"
-          aria-expanded={Boolean(businessProfileMenuAnchor)}
-          disabled={isBusinessProfileStatusSaving}
-          onClick={(e) => setBusinessProfileMenuAnchor(e.currentTarget)}
-          sx={{
-            width: 34,
-            height: 34,
-            flexShrink: 0,
-            borderRadius: "8px",
-            border: `1px solid ${alpha(m.navy, 0.12)}`,
-            bgcolor: "#fff",
-            color: alpha(m.navy, 0.72),
-            "&:hover": { bgcolor: alpha(m.navy, 0.03) },
-          }}
-        >
-          <MoreVertRoundedIcon sx={{ fontSize: 20 }} />
-        </IconButton>
-
-        <Menu
-          anchorEl={businessProfileMenuAnchor}
-          open={Boolean(businessProfileMenuAnchor)}
-          onClose={() => setBusinessProfileMenuAnchor(null)}
-          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-          transformOrigin={{ vertical: "top", horizontal: "right" }}
-          PaperProps={{
-            sx: {
-              borderRadius: "10px",
-              border: `1px solid ${alpha(m.navy, 0.10)}`,
-              boxShadow: "0 14px 30px rgba(16,35,63,0.12)",
-              mt: 0.75,
-              minWidth: 160,
-              p: 0.5,
-            },
-          }}
-        >
-          {isBusinessProfileActive ? (
-            <>
-              <MenuItem
-                onClick={onTemporarilyDeactivateBusinessProfile}
-                disabled={isBusinessProfileStatusSaving}
-                sx={{
-                  borderRadius: "8px",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: alpha(m.navy, 0.82),
-                  my: 0.25,
-                }}
-              >
-                Temporarily Deactivate
-              </MenuItem>
-              <MenuItem
-                onClick={() => {
-                  setBusinessProfileMenuAnchor(null);
-                  setPermanentDeactivateConfirmOpen(true);
-                }}
-                disabled={isBusinessProfileStatusSaving}
-                sx={{
-                  borderRadius: "8px",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  color: alpha(m.navy, 0.82),
-                  my: 0.25,
-                }}
-              >
-                Permanently Deactivate
-              </MenuItem>
-            </>
-          ) : (
-            <MenuItem
-              onClick={onActivateBusinessProfile}
-              disabled={isBusinessProfileStatusSaving}
+      <MollureModal
+        open={templateSyncModalOpen}
+        onClose={() => {
+          setBusinessOfferingSelect("Both");
+          onSwitchActiveBusinessTemplate("Fixed Location");
+          setIsBusinessPublishEnabled(true);
+          setTemplateSyncModalOpen(false);
+        }}
+        title="Fixed and Desired location"
+        maxWidth="xs"
+        fullWidth
+        footer={
+          <Stack direction="row" spacing={1.25} justifyContent="flex-end" sx={{ px: 2.5, py: 1.75 }}>
+            <Button
+              variant="outlined"
+              onClick={() => {
+                setBusinessOfferingSelect("Both");
+                onSwitchActiveBusinessTemplate("Fixed Location");
+                setIsBusinessPublishEnabled(true);
+                setTemplateSyncModalOpen(false);
+              }}
+              disabled={businessFormDisabled}
               sx={{
-                borderRadius: "8px",
-                fontSize: 13,
-                fontWeight: 700,
-                color: alpha(m.navy, 0.82),
-                my: 0.25,
+                borderRadius: "10px",
+                textTransform: "none",
+                fontWeight: 800,
+                height: 36,
+                px: 3,
+                borderColor: alpha(m.navy, 0.16),
+                color: alpha(m.navy, 0.65),
               }}
             >
-              Activate
-            </MenuItem>
-          )}
-        </Menu>
+              Cancel
+            </Button>
+            <Button
+              variant="contained"
+              disableElevation
+              onClick={() => {
+                applyTemplateSyncSettings(createDefaultTemplateSyncSettings());
+                setBusinessOfferingSelect("Both");
+                onSwitchActiveBusinessTemplate("Fixed Location");
+                setTemplateSyncModalOpen(false);
+                showSnackbar({
+                  severity: "success",
+                  message: "Fixed and Desired location selected. Use settings to adjust sync anytime.",
+                });
+              }}
+              disabled={businessFormDisabled}
+              sx={{
+                borderRadius: "10px",
+                textTransform: "none",
+                fontWeight: 900,
+                height: 36,
+                px: 3,
+                bgcolor: m.teal,
+                color: "#fff",
+                "&:hover": { bgcolor: m.tealDark },
+              }}
+            >
+              Save
+            </Button>
+          </Stack>
+        }
+      >
+        <Box sx={{ px: 2.5, py: 2 }}>
+          <Typography sx={{ fontSize: 13, color: alpha(m.navy, 0.68), lineHeight: 1.55 }}>
+            You are setting up both Fixed and Desired location templates. Use the settings icon next to Publish
+            to choose how each section syncs between them — or keep the defaults and change this later.
+          </Typography>
+        </Box>
+      </MollureModal>
 
-        <MollureModal
-          open={permanentDeactivateConfirmOpen}
-          onClose={() => setPermanentDeactivateConfirmOpen(false)}
-          title="Permanently deactivate profile?"
-          maxWidth="xs"
-          fullWidth
-          footer={
-            <Stack direction="row" spacing={1.25} justifyContent="flex-end" sx={{ px: 2.5, py: 1.75 }}>
-              <Button
-                variant="outlined"
-                onClick={() => setPermanentDeactivateConfirmOpen(false)}
-                disabled={isBusinessProfileStatusSaving}
-                sx={{
-                  borderRadius: "10px",
-                  textTransform: "none",
-                  fontWeight: 800,
-                  height: 36,
-                  px: 3,
-                  borderColor: alpha(m.navy, 0.16),
-                  color: alpha(m.navy, 0.65),
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="contained"
-                disableElevation
-                onClick={onConfirmPermanentDeactivate}
-                disabled={isBusinessProfileStatusSaving}
-                sx={{
-                  borderRadius: "10px",
-                  textTransform: "none",
-                  fontWeight: 900,
-                  height: 36,
-                  px: 3,
-                  bgcolor: m.teal,
-                  color: "#fff",
-                  "&:hover": { bgcolor: m.tealDark },
-                }}
-              >
-                Permanently Deactivate
-              </Button>
-            </Stack>
-          }
-        >
-          <Box sx={{ px: 2.5, py: 2 }}>
-            <Typography sx={{ fontSize: 13, color: alpha(m.navy, 0.68), lineHeight: 1.55 }}>
-              Your public profile will be removed from listings. You can still reactivate later by publishing again.
-            </Typography>
-          </Box>
-        </MollureModal>
-      </Stack>
+      <AppDrawer
+        anchor="right"
+        open={templateSyncDrawerOpen}
+        onClose={() => setTemplateSyncDrawerOpen(false)}
+        title="Template sync settings"
+        subtitle="Control how Fixed and Desired templates share section data."
+      >
+        <Box sx={{ maxHeight: "calc(100vh - 180px)", overflow: "auto", pr: 0.5 }}>
+          <TemplateSyncSettingsForm
+            value={templateSyncDraft}
+            disabled={businessFormDisabled}
+            onChange={setTemplateSyncDraft}
+          />
+        </Box>
+        <Stack direction="row" spacing={1.25} justifyContent="flex-end" sx={{ pt: 1 }}>
+          <Button
+            variant="outlined"
+            onClick={() => setTemplateSyncDrawerOpen(false)}
+            disabled={businessFormDisabled}
+            sx={{
+              borderRadius: "10px",
+              textTransform: "none",
+              fontWeight: 800,
+              height: 36,
+              px: 3,
+              borderColor: alpha(m.navy, 0.16),
+              color: alpha(m.navy, 0.65),
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            disableElevation
+            onClick={() => {
+              applyTemplateSyncSettings(templateSyncDraft);
+              setTemplateSyncDrawerOpen(false);
+              showSnackbar({ severity: "success", message: "Template sync settings saved." });
+            }}
+            disabled={businessFormDisabled}
+            sx={{
+              borderRadius: "10px",
+              textTransform: "none",
+              fontWeight: 900,
+              height: 36,
+              px: 3,
+              bgcolor: "primary.main",
+              "&:hover": { bgcolor: "mollure.tealDark" },
+            }}
+          >
+            Save
+          </Button>
+        </Stack>
+      </AppDrawer>
 
       <SectionShell title={data.profile.title} action={renderSectionEditAction("profile")}>
         <Grid container spacing={2.25}>
@@ -4138,7 +4317,7 @@ export default function ProfessionalFixedLocationSetup({
               Book Services
             </Typography>
             <Typography sx={{ mt: 0.35, color: alpha(m.navy, 0.55), fontSize: 12, lineHeight: 1.45 }}>
-              Pick a category and service, then tap + to create a combo card you can edit or delete.
+              Pick two services, then tap + to create a combo card you can edit or delete.
             </Typography>
           </Box>
 
@@ -4156,27 +4335,27 @@ export default function ProfessionalFixedLocationSetup({
               <Grid container spacing={1.5} alignItems="center">
                 <Grid item xs={12} md={5}>
                   <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.6 }}>
-                    Select category
+                    Select first service
                   </Typography>
                   <MollureFormField
                     select
                     value={fixedBiz.bookCategory}
                     onChange={(e) => {
-                      const categoryId = e.target.value;
-                      setFixedBizField("bookCategory", categoryId);
-                      const nextServices = getBookingServiceOptions(categoryId);
-                      setFixedBizField(
-                        "bookService",
-                        nextServices.some((option) => option.value === fixedBiz.bookService)
-                          ? fixedBiz.bookService
-                          : nextServices[0]?.value || "",
-                      );
+                      const firstServiceId = e.target.value;
+                      setFixedBizField("bookCategory", firstServiceId);
+                      if (fixedBiz.bookService === firstServiceId) {
+                        setFixedBizField(
+                          "bookService",
+                          allBookingServiceOptions.find((option) => option.value !== firstServiceId)?.value ||
+                            "",
+                        );
+                      }
                     }}
                     sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     disabled={servicesDetailsDisabled}
                   >
-                    <MenuItem value="">Select category</MenuItem>
-                    {bookingCategoryOptions.map((opt) => (
+                    <MenuItem value="">Select first service</MenuItem>
+                    {allBookingServiceOptions.map((opt) => (
                       <MenuItem key={opt.value} value={opt.value}>
                         {opt.label}
                       </MenuItem>
@@ -4185,7 +4364,7 @@ export default function ProfessionalFixedLocationSetup({
                 </Grid>
                 <Grid item xs={12} md={5}>
                   <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.6 }}>
-                    Select service
+                    Select second service
                   </Typography>
                   <MollureFormField
                     select
@@ -4194,18 +4373,25 @@ export default function ProfessionalFixedLocationSetup({
                     sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     disabled={servicesDetailsDisabled}
                   >
-                    <MenuItem value="">Select service</MenuItem>
-                    {bookingServiceOptions.map((opt) => (
-                      <MenuItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </MenuItem>
-                    ))}
+                    <MenuItem value="">Select second service</MenuItem>
+                    {bookingServiceOptions
+                      .filter((opt) => opt.value !== fixedBiz.bookCategory)
+                      .map((opt) => (
+                        <MenuItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </MenuItem>
+                      ))}
                   </MollureFormField>
                 </Grid>
                 <Grid item xs={12} md={2} sx={{ display: "flex", justifyContent: { md: "flex-end" }, pr: { md: 0.5 } }}>
                   <IconButton
                     onClick={addBookingCombo}
-                    disabled={servicesDetailsDisabled || !fixedBiz.bookCategory || !fixedBiz.bookService}
+                    disabled={
+                      servicesDetailsDisabled ||
+                      !fixedBiz.bookCategory ||
+                      !fixedBiz.bookService ||
+                      fixedBiz.bookCategory === fixedBiz.bookService
+                    }
                     sx={addSoftIconButtonSx(m, 34)}
                   >
                     <AddRoundedIcon />
@@ -4229,7 +4415,7 @@ export default function ProfessionalFixedLocationSetup({
                   </Typography>
                   {fixedBiz.bookCombos.length === 0 ? (
                     <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: alpha(m.navy, 0.5), py: 0.5 }}>
-                      Select a category and service above, then tap + to add a combination.
+                      Select two services above, then tap + to add a combination.
                     </Typography>
                   ) : (
                     <Stack
@@ -4241,7 +4427,6 @@ export default function ProfessionalFixedLocationSetup({
                     >
                       {fixedBiz.bookCombos.map((c) => {
                         const isEditing = bookingComboEditId === c.id;
-                        const comboServiceOptions = getBookingServiceOptions(c.categoryId);
                         const { categoryLabel, serviceLabel } = resolveBookingComboLabels(c.categoryId, c.serviceId);
                         const comboFieldsDisabled = servicesDetailsDisabled;
 
@@ -4278,7 +4463,7 @@ export default function ProfessionalFixedLocationSetup({
                                       "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" },
                                     }}
                                   >
-                                    {bookingCategoryOptions.map((opt) => (
+                                    {allBookingServiceOptions.map((opt) => (
                                       <MenuItem key={opt.value} value={opt.value}>
                                         {opt.label}
                                       </MenuItem>
@@ -4305,11 +4490,13 @@ export default function ProfessionalFixedLocationSetup({
                                       "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" },
                                     }}
                                   >
-                                    {comboServiceOptions.map((opt) => (
-                                      <MenuItem key={opt.value} value={opt.value}>
-                                        {opt.label}
-                                      </MenuItem>
-                                    ))}
+                                    {allBookingServiceOptions
+                                      .filter((opt) => opt.value !== c.categoryId)
+                                      .map((opt) => (
+                                        <MenuItem key={opt.value} value={opt.value}>
+                                          {opt.label}
+                                        </MenuItem>
+                                      ))}
                                   </MollureFormField>
                                 </Stack>
                                 <Stack direction="row" spacing={0.5} justifyContent="flex-end">
@@ -4771,8 +4958,8 @@ export default function ProfessionalFixedLocationSetup({
           </Typography>
           <MollureFormField
             placeholder={data.generalNotes.placeholder}
-            value={values.notes}
-            onChange={(e) => setField("notes", e.target.value)}
+            value={biz.notes}
+            onChange={(e) => setBizField("notes", e.target.value)}
             multiline
             minRows={4}
             disabled={generalNotesDisabled}
@@ -4794,8 +4981,8 @@ export default function ProfessionalFixedLocationSetup({
               <Grid item xs={12} md={6}>
                 <MollureFormField
                   select
-                  value={values.priceRangeFrom}
-                  onChange={(e) => setField("priceRangeFrom", e.target.value)}
+                  value={biz.priceRangeFrom}
+                  onChange={(e) => setBizField("priceRangeFrom", e.target.value)}
                   disabled={priceDisabled}
                   sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                 >
@@ -4809,8 +4996,8 @@ export default function ProfessionalFixedLocationSetup({
               <Grid item xs={12} md={6}>
                 <MollureFormField
                   select
-                  value={values.priceRangeTo}
-                  onChange={(e) => setField("priceRangeTo", e.target.value)}
+                  value={biz.priceRangeTo}
+                  onChange={(e) => setBizField("priceRangeTo", e.target.value)}
                   disabled={priceDisabled}
                   sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                 >
@@ -4829,8 +5016,8 @@ export default function ProfessionalFixedLocationSetup({
               Prepayment (Optional)
             </Typography>
             <MollureFormField
-              value={values.prepaymentPercent}
-              onChange={(e) => setField("prepaymentPercent", e.target.value)}
+              value={biz.prepaymentPercent}
+              onChange={(e) => setBizField("prepaymentPercent", e.target.value)}
               placeholder="0"
               disabled={priceDisabled}
               sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
@@ -4842,8 +5029,8 @@ export default function ProfessionalFixedLocationSetup({
             <Box sx={{ mt: 1 }}>
               <MollureFormField
                 placeholder="Custom instructions for prepayment"
-                value={values.prepaymentInstructions}
-                onChange={(e) => setField("prepaymentInstructions", e.target.value)}
+                value={biz.prepaymentInstructions}
+                onChange={(e) => setBizField("prepaymentInstructions", e.target.value)}
                 multiline
                 minRows={3}
                 disabled={priceDisabled}

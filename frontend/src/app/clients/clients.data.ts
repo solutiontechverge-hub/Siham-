@@ -1,4 +1,5 @@
 import { clientsShellHeader, marketingShellFooter } from "../../data/marketingShell.data";
+import { netherlandsCities } from "../../data/netherlandsCities.data";
 
 export type ClientFeatureIconKey =
   | "location"
@@ -80,7 +81,7 @@ export const clientsPageData = {
         placeholder: "Select category",
         options: [...clientHomeServiceCategories],
       },
-      { label: "Location", placeholder: "Select city", options: ["Fixed Location", "Desired Location"] },
+      { label: "Location", placeholder: "Select city", options: [...netherlandsCities] },
       {
         label: "Select Municipality",
         placeholder: "Select municipality",
@@ -174,6 +175,7 @@ export const clientsPageData = {
     description:
       "Join thousands of salon owners and freelancers who are saving time and growing their revenue with Mollure.",
     action: "Partner with Mollure",
+    href: "/professionals/pricing",
     supportingText: "Credit card required - free for first 50 transactions",
   },
   footer: marketingShellFooter,

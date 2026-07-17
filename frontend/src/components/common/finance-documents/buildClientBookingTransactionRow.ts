@@ -100,8 +100,10 @@ export function buildClientBookingTransactionRow({
 
   return {
     id: `booking-${bookingRef}`,
+    entryType: "onlineBooking",
     entryId: bookingRef,
     date: invoiceDate,
+    bookingId: bookingRef,
     entryLabel: "Booking",
     clientName: requesterName,
     clientEmail: requesterEmail ?? "",

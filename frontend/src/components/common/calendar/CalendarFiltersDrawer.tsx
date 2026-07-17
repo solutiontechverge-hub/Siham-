@@ -46,7 +46,6 @@ export default function CalendarFiltersDrawer({
       open={open}
       onClose={onClose}
       title="Filters"
-      width={{ xs: "100%", sm: 320 }}
       footer={
         <Box sx={{ p: 2 }}>
           <Stack direction="row" spacing={1}>

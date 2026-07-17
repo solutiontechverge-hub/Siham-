@@ -7,6 +7,9 @@ import { Box, Divider, Drawer, IconButton, Stack, type DrawerProps, type SxProps
 import { alpha, useTheme } from "@mui/material/styles";
 import { SubHeading } from "../ui/typography";
 
+/** Canonical right-panel drawer width — matches View Invoice / finance document drawers. */
+export const MOLLURE_DRAWER_WIDTH = { xs: "100%", sm: 560 } as const;
+
 type MollureDrawerProps = Omit<DrawerProps, "children" | "title"> & {
   title: React.ReactNode;
   children: React.ReactNode;
@@ -32,7 +35,7 @@ export default function MollureDrawer({
   anchor = "right",
   ...props
 }: MollureDrawerProps) {
-  const resolvedWidth = panelWidth ?? width ?? { xs: "100vw", sm: 480 };
+  const resolvedWidth = panelWidth ?? width ?? MOLLURE_DRAWER_WIDTH;
   const theme = useTheme();
   const m = theme.palette.mollure;
 

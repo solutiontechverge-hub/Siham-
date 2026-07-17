@@ -5,6 +5,13 @@ import {
   uploadTeamMemberPhotoFileToS3,
 } from "../services/s3-upload.service.js";
 import { buildServiceDetailsFromCategories } from "../utils/business-service-categories.js";
+import { syncBookingToFinanceTransaction } from "../services/finance-sync.service.js";
+import {
+  notifyBookingStatusChange,
+  notifyIncomingBookingRequest,
+  notifyIncomingEditRequest,
+} from "../services/bookingEmail.service.js";
+import { emitBookingChanged } from "../messaging/messagingSocket.js";
 import { normalizeEntityId } from "../utils/business-setup-parsers.js";
 import {
   isValidUuid,
@@ -95,6 +102,16 @@ const parseOptionalInteger = (value) => {
 
 const toIsoDate = (value) => {
   if (!value) return null;
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+    // DATE columns were parsed as local midnight by pg — use local Y-M-D, not UTC.
+    const y = value.getFullYear();
+    const m = String(value.getMonth() + 1).padStart(2, "0");
+    const d = String(value.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+  const wallClock = String(value).match(/^(\d{4}-\d{2}-\d{2})/);
+  if (wallClock) return wallClock[1];
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed.toISOString().slice(0, 10);
@@ -102,14 +119,59 @@ const toIsoDate = (value) => {
 
 const toTimeLabel = (value) => {
   if (!value) return null;
+  const iso = value instanceof Date ? value.toISOString() : String(value);
+  const wallClock = iso.match(/T(\d{2}:\d{2})/);
+  if (wallClock) return wallClock[1];
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return null;
   return parsed.toISOString().slice(11, 16);
 };
 
+const normalizeBookingDateInput = (value) => {
+  if (!value) return null;
+  const match = String(value).match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : null;
+};
+
+const calendarEntryDateSql = (alias) =>
+  `substring(COALESCE(${alias}.start_time::text, ${alias}.blocked_time_start::text, ${alias}.start_date::text) from 1 for 10)::date`;
+
+const calendarEntryInRangeSql = (alias, startParam, endParam) => `(
+  ${calendarEntryDateSql(alias)} BETWEEN ${startParam}::date AND ${endParam}::date
+  OR (
+    ${alias}.start_date IS NOT NULL
+    AND ${alias}.end_date IS NOT NULL
+    AND ${alias}.start_date <= ${endParam}::date
+    AND ${alias}.end_date >= ${startParam}::date
+  )
+)`;
+
+const bookingDateSql = (alias) =>
+  `substring(COALESCE(${alias}.booking_date::text, ${alias}.start_time::text) from 1 for 10)::date`;
+
 const makeCalendarCode = (prefix = "OF123") => `${prefix}${Date.now()}${Math.random().toString(16).slice(2, 6)}`;
-const calendarStatusSet = new Set(["requested", "cancelled", "completed", "confirmed", "blocked", "no_show"]);
-const bookingStatusSet = new Set(["requested", "cancelled", "completed", "confirmed", "no_show"]);
+const calendarStatusSet = new Set(["requested", "cancelled", "completed", "confirmed", "blocked", "in_progress", "no_show"]);
+const bookingStatusSet = new Set(["requested", "cancelled", "completed", "confirmed", "in_progress", "no_show"]);
+
+const ensureUniqueBookingCode = async (preferredCode, prefix = "123") => {
+  const trimmed = String(preferredCode ?? "").trim();
+  if (trimmed) {
+    const existing = await query(`SELECT 1 FROM bookings WHERE unique_code = $1 LIMIT 1`, [trimmed]);
+    if (!existing.rows.length) {
+      return trimmed;
+    }
+  }
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const candidate = makeCalendarCode(prefix);
+    const existing = await query(`SELECT 1 FROM bookings WHERE unique_code = $1 LIMIT 1`, [candidate]);
+    if (!existing.rows.length) {
+      return candidate;
+    }
+  }
+
+  return makeCalendarCode(prefix);
+};
 
 const normalizeCalendarStatus = (value, fallback = "confirmed") => {
   const next = String(value ?? "").trim().toLowerCase();
@@ -294,6 +356,7 @@ const getBusinessSetupDetailById = async (setupId, client = { query }) => {
     ...businessSetup,
     service_categories: serviceCategories,
     book_service_combinations: parseJsonArray(businessSetup.book_service_combinations),
+    section_sync_settings: parseJsonValue(businessSetup.section_sync_settings, {}),
     team_members: teamMembers,
     service_details: serviceDetails,
   };
@@ -716,13 +779,22 @@ export const upsertBusinessSetup = async (req, res) => {
       desired_location_area: req.body.desired_location_area ?? null,
       desired_location_province: req.body.desired_location_province ?? null,
       desired_location_services: parseTextArray(req.body.desired_location_services),
+      section_sync_settings: JSON.stringify(
+        parseJsonValue(req.body.section_sync_settings, {}),
+      ),
     };
+
+    const jsonbFields = new Set([
+      "service_categories",
+      "book_service_combinations",
+      "section_sync_settings",
+    ]);
 
     const fields = Object.keys(payload);
     const values = [professionalProfile.id, ...fields.map((field) => payload[field])];
     const updateAssignments = fields
       .map((field, index) => {
-        const castType = ["service_categories", "book_service_combinations"].includes(field) ? "::jsonb" : "";
+        const castType = jsonbFields.has(field) ? "::jsonb" : "";
         return `${field} = $${index + 2}${castType}`;
       })
       .concat("updated_at = NOW()")
@@ -735,7 +807,7 @@ export const upsertBusinessSetup = async (req, res) => {
 
       const insertValues = fields
         .map((field, index) => {
-          const castType = ["service_categories", "book_service_combinations"].includes(field) ? "::jsonb" : "";
+          const castType = jsonbFields.has(field) ? "::jsonb" : "";
           return `$${index + 2}${castType}`;
         })
         .join(", ");
@@ -1027,6 +1099,25 @@ export const getCalendarOverview = async (req, res) => {
       });
     }
 
+    const startDate = normalizeBookingDateInput(req.query.startDate);
+    const endDate = normalizeBookingDateInput(req.query.endDate);
+
+    if ((startDate && !endDate) || (!startDate && endDate)) {
+      return res.status(400).json({
+        success: false,
+        message: "Both startDate and endDate are required when filtering calendar overview.",
+        data: null,
+      });
+    }
+
+    if (startDate && endDate && startDate > endDate) {
+      return res.status(400).json({
+        success: false,
+        message: "startDate must be on or before endDate.",
+        data: null,
+      });
+    }
+
     const professionalProfile = await getProfessionalProfile(req.user.id);
 
     if (!professionalProfile) {
@@ -1037,26 +1128,42 @@ export const getCalendarOverview = async (req, res) => {
       });
     }
 
+    const dateFilterParams = startDate && endDate ? [startDate, endDate] : [];
+    const entriesDateClause =
+      startDate && endDate ? `AND ${calendarEntryInRangeSql("calendar_entries", "$2", "$3")}` : "";
+    const bookingsDateClause =
+      startDate && endDate ? `AND ${bookingDateSql("b")} BETWEEN $2::date AND $3::date` : "";
+
     const [entriesResult, bookingsResult, settingsResult] = await Promise.all([
       query(
         `SELECT *
          FROM calendar_entries
          WHERE professional_profile_id = $1
+         ${entriesDateClause}
          ORDER BY COALESCE(start_time, blocked_time_start, created_at) DESC`,
-        [professionalProfile.id],
+        [professionalProfile.id, ...dateFilterParams],
       ),
       query(
         `SELECT
            b.*,
            s.title AS service_title,
-           tm.full_name AS team_member_name
+           tm.full_name AS team_member_name,
+           COALESCE(
+             NULLIF(TRIM(ip.display_name), ''),
+             NULLIF(TRIM(CONCAT_WS(' ', ip.first_name, ip.last_name)), ''),
+             u.email
+           ) AS customer_name,
+           u.email AS customer_email
          FROM bookings b
          INNER JOIN business_setups bs ON bs.id = b.business_setup_id
          LEFT JOIN subcategories s ON s.id = b.service_id
          LEFT JOIN business_team_members tm ON tm.id = b.team_member_id
+         LEFT JOIN users u ON u.id = b.customer_id
+         LEFT JOIN individual_profiles ip ON ip.user_id = u.id
          WHERE bs.professional_profile_id = $1
+         ${bookingsDateClause}
          ORDER BY COALESCE(b.start_time, b.created_at) DESC`,
-        [professionalProfile.id],
+        [professionalProfile.id, ...dateFilterParams],
       ),
       query(
         `SELECT *
@@ -1076,15 +1183,19 @@ export const getCalendarOverview = async (req, res) => {
           start: toTimeLabel(entry.start_time || entry.blocked_time_start),
           end: toTimeLabel(entry.end_time || entry.blocked_time_end),
         })),
-        bookings: bookingsResult.rows.map((booking) => ({
-          ...booking,
-          booking_type:
-            booking.booking_type || (normalizeBookingStatus(booking.status, "confirmed") === "requested" ? "request" : "online"),
-          unique_code: booking.unique_code || `123${booking.id}`,
-          date: toIsoDate(booking.booking_date || booking.start_time),
-          start: toTimeLabel(booking.start_time),
-          end: toTimeLabel(booking.end_time),
-        })),
+        bookings: bookingsResult.rows.map((booking) => {
+          const bookingDate = toIsoDate(booking.booking_date || booking.start_time);
+          return {
+            ...booking,
+            booking_date: bookingDate,
+            booking_type:
+              booking.booking_type || (normalizeBookingStatus(booking.status, "confirmed") === "requested" ? "request" : "online"),
+            unique_code: booking.unique_code || `123${booking.id}`,
+            date: bookingDate,
+            start: toTimeLabel(booking.start_time),
+            end: toTimeLabel(booking.end_time),
+          };
+        }),
         settings: settingsResult.rows[0] || null,
       },
     });
@@ -1170,26 +1281,73 @@ export const listBookings = async (req, res) => {
       }
 
       result = await query(
-        `SELECT *
-         FROM bookings
-         WHERE business_setup_id = $1
-         ORDER BY created_at DESC`,
+        `SELECT
+           b.*,
+           s.title AS service_title,
+           tm.full_name AS team_member_name,
+           bs.business_name,
+           bs.fixed_location_municipality,
+           bs.fixed_location_address,
+           bs.fixed_location_street_number,
+           bs.fixed_location_postal_code,
+           bs.fixed_location_province,
+           COALESCE(
+             NULLIF(TRIM(ip.display_name), ''),
+             NULLIF(TRIM(CONCAT_WS(' ', ip.first_name, ip.last_name)), ''),
+             u.email
+           ) AS customer_name,
+           u.email AS customer_email
+         FROM bookings b
+         INNER JOIN business_setups bs ON bs.id = b.business_setup_id
+         LEFT JOIN subcategories s ON s.id = b.service_id
+         LEFT JOIN business_team_members tm ON tm.id = b.team_member_id
+         LEFT JOIN users u ON u.id = b.customer_id
+         LEFT JOIN individual_profiles ip ON ip.user_id = u.id
+         WHERE b.business_setup_id = $1
+         ORDER BY COALESCE(b.start_time, b.created_at) DESC`,
         [businessSetup.id],
       );
     } else {
       result = await query(
-        `SELECT *
-         FROM bookings
-         WHERE customer_id = $1
-         ORDER BY created_at DESC`,
+        `SELECT
+           b.*,
+           s.title AS service_title,
+           tm.full_name AS team_member_name,
+           bs.business_name,
+           bs.fixed_location_municipality,
+           bs.fixed_location_address,
+           bs.fixed_location_street_number,
+           bs.fixed_location_postal_code,
+           bs.fixed_location_province
+         FROM bookings b
+         INNER JOIN business_setups bs ON bs.id = b.business_setup_id
+         LEFT JOIN subcategories s ON s.id = b.service_id
+         LEFT JOIN business_team_members tm ON tm.id = b.team_member_id
+         WHERE b.customer_id = $1
+         ORDER BY COALESCE(b.start_time, b.created_at) DESC`,
         [req.user.id],
       );
     }
 
+    const bookings = result.rows.map((booking) => {
+      const bookingDate = toIsoDate(booking.booking_date || booking.start_time);
+      return {
+        ...booking,
+        booking_date: bookingDate,
+        date: bookingDate,
+        start: toTimeLabel(booking.start_time),
+        end: toTimeLabel(booking.end_time),
+        booking_type:
+          booking.booking_type ||
+          (normalizeBookingStatus(booking.status, "confirmed") === "requested" ? "request" : "online"),
+        unique_code: booking.unique_code || `123${booking.id}`,
+      };
+    });
+
     return res.status(200).json({
       success: true,
       message: "Bookings fetched successfully.",
-      data: result.rows,
+      data: bookings,
     });
   } catch (error) {
     return res.status(500).json({
@@ -1209,6 +1367,7 @@ export const createBooking = async (req, res) => {
     const normalizedStatus = normalizeBookingStatus(req.body.status, "requested");
     const bookingType = req.body.booking_type ?? "online";
     const generatedCodePrefix = bookingType === "offline" ? "OF123" : "123";
+    const uniqueCode = await ensureUniqueBookingCode(req.body.unique_code, generatedCodePrefix);
 
     const result = await query(
       `INSERT INTO bookings (
@@ -1241,7 +1400,7 @@ export const createBooking = async (req, res) => {
        )
        RETURNING *`,
       [
-        req.body.booking_date,
+        normalizeBookingDateInput(req.body.booking_date),
         req.body.business_setup_id,
         req.user.id,
         req.body.service_id ?? null,
@@ -1254,7 +1413,7 @@ export const createBooking = async (req, res) => {
         req.body.prepayment_status ?? null,
         normalizedStatus,
         bookingType,
-        req.body.unique_code || makeCalendarCode(generatedCodePrefix),
+        uniqueCode,
         parseOptionalNumber(req.body.total_price),
         parseTextArray(req.body.images),
         req.body.contact_number ?? null,
@@ -1267,10 +1426,30 @@ export const createBooking = async (req, res) => {
       ],
     );
 
+    const booking = result.rows[0];
+    if (booking && ["confirmed", "completed"].includes(booking.status)) {
+      try {
+        await syncBookingToFinanceTransaction(booking.id, {
+          paymentPhase: booking.prepayment_status === "paid" ? "prepay" : "full",
+          paymentMethod: booking.booking_type === "offline" ? "offlineDirect" : "onlineDirect",
+        });
+      } catch {
+        // finance sync is best-effort
+      }
+    }
+
+    if (booking?.status === "confirmed") {
+      void notifyBookingStatusChange(booking.id, "requested", booking.status);
+    } else if (booking?.status === "requested") {
+      void notifyIncomingBookingRequest(booking.id);
+    }
+
+    emitBookingChanged(booking, "created");
+
     return res.status(201).json({
       success: true,
       message: "Booking created successfully.",
-      data: result.rows[0],
+      data: booking,
     });
   } catch (error) {
     return res.status(500).json({
@@ -1354,6 +1533,249 @@ export const updateCalendarEntryStatus = async (req, res) => {
   }
 };
 
+export const deleteCalendarEntry = async (req, res) => {
+  try {
+    if (req.user.user_type !== "professional") {
+      return res.status(403).json({
+        success: false,
+        message: "Only professional users can delete calendar entries.",
+        data: null,
+      });
+    }
+
+    const professionalProfile = await getProfessionalProfile(req.user.id);
+    if (!professionalProfile) {
+      return res.status(404).json({
+        success: false,
+        message: "Professional profile not found.",
+        data: null,
+      });
+    }
+
+    const entryId = parseUuid(req.params.id);
+    if (!entryId) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid calendar entry id.",
+        data: null,
+      });
+    }
+
+    const result = await query(
+      `DELETE FROM calendar_entries
+       WHERE id = $1
+         AND professional_profile_id = $2
+       RETURNING id`,
+      [entryId, professionalProfile.id],
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: "Calendar entry not found.",
+        data: null,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Calendar entry deleted successfully.",
+      data: { id: result.rows[0].id },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete calendar entry.",
+      data: {
+        error: error.message,
+      },
+    });
+  }
+};
+
+export const updateMyBooking = async (req, res) => {
+  try {
+    if (req.user.user_type === "professional") {
+      return res.status(403).json({
+        success: false,
+        message: "Professionals must use the status endpoint for booking updates.",
+        data: null,
+      });
+    }
+
+    const bookingId = parseUuid(req.params.id);
+    if (!bookingId) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid booking id.",
+        data: null,
+      });
+    }
+
+    const hasStatus = req.body.status !== undefined && req.body.status !== null && req.body.status !== "";
+    const hasPrepayment =
+      req.body.prepayment_status !== undefined &&
+      req.body.prepayment_status !== null &&
+      req.body.prepayment_status !== "";
+    const hasNotes = req.body.notes !== undefined && req.body.notes !== null;
+    const hasSchedule =
+      (req.body.booking_date !== undefined && req.body.booking_date !== null && req.body.booking_date !== "") ||
+      (req.body.start_time !== undefined && req.body.start_time !== null && req.body.start_time !== "") ||
+      (req.body.end_time !== undefined && req.body.end_time !== null && req.body.end_time !== "");
+
+    if (!hasStatus && !hasPrepayment && !hasNotes && !hasSchedule) {
+      return res.status(400).json({
+        success: false,
+        message: "Provide status, prepayment_status, notes, and/or schedule fields to update.",
+        data: null,
+      });
+    }
+
+    const existingResult = await query(
+      `SELECT *
+       FROM bookings
+       WHERE id = $1
+         AND customer_id = $2
+       LIMIT 1`,
+      [bookingId, req.user.id],
+    );
+
+    if (!existingResult.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found.",
+        data: null,
+      });
+    }
+
+    const existing = existingResult.rows[0];
+    const previousStatus = existing.status;
+
+    let nextStatus = existing.status;
+    if (hasStatus) {
+      nextStatus = normalizeBookingStatus(req.body.status, existing.status);
+      const allowedCustomerStatuses = ["cancelled", "confirmed", "requested"];
+      if (!allowedCustomerStatuses.includes(nextStatus)) {
+        return res.status(400).json({
+          success: false,
+          message: "Customers may only set booking status to cancelled, confirmed, or requested.",
+          data: null,
+        });
+      }
+      // Re-open a confirmed booking as an incoming booking request for the professional.
+      if (nextStatus === "requested" && existing.status !== "confirmed" && existing.status !== "requested") {
+        return res.status(400).json({
+          success: false,
+          message: "Booking can only be re-requested from a confirmed booking.",
+          data: null,
+        });
+      }
+    }
+
+    let nextPrepayment = existing.prepayment_status;
+    if (hasPrepayment) {
+      const normalizedPrepayment = String(req.body.prepayment_status).trim().toLowerCase();
+      if (!["paid", "pending", "failed", "required"].includes(normalizedPrepayment)) {
+        return res.status(400).json({
+          success: false,
+          message: "prepayment_status must be paid, pending, failed, or required.",
+          data: null,
+        });
+      }
+      nextPrepayment = normalizedPrepayment;
+      if (normalizedPrepayment === "paid" && nextStatus === "requested") {
+        nextStatus = "confirmed";
+      }
+    }
+
+    const nextNotes = hasNotes ? String(req.body.notes) : existing.notes;
+    const nextTotalPrice =
+      req.body.total_price !== undefined && req.body.total_price !== null && req.body.total_price !== ""
+        ? Number(req.body.total_price)
+        : existing.total_price;
+    const nextBookingDate = hasSchedule
+      ? normalizeBookingDateInput(req.body.booking_date) || existing.booking_date
+      : existing.booking_date;
+    const nextStartTime =
+      req.body.start_time !== undefined && req.body.start_time !== null && req.body.start_time !== ""
+        ? req.body.start_time
+        : existing.start_time;
+    const nextEndTime =
+      req.body.end_time !== undefined && req.body.end_time !== null && req.body.end_time !== ""
+        ? req.body.end_time
+        : existing.end_time;
+
+    const result = await query(
+      `UPDATE bookings
+       SET status = $1,
+           prepayment_status = $2,
+           notes = $3,
+           total_price = $4,
+           booking_date = $5,
+           start_time = $6,
+           end_time = $7,
+           updated_at = NOW()
+       WHERE id = $8
+         AND customer_id = $9
+       RETURNING *`,
+      [
+        nextStatus,
+        nextPrepayment,
+        nextNotes,
+        Number.isFinite(nextTotalPrice) ? nextTotalPrice : existing.total_price,
+        nextBookingDate,
+        nextStartTime,
+        nextEndTime,
+        bookingId,
+        req.user.id,
+      ],
+    );
+
+    if (!result.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found.",
+        data: null,
+      });
+    }
+
+    const booking = result.rows[0];
+    if (["confirmed", "completed"].includes(booking.status)) {
+      try {
+        await syncBookingToFinanceTransaction(booking.id, {
+          paymentPhase: booking.prepayment_status === "paid" ? "prepay" : "full",
+          paymentMethod: booking.booking_type === "offline" ? "offlineDirect" : "onlineDirect",
+        });
+      } catch {
+        // best-effort
+      }
+    }
+
+    if (previousStatus !== booking.status) {
+      void notifyBookingStatusChange(booking.id, previousStatus, booking.status);
+      if (previousStatus === "confirmed" && booking.status === "requested") {
+        void notifyIncomingBookingRequest(booking.id);
+      }
+    }
+
+    emitBookingChanged(booking, "updated");
+
+    return res.status(200).json({
+      success: true,
+      message: "Booking updated successfully.",
+      data: booking,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update booking.",
+      data: {
+        error: error.message,
+      },
+    });
+  }
+};
+
 export const updateBookingStatus = async (req, res) => {
   try {
     if (req.user.user_type !== "professional") {
@@ -1364,11 +1786,11 @@ export const updateBookingStatus = async (req, res) => {
       });
     }
 
-    const businessSetup = await getBusinessSetupByUserId(req.user.id);
-    if (!businessSetup) {
+    const professionalProfile = await getProfessionalProfile(req.user.id);
+    if (!professionalProfile) {
       return res.status(404).json({
         success: false,
-        message: "Business setup not found.",
+        message: "Professional profile not found.",
         data: null,
       });
     }
@@ -1383,14 +1805,77 @@ export const updateBookingStatus = async (req, res) => {
     }
 
     const status = normalizeBookingStatus(req.body.status, "requested");
+
+    // Scope by professional profile (all business setups), not a single rows[0] setup —
+    // calendar overview lists bookings across setups; Accept/Reject must match that.
+    const existingResult = await query(
+      `SELECT b.status, b.notes, b.total_price, b.booking_date, b.start_time, b.end_time, b.business_setup_id
+       FROM bookings b
+       INNER JOIN business_setups bs ON bs.id = b.business_setup_id
+       WHERE b.id = $1
+         AND bs.professional_profile_id = $2
+       LIMIT 1`,
+      [bookingId, professionalProfile.id],
+    );
+
+    if (!existingResult.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found.",
+        data: null,
+      });
+    }
+
+    const previousStatus = existingResult.rows[0].status;
+    const businessSetupId = existingResult.rows[0].business_setup_id;
+    const nextNotes =
+      req.body.notes !== undefined && req.body.notes !== null
+        ? String(req.body.notes)
+        : existingResult.rows[0].notes;
+    const nextTotalPrice =
+      req.body.total_price !== undefined && req.body.total_price !== null && req.body.total_price !== ""
+        ? Number(req.body.total_price)
+        : existingResult.rows[0].total_price;
+
+    const existingBooking = existingResult.rows[0];
+    const hasSchedule =
+      (req.body.booking_date !== undefined && req.body.booking_date !== null && req.body.booking_date !== "") ||
+      (req.body.start_time !== undefined && req.body.start_time !== null && req.body.start_time !== "") ||
+      (req.body.end_time !== undefined && req.body.end_time !== null && req.body.end_time !== "");
+    const nextBookingDate = hasSchedule
+      ? normalizeBookingDateInput(req.body.booking_date) || existingBooking.booking_date
+      : existingBooking.booking_date;
+    const nextStartTime =
+      req.body.start_time !== undefined && req.body.start_time !== null && req.body.start_time !== ""
+        ? req.body.start_time
+        : existingBooking.start_time;
+    const nextEndTime =
+      req.body.end_time !== undefined && req.body.end_time !== null && req.body.end_time !== ""
+        ? req.body.end_time
+        : existingBooking.end_time;
+
     const result = await query(
       `UPDATE bookings
        SET status = $1,
+           notes = $2,
+           total_price = $3,
+           booking_date = $4,
+           start_time = $5,
+           end_time = $6,
            updated_at = NOW()
-       WHERE id = $2
-         AND business_setup_id = $3
+       WHERE id = $7
+         AND business_setup_id = $8
        RETURNING *`,
-      [status, bookingId, businessSetup.id],
+      [
+        status,
+        nextNotes,
+        Number.isFinite(nextTotalPrice) ? nextTotalPrice : existingResult.rows[0].total_price,
+        nextBookingDate,
+        nextStartTime,
+        nextEndTime,
+        bookingId,
+        businessSetupId,
+      ],
     );
 
     if (!result.rows.length) {
@@ -1401,10 +1886,29 @@ export const updateBookingStatus = async (req, res) => {
       });
     }
 
+    const booking = result.rows[0];
+    if (["confirmed", "completed"].includes(booking.status)) {
+      try {
+        await syncBookingToFinanceTransaction(booking.id, {
+          paymentMethod: booking.booking_type === "offline" ? "offlineDirect" : "onlineDirect",
+        });
+      } catch {
+        // best-effort
+      }
+    }
+
+    void notifyBookingStatusChange(booking.id, previousStatus, booking.status);
+
+    if (req.body.notify_incoming_er === true || req.body.email_scenario === "incoming_er") {
+      void notifyIncomingEditRequest(booking.id);
+    }
+
+    emitBookingChanged(booking, "updated");
+
     return res.status(200).json({
       success: true,
       message: "Booking status updated successfully.",
-      data: result.rows[0],
+      data: booking,
     });
   } catch (error) {
     return res.status(500).json({

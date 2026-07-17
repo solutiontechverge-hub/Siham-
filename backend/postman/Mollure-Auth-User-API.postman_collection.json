@@ -2,6 +2,7 @@
   "info": {
     "_postman_id": "4d3d9d8d-2a7d-4e96-9a6a-41e29f8d12f1",
     "name": "Mollure Auth User API",
+    "description": "Mollure backend API collection.\n\n## Auth tokens\n- **Access token** (`authToken`): expires in **5 hours** — use as `Bearer {{authToken}}` on protected routes.\n- **Refresh token** (`refreshToken`): expires in **7 days** — returned on login; re-login when access token expires.\n\nRun **Auth → POST Login** first; the test script saves both tokens to collection variables.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -12,6 +13,14 @@
     {
       "key": "authToken",
       "value": ""
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    },
+    {
+      "key": "accessTokenExpiresInHours",
+      "value": "5"
     },
     {
       "key": "email",
@@ -468,8 +477,21 @@
               "script": {
                 "exec": [
                   "const jsonData = pm.response.json();",
-                  "if (jsonData.success && jsonData.data && jsonData.data.access_token) {",
-                  "  pm.collectionVariables.set('authToken', jsonData.data.access_token);",
+                  "if (jsonData.success && jsonData.data) {",
+                  "  if (jsonData.data.access_token) {",
+                  "    pm.collectionVariables.set('authToken', jsonData.data.access_token);",
+                  "  }",
+                  "  if (jsonData.data.refresh_token) {",
+                  "    pm.collectionVariables.set('refreshToken', jsonData.data.refresh_token);",
+                  "  }",
+                  "  const token = jsonData.data.access_token;",
+                  "  if (token) {",
+                  "    const payload = JSON.parse(atob(token.split('.')[1]));",
+                  "    if (payload.exp) {",
+                  "      const expiresAt = new Date(payload.exp * 1000);",
+                  "      console.log('Access token expires at:', expiresAt.toISOString());",
+                  "    }",
+                  "  }",
                   "}"
                 ],
                 "type": "text/javascript"
@@ -477,6 +499,7 @@
             }
           ],
           "request": {
+            "description": "Returns access_token (valid 5 hours) and refresh_token (valid 7 days). Test script saves both to collection variables.",
             "method": "POST",
             "header": [
               {

@@ -1,0 +1,146 @@
+import type {
+  CalendarBookingLocation,
+  TeamScheduleAvailabilityEntry,
+  TeamScheduleBlockedEntry,
+  TeamScheduleTimeRange,
+} from "../../../app/professionals/fixed-location/calendar/calendar.data";
+import type { BlockTimeDraft } from "./calendar.utils";
+
+export type AvailabilityDraft = {
+  teamIds: string[];
+  locations: CalendarBookingLocation[];
+  dateFrom: string;
+  dateTo: string;
+  dayFrom: BlockTimeDraft["dayFrom"];
+  dayTo: BlockTimeDraft["dayTo"];
+  shifts: TeamScheduleTimeRange[];
+};
+
+export const DAY_FULL_OPTIONS = [
+  { label: "Monday", value: "Monday" },
+  { label: "Tuesday", value: "Tuesday" },
+  { label: "Wednesday", value: "Wednesday" },
+  { label: "Thursday", value: "Thursday" },
+  { label: "Friday", value: "Friday" },
+  { label: "Saturday", value: "Saturday" },
+  { label: "Sunday", value: "Sunday" },
+] as const;
+
+const DAY_FULL_TO_ABBR: Record<BlockTimeDraft["dayFrom"], string> = {
+  Monday: "Mon",
+  Tuesday: "Tue",
+  Wednesday: "Wed",
+  Thursday: "Thu",
+  Friday: "Fri",
+  Saturday: "Sat",
+  Sunday: "Sun",
+};
+
+const DAY_ABBR_TO_FULL: Record<string, BlockTimeDraft["dayFrom"]> = {
+  Mon: "Monday",
+  Tue: "Tuesday",
+  Wed: "Wednesday",
+  Thu: "Thursday",
+  Fri: "Friday",
+  Sat: "Saturday",
+  Sun: "Sunday",
+};
+
+export const toDayAbbr = (day: BlockTimeDraft["dayFrom"] | string) =>
+  DAY_FULL_TO_ABBR[day as BlockTimeDraft["dayFrom"]] ?? day.slice(0, 3);
+
+export const toDayFull = (day: string): BlockTimeDraft["dayFrom"] =>
+  DAY_ABBR_TO_FULL[day] ?? (day as BlockTimeDraft["dayFrom"]);
+
+export const emptyAvailabilityDraft = (dateIso: string): AvailabilityDraft => ({
+  teamIds: [],
+  locations: [],
+  dateFrom: dateIso,
+  dateTo: dateIso,
+  dayFrom: "Monday",
+  dayTo: "Friday",
+  shifts: [{ start: "09:00", end: "17:00" }],
+});
+
+export const availabilityEntryToDraft = (entry: TeamScheduleAvailabilityEntry): AvailabilityDraft => ({
+  teamIds: [entry.resourceId],
+  locations: [entry.location],
+  dateFrom: entry.dateFrom,
+  dateTo: entry.dateTo,
+  dayFrom: toDayFull(entry.dayFrom),
+  dayTo: toDayFull(entry.dayTo),
+  shifts: [...entry.times],
+});
+
+export const blockedEntryToDraft = (
+  entry: TeamScheduleBlockedEntry,
+  supportedLocations: readonly CalendarBookingLocation[],
+): BlockTimeDraft & { activity: string } => ({
+  title: "Custom",
+  teamIds: [entry.resourceId],
+  locations: [...supportedLocations],
+  dateFrom: entry.dateFrom,
+  dateTo: entry.dateTo,
+  dayFrom: toDayFull(entry.dayFrom),
+  dayTo: toDayFull(entry.dayTo),
+  startTime: entry.times[0]?.start ?? "09:00",
+  endTime: entry.times[0]?.end ?? "17:00",
+  activity: entry.activity,
+});
+
+export const buildAvailabilityEntriesFromDraft = (
+  draft: AvailabilityDraft,
+  editingEntry?: TeamScheduleAvailabilityEntry,
+): TeamScheduleAvailabilityEntry[] => {
+  const dayFrom = toDayAbbr(draft.dayFrom);
+  const dayTo = toDayAbbr(draft.dayTo);
+  const shifts = draft.shifts.filter((shift) => shift.start && shift.end);
+
+  if (editingEntry) {
+    return [
+      {
+        ...editingEntry,
+        resourceId: draft.teamIds[0] ?? editingEntry.resourceId,
+        location: draft.locations[0] ?? editingEntry.location,
+        dateFrom: draft.dateFrom,
+        dateTo: draft.dateTo,
+        dayFrom,
+        dayTo,
+        times: shifts.length ? shifts : editingEntry.times,
+      },
+    ];
+  }
+
+  const entries: TeamScheduleAvailabilityEntry[] = [];
+  for (const teamId of draft.teamIds) {
+    for (const location of draft.locations) {
+      entries.push({
+        id: `avail-${teamId}-${location}-${Date.now()}-${entries.length}`,
+        resourceId: teamId,
+        location,
+        dateFrom: draft.dateFrom,
+        dateTo: draft.dateTo,
+        dayFrom,
+        dayTo,
+        times: shifts.length ? shifts : [{ start: "09:00", end: "17:00" }],
+        bookedDates: [],
+      });
+    }
+  }
+  return entries;
+};
+
+export const buildBlockedEntryFromDraft = (
+  draft: BlockTimeDraft & { activity?: string },
+  editingEntry?: TeamScheduleBlockedEntry,
+): TeamScheduleBlockedEntry => ({
+  id: editingEntry?.id ?? `blocked-${Date.now()}`,
+  resourceId: draft.teamIds[0] ?? editingEntry?.resourceId ?? "",
+  activity: draft.activity?.trim() || draft.title,
+  dateFrom: draft.dateFrom,
+  dateTo: draft.dateTo,
+  dayFrom: toDayAbbr(draft.dayFrom),
+  dayTo: toDayAbbr(draft.dayTo),
+  times: [{ start: draft.startTime, end: draft.endTime }],
+  archived: editingEntry?.archived,
+});

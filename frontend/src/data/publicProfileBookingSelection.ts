@@ -5,6 +5,8 @@ export const PROFILE_BOOKING_SELECTION_KEY = "mollure:profile_booking_selection"
 
 export type ProfileBookingServiceRow = {
   id: string;
+  /** Real subcategory / catalog UUID when known (kept separate from synthetic row `id`). */
+  catalogServiceId?: string | null;
   name: string;
   durationMins: number;
   price: number;
@@ -72,6 +74,7 @@ function appendServiceRows(
   for (let index = 0; index < count; index += 1) {
     rows.push({
       id: `profile-svc-${service.id}-${index}`,
+      catalogServiceId: service.id,
       name: service.name,
       durationMins: service.durationMins,
       price: service.priceValue,
@@ -87,6 +90,7 @@ function appendComboRow(
 ) {
   rows.push({
     id: `profile-combo-${combo.id}`,
+    catalogServiceId: combo.serviceId ?? null,
     name: `${combo.categoryLabel} + ${combo.serviceLabel}`,
     durationMins: combo.durationMins,
     price: combo.priceValue,
@@ -155,13 +159,13 @@ export function buildPublicProfileBookingSelection(input: {
 
 export function savePublicProfileBookingSelection(selection: PublicProfileBookingSelection) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(PROFILE_BOOKING_SELECTION_KEY, JSON.stringify(selection));
+  window.sessionStorage.setItem(PROFILE_BOOKING_SELECTION_KEY, JSON.stringify(selection));
 }
 
 export function loadPublicProfileBookingSelection(): PublicProfileBookingSelection | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = window.localStorage.getItem(PROFILE_BOOKING_SELECTION_KEY);
+    const raw = window.sessionStorage.getItem(PROFILE_BOOKING_SELECTION_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as PublicProfileBookingSelection;
     if (!parsed?.shopId || !Array.isArray(parsed.services)) return null;
@@ -176,5 +180,5 @@ export function loadPublicProfileBookingSelection(): PublicProfileBookingSelecti
 
 export function clearPublicProfileBookingSelection() {
   if (typeof window === "undefined") return;
-  window.localStorage.removeItem(PROFILE_BOOKING_SELECTION_KEY);
+  window.sessionStorage.removeItem(PROFILE_BOOKING_SELECTION_KEY);
 }

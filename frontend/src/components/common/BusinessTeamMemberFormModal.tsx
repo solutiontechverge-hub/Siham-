@@ -146,7 +146,6 @@ export default function BusinessTeamMemberFormModal({
       open={open}
       onClose={onClose}
       title={title}
-      panelWidth={{ xs: "100vw", sm: 520 }}
       footer={footer}
     >
       <Box sx={{ px: 2.5, py: 2, width: "100%", boxSizing: "border-box" }}>

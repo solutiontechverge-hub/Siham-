@@ -67,12 +67,16 @@ export default function RatingReviewCard({ review, onSendReply, onDeleteReply }:
 
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const menuOpen = Boolean(anchorEl);
-  const [replyExpanded, setReplyExpanded] = React.useState(Boolean(review.reply));
+  const [composeOpen, setComposeOpen] = React.useState(false);
+  const [editing, setEditing] = React.useState(false);
   const [draftReply, setDraftReply] = React.useState("");
 
   React.useEffect(() => {
-    setReplyExpanded(Boolean(review.reply));
-  }, [review.reply]);
+    if (review.reply && !editing) {
+      setComposeOpen(false);
+      setDraftReply("");
+    }
+  }, [review.reply, editing]);
 
   function handleSendReply() {
     const message = draftReply.trim();
@@ -82,7 +86,8 @@ export default function RatingReviewCard({ review, onSendReply, onDeleteReply }:
     }
     onSendReply?.(message);
     setDraftReply("");
-    setReplyExpanded(true);
+    setComposeOpen(false);
+    setEditing(false);
     showSnackbar({ severity: "success", message: "Reply sent successfully." });
   }
 
@@ -90,15 +95,25 @@ export default function RatingReviewCard({ review, onSendReply, onDeleteReply }:
     setAnchorEl(null);
     if (!review.reply) return;
     setDraftReply(review.reply.message);
-    setReplyExpanded(true);
+    setEditing(true);
+    setComposeOpen(true);
   }
 
   function handleDeleteReply() {
     setAnchorEl(null);
     onDeleteReply?.();
     setDraftReply("");
+    setComposeOpen(false);
+    setEditing(false);
     showSnackbar({ severity: "success", message: "Reply deleted." });
   }
+
+  const handleReplyClick = () => {
+    if (review.reply) return;
+    setComposeOpen(true);
+  };
+
+  const showCompose = composeOpen && (!review.reply || editing);
 
   return (
     <Paper
@@ -136,27 +151,29 @@ export default function RatingReviewCard({ review, onSendReply, onDeleteReply }:
 
           <ReviewTags tags={review.tags} />
 
-          <BodyText
-            component="button"
-            type="button"
-            onClick={() => setReplyExpanded((v) => !v)}
-            sx={{
-              mt: 1.2,
-              p: 0,
-              border: 0,
-              bgcolor: "transparent",
-              cursor: "pointer",
-              color: m.teal,
-              fontSize: 12,
-              fontWeight: 800,
-              textDecoration: "underline",
-              "&:hover": { color: m.tealDark },
-            }}
-          >
-            Reply
-          </BodyText>
+          {!review.reply ? (
+            <BodyText
+              component="button"
+              type="button"
+              onClick={handleReplyClick}
+              sx={{
+                mt: 1.2,
+                p: 0,
+                border: 0,
+                bgcolor: "transparent",
+                cursor: "pointer",
+                color: m.teal,
+                fontSize: 12,
+                fontWeight: 800,
+                textDecoration: "underline",
+                "&:hover": { color: m.tealDark },
+              }}
+            >
+              Reply
+            </BodyText>
+          ) : null}
 
-          <Collapse in={replyExpanded} timeout={180}>
+          {review.reply && !editing ? (
             <Box
               sx={{
                 mt: 1.1,
@@ -169,36 +186,28 @@ export default function RatingReviewCard({ review, onSendReply, onDeleteReply }:
             >
               <Stack direction="row" alignItems="flex-start" spacing={1}>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  {review.reply ? (
-                    <>
-                      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.72) }}>
-                        Reply from {review.reply.authorName}
-                      </BodyText>
-                      <BodyText sx={{ mt: 0.35, fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.5), lineHeight: 1.55 }}>
-                        {review.reply.message}
-                      </BodyText>
-                    </>
-                  ) : (
-                    <BodyText sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.5) }}>Type Reply</BodyText>
-                  )}
+                  <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.72) }}>
+                    Reply from {review.reply.authorName}
+                  </BodyText>
+                  <BodyText sx={{ mt: 0.35, fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.5), lineHeight: 1.55 }}>
+                    {review.reply.message}
+                  </BodyText>
                 </Box>
 
-                {review.reply ? (
-                  <IconButton
-                    size="small"
-                    onClick={(e) => setAnchorEl(e.currentTarget)}
-                    sx={{
-                      width: 28,
-                      height: 28,
-                      borderRadius: "8px",
-                      border: `1px solid ${alpha(m.navy, 0.08)}`,
-                      bgcolor: "#fff",
-                    }}
-                    aria-label="Reply actions"
-                  >
-                    <MoreVertRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
-                  </IconButton>
-                ) : null}
+                <IconButton
+                  size="small"
+                  onClick={(e) => setAnchorEl(e.currentTarget)}
+                  sx={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: "8px",
+                    border: `1px solid ${alpha(m.navy, 0.08)}`,
+                    bgcolor: "#fff",
+                  }}
+                  aria-label="Reply actions"
+                >
+                  <MoreVertRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
+                </IconButton>
 
                 <Menu
                   anchorEl={anchorEl}
@@ -226,7 +235,9 @@ export default function RatingReviewCard({ review, onSendReply, onDeleteReply }:
                 </Menu>
               </Stack>
             </Box>
+          ) : null}
 
+          <Collapse in={showCompose} timeout={180} unmountOnExit>
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
               <AppTextField
                 placeholder="Type Reply"

@@ -14,6 +14,8 @@ import {
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 
+import MessagingInsetOverlay from "./MessagingInsetOverlay";
+
 export type MessagingModalShellProps = {
   open: boolean;
   title: string;
@@ -22,27 +24,20 @@ export type MessagingModalShellProps = {
   maxWidth?: "xs" | "sm";
   footer?: React.ReactNode;
   hideDivider?: boolean;
+  embedded?: boolean;
 };
 
-export default function MessagingModalShell({
-  open,
+function ModalBody({
   title,
   onClose,
   children,
-  maxWidth = "xs",
   footer,
   hideDivider,
-}: MessagingModalShellProps) {
+}: Pick<MessagingModalShellProps, "title" | "onClose" | "children" | "footer" | "hideDivider">) {
   const m = useTheme().palette.mollure;
 
   return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      maxWidth={maxWidth}
-      fullWidth
-      PaperProps={{ sx: { borderRadius: "12px", overflow: "hidden" } }}
-    >
+    <>
       <Box sx={{ px: 2.5, pt: 2, pb: 1 }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between">
           <Typography sx={{ fontWeight: 900, fontSize: 16, color: alpha(m.navy, 0.88) }}>{title}</Typography>
@@ -78,16 +73,65 @@ export default function MessagingModalShell({
           {footer}
         </DialogActions>
       ) : null}
+    </>
+  );
+}
+
+export default function MessagingModalShell({
+  open,
+  title,
+  onClose,
+  children,
+  maxWidth = "xs",
+  footer,
+  hideDivider,
+  embedded = false,
+}: MessagingModalShellProps) {
+  if (embedded) {
+    return (
+      <MessagingInsetOverlay
+        open={open}
+        title={title}
+        onClose={onClose}
+        footer={footer}
+        hideDivider={hideDivider}
+        maxWidth={maxWidth === "sm" ? 440 : 400}
+      >
+        {children}
+      </MessagingInsetOverlay>
+    );
+  }
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth={maxWidth}
+      fullWidth
+      PaperProps={{ sx: { borderRadius: "12px", overflow: "hidden" } }}
+    >
+      <ModalBody title={title} onClose={onClose} footer={footer} hideDivider={hideDivider}>
+        {children}
+      </ModalBody>
     </Dialog>
   );
 }
 
-export function MessagingModalCancelButton({ onClick, label = "Cancel" }: { onClick: () => void; label?: string }) {
+export function MessagingModalCancelButton({
+  onClick,
+  label = "Cancel",
+  disabled,
+}: {
+  onClick: () => void;
+  label?: string;
+  disabled?: boolean;
+}) {
   const m = useTheme().palette.mollure;
   return (
     <Button
       variant="outlined"
       onClick={onClick}
+      disabled={disabled}
       sx={{
         textTransform: "none",
         fontWeight: 800,

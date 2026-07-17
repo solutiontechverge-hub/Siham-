@@ -49,10 +49,15 @@ export type BusinessPublicProfileServiceForItem = {
 
 export type BusinessPublicProfileBookCombo = {
   id: string;
+  /** Second service UUID from book_service_combinations.service_id. */
+  serviceId?: string | null;
+  /** First service name (stored as category_title in API — always a service). */
   categoryLabel: string;
+  /** Second service name. */
   serviceLabel: string;
   durationLabel: string;
   priceLabel: string;
+  /** Always service1 price + service2 price. */
   priceValue: number;
   durationMins: number;
 };
@@ -130,6 +135,9 @@ export type BusinessPublicProfileData = {
   priceDescription: string;
   prepaymentLabel: string;
   prepaymentInstructions: string;
+  /** Cancellation fee % from professional business settings (`late_cancellation_fee_percentage`). */
+  cancellationFeePercent: number;
+  cancellationPolicyInstruction: string;
   kilometerAllowanceLabel: string;
   kilometerAllowanceInstructions: string;
   policySections: BusinessPublicProfilePolicySection[];
@@ -431,6 +439,9 @@ export function mapListingCardToPublicProfile(card: ListingCardData): BusinessPu
     prepaymentLabel: "20%",
     prepaymentInstructions:
       "Rejuvenate your hair with our luxury spa treatment followed by a professional styling session.",
+    cancellationFeePercent: 2,
+    cancellationPolicyInstruction:
+      "Cancellations may be subject to a fee of 2% of the service cost per the professional's policy.",
     kilometerAllowanceLabel: "10 EUR / km",
     kilometerAllowanceInstructions:
       "Travel costs apply for customer location appointments outside the listed service areas.",

@@ -1,6 +1,7 @@
 import type { ClientBookingStatus } from "./clientBookingRecords";
 
-export function bookingStatusLabel(status: ClientBookingStatus): string {
+export function bookingStatusLabel(status: ClientBookingStatus, opts?: { paymentDue?: boolean }): string {
+  if (opts?.paymentDue) return "Payment Due";
   switch (status) {
     case "draft":
       return "Draft";
@@ -8,6 +9,8 @@ export function bookingStatusLabel(status: ClientBookingStatus): string {
       return "Requested";
     case "confirmed":
       return "Confirmed";
+    case "in_progress":
+      return "In Progress";
     case "completed":
       return "Completed";
     case "cancelled":
@@ -19,17 +22,33 @@ export function bookingStatusLabel(status: ClientBookingStatus): string {
   }
 }
 
-export function bookingStatusChipColors(status: ClientBookingStatus): {
+export function bookingStatusChipColors(
+  status: ClientBookingStatus,
+  opts?: { paymentDue?: boolean },
+): {
   bgcolor: string;
   color: string;
   border: string;
 } {
+  if (opts?.paymentDue) {
+    return {
+      bgcolor: "rgba(245, 166, 35, 0.18)",
+      color: "#C67A00",
+      border: "1px solid rgba(245, 166, 35, 0.35)",
+    };
+  }
   switch (status) {
     case "confirmed":
       return {
         bgcolor: "rgba(76, 175, 80, 0.14)",
         color: "#2E7D32",
         border: "1px solid rgba(76, 175, 80, 0.28)",
+      };
+    case "in_progress":
+      return {
+        bgcolor: "rgba(33, 184, 191, 0.10)",
+        color: "#149CA7",
+        border: "1px solid rgba(33, 184, 191, 0.30)",
       };
     case "completed":
       return {
@@ -69,6 +88,7 @@ export function mapApiBookingStatusToClient(status: string): ClientBookingStatus
   const normalized = status.trim().toLowerCase();
   if (normalized === "requested") return "requested";
   if (normalized === "confirmed") return "confirmed";
+  if (normalized === "in_progress" || normalized === "in progress") return "in_progress";
   if (normalized === "completed") return "completed";
   if (normalized === "cancelled") return "cancelled";
   if (normalized === "no_show" || normalized === "no show") return "no_show";

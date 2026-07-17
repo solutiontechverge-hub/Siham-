@@ -203,7 +203,7 @@ export default function ClientBookingChangeResponsePanel({
           variant="contained"
           disableElevation
           startIcon={<CheckRoundedIcon />}
-          onClick={onOk ?? onAccept}
+          onClick={onAccept ?? onOk}
           sx={{
             flex: 1,
             borderRadius: "10px",
@@ -215,7 +215,7 @@ export default function ClientBookingChangeResponsePanel({
             "&:hover": { bgcolor: m.successDark },
           }}
         >
-          Ok
+          Accept
         </Button>
         <Button
           fullWidth

@@ -31,6 +31,7 @@ export type AppCalendarPanelProps = {
   /** Called after a day is picked (e.g. close parent popover) */
   onDaySelect?: () => void;
   compact?: boolean;
+  daySx?: (iso: string) => Record<string, unknown> | undefined;
 };
 
 type PanelView = "days" | "months" | "years";
@@ -73,7 +74,7 @@ function monthFromValue(value: string) {
   return new Date(new Date().getFullYear(), new Date().getMonth(), 1);
 }
 
-export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compact = false }: AppCalendarPanelProps) {
+export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compact = false, daySx }: AppCalendarPanelProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
 
@@ -256,7 +257,10 @@ export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compa
                 const iso = isoOf(day);
                 const selected = iso === value;
                 const off = isDayDisabled(day);
-                const isToday = iso === new Date().toISOString().slice(0, 10);
+                const todayIso = new Date().toISOString().slice(0, 10);
+                const isToday = iso === todayIso;
+                const isPast = !off && iso < todayIso;
+                const extraDaySx = daySx?.(iso) ?? {};
                 return (
                   <ButtonBase
                     key={iso}
@@ -272,12 +276,21 @@ export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compa
                       placeItems: "center",
                       fontSize: compact ? 11.5 : 12.5,
                       fontWeight: selected ? 900 : isToday ? 900 : 700,
-                      color: off ? alpha(m.navy, 0.22) : selected ? "#fff" : isToday ? m.teal : alpha(m.navy, 0.72),
+                      color: off
+                        ? alpha(m.navy, 0.22)
+                        : selected
+                          ? "#fff"
+                          : isPast
+                            ? alpha(m.navy, 0.32)
+                            : isToday
+                              ? m.teal
+                              : alpha(m.navy, 0.72),
                       bgcolor: selected ? m.teal : "transparent",
                       border: isToday && !selected ? `1.5px solid ${alpha(m.teal, 0.4)}` : "none",
                       cursor: off ? "not-allowed" : "pointer",
                       "&.Mui-disabled": { pointerEvents: "auto" },
                       "&:hover": { bgcolor: off ? "transparent" : selected ? m.tealDark : alpha(m.teal, 0.09) },
+                      ...extraDaySx,
                     }}
                   >
                     {day}

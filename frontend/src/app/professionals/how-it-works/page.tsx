@@ -5,7 +5,7 @@ import { HowItWorksPageContent, MarketingShellLayout } from "../../../components
 export default function ProfessionalsHowItWorksPage() {
   return (
     <MarketingShellLayout audience="professionals">
-      <HowItWorksPageContent />
+      <HowItWorksPageContent audience="professionals" />
     </MarketingShellLayout>
   );
 }

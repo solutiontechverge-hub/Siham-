@@ -1,13 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { Box, Button, Grid, MenuItem, Paper, type PaperProps } from "@mui/material";
+import { Box, Button, Grid, MenuItem, Paper, Stack, type PaperProps } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import CalendarPopover, { formatListingDateTimeDisplay, type CalendarPopoverValue } from "./CalendarPopover";
 import ListingLocationModeCards from "./ListingLocationModeCards";
 import Image from "next/image";
 import { ArrowDown } from "../../../../images";
 import { KeywordTagsInput, MollureTextField } from "..";
+import ServiceCategoryIcon from "../ServiceCategoryIcon";
 import { BodyText } from "../../ui/typography";
 
 function assetUrl(asset: any) {
@@ -166,8 +167,25 @@ export default function ListingFilterBox({
               <BodyText sx={{ color: tokens.placeholder, fontSize: 13 }}>Select Category</BodyText>
             </MenuItem>
             {categoryOptions.map((opt) => (
-              <MenuItem key={opt.value} value={opt.value}>
-                {opt.label}
+              <MenuItem
+                key={opt.value}
+                value={opt.value}
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  minHeight: 40,
+                  py: 1,
+                }}
+              >
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  spacing={1.75}
+                  sx={{ width: "100%", lineHeight: 1 }}
+                >
+                  <ServiceCategoryIcon label={opt.label} fontSize={20} color={tokens.teal} />
+                  <BodyText sx={{ fontSize: 14, lineHeight: 1.2, color: "inherit" }}>{opt.label}</BodyText>
+                </Stack>
               </MenuItem>
             ))}
           </MollureTextField>

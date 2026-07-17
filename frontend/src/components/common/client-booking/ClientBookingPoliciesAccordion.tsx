@@ -30,7 +30,49 @@ export default function ClientBookingPoliciesAccordion({
   const m = useTheme().palette.mollure;
   const [expanded, setExpanded] = React.useState(true);
 
-  if (!sections.length) return null;
+  if (!sections.length && !showCancelAction) return null;
+
+  const cancelButton = showCancelAction ? (
+    <Button
+      fullWidth
+      variant="outlined"
+      startIcon={<CloseRoundedIcon sx={{ fontSize: 18 }} />}
+      onClick={(e) => {
+        e.stopPropagation();
+        onCancelBooking?.();
+      }}
+      sx={{
+        borderRadius: "10px",
+        textTransform: "none",
+        fontWeight: 800,
+        fontSize: 12.5,
+        height: 40,
+        borderColor: alpha(m.navy, 0.12),
+        color: alpha(m.navy, 0.55),
+        bgcolor: alpha(m.navy, 0.03),
+        "&:hover": { bgcolor: alpha(m.navy, 0.06), borderColor: alpha(m.navy, 0.18) },
+      }}
+    >
+      Cancel Booking
+    </Button>
+  ) : null;
+
+  if (!sections.length) {
+    return (
+      <Box
+        sx={{
+          borderRadius: "10px",
+          border: `1px solid ${alpha(m.navy, 0.08)}`,
+          borderLeft: `3px solid ${alpha(m.teal, 0.55)}`,
+          bgcolor: m.white,
+          px: 2,
+          py: 2,
+        }}
+      >
+        {cancelButton}
+      </Box>
+    );
+  }
 
   return (
     <Accordion
@@ -42,7 +84,8 @@ export default function ClientBookingPoliciesAccordion({
       sx={{
         borderRadius: "10px !important",
         border: `1px solid ${alpha(m.navy, 0.08)}`,
-        bgcolor: "#fff",
+        borderLeft: `3px solid ${alpha(m.teal, 0.55)}`,
+        bgcolor: m.white,
         overflow: "hidden",
         "&:before": { display: "none" },
       }}
@@ -59,7 +102,7 @@ export default function ClientBookingPoliciesAccordion({
         }
         sx={{
           px: 2,
-          minHeight: 48,
+          minHeight: 52,
           "& .MuiAccordionSummary-content": { my: 1 },
         }}
       >
@@ -80,28 +123,10 @@ export default function ClientBookingPoliciesAccordion({
           ))}
         </Stack>
 
-        {showCancelAction ? (
+        {cancelButton ? (
           <>
             <Divider sx={{ my: 2 }} />
-            <Button
-              fullWidth
-              variant="outlined"
-              startIcon={<CloseRoundedIcon sx={{ fontSize: 18 }} />}
-              onClick={onCancelBooking}
-              sx={{
-                borderRadius: "10px",
-                textTransform: "none",
-                fontWeight: 800,
-                fontSize: 12.5,
-                height: 40,
-                borderColor: alpha(m.navy, 0.12),
-                color: alpha(m.navy, 0.55),
-                bgcolor: alpha(m.navy, 0.03),
-                "&:hover": { bgcolor: alpha(m.navy, 0.06), borderColor: alpha(m.navy, 0.18) },
-              }}
-            >
-              Cancel Booking
-            </Button>
+            {cancelButton}
           </>
         ) : null}
       </AccordionDetails>

@@ -2,19 +2,20 @@
 
 import * as React from "react";
 import { SubHeading } from "../ui/typography";
+import { MOLLURE_HEADING_BODY_GAP_PX } from "../../theme/spacing";
 
 const sectionHeadingSx = {
   fontWeight: 600,
-  fontSize: { xs: "1.5rem", sm: "1.75rem" },
+  textAlign: "center",
   color: "mollure.textcolorgrey700",
 } as const;
 
 export function HowItWorksSectionTitle({
   title,
-  mb = 4,
+  mb = `${MOLLURE_HEADING_BODY_GAP_PX}px`,
 }: {
   title: string;
-  mb?: number;
+  mb?: number | string;
 }) {
   return (
     <SubHeading

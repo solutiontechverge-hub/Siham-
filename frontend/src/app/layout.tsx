@@ -12,8 +12,8 @@ const poppins = Poppins({
 });
 
 export const metadata = {
-  title: "Mollure Frontend",
-  description: "Next.js + MUI setup",
+  title: "Mollure",
+  description: "Book beauty and wellness services with Mollure",
 };
 
 export default function RootLayout({

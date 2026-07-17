@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useAppSelector } from "../../store/hooks";
+import { useSubmitContactMessageMutation } from "../../store/services/contactApi";
 
 export type ContactUsFormValues = {
   persona: string;
@@ -54,6 +55,7 @@ function validate(values: ContactUsFormValues): ContactUsFieldErrors {
 
 export function useContactUsForm() {
   const isSignedIn = useAppSelector((s) => Boolean(s.auth.accessToken));
+  const [submitContactMessage] = useSubmitContactMessageMutation();
   const [values, setValues] = React.useState<ContactUsFormValues>(initialValues);
   const [touched, setTouched] = React.useState<Partial<Record<keyof ContactUsFormValues, boolean>>>(
     {},
@@ -110,10 +112,19 @@ export function useContactUsForm() {
     }
 
     setSubmitState("submitting");
-    // TODO: wire to backend when contact endpoint is defined.
-    await new Promise((r) => setTimeout(r, 500));
-    setSubmitState("success");
-  }, [isSignedIn, values]);
+    try {
+      await submitContactMessage({
+        persona: values.persona,
+        name: values.name.trim(),
+        email: values.email.trim(),
+        subject: values.subject,
+        message: values.message.trim(),
+      }).unwrap();
+      setSubmitState("success");
+    } catch {
+      setSubmitState("idle");
+    }
+  }, [isSignedIn, submitContactMessage, values]);
 
   const closeGate = React.useCallback(() => setShowSignInGate(false), []);
 

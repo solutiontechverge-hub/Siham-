@@ -32,7 +32,7 @@ export default function ClientBusinessProfilePage() {
 
     let modeFromListing: "fixed" | "desired" | null = null;
     try {
-      const raw = window.localStorage.getItem("mollure:selected_shop");
+      const raw = window.sessionStorage.getItem("mollure:selected_shop");
       if (raw) {
         const parsed = JSON.parse(raw) as { shopId?: string; locationMode?: "fixed" | "desired" };
         if (parsed.shopId === profile.shopId && parsed.locationMode) {
@@ -58,7 +58,7 @@ export default function ClientBusinessProfilePage() {
     (mode: "fixed" | "desired" = locationMode) => {
       if (!profile) return;
       try {
-        window.localStorage.setItem(
+        window.sessionStorage.setItem(
           "mollure:selected_shop",
           JSON.stringify({
             shopId: profile.shopId,
@@ -89,7 +89,7 @@ export default function ClientBusinessProfilePage() {
   const onBookNow = (selection: PublicProfileBookingSelection) => {
     persistSelectedShop(selection.locationMode);
     try {
-      window.localStorage.setItem(
+      window.sessionStorage.setItem(
         "mollure:selected_shop",
         JSON.stringify({
           shopId: selection.shopId,

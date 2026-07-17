@@ -9,6 +9,7 @@ import { profilePageData } from "../profile/data-profile";
 import { useAppSelector } from "../../../store/hooks";
 import ClientBookingPillTabsBar from "./ClientBookingPillTabsBar";
 import type { BookingListTab } from "./clientBookingRecords";
+import { useBookingRealtimeSync } from "../../../hooks/useBookingRealtimeSync";
 
 type Props = {
   activeTab: BookingListTab;
@@ -18,6 +19,7 @@ type Props = {
 export default function ClientBookingPageShell({ activeTab, children }: Props) {
   const pathname = usePathname();
   const user = useAppSelector((s) => s.auth.user);
+  useBookingRealtimeSync();
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: profilePageData.pageBg }}>

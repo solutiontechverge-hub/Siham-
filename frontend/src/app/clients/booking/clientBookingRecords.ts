@@ -1,17 +1,27 @@
 import type { ClientBookingDraft } from "../../../components/common/client-booking/types";
+import type { BookingEditRequestRecord } from "../../../components/common/client-booking/bookingEditRequest";
+import { parseTimeLabelToMinutes } from "./booking-time";
 
 export type ClientBookingStatus =
   | "draft"
   | "requested"
   | "confirmed"
+  | "in_progress"
   | "completed"
   | "cancelled"
   | "no_show";
 
+export type BookingRequestDirection = "outgoing" | "incoming";
+
 export type ClientBookingRecord = {
   id: string;
   bookingRef?: string;
+  apiBookingId?: string;
   status: ClientBookingStatus;
+  /** True after the client sends a booking request while checkout is still draft. */
+  bookingRequestSent?: boolean;
+  /** BR/EBR direction from the client's perspective. */
+  bookingRequestDirection?: BookingRequestDirection;
   shop?: {
     shopId?: string;
     shopName?: string;
@@ -22,16 +32,18 @@ export type ClientBookingRecord = {
   draft?: ClientBookingDraft | null;
   createdAt?: string;
   prepaid?: boolean;
+  /** True when the booking balance / invoice has been settled. */
+  paid?: boolean;
   prepaymentPercent?: number;
   requiresPrepayment?: boolean;
   contactPhone?: string;
+  /** Raw booking notes (may include EBR meta). */
+  notes?: string | null;
+  /** Incoming EBR from professional, parsed from booking notes. */
+  incomingEditRequest?: BookingEditRequestRecord | null;
 };
 
-export const BOOKINGS_CHANGED_EVENT = "mollure:client_bookings_changed";
-
-export type BookingListTab = "past" | "outgoing" | "upcoming";
-
-const STORAGE_KEY = "mollure:client_bookings";
+export type BookingListTab = "past" | "ongoing" | "upcoming";
 
 function startOfDay(d: Date) {
   const next = new Date(d);
@@ -46,211 +58,104 @@ function bookingDate(record: ClientBookingRecord): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-function isPresentBooking(record: ClientBookingRecord, today = startOfDay(new Date())): boolean {
-  const d = bookingDate(record);
-  if (!d) return true;
-  return d.getTime() >= today.getTime();
+function totalServiceDurationMins(record: ClientBookingRecord): number {
+  const services = record.draft?.services ?? [];
+  return services.reduce(
+    (sum, service) => sum + (Number.isFinite(service.durationMins) ? service.durationMins : 0),
+    0,
+  );
 }
 
-function isPastBooking(record: ClientBookingRecord, today = startOfDay(new Date())): boolean {
+/**
+ * Booking end as a local Date (selected start time + total service duration).
+ * Returns null when the start time or duration is unknown, so callers can fall
+ * back to a date-only comparison.
+ */
+function bookingEndDateTime(record: ClientBookingRecord): Date | null {
+  const iso = record.draft?.selectedDateISO;
+  const timeLabel = record.draft?.selectedTime;
+  if (!iso || !timeLabel) return null;
+  const duration = totalServiceDurationMins(record);
+  if (duration <= 0) return null;
+  const base = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(base.getTime())) return null;
+  base.setMinutes(base.getMinutes() + parseTimeLabelToMinutes(timeLabel) + duration);
+  return base;
+}
+
+/**
+ * A booking is "ended" once its service window has passed. When the exact end
+ * time cannot be computed, fall back to date-only (ended once the booking date
+ * is before today).
+ */
+function hasBookingEnded(record: ClientBookingRecord, now = new Date()): boolean {
+  const end = bookingEndDateTime(record);
+  if (end) return now.getTime() >= end.getTime();
   const d = bookingDate(record);
   if (!d) return false;
-  return d.getTime() < today.getTime();
+  return d.getTime() < startOfDay(now).getTime();
+}
+
+function isPastBooking(record: ClientBookingRecord, now = new Date()): boolean {
+  return hasBookingEnded(record, now);
+}
+
+function isTodayBooking(record: ClientBookingRecord, now = new Date()): boolean {
+  if (hasBookingEnded(record, now)) return false;
+  const d = bookingDate(record);
+  if (!d) return false;
+  return d.getTime() === startOfDay(now).getTime();
+}
+
+function isFutureBooking(record: ClientBookingRecord, now = new Date()): boolean {
+  if (hasBookingEnded(record, now)) return false;
+  const d = bookingDate(record);
+  if (!d) return false;
+  return d.getTime() > startOfDay(now).getTime();
+}
+
+/** Draft bookings are checkout-only until the client sends a booking request. */
+export function isClientListVisibleBooking(record: ClientBookingRecord): boolean {
+  return normalizeStatus(record) !== "draft" || Boolean(record.bookingRequestSent);
 }
 
 function normalizeStatus(record: ClientBookingRecord): ClientBookingStatus {
   if (record.status === "cancelled") return "cancelled";
   if (record.status === "no_show") return "no_show";
-  if (record.status === "draft") return "confirmed";
+  if (record.status === "draft") return "draft";
   if (record.status === "requested") return "requested";
   if (record.status === "completed") return "completed";
+  if (record.status === "in_progress") {
+    return hasBookingEnded(record) ? "completed" : "in_progress";
+  }
   if (record.status === "confirmed") {
-    return isPastBooking(record) ? "completed" : "confirmed";
+    return hasBookingEnded(record) ? "completed" : "confirmed";
   }
-  if (isPastBooking(record)) return "completed";
-  return "confirmed";
+  return hasBookingEnded(record) ? "completed" : "confirmed";
 }
 
-export function loadClientBookings(): ClientBookingRecord[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
-    if (!Array.isArray(parsed)) return seedDemoBookings();
-    const normalized = parsed.map((b) => {
-      const row = b as ClientBookingRecord;
-      return { ...row, status: normalizeStatus(row) };
-    });
-    return normalized.length ? normalized : seedDemoBookings();
-  } catch {
-    return seedDemoBookings();
-  }
-}
-
-export function saveClientBookings(bookings: ClientBookingRecord[]) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(bookings));
-  window.dispatchEvent(new Event(BOOKINGS_CHANGED_EVENT));
-}
-
-export function loadClientBookingsForList(): ClientBookingRecord[] {
-  const all = loadClientBookings();
-  const hasUserBooking = all.some((b) => !b.id.startsWith("demo-"));
-  if (!hasUserBooking) return all;
-  return all.filter((b) => !b.id.startsWith("demo-"));
-}
-
-export function upsertRequestedBooking(record: ClientBookingRecord) {
-  let all = loadClientBookings();
-  const idx = all.findIndex((b) => b.id === record.id);
-  if (idx >= 0) {
-    all = [...all];
-    all[idx] = { ...all[idx], ...record };
-  } else {
-    all = [record, ...all];
-  }
-  if (!record.id.startsWith("demo-")) {
-    all = all.filter((b) => !b.id.startsWith("demo-"));
-  }
-  saveClientBookings(all);
-}
-
-export function findClientBookingById(id: string): ClientBookingRecord | undefined {
-  return loadClientBookings().find((b) => b.id === id);
-}
-
-export function removeClientBookingById(id: string) {
-  const next = loadClientBookings().filter((b) => b.id !== id);
-  saveClientBookings(next.length ? next : []);
-}
-
-export function markClientBookingCancelled(id: string) {
-  const all = loadClientBookings();
-  const idx = all.findIndex((b) => b.id === id);
-  if (idx < 0) return;
-  const next = [...all];
-  next[idx] = { ...next[idx], status: "cancelled" };
-  saveClientBookings(next);
-}
-
-export function markClientBookingPrepaid(id: string) {
-  const all = loadClientBookings();
-  const idx = all.findIndex((b) => b.id === id);
-  if (idx < 0) return;
-  const next = [...all];
-  next[idx] = { ...next[idx], prepaid: true };
-  saveClientBookings(next);
-}
-
-export function updateClientBookingStatus(id: string, status: ClientBookingStatus) {
-  const all = loadClientBookings();
-  const idx = all.findIndex((b) => b.id === id);
-  if (idx < 0) return;
-  const next = [...all];
-  next[idx] = { ...next[idx], status };
-  saveClientBookings(next);
-}
-
-export function updateClientBookingStatusByRef(bookingRef: string, status: ClientBookingStatus) {
-  const normalizedRef = bookingRef.replace(/^#/, "").trim();
-  const all = loadClientBookings();
-  const idx = all.findIndex(
-    (b) => b.bookingRef === normalizedRef || b.bookingRef === bookingRef || b.id === normalizedRef,
-  );
-  if (idx < 0) return;
-  const next = [...all];
-  next[idx] = { ...next[idx], status };
-  saveClientBookings(next);
-}
-
-function seedDemoBookings(): ClientBookingRecord[] {
-  const today = new Date();
-  const past = new Date(today);
-  past.setDate(past.getDate() - 14);
-  const future = new Date(today);
-  future.setDate(future.getDate() + 7);
-
-  const fmt = (d: Date) => d.toISOString().slice(0, 10);
-
-  return [
-    {
-      id: "demo-completed-1",
-      status: "completed",
-      shop: { shopName: "Craig Martha Salon", addressLabel: "Marina-Park 50, Den Helder" },
-      draft: {
-        selectedDateISO: fmt(past),
-        selectedTime: "10:00 AM",
-        combineServices: false,
-        services: [{ id: "s1", name: "Buzz Cut", durationMins: 45, price: 25, guestId: null, teamMemberId: "tm-1" }],
-        total: 25,
-      },
-      createdAt: past.toISOString(),
-    },
-    {
-      id: "demo-confirmed-1",
-      status: "confirmed",
-      shop: { shopName: "Elly Beauty", municipalityLabel: "Amsterdam" },
-      draft: {
-        selectedDateISO: fmt(future),
-        selectedTime: "2:00 PM",
-        combineServices: false,
-        services: [{ id: "s2", name: "Make-up Basic", durationMins: 60, price: 80, guestId: null, teamMemberId: "tm-2" }],
-        total: 80,
-      },
-      createdAt: today.toISOString(),
-    },
-    {
-      id: "demo-requested-1",
-      status: "requested",
-      requiresPrepayment: true,
-      prepaid: false,
-      prepaymentPercent: 20,
-      shop: {
-        shopName: "Ryan Harris Salon",
-        addressLabel: "Marina-Park 50, Den Helder",
-      },
-      draft: {
-        selectedDateISO: fmt(future),
-        selectedTime: "11:15 AM",
-        combineServices: false,
-        people: [{ id: "p-requester", name: "Guest", isRequester: true }],
-        teamMembers: [{ id: "tm-2", name: "Ryan Harris" }],
-        services: [
-          {
-            id: "s3",
-            name: "Make-up Basic",
-            durationMins: 60,
-            price: 80,
-            guestId: "p-requester",
-            teamMemberId: "tm-2",
-          },
-          {
-            id: "s4",
-            name: "Lash Lift",
-            durationMins: 50,
-            price: 55,
-            guestId: "p-requester",
-            teamMemberId: "tm-2",
-          },
-        ],
-        total: 135,
-      },
-      createdAt: today.toISOString(),
-    },
-  ];
+/** Past appointment still awaiting settlement (invoice / remaining balance). */
+export function isClientBookingPaymentDue(record: ClientBookingRecord): boolean {
+  const status = normalizeStatus(record);
+  if (status === "cancelled" || status === "no_show") return false;
+  if (status !== "completed") return false;
+  return record.paid === false;
 }
 
 export function filterBookingsByTab(bookings: ClientBookingRecord[], tab: BookingListTab): ClientBookingRecord[] {
-  const today = startOfDay(new Date());
+  const now = new Date();
   const filtered = bookings.filter((b) => {
     const status = normalizeStatus(b);
-    if (tab === "past") {
-      return status === "completed" || status === "cancelled" || status === "no_show";
-    }
-    if (tab === "outgoing") return status === "confirmed" && isPresentBooking(b, today);
-    return status === "requested" || status === "draft" || (status === "confirmed" && isPresentBooking(b, today));
+    if (status === "cancelled" || status === "no_show" || status === "completed") return tab === "past";
+    if (tab === "past") return isPastBooking(b, now);
+    if (tab === "ongoing") return isTodayBooking(b, now);
+    return isFutureBooking(b, now);
   });
   return filtered.sort((a, b) => {
+    const dateA = bookingDate(a)?.getTime() ?? 0;
+    const dateB = bookingDate(b)?.getTime() ?? 0;
+    if (tab === "past") return dateB - dateA;
+    if (dateA !== dateB) return dateA - dateB;
     const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
     const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
     return tb - ta;

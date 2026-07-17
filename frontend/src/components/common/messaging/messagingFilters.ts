@@ -5,22 +5,16 @@ import type {
   MessagingThread,
 } from "./messagingTypes";
 
-export function threadPassesSettingsFilters(thread: MessagingThread, settings: MessagingSettingsFilters): boolean {
-  const anyEnabled = Object.values(settings).some(Boolean);
-  if (!anyEnabled) return true;
-
-  const matches: boolean[] = [];
-  if (settings.completed) matches.push(thread.bookingStatus === "completed");
-  if (settings.cancelled) matches.push(thread.bookingStatus === "cancelled");
-  if (settings.invalid) matches.push(thread.bookingStatus === "invalid");
-  if (settings.no_show) matches.push(thread.bookingStatus === "no_show");
-  if (settings.unlinked) matches.push(Boolean(thread.unlinked));
-
-  return matches.some(Boolean);
+export function threadPassesSettingsFilters(_thread: MessagingThread, _settings: MessagingSettingsFilters): boolean {
+  return true;
 }
 
 export function threadPassesDrawerFilters(thread: MessagingThread, drawer: MessagingDrawerFilters): boolean {
-  if (drawer.searchFor !== "all" && thread.bookingStatus !== drawer.searchFor) return false;
+  if (drawer.searchFor === "unlinked") {
+    if (!thread.unlinked) return false;
+  } else if (drawer.searchFor !== "all" && thread.bookingStatus !== drawer.searchFor) {
+    return false;
+  }
   const locationOk =
     (drawer.locationFixed && thread.locationType === "fixed") ||
     (drawer.locationDesired && thread.locationType === "desired");
