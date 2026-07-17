@@ -150,8 +150,8 @@ const bookingDateSql = (alias) =>
   `substring(COALESCE(${alias}.booking_date::text, ${alias}.start_time::text) from 1 for 10)::date`;
 
 const makeCalendarCode = (prefix = "OF123") => `${prefix}${Date.now()}${Math.random().toString(16).slice(2, 6)}`;
-const calendarStatusSet = new Set(["requested", "cancelled", "completed", "confirmed", "blocked", "no_show"]);
-const bookingStatusSet = new Set(["requested", "cancelled", "completed", "confirmed", "no_show"]);
+const calendarStatusSet = new Set(["requested", "cancelled", "completed", "confirmed", "blocked", "in_progress", "no_show"]);
+const bookingStatusSet = new Set(["requested", "cancelled", "completed", "confirmed", "in_progress", "no_show"]);
 
 const ensureUniqueBookingCode = async (preferredCode, prefix = "123") => {
   const trimmed = String(preferredCode ?? "").trim();

@@ -232,7 +232,7 @@ export type CalendarEntry = {
   id: string;
   professional_profile_id: string;
   team_member_id: string | null;
-  status: "requested" | "cancelled" | "completed" | "confirmed" | "blocked" | "no_show";
+  status: "requested" | "cancelled" | "completed" | "confirmed" | "blocked" | "in_progress" | "no_show";
   title: string;
   unique_code: string;
   start_time: string | null;
@@ -332,12 +332,12 @@ export type UpsertCalendarSettingsRequest = {
 
 export type UpdateCalendarEntryStatusRequest = {
   id: string;
-  status: "requested" | "cancelled" | "completed" | "confirmed" | "no_show";
+  status: "requested" | "cancelled" | "completed" | "confirmed" | "in_progress" | "no_show";
 };
 
 export type UpdateBookingStatusRequest = {
   id: string;
-  status: "requested" | "cancelled" | "completed" | "confirmed" | "no_show";
+  status: "requested" | "cancelled" | "completed" | "confirmed" | "in_progress" | "no_show";
   notes?: string | null;
   total_price?: number | string | null;
   booking_date?: string | null;
@@ -367,7 +367,7 @@ export type CreateBookingRequest = {
   location_details?: Record<string, unknown>;
   notes?: string | null;
   prepayment_status?: string | null;
-  status?: "requested" | "cancelled" | "completed" | "confirmed" | "no_show";
+  status?: "requested" | "cancelled" | "completed" | "confirmed" | "in_progress" | "no_show";
   booking_type?: "online" | "offline" | "project" | "request";
   unique_code?: string | null;
   total_price?: number | string | null;

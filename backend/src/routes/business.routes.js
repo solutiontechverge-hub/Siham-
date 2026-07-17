@@ -35,8 +35,8 @@ import { upload } from "../middleware/upload.middleware.js";
 const router = express.Router();
 const locationModes = ["fixed", "desired", "both"];
 const locationTypes = ["fixed", "desired"];
-const calendarStatuses = ["requested", "cancelled", "completed", "confirmed", "blocked", "no_show"];
-const bookingStatuses = ["requested", "cancelled", "completed", "confirmed", "no_show"];
+const calendarStatuses = ["requested", "cancelled", "completed", "confirmed", "blocked", "in_progress", "no_show"];
+const bookingStatuses = ["requested", "cancelled", "completed", "confirmed", "in_progress", "no_show"];
 const percentageFields = [
   "prepayment_percentage",
   "late_reschedule_fee_percentage",
@@ -310,7 +310,7 @@ router.post(
       .optional({ values: "falsy" })
       .trim()
       .isIn(bookingStatuses)
-      .withMessage("status must be requested, cancelled, completed, confirmed, or no_show."),
+      .withMessage("status must be requested, cancelled, completed, confirmed, in_progress, or no_show."),
   ],
   validateRequest,
   createBooking,
@@ -322,7 +322,7 @@ router.patch(
     body("status")
       .trim()
       .isIn(bookingStatuses)
-      .withMessage("status must be requested, cancelled, completed, confirmed, or no_show."),
+      .withMessage("status must be requested, cancelled, completed, confirmed, in_progress, or no_show."),
     body("notes").optional({ values: "falsy" }).isString().withMessage("notes must be a string."),
     body("total_price")
       .optional({ values: "falsy" })

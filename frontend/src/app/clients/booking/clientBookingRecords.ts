@@ -1,10 +1,12 @@
 import type { ClientBookingDraft } from "../../../components/common/client-booking/types";
 import type { BookingEditRequestRecord } from "../../../components/common/client-booking/bookingEditRequest";
+import { parseTimeLabelToMinutes } from "./booking-time";
 
 export type ClientBookingStatus =
   | "draft"
   | "requested"
   | "confirmed"
+  | "in_progress"
   | "completed"
   | "cancelled"
   | "no_show";
@@ -56,22 +58,60 @@ function bookingDate(record: ClientBookingRecord): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-function isPastBooking(record: ClientBookingRecord, today = startOfDay(new Date())): boolean {
-  const d = bookingDate(record);
-  if (!d) return false;
-  return d.getTime() < today.getTime();
+function totalServiceDurationMins(record: ClientBookingRecord): number {
+  const services = record.draft?.services ?? [];
+  return services.reduce(
+    (sum, service) => sum + (Number.isFinite(service.durationMins) ? service.durationMins : 0),
+    0,
+  );
 }
 
-function isTodayBooking(record: ClientBookingRecord, today = startOfDay(new Date())): boolean {
-  const d = bookingDate(record);
-  if (!d) return false;
-  return d.getTime() === today.getTime();
+/**
+ * Booking end as a local Date (selected start time + total service duration).
+ * Returns null when the start time or duration is unknown, so callers can fall
+ * back to a date-only comparison.
+ */
+function bookingEndDateTime(record: ClientBookingRecord): Date | null {
+  const iso = record.draft?.selectedDateISO;
+  const timeLabel = record.draft?.selectedTime;
+  if (!iso || !timeLabel) return null;
+  const duration = totalServiceDurationMins(record);
+  if (duration <= 0) return null;
+  const base = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(base.getTime())) return null;
+  base.setMinutes(base.getMinutes() + parseTimeLabelToMinutes(timeLabel) + duration);
+  return base;
 }
 
-function isFutureBooking(record: ClientBookingRecord, today = startOfDay(new Date())): boolean {
+/**
+ * A booking is "ended" once its service window has passed. When the exact end
+ * time cannot be computed, fall back to date-only (ended once the booking date
+ * is before today).
+ */
+function hasBookingEnded(record: ClientBookingRecord, now = new Date()): boolean {
+  const end = bookingEndDateTime(record);
+  if (end) return now.getTime() >= end.getTime();
   const d = bookingDate(record);
   if (!d) return false;
-  return d.getTime() > today.getTime();
+  return d.getTime() < startOfDay(now).getTime();
+}
+
+function isPastBooking(record: ClientBookingRecord, now = new Date()): boolean {
+  return hasBookingEnded(record, now);
+}
+
+function isTodayBooking(record: ClientBookingRecord, now = new Date()): boolean {
+  if (hasBookingEnded(record, now)) return false;
+  const d = bookingDate(record);
+  if (!d) return false;
+  return d.getTime() === startOfDay(now).getTime();
+}
+
+function isFutureBooking(record: ClientBookingRecord, now = new Date()): boolean {
+  if (hasBookingEnded(record, now)) return false;
+  const d = bookingDate(record);
+  if (!d) return false;
+  return d.getTime() > startOfDay(now).getTime();
 }
 
 /** Draft bookings are checkout-only until the client sends a booking request. */
@@ -85,14 +125,13 @@ function normalizeStatus(record: ClientBookingRecord): ClientBookingStatus {
   if (record.status === "draft") return "draft";
   if (record.status === "requested") return "requested";
   if (record.status === "completed") return "completed";
-  if (record.status === "confirmed") {
-    const d = bookingDate(record);
-    if (d && d.getTime() < startOfDay(new Date()).getTime()) return "completed";
-    return "confirmed";
+  if (record.status === "in_progress") {
+    return hasBookingEnded(record) ? "completed" : "in_progress";
   }
-  const d = bookingDate(record);
-  if (d && d.getTime() < startOfDay(new Date()).getTime()) return "completed";
-  return "confirmed";
+  if (record.status === "confirmed") {
+    return hasBookingEnded(record) ? "completed" : "confirmed";
+  }
+  return hasBookingEnded(record) ? "completed" : "confirmed";
 }
 
 /** Past appointment still awaiting settlement (invoice / remaining balance). */
@@ -104,13 +143,13 @@ export function isClientBookingPaymentDue(record: ClientBookingRecord): boolean 
 }
 
 export function filterBookingsByTab(bookings: ClientBookingRecord[], tab: BookingListTab): ClientBookingRecord[] {
-  const today = startOfDay(new Date());
+  const now = new Date();
   const filtered = bookings.filter((b) => {
     const status = normalizeStatus(b);
-    if (status === "cancelled" || status === "no_show") return tab === "past";
-    if (tab === "past") return isPastBooking(b, today);
-    if (tab === "ongoing") return isTodayBooking(b, today);
-    return isFutureBooking(b, today);
+    if (status === "cancelled" || status === "no_show" || status === "completed") return tab === "past";
+    if (tab === "past") return isPastBooking(b, now);
+    if (tab === "ongoing") return isTodayBooking(b, now);
+    return isFutureBooking(b, now);
   });
   return filtered.sort((a, b) => {
     const dateA = bookingDate(a)?.getTime() ?? 0;

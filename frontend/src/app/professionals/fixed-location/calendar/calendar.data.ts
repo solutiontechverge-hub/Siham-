@@ -5,6 +5,7 @@ export type CalendarBookingStatus =
   | "Requested"
   | "Cancelled"
   | "Confirmed"
+  | "In Progress"
   | "Completed"
   | "No Show"
   | "Invalid";

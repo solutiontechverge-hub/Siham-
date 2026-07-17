@@ -5,6 +5,7 @@ import { query } from "./db/index.js";
 import { runMigrations } from "./db/runMigrations.js";
 import { attachMessagingSocket } from "./messaging/messagingSocket.js";
 import { startBookingReminderJob } from "./jobs/bookingReminder.job.js";
+import { startBookingAutoCompleteJob } from "./jobs/bookingAutoComplete.job.js";
 import { startEmailReminderJob } from "./jobs/emailReminder.job.js";
 import { startMessagingRetentionJob } from "./jobs/messagingRetention.job.js";
 import { initEmailTransport } from "./helpers/email.helper.js";
@@ -45,6 +46,7 @@ const startServer = async () => {
     server.listen(port, host, () => {
       console.log(`Backend listening on http://${host}:${port}`);
       startBookingReminderJob();
+      startBookingAutoCompleteJob();
       startEmailReminderJob();
       startMessagingRetentionJob();
     });

@@ -13,6 +13,8 @@ const statusFromApi: Record<string, CalendarBookingStatus> = {
   cancelled: "Cancelled",
   canceled: "Cancelled",
   confirmed: "Confirmed",
+  in_progress: "In Progress",
+  "in progress": "In Progress",
   completed: "Completed",
   no_show: "No Show",
   "no show": "No Show",
