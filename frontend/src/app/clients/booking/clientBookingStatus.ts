@@ -9,6 +9,8 @@ export function bookingStatusLabel(status: ClientBookingStatus, opts?: { payment
       return "Requested";
     case "confirmed":
       return "Confirmed";
+    case "in_progress":
+      return "In Progress";
     case "completed":
       return "Completed";
     case "cancelled":
@@ -41,6 +43,12 @@ export function bookingStatusChipColors(
         bgcolor: "rgba(76, 175, 80, 0.14)",
         color: "#2E7D32",
         border: "1px solid rgba(76, 175, 80, 0.28)",
+      };
+    case "in_progress":
+      return {
+        bgcolor: "rgba(33, 184, 191, 0.10)",
+        color: "#149CA7",
+        border: "1px solid rgba(33, 184, 191, 0.30)",
       };
     case "completed":
       return {
@@ -80,6 +88,7 @@ export function mapApiBookingStatusToClient(status: string): ClientBookingStatus
   const normalized = status.trim().toLowerCase();
   if (normalized === "requested") return "requested";
   if (normalized === "confirmed") return "confirmed";
+  if (normalized === "in_progress" || normalized === "in progress") return "in_progress";
   if (normalized === "completed") return "completed";
   if (normalized === "cancelled") return "cancelled";
   if (normalized === "no_show" || normalized === "no show") return "no_show";

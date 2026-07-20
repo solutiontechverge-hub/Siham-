@@ -3,6 +3,7 @@ export const Profile = require("./avatar.svg");
 export const ListingBG = require("./BG.svg");
 export const FixedLocationIcon = require("./Fixed-location.svg");
 export const DesiredLocationIcon = require("./Desired-location.svg");
+export const KidsIcon = require("./kids-icon.svg");
 export const SearchIcon = require("./Search.svg");
 export const ArrowDown = require("./arrow-down.svg");
 

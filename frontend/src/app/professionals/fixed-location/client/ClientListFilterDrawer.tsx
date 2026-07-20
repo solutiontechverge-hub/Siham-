@@ -38,7 +38,6 @@ export default function ClientListFilterDrawer({
       anchor="right"
       open={open}
       onClose={onClose}
-      width={{ xs: "100%", sm: 360 }}
       title="Filter clients"
       footer={
         <Stack direction="row" spacing={1} justifyContent="space-between" sx={{ px: 2.5, py: 2, width: "100%" }}>

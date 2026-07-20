@@ -55,7 +55,11 @@ function reorderIds(ids: string[], from: number, to: number) {
   return next;
 }
 
-export default function AdminListingRankingPage() {
+type AdminListingRankingPageProps = {
+  embedded?: boolean;
+};
+
+export default function AdminListingRankingPage({ embedded = false }: AdminListingRankingPageProps) {
   const tokens = useTheme().palette.mollure;
   const [orderedIds, setOrderedIds] = React.useState(liveRankingFactors.map((f) => f.id));
   const [draggingId, setDraggingId] = React.useState<string | null>(null);
@@ -80,31 +84,35 @@ export default function AdminListingRankingPage() {
 
   return (
     <>
-      <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1.5 }}>
-        <Typography
-          component={Link}
-          href="/admin/dashboard"
-          sx={{ fontSize: 12, color: tokens.bodyText, textDecoration: "none", "&:hover": { color: tokens.teal } }}
-        >
-          Home
-        </Typography>
-        <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>/</Typography>
-        <Typography sx={{ fontSize: 12, color: tokens.navy, fontWeight: 500 }}>
-          Listing & Ranking Management
-        </Typography>
-      </Stack>
+      {!embedded ? (
+        <>
+          <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1.5 }}>
+            <Typography
+              component={Link}
+              href="/admin/dashboard"
+              sx={{ fontSize: 12, color: tokens.bodyText, textDecoration: "none", "&:hover": { color: tokens.teal } }}
+            >
+              Home
+            </Typography>
+            <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>/</Typography>
+            <Typography sx={{ fontSize: 12, color: tokens.navy, fontWeight: 500 }}>
+              Listing & Ranking Management
+            </Typography>
+          </Stack>
 
-      <Box sx={{ mb: 3 }}>
-        <Typography
-          variant="mainHeading"
-          sx={{ fontSize: { xs: 24, md: 28 }, color: tokens.textcolorgrey700, mb: 0.5 }}
-        >
-          Listing & Ranking Management
-        </Typography>
-        <Typography sx={{ fontSize: 14, color: tokens.bodyText, maxWidth: 640 }}>
-          Ranking weights are set by the platform. Drag rows to adjust factor priority order.
-        </Typography>
-      </Box>
+          <Box sx={{ mb: 3 }}>
+            <Typography
+              variant="mainHeading"
+              sx={{ fontSize: { xs: 24, md: 28 }, color: tokens.textcolorgrey700, mb: 0.5 }}
+            >
+              Listing & Ranking Management
+            </Typography>
+            <Typography sx={{ fontSize: 14, color: tokens.bodyText, maxWidth: 640 }}>
+              Ranking weights are set by the platform. Drag rows to adjust factor priority order.
+            </Typography>
+          </Box>
+        </>
+      ) : null}
 
       <AdminSectionCard
         noPadding

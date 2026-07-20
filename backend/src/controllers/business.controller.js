@@ -12,6 +12,11 @@ import {
   dispatchBookingEventNotification,
   dispatchBookingUpdatedNotifications,
 } from "../services/bookingNotification.service.js";
+import {
+  notifyBookingStatusChange,
+  notifyIncomingBookingRequest,
+  notifyIncomingEditRequest,
+} from "../services/bookingEmail.service.js";
 import { emitBookingChanged } from "../messaging/messagingSocket.js";
 import { normalizeEntityId } from "../utils/business-setup-parsers.js";
 import { saveBookingAttachments } from "../services/booking-upload.service.js";
@@ -152,8 +157,8 @@ const bookingDateSql = (alias) =>
   `substring(COALESCE(${alias}.booking_date::text, ${alias}.start_time::text) from 1 for 10)::date`;
 
 const makeCalendarCode = (prefix = "OF123") => `${prefix}${Date.now()}${Math.random().toString(16).slice(2, 6)}`;
-const calendarStatusSet = new Set(["requested", "cancelled", "completed", "confirmed", "blocked", "no_show"]);
-const bookingStatusSet = new Set(["requested", "cancelled", "completed", "confirmed", "no_show"]);
+const calendarStatusSet = new Set(["requested", "cancelled", "completed", "confirmed", "blocked", "in_progress", "no_show"]);
+const bookingStatusSet = new Set(["requested", "cancelled", "completed", "confirmed", "in_progress", "no_show"]);
 
 const ensureUniqueBookingCode = async (preferredCode, prefix = "123") => {
   const trimmed = String(preferredCode ?? "").trim();
@@ -358,6 +363,7 @@ const getBusinessSetupDetailById = async (setupId, client = { query }) => {
     ...businessSetup,
     service_categories: serviceCategories,
     book_service_combinations: parseJsonArray(businessSetup.book_service_combinations),
+    section_sync_settings: parseJsonValue(businessSetup.section_sync_settings, {}),
     team_members: teamMembers,
     service_details: serviceDetails,
   };
@@ -780,13 +786,22 @@ export const upsertBusinessSetup = async (req, res) => {
       desired_location_area: req.body.desired_location_area ?? null,
       desired_location_province: req.body.desired_location_province ?? null,
       desired_location_services: parseTextArray(req.body.desired_location_services),
+      section_sync_settings: JSON.stringify(
+        parseJsonValue(req.body.section_sync_settings, {}),
+      ),
     };
+
+    const jsonbFields = new Set([
+      "service_categories",
+      "book_service_combinations",
+      "section_sync_settings",
+    ]);
 
     const fields = Object.keys(payload);
     const values = [professionalProfile.id, ...fields.map((field) => payload[field])];
     const updateAssignments = fields
       .map((field, index) => {
-        const castType = ["service_categories", "book_service_combinations"].includes(field) ? "::jsonb" : "";
+        const castType = jsonbFields.has(field) ? "::jsonb" : "";
         return `${field} = $${index + 2}${castType}`;
       })
       .concat("updated_at = NOW()")
@@ -799,7 +814,7 @@ export const upsertBusinessSetup = async (req, res) => {
 
       const insertValues = fields
         .map((field, index) => {
-          const castType = ["service_categories", "book_service_combinations"].includes(field) ? "::jsonb" : "";
+          const castType = jsonbFields.has(field) ? "::jsonb" : "";
           return `$${index + 2}${castType}`;
         })
         .join(", ");
@@ -1457,6 +1472,12 @@ export const createBooking = async (req, res) => {
     }
 
     void dispatchBookingCreatedNotifications(booking);
+    if (booking?.status === "confirmed") {
+      void notifyBookingStatusChange(booking.id, "requested", booking.status);
+    } else if (booking?.status === "requested") {
+      void notifyIncomingBookingRequest(booking.id);
+    }
+
     emitBookingChanged(booking, "created");
 
     return res.status(201).json({
@@ -1630,11 +1651,16 @@ export const updateMyBooking = async (req, res) => {
       req.body.prepayment_status !== undefined &&
       req.body.prepayment_status !== null &&
       req.body.prepayment_status !== "";
+    const hasNotes = req.body.notes !== undefined && req.body.notes !== null;
+    const hasSchedule =
+      (req.body.booking_date !== undefined && req.body.booking_date !== null && req.body.booking_date !== "") ||
+      (req.body.start_time !== undefined && req.body.start_time !== null && req.body.start_time !== "") ||
+      (req.body.end_time !== undefined && req.body.end_time !== null && req.body.end_time !== "");
 
-    if (!hasStatus && !hasPrepayment) {
+    if (!hasStatus && !hasPrepayment && !hasNotes && !hasSchedule) {
       return res.status(400).json({
         success: false,
-        message: "Provide status and/or prepayment_status to update.",
+        message: "Provide status, prepayment_status, notes, and/or schedule fields to update.",
         data: null,
       });
     }
@@ -1662,10 +1688,19 @@ export const updateMyBooking = async (req, res) => {
     let nextStatus = existing.status;
     if (hasStatus) {
       nextStatus = normalizeBookingStatus(req.body.status, existing.status);
-      if (!["cancelled", "confirmed"].includes(nextStatus)) {
+      const allowedCustomerStatuses = ["cancelled", "confirmed", "requested"];
+      if (!allowedCustomerStatuses.includes(nextStatus)) {
         return res.status(400).json({
           success: false,
-          message: "Customers may only set booking status to cancelled or confirmed.",
+          message: "Customers may only set booking status to cancelled, confirmed, or requested.",
+          data: null,
+        });
+      }
+      // Re-open a confirmed booking as an incoming booking request for the professional.
+      if (nextStatus === "requested" && existing.status !== "confirmed" && existing.status !== "requested") {
+        return res.status(400).json({
+          success: false,
+          message: "Booking can only be re-requested from a confirmed booking.",
           data: null,
         });
       }
@@ -1687,15 +1722,47 @@ export const updateMyBooking = async (req, res) => {
       }
     }
 
+    const nextNotes = hasNotes ? String(req.body.notes) : existing.notes;
+    const nextTotalPrice =
+      req.body.total_price !== undefined && req.body.total_price !== null && req.body.total_price !== ""
+        ? Number(req.body.total_price)
+        : existing.total_price;
+    const nextBookingDate = hasSchedule
+      ? normalizeBookingDateInput(req.body.booking_date) || existing.booking_date
+      : existing.booking_date;
+    const nextStartTime =
+      req.body.start_time !== undefined && req.body.start_time !== null && req.body.start_time !== ""
+        ? req.body.start_time
+        : existing.start_time;
+    const nextEndTime =
+      req.body.end_time !== undefined && req.body.end_time !== null && req.body.end_time !== ""
+        ? req.body.end_time
+        : existing.end_time;
+
     const result = await query(
       `UPDATE bookings
        SET status = $1,
            prepayment_status = $2,
+           notes = $3,
+           total_price = $4,
+           booking_date = $5,
+           start_time = $6,
+           end_time = $7,
            updated_at = NOW()
-       WHERE id = $3
-         AND customer_id = $4
+       WHERE id = $8
+         AND customer_id = $9
        RETURNING *`,
-      [nextStatus, nextPrepayment, bookingId, req.user.id],
+      [
+        nextStatus,
+        nextPrepayment,
+        nextNotes,
+        Number.isFinite(nextTotalPrice) ? nextTotalPrice : existing.total_price,
+        nextBookingDate,
+        nextStartTime,
+        nextEndTime,
+        bookingId,
+        req.user.id,
+      ],
     );
 
     if (!result.rows.length) {
@@ -1726,6 +1793,12 @@ export const updateMyBooking = async (req, res) => {
           req.body.notify_incoming_er === true || req.body.email_scenario === "incoming_er",
       });
     }
+    if (previousStatus !== booking.status) {
+      void notifyBookingStatusChange(booking.id, previousStatus, booking.status);
+      if (previousStatus === "confirmed" && booking.status === "requested") {
+        void notifyIncomingBookingRequest(booking.id);
+      }
+    }
     emitBookingChanged(booking, "updated");
 
     return res.status(200).json({
@@ -1754,11 +1827,11 @@ export const updateBookingStatus = async (req, res) => {
       });
     }
 
-    const businessSetup = await getBusinessSetupByUserId(req.user.id);
-    if (!businessSetup) {
+    const professionalProfile = await getProfessionalProfile(req.user.id);
+    if (!professionalProfile) {
       return res.status(404).json({
         success: false,
-        message: "Business setup not found.",
+        message: "Professional profile not found.",
         data: null,
       });
     }
@@ -1774,13 +1847,16 @@ export const updateBookingStatus = async (req, res) => {
 
     const status = normalizeBookingStatus(req.body.status, "requested");
 
+    // Scope by professional profile (all business setups), not a single rows[0] setup —
+    // calendar overview lists bookings across setups; Accept/Reject must match that.
     const existingResult = await query(
-      `SELECT status
-       FROM bookings
-       WHERE id = $1
-         AND business_setup_id = $2
+      `SELECT b.status, b.notes, b.total_price, b.booking_date, b.start_time, b.end_time, b.business_setup_id
+       FROM bookings b
+       INNER JOIN business_setups bs ON bs.id = b.business_setup_id
+       WHERE b.id = $1
+         AND bs.professional_profile_id = $2
        LIMIT 1`,
-      [bookingId, businessSetup.id],
+      [bookingId, professionalProfile.id],
     );
 
     if (!existingResult.rows.length) {
@@ -1792,15 +1868,55 @@ export const updateBookingStatus = async (req, res) => {
     }
 
     const previousStatus = existingResult.rows[0].status;
+    const businessSetupId = existingResult.rows[0].business_setup_id;
+    const nextNotes =
+      req.body.notes !== undefined && req.body.notes !== null
+        ? String(req.body.notes)
+        : existingResult.rows[0].notes;
+    const nextTotalPrice =
+      req.body.total_price !== undefined && req.body.total_price !== null && req.body.total_price !== ""
+        ? Number(req.body.total_price)
+        : existingResult.rows[0].total_price;
+
+    const existingBooking = existingResult.rows[0];
+    const hasSchedule =
+      (req.body.booking_date !== undefined && req.body.booking_date !== null && req.body.booking_date !== "") ||
+      (req.body.start_time !== undefined && req.body.start_time !== null && req.body.start_time !== "") ||
+      (req.body.end_time !== undefined && req.body.end_time !== null && req.body.end_time !== "");
+    const nextBookingDate = hasSchedule
+      ? normalizeBookingDateInput(req.body.booking_date) || existingBooking.booking_date
+      : existingBooking.booking_date;
+    const nextStartTime =
+      req.body.start_time !== undefined && req.body.start_time !== null && req.body.start_time !== ""
+        ? req.body.start_time
+        : existingBooking.start_time;
+    const nextEndTime =
+      req.body.end_time !== undefined && req.body.end_time !== null && req.body.end_time !== ""
+        ? req.body.end_time
+        : existingBooking.end_time;
 
     const result = await query(
       `UPDATE bookings
        SET status = $1,
+           notes = $2,
+           total_price = $3,
+           booking_date = $4,
+           start_time = $5,
+           end_time = $6,
            updated_at = NOW()
-       WHERE id = $2
-         AND business_setup_id = $3
+       WHERE id = $7
+         AND business_setup_id = $8
        RETURNING *`,
-      [status, bookingId, businessSetup.id],
+      [
+        status,
+        nextNotes,
+        Number.isFinite(nextTotalPrice) ? nextTotalPrice : existingResult.rows[0].total_price,
+        nextBookingDate,
+        nextStartTime,
+        nextEndTime,
+        bookingId,
+        businessSetupId,
+      ],
     );
 
     if (!result.rows.length) {

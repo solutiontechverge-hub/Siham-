@@ -33,6 +33,7 @@ export type ClientBookingDraftProjectDetails = {
     url?: string;
     mimeType?: string;
     kind?: "image" | "document";
+    previewUrl?: string;
   }>;
 };
 
@@ -62,4 +63,5 @@ export type ClientBookingSummarySection = {
   planningItem?: { activity: string; duration: string };
   teamMemberLabel?: string;
   isRequester?: boolean;
+  participantType?: "model" | "planning" | "guest" | "requester";
 };

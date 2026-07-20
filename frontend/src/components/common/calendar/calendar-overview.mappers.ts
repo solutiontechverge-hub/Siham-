@@ -6,13 +6,15 @@ import type {
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { CalendarBooking, CalendarEntry } from "../../../store/services/businessApi";
 import { wallClockDateFromDateTime, wallClockTimeFromDateTime } from "./calendar.utils";
-import { parseCalendarEntryNotes } from "./bookingEventDetails";
+import { parseCalendarEntryNotes, parseStoredEbrFromNotes } from "./bookingEventDetails";
 
 const statusFromApi: Record<string, CalendarBookingStatus> = {
   requested: "Requested",
   cancelled: "Cancelled",
   canceled: "Cancelled",
   confirmed: "Confirmed",
+  in_progress: "In Progress",
+  "in progress": "In Progress",
   completed: "Completed",
   no_show: "No Show",
   "no show": "No Show",
@@ -81,7 +83,9 @@ export function mapCalendarBookingToEvent(
   const isRequested = status === "Requested";
   const start = booking.start || timeFromIso(booking.start_time);
   const end = booking.end || timeFromIso(booking.end_time);
-  const title = booking.service_title || "Booking";
+  const parsedNotes = parseCalendarEntryNotes(booking.notes);
+  const ebrServices = parsedNotes?.services?.length ? parsedNotes.services : null;
+  const title = ebrServices?.[0]?.name || booking.service_title || "Booking";
   const clientName = booking.customer_name || booking.client_name || undefined;
   const isRequestBooking =
     isRequested || booking.booking_type === "request" || booking.status?.toLowerCase() === "requested";
@@ -89,6 +93,20 @@ export function mapCalendarBookingToEvent(
     booking.team_member_id != null && String(booking.team_member_id).trim()
       ? String(booking.team_member_id)
       : fallbackResourceId || "unassigned";
+  const ebrMeta = status === "Cancelled" ? null : parseStoredEbrFromNotes(booking.notes);
+  const isOutgoingEbr =
+    status !== "Cancelled" &&
+    parsedNotes?.lastEditedBy === "professional" &&
+    (parsedNotes?.requestDirection === "outgoing" || parsedNotes?.responseStatus === "suggestion_for_change");
+  const isIncomingClientEbr =
+    status !== "Cancelled" &&
+    Boolean(ebrMeta) &&
+    (ebrMeta!.status === "pending" || ebrMeta!.status === "suggested") &&
+    (ebrMeta!.lastEditedBy === "client" ||
+      Boolean(ebrMeta!.clientNote) ||
+      parsedNotes?.lastEditedBy === "client");
+  const clientNote = ebrMeta?.clientNote?.trim() || "";
+  const noteText = clientNote || parsedNotes?.internalNote?.trim() || "";
 
   return {
     id: `b-${booking.id}`,
@@ -107,12 +125,13 @@ export function mapCalendarBookingToEvent(
       : booking.booking_type
         ? (bookingTypeFromApi[booking.booking_type] ?? "Online")
         : "Online",
-    bookingScenario: isRequestBooking ? "BR" : undefined,
+    bookingScenario: isIncomingClientEbr ? "EBR" : isRequestBooking ? "BR" : undefined,
     showClientName: clientName,
+    notes: booking.notes ?? null,
     details: {
       clientEmail: booking.customer_email ?? "",
-      requestDirection: "incoming",
-      services: [
+      requestDirection: isOutgoingEbr ? "outgoing" : "incoming",
+      services: ebrServices ?? [
         {
           id: booking.service_id || `svc-b-${booking.id}`,
           name: title,
@@ -120,16 +139,40 @@ export function mapCalendarBookingToEvent(
           price: Number(booking.total_price) || 0,
         },
       ],
+      ...(parsedNotes?.products?.length ? { products: parsedNotes.products } : {}),
+      ...(parsedNotes?.editedServiceIds?.length ? { editedServiceIds: parsedNotes.editedServiceIds } : {}),
+      ...(isIncomingClientEbr
+        ? { lastEditedBy: "client" as const, responseStatus: "suggestion_for_change" as const }
+        : parsedNotes?.lastEditedBy
+          ? { lastEditedBy: parsedNotes.lastEditedBy }
+          : {}),
+      ...(!isIncomingClientEbr && parsedNotes?.responseStatus
+        ? { responseStatus: parsedNotes.responseStatus }
+        : {}),
       phoneNumber: booking.contact_number ?? "",
       showPrepayment: String(booking.prepayment_status ?? "").toLowerCase() === "paid"
         || String(booking.prepayment_status ?? "").toLowerCase() === "required",
-      ...(parseCalendarEntryNotes(booking.notes) ??
-        (booking.notes
-          ? {
-              internalNote: booking.notes,
-              showInternalNote: true,
-            }
-          : {})),
+      ...(noteText
+        ? {
+            internalNote: noteText,
+            showInternalNote: true,
+          }
+        : {}),
+      ...(parsedNotes
+        ? {
+            showLateRescheduling: parsedNotes.showLateRescheduling,
+            lateRescheduleFeePercent: parsedNotes.lateRescheduleFeePercent,
+            showLateCancellation: parsedNotes.showLateCancellation,
+            lateCancellationFeePercent: parsedNotes.lateCancellationFeePercent,
+            showPrepayment: parsedNotes.showPrepayment || String(booking.prepayment_status ?? "").toLowerCase() === "paid"
+              || String(booking.prepayment_status ?? "").toLowerCase() === "required",
+            prepaymentPercent: parsedNotes.prepaymentPercent,
+            paymentMethod: parsedNotes.paymentMethod,
+            showKilometerAllowance: parsedNotes.showKilometerAllowance,
+            ...(parsedNotes.cancellationReason ? { cancellationReason: parsedNotes.cancellationReason } : {}),
+            ...(parsedNotes.clientSnapshot ? { clientSnapshot: parsedNotes.clientSnapshot } : {}),
+          }
+        : {}),
     },
   };
 }

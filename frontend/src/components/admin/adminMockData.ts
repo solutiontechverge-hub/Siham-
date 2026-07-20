@@ -138,6 +138,13 @@ export const mockAdminUsers: AdminUser[] = [
   { id: "3", name: "Legacy Admin", email: "old@molur.com", role: "super_admin", status: "disabled" },
 ];
 
+export type ProfessionalCategory =
+  | "Hair & Beauty"
+  | "Wellness & Spa"
+  | "Fitness & Training"
+  | "Make-up & Skincare"
+  | "Barber";
+
 export type MockProfessional = {
   id: string;
   registrationDate: string;
@@ -147,7 +154,9 @@ export type MockProfessional = {
   phone: string;
   serviceMode: "FL" | "DL" | "DL Project";
   validationStatus: "pending" | "validated" | "not_validated";
+  verificationDate?: string;
   accountStatus: "awaiting_setup" | "active" | "suspended" | "disabled";
+  primaryCategory: ProfessionalCategory;
   categories: string[];
   onlineBookings: number;
   offlineBookings: number;
@@ -160,17 +169,18 @@ export type MockProfessional = {
   province: string;
 };
 
-export const mockProfessionals: MockProfessional[] = [
+const professionalSeed: Omit<MockProfessional, "id">[] = [
   {
-    id: "p1",
     registrationDate: "2025-01-08",
-    brandName: "Sarah Beauty",
-    legalName: "Sarah Beauty B.V.",
+    brandName: "Sarah Johnson",
+    legalName: "Sarah Johnson Beauty B.V.",
     email: "sarah@sarahbeauty.nl",
     phone: "+31 6 12345678",
     serviceMode: "FL",
     validationStatus: "validated",
+    verificationDate: "2025-01-10",
     accountStatus: "active",
+    primaryCategory: "Hair & Beauty",
     categories: ["Hair", "Nails"],
     onlineBookings: 142,
     offlineBookings: 38,
@@ -183,7 +193,6 @@ export const mockProfessionals: MockProfessional[] = [
     province: "Noord-Holland",
   },
   {
-    id: "p2",
     registrationDate: "2024-11-22",
     brandName: "Glow Studio",
     legalName: "Glow Studio",
@@ -192,6 +201,7 @@ export const mockProfessionals: MockProfessional[] = [
     serviceMode: "DL",
     validationStatus: "pending",
     accountStatus: "awaiting_setup",
+    primaryCategory: "Make-up & Skincare",
     categories: ["Make-up", "Skincare"],
     onlineBookings: 56,
     offlineBookings: 12,
@@ -204,7 +214,6 @@ export const mockProfessionals: MockProfessional[] = [
     province: "Utrecht",
   },
   {
-    id: "p3",
     registrationDate: "2024-09-15",
     brandName: "Urban Cuts",
     legalName: "Urban Cuts Freelance",
@@ -213,6 +222,7 @@ export const mockProfessionals: MockProfessional[] = [
     serviceMode: "DL Project",
     validationStatus: "not_validated",
     accountStatus: "suspended",
+    primaryCategory: "Barber",
     categories: ["Barber", "Hair"],
     onlineBookings: 28,
     offlineBookings: 64,
@@ -224,6 +234,241 @@ export const mockProfessionals: MockProfessional[] = [
     lastBooking: "2024-12-28",
     province: "Zuid-Holland",
   },
+  {
+    registrationDate: "2025-01-02",
+    brandName: "Zen Wellness",
+    legalName: "Zen Wellness NL",
+    email: "hello@zenwellness.nl",
+    phone: "+31 6 99887766",
+    serviceMode: "FL",
+    validationStatus: "validated",
+    verificationDate: "2025-01-04",
+    accountStatus: "active",
+    primaryCategory: "Wellness & Spa",
+    categories: ["Massage", "Spa"],
+    onlineBookings: 98,
+    offlineBookings: 22,
+    onlineTransactions: 90,
+    offlineTransactions: 18,
+    avgRating: 4.9,
+    totalReviews: 56,
+    ranking: 3,
+    lastBooking: "2025-01-12",
+    province: "Noord-Brabant",
+  },
+  {
+    registrationDate: "2024-12-18",
+    brandName: "FitLife Coaching",
+    legalName: "FitLife Coaching",
+    email: "coach@fitlife.nl",
+    phone: "+31 6 55443322",
+    serviceMode: "DL",
+    validationStatus: "validated",
+    verificationDate: "2024-12-20",
+    accountStatus: "active",
+    primaryCategory: "Fitness & Training",
+    categories: ["Personal Training", "Nutrition"],
+    onlineBookings: 74,
+    offlineBookings: 31,
+    onlineTransactions: 68,
+    offlineTransactions: 28,
+    avgRating: 4.6,
+    totalReviews: 42,
+    ranking: 5,
+    lastBooking: "2025-01-11",
+    province: "Gelderland",
+  },
+  {
+    registrationDate: "2024-10-30",
+    brandName: "Luxe Makeup",
+    legalName: "Luxe Makeup Studio",
+    email: "book@luxemakeup.nl",
+    phone: "+31 6 66778899",
+    serviceMode: "FL",
+    validationStatus: "pending",
+    accountStatus: "active",
+    primaryCategory: "Make-up & Skincare",
+    categories: ["Make-up", "Bridal"],
+    onlineBookings: 45,
+    offlineBookings: 18,
+    onlineTransactions: 40,
+    offlineTransactions: 15,
+    avgRating: 4.4,
+    totalReviews: 28,
+    ranking: 12,
+    lastBooking: "2025-01-08",
+    province: "Noord-Holland",
+  },
+  {
+    registrationDate: "2024-08-12",
+    brandName: "Classic Barber Co",
+    legalName: "Classic Barber Co",
+    email: "info@classicbarber.nl",
+    phone: "+31 6 22113344",
+    serviceMode: "FL",
+    validationStatus: "not_validated",
+    accountStatus: "disabled",
+    primaryCategory: "Barber",
+    categories: ["Barber", "Grooming"],
+    onlineBookings: 12,
+    offlineBookings: 8,
+    onlineTransactions: 10,
+    offlineTransactions: 6,
+    avgRating: 3.2,
+    totalReviews: 9,
+    ranking: 45,
+    lastBooking: "2024-11-20",
+    province: "Limburg",
+  },
+  {
+    registrationDate: "2025-01-05",
+    brandName: "Emma Styles",
+    legalName: "Emma Styles",
+    email: "emma@emmastyles.nl",
+    phone: "+31 6 77889900",
+    serviceMode: "DL",
+    validationStatus: "validated",
+    verificationDate: "2025-01-06",
+    accountStatus: "active",
+    primaryCategory: "Hair & Beauty",
+    categories: ["Hair", "Colour"],
+    onlineBookings: 31,
+    offlineBookings: 6,
+    onlineTransactions: 28,
+    offlineTransactions: 5,
+    avgRating: 4.8,
+    totalReviews: 14,
+    ranking: 18,
+    lastBooking: "2025-01-13",
+    province: "Utrecht",
+  },
+  {
+    registrationDate: "2024-07-21",
+    brandName: "Serenity Spa",
+    legalName: "Serenity Spa B.V.",
+    email: "relax@serenityspa.nl",
+    phone: "+31 6 33445566",
+    serviceMode: "FL",
+    validationStatus: "validated",
+    verificationDate: "2024-07-25",
+    accountStatus: "active",
+    primaryCategory: "Wellness & Spa",
+    categories: ["Spa", "Facial"],
+    onlineBookings: 112,
+    offlineBookings: 44,
+    onlineTransactions: 105,
+    offlineTransactions: 40,
+    avgRating: 4.5,
+    totalReviews: 67,
+    ranking: 4,
+    lastBooking: "2025-01-09",
+    province: "Zuid-Holland",
+  },
+  {
+    registrationDate: "2024-12-01",
+    brandName: "Power Gym PT",
+    legalName: "Power Gym PT",
+    email: "pt@powergym.nl",
+    phone: "+31 6 88990011",
+    serviceMode: "DL Project",
+    validationStatus: "pending",
+    accountStatus: "awaiting_setup",
+    primaryCategory: "Fitness & Training",
+    categories: ["Personal Training"],
+    onlineBookings: 8,
+    offlineBookings: 4,
+    onlineTransactions: 6,
+    offlineTransactions: 3,
+    avgRating: 0,
+    totalReviews: 0,
+    ranking: 62,
+    lastBooking: "2024-12-15",
+    province: "Flevoland",
+  },
+];
+
+function generateMockProfessionals(): MockProfessional[] {
+  const categories: ProfessionalCategory[] = [
+    "Hair & Beauty",
+    "Wellness & Spa",
+    "Fitness & Training",
+    "Make-up & Skincare",
+    "Barber",
+  ];
+  const validationStatuses: MockProfessional["validationStatus"][] = [
+    "validated",
+    "pending",
+    "not_validated",
+  ];
+  const accountStatuses: MockProfessional["accountStatus"][] = [
+    "active",
+    "awaiting_setup",
+    "suspended",
+    "disabled",
+  ];
+  const modes: MockProfessional["serviceMode"][] = ["FL", "DL", "DL Project"];
+
+  const extra: MockProfessional[] = [];
+  for (let i = 0; i < 22; i++) {
+    const category = categories[i % categories.length];
+    const validation = validationStatuses[i % validationStatuses.length];
+    const month = String((i % 12) + 1).padStart(2, "0");
+    const day = String((i % 28) + 1).padStart(2, "0");
+    extra.push({
+      id: `p-gen-${i + 1}`,
+      registrationDate: `2024-${month}-${day}`,
+      brandName: `Professional ${i + 11}`,
+      legalName: `Professional ${i + 11} B.V.`,
+      email: `pro${i + 11}@email.nl`,
+      phone: `+31 6 ${String(2000000 + i).slice(1)}`,
+      serviceMode: modes[i % modes.length],
+      validationStatus: validation,
+      verificationDate: validation === "validated" ? `2024-${month}-${String(Number(day) + 2).padStart(2, "0")}` : undefined,
+      accountStatus: accountStatuses[i % accountStatuses.length],
+      primaryCategory: category,
+      categories: [category.split(" ")[0]],
+      onlineBookings: 10 + i * 3,
+      offlineBookings: 4 + i,
+      onlineTransactions: 8 + i * 2,
+      offlineTransactions: 3 + i,
+      avgRating: validation === "validated" ? 3.5 + (i % 15) / 10 : 0,
+      totalReviews: validation === "validated" ? 5 + i * 2 : 0,
+      ranking: 10 + i,
+      lastBooking: `2025-${month}-${day}`,
+      province: "Noord-Holland",
+    });
+  }
+
+  return [
+    ...professionalSeed.map((p, idx) => ({ ...p, id: `p${idx + 1}` })),
+    ...extra,
+  ];
+}
+
+export const mockProfessionals: MockProfessional[] = generateMockProfessionals();
+
+export const professionalManagementSummary = {
+  total: 1365,
+  verified: 985,
+  pending: 152,
+  rejected: 48,
+  inactive: 180,
+  growthTrend: 18.7,
+};
+
+export const professionalTopCategories = [
+  { name: "Hair & Beauty" as ProfessionalCategory, count: 452 },
+  { name: "Wellness & Spa" as ProfessionalCategory, count: 318 },
+  { name: "Fitness & Training" as ProfessionalCategory, count: 245 },
+  { name: "Make-up & Skincare" as ProfessionalCategory, count: 198 },
+  { name: "Barber" as ProfessionalCategory, count: 152 },
+];
+
+export const professionalVerificationOverview = [
+  { name: "Verified", value: professionalManagementSummary.verified },
+  { name: "Pending", value: professionalManagementSummary.pending },
+  { name: "Rejected", value: professionalManagementSummary.rejected },
+  { name: "Inactive", value: professionalManagementSummary.inactive },
 ];
 
 export type MockClient = {

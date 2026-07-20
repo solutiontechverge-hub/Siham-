@@ -22,8 +22,6 @@ import {
   Menu,
   MenuItem,
   Paper,
-  Radio,
-  RadioGroup,
   Stack,
   Tab,
   Tabs,
@@ -44,6 +42,10 @@ import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
 import ModeEditOutlineRoundedIcon from "@mui/icons-material/ModeEditOutlineRounded";
 import { AppDropdown, ClientPageTabsBar, clientTopTabsActiveLabel, MarketingSiteFooter, MollureMarketingHeader } from "../../../components/common";
+import MessagingModalShell, {
+  MessagingModalCancelButton,
+  MessagingModalPrimaryButton,
+} from "../../../components/common/messaging/MessagingModalShell";
 import { ServiceSummaryMetaLine } from "../../../components/common/ServiceSummaryMetaLine";
 import { fmtMinutesToTimeLabel, parseTimeLabelToMinutes, serviceTimeRangeLabel } from "./booking-time";
 import ClientBookingListView from "./ClientBookingListView";
@@ -53,6 +55,7 @@ import {
   ACTIVE_BOOKING_ID_KEY,
   CHECKOUT_REF_KEY,
   createBookingRef,
+  getActiveBookingSession,
   setActiveBookingSession,
 } from "./clientBookingSession";
 import { resolveCreateCheckoutPath } from "./resolveCreateBookingStatus";
@@ -62,6 +65,7 @@ import { getApiErrorMessage } from "../../../lib/api-error";
 import { getServicesForLocationMode, getTeamForLocationMode } from "../../../data/businessPublicProfile.data";
 import { useBusinessPublicProfile } from "../../../hooks/useBusinessPublicProfile";
 import { extractUuidFromSyntheticId } from "./clientBookingApi.mapper";
+import { enrichClientBookingRecord } from "./clientBookingDraftCache";
 import { parsePrepaymentPercent } from "../../../components/common/client-booking/parsePrepaymentPercent";
 import { loadPublicProfileBookingSelection } from "../../../data/publicProfileBookingSelection";
 import { useAppSelector } from "../../../store/hooks";
@@ -130,6 +134,10 @@ function ClientBookingCreateView() {
   const searchParams = useSearchParams();
   const fromProfile = searchParams?.get("from") === "profile";
   const profileHydrationToken = searchParams?.get("t") ?? "";
+  const isEbrSuggest = searchParams?.get("ebrSuggest") === "1";
+  const ebrFocus = searchParams?.get("ebrFocus") as "datetime" | "services" | "project" | null;
+  const isConfirmedEbrEdit =
+    isEbrSuggest && getActiveBookingSession()?.status === "confirmed";
   const { showSnackbar } = useSnackbar();
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -220,13 +228,35 @@ function ClientBookingCreateView() {
     });
   };
 
-  const times = React.useMemo(() => {
+  const allDayTimes = React.useMemo(() => {
     const slots: string[] = [];
     for (let minutes = 9 * 60; minutes <= 18 * 60; minutes += 30) {
       slots.push(fmtMinutesToTimeLabel(minutes));
     }
     return slots;
   }, []);
+
+  const isSelectedToday = React.useMemo(
+    () => startOfDay(selectedDate).getTime() === today0.getTime(),
+    [selectedDate, today0],
+  );
+
+  const nowMinutes = React.useMemo(() => {
+    const now = new Date();
+    return now.getHours() * 60 + now.getMinutes();
+  }, [selectedDate]);
+
+  const times = allDayTimes;
+
+  const availableTimes = React.useMemo(() => {
+    if (!isSelectedToday) return times;
+    return times.filter((t) => parseTimeLabelToMinutes(t) > nowMinutes);
+  }, [isSelectedToday, nowMinutes, times]);
+
+  const isTimePast = React.useCallback(
+    (t: string) => isSelectedToday && parseTimeLabelToMinutes(t) <= nowMinutes,
+    [isSelectedToday, nowMinutes],
+  );
 
   const timeScrollRef = React.useRef<HTMLDivElement>(null);
   const scrollTimeSlots = React.useCallback((direction: "left" | "right") => {
@@ -281,8 +311,8 @@ function ClientBookingCreateView() {
   };
 
   const getPreferredServiceTab = React.useCallback((items: Service[]): "assigned" | "unassigned" => {
-    const hasUnassigned = items.some((s) => !isServiceTeamAssigned(s));
-    const hasAssigned = items.some((s) => isServiceTeamAssigned(s));
+    const hasUnassigned = items.some((s) => !s.guestId);
+    const hasAssigned = items.some((s) => Boolean(s.guestId));
     if (hasUnassigned && !hasAssigned) return "unassigned";
     return "assigned";
   }, []);
@@ -291,7 +321,12 @@ function ClientBookingCreateView() {
   const [profileHydrated, setProfileHydrated] = React.useState(false);
   const hydrationSignatureRef = React.useRef<string | null>(null);
 
-  const [selectedTime, setSelectedTime] = React.useState(times[0] ?? "");
+  const [selectedTime, setSelectedTime] = React.useState(() => {
+    const now = new Date();
+    const mins = now.getHours() * 60 + now.getMinutes();
+    const future = allDayTimes.filter((t) => parseTimeLabelToMinutes(t) > mins);
+    return (future[0] ?? allDayTimes[0]) ?? "";
+  });
   const [combineServices, setCombineServices] = React.useState(true);
   const [selectedPersonId, setSelectedPersonId] = React.useState<string>("p-requester");
   const [selectedTeamMemberId, setSelectedTeamMemberId] = React.useState<string>("");
@@ -299,9 +334,15 @@ function ClientBookingCreateView() {
   const [selectedServiceIds, setSelectedServiceIds] = React.useState<Record<string, boolean>>({});
 
   const [addServiceDialogOpen, setAddServiceDialogOpen] = React.useState(false);
-  const [addServiceCatalogId, setAddServiceCatalogId] = React.useState("");
+  const [addServiceCatalogIds, setAddServiceCatalogIds] = React.useState<Record<string, boolean>>({});
   const [addServiceGuestId, setAddServiceGuestId] = React.useState("");
-
+  /** Fixed location: confirm before removing a service card. */
+  const [servicePendingRemove, setServicePendingRemove] = React.useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+  /** Baseline services when opening EBR suggest-edit — used to mark Edited lines. */
+  const ebrSuggestBaselineRef = React.useRef<Service[] | null>(null);
   const [projectDescription, setProjectDescription] = React.useState("");
   const [projectUploads, setProjectUploads] = React.useState<
     Array<{ id: string; name: string; previewUrl: string; file: File }>
@@ -326,16 +367,44 @@ function ClientBookingCreateView() {
   const catalogByTeamMemberId = React.useMemo<Record<string, CatalogService[]>>(() => {
     if (!shop?.shopId || !profileHydrated || !businessProfile) return {};
 
-    const catalogItems: CatalogService[] = getServicesForLocationMode(businessProfile, locationMode).map((s) => ({
+    const locationCatalog = getServicesForLocationMode(businessProfile, locationMode);
+    const fallbackItems: CatalogService[] = locationCatalog.map((s) => ({
       id: s.id,
       name: s.name,
       durationMins: s.durationMins,
       price: s.priceValue,
     }));
+    const byId = new Map(locationCatalog.map((s) => [s.id, s]));
+    const byName = new Map(locationCatalog.map((s) => [s.name.trim().toLowerCase(), s]));
+    const profileTeam = getTeamForLocationMode(businessProfile, locationMode);
 
     const map: Record<string, CatalogService[]> = {};
     for (const tm of shopTeamMembers) {
-      map[tm.id] = catalogItems;
+      const profileMember = profileTeam.find((m) => m.id === tm.id);
+      const slots = profileMember?.serviceSlots ?? [];
+      if (slots.length === 0) {
+        map[tm.id] = fallbackItems;
+        continue;
+      }
+
+      const seen = new Set<string>();
+      const items: CatalogService[] = [];
+      for (const slot of slots) {
+        for (const opt of slot.options) {
+          const matched =
+            byId.get(opt.value) ?? byName.get(String(opt.label ?? "").trim().toLowerCase());
+          const id = matched?.id ?? opt.value;
+          if (!id || seen.has(id)) continue;
+          seen.add(id);
+          items.push({
+            id,
+            name: matched?.name ?? opt.label,
+            durationMins: matched?.durationMins ?? 30,
+            price: matched?.priceValue ?? 0,
+          });
+        }
+      }
+      map[tm.id] = items.length > 0 ? items : fallbackItems;
     }
     return map;
   }, [businessProfile, locationMode, profileHydrated, shop?.shopId, shopTeamMembers]);
@@ -361,12 +430,10 @@ function ClientBookingCreateView() {
   const canAddFixedLocationGuest =
     !isDesiredLocation && additionalGuests.length < FIXED_LOCATION_MAX_GUESTS;
   const serviceAssignees = React.useMemo(() => {
-    if (isDesiredLocation) {
-      return people.filter((p) => !p.isRequester && !isPlanningPerson(p));
-    }
-    return people.filter((p) => p.isRequester || isAdditionalGuest(p));
-  }, [isDesiredLocation, isPlanningPerson, people]);
-  const canAddService = serviceAssignees.length > 0;
+    // Jane / Model / Guest can all receive services; Planning cannot.
+    return people.filter((p) => !isPlanningPerson(p));
+  }, [isPlanningPerson, people]);
+  const canAddService = serviceAssignees.length > 0 && Boolean(selectedTeamMemberId);
 
   const serviceCountLabel = React.useCallback(
     (personId: string) => {
@@ -382,55 +449,68 @@ function ClientBookingCreateView() {
   );
 
   const planningCardDetails = React.useCallback((person: BookingPerson) => {
-    if (!person.planningIsLocked) return { activity: "", duration: "" };
+    if (!person.planningIsLocked) return { duration: "" };
     return {
-      activity: person.planningActivity?.trim() ?? "",
       duration: person.planningDuration?.trim() ?? "",
     };
   }, []);
 
   const renderPlanningCardSubtitle = (person: BookingPerson) => {
-    const { activity, duration } = planningCardDetails(person);
-    if (!activity && !duration) return null;
+    const { duration } = planningCardDetails(person);
+    if (!duration) return null;
     return (
-      <Stack spacing={0.15} sx={{ mt: 0.2 }}>
-        {activity ? (
-          <Typography sx={{ fontWeight: 700, fontSize: 11, color: alpha(m.navy, 0.48), lineHeight: 1.2 }}>
-            {activity}
-          </Typography>
-        ) : null}
-        {duration ? (
-          <Typography sx={{ fontWeight: 700, fontSize: 11, color: alpha(m.navy, 0.48), lineHeight: 1.2 }}>
-            {duration}
-          </Typography>
-        ) : null}
-      </Stack>
+      <Typography sx={{ fontWeight: 700, fontSize: 11, color: alpha(m.navy, 0.48), lineHeight: 1.2, mt: 0.2 }}>
+        {duration}
+      </Typography>
     );
   };
 
   const selectedServicesCount = React.useMemo(() => Object.values(selectedServiceIds).filter(Boolean).length, [selectedServiceIds]);
   const allServicesAssigned = React.useMemo(
-    () => services.length > 0 && services.every((s) => isServiceTeamAssigned(s)),
+    () =>
+      services.length > 0 &&
+      services.every((s) => Boolean(s.guestId) && Boolean(s.teamMemberId)),
     [services],
   );
 
-  const assigned = services.filter((s) => isServiceTeamAssigned(s));
-  const unassigned = services.filter((s) => !isServiceTeamAssigned(s));
+  /** Services already given to the selected person (Jane / Model / Guest). */
+  const assigned = React.useMemo(
+    () => services.filter((s) => Boolean(s.guestId) && s.guestId === selectedPersonId),
+    [selectedPersonId, services],
+  );
+  /** Pending rows without a person — catalog never lives here. */
+  const unassigned = React.useMemo(() => services.filter((s) => !s.guestId), [services]);
+
+  const isModelOrGuestSelected = Boolean(
+    selectedPerson && !selectedPerson.isRequester && !isPlanningPerson(selectedPerson),
+  );
 
   React.useEffect(() => {
     if (!profileHydrated && fromProfile) return;
-    if (serviceTab === "assigned" && assigned.length === 0 && unassigned.length > 0) {
+    // Model/Guest: stay on Assigned — add services via Service to assignment list.
+    if (isModelOrGuestSelected) {
+      if (serviceTab !== "assigned") setServiceTab("assigned");
+      return;
+    }
+    if (unassigned.length > 0 && serviceTab === "assigned") {
       setServiceTab("unassigned");
-    } else if (serviceTab === "unassigned" && unassigned.length === 0 && assigned.length > 0) {
+    } else if (unassigned.length === 0 && assigned.length > 0 && serviceTab === "unassigned") {
       setServiceTab("assigned");
     }
-  }, [assigned.length, fromProfile, profileHydrated, serviceTab, unassigned.length]);
+  }, [
+    assigned.length,
+    fromProfile,
+    isModelOrGuestSelected,
+    profileHydrated,
+    serviceTab,
+    unassigned.length,
+  ]);
 
   const selectedUnassignedServices = React.useMemo(
     () => unassigned.filter((s) => selectedServiceIds[s.id]),
     [unassigned, selectedServiceIds],
   );
-  const canDirectAssign = selectedUnassignedServices.length > 0;
+  const canDirectAssign = Boolean(selectedTeamMemberId) && selectedUnassignedServices.length > 0;
   const visible = serviceTab === "assigned" ? assigned : unassigned;
   const hasUnassigned = unassigned.length > 0;
 
@@ -469,8 +549,20 @@ function ClientBookingCreateView() {
   const teamMemberChipLabelForItems = React.useCallback(
     (items: Service[]) => {
       const ids = [...new Set(items.map((s) => s.teamMemberId).filter((id): id is string => Boolean(id)))];
+      if (ids.length === 0) return undefined;
+      // One shared professional — single chip. Multiple different TMs — per-service labels instead.
       if (ids.length !== 1) return undefined;
       const fullName = teamMemberNameById.get(ids[0]);
+      if (!fullName) return undefined;
+      return fullName.split(/\s+/)[0];
+    },
+    [teamMemberNameById],
+  );
+
+  const teamMemberFirstName = React.useCallback(
+    (teamMemberId: string | null | undefined) => {
+      if (!teamMemberId) return undefined;
+      const fullName = teamMemberNameById.get(teamMemberId);
       if (!fullName) return undefined;
       return fullName.split(/\s+/)[0];
     },
@@ -514,6 +606,25 @@ function ClientBookingCreateView() {
   }, [isPastDay, selectedDate, today0]);
 
   React.useEffect(() => {
+    // If today has no remaining slots, move to tomorrow.
+    if (isSelectedToday && availableTimes.length === 0) {
+      setSelectedDate(addDays(today0, 1));
+      return;
+    }
+    // Keep selection on a bookable future slot (nearest by default).
+    if (availableTimes.length > 0 && !availableTimes.includes(selectedTime)) {
+      setSelectedTime(availableTimes[0]);
+    }
+  }, [availableTimes, isSelectedToday, selectedTime, today0]);
+
+  React.useEffect(() => {
+    const el = timeScrollRef.current;
+    if (!el || !selectedTime) return;
+    const activeBtn = el.querySelector<HTMLElement>(`[data-time-slot="${selectedTime}"]`);
+    activeBtn?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+  }, [selectedTime, selectedDate]);
+
+  React.useEffect(() => {
     try {
       const profileSelection = loadPublicProfileBookingSelection();
       const raw = window.sessionStorage.getItem("mollure:selected_shop");
@@ -539,6 +650,21 @@ function ClientBookingCreateView() {
         return;
       }
 
+      // Confirmed EBR edit: prefer the booking session shop (Desired needs locationMode + people).
+      if (isEbrSuggest) {
+        const session = getActiveBookingSession();
+        if (session?.shop?.shopId) {
+          setShop({
+            shopId: session.shop.shopId,
+            shopName: session.shop.shopName,
+            municipalityLabel: session.shop.municipalityLabel,
+            addressLabel: session.shop.addressLabel,
+            locationMode: session.shop.locationMode,
+          });
+          return;
+        }
+      }
+
       if (parsed?.shopId && parsed?.shopName) {
         setShop({
           shopId: parsed.shopId,
@@ -551,7 +677,7 @@ function ClientBookingCreateView() {
     } catch {
       // ignore
     }
-  }, [fromProfile, profileHydrationToken]);
+  }, [fromProfile, isEbrSuggest, profileHydrationToken]);
 
   const applyProfileSelection = React.useCallback(
     (profileSelection: NonNullable<ReturnType<typeof loadPublicProfileBookingSelection>>) => {
@@ -565,8 +691,9 @@ function ClientBookingCreateView() {
         name: row.name,
         durationMins: row.durationMins,
         price: row.price,
-        guestId: "p-requester",
-        teamMemberId: row.teamMemberId,
+        // Desired: leave person + professional open so Model can pick services via Assign.
+        guestId: profileSelection.locationMode === "desired" ? null : "p-requester",
+        teamMemberId: profileSelection.locationMode === "desired" ? null : row.teamMemberId,
       }));
 
       setServices(profileServices);
@@ -611,6 +738,120 @@ function ClientBookingCreateView() {
       applyProfileSelection(selection);
     };
 
+    // Confirmed Edit / EBR must win over leftover profile-selection cache.
+    // Desired bookings often still have mollure:profile_booking_selection from create,
+    // which used to wipe Models/Guests/Planning before we restored the draft.
+    if (isEbrSuggest) {
+      if (!shop?.shopId) return;
+      const existingRaw = getActiveBookingSession();
+      const existing = existingRaw ? enrichClientBookingRecord(existingRaw) : null;
+      if (!existing?.draft?.services?.length) {
+        // Session not ready yet — never fall through to blank catalog.
+        return;
+      }
+      if (existing.shop?.shopId && existing.shop.shopId !== shop.shopId) {
+        return;
+      }
+
+      const locationMode = existing.shop?.locationMode ?? shop.locationMode ?? "fixed";
+      const signature = `ebrSuggest:${existing.bookingRef}:${existing.draft.people
+        ?.map((p) => `${p.id}:${p.participantType ?? ""}`)
+        .join(",")}:${existing.draft.services
+        .map((row) => `${row.id}:${row.guestId ?? ""}:${row.teamMemberId ?? ""}`)
+        .join("|")}:${existing.draft.projectDetails?.description ?? ""}`;
+      if (hydrationSignatureRef.current === signature) return;
+      hydrationSignatureRef.current = signature;
+
+      const draftServices: Service[] = existing.draft.services.map((row) => ({
+        id: row.id,
+        catalogServiceId: extractUuidFromSyntheticId(row.id) ?? row.id,
+        name: row.name,
+        durationMins: row.durationMins,
+        price: row.price,
+        guestId:
+          row.guestId != null && row.guestId !== ""
+            ? row.guestId
+            : locationMode === "desired"
+              ? null
+              : "p-requester",
+        teamMemberId: row.teamMemberId ?? null,
+      }));
+
+      setServices(draftServices);
+      ebrSuggestBaselineRef.current = draftServices.map((s) => ({ ...s }));
+
+      const draftPeople =
+        existing.draft.people?.length
+          ? existing.draft.people.map((p) => ({
+              id: p.id,
+              name: p.name,
+              isRequester: Boolean(p.isRequester),
+              participantType: p.participantType,
+              planningActivity: p.planningActivity,
+              planningDuration: p.planningDuration,
+              planningIsLocked: p.planningIsLocked,
+            }))
+          : [
+              {
+                id: "p-requester",
+                name: requesterDisplayName,
+                isRequester: true as const,
+              },
+            ];
+      setPeople(draftPeople);
+
+      const personWithServices =
+        draftPeople.find((p) => draftServices.some((s) => s.guestId === p.id)) ??
+        draftPeople.find((p) => p.isRequester) ??
+        draftPeople[0];
+      if (personWithServices?.id) setSelectedPersonId(personWithServices.id);
+
+      if (existing.draft.teamMembers?.length) {
+        setShopTeamMembers((prev) => {
+          const fromDraft = existing.draft.teamMembers!.map((tm) => ({
+            id: tm.id,
+            name: tm.name,
+            locationModes: (prev.find((p) => p.id === tm.id)?.locationModes ?? [
+              locationMode,
+            ]) as Array<"fixed" | "desired">,
+          }));
+          return fromDraft.length ? fromDraft : prev;
+        });
+      } else if (businessProfile) {
+        const apiTeam = getTeamForLocationMode(businessProfile, locationMode).map((tm) => ({
+          id: tm.id,
+          name: tm.name,
+          locationModes: tm.locationModes,
+        }));
+        if (apiTeam.length) setShopTeamMembers(apiTeam);
+      }
+
+      if (existing.draft.selectedDateISO) {
+        const parsed = new Date(`${existing.draft.selectedDateISO}T00:00:00`);
+        if (!Number.isNaN(parsed.getTime())) setSelectedDate(parsed);
+      }
+      if (existing.draft.selectedTime) setSelectedTime(existing.draft.selectedTime);
+      setCombineServices(Boolean(existing.draft.combineServices));
+      if (existing.draft.projectDetails) {
+        setProjectDescription(existing.draft.projectDetails.description ?? "");
+        setProjectUploads(
+          (existing.draft.projectDetails.uploads ?? []).map((u) => ({
+            id: u.id,
+            name: u.name,
+            previewUrl: u.previewUrl ?? "",
+          })),
+        );
+      }
+      const firstTm =
+        draftServices.find((s) => s.teamMemberId)?.teamMemberId ??
+        existing.draft.teamMembers?.[0]?.id ??
+        "";
+      if (firstTm) setSelectedTeamMemberId(firstTm);
+      setServiceTab(getPreferredServiceTab(draftServices));
+      setProfileHydrated(true);
+      return;
+    }
+
     if (fromProfile && profileSelection?.services.length) {
       applyProfileIfNeeded(profileSelection);
       return;
@@ -639,17 +880,18 @@ function ClientBookingCreateView() {
         }))
       : [];
 
+    const mode = shop.locationMode ?? "fixed";
     const catalogServices = getServicesForLocationMode(
       businessProfile,
-      shop.locationMode ?? "fixed",
+      mode,
     ).map((s) => ({
       id: s.id,
       catalogServiceId: s.id,
       name: s.name,
       durationMins: s.durationMins,
       price: s.priceValue,
-      guestId: "p-requester" as string | null,
-      teamMemberId: apiTeam[0]?.id ?? null,
+      guestId: (mode === "desired" ? null : "p-requester") as string | null,
+      teamMemberId: mode === "desired" ? null : apiTeam[0]?.id ?? null,
     }));
 
     setServices(catalogServices.slice(0, 3));
@@ -662,7 +904,9 @@ function ClientBookingCreateView() {
     businessProfile,
     fromProfile,
     getPreferredServiceTab,
+    isEbrSuggest,
     profileHydrationToken,
+    requesterDisplayName,
     shop?.locationMode,
     shop?.shopId,
   ]);
@@ -674,10 +918,14 @@ function ClientBookingCreateView() {
   }, [people, selectedPersonId]);
 
   React.useEffect(() => {
-    if (!filteredTeamMembers.some((tm) => tm.id === selectedTeamMemberId)) {
-      setSelectedTeamMemberId(filteredTeamMembers[0]?.id ?? "");
+    if (filteredTeamMembers.some((tm) => tm.id === selectedTeamMemberId)) return;
+    const fallbackId = filteredTeamMembers[0]?.id ?? "";
+    setSelectedTeamMemberId(fallbackId);
+    // Desired: keep every service on the single active professional.
+    if (isDesiredLocation && fallbackId) {
+      setServices((prev) => prev.map((s) => ({ ...s, teamMemberId: fallbackId })));
     }
-  }, [filteredTeamMembers, selectedTeamMemberId]);
+  }, [filteredTeamMembers, isDesiredLocation, selectedTeamMemberId]);
 
   const reorderPeople = React.useCallback((fromId: string, toId: string) => {
     if (fromId === toId) return;
@@ -717,6 +965,16 @@ function ClientBookingCreateView() {
     if (planningPersonId) syncPlanningDraftToPerson(planningPersonId, planningActivity, planningDuration);
     setPlanningPersonId(null);
     setSelectedPersonId(personId);
+    setSelectedServiceIds({});
+    const person = people.find((p) => p.id === personId);
+    const isModelOrGuest = Boolean(person && !person.isRequester && !isPlanningPerson(person));
+    if (isModelOrGuest) {
+      setServiceTab("assigned");
+      return;
+    }
+    const personHasAssigned = services.some((s) => s.guestId === personId);
+    const hasPending = services.some((s) => !s.guestId);
+    setServiceTab(hasPending && !personHasAssigned ? "unassigned" : "assigned");
   };
 
   const addParticipant = (cardName: string) => {
@@ -789,7 +1047,8 @@ function ClientBookingCreateView() {
     const person = people.find((p) => p.id === guestId);
     if (!person || person.isRequester) return;
     setPeople((prev) => prev.filter((p) => p.id !== guestId));
-    setServices((prev) => prev.map((s) => (s.guestId === guestId ? { ...s, guestId: null } : s)));
+    // Remove this guest's services from the booking (do not send them to Unassigned).
+    setServices((prev) => prev.filter((s) => s.guestId !== guestId));
     if (planningPersonId === guestId) {
       setPlanningPersonId(null);
       setPlanningActivity("");
@@ -805,68 +1064,84 @@ function ClientBookingCreateView() {
   };
 
   const assignSelectedDirect = () => {
-    if (!canDirectAssign) return;
-    const fallbackTeamMemberId = filteredTeamMembers[0]?.id ?? null;
+    if (!canDirectAssign || !selectedTeamMemberId) return;
     const ids = new Set(selectedUnassignedServices.map((s) => s.id));
     setServices((prev) =>
       prev.map((s) => {
         if (!ids.has(s.id)) return s;
-        const teamMemberId = s.teamMemberId ?? selectedTeamMemberId ?? fallbackTeamMemberId;
         return {
           ...s,
           guestId: selectedPersonId,
-          teamMemberId,
+          teamMemberId: selectedTeamMemberId,
         };
       }),
     );
     setSelectedServiceIds({});
-    setServiceTab("assigned");
   };
 
   const openAddServiceDialog = () => {
-    const catalog = catalogByTeamMemberId[selectedTeamMemberId] ?? [];
-    setAddServiceCatalogId(catalog[0]?.id ?? "");
-    setAddServiceGuestId(serviceAssignees[0]?.id ?? people[0]?.id ?? "");
+    if (!selectedTeamMemberId && filteredTeamMembers[0]?.id) {
+      setSelectedTeamMemberId(filteredTeamMembers[0].id);
+    }
+    setAddServiceCatalogIds({});
+    const preferredAssignee =
+      serviceAssignees.find((p) => p.id === selectedPersonId)?.id ?? serviceAssignees[0]?.id ?? people[0]?.id ?? "";
+    setAddServiceGuestId(preferredAssignee);
     setAddServiceDialogOpen(true);
   };
 
   const confirmAddService = () => {
     const catalog = catalogByTeamMemberId[selectedTeamMemberId] ?? [];
-    const picked = catalog.find((c) => c.id === addServiceCatalogId);
-    if (!picked || !addServiceGuestId) return;
-    const newService: Service = {
-      id: UUID_RE.test(picked.id) ? picked.id : `svc-${Date.now()}`,
-      catalogServiceId: UUID_RE.test(picked.id) ? picked.id : extractUuidFromSyntheticId(picked.id),
-      name: picked.name,
-      durationMins: picked.durationMins,
-      price: picked.price,
-      originalPrice: picked.originalPrice,
-      discountPct: picked.discountPct,
-      guestId: addServiceGuestId,
-      teamMemberId: selectedTeamMemberId,
-    };
-    setServices((prev) => [...prev, newService]);
+    const selectedIds = Object.entries(addServiceCatalogIds)
+      .filter(([, checked]) => checked)
+      .map(([id]) => id);
+    if (!selectedIds.length || !addServiceGuestId || !selectedTeamMemberId) return;
+
+    const stamped: Service[] = [];
+    for (const catalogId of selectedIds) {
+      const picked = catalog.find((c) => c.id === catalogId);
+      if (!picked) continue;
+      stamped.push({
+        id: UUID_RE.test(picked.id) ? `${picked.id}-${Date.now()}-${stamped.length}` : `svc-${Date.now()}-${stamped.length}`,
+        catalogServiceId: UUID_RE.test(picked.id) ? picked.id : extractUuidFromSyntheticId(picked.id),
+        name: picked.name,
+        durationMins: picked.durationMins,
+        price: picked.price,
+        originalPrice: picked.originalPrice,
+        discountPct: picked.discountPct,
+        guestId: addServiceGuestId,
+        teamMemberId: selectedTeamMemberId,
+      });
+    }
+    if (!stamped.length) return;
+
+    setServices((prev) => [...prev, ...stamped]);
+    setSelectedPersonId(addServiceGuestId);
+    setServiceTab("assigned");
     setAddServiceDialogOpen(false);
+    setAddServiceCatalogIds({});
+  };
+
+  /** Desired: one professional for the whole booking. Fixed: only updates the picker for the next assign. */
+  const applySharedTeamMember = (teamMemberId: string) => {
+    setSelectedTeamMemberId(teamMemberId);
+    if (!teamMemberId || !isDesiredLocation) return;
+    setServices((prev) => prev.map((s) => ({ ...s, teamMemberId })));
   };
 
   const updateServiceTeamMember = (serviceId: string, teamMemberId: string) => {
-    const nextTeamMemberId = teamMemberId || null;
-    setServices((prev) =>
-      prev.map((s) => {
-        if (s.id !== serviceId) return s;
-        return {
-          ...s,
-          teamMemberId: nextTeamMemberId,
-          guestId: nextTeamMemberId ? (s.guestId ?? selectedPersonId) : null,
-        };
-      }),
-    );
-    if (nextTeamMemberId) setServiceTab("assigned");
+    if (!teamMemberId) return;
+    setServices((prev) => prev.map((s) => (s.id === serviceId ? { ...s, teamMemberId } : s)));
+  };
+
+  const confirmRemoveService = () => {
+    if (!servicePendingRemove) return;
+    setServices((prev) => prev.filter((x) => x.id !== servicePendingRemove.id));
+    setServicePendingRemove(null);
   };
 
   const toggleServiceSelection = (serviceId: string, checked: boolean) => {
     setSelectedServiceIds((prev) => ({ ...prev, [serviceId]: checked }));
-    if (!checked) updateServiceTeamMember(serviceId, "");
   };
 
   const onContinue = async () => {
@@ -890,10 +1165,92 @@ function ClientBookingCreateView() {
       ...s,
       catalogServiceId: s.catalogServiceId ?? extractUuidFromSyntheticId(s.id),
       guestId: s.guestId ?? requesterId,
+      // Desired location: every service must use the single selected professional.
+      teamMemberId:
+        isDesiredLocation && selectedTeamMemberId ? selectedTeamMemberId : s.teamMemberId,
     }));
+
+    const payload = {
+      selectedDateISO: toISO(selectedDate),
+      selectedTime,
+      combineServices,
+      people: peopleForDraft,
+      services: servicesForDraft,
+      teamMembers: shopTeamMembers.map(({ id, name }) => ({ id, name })),
+      total,
+      ...(isDesiredLocation
+        ? {
+            projectDetails: {
+              description: projectDescription,
+              uploads: projectUploads.map((u) => ({
+                id: u.id,
+                name: u.name,
+                previewUrl: u.previewUrl,
+              })),
+            },
+          }
+        : {}),
+    };
 
     const prepaymentPercent = parsePrepaymentPercent(businessProfile?.prepaymentLabel);
     const requiresPrepayment = !isDesiredLocation && prepaymentPercent > 0;
+
+    // EBR suggest-edit: update existing booking draft and return to details (no new booking).
+    if (isEbrSuggest) {
+      setIsContinuing(true);
+      try {
+        const existing = getActiveBookingSession();
+        if (!existing?.bookingRef) {
+          showSnackbar({ severity: "error", message: "Booking not found for suggested changes." });
+          return;
+        }
+
+        const baseline = ebrSuggestBaselineRef.current ?? existing.draft?.services ?? [];
+        const baselineById = new Map(baseline.map((s) => [s.id, s]));
+        const editedServiceIds: string[] = [];
+        for (const service of servicesForDraft) {
+          const original = baselineById.get(service.id);
+          if (
+            !original ||
+            original.name !== service.name ||
+            original.price !== service.price ||
+            original.durationMins !== service.durationMins ||
+            (original.teamMemberId ?? null) !== (service.teamMemberId ?? null) ||
+            (original.guestId ?? null) !== (service.guestId ?? null)
+          ) {
+            editedServiceIds.push(service.id);
+          }
+        }
+        for (const original of baseline) {
+          if (!servicesForDraft.some((s) => s.id === original.id)) {
+            editedServiceIds.push(original.id);
+          }
+        }
+
+        setActiveBookingSession({
+          ...existing,
+          draft: payload,
+          requiresPrepayment: existing.requiresPrepayment ?? requiresPrepayment,
+          prepaymentPercent: existing.prepaymentPercent ?? (requiresPrepayment ? prepaymentPercent : 0),
+        });
+        if (typeof window !== "undefined") {
+          window.sessionStorage.setItem("mollure:ebr_suggest_return", "1");
+          window.sessionStorage.setItem(
+            "mollure:ebr_suggest_edited_ids",
+            JSON.stringify([...new Set(editedServiceIds)]),
+          );
+        }
+        const listTab = parseBookingListTab(searchParams?.get("tab"));
+        const checkoutPath = resolveCreateCheckoutPath({
+          locationMode,
+          requiresPrepayment: Boolean(existing.requiresPrepayment ?? requiresPrepayment),
+        });
+        router.push(`${checkoutPath}?tab=${listTab}`);
+      } finally {
+        setIsContinuing(false);
+      }
+      return;
+    }
 
     const bookingRef = createBookingRef();
 
@@ -982,7 +1339,25 @@ function ClientBookingCreateView() {
     }
   };
 
-  const continueLabel = "Continue";
+  const continueLabel = isConfirmedEbrEdit
+    ? "Send EBR to professional"
+    : isEbrSuggest
+      ? "Save & return"
+      : "Continue";
+
+  React.useEffect(() => {
+    if (!isEbrSuggest || !ebrFocus || !profileHydrated) return;
+    const id =
+      ebrFocus === "project"
+        ? "booking-project-section"
+        : ebrFocus === "services"
+          ? "booking-services-section"
+          : "booking-calendar-section";
+    const timer = window.setTimeout(() => {
+      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
+    return () => window.clearTimeout(timer);
+  }, [ebrFocus, isEbrSuggest, profileHydrated]);
 
   const planningFieldSx = {
     "& .MuiOutlinedInput-root": {
@@ -1092,7 +1467,8 @@ function ClientBookingCreateView() {
 
         <Tabs
           value={serviceTab}
-          onChange={(_, v) => {
+          onChange={(_, v: "assigned" | "unassigned") => {
+            if (v === "assigned" && unassigned.length > 0) return;
             setServiceTab(v);
             setSelectedServiceIds({});
           }}
@@ -1107,6 +1483,7 @@ function ClientBookingCreateView() {
           <Tab
             value="assigned"
             label={`Assigned(${assigned.length})`}
+            disabled={unassigned.length > 0 && !isModelOrGuestSelected}
             sx={{
               minHeight: 28,
               textTransform: "none",
@@ -1116,6 +1493,7 @@ function ClientBookingCreateView() {
               px: 1.25,
               color: alpha(m.navy, 0.62),
               "&.Mui-selected": { bgcolor: "#fff", color: alpha(m.navy, 0.78) },
+              "&.Mui-disabled": { opacity: 0.45 },
             }}
           />
           <Tab
@@ -1134,6 +1512,39 @@ function ClientBookingCreateView() {
           />
         </Tabs>
       </Stack>
+
+      {/* Desired: one shared professional for all. Fixed assigned: per-service dropdown on each card. */}
+      {filteredTeamMembers.length > 0 && (isDesiredLocation || serviceTab === "unassigned") ? (
+        <Box sx={{ mb: 1.25 }} onClick={(e) => e.stopPropagation()}>
+          <AppDropdown
+            value={selectedTeamMemberId}
+            onChange={(val) => applySharedTeamMember(String(val ?? ""))}
+            options={filteredTeamMembers.map((tm) => ({
+              value: tm.id,
+              label: tm.name,
+            }))}
+            placeholder="Select team member"
+            size="small"
+            fullWidth
+            InputProps={{
+              startAdornment: (
+                <PersonOutlineRoundedIcon
+                  sx={{ fontSize: 18, color: alpha(m.navy, 0.45), ml: 0.5, mr: 0.25 }}
+                />
+              ),
+            }}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "10px",
+                bgcolor: "#fff",
+                fontSize: 12,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.62),
+              },
+            }}
+          />
+        </Box>
+      ) : null}
 
       {hasUnassigned && serviceTab === "unassigned" ? (
         <Stack direction="row" alignItems="center" justifyContent="flex-end" sx={{ mb: 1 }}>
@@ -1163,137 +1574,246 @@ function ClientBookingCreateView() {
       ) : null}
 
       <Stack spacing={1}>
-        {visible.map((s) => (
-          <Paper
-            key={s.id}
-            elevation={0}
-            sx={{
-              borderRadius: "10px",
-              border: `1px solid ${alpha(m.navy, 0.10)}`,
-              px: 1.25,
-              py: 1.1,
-              bgcolor: "#fff",
-              cursor: "default",
-              transition: "border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease",
-              "&:hover": {
-                borderColor: alpha(m.teal, 0.35),
-                boxShadow: "0 6px 18px rgba(16, 35, 63, 0.06)",
-              },
-            }}
-          >
-            <Stack direction="row" alignItems="flex-start" spacing={1.25}>
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-                  <Typography
-                    sx={{
-                      fontSize: 12.5,
-                      fontWeight: 900,
-                      color: alpha(m.navy, 0.82),
-                      lineHeight: 1.1,
-                      flex: 1,
-                      minWidth: 0,
-                    }}
-                  >
-                    {s.name}
-                  </Typography>
-                  <Typography
-                    sx={{
-                      fontSize: 12.5,
-                      fontWeight: 900,
-                      color: alpha(m.navy, 0.82),
-                      lineHeight: 1.1,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {s.price} €
-                  </Typography>
-                </Stack>
-                <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: alpha(m.navy, 0.45), mt: 0.25 }}>
-                  {s.durationMins} Mins
-                </Typography>
-                {typeof s.originalPrice === "number" || typeof s.discountPct === "number" ? (
-                  <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mt: 0.35 }}>
-                    {typeof s.originalPrice === "number" ? (
-                      <Typography
-                        sx={{
-                          fontSize: 10.5,
-                          fontWeight: 800,
-                          color: alpha(m.navy, 0.45),
-                          textDecoration: "line-through",
-                        }}
-                      >
-                        {s.originalPrice} €
-                      </Typography>
-                    ) : null}
-                    {typeof s.discountPct === "number" ? (
-                      <Typography sx={{ fontSize: 10.5, fontWeight: 800, color: m.teal }}>
-                        {s.discountPct}% Discount
-                      </Typography>
-                    ) : null}
-                  </Stack>
-                ) : null}
-                <Box sx={{ mt: 0.85 }} onClick={(e) => e.stopPropagation()}>
-                  <AppDropdown
-                    value={s.teamMemberId ?? ""}
-                    onChange={(val) => updateServiceTeamMember(s.id, String(val))}
-                    options={filteredTeamMembers.map((tm) => ({
-                      value: tm.id,
-                      label: tm.name,
-                    }))}
-                    placeholder="Select team member"
-                    size="small"
-                    fullWidth
-                    disabled={serviceTab === "unassigned" && !selectedServiceIds[s.id]}
-                    InputProps={{
-                      startAdornment: (
-                        <PersonOutlineRoundedIcon
-                          sx={{ fontSize: 18, color: alpha(m.navy, 0.45), ml: 0.5, mr: 0.25 }}
-                        />
-                      ),
-                    }}
-                    sx={{
-                      "& .MuiOutlinedInput-root": {
-                        borderRadius: "10px",
-                        bgcolor: alpha(m.navy, 0.015),
-                        fontSize: 11.5,
-                        fontWeight: 800,
-                      },
-                    }}
-                  />
-                </Box>
-              </Box>
+        {visible.map((s) => {
+          const showFixedAssignedCard =
+            !isDesiredLocation && serviceTab === "assigned" && Boolean(s.guestId);
 
-              <Stack direction="row" alignItems="center" spacing={0.25}>
-                {serviceTab === "unassigned" ? (
-                  <Checkbox
+          if (showFixedAssignedCard) {
+            return (
+              <Paper
+                key={s.id}
+                elevation={0}
+                sx={{
+                  borderRadius: "10px",
+                  border: `1px solid ${alpha(m.navy, 0.12)}`,
+                  px: 1.5,
+                  py: 1.35,
+                  bgcolor: "#fff",
+                }}
+              >
+                <Stack direction="row" alignItems="flex-start" spacing={1.25}>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography
+                      sx={{
+                        fontSize: 13.5,
+                        fontWeight: 900,
+                        color: alpha(m.navy, 0.88),
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      {s.name}
+                    </Typography>
+                    <Typography
+                      sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.48), mt: 0.35 }}
+                    >
+                      {s.durationMins} Mins
+                    </Typography>
+                    <Box sx={{ mt: "20px", maxWidth: 220 }} onClick={(e) => e.stopPropagation()}>
+                      <AppDropdown
+                        value={s.teamMemberId ?? ""}
+                        onChange={(val) => updateServiceTeamMember(s.id, String(val ?? ""))}
+                        options={filteredTeamMembers.map((tm) => ({
+                          value: tm.id,
+                          label: tm.name,
+                        }))}
+                        placeholder="Select team member"
+                        size="small"
+                        fullWidth
+                        InputProps={{
+                          startAdornment: (
+                            <PersonOutlineRoundedIcon
+                              sx={{ fontSize: 18, color: alpha(m.navy, 0.45), ml: 0.5, mr: 0.25 }}
+                            />
+                          ),
+                        }}
+                        sx={{
+                          "& .MuiOutlinedInput-root": {
+                            borderRadius: "10px",
+                            bgcolor: "#fff",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            color: alpha(m.navy, 0.72),
+                            minHeight: 36,
+                          },
+                        }}
+                      />
+                    </Box>
+                  </Box>
+
+                  <Stack alignItems="flex-end" spacing={0.35} sx={{ flexShrink: 0, pt: 0.1 }}>
+                    <Stack direction="row" alignItems="flex-start" spacing={0.75}>
+                      <Box sx={{ textAlign: "right" }}>
+                        <Stack direction="row" alignItems="baseline" spacing={0.75} justifyContent="flex-end">
+                          {typeof s.originalPrice === "number" ? (
+                            <Typography
+                              sx={{
+                                fontSize: 12,
+                                fontWeight: 800,
+                                color: alpha(m.navy, 0.4),
+                                textDecoration: "line-through",
+                              }}
+                            >
+                              {s.originalPrice} €
+                            </Typography>
+                          ) : null}
+                          <Typography
+                            sx={{
+                              fontSize: 14,
+                              fontWeight: 900,
+                              color: alpha(m.navy, 0.88),
+                              lineHeight: 1.1,
+                            }}
+                          >
+                            {s.price} €
+                          </Typography>
+                        </Stack>
+                        {typeof s.discountPct === "number" ? (
+                          <Typography sx={{ fontSize: 11, fontWeight: 800, color: m.teal, mt: 0.35 }}>
+                            {s.discountPct}% Discount
+                          </Typography>
+                        ) : null}
+                      </Box>
+                      <IconButton
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setServicePendingRemove({ id: s.id, name: s.name });
+                        }}
+                        sx={{
+                          width: 26,
+                          height: 26,
+                          borderRadius: "999px",
+                          color: alpha(m.navy, 0.4),
+                          "&:hover": { bgcolor: alpha(m.navy, 0.06), color: alpha(m.navy, 0.65) },
+                        }}
+                        aria-label={`Remove ${s.name}`}
+                      >
+                        <CloseRoundedIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Stack>
+                  </Stack>
+                </Stack>
+              </Paper>
+            );
+          }
+
+          return (
+            <Paper
+              key={s.id}
+              elevation={0}
+              sx={{
+                borderRadius: "10px",
+                border: `1px solid ${alpha(m.navy, 0.10)}`,
+                px: 1.25,
+                py: 1.1,
+                bgcolor: "#fff",
+                cursor: "default",
+                transition: "border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease",
+                "&:hover": {
+                  borderColor: alpha(m.teal, 0.35),
+                  boxShadow: "0 6px 18px rgba(16, 35, 63, 0.06)",
+                },
+              }}
+            >
+              <Stack direction="row" alignItems="flex-start" spacing={1.25}>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+                    <Typography
+                      sx={{
+                        fontSize: 12.5,
+                        fontWeight: 900,
+                        color: alpha(m.navy, 0.82),
+                        lineHeight: 1.1,
+                        flex: 1,
+                        minWidth: 0,
+                      }}
+                    >
+                      {s.name}
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontSize: 12.5,
+                        fontWeight: 900,
+                        color: alpha(m.navy, 0.82),
+                        lineHeight: 1.1,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {s.price} €
+                    </Typography>
+                  </Stack>
+                  <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: alpha(m.navy, 0.45), mt: 0.25 }}>
+                    {s.durationMins} Mins
+                  </Typography>
+                  {typeof s.originalPrice === "number" || typeof s.discountPct === "number" ? (
+                    <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mt: 0.35 }}>
+                      {typeof s.originalPrice === "number" ? (
+                        <Typography
+                          sx={{
+                            fontSize: 10.5,
+                            fontWeight: 800,
+                            color: alpha(m.navy, 0.45),
+                            textDecoration: "line-through",
+                          }}
+                        >
+                          {s.originalPrice} €
+                        </Typography>
+                      ) : null}
+                      {typeof s.discountPct === "number" ? (
+                        <Typography sx={{ fontSize: 10.5, fontWeight: 800, color: m.teal }}>
+                          {s.discountPct}% Discount
+                        </Typography>
+                      ) : null}
+                    </Stack>
+                  ) : null}
+                </Box>
+
+                <Stack direction="row" alignItems="center" spacing={0.25}>
+                  {serviceTab === "unassigned" ? (
+                    <Checkbox
+                      size="small"
+                      checked={Boolean(selectedServiceIds[s.id])}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={(e) => toggleServiceSelection(s.id, e.target.checked)}
+                      sx={{ "&.Mui-checked": { color: m.teal }, color: alpha(m.navy, 0.35) }}
+                    />
+                  ) : null}
+                  <IconButton
                     size="small"
-                    checked={Boolean(selectedServiceIds[s.id])}
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={(e) => toggleServiceSelection(s.id, e.target.checked)}
-                    sx={{ "&.Mui-checked": { color: m.teal }, color: alpha(m.navy, 0.35) }}
-                  />
-                ) : null}
-                <IconButton
-                  size="small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setServices((prev) => prev.filter((x) => x.id !== s.id));
-                  }}
-                  sx={{
-                    width: 26,
-                    height: 26,
-                    borderRadius: "999px",
-                    bgcolor: alpha(m.navy, 0.03),
-                    color: alpha(m.navy, 0.45),
-                  }}
-                  aria-label={`Remove ${s.name}`}
-                >
-                  <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
-                </IconButton>
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!isDesiredLocation) {
+                        setServicePendingRemove({ id: s.id, name: s.name });
+                        return;
+                      }
+                      setServices((prev) => prev.filter((x) => x.id !== s.id));
+                    }}
+                    sx={{
+                      width: 26,
+                      height: 26,
+                      borderRadius: "999px",
+                      bgcolor: alpha(m.navy, 0.03),
+                      color: alpha(m.navy, 0.45),
+                    }}
+                    aria-label={`Remove ${s.name}`}
+                  >
+                    <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
+                  </IconButton>
+                </Stack>
               </Stack>
-            </Stack>
-          </Paper>
-        ))}
+            </Paper>
+          );
+        })}
+
+        {visible.length === 0 ? (
+          <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.45), py: 1 }}>
+            {serviceTab === "unassigned"
+              ? "No unassigned services."
+              : isModelOrGuestSelected
+                ? "No services selected yet. Use Service to assignment list below."
+                : "No services assigned to this person yet."}
+          </Typography>
+        ) : null}
       </Stack>
 
       {serviceTab === "unassigned" && canDirectAssign ? (
@@ -1337,14 +1857,13 @@ function ClientBookingCreateView() {
             borderRadius: "999px",
             bgcolor: m.teal,
             color: "#fff",
-            display: "grid",
-            placeItems: "center",
-            fontSize: 14,
-            fontWeight: 900,
-            lineHeight: 1,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            lineHeight: 0,
           }}
         >
-          +
+          <AddRoundedIcon sx={{ fontSize: 14 }} />
         </Box>
         <Typography sx={{ fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.48) }}>
           Service to assignment list
@@ -1380,23 +1899,63 @@ function ClientBookingCreateView() {
             Add service to assignment list
           </DialogTitle>
           <DialogContent sx={{ pt: 0.5 }}>
-            <Typography sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.55), mb: 1.25 }}>
-              {`Professional: ${teamMemberNameById.get(selectedTeamMemberId) ?? "—"}`}
+            <Typography sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.72), mb: 0.75 }}>
+              Professional
             </Typography>
+            <AppDropdown
+              value={selectedTeamMemberId}
+              onChange={(val) => {
+                const nextId = String(val ?? "");
+                // Desired: one TM for the whole booking. Fixed: only for this add action.
+                if (isDesiredLocation) applySharedTeamMember(nextId);
+                else setSelectedTeamMemberId(nextId);
+                setAddServiceCatalogIds({});
+              }}
+              options={filteredTeamMembers.map((tm) => ({
+                value: tm.id,
+                label: tm.name,
+              }))}
+              placeholder="Select team member"
+              size="small"
+              fullWidth
+              InputProps={{
+                startAdornment: (
+                  <PersonOutlineRoundedIcon
+                    sx={{ fontSize: 18, color: alpha(m.navy, 0.45), ml: 0.5, mr: 0.25 }}
+                  />
+                ),
+              }}
+              sx={{
+                mb: 1.5,
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "10px",
+                  bgcolor: alpha(m.navy, 0.015),
+                  fontSize: 12,
+                  fontWeight: 700,
+                },
+              }}
+            />
 
             <Typography sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.72), mb: 0.75 }}>
               Services
             </Typography>
-            <RadioGroup
-              value={addServiceCatalogId}
-              onChange={(e) => setAddServiceCatalogId(e.target.value)}
-              sx={{ gap: 0.5, mb: 1.5 }}
-            >
+            <Stack spacing={0.5} sx={{ mb: 1.5 }}>
               {(catalogByTeamMemberId[selectedTeamMemberId] ?? []).map((item) => (
                 <FormControlLabel
                   key={item.id}
-                  value={item.id}
-                  control={<Radio size="small" sx={{ "&.Mui-checked": { color: m.teal } }} />}
+                  control={
+                    <Checkbox
+                      size="small"
+                      checked={Boolean(addServiceCatalogIds[item.id])}
+                      onChange={(e) =>
+                        setAddServiceCatalogIds((prev) => ({
+                          ...prev,
+                          [item.id]: e.target.checked,
+                        }))
+                      }
+                      sx={{ "&.Mui-checked": { color: m.teal }, color: alpha(m.navy, 0.35) }}
+                    />
+                  }
                   label={
                     <Stack direction="row" justifyContent="space-between" sx={{ width: "100%", pr: 1 }}>
                       <Box>
@@ -1420,22 +1979,26 @@ function ClientBookingCreateView() {
                     border: `1px solid ${alpha(m.navy, 0.08)}`,
                     bgcolor: alpha(m.navy, 0.015),
                     alignItems: "flex-start",
+                    width: "100%",
+                    "& .MuiFormControlLabel-label": { flex: 1, minWidth: 0 },
                   }}
                 />
               ))}
-            </RadioGroup>
+            </Stack>
 
             <Typography sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.72), mb: 0.75 }}>
-              {isDesiredLocation ? "Assign to model" : "Assign to guest"}
+              Assign to
             </Typography>
             <AppDropdown
               value={addServiceGuestId}
               onChange={(val) => setAddServiceGuestId(String(val))}
               options={serviceAssignees.map((p) => ({
                 value: p.id,
-                label: p.isRequester ? `${p.name} (Requester)` : p.name,
+                label: p.isRequester
+                  ? `${p.name} (Requester)`
+                  : `${p.name} (${getParticipantLabel(p)})`,
               }))}
-              placeholder={isDesiredLocation ? "Select model" : "Select guest"}
+              placeholder="Select person"
               size="small"
               fullWidth
               sx={{
@@ -1464,7 +2027,9 @@ function ClientBookingCreateView() {
               onClick={confirmAddService}
               variant="contained"
               disableElevation
-              disabled={!addServiceCatalogId || !addServiceGuestId}
+              disabled={
+                !Object.values(addServiceCatalogIds).some(Boolean) || !addServiceGuestId || !selectedTeamMemberId
+              }
               sx={{
                 borderRadius: "10px",
                 textTransform: "none",
@@ -1477,6 +2042,25 @@ function ClientBookingCreateView() {
             </Button>
           </DialogActions>
         </Dialog>
+
+        <MessagingModalShell
+          open={Boolean(servicePendingRemove)}
+          title="Remove service"
+          onClose={() => setServicePendingRemove(null)}
+          footer={
+            <>
+              <MessagingModalCancelButton onClick={() => setServicePendingRemove(null)} />
+              <MessagingModalPrimaryButton label="Confirm" onClick={confirmRemoveService} />
+            </>
+          }
+        >
+          <Box sx={{ py: 2, textAlign: "center" }}>
+            <Typography sx={{ fontWeight: 900, fontSize: 14, color: alpha(m.navy, 0.85) }}>
+              Do you want to remove this service
+              {servicePendingRemove?.name ? ` (${servicePendingRemove.name})` : ""}?
+            </Typography>
+          </Box>
+        </MessagingModalShell>
 
         <Paper
           elevation={0}
@@ -1509,7 +2093,7 @@ function ClientBookingCreateView() {
                   }}
                 >
                   {/* Month + day strip */}
-                  <Box sx={{ p: 1.5 }}>
+                  <Box id="booking-calendar-section" sx={{ p: 1.5 }}>
                     <Stack direction="row" alignItems="center" spacing={1} justifyContent="center" sx={{ mb: 1.25 }}>
                       <IconButton
                         size="small"
@@ -1826,11 +2410,17 @@ function ClientBookingCreateView() {
                         >
                           {times.map((t) => {
                             const active = t === selectedTime;
+                            const past = isTimePast(t);
                             return (
                               <Button
                                 key={t}
+                                data-time-slot={t}
                                 variant={active ? "contained" : "outlined"}
-                                onClick={() => setSelectedTime(t)}
+                                onClick={() => {
+                                  if (past) return;
+                                  setSelectedTime(t);
+                                }}
+                                disabled={past}
                                 disableElevation
                                 sx={{
                                   flexShrink: 0,
@@ -1842,13 +2432,24 @@ function ClientBookingCreateView() {
                                   fontSize: 11.5,
                                   fontWeight: 900,
                                   whiteSpace: "nowrap",
-                                  ...(active
-                                    ? { bgcolor: m.teal, "&:hover": { bgcolor: m.tealDark } }
-                                    : {
-                                        borderColor: alpha(m.navy, 0.10),
-                                        bgcolor: "#fff",
-                                        color: alpha(m.navy, 0.65),
-                                      }),
+                                  ...(past
+                                    ? {
+                                        borderColor: alpha(m.navy, 0.08),
+                                        bgcolor: alpha(m.navy, 0.03),
+                                        color: alpha(m.navy, 0.32),
+                                        "&.Mui-disabled": {
+                                          borderColor: alpha(m.navy, 0.08),
+                                          bgcolor: alpha(m.navy, 0.03),
+                                          color: alpha(m.navy, 0.32),
+                                        },
+                                      }
+                                    : active
+                                      ? { bgcolor: m.teal, color: "#fff", "&:hover": { bgcolor: m.tealDark } }
+                                      : {
+                                          borderColor: alpha(m.navy, 0.10),
+                                          bgcolor: "#fff",
+                                          color: alpha(m.navy, 0.65),
+                                        }),
                                 }}
                               >
                                 {t}
@@ -1893,7 +2494,7 @@ function ClientBookingCreateView() {
                         />
 
                         {isDesiredLocation ? (
-                          <Box sx={{ width: "100%", mt: 1.25, textAlign: "left" }}>
+                          <Box id="booking-project-section" sx={{ width: "100%", mt: 1.25, textAlign: "left" }}>
                             <Typography sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.78), mb: 1.25 }}>
                               Project Details
                             </Typography>
@@ -2051,14 +2652,15 @@ function ClientBookingCreateView() {
                   <Divider />
 
                   {/* People */}
-                  <Box sx={{ p: 1.5 }}>
+                  <Box id="booking-services-section" sx={{ p: 1.5 }}>
                     {isDesiredLocation ? (
                       <Stack direction="row" alignItems="center" justifyContent="flex-end" sx={{ mb: 1 }}>
                         <Button
                           variant="outlined"
-                          endIcon={<KeyboardArrowDownRoundedIcon sx={{ fontSize: 18 }} />}
+                          endIcon={<KeyboardArrowDownRoundedIcon sx={{ fontSize: 16 }} />}
                           startIcon={
                             <Box
+                              component="span"
                               sx={{
                                 width: 18,
                                 height: 18,
@@ -2066,27 +2668,43 @@ function ClientBookingCreateView() {
                                 bgcolor: m.addSoftBg,
                                 color: m.addSoftFg,
                                 border: `1px solid ${m.addSoftBorder}`,
-                                display: "grid",
-                                placeItems: "center",
-                                fontSize: 14,
-                                fontWeight: 900,
-                                lineHeight: 1,
-                                mr: -0.25,
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flexShrink: 0,
+                                lineHeight: 0,
                               }}
                             >
-                              +
+                              <AddRoundedIcon sx={{ fontSize: 14, display: "block" }} />
                             </Box>
                           }
                           onClick={(e) => setParticipantMenuAnchor(e.currentTarget)}
                           sx={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
                             borderRadius: "10px",
                             textTransform: "none",
                             fontWeight: 900,
                             fontSize: 11.5,
+                            lineHeight: 1,
                             height: 32,
+                            minHeight: 32,
+                            py: 0,
+                            px: 1.25,
                             borderColor: alpha(m.navy, 0.12),
                             color: alpha(m.navy, 0.62),
                             bgcolor: "#fff",
+                            "& .MuiButton-startIcon, & .MuiButton-endIcon": {
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              marginTop: 0,
+                              marginBottom: 0,
+                            },
+                            "& .MuiButton-startIcon": { mr: 0.75, ml: 0 },
+                            "& .MuiButton-endIcon": { ml: 0.35, mr: 0 },
+                            "& .MuiButton-startIcon > *:nth-of-type(1)": { fontSize: "inherit" },
                           }}
                         >
                           Add
@@ -2152,12 +2770,14 @@ function ClientBookingCreateView() {
                               borderRadius: "10px",
                               border: `1px solid ${active ? alpha(m.teal, 0.7) : alpha(m.navy, 0.10)}`,
                               bgcolor: "#fff",
-                              px: 1.25,
-                              py: 1.05,
+                              px: 1,
+                              pt: 1.05,
+                              pb: 0.75,
                               cursor: "pointer",
                               boxShadow: active ? `0 0 0 4px ${alpha(m.teal, 0.08)}` : "none",
                               position: "relative",
-                              minHeight: 66,
+                              minHeight: 72,
+                              overflow: "visible",
                               ...(draggingPersonId === p.id
                                 ? { opacity: 0.7 }
                                 : draggingPersonId
@@ -2181,27 +2801,35 @@ function ClientBookingCreateView() {
                                 }}
                                 sx={{
                                   position: "absolute",
-                                  right: 8,
-                                  top: 8,
-                                  width: 26,
-                                  height: 26,
+                                  right: 4,
+                                  bottom: 4,
+                                  zIndex: 2,
+                                  width: 22,
+                                  height: 22,
                                   borderRadius: "999px",
-                                  bgcolor: alpha(m.navy, 0.03),
-                                  color: alpha(m.navy, 0.45),
+                                  bgcolor: alpha(m.navy, 0.04),
+                                  color: alpha(m.navy, 0.5),
+                                  "&:hover": {
+                                    bgcolor: alpha(m.navy, 0.08),
+                                    color: alpha(m.navy, 0.72),
+                                  },
                                 }}
                                 aria-label={`Remove ${p.name}`}
                               >
-                                <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
+                                <DeleteOutlineRoundedIcon sx={{ fontSize: 14 }} />
                               </IconButton>
                             ) : null}
 
-                            <Stack spacing={0.55}>
+                            <Stack spacing={0.55} sx={{ pb: p.isRequester ? 0 : 2.25, alignItems: "center" }}>
                               {p.isRequester ? (
                                 <Typography sx={{ fontWeight: 900, fontSize: 12.5, color: alpha(m.navy, 0.82) }}>
                                   {p.name}
                                 </Typography>
                               ) : (
-                                <Box sx={{ display: "flex", justifyContent: "center" }} onClick={(e) => e.stopPropagation()}>
+                                <Box
+                                  sx={{ display: "flex", justifyContent: "center", width: "100%" }}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
                                   <TextField
                                     value={p.name}
                                     onChange={(e) => updateGuestName(p.id, e.target.value)}
@@ -2218,7 +2846,7 @@ function ClientBookingCreateView() {
                                     }}
                                     sx={{
                                       width: "100%",
-                                      maxWidth: 120,
+                                      maxWidth: 96,
                                       "& .MuiOutlinedInput-root": {
                                         height: 22,
                                         borderRadius: "8px",
@@ -2234,7 +2862,15 @@ function ClientBookingCreateView() {
                               {isPlanningPerson(p) ? (
                                 renderPlanningCardSubtitle(p)
                               ) : (
-                                <Typography sx={{ fontWeight: 700, fontSize: 11, color: alpha(m.navy, 0.48), mt: 0.2 }}>
+                                <Typography
+                                  sx={{
+                                    fontWeight: 700,
+                                    fontSize: 11,
+                                    color: alpha(m.navy, 0.48),
+                                    mt: 0.2,
+                                    textAlign: "center",
+                                  }}
+                                >
                                   {personCardSubtitle(p)}
                                 </Typography>
                               )}
@@ -2368,43 +3004,64 @@ function ClientBookingCreateView() {
                   <Box sx={{ p: 1.6 }}>
                     <Stack spacing={1.25}>
                       {summarySections.map(({ key, title, items, planningItem, teamMemberLabel }) => {
+                        const uniqueTeamMemberLabels = [
+                          ...new Set(
+                            items
+                              .map((s) => teamMemberFirstName(s.teamMemberId))
+                              .filter((name): name is string => Boolean(name)),
+                          ),
+                        ];
+                        // Prefer section chips for every assigned professional (fixed may have several).
+                        const sectionTeamLabels =
+                          uniqueTeamMemberLabels.length > 0
+                            ? uniqueTeamMemberLabels
+                            : teamMemberLabel
+                              ? [teamMemberLabel]
+                              : [];
+
                         return (
                           <Box key={key}>
-                            {teamMemberLabel ? (
-                              <Box
-                                sx={{
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  gap: 0.65,
-                                  borderRadius: "999px",
-                                  border: `1px solid ${alpha(m.navy, 0.12)}`,
-                                  bgcolor: "#fff",
-                                  px: 1,
-                                  py: 0.45,
-                                  mb: 0.65,
-                                }}
-                              >
-                                <Box
-                                  sx={{
-                                    width: 22,
-                                    height: 22,
-                                    borderRadius: "999px",
-                                    border: `1px solid ${alpha(m.navy, 0.14)}`,
-                                    display: "grid",
-                                    placeItems: "center",
-                                    flexShrink: 0,
-                                  }}
-                                >
-                                  <PersonOutlineRoundedIcon sx={{ fontSize: 14, color: alpha(m.navy, 0.45) }} />
-                                </Box>
-                                <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: alpha(m.navy, 0.62), lineHeight: 1 }}>
-                                  {teamMemberLabel}
-                                </Typography>
-                              </Box>
-                            ) : null}
                             <Typography sx={{ fontWeight: 900, fontSize: 12, color: alpha(m.navy, 0.78), mb: 0.75 }}>
                               {title}
                             </Typography>
+                            {sectionTeamLabels.length > 0 ? (
+                              <Stack direction="row" flexWrap="wrap" useFlexGap spacing={0.65} sx={{ mb: 0.75 }}>
+                                {sectionTeamLabels.map((label) => (
+                                  <Box
+                                    key={label}
+                                    sx={{
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      gap: 0.65,
+                                      borderRadius: "999px",
+                                      border: `1px solid ${alpha(m.navy, 0.12)}`,
+                                      bgcolor: "#fff",
+                                      px: 1,
+                                      py: 0.45,
+                                    }}
+                                  >
+                                    <Box
+                                      sx={{
+                                        width: 22,
+                                        height: 22,
+                                        borderRadius: "999px",
+                                        border: `1px solid ${alpha(m.navy, 0.14)}`,
+                                        display: "grid",
+                                        placeItems: "center",
+                                        flexShrink: 0,
+                                      }}
+                                    >
+                                      <PersonOutlineRoundedIcon sx={{ fontSize: 14, color: alpha(m.navy, 0.45) }} />
+                                    </Box>
+                                    <Typography
+                                      sx={{ fontSize: 11.5, fontWeight: 800, color: alpha(m.navy, 0.62), lineHeight: 1 }}
+                                    >
+                                      {label}
+                                    </Typography>
+                                  </Box>
+                                ))}
+                              </Stack>
+                            ) : null}
                             <Stack spacing={0.75}>
                               {planningItem ? (
                                 <Box
@@ -2470,16 +3127,16 @@ function ClientBookingCreateView() {
                         );
                       })}
 
-                      <Stack direction="row" justifyContent="space-between">
+                      <Stack direction="row" justifyContent="space-between" alignItems="center">
                         <Typography sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.78) }}>
                           Total
                         </Typography>
-                        <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78) }}>
+                        <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78), lineHeight: 1.1 }}>
                           {total} €
                         </Typography>
                       </Stack>
 
-                      {!allServicesAssigned && unassigned.length > 0 ? (
+                      {!allServicesAssigned && services.length > 0 ? (
                         <Typography
                           sx={{
                             mt: 1,
@@ -2489,8 +3146,9 @@ function ClientBookingCreateView() {
                             lineHeight: 1.35,
                           }}
                         >
-                          {unassigned.length} service{unassigned.length === 1 ? "" : "s"} still need a team member.
-                          Open the <strong>Unassigned</strong> tab and pick a professional for each.
+                          {unassigned.length > 0
+                            ? `${unassigned.length} service${unassigned.length === 1 ? "" : "s"} still need a person and team member.`
+                            : "Every service needs a team member before you can continue."}
                         </Typography>
                       ) : null}
 

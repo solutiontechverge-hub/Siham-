@@ -20,6 +20,7 @@ import PaymentDueIcon from "../../../components/common/client-booking/PaymentDue
 import { getCheckoutPath, setActiveBookingSession } from "./clientBookingSession";
 import { useGetMyBookingsQuery } from "../../../store/services/businessApi";
 import { mapApiBookingToClientRecord } from "./clientBookingApi.mapper";
+import { enrichClientBookingRecord } from "./clientBookingDraftCache";
 
 const emptyCopy: Record<BookingListTab, string> = {
   past: "No past bookings yet.",
@@ -38,15 +39,27 @@ export default function ClientBookingListView({ listTab }: Props) {
 
   const bookings = React.useMemo(() => {
     const rows = data?.data ?? [];
-    return rows.map(mapApiBookingToClientRecord);
+    return rows.map((row) => enrichClientBookingRecord(mapApiBookingToClientRecord(row)));
   }, [data]);
 
   const openBooking = (record: ClientBookingRecord) => {
-    setActiveBookingSession(record);
-    router.push(getCheckoutPath(record, listTab));
+    const enriched = enrichClientBookingRecord(record);
+    setActiveBookingSession(enriched);
+    router.push(getCheckoutPath(enriched, listTab));
   };
 
-  const filtered = React.useMemo(() => filterBookingsByTab(bookings, listTab), [bookings, listTab]);
+  // Re-evaluate booking folders/status every minute so a booking whose service
+  // window has passed moves to Past (and shows Completed) without a refresh.
+  const [tick, setTick] = React.useState(0);
+  React.useEffect(() => {
+    const id = window.setInterval(() => setTick((t) => t + 1), 60 * 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const filtered = React.useMemo(
+    () => filterBookingsByTab(bookings, listTab),
+    [bookings, listTab, tick],
+  );
   const loading = isLoading || isFetching;
 
   return (
@@ -65,7 +78,7 @@ export default function ClientBookingListView({ listTab }: Props) {
           <Typography sx={{ fontWeight: 900, color: alpha(m.navy, 0.86), fontSize: 14 }}>Your Bookings</Typography>
           <Button
             component={Link}
-            href="/clients/booking?tab=upcoming&mode=create"
+            href="/clients/listing"
             variant="contained"
             disableElevation
             sx={{

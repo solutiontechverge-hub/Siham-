@@ -348,51 +348,114 @@ function findServiceDetail(setup: BusinessSetupListing, serviceId: string | numb
   );
 }
 
+function findServiceDetailByTitle(setup: BusinessSetupListing, title: string | null | undefined) {
+  const needle = String(title ?? "").trim().toLowerCase();
+  if (!needle) return undefined;
+  return setup.serviceDetails?.find((d) => String(d.serviceTitle ?? "").trim().toLowerCase() === needle);
+}
+
+/** A combo is always two services — resolve price/duration by service id (title as fallback). */
+function resolveComboServiceDetail(
+  setup: BusinessSetupListing,
+  serviceId: string | null | undefined,
+  title: string | null | undefined,
+) {
+  return findServiceDetail(setup, serviceId) ?? findServiceDetailByTitle(setup, title);
+}
+
+/** Sum pricing must never fall back to business priceRange (e.g. "Medium - High"). */
+function resolveComboServicePrice(
+  setup: BusinessSetupListing,
+  serviceId: string | null | undefined,
+  title: string | null | undefined,
+): number {
+  const detail = resolveComboServiceDetail(setup, serviceId, title);
+  if (detail?.price != null) {
+    const price = Number(detail.price);
+    if (Number.isFinite(price) && price > 0) return price;
+  }
+
+  const key = serviceId != null && serviceId !== "" ? String(serviceId) : "";
+  const needle = String(title ?? "").trim().toLowerCase();
+
+  for (const entry of setup.serviceCategories ?? []) {
+    const amount = Number(entry.amount);
+    if (!Number.isFinite(amount) || amount <= 0) continue;
+
+    const entryServiceId = String(entry.service_id ?? entry.serviceId ?? "").trim();
+    if (key && entryServiceId === key) return amount;
+
+    const entryTitle = String(entry.service_title ?? entry.serviceTitle ?? "")
+      .trim()
+      .toLowerCase();
+    if (needle && entryTitle === needle) return amount;
+  }
+
+  return 0;
+}
+
 function buildBookCombos(setup: BusinessSetupListing): BusinessPublicProfileBookCombo[] {
   const durationByServiceId = buildDurationByServiceId(setup);
 
   return (setup.bookServiceCombinations ?? [])
-    .filter((combo) => combo.serviceTitle || combo.categoryTitle || combo.service_title || combo.category_title)
     .map((combo, index) => {
-      const serviceId = String(combo.service_id ?? combo.serviceId ?? "").trim() || null;
-      const detail = findServiceDetail(setup, serviceId);
-      const rawDuration =
-        (serviceId ? durationByServiceId.get(serviceId) : undefined) || detail?.durationLabel?.trim() || "";
-      const durationMins = parseDurationMins(rawDuration);
-      const durationLabel = normalizeServiceDurationLabel(rawDuration, durationMins);
-      const priceValue = detail?.price != null ? Number(detail.price) : 0;
-      const categoryLabel = String(
-        combo.categoryTitle ??
-          (combo as { category_title?: string }).category_title ??
-          "",
+      // API fields: category_* = first service, service_* = second service (always a 2-service combo).
+      const firstServiceId = String(combo.category_id ?? combo.categoryId ?? "").trim() || null;
+      const secondServiceId = String(combo.service_id ?? combo.serviceId ?? "").trim() || null;
+      const firstLabel = String(
+        combo.categoryTitle ?? (combo as { category_title?: string }).category_title ?? "",
       ).trim();
-      const serviceLabel = String(
-        combo.serviceTitle ??
-          (combo as { service_title?: string }).service_title ??
-          "",
+      const secondLabel = String(
+        combo.serviceTitle ?? (combo as { service_title?: string }).service_title ?? "",
       ).trim();
+
+      if (!firstServiceId || !secondServiceId) return null;
+
+      const firstDetail = resolveComboServiceDetail(setup, firstServiceId, firstLabel);
+      const secondDetail = resolveComboServiceDetail(setup, secondServiceId, secondLabel);
+
+      const priceValue =
+        resolveComboServicePrice(setup, firstServiceId, firstLabel) +
+        resolveComboServicePrice(setup, secondServiceId, secondLabel);
+
+      const firstDurationRaw =
+        (firstServiceId ? durationByServiceId.get(firstServiceId) : undefined) ||
+        firstDetail?.durationLabel?.trim() ||
+        "";
+      const secondDurationRaw =
+        (secondServiceId ? durationByServiceId.get(secondServiceId) : undefined) ||
+        secondDetail?.durationLabel?.trim() ||
+        "";
+      const durationMins = parseDurationMins(firstDurationRaw) + parseDurationMins(secondDurationRaw);
+      const durationLabel =
+        durationMins > 0
+          ? normalizeServiceDurationLabel(`${durationMins} mins`, durationMins)
+          : normalizeServiceDurationLabel(
+              secondDurationRaw || firstDurationRaw,
+              parseDurationMins(secondDurationRaw || firstDurationRaw),
+            );
 
       return {
         id: `bc-${setup.id}-${index}`,
-        serviceId,
-        categoryLabel: categoryLabel || "Category",
-        serviceLabel: serviceLabel || "Service",
+        serviceId: secondServiceId,
+        categoryLabel: firstLabel || firstDetail?.serviceTitle || "Service",
+        serviceLabel: secondLabel || secondDetail?.serviceTitle || "Service",
         durationLabel: durationLabel || "—",
-        priceLabel: priceValue > 0 ? formatPriceLabel(priceValue) : setup.priceRange ? `${setup.priceRange} EUR` : "Price on request",
+        priceLabel: formatPriceLabel(priceValue),
         priceValue,
-        durationMins,
+        durationMins: durationMins > 0 ? durationMins : 45,
       };
-    });
+    })
+    .filter((combo): combo is BusinessPublicProfileBookCombo => combo != null);
 }
 
 function buildServiceForItems(setup: BusinessSetupListing): BusinessPublicProfileServiceForItem[] {
   const ids = (setup.serviceFor ?? []).map((v) => String(v).toLowerCase());
-  const known = (["men", "women", "kids"] as const).map((id) => ({
+  return (["men", "women", "kids"] as const).map((id) => ({
     id,
     label: SERVICE_FOR_LABELS[id].label,
     enabled: ids.includes(id),
   }));
-  return known.filter((item) => item.enabled);
 }
 
 function buildPolicySections(setup: BusinessSetupListing): BusinessPublicProfilePolicySection[] {
@@ -413,16 +476,27 @@ function buildPolicySections(setup: BusinessSetupListing): BusinessPublicProfile
   }
 
   const rescheduleBefore = formatTimeBlock(setup.appointmentBefore);
-  if (rescheduleBefore || setup.reschedulePolicy.feePercentage != null) {
+  if (rescheduleBefore || setup.reschedulePolicy.feePercentage != null || setup.reschedulePolicy.instruction) {
+    const feeLabel =
+      setup.reschedulePolicy.feePercentage != null
+        ? formatPercent(setup.reschedulePolicy.feePercentage)
+        : "";
     sections.push({
       title: "Reschedule",
       fields: [
         ...(rescheduleBefore ? [{ label: "Min. Time Before Appointment", value: rescheduleBefore }] : []),
-        ...(setup.reschedulePolicy.feePercentage != null
-          ? [{ label: "Late Reschedule Fee", value: formatPercent(setup.reschedulePolicy.feePercentage) }]
-          : []),
+        ...(feeLabel ? [{ label: "Late Reschedule Fee", value: feeLabel }] : []),
       ],
-      description: setup.reschedulePolicy.instruction || undefined,
+      description:
+        setup.reschedulePolicy.instruction ||
+        (rescheduleBefore || feeLabel
+          ? [
+              rescheduleBefore ? `Please reschedule at least ${rescheduleBefore} before the appointment.` : "",
+              feeLabel ? `Late reschedules may be subject to a fee of ${feeLabel}.` : "",
+            ]
+              .filter(Boolean)
+              .join(" ")
+          : undefined),
     });
   }
 
@@ -431,26 +505,41 @@ function buildPolicySections(setup: BusinessSetupListing): BusinessPublicProfile
     cancel.beforeHours != null || cancel.beforeMinutes != null
       ? formatTimeBlock({ hours: cancel.beforeHours, minutes: cancel.beforeMinutes })
       : "";
-  if (cancelBefore || cancel.feePercentage != null) {
+  if (cancelBefore || cancel.feePercentage != null || cancel.instruction) {
+    const feeLabel = cancel.feePercentage != null ? formatPercent(cancel.feePercentage) : "";
     sections.push({
       title: "Cancellation",
       fields: [
         ...(cancelBefore ? [{ label: "Min. Time Before Appointment", value: cancelBefore }] : []),
-        ...(cancel.feePercentage != null
-          ? [{ label: "Late Cancellation Fee", value: formatPercent(cancel.feePercentage) }]
-          : []),
+        ...(feeLabel ? [{ label: "Late Cancellation Fee", value: feeLabel }] : []),
       ],
-      description: cancel.instruction || undefined,
+      description:
+        cancel.instruction ||
+        (cancelBefore && feeLabel
+          ? `Cancellations made less than ${cancelBefore} before the scheduled appointment will be subject to a fee of ${feeLabel} of the service cost.`
+          : cancelBefore
+            ? `Cancellations made less than ${cancelBefore} before the scheduled appointment may be subject to a fee.`
+            : feeLabel
+              ? `Late cancellations will be subject to a fee of ${feeLabel} of the service cost.`
+              : undefined),
     });
   }
 
   if (setup.noShowPolicy.feePercentage != null || setup.noShowPolicy.instruction) {
+    const feeLabel =
+      setup.noShowPolicy.feePercentage != null ? formatPercent(setup.noShowPolicy.feePercentage) : "";
+    const fullAmount =
+      setup.noShowPolicy.feePercentage != null && Number(setup.noShowPolicy.feePercentage) >= 100;
     sections.push({
       title: "No show",
-      fields: setup.noShowPolicy.feePercentage != null
-        ? [{ label: "No show Fee", value: formatPercent(setup.noShowPolicy.feePercentage) }]
-        : undefined,
-      description: setup.noShowPolicy.instruction || undefined,
+      fields: feeLabel ? [{ label: "No show Fee", value: feeLabel }] : undefined,
+      description:
+        setup.noShowPolicy.instruction ||
+        (fullAmount
+          ? "No-shows will be charged the full service amount."
+          : feeLabel
+            ? `No-shows will be charged a fee of ${feeLabel} of the service cost.`
+            : undefined),
     });
   }
 
@@ -566,6 +655,8 @@ export function mapBusinessSetupToPublicProfile(setup: BusinessSetupListing): Bu
     prepaymentLabel:
       setup.prepaymentPercentage != null ? formatPercent(setup.prepaymentPercentage) : "",
     prepaymentInstructions: setup.prepaymentInstruction?.trim() || "",
+    cancellationFeePercent: Number(setup.cancellationPolicy?.feePercentage) || 0,
+    cancellationPolicyInstruction: setup.cancellationPolicy?.instruction?.trim() || "",
     kilometerAllowanceLabel:
       setup.kilometerAllowance != null ? `${setup.kilometerAllowance} EUR / km` : "",
     kilometerAllowanceInstructions: setup.kilometerAllowanceInstruction?.trim() || "",

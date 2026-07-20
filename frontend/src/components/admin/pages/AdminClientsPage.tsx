@@ -32,6 +32,7 @@ import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { alpha, useTheme } from "@mui/material/styles";
 import { AppButton, AppMultiSelect, AppPagination, AppSearchField, AppSelect, AppTextField } from "../../common";
 import MollureModal from "../../common/MollureModal";
+import AdminFilterDateRange from "../AdminFilterDateRange";
 import AdminPageHeader from "../AdminPageHeader";
 import AdminSectionCard from "../AdminSectionCard";
 import AdminDataTable, { AdminSummaryGrid, type AdminTableColumn } from "../AdminDataTable";
@@ -621,63 +622,15 @@ export default function AdminClientsPage() {
             </FilterField>
 
             <FilterField label="Registration date">
-              <Stack
-                direction="row"
-                alignItems="center"
-                spacing={0.75}
-                sx={{
-                  px: 1.5,
-                  py: 0.85,
-                  borderRadius: 2,
-                  border: `1px solid ${tokens.inputBorder}`,
-                  bgcolor: tokens.white,
-                  minWidth: { xs: "100%", sm: 260 },
-                  height: 40,
+              <AdminFilterDateRange
+                start={regDateFrom}
+                end={regDateTo}
+                onChange={(start, end) => {
+                  setRegDateFrom(start);
+                  setRegDateTo(end);
                 }}
-              >
-                <CalendarTodayOutlinedIcon sx={{ fontSize: 18, color: tokens.teal, flexShrink: 0 }} />
-                <Box
-                  component="input"
-                  type="date"
-                  value={regDateFrom}
-                  onChange={(e) => {
-                    setRegDateFrom(e.target.value);
-                  }}
-                  aria-label="Registration date from"
-                  placeholder="mm/dd/yyyy"
-                  sx={{
-                    border: 0,
-                    outline: 0,
-                    bgcolor: "transparent",
-                    fontSize: 12,
-                    color: regDateFrom ? tokens.navy : tokens.placeholder,
-                    fontFamily: "inherit",
-                    width: "100%",
-                    minWidth: 0,
-                  }}
-                />
-                <Typography sx={{ fontSize: 12, color: tokens.bodyText, flexShrink: 0 }}>–</Typography>
-                <Box
-                  component="input"
-                  type="date"
-                  value={regDateTo}
-                  onChange={(e) => {
-                    setRegDateTo(e.target.value);
-                  }}
-                  aria-label="Registration date to"
-                  placeholder="mm/dd/yyyy"
-                  sx={{
-                    border: 0,
-                    outline: 0,
-                    bgcolor: "transparent",
-                    fontSize: 12,
-                    color: regDateTo ? tokens.navy : tokens.placeholder,
-                    fontFamily: "inherit",
-                    width: "100%",
-                    minWidth: 0,
-                  }}
-                />
-              </Stack>
+                minWidth={{ xs: "100%", sm: 260 }}
+              />
             </FilterField>
 
             <FilterField label="Account Status">

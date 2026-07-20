@@ -21,6 +21,7 @@ export type { ServiceCategoryBarItem } from "./ServiceCategoryBar";
 export { default as ServiceCategoryIcon } from "./ServiceCategoryIcon";
 export type { ServiceCategoryIconProps } from "./ServiceCategoryIcon";
 export { default as AppDrawer } from "./AppDrawer";
+export { default as MollureDrawer, MOLLURE_DRAWER_WIDTH } from "./MollureDrawer";
 export { default as AppDropdown } from "./AppDropdown";
 export { default as AppDatePicker, AppCalendarPanel, normalizeDateToIso } from "./AppDatePicker";
 export { default as AppTimePicker, AppTimePanel, formatTimeDisplay } from "./AppTimePicker";

@@ -1,10 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { Box, Divider, Paper, Stack, Typography } from "@mui/material";
+import { Box, Paper, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import type { PaymentSummarySection } from "./buildClientBookingPaymentSummary";
-import { paymentSummaryGrandTotal } from "./buildClientBookingPaymentSummary";
 
 type Props = {
   sections: PaymentSummarySection[];
@@ -49,29 +48,25 @@ function SummaryLink({
 
 export default function ClientBookingPaymentSummary({ sections, onViewInvoice, onViewReceipt }: Props) {
   const m = useTheme().palette.mollure;
-  const grandTotal = React.useMemo(() => paymentSummaryGrandTotal(sections), [sections]);
 
   if (!sections.length) return null;
 
   return (
-    <Paper
-      elevation={0}
-      sx={{
-        mt: 2,
-        borderRadius: "10px",
-        border: `1px solid ${alpha(m.navy, 0.08)}`,
-        bgcolor: "#fff",
-        overflow: "hidden",
-      }}
-    >
-      <Box sx={{ px: 2, py: 1.5, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <Typography sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.78) }}>Payment Summary</Typography>
-        <Typography sx={{ fontWeight: 1000, fontSize: 15, color: alpha(m.navy, 0.9) }}>€{grandTotal.toFixed(2)}</Typography>
-      </Box>
-      <Divider />
-
-      <Box sx={{ px: 2, py: 1.5 }}>
-        <Stack spacing={2.25}>
+    <Box sx={{ mt: 2 }}>
+      <Typography sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.78), mb: 1, px: 0.25 }}>
+        Payment Summary
+      </Typography>
+      <Paper
+        elevation={0}
+        sx={{
+          borderRadius: "10px",
+          border: `1px solid ${alpha(m.navy, 0.08)}`,
+          bgcolor: alpha(m.navy, 0.03),
+          px: 1.75,
+          py: 1.35,
+        }}
+      >
+        <Stack spacing={2}>
           {sections.map((section) => (
             <Box key={section.title}>
               <Typography sx={{ fontWeight: 900, fontSize: 12.5, color: alpha(m.navy, 0.72), mb: 1.1 }}>
@@ -103,7 +98,7 @@ export default function ClientBookingPaymentSummary({ sections, onViewInvoice, o
                           textAlign: "right",
                         }}
                       >
-                        €{line.amount.toFixed(2)}
+                        €{line.amount.toFixed(0)}
                       </Typography>
                     </Stack>
                     {line.showInvoice || line.showReceipt ? (
@@ -125,7 +120,7 @@ export default function ClientBookingPaymentSummary({ sections, onViewInvoice, o
             </Box>
           ))}
         </Stack>
-      </Box>
-    </Paper>
+      </Paper>
+    </Box>
   );
 }

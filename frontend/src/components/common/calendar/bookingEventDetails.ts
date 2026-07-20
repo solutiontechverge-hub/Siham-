@@ -3,10 +3,34 @@ import type {
   CalendarEvent,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { ManualEntryDiscount } from "../../sections/finance/manualEntry.data";
-import { allBookingCatalogServices } from "../../../data/bookingServiceCatalog.data";
-import { minutesSinceMidnight } from "./calendar.utils";
 
 const NOTES_META_PREFIX = "---mollure-meta---";
+
+export type StoredEbrNotePayload = {
+  status: "suggested" | "pending" | "rejected" | "accepted" | "none";
+  suggestedAt?: string;
+  professionalNote?: string;
+  clientNote?: string;
+  editedServiceIds?: string[];
+  editedProductIds?: string[];
+  /** Preferred for client→pro rounds so the drawer can show “Edited”. */
+  clientEditedServiceIds?: string[];
+  suggestedServices?: NonNullable<CalendarBookingDetails["services"]>;
+  suggestedProducts?: NonNullable<CalendarBookingDetails["products"]>;
+  /** Proposed schedule — booking columns stay original until professional Accept. */
+  suggestedDateISO?: string;
+  suggestedTime?: string;
+  suggestedStart?: string;
+  suggestedEnd?: string;
+  /** Confirmed booking schedule before this client EBR (for outcome diffs). */
+  originalDateISO?: string;
+  originalTime?: string;
+  suggestedTotalPrice?: number;
+  suggestedProjectDetails?: NonNullable<CalendarBookingDetails["clientSnapshot"]>["projectDetails"];
+  responseStatus?: CalendarBookingDetails["responseStatus"];
+  requestDirection?: CalendarBookingDetails["requestDirection"];
+  lastEditedBy?: CalendarBookingDetails["lastEditedBy"];
+};
 
 type StoredBookingNoteMeta = Partial<
   Pick<
@@ -20,10 +44,40 @@ type StoredBookingNoteMeta = Partial<
     | "prepaymentPercent"
     | "paymentMethod"
     | "showKilometerAllowance"
+    | "kilometerAllowance"
+    | "cancellationReason"
+    | "responseStatus"
+    | "requestDirection"
+    | "editedServiceIds"
+    | "lastEditedBy"
+    | "clientSnapshot"
   >
->;
+> & {
+  ebr?: StoredEbrNotePayload;
+};
 
-export function serializeCalendarEntryNotes(internalNote: string, details?: CalendarBookingDetails): string | null {
+export function resolveKilometerAllowanceAmount(
+  kilometerAllowance?: CalendarBookingDetails["kilometerAllowance"] | null,
+): number {
+  const rate = Number(kilometerAllowance?.eurPerKm);
+  const km = Number(kilometerAllowance?.totalKilometer);
+  if (!Number.isFinite(rate) || !Number.isFinite(km) || rate <= 0 || km <= 0) return 0;
+  return Math.round((rate * km + Number.EPSILON) * 100) / 100;
+}
+
+function metaHasValues(meta: StoredBookingNoteMeta) {
+  return Object.entries(meta).some(([key, value]) => {
+    if (key === "ebr") return Boolean(value && typeof value === "object");
+    if (Array.isArray(value)) return value.length > 0;
+    return value != null && value !== false && value !== "";
+  });
+}
+
+export function serializeCalendarEntryNotes(
+  internalNote: string,
+  details?: CalendarBookingDetails,
+  ebr?: StoredEbrNotePayload | null,
+): string | null {
   const trimmed = internalNote.trim();
   const meta: StoredBookingNoteMeta = {
     showInternalNote: Boolean(trimmed) || Boolean(details?.showInternalNote),
@@ -35,11 +89,145 @@ export function serializeCalendarEntryNotes(internalNote: string, details?: Cale
     prepaymentPercent: details?.prepaymentPercent,
     paymentMethod: details?.paymentMethod,
     showKilometerAllowance: details?.showKilometerAllowance,
+    kilometerAllowance: details?.kilometerAllowance,
+    cancellationReason: details?.cancellationReason?.trim() || undefined,
+    responseStatus: details?.responseStatus,
+    requestDirection: details?.requestDirection,
+    editedServiceIds: details?.editedServiceIds,
+    lastEditedBy: details?.lastEditedBy,
+    clientSnapshot: details?.clientSnapshot,
+    ...(ebr ? { ebr } : {}),
   };
-  const hasMeta = Object.values(meta).some((value) => value != null && value !== false && value !== "");
+  const hasMeta = metaHasValues(meta);
   if (!trimmed && !hasMeta) return null;
   if (!hasMeta) return trimmed;
   return `${trimmed}${trimmed ? "\n" : ""}${NOTES_META_PREFIX}\n${JSON.stringify(meta)}`;
+}
+
+export function parseStoredEbrFromNotes(notes?: string | null): StoredEbrNotePayload | null {
+  if (!notes?.trim()) return null;
+  const markerIndex = notes.indexOf(NOTES_META_PREFIX);
+  if (markerIndex === -1) return null;
+  const metaRaw = notes.slice(markerIndex + NOTES_META_PREFIX.length).trim();
+  try {
+    const meta = JSON.parse(metaRaw) as StoredBookingNoteMeta;
+    return meta.ebr ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Keep suggested changes but mark EBR as rejected (booking columns stay original). */
+export function markClientEbrRejectedInNotes(notes?: string | null): string | null {
+  const details = parseCalendarEntryNotes(notes);
+  const ebr = parseStoredEbrFromNotes(notes);
+  const internalNote = (details?.internalNote ?? "").trim();
+  if (!ebr) {
+    return clearEbrSuggestionsFromNotes(notes, {
+      internalNote,
+      requestDirection: details?.requestDirection,
+      clientSnapshot: details?.clientSnapshot,
+    });
+  }
+  return serializeCalendarEntryNotes(
+    internalNote,
+    {
+      showInternalNote: Boolean(internalNote) || Boolean(details?.showInternalNote),
+      showLateRescheduling: details?.showLateRescheduling,
+      lateRescheduleFeePercent: details?.lateRescheduleFeePercent,
+      showLateCancellation: details?.showLateCancellation,
+      lateCancellationFeePercent: details?.lateCancellationFeePercent,
+      showPrepayment: details?.showPrepayment,
+      prepaymentPercent: details?.prepaymentPercent,
+      paymentMethod: details?.paymentMethod,
+      showKilometerAllowance: details?.showKilometerAllowance,
+      kilometerAllowance: details?.kilometerAllowance,
+      cancellationReason: details?.cancellationReason,
+      requestDirection: details?.requestDirection,
+      clientSnapshot: details?.clientSnapshot,
+    },
+    {
+      ...ebr,
+      status: "rejected",
+      lastEditedBy: ebr.lastEditedBy ?? "client",
+      responseStatus: undefined,
+    },
+  );
+}
+
+/** Apply accepted changes into clientSnapshot, keep ebr status=accepted for client outcome banner. */
+export function markClientEbrAcceptedInNotes(
+  notes?: string | null,
+  applied?: Partial<CalendarBookingDetails> | null,
+): string | null {
+  const details = parseCalendarEntryNotes(notes);
+  const ebr = parseStoredEbrFromNotes(notes);
+  const internalNote = (applied?.internalNote ?? details?.internalNote ?? "").trim();
+  if (!ebr) {
+    return clearEbrSuggestionsFromNotes(notes, applied);
+  }
+
+  const nextSnapshot = {
+    ...(details?.clientSnapshot ?? {}),
+    ...(applied?.clientSnapshot ?? {}),
+  };
+
+  return serializeCalendarEntryNotes(
+    internalNote,
+    {
+      showInternalNote: Boolean(internalNote) || Boolean(details?.showInternalNote),
+      showLateRescheduling: details?.showLateRescheduling,
+      lateRescheduleFeePercent: details?.lateRescheduleFeePercent,
+      showLateCancellation: details?.showLateCancellation,
+      lateCancellationFeePercent: details?.lateCancellationFeePercent,
+      showPrepayment: details?.showPrepayment,
+      prepaymentPercent: details?.prepaymentPercent,
+      paymentMethod: details?.paymentMethod,
+      showKilometerAllowance: details?.showKilometerAllowance,
+      kilometerAllowance: details?.kilometerAllowance,
+      cancellationReason: details?.cancellationReason,
+      requestDirection: details?.requestDirection,
+      clientSnapshot: nextSnapshot,
+      ...(applied?.services ? { services: applied.services } : {}),
+      ...(applied?.products ? { products: applied.products } : {}),
+    },
+    {
+      ...ebr,
+      status: "accepted",
+      lastEditedBy: ebr.lastEditedBy ?? "client",
+      responseStatus: undefined,
+    },
+  );
+}
+
+/** Rebuild notes without pending EBR suggestions (optionally with applied booking details). */
+export function clearEbrSuggestionsFromNotes(
+  notes?: string | null,
+  applied?: Partial<CalendarBookingDetails> | null,
+): string | null {
+  const details = parseCalendarEntryNotes(notes);
+  const internalNote = (applied?.internalNote ?? details?.internalNote ?? "").trim();
+  const nextDetails: CalendarBookingDetails = {
+    ...(details ?? {}),
+    ...(applied ?? {}),
+    // Drop negotiation markers after accept/reject/cancel.
+    responseStatus: undefined,
+    lastEditedBy: undefined,
+    requestDirection: undefined,
+    editedServiceIds: applied?.editedServiceIds,
+    clientEditedServiceIds: undefined,
+    ...(applied?.cancellationReason?.trim()
+      ? { cancellationReason: applied.cancellationReason.trim() }
+      : details?.cancellationReason?.trim()
+        ? { cancellationReason: details.cancellationReason.trim() }
+        : {}),
+  };
+  // When clearing without applying, do not keep suggested service overlays as permanent lines.
+  if (!applied?.services) {
+    delete nextDetails.services;
+    delete nextDetails.products;
+  }
+  return serializeCalendarEntryNotes(internalNote, nextDetails, null);
 }
 
 export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingDetails | undefined {
@@ -55,6 +243,7 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
   const metaRaw = notes.slice(markerIndex + NOTES_META_PREFIX.length).trim();
   try {
     const meta = JSON.parse(metaRaw) as StoredBookingNoteMeta;
+    const ebr = meta.ebr;
     return {
       internalNote,
       showInternalNote: Boolean(internalNote) || Boolean(meta.showInternalNote),
@@ -66,6 +255,35 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
       prepaymentPercent: meta.prepaymentPercent ?? "",
       paymentMethod: meta.paymentMethod ?? "online",
       showKilometerAllowance: Boolean(meta.showKilometerAllowance),
+      ...(meta.kilometerAllowance
+        ? {
+            kilometerAllowance: {
+              eurPerKm: meta.kilometerAllowance.eurPerKm ?? "",
+              totalKilometer: meta.kilometerAllowance.totalKilometer ?? "",
+            },
+          }
+        : {}),
+      ...(meta.cancellationReason?.trim()
+        ? { cancellationReason: meta.cancellationReason.trim() }
+        : {}),
+      ...(meta.responseStatus ? { responseStatus: meta.responseStatus } : {}),
+      ...(meta.requestDirection ? { requestDirection: meta.requestDirection } : {}),
+      ...(meta.editedServiceIds?.length ? { editedServiceIds: meta.editedServiceIds } : {}),
+      ...(meta.lastEditedBy ? { lastEditedBy: meta.lastEditedBy } : {}),
+      ...(meta.clientSnapshot ? { clientSnapshot: meta.clientSnapshot } : {}),
+      ...(ebr?.status !== "rejected" && ebr?.suggestedServices?.length ? { services: ebr.suggestedServices } : {}),
+      ...(ebr?.status !== "rejected" && ebr?.suggestedProducts?.length ? { products: ebr.suggestedProducts } : {}),
+      ...(ebr?.status !== "rejected" && ebr?.editedServiceIds?.length && !meta.editedServiceIds?.length
+        ? { editedServiceIds: ebr.editedServiceIds }
+        : {}),
+      ...(ebr?.status !== "rejected" && ebr?.suggestedProjectDetails
+        ? {
+            clientSnapshot: {
+              ...(meta.clientSnapshot ?? {}),
+              projectDetails: ebr.suggestedProjectDetails,
+            },
+          }
+        : {}),
     };
   } catch {
     return {
@@ -115,49 +333,12 @@ export const emptyDesiredLocation = () => ({
   municipality: "",
 });
 
-function bookingDurationMins(ev: CalendarEvent) {
-  return Math.max(15, minutesSinceMidnight(ev.end) - minutesSinceMidnight(ev.start));
-}
-
-function matchCatalogService(title: string) {
-  const normalized = title.toLowerCase().trim();
-  return (
-    allBookingCatalogServices.find((service) => service.name.toLowerCase() === normalized) ??
-    allBookingCatalogServices.find(
-      (service) =>
-        normalized.includes(service.name.toLowerCase()) || service.name.toLowerCase().includes(normalized),
-    )
-  );
-}
-
-function defaultPriceForTitle(title: string) {
-  const normalized = title.toLowerCase();
-  if (/\bmassage\b/.test(normalized)) return 165;
-  if (/\blash/.test(normalized)) return 85;
-  if (/\bhair\b|\bcut\b/.test(normalized)) return 45;
-  if (/\bmake-?up\b/.test(normalized)) return 60;
-  return 65;
-}
-
-function buildFallbackService(ev: CalendarEvent) {
-  const catalogMatch = matchCatalogService(ev.title);
-  if (catalogMatch) {
-    return { ...catalogMatch };
-  }
-
-  return {
-    id: `svc-${ev.id}`,
-    name: ev.title,
-    durationMins: bookingDurationMins(ev),
-    price: defaultPriceForTitle(ev.title),
-  };
-}
-
 export function resolveBookingDetailsFromEvent(ev: CalendarEvent): CalendarBookingDetails {
   if (ev.details) return ev.details;
 
   return {
-    services: [buildFallbackService(ev)],
+    services: [],
+    products: [],
     clientEmail: "",
     phoneCode: "",
     phoneNumber: "",
@@ -180,7 +361,7 @@ export function hydrateBookingDrawerFromEvent(ev: CalendarEvent): BookingDrawerH
 
   return {
     clientEmail: details.clientEmail ?? "",
-    services: details.services ?? [buildFallbackService(ev)],
+    services: details.services ?? [],
     products: details.products ?? [],
     guests: details.guests ?? [],
     phoneCode: details.phoneCode ?? "",

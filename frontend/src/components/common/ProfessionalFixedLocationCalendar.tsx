@@ -13,10 +13,11 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import StickyNote2OutlinedIcon from "@mui/icons-material/StickyNote2Outlined";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
-import { Avatar, Box, Button, ButtonBase, Chip, IconButton, Paper, Popover, Stack, Tooltip } from "@mui/material";
+import { Avatar, Box, Button, ButtonBase, Chip, Divider, IconButton, Menu, MenuItem, Paper, Popover, Stack, Tooltip } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../ui/typography";
 import { useSnackbar } from "./AppSnackbar";
+import { getApiErrorMessage } from "../../lib/api-error";
 import AppPillTabs from "./AppPillTabs";
 import MollureDrawer from "./MollureDrawer";
 import AppSearchField from "./AppSearchField";
@@ -26,15 +27,26 @@ import AppTextField from "./AppTextField";
 import AppCountryPhoneFields from "./AppCountryPhoneFields";
 import AppDropdown from "./AppDropdown";
 import CalendarAddMenu from "./calendar/CalendarAddMenu";
+import CalendarNoShowModal from "./calendar/CalendarNoShowModal";
+import CalendarCancelBookingModal from "./calendar/CalendarCancelBookingModal";
+import CalendarBookingActionConfirmDialog, {
+  type CalendarBookingAction,
+} from "./calendar/CalendarBookingActionConfirmDialog";
 import CalendarBookingCard from "./calendar/CalendarBookingCard";
+import BookingEditedTag from "./calendar/BookingEditedTag";
 import CalendarBookingTicketStack from "./calendar/CalendarBookingTicketStack";
 import { clusterSameStartTimeEvents, getClusterTimeBounds } from "./calendar/calendar-overlap.utils";
 import { useMessagingWidget } from "./messaging/MessagingWidgetContext";
 import {
   buildBookingDetailsSnapshot,
+  clearEbrSuggestionsFromNotes,
+  markClientEbrAcceptedInNotes,
+  markClientEbrRejectedInNotes,
   emptyDesiredLocation,
   hydrateBookingDrawerFromEvent,
   parseApiCalendarEventId,
+  parseStoredEbrFromNotes,
+  serializeCalendarEntryNotes,
 } from "./calendar/bookingEventDetails";
 import {
   canDiscardEbr,
@@ -65,14 +77,25 @@ import {
 import BookingSelectServicesScreen from "./calendar/BookingSelectServicesScreen";
 import DiscardBrDialog from "./calendar/DiscardBrDialog";
 import DiscardEbrDialog from "./calendar/DiscardEbrDialog";
+import BookingRequestConfirmDialog from "./calendar/BookingRequestConfirmDialog";
 import BookingRequestResponseActions from "./calendar/BookingRequestResponseActions";
 import BookingDrawerSelectedItemsSection from "./calendar/BookingDrawerSelectedItemsSection";
+import BookingDrawerClientSnapshotSection from "./calendar/BookingDrawerClientSnapshotSection";
+import BookingActivityOverview from "./calendar/BookingActivityOverview";
+import { buildBookingActivityTimeline } from "./calendar/buildBookingActivityTimeline";
+import type { BookingActivityItem } from "./calendar/bookingActivity.types";
+import SalesOverview from "./calendar/SalesOverview";
 import BookingEditServiceScreen from "./calendar/BookingEditServiceScreen";
 import BookingSelectProductsScreen from "./calendar/BookingSelectProductsScreen";
 import BookingAddUniqueItemScreen from "./calendar/BookingAddUniqueItemScreen";
+import { professionalSuggestBookingChanges } from "./client-booking/bookingEditRequest";
 import { useCalendarFilters } from "./calendar/useCalendarFilters";
 import type { BookingCatalogService } from "../../data/bookingServiceCatalog.data";
-import { formatBookingServiceMeta } from "../../data/bookingServiceCatalog.data";
+import {
+  allBookingCatalogServices,
+  bookingServiceCatalog,
+  formatBookingServiceMeta,
+} from "../../data/bookingServiceCatalog.data";
 import {
   buildBookingServiceLineItem,
   buildServiceEditDraftFromCatalog,
@@ -86,7 +109,6 @@ import {
 } from "../../data/bookingServiceEdit.data";
 import {
   bookingProductCatalog,
-  buildProductSelectionDraftFromSelected,
   createEmptyProductSelectionDraft,
   formatProductLineName,
   formatProductUnitPrice,
@@ -171,6 +193,7 @@ import {
   mapCalendarEntryToEvent,
 } from "./calendar/calendar-entry.mappers";
 import type { CreateCalendarEntryRequest, CalendarEntry, UpsertCalendarSettingsRequest } from "../../store/services/businessApi";
+import { useGetMyBookingsQuery } from "../../store/services/businessApi";
 import { GENDER_OPTIONS, type GenderOption } from "../../lib/gender-options";
 import { getOptionalPhoneValidationErrors, getPhoneValidationErrors } from "../../lib/phone-validation";
 
@@ -190,11 +213,16 @@ export type ProfessionalFixedLocationCalendarProps = {
   onDeleteCalendarEntry?: (id: string) => Promise<void>;
   onUpdateBookingStatus?: (
     id: string,
-    status: "requested" | "cancelled" | "completed" | "confirmed" | "no_show",
+    status: "requested" | "cancelled" | "completed" | "confirmed" | "in_progress" | "no_show",
     options?: {
       notification_event?: string;
       notify_incoming_er?: boolean;
       initiated_by?: "client" | "professional";
+      notes?: string | null;
+      total_price?: number | null;
+      booking_date?: string | null;
+      start_time?: string | null;
+      end_time?: string | null;
     },
   ) => Promise<void>;
   onDispatchBookingNotification?: (
@@ -204,7 +232,7 @@ export type ProfessionalFixedLocationCalendarProps = {
   ) => Promise<void>;
   onUpdateCalendarEntryStatus?: (
     id: string,
-    status: "requested" | "cancelled" | "completed" | "confirmed" | "no_show",
+    status: "requested" | "cancelled" | "completed" | "confirmed" | "in_progress" | "no_show",
   ) => Promise<void>;
   onDateRangeChange?: (range: CalendarQueryDateRange) => void;
 };
@@ -240,6 +268,18 @@ export default function ProfessionalFixedLocationCalendar({
   const theme = useTheme();
   const m = theme.palette.mollure;
   const { showSnackbar } = useSnackbar();
+
+  /** Same list shown in Select Services and used when saving the selection. */
+  const selectableServiceCatalog = React.useMemo(
+    () => (serviceCatalog.length > 0 ? serviceCatalog : [...allBookingCatalogServices]),
+    [serviceCatalog],
+  );
+  const selectableServiceCategories = React.useMemo(() => {
+    if (serviceCatalog.length > 0) {
+      return [{ category: "Services", services: serviceCatalog }];
+    }
+    return bookingServiceCatalog;
+  }, [serviceCatalog]);
   const { openMessaging } = useMessagingWidget();
 
   const openBookingMessages = React.useCallback(
@@ -280,7 +320,7 @@ export default function ProfessionalFixedLocationCalendar({
 
   const addMenuButtonRef = React.useRef<HTMLButtonElement | null>(null);
 
-  const productCatalog = React.useMemo(() => [] as typeof bookingProductCatalog, []);
+  const productCatalog = React.useMemo(() => [...bookingProductCatalog], []);
 
   const defaultDateIso = React.useMemo(() => toIsoLocalDate(new Date()), []);
   const [activeSubTab, setActiveSubTab] = React.useState<CalendarSubTab>(data.initialSubTab);
@@ -298,6 +338,7 @@ export default function ProfessionalFixedLocationCalendar({
   const [addAnchor, setAddAnchor] = React.useState<HTMLElement | null>(null);
   const [filtersOpen, setFiltersOpen] = React.useState(false);
   const [slotDrawerTab, setSlotDrawerTab] = React.useState<"booking" | "sales" | "activity">("booking");
+  const [activityDetailItem, setActivityDetailItem] = React.useState<BookingActivityItem | null>(null);
   const [slotLocation, setSlotLocation] = React.useState<CalendarBookingLocation>(data.supportedLocations[0] ?? "FL");
   const [slotBookingType, setSlotBookingType] = React.useState<CalendarBookingType>("Requests");
   const [slotStatus, setSlotStatus] = React.useState<
@@ -310,10 +351,19 @@ export default function ProfessionalFixedLocationCalendar({
   const [slotCalendarTouched, setSlotCalendarTouched] = React.useState(false);
   const [discardBrOpen, setDiscardBrOpen] = React.useState(false);
   const [discardEbrOpen, setDiscardEbrOpen] = React.useState(false);
+  const [incomingConfirmAction, setIncomingConfirmAction] = React.useState<"accept" | "reject" | null>(
+    null,
+  );
   const [incomingRequestEditMode, setIncomingRequestEditMode] = React.useState(false);
   const [originalServicesSnapshot, setOriginalServicesSnapshot] = React.useState<BookingServiceLineItem[]>([]);
   const [slotClientSearch, setSlotClientSearch] = React.useState("");
   const [slotAddMenuAnchor, setSlotAddMenuAnchor] = React.useState<HTMLElement | null>(null);
+  const [bookingActionAnchor, setBookingActionAnchor] = React.useState<HTMLElement | null>(null);
+  const [noShowModalOpen, setNoShowModalOpen] = React.useState(false);
+  const [cancelModalOpen, setCancelModalOpen] = React.useState(false);
+  const [pendingBookingAction, setPendingBookingAction] = React.useState<CalendarBookingAction | null>(
+    null,
+  );
   const [addMenuTarget, setAddMenuTarget] = React.useState<"client" | string>("client");
   const [selectionTarget, setSelectionTarget] = React.useState<"client" | string>("client");
   const [selectedServices, setSelectedServices] = React.useState<BookingServiceLineItem[]>([]);
@@ -620,7 +670,105 @@ export default function ProfessionalFixedLocationCalendar({
     kilometerAllowanceDraft,
   ]);
 
+  const { data: myBookingsResponse } = useGetMyBookingsQuery(undefined, {
+    skip: !slotDrawerOpen || (slotDrawerTab !== "activity" && slotDrawerTab !== "sales"),
+  });
+
+  const clientActivityIdentity = React.useMemo(() => {
+    const email =
+      selectedClient?.email?.trim() ||
+      drawerSalesActivityContext?.details?.clientEmail?.trim() ||
+      "";
+    const name =
+      selectedClient?.name?.trim() ||
+      drawerSalesActivityContext?.showClientName?.trim() ||
+      `${guestDraft.firstName} ${guestDraft.lastName}`.trim() ||
+      `${nonMollureDraft.firstName} ${nonMollureDraft.lastName}`.trim() ||
+      "";
+    return { email, name };
+  }, [
+    selectedClient?.email,
+    selectedClient?.name,
+    drawerSalesActivityContext?.details?.clientEmail,
+    drawerSalesActivityContext?.showClientName,
+    guestDraft.firstName,
+    guestDraft.lastName,
+    nonMollureDraft.firstName,
+    nonMollureDraft.lastName,
+  ]);
+
+  const clientBookingsForActivity = React.useMemo(() => {
+    const all = myBookingsResponse?.data ?? [];
+    const currentId = drawerSalesActivityContext
+      ? parseApiCalendarEventId(drawerSalesActivityContext.id)?.id ?? null
+      : null;
+    const currentCode = drawerSalesActivityContext?.bookingCode ?? null;
+    return all.filter((booking) => {
+      if (currentId && String(booking.id) === String(currentId)) return true;
+      if (currentCode && booking.unique_code && booking.unique_code === currentCode) return true;
+      const email = clientActivityIdentity.email.toLowerCase();
+      const name = clientActivityIdentity.name.toLowerCase();
+      const bookingEmail = (booking.customer_email ?? "").trim().toLowerCase();
+      const bookingName = (booking.customer_name || booking.client_name || "").trim().toLowerCase();
+      if (email && bookingEmail && email === bookingEmail) return true;
+      if (name && bookingName && name === bookingName) return true;
+      return false;
+    });
+  }, [clientActivityIdentity.email, clientActivityIdentity.name, drawerSalesActivityContext, myBookingsResponse?.data]);
+
+  const activityTimelineItems = React.useMemo(
+    () =>
+      buildBookingActivityTimeline({
+        bookings: clientBookingsForActivity,
+        clientEmail: clientActivityIdentity.email,
+        clientName: clientActivityIdentity.name,
+        currentBookingId: drawerSalesActivityContext
+          ? parseApiCalendarEventId(drawerSalesActivityContext.id)?.id ?? null
+          : null,
+        currentBookingCode: drawerSalesActivityContext?.bookingCode ?? null,
+        currentScenario: drawerSalesActivityContext?.bookingScenario ?? null,
+        currentStatus: drawerSalesActivityContext?.status ?? null,
+        currentCancellationReason: drawerSalesActivityContext?.details?.cancellationReason ?? null,
+        currentProfessionalName:
+          data.resources.find((r) => r.id === drawerSalesActivityContext?.resourceId)?.name ?? null,
+        mode: "activity",
+      }),
+    [
+      clientActivityIdentity.email,
+      clientActivityIdentity.name,
+      clientBookingsForActivity,
+      data.resources,
+      drawerSalesActivityContext,
+    ],
+  );
+
   const isCompletedBooking = viewingBookingEvent?.status === "Completed";
+
+  const noShowParticipants = React.useMemo(() => {
+    if (!viewingBookingEvent) return [];
+    const list: { id: string; name: string }[] = [];
+    const clientName = viewingBookingEvent.showClientName?.trim();
+    if (clientName) list.push({ id: "client", name: clientName });
+
+    const people = viewingBookingEvent.details?.clientSnapshot?.people ?? [];
+    let modelOrdinal = 0;
+    for (const person of people) {
+      if (person.isRequester) continue;
+      if (person.participantType === "planning" || person.name?.trim() === "Planning") continue;
+      const trimmed = person.name?.trim() ?? "";
+      let name: string;
+      if (person.participantType === "model") {
+        modelOrdinal += 1;
+        name = trimmed && trimmed.toLowerCase() !== "model" ? trimmed : `Model ${modelOrdinal}`;
+      } else {
+        name = trimmed && trimmed.toLowerCase() !== "guest" ? trimmed : "Guest";
+      }
+      list.push({ id: person.id, name });
+    }
+    if (list.length === 0) list.push({ id: "client", name: "Client" });
+    return list;
+  }, [viewingBookingEvent]);
+
   const showIncomingRequestActions =
     isViewingBooking && canRespondToIncomingRequest(viewingBookingEvent) && !isEditingExisting;
   const showDiscardEbr = isViewingBooking && canDiscardEbr(viewingBookingEvent) && !isEditingExisting;
@@ -639,6 +787,69 @@ export default function ProfessionalFixedLocationCalendar({
   );
   const isViewingExisting =
     isCompletedBooking || (Boolean(editingEventId) && !isEditingExisting);
+
+  const bookingEditSignature = React.useMemo(
+    () =>
+      JSON.stringify({
+        services: selectedServices,
+        products: selectedProducts,
+        slot: selectedSlot,
+        client: selectedClient,
+        guests: bookingGuests,
+        phone: bookingPhoneDraft,
+        desiredLocation: desiredLocationDraft,
+        location: slotLocation,
+        status: slotStatus,
+        showPrepayment,
+        prepaymentPercent,
+        paymentMethod,
+        showLateCancellation,
+        lateCancellationFeePercent,
+        showLateRescheduling,
+        lateRescheduleFeePercent,
+        showInternalNote,
+        internalNote: bookingInternalNote,
+        totalDiscount: bookingTotalDiscount,
+        showKilometerAllowance,
+        kilometerAllowance: kilometerAllowanceDraft,
+      }),
+    [
+      selectedServices,
+      selectedProducts,
+      selectedSlot,
+      selectedClient,
+      bookingGuests,
+      bookingPhoneDraft,
+      desiredLocationDraft,
+      slotLocation,
+      slotStatus,
+      showPrepayment,
+      prepaymentPercent,
+      paymentMethod,
+      showLateCancellation,
+      lateCancellationFeePercent,
+      showLateRescheduling,
+      lateRescheduleFeePercent,
+      showInternalNote,
+      bookingInternalNote,
+      bookingTotalDiscount,
+      showKilometerAllowance,
+      kilometerAllowanceDraft,
+    ],
+  );
+  const [editBaselineSignature, setEditBaselineSignature] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (isEditingExisting) {
+      setEditBaselineSignature((prev) => (prev === null ? bookingEditSignature : prev));
+    } else {
+      setEditBaselineSignature(null);
+    }
+  }, [isEditingExisting, bookingEditSignature]);
+  const isBookingDirty =
+    isEditingExisting &&
+    editBaselineSignature !== null &&
+    bookingEditSignature !== editBaselineSignature;
+
   const lockClientIdentity = isViewingBooking && isClientOriginatedBooking(viewingBookingEvent);
   const showLineItemRemoveButton = !isViewingExisting;
   const showClientRemoveButton = showLineItemRemoveButton && !lockClientIdentity;
@@ -662,6 +873,7 @@ export default function ProfessionalFixedLocationCalendar({
     setSlotDrawerOpen(false);
     setEditingEventId(null);
     setIsEditingExisting(false);
+    setActivityDetailItem(null);
   }, []);
 
   const calendarFieldLabel = React.useMemo(() => {
@@ -671,6 +883,20 @@ export default function ProfessionalFixedLocationCalendar({
     }
     return "Select calender";
   }, [isViewingBooking, slotCalendarTouched, selectedSlot?.date, slotLocation]);
+
+  const clientEbrSuggestion = React.useMemo(() => {
+    if (!viewingBookingEvent || viewingBookingEvent.bookingScenario !== "EBR") return null;
+    const ebr = parseStoredEbrFromNotes(viewingBookingEvent.notes);
+    if (!ebr || ebr.lastEditedBy !== "client") return null;
+    return ebr;
+  }, [viewingBookingEvent]);
+
+  const requestedScheduleLabel = React.useMemo(() => {
+    if (!clientEbrSuggestion?.suggestedDateISO) return "";
+    const datePart = formatMdyDate(clientEbrSuggestion.suggestedDateISO);
+    const timePart = clientEbrSuggestion.suggestedTime?.trim() || "";
+    return [datePart, timePart].filter(Boolean).join(" · ");
+  }, [clientEbrSuggestion]);
 
   const [blockDraft, setBlockDraft] = React.useState<BlockTimeDraft>(() => ({
     title: "Meeting",
@@ -810,6 +1036,11 @@ export default function ProfessionalFixedLocationCalendar({
         notification_event?: string;
         notify_incoming_er?: boolean;
         initiated_by?: "client" | "professional";
+        notes?: string | null;
+        total_price?: number | null;
+        booking_date?: string | null;
+        start_time?: string | null;
+        end_time?: string | null;
       },
     ) => {
       const parsed = parseApiCalendarEventId(eventId);
@@ -819,11 +1050,13 @@ export default function ProfessionalFixedLocationCalendar({
           ? "requested"
           : status === "Confirmed"
             ? "confirmed"
-            : status === "Completed"
-              ? "completed"
-              : status === "No Show"
-                ? "no_show"
-                : "cancelled";
+            : status === "In Progress"
+              ? "in_progress"
+              : status === "Completed"
+                ? "completed"
+                : status === "No Show"
+                  ? "no_show"
+                  : "cancelled";
       if (parsed.kind === "booking") {
         if (onUpdateBookingStatus) {
           await onUpdateBookingStatus(parsed.id, apiStatus, options);
@@ -850,6 +1083,88 @@ export default function ProfessionalFixedLocationCalendar({
     },
     [onDispatchBookingNotification],
   );
+
+  const handleBookingActionSelect = React.useCallback(
+    async (action: "edit" | "in_progress" | "no_show" | "cancel") => {
+      setBookingActionAnchor(null);
+      if (!editingEventId) return;
+
+      if (action === "edit") {
+        setIsEditingExisting(true);
+        return;
+      }
+
+      if (action === "no_show") {
+        setNoShowModalOpen(true);
+        return;
+      }
+
+      if (action === "cancel") {
+        setCancelModalOpen(true);
+        return;
+      }
+
+      setPendingBookingAction(action);
+    },
+    [editingEventId],
+  );
+
+  const handleConfirmCancel = React.useCallback(async () => {
+    setCancelModalOpen(false);
+    if (!editingEventId) return;
+    try {
+      await persistEventStatus(editingEventId, "Cancelled");
+      setEvents((prev) =>
+        prev.map((event) => (event.id === editingEventId ? { ...event, status: "Cancelled" } : event)),
+      );
+      showSnackbar({ severity: "success", message: "Booking cancelled." });
+    } catch (error) {
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Unable to update booking status."),
+      });
+    }
+  }, [editingEventId, persistEventStatus, showSnackbar]);
+
+  const handleConfirmBookingAction = React.useCallback(async () => {
+    const action = pendingBookingAction;
+    setPendingBookingAction(null);
+    if (!action || !editingEventId) return;
+
+    const nextStatus: CalendarEvent["status"] =
+      action === "in_progress" ? "In Progress" : "Cancelled";
+    const successMessage =
+      action === "in_progress" ? "Booking marked in progress." : "Booking cancelled.";
+    try {
+      await persistEventStatus(editingEventId, nextStatus);
+      setEvents((prev) =>
+        prev.map((event) => (event.id === editingEventId ? { ...event, status: nextStatus } : event)),
+      );
+      showSnackbar({ severity: "success", message: successMessage });
+    } catch (error) {
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Unable to update booking status."),
+      });
+    }
+  }, [editingEventId, pendingBookingAction, persistEventStatus, showSnackbar]);
+
+  const handleConfirmNoShow = React.useCallback(async () => {
+    setNoShowModalOpen(false);
+    if (!editingEventId) return;
+    try {
+      await persistEventStatus(editingEventId, "No Show");
+      setEvents((prev) =>
+        prev.map((event) => (event.id === editingEventId ? { ...event, status: "No Show" } : event)),
+      );
+      showSnackbar({ severity: "success", message: "Booking marked as no show." });
+    } catch (error) {
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Unable to update booking status."),
+      });
+    }
+  }, [editingEventId, persistEventStatus, showSnackbar]);
 
   React.useEffect(() => {
     setBlockDraft((prev) => {
@@ -1800,27 +2115,220 @@ export default function ProfessionalFixedLocationCalendar({
   }, [editingEventId, showSnackbar]);
 
   const handleAcceptIncomingRequest = React.useCallback(async () => {
-    if (!editingEventId) return;
-    try {
-      await persistEventStatus(editingEventId, "Confirmed");
-    } catch {
-      showSnackbar({ severity: "error", message: "Unable to accept booking request." });
+    if (!editingEventId || !viewingBookingEvent) return;
+    const parsed = parseApiCalendarEventId(editingEventId);
+    if (!parsed || parsed.kind !== "booking" || !onUpdateBookingStatus) {
+      try {
+        await persistEventStatus(editingEventId, "Confirmed");
+      } catch (error) {
+        showSnackbar({
+          severity: "error",
+          message: getApiErrorMessage(error, "Unable to accept booking request."),
+        });
+        return;
+      }
+      setEvents((prev) =>
+        prev.map((event) => (event.id === editingEventId ? { ...event, status: "Confirmed" } : event)),
+      );
+      setSlotStatus("Confirmed");
+      setIncomingRequestEditMode(false);
+      showSnackbar({ severity: "success", message: "Booking request accepted." });
       return;
     }
-    setEvents((prev) =>
-      prev.map((event) => (event.id === editingEventId ? { ...event, status: "Confirmed" } : event)),
-    );
-    setSlotStatus("Confirmed");
-    setIncomingRequestEditMode(false);
-    showSnackbar({ severity: "success", message: "Booking request accepted." });
-  }, [editingEventId, persistEventStatus, showSnackbar]);
+
+    try {
+      const ebr = parseStoredEbrFromNotes(viewingBookingEvent.notes);
+      const isClientEbr =
+        viewingBookingEvent.bookingScenario === "EBR" &&
+        Boolean(ebr) &&
+        (ebr.status === "pending" || ebr.status === "suggested") &&
+        (ebr.lastEditedBy === "client" || viewingBookingEvent.details?.lastEditedBy === "client");
+
+      const suggestedServices = ebr?.suggestedServices?.length
+        ? ebr.suggestedServices
+        : viewingBookingEvent.details?.services;
+      const suggestedProducts = ebr?.suggestedProducts?.length
+        ? ebr.suggestedProducts
+        : viewingBookingEvent.details?.products;
+      const suggestedTotal =
+        ebr?.suggestedTotalPrice ??
+        suggestedServices?.reduce((sum, s) => sum + (Number(s.price) || 0), 0);
+      const suggestedProject = ebr?.suggestedProjectDetails;
+      const suggestedDate = ebr?.suggestedDateISO;
+      const suggestedStart = ebr?.suggestedStart;
+      const suggestedEnd = ebr?.suggestedEnd;
+
+      let nextNotes: string | null | undefined;
+      let scheduleExtras: {
+        booking_date?: string;
+        start_time?: string;
+        end_time?: string;
+      } = {};
+
+    // Client change request: apply suggested schedule/services and keep accepted outcome for client UI.
+      if (isClientEbr) {
+        const appliedNote = (ebr?.clientNote || viewingBookingEvent.details?.internalNote || "").trim();
+        nextNotes = markClientEbrAcceptedInNotes(viewingBookingEvent.notes, {
+          internalNote: appliedNote,
+          services: suggestedServices,
+          products: suggestedProducts,
+          clientSnapshot: {
+            ...(viewingBookingEvent.details?.clientSnapshot ?? {}),
+            ...(suggestedServices?.length
+              ? {
+                  services: suggestedServices.map((s) => ({
+                    id: s.id,
+                    name: s.name,
+                    price: s.price,
+                    durationMins: s.durationMins,
+                    guestId: s.guestId,
+                    teamMemberId: s.teamMemberId,
+                  })),
+                }
+              : {}),
+            ...(suggestedProject ? { projectDetails: suggestedProject } : {}),
+          },
+          requestDirection: "incoming",
+        });
+        if (
+          suggestedDate &&
+          suggestedStart &&
+          suggestedEnd &&
+          /^\d{2}:\d{2}$/.test(suggestedStart) &&
+          /^\d{2}:\d{2}$/.test(suggestedEnd)
+        ) {
+          scheduleExtras = {
+            booking_date: suggestedDate,
+            start_time: `${suggestedDate}T${suggestedStart}:00`,
+            end_time: `${suggestedDate}T${suggestedEnd}:00`,
+          };
+        }
+      }
+
+      await onUpdateBookingStatus(parsed.id, "confirmed", {
+        ...(nextNotes !== undefined ? { notes: nextNotes } : {}),
+        ...(typeof suggestedTotal === "number" && isClientEbr ? { total_price: suggestedTotal } : {}),
+        ...scheduleExtras,
+      });
+
+      setEvents((prev) =>
+        prev.map((event) => {
+          if (event.id !== editingEventId) return event;
+          return {
+            ...event,
+            status: "Confirmed" as const,
+            bookingScenario: undefined,
+            notes: nextNotes ?? event.notes,
+            ...(scheduleExtras.booking_date
+              ? {
+                  date: scheduleExtras.booking_date,
+                  start: suggestedStart || event.start,
+                  end: suggestedEnd || event.end,
+                }
+              : {}),
+            details: {
+              ...event.details,
+              responseStatus: undefined,
+              lastEditedBy: undefined,
+              editedServiceIds: undefined,
+              clientEditedServiceIds: undefined,
+              ...(suggestedServices?.length ? { services: suggestedServices } : {}),
+              ...(suggestedProducts?.length ? { products: suggestedProducts } : {}),
+            },
+          };
+        }),
+      );
+      if (scheduleExtras.booking_date && selectedSlot) {
+        setSelectedSlot({
+          ...selectedSlot,
+          date: scheduleExtras.booking_date,
+          start: suggestedStart || selectedSlot.start,
+          end: suggestedEnd || selectedSlot.end,
+        });
+      }
+      setSlotStatus("Confirmed");
+      setIncomingRequestEditMode(false);
+      showSnackbar({ severity: "success", message: "Booking request accepted." });
+    } catch (error) {
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Unable to accept booking request."),
+      });
+    }
+  }, [
+    editingEventId,
+    onUpdateBookingStatus,
+    persistEventStatus,
+    selectedSlot,
+    showSnackbar,
+    viewingBookingEvent,
+  ]);
 
   const handleRejectIncomingRequest = React.useCallback(async () => {
-    if (!editingEventId) return;
+    if (!editingEventId || !viewingBookingEvent) return;
+    const ebr = parseStoredEbrFromNotes(viewingBookingEvent.notes);
+    const isClientEbr =
+      viewingBookingEvent.bookingScenario === "EBR" &&
+      Boolean(ebr) &&
+      (ebr.status === "pending" || ebr.status === "suggested") &&
+      (ebr.lastEditedBy === "client" || viewingBookingEvent.details?.lastEditedBy === "client");
+
+    // Client change request: keep original booking confirmed; keep rejected proposal for client UI.
+    if (isClientEbr) {
+      const parsed = parseApiCalendarEventId(editingEventId);
+      if (!parsed || parsed.kind !== "booking" || !onUpdateBookingStatus) {
+        showSnackbar({ severity: "error", message: "Unable to reject booking request." });
+        return;
+      }
+      try {
+        const rejectedNotes = markClientEbrRejectedInNotes(viewingBookingEvent.notes);
+        await onUpdateBookingStatus(parsed.id, "confirmed", {
+          notes: rejectedNotes,
+        });
+        setEvents((prev) =>
+          prev.map((event) =>
+            event.id === editingEventId
+              ? {
+                  ...event,
+                  status: "Confirmed" as const,
+                  bookingScenario: undefined,
+                  notes: rejectedNotes,
+                  details: {
+                    ...event.details,
+                    responseStatus: undefined,
+                    lastEditedBy: undefined,
+                    editedServiceIds: undefined,
+                    clientEditedServiceIds: undefined,
+                  },
+                }
+              : event,
+          ),
+        );
+        setSlotStatus("Confirmed");
+        setIncomingRequestEditMode(false);
+        setIsEditingExisting(false);
+        showSnackbar({ severity: "success", message: "Edit request rejected. Booking unchanged." });
+      } catch (error) {
+        showSnackbar({
+          severity: "error",
+          message: getApiErrorMessage(error, "Unable to reject booking request."),
+        });
+      }
+      return;
+    }
+
     try {
-      await persistEventStatus(editingEventId, "Invalid");
-    } catch {
-      showSnackbar({ severity: "error", message: "Unable to reject booking request." });
+      const parsed = parseApiCalendarEventId(editingEventId);
+      if (parsed?.kind === "booking" && onUpdateBookingStatus) {
+        await onUpdateBookingStatus(parsed.id, "cancelled");
+      } else {
+        await persistEventStatus(editingEventId, "Invalid");
+      }
+    } catch (error) {
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Unable to reject booking request."),
+      });
       return;
     }
     setEvents((prev) =>
@@ -1830,7 +2338,7 @@ export default function ProfessionalFixedLocationCalendar({
     setIncomingRequestEditMode(false);
     setIsEditingExisting(false);
     showSnackbar({ severity: "success", message: "Booking request rejected." });
-  }, [editingEventId, persistEventStatus, showSnackbar]);
+  }, [editingEventId, onUpdateBookingStatus, persistEventStatus, showSnackbar, viewingBookingEvent]);
 
   const handleStartIncomingEdit = React.useCallback(() => {
     if (!viewingBookingEvent) return;
@@ -1860,20 +2368,14 @@ export default function ProfessionalFixedLocationCalendar({
 
   const openSelectServices = React.useCallback(() => {
     setSelectionTarget(addMenuTarget);
-    const currentServices =
-      addMenuTarget === "client"
-        ? selectedServices
-        : bookingGuests.find((item) => item.id === addMenuTarget)?.services ?? [];
-
-    setServiceOverridesDraft(
-      Object.fromEntries(currentServices.map((service) => [service.id, lineItemToOverride(service)])),
-    );
-    setServiceSelectionDraft(currentServices.map((service) => service.id));
+    // Add flow: start with no preselection — only what the user picks is added.
+    setServiceOverridesDraft({});
+    setServiceSelectionDraft([]);
     setServiceEditDraft(emptyBookingServiceEditDraft());
     setServiceEditAttempted(false);
     setSlotAddMenuAnchor(null);
     setSlotBookingScreen("select-services");
-  }, [addMenuTarget, bookingGuests, selectedServices]);
+  }, [addMenuTarget]);
 
   const openEditService = React.useCallback(
     (service: BookingCatalogService) => {
@@ -1888,11 +2390,11 @@ export default function ProfessionalFixedLocationCalendar({
       setServiceEditAttempted(false);
       setSlotBookingScreen("edit-service");
     },
-    [data.resources, selectedSlot?.resourceId, selectedSlot?.start, serviceOverridesDraft, serviceCatalog],
+    [data.resources, selectedSlot?.resourceId, selectedSlot?.start, serviceOverridesDraft],
   );
 
   const applyServiceEdit = React.useCallback(() => {
-    const catalogService = serviceCatalog.find((service) => service.id === serviceEditDraft.serviceId);
+    const catalogService = selectableServiceCatalog.find((service) => service.id === serviceEditDraft.serviceId);
     if (!catalogService) return false;
 
     const lineItem = buildBookingServiceLineItem(catalogService, serviceEditDraft);
@@ -1905,7 +2407,7 @@ export default function ProfessionalFixedLocationCalendar({
     setSlotBookingScreen("select-services");
     void dispatchBookingEventIfApi(editingEventId, "service_edited", { initiated_by: "professional" });
     return true;
-  }, [dispatchBookingEventIfApi, editingEventId, serviceCatalog, serviceEditDraft]);
+  }, [dispatchBookingEventIfApi, editingEventId, selectableServiceCatalog, serviceEditDraft]);
 
   const toggleServiceSelectionDraft = React.useCallback((serviceId: string) => {
     if (isViewingExisting) return;
@@ -1915,14 +2417,14 @@ export default function ProfessionalFixedLocationCalendar({
   }, [isViewingExisting]);
 
   const applyServiceSelection = React.useCallback(() => {
-    const byId = new Map(serviceCatalog.map((service) => [service.id, service]));
+    const byId = new Map(selectableServiceCatalog.map((service) => [service.id, service]));
     const currentServices =
       selectionTarget === "client"
         ? selectedServices
         : bookingGuests.find((item) => item.id === selectionTarget)?.services ?? [];
     const currentById = new Map(currentServices.map((service) => [service.id, service]));
 
-    const nextServices = serviceSelectionDraft
+    const pickedServices = serviceSelectionDraft
       .map((id) => {
         const catalogService = byId.get(id);
         if (catalogService) {
@@ -1938,11 +2440,26 @@ export default function ProfessionalFixedLocationCalendar({
             name: catalogService.name,
             price: catalogService.price,
             durationMins: catalogService.durationMins,
+            startTime: selectedSlot?.start,
+            endTime: selectedSlot?.end,
+            staffResourceId: selectedSlot?.resourceId,
           } satisfies BookingServiceLineItem;
         }
         return currentById.get(id) ?? null;
       })
       .filter((service): service is BookingServiceLineItem => Boolean(service));
+
+    // Always keep already-added services; only append newly selected ones.
+    const mergedById = new Map<string, BookingServiceLineItem>();
+    for (const service of currentServices) mergedById.set(service.id, service);
+    // Also keep original booking services so nothing disappears while editing.
+    if (selectionTarget === "client") {
+      for (const service of originalServicesSnapshot) {
+        if (!mergedById.has(service.id)) mergedById.set(service.id, service);
+      }
+    }
+    for (const service of pickedServices) mergedById.set(service.id, service);
+    const nextServices = Array.from(mergedById.values());
 
     if (selectionTarget === "client") {
       setSelectedServices(nextServices);
@@ -1955,9 +2472,13 @@ export default function ProfessionalFixedLocationCalendar({
     setSlotSaveAttempted(false);
   }, [
     bookingGuests,
+    originalServicesSnapshot,
     selectedServices,
+    selectedSlot?.end,
+    selectedSlot?.resourceId,
+    selectedSlot?.start,
     selectionTarget,
-    serviceCatalog,
+    selectableServiceCatalog,
     serviceOverridesDraft,
     serviceSelectionDraft,
   ]);
@@ -1984,34 +2505,12 @@ export default function ProfessionalFixedLocationCalendar({
       return Array.from(merged.values());
     });
 
-    setProductSelectionDraft(() => {
-      const mergedCustomMap = new Map<string, BookingCatalogProduct>();
-      customBookingProducts.forEach((product) => mergedCustomMap.set(product.id, product));
-      customFromSelection.forEach((product) => mergedCustomMap.set(product.id, product));
-
-      const catalogDraft = buildProductSelectionDraftFromSelected(
-        currentProducts
-          .filter((product) => !product.id.startsWith("unique-"))
-          .map((product) => ({ id: product.id, quantity: product.quantity })),
-      );
-      const customDraft = Object.fromEntries(
-        Array.from(mergedCustomMap.values()).map((product) => {
-          const saved = currentProducts.find((item) => item.id === product.id);
-          const draftItem = productSelectionDraft[product.id];
-          return [
-            product.id,
-            saved
-              ? { selected: true, quantity: saved.quantity }
-              : draftItem ?? { selected: true, quantity: 1 },
-          ];
-        }),
-      );
-      return { ...catalogDraft, ...customDraft };
-    });
+    // Add flow: nothing preselected — only what the user picks is added.
+    setProductSelectionDraft(createEmptyProductSelectionDraft());
 
     setSlotAddMenuAnchor(null);
     setSlotBookingScreen("select-products");
-  }, [addMenuTarget, bookingGuests, customBookingProducts, productSelectionDraft, selectedProducts]);
+  }, [addMenuTarget, bookingGuests, selectedProducts]);
 
   const toggleProductSelectionDraft = React.useCallback((productId: string) => {
     if (isViewingExisting) return;
@@ -2065,17 +2564,28 @@ export default function ProfessionalFixedLocationCalendar({
       });
 
     const nextProducts = [...catalogProducts, ...customProducts];
+    const currentProducts =
+      selectionTarget === "client"
+        ? selectedProducts
+        : bookingGuests.find((item) => item.id === selectionTarget)?.products ?? [];
+
+    // Merge newly picked products into the current list (no defaults, no wipe).
+    const mergedById = new Map(currentProducts.map((product) => [product.id, product]));
+    for (const product of nextProducts) {
+      mergedById.set(product.id, product);
+    }
+    const mergedProducts = Array.from(mergedById.values());
 
     if (selectionTarget === "client") {
-      setSelectedProducts(nextProducts);
+      setSelectedProducts(mergedProducts);
     } else {
       setBookingGuests((prev) =>
-        prev.map((guest) => (guest.id === selectionTarget ? { ...guest, products: nextProducts } : guest)),
+        prev.map((guest) => (guest.id === selectionTarget ? { ...guest, products: mergedProducts } : guest)),
       );
     }
     setSlotBookingScreen("new-booking");
     setSlotSaveAttempted(false);
-  }, [customBookingProducts, productCatalog, productSelectionDraft, selectionTarget]);
+  }, [bookingGuests, customBookingProducts, productCatalog, productSelectionDraft, selectedProducts, selectionTarget]);
 
   const openAddUniqueItem = React.useCallback(() => {
     setUniqueItemDraft(emptyBookingUniqueItemDraft());
@@ -2196,12 +2706,81 @@ export default function ProfessionalFixedLocationCalendar({
         bookingTotalDiscount,
         showKilometerAllowance,
         kilometerAllowanceDraft,
-        requestDirection: "incoming",
+        // Keep BR on calendar; only flip arrow to outgoing for the client-facing edit request.
+        requestDirection: "outgoing",
         originalServices,
         editedServiceIds: editedIds,
         clientEditedServiceIds: [],
         lastEditedBy: "professional",
       });
+      nextDetails.responseStatus = "suggestion_for_change";
+      // Keep client project/people snapshot so client EBR view stays on Continue layout.
+      if (existingEvent.details?.clientSnapshot) {
+        nextDetails.clientSnapshot = existingEvent.details.clientSnapshot;
+      }
+
+      const snapshotServices = existingEvent.details?.clientSnapshot?.services ?? [];
+      const suggestedServices = selectedServices.map((service) => {
+        const fromSnapshot =
+          snapshotServices.find((row) => row.id === service.id) ??
+          snapshotServices.find((row) => row.name === service.name);
+        return {
+          id: service.id,
+          name: service.name,
+          durationMins: service.durationMins,
+          price: getEffectiveServicePrice(service),
+          staffResourceId: service.staffResourceId,
+          startTime: service.startTime,
+          endTime: service.endTime,
+          guestId: fromSnapshot?.guestId ?? null,
+        };
+      });
+      const suggestedProducts: NonNullable<typeof nextDetails.products> = selectedProducts.map((product) => ({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        quantity: product.quantity,
+        unitPrice: product.unitPrice ?? product.price,
+      }));
+      const originalProductIds = new Set((existingEvent.details?.products ?? []).map((product) => product.id));
+      const editedProductIds = selectedProducts
+        .filter((product) => !originalProductIds.has(product.id))
+        .map((product) => product.id);
+      const bookingRef = existingEvent.bookingCode ?? editingEventId;
+      const ebrTotal = suggestedServices.reduce((sum, service) => sum + service.price, 0)
+        + suggestedProducts.reduce((sum, product) => sum + product.price * (product.quantity || 1), 0);
+      const serviceNames = suggestedServices.map((service) => service.name).filter(Boolean);
+      const humanNote = [
+        bookingInternalNote.trim(),
+        serviceNames.length ? `Services: ${serviceNames.join(", ")}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+      const persistedNotes = serializeCalendarEntryNotes(humanNote, nextDetails, {
+        status: "suggested",
+        suggestedAt: new Date().toISOString(),
+        professionalNote: bookingInternalNote.trim() || undefined,
+        editedServiceIds: editedIds,
+        editedProductIds,
+        suggestedServices,
+        suggestedProducts,
+        responseStatus: "suggestion_for_change",
+        requestDirection: "outgoing",
+        lastEditedBy: "professional",
+      });
+
+      const parsedBooking = parseApiCalendarEventId(editingEventId);
+      if (parsedBooking?.kind === "booking" && onUpdateBookingStatus) {
+        try {
+          await onUpdateBookingStatus(parsedBooking.id, "requested", {
+            notes: persistedNotes,
+            total_price: ebrTotal,
+          });
+        } catch {
+          showSnackbar({ severity: "error", message: "Unable to send edited booking request." });
+          return false;
+        }
+      }
 
       setEvents((prev) =>
         prev.map((event) =>
@@ -2209,7 +2788,7 @@ export default function ProfessionalFixedLocationCalendar({
             ? {
                 ...event,
                 status: "Requested",
-                bookingScenario: "EBR",
+                bookingScenario: "BR",
                 title: selectedServices[0]?.name ?? event.title,
                 details: {
                   ...event.details,
@@ -2221,6 +2800,30 @@ export default function ProfessionalFixedLocationCalendar({
             : event,
         ),
       );
+      professionalSuggestBookingChanges(bookingRef, {
+        professionalNote: bookingInternalNote.trim() || undefined,
+        editedServiceIds: editedIds,
+        editedProductIds,
+        suggestedServices: suggestedServices.map((service) => ({
+          id: service.id,
+          name: service.name,
+          durationMins: service.durationMins,
+          price: service.price,
+          teamMemberId: service.staffResourceId ?? null,
+          teamMemberName: service.staffResourceId
+            ? resourceNameById.get(service.staffResourceId)
+            : undefined,
+          guestId: service.guestId ?? null,
+          startTime: service.startTime,
+          endTime: service.endTime,
+        })),
+        suggestedProducts: suggestedProducts.map((product) => ({
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          quantity: product.quantity,
+        })),
+      });
       setIncomingRequestEditMode(false);
       setIsEditingExisting(false);
       setSlotStatus("Requested");
@@ -2386,6 +2989,7 @@ export default function ProfessionalFixedLocationCalendar({
     nonMollureDraft.firstName,
     nonMollureDraft.lastName,
     onCreateCalendarEntry,
+    onUpdateBookingStatus,
     originalServicesSnapshot,
     paymentMethod,
     prepaymentPercent,
@@ -2403,6 +3007,7 @@ export default function ProfessionalFixedLocationCalendar({
     slotBookingType,
     slotLocation,
     slotStatus,
+    resourceNameById,
   ]);
 
   return (
@@ -3308,23 +3913,32 @@ export default function ProfessionalFixedLocationCalendar({
         anchor="right"
         open={slotDrawerOpen}
         onClose={closeBookingDrawer}
-        title={isBookingDetailsSubScreen ? "Booking Details" : ""}
+        title={
+          activityDetailItem
+            ? activityDetailItem.detailType === "cancellation"
+              ? "Activity Details"
+              : "Edit request details"
+            : isBookingDetailsSubScreen
+              ? "Booking Details"
+              : ""
+        }
         onBack={
-          isBookingDetailsSubScreen
-            ? () =>
-                setSlotBookingScreen(
-                  slotBookingScreen === "add-unique-item"
-                    ? "select-products"
-                    : slotBookingScreen === "edit-service"
-                      ? "select-services"
-                      : "new-booking",
-                )
-            : undefined
+          activityDetailItem
+            ? () => setActivityDetailItem(null)
+            : isBookingDetailsSubScreen
+              ? () =>
+                  setSlotBookingScreen(
+                    slotBookingScreen === "add-unique-item"
+                      ? "select-products"
+                      : slotBookingScreen === "edit-service"
+                        ? "select-services"
+                        : "new-booking",
+                  )
+              : undefined
         }
         hideDividers
-        width={{ xs: "100%", sm: 420 }}
         footer={
-          selectedSlot && slotDrawerTab === "booking" ? (
+          selectedSlot && slotDrawerTab === "booking" && !activityDetailItem ? (
             <Box sx={{ px: 2.5, py: 2 }}>
               <Stack direction="row" alignItems="center" spacing={1.25}>
                 {slotBookingScreen === "new-booking" && slotClientAdded && !isViewingExisting ? (
@@ -3517,7 +4131,8 @@ export default function ProfessionalFixedLocationCalendar({
                         ? isViewingExisting || !hasProductDraftSelection
                         : slotBookingScreen === "add-unique-item"
                           ? isViewingExisting || !slotValidation.isValid
-                          : !slotValidation.isValid || isViewingExisting)
+                          : !slotValidation.isValid || isViewingExisting) ||
+                    (drawerPrimaryActionLabel === "Update" && isEditingExisting && !isBookingDirty)
                   }
                   onClick={() => {
                     if (isCompletedBooking) return;
@@ -3612,10 +4227,14 @@ export default function ProfessionalFixedLocationCalendar({
                       onClick={() => {
                         if (disabled) return;
                         setSlotDrawerTab(t.id);
+                        setActivityDetailItem(null);
                       }}
                       onKeyDown={(e) => {
                         if (disabled) return;
-                        if (e.key === "Enter" || e.key === " ") setSlotDrawerTab(t.id);
+                        if (e.key === "Enter" || e.key === " ") {
+                          setSlotDrawerTab(t.id);
+                          setActivityDetailItem(null);
+                        }
                       }}
                       sx={{
                         textAlign: "center",
@@ -3647,6 +4266,7 @@ export default function ProfessionalFixedLocationCalendar({
               {slotDrawerTab === "booking" ? (
                 slotBookingScreen === "select-services" ? (
                   <BookingSelectServicesScreen
+                    catalog={selectableServiceCategories}
                     selectedIds={serviceSelectionDraft}
                     serviceOverrides={serviceOverridesDraft}
                     onToggle={(service) => toggleServiceSelectionDraft(service.id)}
@@ -4166,9 +4786,77 @@ export default function ProfessionalFixedLocationCalendar({
                   <Stack spacing={1.6}>
                     {isViewingBooking && viewingBookingEvent ? (
                       <Box>
-                        <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 16, letterSpacing: "-0.01em" }}>
-                          Booking Details
-                        </BodyText>
+                        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+                          <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 16, letterSpacing: "-0.01em" }}>
+                            Booking Details
+                          </BodyText>
+                          {viewingBookingEvent.status === "Confirmed" ? (
+                            <>
+                              <Button
+                                onClick={(e) => setBookingActionAnchor(e.currentTarget)}
+                                endIcon={<KeyboardArrowDownRoundedIcon sx={{ fontSize: 18 }} />}
+                                sx={{
+                                  borderRadius: "10px",
+                                  textTransform: "none",
+                                  fontWeight: 800,
+                                  height: 34,
+                                  px: 1.5,
+                                  color: alpha(m.navy, 0.72),
+                                  bgcolor: alpha(m.navy, 0.04),
+                                  "&:hover": { bgcolor: alpha(m.navy, 0.08) },
+                                }}
+                              >
+                                Action
+                              </Button>
+                              <Menu
+                                anchorEl={bookingActionAnchor}
+                                open={Boolean(bookingActionAnchor)}
+                                onClose={() => setBookingActionAnchor(null)}
+                                anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                                transformOrigin={{ vertical: "top", horizontal: "right" }}
+                                slotProps={{
+                                  paper: {
+                                    sx: {
+                                      mt: 0.5,
+                                      minWidth: 180,
+                                      borderRadius: "12px",
+                                      border: `1px solid ${alpha(m.navy, 0.1)}`,
+                                      boxShadow: "0 14px 30px rgba(16, 35, 63, 0.12)",
+                                    },
+                                  },
+                                }}
+                              >
+                                <MenuItem
+                                  onClick={() => void handleBookingActionSelect("edit")}
+                                  sx={{ fontWeight: 800, fontSize: 13.5, color: alpha(m.navy, 0.78), py: 1.1 }}
+                                >
+                                  Edit Booking
+                                </MenuItem>
+                                <Divider sx={{ my: "0 !important" }} />
+                                <MenuItem
+                                  onClick={() => void handleBookingActionSelect("cancel")}
+                                  sx={{ fontWeight: 800, fontSize: 13.5, color: alpha(m.navy, 0.78), py: 1.1 }}
+                                >
+                                  Cancel Booking
+                                </MenuItem>
+                                <Divider sx={{ my: "0 !important" }} />
+                                <MenuItem
+                                  onClick={() => void handleBookingActionSelect("in_progress")}
+                                  sx={{ fontWeight: 800, fontSize: 13.5, color: alpha(m.navy, 0.78), py: 1.1 }}
+                                >
+                                  In Progress
+                                </MenuItem>
+                                <Divider sx={{ my: "0 !important" }} />
+                                <MenuItem
+                                  onClick={() => void handleBookingActionSelect("no_show")}
+                                  sx={{ fontWeight: 800, fontSize: 13.5, color: alpha(m.navy, 0.78), py: 1.1 }}
+                                >
+                                  No Show
+                                </MenuItem>
+                              </Menu>
+                            </>
+                          ) : null}
+                        </Stack>
 
                         <Stack spacing={1.25} sx={{ mt: 1.25 }}>
                           <Box>
@@ -4386,6 +5074,15 @@ export default function ProfessionalFixedLocationCalendar({
                           }}
                         />
                       </ButtonBase>
+
+                      {requestedScheduleLabel ? (
+                        <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mt: 1, px: 0.25 }}>
+                          <BodyText sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.72) }}>
+                            Requested: {requestedScheduleLabel}
+                          </BodyText>
+                          <BookingEditedTag variant="edited" />
+                        </Stack>
+                      ) : null}
 
                       {slotCalendarOpen ? (
                         <Paper
@@ -4725,6 +5422,9 @@ export default function ProfessionalFixedLocationCalendar({
                           services={selectedServices}
                           products={selectedProducts}
                           showRemoveButtons={showLineItemRemoveButton}
+                          resolveStaffName={(staffResourceId) =>
+                            staffResourceId ? resourceNameById.get(staffResourceId) : undefined
+                          }
                           resolveServiceEditTag={resolveServiceEditTag}
                           onRemoveService={(serviceId) => {
                             setSelectedServices((prev) => prev.filter((item) => item.id !== serviceId));
@@ -4741,12 +5441,16 @@ export default function ProfessionalFixedLocationCalendar({
                             incomingRequestEditMode
                               ? (service) => {
                                   const catalogService =
-                                    serviceCatalog.find((item) => item.id === service.id) ??
-                                    serviceCatalog.find((item) => item.name === service.name);
+                                    selectableServiceCatalog.find((item) => item.id === service.id) ??
+                                    selectableServiceCatalog.find((item) => item.name === service.name);
                                   if (catalogService) openEditService(catalogService);
                                 }
                               : undefined
                           }
+                        />
+
+                        <BookingDrawerClientSnapshotSection
+                          snapshot={viewingBookingEvent?.details?.clientSnapshot ?? null}
                         />
 
                         {bookingGuests.map((guest) => (
@@ -5483,9 +6187,9 @@ export default function ProfessionalFixedLocationCalendar({
 
                         {showIncomingRequestActions ? (
                           <BookingRequestResponseActions
-                            onAccept={handleAcceptIncomingRequest}
+                            onAccept={() => setIncomingConfirmAction("accept")}
                             onEdit={handleStartIncomingEdit}
-                            onReject={handleRejectIncomingRequest}
+                            onReject={() => setIncomingConfirmAction("reject")}
                           />
                         ) : null}
 
@@ -5609,93 +6313,29 @@ export default function ProfessionalFixedLocationCalendar({
                 <Box sx={{ pt: 1 }}>
                   {drawerSalesActivityContext ? (
                     slotDrawerTab === "sales" ? (
-                      <Stack spacing={1.25}>
-                        <BodyText sx={{ fontSize: 13, fontWeight: 900, color: m.navy }}>
-                          Sales summary
-                        </BodyText>
-                        {(drawerSalesActivityContext.details?.services ?? selectedServices).map((service) => (
-                          <Stack key={service.id} direction="row" justifyContent="space-between" spacing={2}>
-                            <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.72) }}>{service.name}</BodyText>
-                            <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.82) }}>
-                              €{getEffectiveServicePrice(service)}
-                            </BodyText>
-                          </Stack>
-                        ))}
-                        {(drawerSalesActivityContext.details?.products ?? selectedProducts).map((product) => (
-                          <Stack key={product.id} direction="row" justifyContent="space-between" spacing={2}>
-                            <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.72) }}>{product.name}</BodyText>
-                            <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.82) }}>
-                              €{product.price}
-                            </BodyText>
-                          </Stack>
-                        ))}
-                        <Box sx={{ pt: 1, borderTop: `1px solid ${alpha(m.navy, 0.08)}` }}>
-                          <Stack direction="row" justifyContent="space-between">
-                            <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.62) }}>Subtotal</BodyText>
-                            <BodyText sx={{ fontSize: 14, fontWeight: 900, color: m.navy }}>€{subtotalPrice}</BodyText>
-                          </Stack>
-                          {bookingTotalDiscount ? (
-                            <Stack direction="row" justifyContent="space-between" sx={{ mt: 0.5 }}>
-                              <BodyText sx={{ fontSize: 12, color: alpha(m.navy, 0.55) }}>
-                                {formatManualEntryDiscountLabel(bookingTotalDiscount)}
-                              </BodyText>
-                              <BodyText sx={{ fontSize: 12, fontWeight: 800, color: m.teal }}>
-                                -€{bookingDiscountAmount}
-                              </BodyText>
-                            </Stack>
-                          ) : null}
-                          <Stack direction="row" justifyContent="space-between" sx={{ mt: 0.75 }}>
-                            <BodyText sx={{ fontSize: 13, fontWeight: 900, color: m.navy }}>Total</BodyText>
-                            <BodyText sx={{ fontSize: 16, fontWeight: 950, color: m.navy }}>€{totalPrice}</BodyText>
-                          </Stack>
-                          {showPrepayment ? (
-                            <Stack direction="row" justifyContent="space-between" sx={{ mt: 0.5 }}>
-                              <BodyText sx={{ fontSize: 12, color: alpha(m.navy, 0.55) }}>Prepayment ({prepaymentPercent}%)</BodyText>
-                              <BodyText sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.72) }}>€{prepaymentAmount}</BodyText>
-                            </Stack>
-                          ) : null}
-                        </Box>
-                      </Stack>
+                      <SalesOverview
+                        bookings={clientBookingsForActivity}
+                        currentEvent={drawerSalesActivityContext}
+                        clientName={clientActivityIdentity.name}
+                        clientEmail={clientActivityIdentity.email}
+                        clientPhone={
+                          [bookingPhoneDraft.phoneCode, bookingPhoneDraft.phoneNumber]
+                            .filter(Boolean)
+                            .join(" ")
+                            .trim() ||
+                          drawerSalesActivityContext.details?.phoneNumber ||
+                          ""
+                        }
+                        fallbackResourceId={drawerSalesActivityContext.resourceId || data.resources[0]?.id || "unassigned"}
+                      />
                     ) : (
-                      <Stack spacing={1.25}>
-                        <BodyText sx={{ fontSize: 13, fontWeight: 900, color: m.navy }}>
-                          Activity
-                        </BodyText>
-                        <Stack spacing={0.75}>
-                          <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.72) }}>
-                            Status: <strong>{drawerSalesActivityContext.status}</strong>
-                          </BodyText>
-                          <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.72) }}>
-                            Booking type: {drawerSalesActivityContext.bookingType ?? slotBookingType}
-                          </BodyText>
-                          <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.72) }}>
-                            Location: {drawerSalesActivityContext.location}
-                          </BodyText>
-                          <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.72) }}>
-                            Time: {drawerSalesActivityContext.start} – {drawerSalesActivityContext.end}
-                          </BodyText>
-                          {drawerSalesActivityContext.bookingScenario ? (
-                            <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.72) }}>
-                              Request: {drawerSalesActivityContext.bookingScenario}
-                            </BodyText>
-                          ) : null}
-                          {drawerSalesActivityContext.details?.internalNote ? (
-                            <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.72) }}>
-                              Note: {drawerSalesActivityContext.details.internalNote}
-                            </BodyText>
-                          ) : null}
-                          {showLateCancellation ? (
-                            <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.72) }}>
-                              Late cancellation fee: {lateCancellationFeePercent}% (€{lateCancellationFeeAmount})
-                            </BodyText>
-                          ) : null}
-                          {showLateRescheduling ? (
-                            <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.72) }}>
-                              Late rescheduling fee: {lateRescheduleFeePercent}% (€{lateRescheduleFeeAmount})
-                            </BodyText>
-                          ) : null}
-                        </Stack>
-                      </Stack>
+                      <BookingActivityOverview
+                        title="Activity Overview"
+                        items={activityTimelineItems}
+                        emptyMessage="No activity for this client yet."
+                        selectedDetail={activityDetailItem}
+                        onSelectedDetailChange={setActivityDetailItem}
+                      />
                     )
                   ) : (
                     <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.6) }}>
@@ -5922,6 +6562,32 @@ export default function ProfessionalFixedLocationCalendar({
       />
       <DiscardBrDialog open={discardBrOpen} onClose={() => setDiscardBrOpen(false)} onConfirm={handleDiscardBr} />
       <DiscardEbrDialog open={discardEbrOpen} onClose={() => setDiscardEbrOpen(false)} onConfirm={handleDiscardEbr} />
+      <BookingRequestConfirmDialog
+        open={Boolean(incomingConfirmAction)}
+        action={incomingConfirmAction}
+        onClose={() => setIncomingConfirmAction(null)}
+        onConfirm={() => {
+          if (incomingConfirmAction === "accept") void handleAcceptIncomingRequest();
+          else if (incomingConfirmAction === "reject") void handleRejectIncomingRequest();
+        }}
+      />
+      <CalendarNoShowModal
+        open={noShowModalOpen}
+        participants={noShowParticipants}
+        onClose={() => setNoShowModalOpen(false)}
+        onConfirm={() => void handleConfirmNoShow()}
+      />
+      <CalendarCancelBookingModal
+        open={cancelModalOpen}
+        onClose={() => setCancelModalOpen(false)}
+        onConfirm={() => void handleConfirmCancel()}
+      />
+      <CalendarBookingActionConfirmDialog
+        open={Boolean(pendingBookingAction)}
+        action={pendingBookingAction}
+        onClose={() => setPendingBookingAction(null)}
+        onConfirm={() => void handleConfirmBookingAction()}
+      />
     </Stack>
   );
 }

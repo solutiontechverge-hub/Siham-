@@ -1,0 +1,103 @@
+"use client";
+
+import * as React from "react";
+import { useParams, useSearchParams } from "next/navigation";
+import { Box, CircularProgress, Container, Typography } from "@mui/material";
+import { MarketingSiteFooter, MollureMarketingHeader } from "../../../../../components/common";
+import ClientProfessionalReviewsView from "../../../../../components/common/client-reviews/ClientProfessionalReviewsView";
+import { marketingShellFooter } from "../../../../../data/marketingShell.data";
+import { useBusinessPublicProfile } from "../../../../../hooks/useBusinessPublicProfile";
+import { useAppSelector } from "../../../../../store/hooks";
+
+export default function ClientProfessionalReviewsPage() {
+  const params = useParams();
+  const searchParams = useSearchParams();
+  const shopId = typeof params?.shopId === "string" ? params.shopId : "";
+  const memberIdParam = searchParams?.get("memberId") ?? "";
+  const { profile, isLoading, isError } = useBusinessPublicProfile(shopId);
+  const user = useAppSelector((s) => s.auth.user);
+
+  const displayName =
+    ((user as { display_name?: string })?.display_name as string | undefined) ||
+    `${(user as { first_name?: string })?.first_name ?? ""} ${(user as { last_name?: string })?.last_name ?? ""}`.trim() ||
+    user?.email ||
+    "Guest";
+
+  const locationMode = React.useMemo<"fixed" | "desired">(() => {
+    if (!profile) return "fixed";
+    if (!profile.supportsFixedLocation) return "desired";
+    if (!profile.supportsDesiredLocation) return "fixed";
+    try {
+      const raw = window.sessionStorage.getItem("mollure:selected_shop");
+      if (raw) {
+        const parsed = JSON.parse(raw) as { shopId?: string; locationMode?: "fixed" | "desired" };
+        if (parsed.shopId === profile.shopId && parsed.locationMode) return parsed.locationMode;
+      }
+    } catch {
+      // ignore
+    }
+    return profile.locationModeDefault;
+  }, [profile]);
+
+  const member = React.useMemo(() => {
+    if (!profile?.teamMembers.length) return null;
+    if (memberIdParam) {
+      return profile.teamMembers.find((m) => m.id === memberIdParam) ?? profile.teamMembers[0];
+    }
+    return profile.teamMembers[0];
+  }, [memberIdParam, profile]);
+
+  const seedDemoReviews = Boolean(profile && member && profile.teamMembers[0]?.id === member.id);
+
+  if (isLoading) {
+    return (
+      <Box sx={{ minHeight: "100vh", bgcolor: "#EAF9FB", py: 4 }}>
+        <Container maxWidth="lg">
+          <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+            <CircularProgress />
+          </Box>
+        </Container>
+      </Box>
+    );
+  }
+
+  if (isError || !profile || !member) {
+    return (
+      <Box sx={{ minHeight: "100vh", bgcolor: "#EAF9FB", py: 4 }}>
+        <Container maxWidth="lg">
+          <Box sx={{ textAlign: "center", py: 8 }}>
+            <Typography>{isError ? "Unable to load reviews." : "Professional not found."}</Typography>
+          </Box>
+        </Container>
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ minHeight: "100vh", bgcolor: "#EAF9FB" }}>
+      <MollureMarketingHeader
+        navItems={[]}
+        isAuthed
+        userLabel={user?.email ?? ""}
+        userName={displayName}
+        homeHref="/"
+      />
+
+      <Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 3.5 } }}>
+        <ClientProfessionalReviewsView
+          profile={profile}
+          member={member}
+          locationMode={locationMode}
+          reviewerName={displayName}
+          seedDemoReviews={seedDemoReviews}
+        />
+      </Container>
+
+      <MarketingSiteFooter
+        columns={marketingShellFooter.columns.map((col) => ({ title: col.title, items: [...col.items] }))}
+        copyright={marketingShellFooter.copyright}
+        sx={{ mt: 2 }}
+      />
+    </Box>
+  );
+}

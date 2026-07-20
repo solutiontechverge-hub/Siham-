@@ -2,6 +2,7 @@ import * as React from "react";
 import MuiTypography, { type TypographyProps } from "@mui/material/Typography";
 import { alpha, type SxProps, type Theme } from "@mui/material/styles";
 import { MOLLURE_HEADING_BODY_GAP_PX } from "../../theme/spacing";
+import { mollureFontSizes } from "../../theme/typography";
 
 type AppTypographyProps<C extends React.ElementType> = Omit<
   TypographyProps<C, { component?: C }>,
@@ -60,16 +61,16 @@ export function MarketingHeroTitle<C extends React.ElementType = "h1">(props: Ap
   const { sx, ...rest } = props;
   return (
     <MuiTypography
-      variant="bodyText"
+      variant="mainHeading"
       component="h1"
       {...rest}
       sx={mergeSx(
         {
           whiteSpace: "pre-line",
-          fontSize: { xs: "2.55rem", sm: "3.35rem", md: "4.05rem" },
-          lineHeight: { xs: 1.08, md: 1.03 },
-          fontWeight: 700,
-          letterSpacing: "-0.04em",
+          fontSize: mollureFontSizes.heading,
+          lineHeight: 1,
+          fontWeight: 600,
+          letterSpacing: 0,
           color: "text.primary",
         },
         sx,
@@ -89,7 +90,7 @@ export function MarketingHeroDescription<C extends React.ElementType = "p">(prop
         [
           {
             whiteSpace: "pre-line",
-            fontSize: { xs: "1rem", md: "1.0625rem" },
+            fontSize: mollureFontSizes.content,
             lineHeight: 1.5,
             color: (theme) => alpha(theme.palette.mollure.navy, 0.55),
           },
@@ -106,7 +107,7 @@ export function MarketingSectionTitle<C extends React.ElementType = "h2">(props:
   const { sx, ...rest } = props;
   return (
     <MuiTypography
-      variant="bodyText"
+      variant="mainHeading"
       component="h2"
       {...rest}
       sx={mergeSx(
@@ -114,9 +115,9 @@ export function MarketingSectionTitle<C extends React.ElementType = "h2">(props:
           fontWeight: 600,
           color: "mollure.textcolorgrey700",
           textAlign: "center",
-          fontSize: { xs: "1.75rem", md: "2.15rem" },
-          lineHeight: 1.15,
-          letterSpacing: "-0.01em",
+          fontSize: mollureFontSizes.heading,
+          lineHeight: 1,
+          letterSpacing: 0,
         },
         sx,
       )}
@@ -136,8 +137,8 @@ export function MarketingSectionSubtitle<C extends React.ElementType = "p">(prop
           fontWeight: 400,
           color: (theme) => alpha(theme.palette.mollure.navy, 0.55),
           textAlign: "center",
-          fontSize: { xs: "0.85rem", md: "0.95rem" },
-          lineHeight: 1.55,
+          fontSize: mollureFontSizes.content,
+          lineHeight: 1.5,
           maxWidth: 620,
           mx: "auto",
           mt: `${MOLLURE_HEADING_BODY_GAP_PX}px`,
@@ -152,14 +153,14 @@ export function MarketingKpiTitle<C extends React.ElementType = "div">(props: Ap
   const { sx, ...rest } = props;
   return (
     <MuiTypography
-      variant="bodyText"
+      variant="subHeading"
       {...rest}
       sx={mergeSx(
         {
-          fontWeight: 700,
+          fontWeight: 600,
           color: "mollure.textcolorgrey700",
-          fontSize: { xs: 16, md: 21 },
-          lineHeight: 1.1,
+          fontSize: mollureFontSizes.subheading,
+          lineHeight: 1.2,
         },
         sx,
       )}
@@ -176,7 +177,7 @@ export function MarketingKpiSubtitle<C extends React.ElementType = "div">(props:
       sx={mergeSx(
         {
           color: "text.secondary",
-          fontSize: { xs: "0.71875rem", md: "0.875rem" },
+          fontSize: mollureFontSizes.content,
           mt: `${MOLLURE_HEADING_BODY_GAP_PX}px`,
         },
         sx,

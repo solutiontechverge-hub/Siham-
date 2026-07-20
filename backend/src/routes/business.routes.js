@@ -38,8 +38,8 @@ import { messagingUpload } from "../middleware/messagingUpload.middleware.js";
 const router = express.Router();
 const locationModes = ["fixed", "desired", "both"];
 const locationTypes = ["fixed", "desired"];
-const calendarStatuses = ["requested", "cancelled", "completed", "confirmed", "blocked", "no_show"];
-const bookingStatuses = ["requested", "cancelled", "completed", "confirmed", "no_show"];
+const calendarStatuses = ["requested", "cancelled", "completed", "confirmed", "blocked", "in_progress", "no_show"];
+const bookingStatuses = ["requested", "cancelled", "completed", "confirmed", "in_progress", "no_show"];
 const percentageFields = [
   "prepayment_percentage",
   "late_reschedule_fee_percentage",
@@ -194,6 +194,22 @@ const businessSetupValidators = [
       .optional({ values: "falsy" })
       .custom((value) => Array.isArray(parseArrayLike(value)))
       .withMessage("team_members must be an array."),
+    body("section_sync_settings")
+      .optional({ values: "falsy" })
+      .custom((value) => {
+        if (value == null || value === "") return true;
+        if (typeof value === "object" && !Array.isArray(value)) return true;
+        if (typeof value === "string") {
+          try {
+            const parsed = JSON.parse(value);
+            return parsed && typeof parsed === "object" && !Array.isArray(parsed);
+          } catch {
+            return false;
+          }
+        }
+        return false;
+      })
+      .withMessage("section_sync_settings must be an object."),
 ];
 
 const saveBusinessSetupHandlers = [
@@ -314,7 +330,7 @@ router.post(
       .optional({ values: "falsy" })
       .trim()
       .isIn(bookingStatuses)
-      .withMessage("status must be requested, cancelled, completed, confirmed, or no_show."),
+      .withMessage("status must be requested, cancelled, completed, confirmed, in_progress, or no_show."),
   ],
   validateRequest,
   createBooking,
@@ -326,7 +342,27 @@ router.patch(
     body("status")
       .trim()
       .isIn(bookingStatuses)
-      .withMessage("status must be requested, cancelled, completed, confirmed, or no_show."),
+      .withMessage("status must be requested, cancelled, completed, confirmed, in_progress, or no_show."),
+    body("notes").optional({ values: "falsy" }).isString().withMessage("notes must be a string."),
+    body("total_price")
+      .optional({ values: "falsy" })
+      .isFloat({ min: 0 })
+      .withMessage("total_price must be a non-negative number."),
+    body("booking_date")
+      .optional({ values: "falsy" })
+      .trim()
+      .matches(/^\d{4}-\d{2}-\d{2}$/)
+      .withMessage("booking_date must be YYYY-MM-DD."),
+    body("start_time")
+      .optional({ values: "falsy" })
+      .trim()
+      .isISO8601()
+      .withMessage("start_time must be a valid datetime."),
+    body("end_time")
+      .optional({ values: "falsy" })
+      .trim()
+      .isISO8601()
+      .withMessage("end_time must be a valid datetime."),
   ],
   validateRequest,
   updateBookingStatus,
@@ -340,13 +376,33 @@ router.patch(
     body("status")
       .optional({ values: "falsy" })
       .trim()
-      .isIn(["cancelled", "confirmed"])
-      .withMessage("status must be cancelled or confirmed."),
+      .isIn(["cancelled", "confirmed", "requested"])
+      .withMessage("status must be cancelled, confirmed, or requested."),
     body("prepayment_status")
       .optional({ values: "falsy" })
       .trim()
       .isIn(["paid", "pending", "failed", "required"])
       .withMessage("prepayment_status must be paid, pending, failed, or required."),
+    body("notes").optional({ values: "null" }).isString().withMessage("notes must be a string."),
+    body("total_price")
+      .optional({ values: "falsy" })
+      .isFloat({ min: 0 })
+      .withMessage("total_price must be a non-negative number."),
+    body("booking_date")
+      .optional({ values: "falsy" })
+      .trim()
+      .matches(/^\d{4}-\d{2}-\d{2}$/)
+      .withMessage("booking_date must be YYYY-MM-DD."),
+    body("start_time")
+      .optional({ values: "falsy" })
+      .trim()
+      .isISO8601()
+      .withMessage("start_time must be a valid datetime."),
+    body("end_time")
+      .optional({ values: "falsy" })
+      .trim()
+      .isISO8601()
+      .withMessage("end_time must be a valid datetime."),
   ],
   validateRequest,
   updateMyBooking,

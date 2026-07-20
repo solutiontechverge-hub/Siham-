@@ -1,17 +1,24 @@
 "use client";
 
+import * as React from "react";
 import { Box, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import MessagingModalShell, { MessagingModalCancelButton, MessagingModalPrimaryButton } from "../messaging/MessagingModalShell";
+import AppTextField from "../AppTextField";
 
 type Props = {
   open: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (reason: string) => void;
 };
 
 export default function ClientBookingCancelDialog({ open, onClose, onConfirm }: Props) {
   const m = useTheme().palette.mollure;
+  const [reason, setReason] = React.useState("");
+
+  React.useEffect(() => {
+    if (!open) setReason("");
+  }, [open]);
 
   return (
     <MessagingModalShell
@@ -25,7 +32,7 @@ export default function ClientBookingCancelDialog({ open, onClose, onConfirm }: 
           <MessagingModalPrimaryButton
             label="Cancel booking"
             onClick={() => {
-              onConfirm();
+              onConfirm(reason.trim());
               onClose();
             }}
           />
@@ -40,6 +47,19 @@ export default function ClientBookingCancelDialog({ open, onClose, onConfirm }: 
           This action cannot be undone. Any prepayment or deposit may be subject to the professional&apos;s cancellation
           policy, including late-cancellation fees. You will no longer be able to edit this booking.
         </Typography>
+        <Box sx={{ mt: 2 }}>
+          <Typography sx={{ mb: 0.75, fontWeight: 800, fontSize: 12.5, color: alpha(m.navy, 0.7) }}>
+            Reason (optional)
+          </Typography>
+          <AppTextField
+            fullWidth
+            multiline
+            minRows={2}
+            placeholder="e.g. Team member fell sick"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+          />
+        </Box>
       </Box>
     </MessagingModalShell>
   );

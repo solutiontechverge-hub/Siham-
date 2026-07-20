@@ -29,6 +29,7 @@ import {
   useDispatchBookingNotificationMutation,
   useUpdateCalendarEntryStatusMutation,
   useUpsertCalendarSettingsMutation,
+  type BookingNotificationEvent,
   type BusinessServiceDetail,
   type CalendarOverviewQuery,
 } from "../../../../store/services/businessApi";
@@ -254,7 +255,11 @@ export default function FixedLocationCalendarPage() {
         await updateBookingStatus({ id, status, ...options }).unwrap();
       }}
       onDispatchBookingNotification={async (id, event, options) => {
-        await dispatchBookingNotification({ id, event, ...options }).unwrap();
+        await dispatchBookingNotification({
+          id,
+          event: event as BookingNotificationEvent,
+          ...options,
+        }).unwrap();
       }}
       onUpdateCalendarEntryStatus={async (id, status) => {
         await updateCalendarEntryStatus({ id, status }).unwrap();

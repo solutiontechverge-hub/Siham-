@@ -50,8 +50,10 @@ export type BusinessTeamMember = {
 };
 
 export type BusinessBookServiceCombination = {
+  /** First service id in the combo (always a service — field name is legacy). */
   category_id: string;
   category_title?: string | null;
+  /** Second service id in the combo. */
   service_id: string;
   service_title?: string | null;
 };
@@ -219,6 +221,7 @@ export type BusinessSetup = {
   desired_location_area: string | null;
   desired_location_province: string | null;
   desired_location_services: string[];
+  section_sync_settings: Record<string, string> | null;
   created_at: string;
   updated_at: string;
   team_members: BusinessTeamMember[];
@@ -229,7 +232,7 @@ export type CalendarEntry = {
   id: string;
   professional_profile_id: string;
   team_member_id: string | null;
-  status: "requested" | "cancelled" | "completed" | "confirmed" | "blocked" | "no_show";
+  status: "requested" | "cancelled" | "completed" | "confirmed" | "blocked" | "in_progress" | "no_show";
   title: string;
   unique_code: string;
   start_time: string | null;
@@ -332,23 +335,7 @@ export type UpsertCalendarSettingsRequest = {
 
 export type UpdateCalendarEntryStatusRequest = {
   id: string;
-  status: "requested" | "cancelled" | "completed" | "confirmed" | "no_show";
-};
-
-export type UpdateBookingStatusRequest = {
-  id: string;
-  status: "requested" | "cancelled" | "completed" | "confirmed" | "no_show";
-  notification_event?: BookingNotificationEvent;
-  notify_incoming_er?: boolean;
-  initiated_by?: "client" | "professional";
-};
-
-export type UpdateMyBookingRequest = {
-  id: string;
-  status?: "cancelled" | "confirmed";
-  prepayment_status?: "paid" | "pending" | "failed" | "required";
-  notification_event?: BookingNotificationEvent;
-  notify_incoming_er?: boolean;
+  status: "requested" | "cancelled" | "completed" | "confirmed" | "in_progress" | "no_show";
 };
 
 export type BookingNotificationEvent =
@@ -361,6 +348,32 @@ export type BookingNotificationEvent =
   | "ebr_discarded"
   | "incoming_er"
   | "payment_due_set";
+
+export type UpdateBookingStatusRequest = {
+  id: string;
+  status: "requested" | "cancelled" | "completed" | "confirmed" | "in_progress" | "no_show";
+  notification_event?: BookingNotificationEvent;
+  notify_incoming_er?: boolean;
+  initiated_by?: "client" | "professional";
+  notes?: string | null;
+  total_price?: number | string | null;
+  booking_date?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+};
+
+export type UpdateMyBookingRequest = {
+  id: string;
+  status?: "cancelled" | "confirmed" | "requested";
+  prepayment_status?: "paid" | "pending" | "failed" | "required";
+  notification_event?: BookingNotificationEvent;
+  notify_incoming_er?: boolean;
+  notes?: string | null;
+  total_price?: number | string | null;
+  booking_date?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+};
 
 export type DispatchBookingNotificationRequest = {
   id: string;
@@ -380,7 +393,7 @@ export type CreateBookingRequest = {
   location_details?: Record<string, unknown>;
   notes?: string | null;
   prepayment_status?: string | null;
-  status?: "requested" | "cancelled" | "completed" | "confirmed" | "no_show";
+  status?: "requested" | "cancelled" | "completed" | "confirmed" | "in_progress" | "no_show";
   booking_type?: "online" | "offline" | "project" | "request";
   unique_code?: string | null;
   total_price?: number | string | null;
@@ -437,6 +450,7 @@ export type UpsertBusinessSetupRequest = {
   desired_location_area?: string;
   desired_location_province?: string;
   desired_location_services?: string[];
+  section_sync_settings?: Record<string, string>;
   team_members?: Array<
     BusinessTeamMember & {
       photo_upload_key?: string;
@@ -793,10 +807,17 @@ export const businessApi = baseApi.injectEndpoints({
     }),
     updateBookingStatus: builder.mutation<ApiEnvelope<CalendarBooking>, UpdateBookingStatusRequest>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
-        const body: Record<string, string | boolean> = { status: payload.status };
+        const body: Record<string, string | number | boolean> = { status: payload.status };
         if (payload.notification_event) body.notification_event = payload.notification_event;
         if (payload.notify_incoming_er) body.notify_incoming_er = true;
         if (payload.initiated_by) body.initiated_by = payload.initiated_by;
+        if (payload.notes !== undefined) body.notes = payload.notes ?? "";
+        if (payload.total_price !== undefined && payload.total_price !== null && payload.total_price !== "") {
+          body.total_price = Number(payload.total_price);
+        }
+        if (payload.booking_date) body.booking_date = payload.booking_date;
+        if (payload.start_time) body.start_time = payload.start_time;
+        if (payload.end_time) body.end_time = payload.end_time;
 
         const response = await fetchWithBQ({
           url: `/api/business/bookings/${payload.id}/status`,
@@ -819,11 +840,18 @@ export const businessApi = baseApi.injectEndpoints({
     }),
     updateMyBooking: builder.mutation<ApiEnvelope<CalendarBooking>, UpdateMyBookingRequest>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
-        const body: Record<string, string | boolean> = {};
+        const body: Record<string, string | number | boolean> = {};
         if (payload.status) body.status = payload.status;
         if (payload.prepayment_status) body.prepayment_status = payload.prepayment_status;
         if (payload.notification_event) body.notification_event = payload.notification_event;
         if (payload.notify_incoming_er) body.notify_incoming_er = true;
+        if (payload.notes !== undefined) body.notes = payload.notes ?? "";
+        if (payload.total_price !== undefined && payload.total_price !== null && payload.total_price !== "") {
+          body.total_price = Number(payload.total_price);
+        }
+        if (payload.booking_date) body.booking_date = payload.booking_date;
+        if (payload.start_time) body.start_time = payload.start_time;
+        if (payload.end_time) body.end_time = payload.end_time;
 
         const response = await fetchWithBQ({
           url: `/api/business/bookings/${payload.id}`,

@@ -46,7 +46,7 @@ export default function ImageCard({
       </Box>
       <CardContent sx={{ p: 3 }}>
         <Stack spacing={1.5}>
-          <SubHeading sx={{ fontSize: "20px", color: "#10233f" }}>{title}</SubHeading>
+          <SubHeading sx={{ color: "#10233f" }}>{title}</SubHeading>
           {description ? (
             <BodyText color="text.secondary">{description}</BodyText>
           ) : null}
