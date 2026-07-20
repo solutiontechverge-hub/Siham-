@@ -263,6 +263,7 @@ export type CalendarBooking = {
   start_time: string | null;
   end_time: string | null;
   location_type: "fixed" | "desired" | null;
+  location_details?: Record<string, unknown> | null;
   notes: string | null;
   status: string;
   prepayment_status?: string | null;
@@ -270,6 +271,8 @@ export type CalendarBooking = {
   booking_type?: "online" | "offline" | "project" | "request" | null;
   unique_code?: string | null;
   total_price: string | number | null;
+  images?: string[] | null;
+  documents?: string[] | null;
   service_title?: string | null;
   team_member_name?: string | null;
   customer_name?: string | null;
@@ -335,9 +338,23 @@ export type UpdateCalendarEntryStatusRequest = {
   status: "requested" | "cancelled" | "completed" | "confirmed" | "in_progress" | "no_show";
 };
 
+export type BookingNotificationEvent =
+  | "suggest_for_change"
+  | "edit_request_outgoing"
+  | "booking_date_changed"
+  | "time_changed"
+  | "service_edited"
+  | "unique_item_edited"
+  | "ebr_discarded"
+  | "incoming_er"
+  | "payment_due_set";
+
 export type UpdateBookingStatusRequest = {
   id: string;
   status: "requested" | "cancelled" | "completed" | "confirmed" | "in_progress" | "no_show";
+  notification_event?: BookingNotificationEvent;
+  notify_incoming_er?: boolean;
+  initiated_by?: "client" | "professional";
   notes?: string | null;
   total_price?: number | string | null;
   booking_date?: string | null;
@@ -349,11 +366,20 @@ export type UpdateMyBookingRequest = {
   id: string;
   status?: "cancelled" | "confirmed" | "requested";
   prepayment_status?: "paid" | "pending" | "failed" | "required";
+  notification_event?: BookingNotificationEvent;
+  notify_incoming_er?: boolean;
   notes?: string | null;
   total_price?: number | string | null;
   booking_date?: string | null;
   start_time?: string | null;
   end_time?: string | null;
+};
+
+export type DispatchBookingNotificationRequest = {
+  id: string;
+  event: BookingNotificationEvent;
+  initiated_by?: "client" | "professional";
+  message?: string;
 };
 
 export type CreateBookingRequest = {
@@ -372,6 +398,8 @@ export type CreateBookingRequest = {
   unique_code?: string | null;
   total_price?: number | string | null;
   contact_number?: string | null;
+  images?: string[];
+  documents?: string[];
 };
 
 export type UpdateBusinessSetupActiveRequest = {
@@ -779,7 +807,10 @@ export const businessApi = baseApi.injectEndpoints({
     }),
     updateBookingStatus: builder.mutation<ApiEnvelope<CalendarBooking>, UpdateBookingStatusRequest>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
-        const body: Record<string, string | number> = { status: payload.status };
+        const body: Record<string, string | number | boolean> = { status: payload.status };
+        if (payload.notification_event) body.notification_event = payload.notification_event;
+        if (payload.notify_incoming_er) body.notify_incoming_er = true;
+        if (payload.initiated_by) body.initiated_by = payload.initiated_by;
         if (payload.notes !== undefined) body.notes = payload.notes ?? "";
         if (payload.total_price !== undefined && payload.total_price !== null && payload.total_price !== "") {
           body.total_price = Number(payload.total_price);
@@ -809,9 +840,11 @@ export const businessApi = baseApi.injectEndpoints({
     }),
     updateMyBooking: builder.mutation<ApiEnvelope<CalendarBooking>, UpdateMyBookingRequest>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
-        const body: Record<string, string | number> = {};
+        const body: Record<string, string | number | boolean> = {};
         if (payload.status) body.status = payload.status;
         if (payload.prepayment_status) body.prepayment_status = payload.prepayment_status;
+        if (payload.notification_event) body.notification_event = payload.notification_event;
+        if (payload.notify_incoming_er) body.notify_incoming_er = true;
         if (payload.notes !== undefined) body.notes = payload.notes ?? "";
         if (payload.total_price !== undefined && payload.total_price !== null && payload.total_price !== "") {
           body.total_price = Number(payload.total_price);
@@ -839,6 +872,34 @@ export const businessApi = baseApi.injectEndpoints({
       },
       invalidatesTags: ["Calendar", "Bookings"],
     }),
+    dispatchBookingNotification: builder.mutation<
+      ApiEnvelope<{ bookingId: string; event: string }>,
+      DispatchBookingNotificationRequest
+    >({
+      async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
+        const body: Record<string, string> = { event: payload.event };
+        if (payload.initiated_by) body.initiated_by = payload.initiated_by;
+        if (payload.message) body.message = payload.message;
+
+        const response = await fetchWithBQ({
+          url: `/api/business/bookings/${payload.id}/notifications`,
+          method: "POST",
+          body,
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<{ bookingId: string; event: string }>;
+        if (!data.success) {
+          return { error: customError(data.message || "Unable to dispatch notification.") };
+        }
+
+        return { data };
+      },
+      invalidatesTags: ["Notifications"],
+    }),
     uploadBusinessMedia: builder.mutation<ApiEnvelope<{ business_media: string[] }>, File[]>({
       async queryFn(files, _api, _extraOptions, fetchWithBQ) {
         const formData = new FormData();
@@ -859,6 +920,50 @@ export const businessApi = baseApi.injectEndpoints({
         const data = response.data as ApiEnvelope<{ business_media: string[] }>;
         if (!data.success || !Array.isArray(data.data?.business_media)) {
           return { error: customError(data.message || "Unable to upload business media.") };
+        }
+
+        return { data };
+      },
+    }),
+    uploadBookingAttachments: builder.mutation<
+      ApiEnvelope<{
+        attachments: Array<{
+          id: string;
+          name: string;
+          mimeType: string;
+          kind: "image" | "document";
+          url: string;
+        }>;
+      }>,
+      File[]
+    >({
+      async queryFn(files, _api, _extraOptions, fetchWithBQ) {
+        const formData = new FormData();
+        for (const file of files) {
+          formData.append("files", file, file.name);
+        }
+
+        const response = await fetchWithBQ({
+          url: "/api/business/bookings/attachments",
+          method: "POST",
+          body: formData,
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<{
+          attachments: Array<{
+            id: string;
+            name: string;
+            mimeType: string;
+            kind: "image" | "document";
+            url: string;
+          }>;
+        }>;
+        if (!data.success || !Array.isArray(data.data?.attachments)) {
+          return { error: customError(data.message || "Unable to upload booking attachments.") };
         }
 
         return { data };
@@ -1106,7 +1211,9 @@ export const {
   useCreateBookingMutation,
   useUpdateBookingStatusMutation,
   useUpdateMyBookingMutation,
+  useDispatchBookingNotificationMutation,
   useUploadBusinessMediaMutation,
+  useUploadBookingAttachmentsMutation,
   useUpdateBusinessSetupActiveMutation,
   useCreateBusinessSubcategoryMutation,
   useUpsertBusinessSetupMutation,

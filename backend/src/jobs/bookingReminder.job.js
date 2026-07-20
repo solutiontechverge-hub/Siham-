@@ -1,4 +1,4 @@
-import { processAppointmentReminders } from "../services/bookingEmail.service.js";
+import { processAppointmentReminderNotifications } from "../services/bookingNotification.service.js";
 
 const DEFAULT_INTERVAL_MS = Number(process.env.BOOKING_REMINDER_POLL_MS || 5 * 60 * 1000);
 
@@ -9,7 +9,7 @@ const runReminderCycle = async () => {
   if (running) return;
   running = true;
   try {
-    const outcomes = await processAppointmentReminders();
+    const outcomes = await processAppointmentReminderNotifications();
     const sentCount = outcomes.filter((item) => item.sent).length;
     if (sentCount > 0) {
       console.log(`[booking-reminder] Sent ${sentCount} appointment reminder email(s).`);

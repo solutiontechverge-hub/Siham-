@@ -46,8 +46,8 @@ const formatStatusLabel = (status) => {
   return labels[status] || String(status ?? "—");
 };
 
-const bookingCardEmail = ({ title, salonName, professionalName, startTime, uniqueCode, iconType, ctaLabel, status }) => {
-  const detailsUrl = buildBookingDetailsUrl(uniqueCode);
+const bookingCardEmail = ({ title, salonName, professionalName, startTime, uniqueCode, iconType, ctaLabel, status, ctaUrl }) => {
+  const detailsUrl = ctaUrl || buildBookingDetailsUrl(uniqueCode);
   const rows = [
     { label: "Professional", value: professionalName },
     { label: "Start Time", value: formatStartTime(startTime) },
@@ -124,6 +124,32 @@ export const buildProfessionalActionEmail = (ctx) =>
     iconType: "info",
     status: ctx.status,
     ctaLabel: "View booking section",
+  });
+
+export const buildNewBookingRequestEmail = (ctx) =>
+  bookingCardEmail({
+    title: "New booking request",
+    salonName: ctx.salonName,
+    professionalName: ctx.clientName || "Client",
+    startTime: ctx.startTime,
+    uniqueCode: ctx.uniqueCode,
+    iconType: "info",
+    status: ctx.status || "requested",
+    ctaLabel: "View calendar",
+    ctaUrl: `${getFrontendBaseUrl()}/professionals/calendar`,
+  });
+
+export const buildPrepaymentReceivedEmail = (ctx) =>
+  bookingCardEmail({
+    title: "Prepayment received",
+    salonName: ctx.salonName,
+    professionalName: ctx.clientName || "Client",
+    startTime: ctx.startTime,
+    uniqueCode: ctx.uniqueCode,
+    iconType: "confirmed",
+    status: ctx.status || "confirmed",
+    ctaLabel: "View calendar",
+    ctaUrl: `${getFrontendBaseUrl()}/professionals/calendar`,
   });
 
 export const buildPostTreatmentPaymentEmail = (ctx) => {

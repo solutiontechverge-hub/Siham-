@@ -177,6 +177,26 @@ export const notifySignupConfirmation = (userId) =>
 export const notifyVerifyEmail = async (email, token) =>
   sendDirectAuthEmail(email, AUTH_EMAIL_TYPES.VERIFY_EMAIL, { token });
 
+/** Sends verification + welcome emails after password signup (awaited, with per-email status). */
+export const sendSignupEmails = async (userId, { email, token }) => {
+  const results = {
+    verification: { sent: false },
+    welcome: { sent: false },
+  };
+
+  try {
+    await notifyVerifyEmail(email, token);
+    results.verification = { sent: true, to: email };
+  } catch (error) {
+    console.error(`[auth-email] Verification email failed for ${email}:`, error.message);
+    results.verification = { sent: false, error: error.message };
+  }
+
+  results.welcome = await notifySignupConfirmation(userId);
+
+  return results;
+};
+
 export const notifyPostVerificationPro = (userId) =>
   sendAuthEmailOnce(userId, AUTH_EMAIL_TYPES.POST_VERIFICATION_PRO);
 

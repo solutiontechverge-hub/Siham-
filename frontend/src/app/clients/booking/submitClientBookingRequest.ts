@@ -50,6 +50,23 @@ function buildFallbackCreateBookingPayload(
     booking_type: locationMode === "desired" ? "project" : "request",
     unique_code: bookingRef,
     total_price: draft.total,
+    ...(draft.projectDetails
+      ? {
+          location_details: {
+            projectDescription: draft.projectDetails.description ?? "",
+            uploads: draft.projectDetails.uploads ?? [],
+          },
+          notes: draft.projectDetails.description
+            ? `Project: ${draft.projectDetails.description}`
+            : null,
+          images: (draft.projectDetails.uploads ?? [])
+            .filter((u) => u.url && (u.kind === "image" || !u.kind))
+            .map((u) => u.url as string),
+          documents: (draft.projectDetails.uploads ?? [])
+            .filter((u) => u.url && u.kind === "document")
+            .map((u) => u.url as string),
+        }
+      : {}),
   };
 }
 

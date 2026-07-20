@@ -54,6 +54,11 @@ export function emitBookingChanged(booking, action = "updated") {
   }
 }
 
+export function emitNotificationChanged(userId) {
+  if (!messagingIo || !userId) return;
+  messagingIo.to(`user:${userId}`).emit("notifications:changed", { userId });
+}
+
 export function attachMessagingSocket(httpServer) {
   const io = new Server(httpServer, {
     cors: {

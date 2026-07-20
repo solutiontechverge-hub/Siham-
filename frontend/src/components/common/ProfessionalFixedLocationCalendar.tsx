@@ -214,13 +214,21 @@ export type ProfessionalFixedLocationCalendarProps = {
   onUpdateBookingStatus?: (
     id: string,
     status: "requested" | "cancelled" | "completed" | "confirmed" | "in_progress" | "no_show",
-    extras?: {
+    options?: {
+      notification_event?: string;
+      notify_incoming_er?: boolean;
+      initiated_by?: "client" | "professional";
       notes?: string | null;
       total_price?: number | null;
       booking_date?: string | null;
       start_time?: string | null;
       end_time?: string | null;
     },
+  ) => Promise<void>;
+  onDispatchBookingNotification?: (
+    id: string,
+    event: string,
+    options?: { initiated_by?: "client" | "professional"; message?: string },
   ) => Promise<void>;
   onUpdateCalendarEntryStatus?: (
     id: string,
@@ -253,6 +261,7 @@ export default function ProfessionalFixedLocationCalendar({
   onSaveCalendarSettings,
   onDeleteCalendarEntry,
   onUpdateBookingStatus,
+  onDispatchBookingNotification,
   onUpdateCalendarEntryStatus,
   onDateRangeChange,
 }: ProfessionalFixedLocationCalendarProps) {
@@ -1020,7 +1029,20 @@ export default function ProfessionalFixedLocationCalendar({
   );
 
   const persistEventStatus = React.useCallback(
-    async (eventId: string, status: CalendarEvent["status"]) => {
+    async (
+      eventId: string,
+      status: CalendarEvent["status"],
+      options?: {
+        notification_event?: string;
+        notify_incoming_er?: boolean;
+        initiated_by?: "client" | "professional";
+        notes?: string | null;
+        total_price?: number | null;
+        booking_date?: string | null;
+        start_time?: string | null;
+        end_time?: string | null;
+      },
+    ) => {
       const parsed = parseApiCalendarEventId(eventId);
       if (!parsed) return;
       const apiStatus =
@@ -1037,7 +1059,7 @@ export default function ProfessionalFixedLocationCalendar({
                   : "cancelled";
       if (parsed.kind === "booking") {
         if (onUpdateBookingStatus) {
-          await onUpdateBookingStatus(parsed.id, apiStatus);
+          await onUpdateBookingStatus(parsed.id, apiStatus, options);
         }
         return;
       }
@@ -1046,6 +1068,20 @@ export default function ProfessionalFixedLocationCalendar({
       }
     },
     [onUpdateBookingStatus, onUpdateCalendarEntryStatus],
+  );
+
+  const dispatchBookingEventIfApi = React.useCallback(
+    async (
+      eventId: string | null | undefined,
+      event: string,
+      options?: { initiated_by?: "client" | "professional"; message?: string },
+    ) => {
+      const parsed = eventId ? parseApiCalendarEventId(eventId) : null;
+      if (parsed?.kind === "booking" && onDispatchBookingNotification) {
+        await onDispatchBookingNotification(parsed.id, event, options);
+      }
+    },
+    [onDispatchBookingNotification],
   );
 
   const handleBookingActionSelect = React.useCallback(
@@ -2315,7 +2351,7 @@ export default function ProfessionalFixedLocationCalendar({
   const handleDiscardEbr = React.useCallback(async () => {
     if (!editingEventId) return;
     try {
-      await persistEventStatus(editingEventId, "Invalid");
+      await persistEventStatus(editingEventId, "Invalid", { notification_event: "ebr_discarded" });
     } catch {
       showSnackbar({ severity: "error", message: "Unable to discard edited booking request." });
       return;
@@ -2369,8 +2405,9 @@ export default function ProfessionalFixedLocationCalendar({
     setServiceSelectionDraft((prev) => (prev.includes(lineItem.id) ? prev : [...prev, lineItem.id]));
     setServiceEditAttempted(false);
     setSlotBookingScreen("select-services");
+    void dispatchBookingEventIfApi(editingEventId, "service_edited", { initiated_by: "professional" });
     return true;
-  }, [selectableServiceCatalog, serviceEditDraft]);
+  }, [dispatchBookingEventIfApi, editingEventId, selectableServiceCatalog, serviceEditDraft]);
 
   const toggleServiceSelectionDraft = React.useCallback((serviceId: string) => {
     if (isViewingExisting) return;
@@ -2573,7 +2610,8 @@ export default function ProfessionalFixedLocationCalendar({
     setUniqueItemDraft(emptyBookingUniqueItemDraft());
     setSlotBookingScreen("select-products");
     setSlotSaveAttempted(false);
-  }, [uniqueItemDraft]);
+    void dispatchBookingEventIfApi(editingEventId, "unique_item_edited", { initiated_by: "professional" });
+  }, [dispatchBookingEventIfApi, editingEventId, uniqueItemDraft]);
 
   const isBookingDetailsSubScreen =
     slotBookingScreen === "select-services" ||
@@ -2790,6 +2828,7 @@ export default function ProfessionalFixedLocationCalendar({
       setIsEditingExisting(false);
       setSlotStatus("Requested");
       showSnackbar({ severity: "success", message: "Edited booking request sent to client." });
+      void dispatchBookingEventIfApi(editingEventId, "suggest_for_change", { initiated_by: "professional" });
       setSlotSaveAttempted(false);
       return true;
     }
@@ -2897,6 +2936,15 @@ export default function ProfessionalFixedLocationCalendar({
         setEditingEventId(nextEvent.id);
         setSlotStatus(nextEvent.status);
         setIsEditingExisting(false);
+        if (editingEventId && isApiCalendarEventId(editingEventId) && existingEvent && selectedSlot) {
+          if (existingEvent.date !== selectedSlot.date) {
+            void dispatchBookingEventIfApi(editingEventId, "booking_date_changed", {
+              initiated_by: "professional",
+            });
+          } else if (existingEvent.start !== selectedSlot.start || existingEvent.end !== selectedSlot.end) {
+            void dispatchBookingEventIfApi(editingEventId, "time_changed", { initiated_by: "professional" });
+          }
+        }
         showSnackbar({
           severity: "success",
           message: isNewManualBooking ? "Booking saved." : "Booking updated.",
@@ -2930,6 +2978,7 @@ export default function ProfessionalFixedLocationCalendar({
     bookingPhoneDraft,
     bookingTotalDiscount,
     desiredLocationDraft,
+    dispatchBookingEventIfApi,
     editingEventId,
     events,
     guestDraft.firstName,

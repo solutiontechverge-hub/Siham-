@@ -7,6 +7,7 @@ import { googleClientId } from "../lib/oauth-config";
 import StoreProvider from "../store/provider";
 import MessagingWidgetHost from "../components/common/messaging/MessagingWidgetHost";
 import MessagingRealtimeBridge from "../components/common/messaging/MessagingRealtimeBridge";
+import NotificationsRealtimeBridge from "../components/common/NotificationsRealtimeBridge";
 import { MessagingWidgetProvider } from "../components/common/messaging/MessagingWidgetContext";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
@@ -16,6 +17,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         <MessagingWidgetProvider>
           {children}
           <MessagingRealtimeBridge />
+          <NotificationsRealtimeBridge />
           <MessagingWidgetHost />
         </MessagingWidgetProvider>
       </ThemeRegistry>
