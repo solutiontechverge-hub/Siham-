@@ -58,6 +58,7 @@ import {
 import { resolveCreateCheckoutPath } from "./resolveCreateBookingStatus";
 import { submitClientBookingRequest } from "./submitClientBookingRequest";
 import { useSnackbar } from "../../../components/common/AppSnackbar";
+import { getApiErrorMessage } from "../../../lib/api-error";
 import { getServicesForLocationMode, getTeamForLocationMode } from "../../../data/businessPublicProfile.data";
 import { useBusinessPublicProfile } from "../../../hooks/useBusinessPublicProfile";
 import { extractUuidFromSyntheticId } from "./clientBookingApi.mapper";
@@ -71,7 +72,7 @@ import {
   type ProfessionalProfile,
   type ProfileResponse,
 } from "../../../store/services/profileApi";
-import { useCreateBookingMutation } from "../../../store/services/businessApi";
+import { useCreateBookingMutation, useUploadBookingAttachmentsMutation } from "../../../store/services/businessApi";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -153,6 +154,7 @@ function ClientBookingCreateView() {
     [businessSetups, shop?.shopId],
   );
   const [createBooking] = useCreateBookingMutation();
+  const [uploadBookingAttachments] = useUploadBookingAttachmentsMutation();
   const [isContinuing, setIsContinuing] = React.useState(false);
 
   const startOfDay = (d: Date) => {
@@ -301,9 +303,9 @@ function ClientBookingCreateView() {
   const [addServiceGuestId, setAddServiceGuestId] = React.useState("");
 
   const [projectDescription, setProjectDescription] = React.useState("");
-  const [projectUploads, setProjectUploads] = React.useState<Array<{ id: string; name: string; previewUrl: string }>>(
-    [],
-  );
+  const [projectUploads, setProjectUploads] = React.useState<
+    Array<{ id: string; name: string; previewUrl: string; file: File }>
+  >([]);
   const [participantMenuAnchor, setParticipantMenuAnchor] = React.useState<HTMLElement | null>(null);
   const [planningPersonId, setPlanningPersonId] = React.useState<string | null>(null);
   const [planningActivity, setPlanningActivity] = React.useState("");
@@ -763,13 +765,13 @@ function ClientBookingCreateView() {
     const file = e.target.files?.[0];
     if (!file) return;
     const previewUrl = URL.createObjectURL(file);
-    const nextIndex = projectUploads.length + 1;
     setProjectUploads((prev) => [
       ...prev,
       {
-        id: `upload-${Date.now()}`,
-        name: `Img.jpg ${String(nextIndex).padStart(3, "0")}`,
+        id: `upload-${Date.now()}-${prev.length}`,
+        name: file.name || `upload-${prev.length + 1}`,
         previewUrl,
+        file,
       },
     ]);
     e.target.value = "";
@@ -890,24 +892,6 @@ function ClientBookingCreateView() {
       guestId: s.guestId ?? requesterId,
     }));
 
-    const payload = {
-      selectedDateISO: toISO(selectedDate),
-      selectedTime,
-      combineServices,
-      people: peopleForDraft,
-      services: servicesForDraft,
-      teamMembers: shopTeamMembers.map(({ id, name }) => ({ id, name })),
-      total,
-      ...(isDesiredLocation
-        ? {
-            projectDetails: {
-              description: projectDescription,
-              uploads: projectUploads.map((u) => ({ id: u.id, name: u.name })),
-            },
-          }
-        : {}),
-    };
-
     const prepaymentPercent = parsePrepaymentPercent(businessProfile?.prepaymentLabel);
     const requiresPrepayment = !isDesiredLocation && prepaymentPercent > 0;
 
@@ -919,6 +903,43 @@ function ClientBookingCreateView() {
         window.sessionStorage.removeItem(ACTIVE_BOOKING_ID_KEY);
         window.sessionStorage.removeItem(CHECKOUT_REF_KEY);
       }
+
+      let projectDetailsUploads: Array<{
+        id: string;
+        name: string;
+        url?: string;
+        mimeType?: string;
+        kind?: "image" | "document";
+      }> = projectUploads.map((u) => ({ id: u.id, name: u.name }));
+      if (isDesiredLocation && projectUploads.length > 0) {
+        const uploaded = await uploadBookingAttachments(projectUploads.map((u) => u.file)).unwrap();
+        const attachments = uploaded.data?.attachments ?? [];
+        projectDetailsUploads = attachments.map((att) => ({
+          id: att.id,
+          name: att.name,
+          url: att.url,
+          mimeType: att.mimeType,
+          kind: att.kind,
+        }));
+      }
+
+      const payload = {
+        selectedDateISO: toISO(selectedDate),
+        selectedTime,
+        combineServices,
+        people: peopleForDraft,
+        services: servicesForDraft,
+        teamMembers: shopTeamMembers.map(({ id, name }) => ({ id, name })),
+        total,
+        ...(isDesiredLocation
+          ? {
+              projectDetails: {
+                description: projectDescription,
+                uploads: projectDetailsUploads,
+              },
+            }
+          : {}),
+      };
 
       const draftRecord = {
         id: `bk_draft_${Date.now()}`,
@@ -951,10 +972,10 @@ function ClientBookingCreateView() {
       const listTab = parseBookingListTab(searchParams?.get("tab"));
       const checkoutPath = resolveCreateCheckoutPath({ locationMode, requiresPrepayment });
       router.push(`${checkoutPath}?tab=${listTab}`);
-    } catch {
+    } catch (error) {
       showSnackbar({
         severity: "error",
-        message: "Unable to create booking. Please try again.",
+        message: getApiErrorMessage(error, "Unable to create booking. Please try again."),
       });
     } finally {
       setIsContinuing(false);
@@ -1952,18 +1973,36 @@ function ClientBookingCreateView() {
                                         <CloseRoundedIcon sx={{ fontSize: 12 }} />
                                       </IconButton>
                                       <Box
-                                        component="img"
-                                        src={img.previewUrl}
-                                        alt={img.name}
                                         sx={{
                                           width: 88,
                                           height: 62,
                                           borderRadius: "8px",
-                                          objectFit: "cover",
                                           border: `1px solid ${alpha(m.navy, 0.08)}`,
-                                          display: "block",
+                                          overflow: "hidden",
+                                          bgcolor: alpha(m.navy, 0.04),
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
                                         }}
-                                      />
+                                      >
+                                        {img.file.type.startsWith("image/") ? (
+                                          <Box
+                                            component="img"
+                                            src={img.previewUrl}
+                                            alt={img.name}
+                                            sx={{
+                                              width: "100%",
+                                              height: "100%",
+                                              objectFit: "cover",
+                                              display: "block",
+                                            }}
+                                          />
+                                        ) : (
+                                          <Typography sx={{ fontSize: 10, fontWeight: 800, color: alpha(m.navy, 0.45) }}>
+                                            PDF
+                                          </Typography>
+                                        )}
+                                      </Box>
                                       <Typography
                                         sx={{
                                           mt: 0.4,

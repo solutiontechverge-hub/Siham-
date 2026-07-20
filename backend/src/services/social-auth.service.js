@@ -1,4 +1,5 @@
 import { getClient, query } from "../db/index.js";
+import { notifySignupConfirmation } from "./authEmail.service.js";
 
 const DEFAULT_OAUTH_USER_TYPE = "individual";
 
@@ -60,7 +61,7 @@ export const findOrCreateOAuthUser = async ({
   );
 
   if (bySubject.rowCount > 0) {
-    return bySubject.rows[0];
+    return { user: bySubject.rows[0], isNewUser: false };
   }
 
   if (!email) {
@@ -86,7 +87,7 @@ export const findOrCreateOAuthUser = async ({
          WHERE id = $2 AND oauth_subject IS NULL`,
         [subject, existing.id],
       );
-      return existing;
+      return { user: existing, isNewUser: false };
     }
 
     const error = new Error("EMAIL_ALREADY_REGISTERED");
@@ -127,7 +128,10 @@ export const findOrCreateOAuthUser = async ({
     });
 
     await client.query("COMMIT");
-    return user;
+
+    void notifySignupConfirmation(user.id);
+
+    return { user, isNewUser: true };
   } catch (error) {
     await client.query("ROLLBACK");
     throw error;

@@ -127,7 +127,25 @@ export function buildClientBookingApiPayload(input: {
   );
 
   const serviceNames = services.map((service) => service.name).filter(Boolean);
-  const notes = serviceNames.length > 1 ? `Services: ${serviceNames.join(", ")}` : null;
+  const projectDescription = input.draft.projectDetails?.description?.trim() || "";
+  const projectUploads = input.draft.projectDetails?.uploads ?? [];
+
+  const isImageUpload = (upload: (typeof projectUploads)[number]) => {
+    if (upload.kind === "image") return true;
+    if (upload.kind === "document") return false;
+    const mime = String(upload.mimeType ?? "").toLowerCase();
+    const name = String(upload.name ?? "").toLowerCase();
+    return mime.startsWith("image/") || /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(name);
+  };
+
+  const imageUrls = projectUploads.filter((u) => u.url && isImageUpload(u)).map((u) => u.url as string);
+  const documentUrls = projectUploads.filter((u) => u.url && !isImageUpload(u)).map((u) => u.url as string);
+
+  const noteParts = [
+    serviceNames.length > 1 ? `Services: ${serviceNames.join(", ")}` : null,
+    projectDescription ? `Project: ${projectDescription}` : null,
+  ].filter(Boolean);
+  const notes = noteParts.length ? noteParts.join(" | ") : null;
 
   return {
     booking_date: dateIso,
@@ -144,6 +162,22 @@ export function buildClientBookingApiPayload(input: {
     unique_code: input.bookingRef,
     total_price: input.total,
     notes,
+    ...(input.draft.projectDetails
+      ? {
+          location_details: {
+            projectDescription,
+            uploads: projectUploads.map((upload) => ({
+              id: upload.id,
+              name: upload.name,
+              url: upload.url ?? null,
+              mimeType: upload.mimeType ?? null,
+              kind: upload.kind ?? null,
+            })),
+          },
+        }
+      : {}),
+    ...(imageUrls.length ? { images: imageUrls } : {}),
+    ...(documentUrls.length ? { documents: documentUrls } : {}),
   };
 }
 
@@ -197,6 +231,45 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
   const priceEach = names.length > 1 ? Math.round((total / names.length) * 100) / 100 : total;
   const prepaid = String(booking.prepayment_status ?? "").toLowerCase() === "paid";
 
+  const locationDetails =
+    booking.location_details && typeof booking.location_details === "object"
+      ? (booking.location_details as {
+          projectDescription?: string;
+          uploads?: Array<{
+            id?: string;
+            name?: string;
+            url?: string | null;
+            mimeType?: string | null;
+            kind?: "image" | "document" | null;
+          }>;
+        })
+      : null;
+  const detailUploads = Array.isArray(locationDetails?.uploads) ? locationDetails.uploads : [];
+  const imageUploads = (booking.images ?? []).filter(Boolean).map((url, index) => ({
+    id: `img-${index}`,
+    name: `Image ${index + 1}`,
+    url,
+    kind: "image" as const,
+  }));
+  const documentUploads = (booking.documents ?? []).filter(Boolean).map((url, index) => ({
+    id: `doc-${index}`,
+    name: `Document ${index + 1}`,
+    url,
+    kind: "document" as const,
+  }));
+  const projectUploads =
+    detailUploads.length > 0
+      ? detailUploads.map((upload, index) => ({
+          id: upload.id || `upload-${index}`,
+          name: upload.name || `File ${index + 1}`,
+          url: upload.url ?? undefined,
+          mimeType: upload.mimeType ?? undefined,
+          kind: upload.kind === "document" ? ("document" as const) : ("image" as const),
+        }))
+      : [...imageUploads, ...documentUploads];
+  const projectDescription =
+    typeof locationDetails?.projectDescription === "string" ? locationDetails.projectDescription : "";
+
   return {
     id: booking.id,
     apiBookingId: booking.id,
@@ -227,6 +300,14 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
         ? [{ id: booking.team_member_id, name: booking.team_member_name || "Team member" }]
         : undefined,
       total,
+      ...(booking.location_type === "desired" || projectDescription || projectUploads.length
+        ? {
+            projectDetails: {
+              description: projectDescription,
+              uploads: projectUploads,
+            },
+          }
+        : {}),
     },
     createdAt: booking.created_at ?? undefined,
     prepaid,

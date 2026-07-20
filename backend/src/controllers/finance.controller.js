@@ -1,4 +1,5 @@
 import { query } from "../db/index.js";
+import { dispatchPaymentDueSetNotification } from "../services/bookingNotification.service.js";
 import { parseUuid } from "../utils/uuid.js";
 import {
   processOverdueInvoiceReissues,
@@ -533,10 +534,16 @@ export const updateFinanceTransaction = async (req, res) => {
       return res.status(404).json({ success: false, message: "Transaction not found.", data: null });
     }
 
+    const updated = result.rows[0];
+    if (status === "Payment due") {
+      const dueDate = updated.document?.dueDate;
+      void dispatchPaymentDueSetNotification(updated.id, dueDate ?? null);
+    }
+
     return res.status(200).json({
       success: true,
       message: "Transaction updated.",
-      data: mapTransactionRow(result.rows[0]),
+      data: mapTransactionRow(updated),
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message, data: null });

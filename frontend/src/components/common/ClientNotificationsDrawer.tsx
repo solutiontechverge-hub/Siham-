@@ -8,12 +8,14 @@ import CancelRoundedIcon from "@mui/icons-material/CancelRounded";
 import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
 import {
   Box,
+  Button,
   Divider,
   Drawer,
   IconButton,
   Stack,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import { useRouter } from "next/navigation";
 import { Typography } from "../ui/typography";
 import type { ClientNotificationItem } from "../../data/clientNotifications.data";
 
@@ -22,6 +24,8 @@ export type ClientNotificationsDrawerProps = {
   onClose: () => void;
   title?: string;
   items: readonly ClientNotificationItem[];
+  onMarkAllRead?: () => void;
+  onItemClick?: (item: ClientNotificationItem) => void;
 };
 
 function StatusIcon({ type }: { type: ClientNotificationItem["statusType"] }) {
@@ -44,9 +48,20 @@ export default function ClientNotificationsDrawer({
   onClose,
   title = "Notifications",
   items,
+  onMarkAllRead,
+  onItemClick,
 }: ClientNotificationsDrawerProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
+  const router = useRouter();
+
+  const handleItemClick = (item: ClientNotificationItem) => {
+    onItemClick?.(item);
+    if (item.href) {
+      router.push(item.href);
+      onClose();
+    }
+  };
 
   return (
     <Drawer
@@ -70,7 +85,17 @@ export default function ClientNotificationsDrawer({
           <Typography sx={{ fontWeight: 900, color: m.navy, fontSize: 22 }}>
             {title}
           </Typography>
-          <IconButton
+          <Stack direction="row" alignItems="center" spacing={0.5}>
+            {onMarkAllRead && items.some((item) => !item.read) ? (
+              <Button
+                size="small"
+                onClick={onMarkAllRead}
+                sx={{ textTransform: "none", fontWeight: 800, fontSize: 12, minWidth: 0, px: 1 }}
+              >
+                Mark all read
+              </Button>
+            ) : null}
+            <IconButton
             onClick={onClose}
             sx={{
               width: 42,
@@ -83,17 +108,34 @@ export default function ClientNotificationsDrawer({
           >
             <CloseRoundedIcon />
           </IconButton>
+          </Stack>
         </Stack>
       </Box>
 
       <Divider sx={{ borderColor: alpha(m.border, 0.9) }} />
 
       <Box sx={{ bgcolor: "#fff" }}>
-        {items.map((n, idx) => (
+        {items.length === 0 ? (
+          <Box sx={{ px: 3, py: 4 }}>
+            <Typography sx={{ color: alpha(m.slate, 0.7), fontSize: 14, fontWeight: 700 }}>
+              No notifications yet.
+            </Typography>
+          </Box>
+        ) : (
+          items.map((n, idx) => (
           <Box key={n.id}>
-            <Box sx={{ px: 3, py: 2.25 }}>
+            <Box
+              sx={{
+                px: 3,
+                py: 2.25,
+                cursor: n.href ? "pointer" : "default",
+                bgcolor: n.read ? "transparent" : alpha(m.teal, 0.04),
+                "&:hover": n.href ? { bgcolor: alpha(m.teal, 0.06) } : undefined,
+              }}
+              onClick={() => handleItemClick(n)}
+            >
               <Typography sx={{ fontWeight: 800, color: m.navy, fontSize: 14 }}>
-                {n.professionalName}
+                {n.actorName ?? n.professionalName}
               </Typography>
 
               <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 0.5 }}>
@@ -112,7 +154,8 @@ export default function ClientNotificationsDrawer({
             </Box>
             {idx < items.length - 1 ? <Divider sx={{ borderColor: alpha(m.border, 0.8) }} /> : null}
           </Box>
-        ))}
+          ))
+        )}
       </Box>
     </Drawer>
   );

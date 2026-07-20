@@ -11,6 +11,7 @@ import businessSetupsRoutes from "./routes/business-setups.routes.js";
 import financeRoutes from "./routes/finance.routes.js";
 import contactRoutes from "./routes/contact.routes.js";
 import messagingRoutes from "./routes/messaging.routes.js";
+import notificationsRoutes from "./routes/notifications.routes.js";
 import userRoutes from "./routes/user.routes.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -49,6 +50,7 @@ app.use("/api/business-setups", businessSetupsRoutes);
 app.use("/api/finance", financeRoutes);
 app.use("/api/contact", contactRoutes);
 app.use("/api/messaging", messagingRoutes);
+app.use("/api/notifications", notificationsRoutes);
 
 app.use((req, res) => {
   res.status(404).json({

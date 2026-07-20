@@ -7,13 +7,19 @@ import { usePathname } from "next/navigation";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import LanguageRoundedIcon from "@mui/icons-material/LanguageRounded";
 import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneRounded";
-import { Avatar, Box, Button, Container, Divider, IconButton, Stack, Typography } from "@mui/material";
+import { Avatar, Badge, Box, Button, Container, Divider, IconButton, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { Logo } from "../../../images";
 import { HeaderNavText } from "../ui/typography";
 import ClientProfileMenuPopover from "./ClientProfileMenuPopover";
 import ClientNotificationsDrawer from "./ClientNotificationsDrawer";
-import { clientNotificationsData } from "../../data/clientNotifications.data";
+import {
+  useGetMyNotificationsQuery,
+  useGetUnreadNotificationCountQuery,
+  useMarkAllNotificationsReadMutation,
+  useMarkNotificationReadMutation,
+  type AppNotificationItem,
+} from "../../store/services/notificationsApi";
 import { useAppSelector } from "../../store/hooks";
 import { getPersistedAuthSession } from "../../lib/auth-storage";
 import ProfessionalProfileMenuPopover from "./ProfessionalProfileMenuPopover";
@@ -84,6 +90,20 @@ function toDisplayName(userName?: string, userLabel?: string) {
  * Marketing strip header: white bar, teal bottom rule, logo + nav + locale / login / secondary pill.
  * Pass `navItems` (and optional `homeHref`, CTAs) for each screen.
  */
+function mapNotificationToDrawerItem(item: AppNotificationItem) {
+  return {
+    id: item.id,
+    professionalName: item.actorName ?? "—",
+    actorName: item.actorName ?? "—",
+    statusLabel: item.title,
+    statusType: item.statusType,
+    bookingIdLabel: item.bookingIdLabel ?? "Booking",
+    timeLabel: item.timeLabel,
+    href: item.href,
+    read: item.read,
+  };
+}
+
 export default function MollureMarketingHeader({
   navItems = [],
   localeLabel = "EN",
@@ -122,7 +142,16 @@ export default function MollureMarketingHeader({
   const isProfessionalContext = userType === "professional" || isProfessionalsRoute;
   const resolvedHomeHref =
     homeHref === "/" && isProfessionalContext ? "/professionals" : homeHref;
-  const showClientNotifications = Boolean(isAuthed && !isProfessionalContext);
+  const showNotifications = Boolean(isAuthed);
+  const { data: notificationsData } = useGetMyNotificationsQuery(undefined, { skip: !showNotifications });
+  const { data: unreadData } = useGetUnreadNotificationCountQuery(undefined, { skip: !showNotifications });
+  const [markNotificationRead] = useMarkNotificationReadMutation();
+  const [markAllNotificationsRead] = useMarkAllNotificationsReadMutation();
+  const notificationItems = React.useMemo(
+    () => (notificationsData?.data ?? []).map(mapNotificationToDrawerItem),
+    [notificationsData?.data],
+  );
+  const unreadCount = unreadData?.data?.count ?? 0;
   const [mounted, setMounted] = React.useState(false);
   const [profileAnchor, setProfileAnchor] = React.useState<HTMLElement | null>(null);
   const openProfileMenu = (anchor: HTMLElement) => setProfileAnchor(anchor);
@@ -312,7 +341,7 @@ export default function MollureMarketingHeader({
 
                 {isAuthed ? (
                   <>
-                    {showClientNotifications ? (
+                    {showNotifications ? (
                       <IconButton
                         aria-label="Notifications"
                         onClick={openNotifications}
@@ -323,7 +352,15 @@ export default function MollureMarketingHeader({
                           color: alpha(m.navy, 0.82),
                         }}
                       >
-                        <NotificationsNoneRoundedIcon sx={{ fontSize: 22 }} />
+                        <Badge
+                          badgeContent={unreadCount > 0 ? (unreadCount > 9 ? "9+" : unreadCount) : 0}
+                          color="error"
+                          sx={{
+                            "& .MuiBadge-badge": { fontSize: 10, minWidth: 18, height: 18, fontWeight: 900 },
+                          }}
+                        >
+                          <NotificationsNoneRoundedIcon sx={{ fontSize: 22 }} />
+                        </Badge>
                       </IconButton>
                     ) : null}
 
@@ -439,12 +476,16 @@ export default function MollureMarketingHeader({
         )
       ) : null}
 
-      {showClientNotifications ? (
+      {showNotifications ? (
         <ClientNotificationsDrawer
           open={notificationsOpen}
           onClose={closeNotifications}
-          title={clientNotificationsData.title}
-          items={clientNotificationsData.items}
+          title="Notifications"
+          items={notificationItems}
+          onMarkAllRead={() => void markAllNotificationsRead()}
+          onItemClick={(item) => {
+            if (!item.read) void markNotificationRead(item.id);
+          }}
         />
       ) : null}
     </Box>

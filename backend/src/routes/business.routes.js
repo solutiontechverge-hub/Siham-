@@ -2,6 +2,7 @@ import express from "express";
 import { body } from "express-validator";
 import {
   createBooking,
+  createBookingNotification,
   createCalendarEntry,
   deleteCalendarEntry,
   updateCalendarEntryStatus,
@@ -14,6 +15,7 @@ import {
   getBusinessSetup,
   updateBusinessSetupActive,
   uploadBusinessMedia,
+  uploadBookingAttachments,
   listBookings,
   listCalendarEntries,
   listCategories,
@@ -31,6 +33,7 @@ import {
 import { authenticateUser, authorizeRoles } from "../middleware/auth.middleware.js";
 import { validateRequest } from "../middleware/validate.middleware.js";
 import { upload } from "../middleware/upload.middleware.js";
+import { messagingUpload } from "../middleware/messagingUpload.middleware.js";
 
 const router = express.Router();
 const locationModes = ["fixed", "desired", "both"];
@@ -274,6 +277,23 @@ router.delete(
 router.get("/bookings", listBookings);
 
 router.post(
+  "/bookings/attachments",
+  (req, res, next) => {
+    messagingUpload.array("files", 8)(req, res, (error) => {
+      if (error) {
+        return res.status(400).json({
+          success: false,
+          message: error.message || "Failed to upload booking attachments.",
+          data: null,
+        });
+      }
+      return next();
+    });
+  },
+  uploadBookingAttachments,
+);
+
+router.post(
   "/bookings",
   [
     body("booking_date").isISO8601().withMessage("booking_date must be a valid date."),
@@ -311,6 +331,8 @@ router.patch(
   validateRequest,
   updateBookingStatus,
 );
+
+router.post("/bookings/:id/notifications", createBookingNotification);
 
 router.patch(
   "/bookings/:id",

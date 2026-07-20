@@ -26,6 +26,7 @@ import {
   useGetMollureClientDirectoryQuery,
   useGetProfessionalClientsQuery,
   useUpdateBookingStatusMutation,
+  useDispatchBookingNotificationMutation,
   useUpdateCalendarEntryStatusMutation,
   useUpsertCalendarSettingsMutation,
   type BusinessServiceDetail,
@@ -84,6 +85,7 @@ export default function FixedLocationCalendarPage() {
   const [deleteCalendarEntry, { isLoading: isDeletingCalendarEntry }] = useDeleteCalendarEntryMutation();
   const [upsertCalendarSettings, { isLoading: isSavingCalendarSettings }] = useUpsertCalendarSettingsMutation();
   const [updateBookingStatus] = useUpdateBookingStatusMutation();
+  const [dispatchBookingNotification] = useDispatchBookingNotificationMutation();
   const [updateCalendarEntryStatus] = useUpdateCalendarEntryStatusMutation();
   const { showSnackbar } = useSnackbar();
 
@@ -248,8 +250,11 @@ export default function FixedLocationCalendarPage() {
           throw error;
         }
       }}
-      onUpdateBookingStatus={async (id, status) => {
-        await updateBookingStatus({ id, status }).unwrap();
+      onUpdateBookingStatus={async (id, status, options) => {
+        await updateBookingStatus({ id, status, ...options }).unwrap();
+      }}
+      onDispatchBookingNotification={async (id, event, options) => {
+        await dispatchBookingNotification({ id, event, ...options }).unwrap();
       }}
       onUpdateCalendarEntryStatus={async (id, status) => {
         await updateCalendarEntryStatus({ id, status }).unwrap();

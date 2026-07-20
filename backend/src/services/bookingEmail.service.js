@@ -5,7 +5,9 @@ import {
   buildBookingCancelledEmail,
   buildBookingConfirmedEmail,
   buildIncomingErEmail,
+  buildNewBookingRequestEmail,
   buildPostTreatmentPaymentEmail,
+  buildPrepaymentReceivedEmail,
   buildProfessionalActionEmail,
 } from "../helpers/bookingEmailTemplates.js";
 import { buildRespondToRequestReminderEmail } from "../helpers/financeEmailTemplates.js";
@@ -19,6 +21,8 @@ export const BOOKING_EMAIL_TYPES = {
   APPOINTMENT_REMINDER: "appointment_reminder",
   PROFESSIONAL_ACTION: "professional_action",
   RESPOND_REQUEST_REMINDER: "respond_request_reminder",
+  NEW_BOOKING_REQUEST: "new_booking_request",
+  PREPAYMENT_RECEIVED: "prepayment_received",
 };
 
 const EMAIL_BUILDERS = {
@@ -45,6 +49,14 @@ const EMAIL_BUILDERS = {
   [BOOKING_EMAIL_TYPES.PROFESSIONAL_ACTION]: {
     subject: "Booking update from your professional",
     build: buildProfessionalActionEmail,
+  },
+  [BOOKING_EMAIL_TYPES.NEW_BOOKING_REQUEST]: {
+    subject: "New booking request",
+    build: buildNewBookingRequestEmail,
+  },
+  [BOOKING_EMAIL_TYPES.PREPAYMENT_RECEIVED]: {
+    subject: "Prepayment received",
+    build: buildPrepaymentReceivedEmail,
   },
 };
 
@@ -196,6 +208,64 @@ export const notifyAppointmentReminder = (bookingId) =>
 
 export const notifyProfessionalAction = (bookingId) =>
   sendBookingClientEmailOnce(bookingId, BOOKING_EMAIL_TYPES.PROFESSIONAL_ACTION);
+
+export const notifyNewBookingRequest = async (bookingId) => {
+  try {
+    const alreadySent = await hasSentEmail(bookingId, BOOKING_EMAIL_TYPES.NEW_BOOKING_REQUEST);
+    if (alreadySent) return { sent: false, reason: "already_sent" };
+
+    const ctx = await loadProfessionalEmailContext(bookingId);
+    if (!ctx?.professionalEmail) {
+      return { sent: false, reason: "professional_email_not_found" };
+    }
+
+    const clientCtx = await loadBookingEmailContext(bookingId);
+    const { html, text } = buildNewBookingRequestEmail({
+      ...clientCtx,
+      clientName: ctx.clientName,
+    });
+    await sendMail({
+      to: ctx.professionalEmail,
+      subject: "New booking request",
+      html,
+      text,
+    });
+    await markEmailSent(bookingId, BOOKING_EMAIL_TYPES.NEW_BOOKING_REQUEST);
+    return { sent: true, to: ctx.professionalEmail };
+  } catch (error) {
+    console.error(`[booking-email] Failed new booking request for ${bookingId}:`, error.message);
+    return { sent: false, reason: "error", error: error.message };
+  }
+};
+
+export const notifyPrepaymentReceived = async (bookingId) => {
+  try {
+    const alreadySent = await hasSentEmail(bookingId, BOOKING_EMAIL_TYPES.PREPAYMENT_RECEIVED);
+    if (alreadySent) return { sent: false, reason: "already_sent" };
+
+    const ctx = await loadProfessionalEmailContext(bookingId);
+    if (!ctx?.professionalEmail) {
+      return { sent: false, reason: "professional_email_not_found" };
+    }
+
+    const clientCtx = await loadBookingEmailContext(bookingId);
+    const { html, text } = buildPrepaymentReceivedEmail({
+      ...clientCtx,
+      clientName: ctx.clientName,
+    });
+    await sendMail({
+      to: ctx.professionalEmail,
+      subject: "Prepayment received",
+      html,
+      text,
+    });
+    await markEmailSent(bookingId, BOOKING_EMAIL_TYPES.PREPAYMENT_RECEIVED);
+    return { sent: true, to: ctx.professionalEmail };
+  } catch (error) {
+    console.error(`[booking-email] Failed prepayment email for ${bookingId}:`, error.message);
+    return { sent: false, reason: "error", error: error.message };
+  }
+};
 
 export const notifyRespondToRequestReminder = async (bookingId) => {
   try {

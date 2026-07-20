@@ -7,11 +7,14 @@ import {
 import { buildServiceDetailsFromCategories } from "../utils/business-service-categories.js";
 import { syncBookingToFinanceTransaction } from "../services/finance-sync.service.js";
 import {
-  notifyBookingStatusChange,
-  notifyIncomingEditRequest,
-} from "../services/bookingEmail.service.js";
+  BOOKING_NOTIFICATION_EVENTS,
+  dispatchBookingCreatedNotifications,
+  dispatchBookingEventNotification,
+  dispatchBookingUpdatedNotifications,
+} from "../services/bookingNotification.service.js";
 import { emitBookingChanged } from "../messaging/messagingSocket.js";
 import { normalizeEntityId } from "../utils/business-setup-parsers.js";
+import { saveBookingAttachments } from "../services/booking-upload.service.js";
 import {
   isValidUuid,
   parseOptionalUuid,
@@ -1349,6 +1352,32 @@ export const listBookings = async (req, res) => {
   }
 };
 
+export const uploadBookingAttachments = async (req, res) => {
+  try {
+    const files = Array.isArray(req.files) ? req.files : [];
+    if (!files.length) {
+      return res.status(400).json({
+        success: false,
+        message: "No files provided.",
+        data: null,
+      });
+    }
+
+    const attachments = await saveBookingAttachments(req.user.id, files);
+    return res.status(201).json({
+      success: true,
+      message: "Booking attachments uploaded successfully.",
+      data: { attachments },
+    });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || "Failed to upload booking attachments.",
+      data: null,
+    });
+  }
+};
+
 export const createBooking = async (req, res) => {
   try {
     const locationDetails = parseJsonValue(req.body.location_details, {});
@@ -1427,10 +1456,7 @@ export const createBooking = async (req, res) => {
       }
     }
 
-    if (booking?.status === "confirmed") {
-      void notifyBookingStatusChange(booking.id, "requested", booking.status);
-    }
-
+    void dispatchBookingCreatedNotifications(booking);
     emitBookingChanged(booking, "created");
 
     return res.status(201).json({
@@ -1692,10 +1718,14 @@ export const updateMyBooking = async (req, res) => {
       }
     }
 
-    if (previousStatus !== booking.status) {
-      void notifyBookingStatusChange(booking.id, previousStatus, booking.status);
+    if (previousStatus !== booking.status || existing.prepayment_status !== booking.prepayment_status) {
+      void dispatchBookingUpdatedNotifications(booking, previousStatus, existing.prepayment_status, {
+        notificationEvent: req.body.notification_event,
+        initiatedBy: "client",
+        notifyIncomingEr:
+          req.body.notify_incoming_er === true || req.body.email_scenario === "incoming_er",
+      });
     }
-
     emitBookingChanged(booking, "updated");
 
     return res.status(200).json({
@@ -1792,11 +1822,11 @@ export const updateBookingStatus = async (req, res) => {
       }
     }
 
-    void notifyBookingStatusChange(booking.id, previousStatus, booking.status);
-
-    if (req.body.notify_incoming_er === true || req.body.email_scenario === "incoming_er") {
-      void notifyIncomingEditRequest(booking.id);
-    }
+    void dispatchBookingUpdatedNotifications(booking, previousStatus, booking.prepayment_status, {
+      notifyIncomingEr: req.body.notify_incoming_er === true || req.body.email_scenario === "incoming_er",
+      notificationEvent: req.body.notification_event,
+      initiatedBy: req.body.initiated_by === "client" ? "client" : "professional",
+    });
 
     emitBookingChanged(booking, "updated");
 
@@ -1809,6 +1839,87 @@ export const updateBookingStatus = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to update booking status.",
+      data: {
+        error: error.message,
+      },
+    });
+  }
+};
+
+const assertBookingNotificationAccess = async (user, bookingId) => {
+  const result = await query(
+    `SELECT
+       b.id,
+       b.customer_id,
+       pp.user_id AS professional_user_id
+     FROM bookings b
+     INNER JOIN business_setups bs ON bs.id = b.business_setup_id
+     INNER JOIN professional_profiles pp ON pp.id = bs.professional_profile_id
+     WHERE b.id = $1
+     LIMIT 1`,
+    [bookingId],
+  );
+
+  const row = result.rows[0];
+  if (!row) return null;
+
+  if (user.user_type === "professional") {
+    return row.professional_user_id === user.id ? row : null;
+  }
+
+  return row.customer_id === user.id ? row : null;
+};
+
+export const createBookingNotification = async (req, res) => {
+  try {
+    const bookingId = parseUuid(req.params.id);
+    if (!bookingId) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid booking id.",
+        data: null,
+      });
+    }
+
+    const event = String(req.body.event ?? req.body.notification_event ?? "").trim();
+    if (!event || !Object.values(BOOKING_NOTIFICATION_EVENTS).includes(event)) {
+      return res.status(400).json({
+        success: false,
+        message: "A valid notification event is required.",
+        data: null,
+      });
+    }
+
+    const access = await assertBookingNotificationAccess(req.user, bookingId);
+    if (!access) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found.",
+        data: null,
+      });
+    }
+
+    const initiatedBy =
+      req.body.initiated_by === "client" || req.body.initiated_by === "professional"
+        ? req.body.initiated_by
+        : req.user.user_type === "professional"
+          ? "professional"
+          : "client";
+
+    await dispatchBookingEventNotification(bookingId, event, {
+      initiatedBy,
+      message: req.body.message ?? null,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Notification dispatched.",
+      data: { bookingId, event },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to dispatch booking notification.",
       data: {
         error: error.message,
       },
