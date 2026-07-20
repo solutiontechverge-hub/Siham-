@@ -47,7 +47,15 @@ import MessagingModalShell, {
   MessagingModalPrimaryButton,
 } from "../../../components/common/messaging/MessagingModalShell";
 import { ServiceSummaryMetaLine } from "../../../components/common/ServiceSummaryMetaLine";
-import { fmtMinutesToTimeLabel, parseTimeLabelToMinutes, serviceTimeRangeLabel } from "./booking-time";
+import {
+  CLIENT_BOOKING_MIN_LEAD_ERROR,
+  CLIENT_BOOKING_MIN_LEAD_MINUTES,
+  fmtMinutesToTimeLabel,
+  getNowMinutesFromMidnight,
+  isSameDayBookingTooSoon,
+  parseTimeLabelToMinutes,
+  serviceTimeRangeLabel,
+} from "./booking-time";
 import ClientBookingListView from "./ClientBookingListView";
 import ClientBookingPageShell from "./ClientBookingPageShell";
 import { parseBookingListTab } from "./bookingPillTabs";
@@ -241,21 +249,26 @@ function ClientBookingCreateView() {
     [selectedDate, today0],
   );
 
-  const nowMinutes = React.useMemo(() => {
-    const now = new Date();
-    return now.getHours() * 60 + now.getMinutes();
-  }, [selectedDate]);
+  const [nowTick, setNowTick] = React.useState(() => Date.now());
+  React.useEffect(() => {
+    if (!isSelectedToday) return;
+    const id = window.setInterval(() => setNowTick(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, [isSelectedToday]);
+
+  const nowMinutes = React.useMemo(() => getNowMinutesFromMidnight(new Date(nowTick)), [nowTick, selectedDate]);
+  const minBookableMinutes = nowMinutes + CLIENT_BOOKING_MIN_LEAD_MINUTES;
 
   const times = allDayTimes;
 
   const availableTimes = React.useMemo(() => {
     if (!isSelectedToday) return times;
-    return times.filter((t) => parseTimeLabelToMinutes(t) > nowMinutes);
-  }, [isSelectedToday, nowMinutes, times]);
+    return times.filter((t) => parseTimeLabelToMinutes(t) > minBookableMinutes);
+  }, [isSelectedToday, minBookableMinutes, times]);
 
-  const isTimePast = React.useCallback(
-    (t: string) => isSelectedToday && parseTimeLabelToMinutes(t) <= nowMinutes,
-    [isSelectedToday, nowMinutes],
+  const isTimeUnavailable = React.useCallback(
+    (t: string) => isSelectedToday && parseTimeLabelToMinutes(t) <= minBookableMinutes,
+    [isSelectedToday, minBookableMinutes],
   );
 
   const timeScrollRef = React.useRef<HTMLDivElement>(null);
@@ -322,11 +335,15 @@ function ClientBookingCreateView() {
   const hydrationSignatureRef = React.useRef<string | null>(null);
 
   const [selectedTime, setSelectedTime] = React.useState(() => {
-    const now = new Date();
-    const mins = now.getHours() * 60 + now.getMinutes();
+    const mins = getNowMinutesFromMidnight() + CLIENT_BOOKING_MIN_LEAD_MINUTES;
     const future = allDayTimes.filter((t) => parseTimeLabelToMinutes(t) > mins);
     return (future[0] ?? allDayTimes[0]) ?? "";
   });
+  const [timeValidationError, setTimeValidationError] = React.useState<string | null>(null);
+  const selectedTimeTooSoon = React.useMemo(
+    () => isSelectedToday && isSameDayBookingTooSoon(selectedTime, new Date(nowTick)),
+    [isSelectedToday, nowTick, selectedTime],
+  );
   const [combineServices, setCombineServices] = React.useState(true);
   const [selectedPersonId, setSelectedPersonId] = React.useState<string>("p-requester");
   const [selectedTeamMemberId, setSelectedTeamMemberId] = React.useState<string>("");
@@ -606,6 +623,10 @@ function ClientBookingCreateView() {
   }, [isPastDay, selectedDate, today0]);
 
   React.useEffect(() => {
+    if (!selectedTimeTooSoon) setTimeValidationError(null);
+  }, [selectedTimeTooSoon]);
+
+  React.useEffect(() => {
     // If today has no remaining slots, move to tomorrow.
     if (isSelectedToday && availableTimes.length === 0) {
       setSelectedDate(addDays(today0, 1));
@@ -614,6 +635,7 @@ function ClientBookingCreateView() {
     // Keep selection on a bookable future slot (nearest by default).
     if (availableTimes.length > 0 && !availableTimes.includes(selectedTime)) {
       setSelectedTime(availableTimes[0]);
+      setTimeValidationError(null);
     }
   }, [availableTimes, isSelectedToday, selectedTime, today0]);
 
@@ -1146,6 +1168,13 @@ function ClientBookingCreateView() {
 
   const onContinue = async () => {
     if (!shop?.shopId || services.length === 0 || !allServicesAssigned || isContinuing) return;
+
+    if (isSelectedToday && isSameDayBookingTooSoon(selectedTime)) {
+      setTimeValidationError(CLIENT_BOOKING_MIN_LEAD_ERROR);
+      showSnackbar({ severity: "error", message: CLIENT_BOOKING_MIN_LEAD_ERROR });
+      return;
+    }
+    setTimeValidationError(null);
 
     const peopleForDraft =
       planningPersonId != null
@@ -2410,17 +2439,21 @@ function ClientBookingCreateView() {
                         >
                           {times.map((t) => {
                             const active = t === selectedTime;
-                            const past = isTimePast(t);
+                            const unavailable = isTimeUnavailable(t);
                             return (
                               <Button
                                 key={t}
                                 data-time-slot={t}
                                 variant={active ? "contained" : "outlined"}
                                 onClick={() => {
-                                  if (past) return;
+                                  if (unavailable) {
+                                    setTimeValidationError(CLIENT_BOOKING_MIN_LEAD_ERROR);
+                                    return;
+                                  }
+                                  setTimeValidationError(null);
                                   setSelectedTime(t);
                                 }}
-                                disabled={past}
+                                disabled={unavailable}
                                 disableElevation
                                 sx={{
                                   flexShrink: 0,
@@ -2432,7 +2465,7 @@ function ClientBookingCreateView() {
                                   fontSize: 11.5,
                                   fontWeight: 900,
                                   whiteSpace: "nowrap",
-                                  ...(past
+                                  ...(unavailable
                                     ? {
                                         borderColor: alpha(m.navy, 0.08),
                                         bgcolor: alpha(m.navy, 0.03),
@@ -2474,6 +2507,21 @@ function ClientBookingCreateView() {
                           <ChevronRightRoundedIcon sx={{ fontSize: 18 }} />
                         </IconButton>
                       </Stack>
+
+                      {(timeValidationError || selectedTimeTooSoon) && (
+                        <Typography
+                          sx={{
+                            mt: 0.9,
+                            px: 0.25,
+                            fontSize: 11.5,
+                            fontWeight: 800,
+                            color: "#C62828",
+                            lineHeight: 1.35,
+                          }}
+                        >
+                          {timeValidationError || CLIENT_BOOKING_MIN_LEAD_ERROR}
+                        </Typography>
+                      )}
 
                       <Stack alignItems="flex-end" sx={{ mt: 1 }}>
                         <FormControlLabel
@@ -3152,11 +3200,25 @@ function ClientBookingCreateView() {
                         </Typography>
                       ) : null}
 
+                      {allServicesAssigned && selectedTimeTooSoon ? (
+                        <Typography
+                          sx={{
+                            mt: 1,
+                            fontSize: 11,
+                            fontWeight: 800,
+                            color: "#C62828",
+                            lineHeight: 1.35,
+                          }}
+                        >
+                          {CLIENT_BOOKING_MIN_LEAD_ERROR}
+                        </Typography>
+                      ) : null}
+
                       <Button
                         fullWidth
                         variant="contained"
                         disableElevation
-                        disabled={!allServicesAssigned || isContinuing}
+                        disabled={!allServicesAssigned || isContinuing || selectedTimeTooSoon}
                         onClick={() => void onContinue()}
                         sx={{
                           mt: 1.25,
@@ -3166,7 +3228,7 @@ function ClientBookingCreateView() {
                           height: 40,
                           bgcolor: m.teal,
                           "&:hover": { bgcolor: m.tealDark },
-                          ...(allServicesAssigned && !isContinuing
+                          ...(allServicesAssigned && !isContinuing && !selectedTimeTooSoon
                             ? null
                             : {
                                 bgcolor: alpha(m.navy, 0.10),

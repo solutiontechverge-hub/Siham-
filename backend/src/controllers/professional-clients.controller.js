@@ -1,5 +1,12 @@
 import { query } from "../db/index.js";
 import { parseUuid } from "../utils/uuid.js";
+import {
+  listResponse,
+  paginateItems,
+  parseListPagination,
+  sqlLimitOffset,
+  withPaginationParams,
+} from "../utils/pagination.js";
 
 const getProfessionalProfile = async (userId) => {
   const result = await query(
@@ -86,18 +93,35 @@ export const listProfessionalClients = async (req, res) => {
       return res.status(404).json({ success: false, message: "Professional profile not found.", data: null });
     }
 
+    const pagination = parseListPagination(req.query);
+    const { clause: limitClause } = sqlLimitOffset(2);
+
+    const countResult = await query(
+      `SELECT COUNT(*)::int AS total
+       FROM professional_clients
+       WHERE professional_profile_id = $1`,
+      [profile.id],
+    );
+    const total = countResult.rows[0]?.total ?? 0;
+
     const result = await query(
       `SELECT * FROM professional_clients
        WHERE professional_profile_id = $1
-       ORDER BY created_at DESC`,
-      [profile.id],
+       ORDER BY created_at DESC
+       ${pagination.paginate ? limitClause : ""}`,
+      withPaginationParams([profile.id], pagination),
     );
 
-    return res.status(200).json({
-      success: true,
-      message: "Clients fetched successfully.",
-      data: result.rows.map(mapClientRow),
-    });
+    return res.status(200).json(
+      listResponse({
+        message: "Clients fetched successfully.",
+        data: result.rows.map(mapClientRow),
+        page: pagination.page,
+        limit: pagination.limit,
+        total,
+        paginate: pagination.paginate,
+      }),
+    );
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -154,11 +178,19 @@ export const listMollureClientDirectory = async (req, res) => {
       rows = rows.filter((row) => `${row.name} ${row.email}`.toLowerCase().includes(q));
     }
 
-    return res.status(200).json({
-      success: true,
-      message: "Mollure client directory fetched successfully.",
-      data: rows,
-    });
+    const pagination = parseListPagination(req.query);
+    const paged = paginateItems(rows, pagination);
+
+    return res.status(200).json(
+      listResponse({
+        message: "Mollure client directory fetched successfully.",
+        data: paged.items,
+        page: pagination.page,
+        limit: pagination.limit,
+        total: paged.pagination.total,
+        paginate: pagination.paginate,
+      }),
+    );
   } catch (error) {
     return res.status(500).json({
       success: false,

@@ -10,6 +10,7 @@ import {
 } from "../messaging/messaging.repository.js";
 import { emitMessagingMessage, emitMessagingMessageDeleted, emitMessagingThreadRead } from "../messaging/messagingSocket.js";
 import { saveMessagingAttachments } from "../services/messaging-upload.service.js";
+import { buildPaginationMeta, parseListPagination } from "../utils/pagination.js";
 
 export const uploadMessagingAttachments = async (req, res) => {
   try {
@@ -56,14 +57,27 @@ export const getMessagingInbox = async (req, res) => {
 
 export const getMessagingProfessionals = async (req, res) => {
   try {
-    const offset = Math.max(0, Number(req.query.offset) || 0);
-    const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 5));
+    const pagination = parseListPagination(req.query, {
+      defaultLimit: 5,
+      maxLimit: 50,
+      force: true,
+    });
     const search = String(req.query.q ?? "");
-    const data = await listProfessionalsForClient({ offset, limit, search });
+    const data = await listProfessionalsForClient({
+      offset: pagination.offset,
+      limit: pagination.limit,
+      search,
+    });
     return res.status(200).json({
       success: true,
       message: "Professionals fetched successfully.",
       data,
+      pagination: buildPaginationMeta({
+        page: pagination.page,
+        limit: pagination.limit,
+        total: data.total ?? 0,
+        paginate: true,
+      }),
     });
   } catch (error) {
     return res.status(error.statusCode || 500).json({

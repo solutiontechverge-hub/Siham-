@@ -14,6 +14,8 @@ import AdminRolesPermissionsPanel from "../AdminRolesPermissionsPanel";
 import AdminDataTable, { type AdminTableColumn } from "../AdminDataTable";
 import { mockAdminRoles } from "../adminRolesData";
 import { mockAdminUsers, type AdminUser, type AdminUserStatus } from "../adminMockData";
+import { useCreateAdminActivityMutation } from "../../../store/services/adminApi";
+import { useAppSelector } from "../../../store/hooks";
 
 const ACCESS_TABS = [
   { id: "users", label: "Admin Users" },
@@ -28,6 +30,8 @@ type AddModalSource = "users" | "roles";
 export default function AdminAccessPage() {
   const theme = useTheme();
   const tokens = theme.palette.mollure;
+  const authUser = useAppSelector((s) => s.auth.user);
+  const [createAdminActivity] = useCreateAdminActivityMutation();
   const createRoleRef = React.useRef<(() => void) | null>(null);
   const [activeTab, setActiveTab] = React.useState<AccessTab>("users");
   const [roles, setRoles] = React.useState(mockAdminRoles);
@@ -104,6 +108,23 @@ export default function AdminAccessPage() {
     setModal("delete");
   };
 
+  const logActivity = React.useCallback(
+    (payload: {
+      action: string;
+      detail: string;
+      color?: "teal" | "navy" | "warning" | "mint";
+      action_type?: string;
+    }) => {
+      void createAdminActivity({
+        ...payload,
+        module: "access",
+        actor_email: authUser?.email,
+        actor_name: authUser?.email?.split("@")[0],
+      });
+    },
+    [authUser?.email, createAdminActivity],
+  );
+
   const handleCreate = () => {
     if (!name.trim() || !email.trim()) return;
     setUsers((prev) => [
@@ -116,6 +137,12 @@ export default function AdminAccessPage() {
         status,
       },
     ]);
+    logActivity({
+      action: "Created admin user",
+      detail: `${name.trim()} (${email.trim()})`,
+      color: "teal",
+      action_type: "created",
+    });
     closeModal();
   };
 
@@ -128,6 +155,12 @@ export default function AdminAccessPage() {
           : u
       )
     );
+    logActivity({
+      action: "Updated admin user",
+      detail: `${name.trim()} (${email.trim()})`,
+      color: "navy",
+      action_type: "updated",
+    });
     closeModal();
   };
 
@@ -136,12 +169,24 @@ export default function AdminAccessPage() {
     setUsers((prev) =>
       prev.map((u) => (u.id === selectedUser.id ? { ...u, status: "disabled" as const } : u))
     );
+    logActivity({
+      action: "Disabled admin user",
+      detail: `${selectedUser.name} (${selectedUser.email})`,
+      color: "warning",
+      action_type: "changed_status",
+    });
     closeModal();
   };
 
   const handleDelete = () => {
     if (!selectedUser) return;
     setUsers((prev) => prev.filter((u) => u.id !== selectedUser.id));
+    logActivity({
+      action: "Deleted admin user",
+      detail: `${selectedUser.name} (${selectedUser.email})`,
+      color: "warning",
+      action_type: "deleted",
+    });
     closeModal();
   };
 

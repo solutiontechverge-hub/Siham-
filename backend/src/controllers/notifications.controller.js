@@ -6,15 +6,36 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from "../services/bookingNotification.service.js";
+import { listResponse, parseListPagination } from "../utils/pagination.js";
+import { query } from "../db/index.js";
 
 export const listMyNotifications = async (req, res) => {
   try {
-    const rows = await listNotificationsForUser(req.user.id);
-    return res.status(200).json({
-      success: true,
-      message: "Notifications fetched successfully.",
-      data: rows.map(mapNotificationRow),
+    const pagination = parseListPagination(req.query, { defaultLimit: 50 });
+
+    const countResult = await query(
+      `SELECT COUNT(*)::int AS total
+       FROM in_app_notifications
+       WHERE recipient_user_id = $1`,
+      [req.user.id],
+    );
+    const total = countResult.rows[0]?.total ?? 0;
+
+    const rows = await listNotificationsForUser(req.user.id, {
+      limit: pagination.paginate ? pagination.limit : Math.max(total, 50),
+      offset: pagination.paginate ? pagination.offset : 0,
     });
+
+    return res.status(200).json(
+      listResponse({
+        message: "Notifications fetched successfully.",
+        data: rows.map(mapNotificationRow),
+        page: pagination.page,
+        limit: pagination.limit,
+        total,
+        paginate: pagination.paginate,
+      }),
+    );
   } catch (error) {
     return res.status(500).json({
       success: false,

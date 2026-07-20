@@ -3,11 +3,13 @@ import type { TransactionRow } from "../../app/professionals/fixed-location/fina
 import type { FinanceInvoiceSettings } from "../../components/common/finance-documents/useFinanceInvoiceSettings";
 import type { FinanceTransactionOptions } from "../../components/common/finance-documents/useFinanceTransactionOptions";
 import { baseApi } from "./baseApi";
+import type { ListPagination, ListPaginationParams } from "../../lib/listPagination";
 
 type ApiEnvelope<T> = {
   success: boolean;
   message: string;
   data: T;
+  pagination?: ListPagination;
 };
 
 export type FinanceStripeConnectStatus = "not_connected" | "onboarding" | "connected";
@@ -25,7 +27,7 @@ export type FinanceTransactionsResponse = {
   total: number;
 };
 
-export type ListFinanceTransactionsParams = {
+export type ListFinanceTransactionsParams = ListPaginationParams & {
   q?: string;
   fromDate?: string | null;
   toDate?: string | null;
@@ -33,8 +35,6 @@ export type ListFinanceTransactionsParams = {
   clientTypes?: string;
   txTypes?: string;
   statuses?: string;
-  limit?: number;
-  offset?: number;
 };
 
 export type CreateFinanceTransactionRequest = {

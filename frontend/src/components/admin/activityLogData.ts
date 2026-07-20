@@ -16,7 +16,8 @@ export type ActivityLogModule =
   | "system"
   | "booking"
   | "email"
-  | "report";
+  | "report"
+  | "access";
 
 export type ActivityLogUser = {
   name: string;
@@ -74,6 +75,7 @@ export const MODULE_FILTER_OPTIONS = [
   { value: "booking", label: "Booking" },
   { value: "email", label: "Email" },
   { value: "report", label: "Report" },
+  { value: "access", label: "Access" },
 ];
 
 export const ACTION_STYLES: Record<ActivityLogAction, { bg: string; color: string; label: string }> = {
