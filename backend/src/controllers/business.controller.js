@@ -7,18 +7,31 @@ import {
 import { buildServiceDetailsFromCategories } from "../utils/business-service-categories.js";
 import { syncBookingToFinanceTransaction } from "../services/finance-sync.service.js";
 import {
+  BOOKING_NOTIFICATION_EVENTS,
+  dispatchBookingCreatedNotifications,
+  dispatchBookingEventNotification,
+  dispatchBookingUpdatedNotifications,
+} from "../services/bookingNotification.service.js";
+import {
   notifyBookingStatusChange,
   notifyIncomingBookingRequest,
   notifyIncomingEditRequest,
 } from "../services/bookingEmail.service.js";
 import { emitBookingChanged } from "../messaging/messagingSocket.js";
 import { normalizeEntityId } from "../utils/business-setup-parsers.js";
+import { saveBookingAttachments } from "../services/booking-upload.service.js";
 import {
   isValidUuid,
   parseOptionalUuid,
   parseUuid,
   parseUuidArray,
 } from "../utils/uuid.js";
+import {
+  listResponse,
+  parseListPagination,
+  sqlLimitOffset,
+  withPaginationParams,
+} from "../utils/pagination.js";
 
 const parseJsonValue = (value, fallback) => {
   if (value === undefined || value === null || value === "") {
@@ -372,8 +385,14 @@ const getBusinessSetupDetailByUserId = async (userId, client = { query }) => {
   return getBusinessSetupDetailById(businessSetup.id, client);
 };
 
-export const listCategories = async (_req, res) => {
+export const listCategories = async (req, res) => {
   try {
+    const pagination = parseListPagination(req.query);
+    const { clause: limitClause } = sqlLimitOffset(1);
+
+    const countResult = await query(`SELECT COUNT(*)::int AS total FROM categories`);
+    const total = countResult.rows[0]?.total ?? 0;
+
     const result = await query(
       `SELECT
          c.id,
@@ -394,14 +413,21 @@ export const listCategories = async (_req, res) => {
        FROM categories c
        LEFT JOIN subcategories s ON s.category_id = c.id
        GROUP BY c.id
-       ORDER BY c.title`,
+       ORDER BY c.title
+       ${pagination.paginate ? limitClause : ""}`,
+      withPaginationParams([], pagination),
     );
 
-    return res.status(200).json({
-      success: true,
-      message: "Categories fetched successfully.",
-      data: result.rows,
-    });
+    return res.status(200).json(
+      listResponse({
+        message: "Categories fetched successfully.",
+        data: result.rows,
+        page: pagination.page,
+        limit: pagination.limit,
+        total,
+        paginate: pagination.paginate,
+      }),
+    );
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -964,6 +990,17 @@ export const listCalendarEntries = async (req, res) => {
       });
     }
 
+    const pagination = parseListPagination(req.query);
+    const { clause: limitClause } = sqlLimitOffset(2);
+
+    const countResult = await query(
+      `SELECT COUNT(*)::int AS total
+       FROM calendar_entries
+       WHERE professional_profile_id = $1`,
+      [professionalProfile.id],
+    );
+    const total = countResult.rows[0]?.total ?? 0;
+
     const result = await query(
       `SELECT
          id,
@@ -987,15 +1024,21 @@ export const listCalendarEntries = async (req, res) => {
          updated_at
        FROM calendar_entries
        WHERE professional_profile_id = $1
-       ORDER BY created_at DESC`,
-      [professionalProfile.id],
+       ORDER BY created_at DESC
+       ${pagination.paginate ? limitClause : ""}`,
+      withPaginationParams([professionalProfile.id], pagination),
     );
 
-    return res.status(200).json({
-      success: true,
-      message: "Calendar entries fetched successfully.",
-      data: result.rows,
-    });
+    return res.status(200).json(
+      listResponse({
+        message: "Calendar entries fetched successfully.",
+        data: result.rows,
+        page: pagination.page,
+        limit: pagination.limit,
+        total,
+        paginate: pagination.paginate,
+      }),
+    );
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -1265,20 +1308,73 @@ export const upsertCalendarSettings = async (req, res) => {
   }
 };
 
+const parseBookingsTabFilter = (tab) => {
+  const normalized = String(tab ?? "").trim().toLowerCase();
+  if (normalized === "past") {
+    return `AND (
+      b.status IN ('completed', 'cancelled', 'no_show')
+      OR COALESCE(b.booking_date, b.start_time::date) < CURRENT_DATE
+    )`;
+  }
+  if (normalized === "ongoing") {
+    return `AND b.status NOT IN ('completed', 'cancelled', 'no_show')
+      AND COALESCE(b.booking_date, b.start_time::date) = CURRENT_DATE`;
+  }
+  if (normalized === "upcoming") {
+    return `AND b.status NOT IN ('completed', 'cancelled', 'no_show')
+      AND COALESCE(b.booking_date, b.start_time::date) > CURRENT_DATE`;
+  }
+  return "";
+};
+
+const mapBookingListRow = (booking) => {
+  const bookingDate = toIsoDate(booking.booking_date || booking.start_time);
+  return {
+    ...booking,
+    booking_date: bookingDate,
+    date: bookingDate,
+    start: toTimeLabel(booking.start_time),
+    end: toTimeLabel(booking.end_time),
+    booking_type:
+      booking.booking_type ||
+      (normalizeBookingStatus(booking.status, "confirmed") === "requested" ? "request" : "online"),
+    unique_code: booking.unique_code || `123${booking.id}`,
+  };
+};
+
 export const listBookings = async (req, res) => {
   try {
+    const pagination = parseListPagination(req.query);
+    const tabFilterSql = parseBookingsTabFilter(req.query.tab);
+    const { clause: limitClause } = sqlLimitOffset(2);
+
     let result;
+    let total = 0;
 
     if (req.user.user_type === "professional") {
       const businessSetup = await getBusinessSetupByUserId(req.user.id);
 
       if (!businessSetup) {
-        return res.status(200).json({
-          success: true,
-          message: "Bookings fetched successfully.",
-          data: [],
-        });
+        return res.status(200).json(
+          listResponse({
+            message: "Bookings fetched successfully.",
+            data: [],
+            page: 1,
+            limit: pagination.paginate ? pagination.limit : 0,
+            total: 0,
+            paginate: pagination.paginate,
+          }),
+        );
       }
+
+      const countResult = await query(
+        `SELECT COUNT(*)::int AS total
+         FROM bookings b
+         WHERE b.business_setup_id = $1
+         ${tabFilterSql}`,
+        [businessSetup.id],
+      );
+      total = countResult.rows[0]?.total ?? 0;
 
       result = await query(
         `SELECT
@@ -1304,10 +1400,21 @@ export const listBookings = async (req, res) => {
          LEFT JOIN users u ON u.id = b.customer_id
          LEFT JOIN individual_profiles ip ON ip.user_id = u.id
          WHERE b.business_setup_id = $1
-         ORDER BY COALESCE(b.start_time, b.created_at) DESC`,
-        [businessSetup.id],
+         ${tabFilterSql}
+         ORDER BY COALESCE(b.start_time, b.created_at) DESC
+         ${pagination.paginate ? limitClause : ""}`,
+        withPaginationParams([businessSetup.id], pagination),
       );
     } else {
+      const countResult = await query(
+        `SELECT COUNT(*)::int AS total
+         FROM bookings b
+         WHERE b.customer_id = $1
+         ${tabFilterSql}`,
+        [req.user.id],
+      );
+      total = countResult.rows[0]?.total ?? 0;
+
       result = await query(
         `SELECT
            b.*,
@@ -1324,31 +1431,25 @@ export const listBookings = async (req, res) => {
          LEFT JOIN subcategories s ON s.id = b.service_id
          LEFT JOIN business_team_members tm ON tm.id = b.team_member_id
          WHERE b.customer_id = $1
-         ORDER BY COALESCE(b.start_time, b.created_at) DESC`,
-        [req.user.id],
+         ${tabFilterSql}
+         ORDER BY COALESCE(b.start_time, b.created_at) DESC
+         ${pagination.paginate ? limitClause : ""}`,
+        withPaginationParams([req.user.id], pagination),
       );
     }
 
-    const bookings = result.rows.map((booking) => {
-      const bookingDate = toIsoDate(booking.booking_date || booking.start_time);
-      return {
-        ...booking,
-        booking_date: bookingDate,
-        date: bookingDate,
-        start: toTimeLabel(booking.start_time),
-        end: toTimeLabel(booking.end_time),
-        booking_type:
-          booking.booking_type ||
-          (normalizeBookingStatus(booking.status, "confirmed") === "requested" ? "request" : "online"),
-        unique_code: booking.unique_code || `123${booking.id}`,
-      };
-    });
+    const bookings = result.rows.map(mapBookingListRow);
 
-    return res.status(200).json({
-      success: true,
-      message: "Bookings fetched successfully.",
-      data: bookings,
-    });
+    return res.status(200).json(
+      listResponse({
+        message: "Bookings fetched successfully.",
+        data: bookings,
+        page: pagination.page,
+        limit: pagination.limit,
+        total,
+        paginate: pagination.paginate,
+      }),
+    );
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -1356,6 +1457,32 @@ export const listBookings = async (req, res) => {
       data: {
         error: error.message,
       },
+    });
+  }
+};
+
+export const uploadBookingAttachments = async (req, res) => {
+  try {
+    const files = Array.isArray(req.files) ? req.files : [];
+    if (!files.length) {
+      return res.status(400).json({
+        success: false,
+        message: "No files provided.",
+        data: null,
+      });
+    }
+
+    const attachments = await saveBookingAttachments(req.user.id, files);
+    return res.status(201).json({
+      success: true,
+      message: "Booking attachments uploaded successfully.",
+      data: { attachments },
+    });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || "Failed to upload booking attachments.",
+      data: null,
     });
   }
 };
@@ -1438,6 +1565,7 @@ export const createBooking = async (req, res) => {
       }
     }
 
+    void dispatchBookingCreatedNotifications(booking);
     if (booking?.status === "confirmed") {
       void notifyBookingStatusChange(booking.id, "requested", booking.status);
     } else if (booking?.status === "requested") {
@@ -1751,13 +1879,20 @@ export const updateMyBooking = async (req, res) => {
       }
     }
 
+    if (previousStatus !== booking.status || existing.prepayment_status !== booking.prepayment_status) {
+      void dispatchBookingUpdatedNotifications(booking, previousStatus, existing.prepayment_status, {
+        notificationEvent: req.body.notification_event,
+        initiatedBy: "client",
+        notifyIncomingEr:
+          req.body.notify_incoming_er === true || req.body.email_scenario === "incoming_er",
+      });
+    }
     if (previousStatus !== booking.status) {
       void notifyBookingStatusChange(booking.id, previousStatus, booking.status);
       if (previousStatus === "confirmed" && booking.status === "requested") {
         void notifyIncomingBookingRequest(booking.id);
       }
     }
-
     emitBookingChanged(booking, "updated");
 
     return res.status(200).json({
@@ -1897,11 +2032,11 @@ export const updateBookingStatus = async (req, res) => {
       }
     }
 
-    void notifyBookingStatusChange(booking.id, previousStatus, booking.status);
-
-    if (req.body.notify_incoming_er === true || req.body.email_scenario === "incoming_er") {
-      void notifyIncomingEditRequest(booking.id);
-    }
+    void dispatchBookingUpdatedNotifications(booking, previousStatus, booking.prepayment_status, {
+      notifyIncomingEr: req.body.notify_incoming_er === true || req.body.email_scenario === "incoming_er",
+      notificationEvent: req.body.notification_event,
+      initiatedBy: req.body.initiated_by === "client" ? "client" : "professional",
+    });
 
     emitBookingChanged(booking, "updated");
 
@@ -1914,6 +2049,87 @@ export const updateBookingStatus = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to update booking status.",
+      data: {
+        error: error.message,
+      },
+    });
+  }
+};
+
+const assertBookingNotificationAccess = async (user, bookingId) => {
+  const result = await query(
+    `SELECT
+       b.id,
+       b.customer_id,
+       pp.user_id AS professional_user_id
+     FROM bookings b
+     INNER JOIN business_setups bs ON bs.id = b.business_setup_id
+     INNER JOIN professional_profiles pp ON pp.id = bs.professional_profile_id
+     WHERE b.id = $1
+     LIMIT 1`,
+    [bookingId],
+  );
+
+  const row = result.rows[0];
+  if (!row) return null;
+
+  if (user.user_type === "professional") {
+    return row.professional_user_id === user.id ? row : null;
+  }
+
+  return row.customer_id === user.id ? row : null;
+};
+
+export const createBookingNotification = async (req, res) => {
+  try {
+    const bookingId = parseUuid(req.params.id);
+    if (!bookingId) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid booking id.",
+        data: null,
+      });
+    }
+
+    const event = String(req.body.event ?? req.body.notification_event ?? "").trim();
+    if (!event || !Object.values(BOOKING_NOTIFICATION_EVENTS).includes(event)) {
+      return res.status(400).json({
+        success: false,
+        message: "A valid notification event is required.",
+        data: null,
+      });
+    }
+
+    const access = await assertBookingNotificationAccess(req.user, bookingId);
+    if (!access) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found.",
+        data: null,
+      });
+    }
+
+    const initiatedBy =
+      req.body.initiated_by === "client" || req.body.initiated_by === "professional"
+        ? req.body.initiated_by
+        : req.user.user_type === "professional"
+          ? "professional"
+          : "client";
+
+    await dispatchBookingEventNotification(bookingId, event, {
+      initiatedBy,
+      message: req.body.message ?? null,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Notification dispatched.",
+      data: { bookingId, event },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to dispatch booking notification.",
       data: {
         error: error.message,
       },

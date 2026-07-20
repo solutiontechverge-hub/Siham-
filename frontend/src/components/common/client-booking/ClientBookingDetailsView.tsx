@@ -68,7 +68,7 @@ import {
 } from "../finance-documents";
 import { usePublicFinanceSettings } from "../finance-documents/usePublicFinanceSettings";
 import type { ClientBookingDraft } from "./types";
-import { useCreateBookingMutation, useGetAllBusinessSetupsQuery, useUpdateMyBookingMutation } from "../../../store/services/businessApi";
+import { useCreateBookingMutation, useDispatchBookingNotificationMutation, useGetAllBusinessSetupsQuery, useUpdateMyBookingMutation } from "../../../store/services/businessApi";
 import { useSyncFinanceTransactionFromBookingMutation } from "../../../store/services/financeApi";
 import { getApiErrorMessage } from "../../../lib/api-error";
 import { useBookingRealtimeSync } from "../../../hooks/useBookingRealtimeSync";
@@ -171,6 +171,23 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
   const { showSnackbar } = useSnackbar();
   const [syncFinanceFromBooking] = useSyncFinanceTransactionFromBookingMutation();
   const [updateMyBooking] = useUpdateMyBookingMutation();
+  const [dispatchBookingNotification] = useDispatchBookingNotificationMutation();
+
+  const dispatchClientBookingNotification = React.useCallback(
+    async (event: "edit_request_outgoing" | "booking_date_changed" | "time_changed" | "service_edited" | "unique_item_edited") => {
+      if (!apiBookingId) return;
+      try {
+        await dispatchBookingNotification({
+          id: apiBookingId,
+          event,
+          initiated_by: "client",
+        }).unwrap();
+      } catch {
+        // best-effort — local edit-request state still updates
+      }
+    },
+    [apiBookingId, dispatchBookingNotification],
+  );
 
   React.useEffect(() => {
     if (!checkoutPaymentOptions.length) return;
@@ -1322,6 +1339,7 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
             onSendBookingRequest={isDraft && !isBookingRequestSent ? handleSendBookingRequest : undefined}
             onDeleteBooking={() => setDeleteDialogOpen(true)}
             onDiscardBookingRequest={() => setDiscardDialogOpen(true)}
+            onDispatchBookingNotification={dispatchClientBookingNotification}
           />
 
           <Box sx={{ px: { xs: 2, md: 2.5 }, pb: 2.5 }}>

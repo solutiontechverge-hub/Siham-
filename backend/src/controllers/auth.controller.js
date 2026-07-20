@@ -1,14 +1,11 @@
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import { getClient, query } from "../db/index.js";
-import {
-  sendPasswordResetOtpEmail,
-  sendVerificationEmail,
-} from "../helpers/email.helper.js";
+import { sendPasswordResetOtpEmail } from "../helpers/email.helper.js";
 import {
   notifyAccountUnderReview,
   notifyPostVerificationPro,
-  notifySignupConfirmation,
+  sendSignupEmails,
 } from "../services/authEmail.service.js";
 import {
   generateAccessToken,
@@ -249,27 +246,30 @@ export const register = async (req, res) => {
 
     await client.query("COMMIT");
 
-    let verificationEmailSent = true;
-    try {
-      await sendVerificationEmail({
-        email: user.email,
-        token: rawVerificationToken,
-      });
-    } catch (emailError) {
-      verificationEmailSent = false;
-      console.error(
-        `[auth] Verification email failed for ${user.email}:`,
-        emailError.message,
-      );
-    }
+    const emailResults = await sendSignupEmails(user.id, {
+      email: user.email,
+      token: rawVerificationToken,
+    });
 
-    void notifySignupConfirmation(user.id);
+    const verificationEmailSent = emailResults.verification.sent;
+    const welcomeEmailSent = emailResults.welcome.sent;
+
+    let message = "User registered successfully.";
+    if (verificationEmailSent && welcomeEmailSent) {
+      message = "User registered successfully. Verification and welcome emails sent.";
+    } else if (verificationEmailSent) {
+      message = "User registered successfully. Verification email sent.";
+    } else if (welcomeEmailSent) {
+      message =
+        "User registered successfully. Welcome email sent, but the verification email could not be sent.";
+    } else {
+      message =
+        "User registered successfully, but signup emails could not be sent. Please contact support.";
+    }
 
     return res.status(201).json({
       success: true,
-      message: verificationEmailSent
-        ? "User registered successfully. Verification email sent."
-        : "User registered successfully, but the verification email could not be sent.",
+      message,
       data: await getUserWithProfile(user.id),
     });
   } catch (error) {

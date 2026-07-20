@@ -2,11 +2,15 @@ export type ClientNotificationStatusType = "pending" | "accepted" | "rejected" |
 
 export type ClientNotificationItem = {
   id: string;
+  /** Primary label — professional name for clients, client name for professionals */
   professionalName: string;
+  actorName?: string;
   statusLabel: string;
   statusType: ClientNotificationStatusType;
   bookingIdLabel: string;
   timeLabel: string;
+  href?: string | null;
+  read?: boolean;
 };
 
 export const clientNotificationsData = {

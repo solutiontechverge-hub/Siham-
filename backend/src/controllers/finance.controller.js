@@ -1,5 +1,12 @@
 import { query } from "../db/index.js";
+import { dispatchPaymentDueSetNotification } from "../services/bookingNotification.service.js";
 import { parseUuid } from "../utils/uuid.js";
+import {
+  buildPaginationMeta,
+  parseListPagination,
+  sqlLimitOffset,
+  withPaginationParams,
+} from "../utils/pagination.js";
 import {
   processOverdueInvoiceReissues,
   syncBookingToFinanceTransaction,
@@ -370,16 +377,20 @@ export const listFinanceTransactions = async (req, res) => {
       ? `AND ${conditions.join(" AND ")}`
       : "";
 
-    const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 500);
-    const offset = Math.max(Number(req.query.offset) || 0, 0);
+    const pagination = parseListPagination(req.query, {
+      defaultLimit: 100,
+      maxLimit: 500,
+      force: true,
+    });
+    const { clause: limitClause } = sqlLimitOffset(2 + values.length);
 
     const result = await query(
       `SELECT * FROM finance_transactions
        WHERE professional_profile_id = $1
        ${where}
        ORDER BY COALESCE(transaction_date, created_at::date) DESC, created_at DESC
-       LIMIT ${limit} OFFSET ${offset}`,
-      [profile.id, ...values],
+       ${limitClause}`,
+      withPaginationParams([profile.id, ...values], pagination),
     );
 
     const countResult = await query(
@@ -387,14 +398,21 @@ export const listFinanceTransactions = async (req, res) => {
        WHERE professional_profile_id = $1 ${where}`,
       [profile.id, ...values],
     );
+    const total = countResult.rows[0]?.total ?? 0;
 
     return res.status(200).json({
       success: true,
       message: "Transactions loaded.",
       data: {
         rows: result.rows.map(mapTransactionRow),
-        total: countResult.rows[0]?.total ?? 0,
+        total,
       },
+      pagination: buildPaginationMeta({
+        page: pagination.page,
+        limit: pagination.limit,
+        total,
+        paginate: true,
+      }),
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message, data: null });
@@ -533,10 +551,16 @@ export const updateFinanceTransaction = async (req, res) => {
       return res.status(404).json({ success: false, message: "Transaction not found.", data: null });
     }
 
+    const updated = result.rows[0];
+    if (status === "Payment due") {
+      const dueDate = updated.document?.dueDate;
+      void dispatchPaymentDueSetNotification(updated.id, dueDate ?? null);
+    }
+
     return res.status(200).json({
       success: true,
       message: "Transaction updated.",
-      data: mapTransactionRow(result.rows[0]),
+      data: mapTransactionRow(updated),
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message, data: null });

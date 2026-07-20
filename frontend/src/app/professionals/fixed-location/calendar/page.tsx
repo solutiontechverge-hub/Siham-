@@ -26,8 +26,10 @@ import {
   useGetMollureClientDirectoryQuery,
   useGetProfessionalClientsQuery,
   useUpdateBookingStatusMutation,
+  useDispatchBookingNotificationMutation,
   useUpdateCalendarEntryStatusMutation,
   useUpsertCalendarSettingsMutation,
+  type BookingNotificationEvent,
   type BusinessServiceDetail,
   type CalendarOverviewQuery,
 } from "../../../../store/services/businessApi";
@@ -84,6 +86,7 @@ export default function FixedLocationCalendarPage() {
   const [deleteCalendarEntry, { isLoading: isDeletingCalendarEntry }] = useDeleteCalendarEntryMutation();
   const [upsertCalendarSettings, { isLoading: isSavingCalendarSettings }] = useUpsertCalendarSettingsMutation();
   const [updateBookingStatus] = useUpdateBookingStatusMutation();
+  const [dispatchBookingNotification] = useDispatchBookingNotificationMutation();
   const [updateCalendarEntryStatus] = useUpdateCalendarEntryStatusMutation();
   const { showSnackbar } = useSnackbar();
 
@@ -248,15 +251,14 @@ export default function FixedLocationCalendarPage() {
           throw error;
         }
       }}
-      onUpdateBookingStatus={async (id, status, extras) => {
-        await updateBookingStatus({
+      onUpdateBookingStatus={async (id, status, options) => {
+        await updateBookingStatus({ id, status, ...options }).unwrap();
+      }}
+      onDispatchBookingNotification={async (id, event, options) => {
+        await dispatchBookingNotification({
           id,
-          status,
-          notes: extras?.notes,
-          total_price: extras?.total_price,
-          booking_date: extras?.booking_date,
-          start_time: extras?.start_time,
-          end_time: extras?.end_time,
+          event: event as BookingNotificationEvent,
+          ...options,
         }).unwrap();
       }}
       onUpdateCalendarEntryStatus={async (id, status) => {

@@ -1,6 +1,9 @@
 import { processInvoiceReminders } from "../services/financeEmail.service.js";
-import { processRespondToRequestReminders } from "../services/bookingEmail.service.js";
-
+import {
+  processPaymentDueReminders,
+  processPaymentOverdueNotifications,
+  processRespondRequestReminderNotifications,
+} from "../services/bookingNotification.service.js";
 const DEFAULT_INTERVAL_MS = Number(process.env.EMAIL_REMINDER_POLL_MS || 15 * 60 * 1000);
 
 let intervalHandle = null;
@@ -10,14 +13,18 @@ const runReminderCycle = async () => {
   if (running) return;
   running = true;
   try {
-    const [respondOutcomes, invoiceOutcomes] = await Promise.all([
-      processRespondToRequestReminders(),
+    const [respondOutcomes, invoiceOutcomes, overdueCount, dueReminderCount] = await Promise.all([
+      processRespondRequestReminderNotifications(),
       processInvoiceReminders(),
+      processPaymentOverdueNotifications(),
+      processPaymentDueReminders(),
     ]);
 
     const sentCount =
       respondOutcomes.filter((item) => item.sent).length +
-      invoiceOutcomes.filter((item) => item.sent).length;
+      invoiceOutcomes.filter((item) => item.sent).length +
+      overdueCount +
+      dueReminderCount;
 
     if (sentCount > 0) {
       console.log(`[email-reminder] Sent ${sentCount} reminder email(s).`);

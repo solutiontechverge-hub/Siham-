@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { Box, Button, ButtonBase, Chip, Container, Divider, Paper, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import {
-  filterBookingsByTab,
   isClientBookingPaymentDue,
   statusChipLabel,
   type BookingListTab,
@@ -17,10 +16,13 @@ import { bookingStatusChipColors } from "./clientBookingStatus";
 import BookingRequestBadge from "../../../components/common/calendar/BookingRequestBadge";
 import PrepaymentPayNowIcon from "../../../components/common/client-booking/PrepaymentPayNowIcon";
 import PaymentDueIcon from "../../../components/common/client-booking/PaymentDueIcon";
+import { AppPagination } from "../../../components/common";
 import { getCheckoutPath, setActiveBookingSession } from "./clientBookingSession";
 import { useGetMyBookingsQuery } from "../../../store/services/businessApi";
 import { mapApiBookingToClientRecord } from "./clientBookingApi.mapper";
 import { enrichClientBookingRecord } from "./clientBookingDraftCache";
+
+const BOOKINGS_PAGE_SIZE = 10;
 
 const emptyCopy: Record<BookingListTab, string> = {
   past: "No past bookings yet.",
@@ -35,12 +37,30 @@ type Props = {
 export default function ClientBookingListView({ listTab }: Props) {
   const m = useTheme().palette.mollure;
   const router = useRouter();
-  const { data, isLoading, isFetching, isError, refetch } = useGetMyBookingsQuery();
+  const [page, setPage] = React.useState(1);
+
+  React.useEffect(() => {
+    setPage(1);
+  }, [listTab]);
+
+  const { data, isLoading, isFetching, isError, refetch } = useGetMyBookingsQuery({
+    page,
+    limit: BOOKINGS_PAGE_SIZE,
+    tab: listTab,
+  });
 
   const bookings = React.useMemo(() => {
     const rows = data?.data ?? [];
     return rows.map((row) => enrichClientBookingRecord(mapApiBookingToClientRecord(row)));
   }, [data]);
+
+  const pagination = data?.pagination;
+  const totalPages = Math.max(1, pagination?.totalPages ?? 1);
+  const total = pagination?.total ?? bookings.length;
+
+  React.useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
 
   const openBooking = (record: ClientBookingRecord) => {
     const enriched = enrichClientBookingRecord(record);
@@ -48,19 +68,9 @@ export default function ClientBookingListView({ listTab }: Props) {
     router.push(getCheckoutPath(enriched, listTab));
   };
 
-  // Re-evaluate booking folders/status every minute so a booking whose service
-  // window has passed moves to Past (and shows Completed) without a refresh.
-  const [tick, setTick] = React.useState(0);
-  React.useEffect(() => {
-    const id = window.setInterval(() => setTick((t) => t + 1), 60 * 1000);
-    return () => window.clearInterval(id);
-  }, []);
-
-  const filtered = React.useMemo(
-    () => filterBookingsByTab(bookings, listTab),
-    [bookings, listTab, tick],
-  );
   const loading = isLoading || isFetching;
+  const showingFrom = total === 0 ? 0 : (page - 1) * BOOKINGS_PAGE_SIZE + 1;
+  const showingTo = Math.min(page * BOOKINGS_PAGE_SIZE, total);
 
   return (
     <Container maxWidth="lg" sx={{ pb: 5 }}>
@@ -110,16 +120,16 @@ export default function ClientBookingListView({ listTab }: Props) {
                 Retry
               </Button>
             </Stack>
-          ) : filtered.length === 0 ? (
+          ) : bookings.length === 0 ? (
             <Typography sx={{ fontWeight: 800, color: alpha(m.navy, 0.55) }}>{emptyCopy[listTab]}</Typography>
           ) : (
             <Stack spacing={1.25}>
-              {filtered.map((b) => {
+              {bookings.map((b) => {
                 const shopName = b.shop?.shopName ?? "Salon";
                 const address = b.shop?.addressLabel ?? b.shop?.municipalityLabel ?? "";
                 const date = b.draft?.selectedDateISO ?? "";
                 const time = b.draft?.selectedTime ?? "";
-                const total = b.draft?.total ?? 0;
+                const totalPrice = b.draft?.total ?? 0;
                 const status = (b.status ?? "confirmed") as ClientBookingStatus;
                 const paymentDue = isClientBookingPaymentDue(b);
                 const showBrBadge =
@@ -226,7 +236,7 @@ export default function ClientBookingListView({ listTab }: Props) {
                               />
                             ) : null}
                           </Stack>
-                          <Typography sx={{ fontWeight: 1000, color: alpha(m.navy, 0.85) }}>{total} €</Typography>
+                          <Typography sx={{ fontWeight: 1000, color: alpha(m.navy, 0.85) }}>{totalPrice} €</Typography>
                         </Stack>
                       </Stack>
                     </Paper>
@@ -235,6 +245,17 @@ export default function ClientBookingListView({ listTab }: Props) {
               })}
             </Stack>
           )}
+
+          {!loading && !isError && total > 0 ? (
+            <Box sx={{ mt: 2.5 }}>
+              <AppPagination
+                count={totalPages}
+                page={Math.min(page, totalPages)}
+                onChange={(_e, next) => setPage(next)}
+                summary={`Showing ${showingFrom}-${showingTo} of ${total}`}
+              />
+            </Box>
+          ) : null}
         </Box>
       </Paper>
     </Container>

@@ -1,10 +1,23 @@
 import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { baseApi } from "./baseApi";
+import {
+  buildListQuery,
+  normalizeListPagination,
+  type ListPagination,
+  type ListPaginationParams,
+} from "../../lib/listPagination";
 
 type ApiEnvelope<T> = {
   success: boolean;
   message: string;
   data: T;
+  pagination?: ListPagination;
+};
+
+export type BookingsPagination = ListPagination;
+
+export type GetMyBookingsParams = ListPaginationParams & {
+  tab?: "past" | "ongoing" | "upcoming";
 };
 
 export type BusinessSubcategory = {
@@ -263,6 +276,7 @@ export type CalendarBooking = {
   start_time: string | null;
   end_time: string | null;
   location_type: "fixed" | "desired" | null;
+  location_details?: Record<string, unknown> | null;
   notes: string | null;
   status: string;
   prepayment_status?: string | null;
@@ -270,6 +284,8 @@ export type CalendarBooking = {
   booking_type?: "online" | "offline" | "project" | "request" | null;
   unique_code?: string | null;
   total_price: string | number | null;
+  images?: string[] | null;
+  documents?: string[] | null;
   service_title?: string | null;
   team_member_name?: string | null;
   customer_name?: string | null;
@@ -335,9 +351,23 @@ export type UpdateCalendarEntryStatusRequest = {
   status: "requested" | "cancelled" | "completed" | "confirmed" | "in_progress" | "no_show";
 };
 
+export type BookingNotificationEvent =
+  | "suggest_for_change"
+  | "edit_request_outgoing"
+  | "booking_date_changed"
+  | "time_changed"
+  | "service_edited"
+  | "unique_item_edited"
+  | "ebr_discarded"
+  | "incoming_er"
+  | "payment_due_set";
+
 export type UpdateBookingStatusRequest = {
   id: string;
   status: "requested" | "cancelled" | "completed" | "confirmed" | "in_progress" | "no_show";
+  notification_event?: BookingNotificationEvent;
+  notify_incoming_er?: boolean;
+  initiated_by?: "client" | "professional";
   notes?: string | null;
   total_price?: number | string | null;
   booking_date?: string | null;
@@ -349,11 +379,20 @@ export type UpdateMyBookingRequest = {
   id: string;
   status?: "cancelled" | "confirmed" | "requested";
   prepayment_status?: "paid" | "pending" | "failed" | "required";
+  notification_event?: BookingNotificationEvent;
+  notify_incoming_er?: boolean;
   notes?: string | null;
   total_price?: number | string | null;
   booking_date?: string | null;
   start_time?: string | null;
   end_time?: string | null;
+};
+
+export type DispatchBookingNotificationRequest = {
+  id: string;
+  event: BookingNotificationEvent;
+  initiated_by?: "client" | "professional";
+  message?: string;
 };
 
 export type CreateBookingRequest = {
@@ -372,6 +411,8 @@ export type CreateBookingRequest = {
   unique_code?: string | null;
   total_price?: number | string | null;
   contact_number?: string | null;
+  images?: string[];
+  documents?: string[];
 };
 
 export type UpdateBusinessSetupActiveRequest = {
@@ -565,10 +606,13 @@ const customError = (message: string): MutationError => ({
 
 export const businessApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    getBusinessCategories: builder.query<ApiEnvelope<BusinessCategory[]>, void>({
-      async queryFn(_arg, _api, _extraOptions, fetchWithBQ) {
+    getBusinessCategories: builder.query<
+      ApiEnvelope<BusinessCategory[]> & { pagination?: ListPagination },
+      ListPaginationParams | void
+    >({
+      async queryFn(arg, _api, _extraOptions, fetchWithBQ) {
         const response = await fetchWithBQ({
-          url: "/api/business/categories",
+          url: buildListQuery("/api/business/categories", arg ?? undefined),
           method: "GET",
         });
 
@@ -581,14 +625,26 @@ export const businessApi = baseApi.injectEndpoints({
           return { error: customError(data.message || "Unable to fetch business categories.") };
         }
 
-        return { data };
+        return {
+          data: {
+            ...data,
+            pagination: normalizeListPagination(data.pagination, {
+              page: arg?.page,
+              limit: arg?.limit,
+              total: data.data.length,
+            }),
+          },
+        };
       },
       providesTags: ["BusinessCategories"],
     }),
-    getAllBusinessSetups: builder.query<ApiEnvelope<BusinessSetupListing[]>, void>({
-      async queryFn(_arg, _api, _extraOptions, fetchWithBQ) {
+    getAllBusinessSetups: builder.query<
+      ApiEnvelope<BusinessSetupListing[]> & { pagination?: ListPagination },
+      ListPaginationParams | void
+    >({
+      async queryFn(arg, _api, _extraOptions, fetchWithBQ) {
         const response = await fetchWithBQ({
-          url: "/api/business-setups/all",
+          url: buildListQuery("/api/business-setups/all", arg ?? undefined),
           method: "GET",
         });
 
@@ -601,7 +657,16 @@ export const businessApi = baseApi.injectEndpoints({
           return { error: customError(data.message || "Unable to fetch business listings.") };
         }
 
-        return { data };
+        return {
+          data: {
+            ...data,
+            pagination: normalizeListPagination(data.pagination, {
+              page: arg?.page,
+              limit: arg?.limit,
+              total: data.data.length,
+            }),
+          },
+        };
       },
       providesTags: ["BusinessSetupsListing"],
     }),
@@ -736,10 +801,15 @@ export const businessApi = baseApi.injectEndpoints({
       },
       invalidatesTags: ["Calendar"],
     }),
-    getMyBookings: builder.query<ApiEnvelope<CalendarBooking[]>, void>({
-      async queryFn(_arg, _api, _extraOptions, fetchWithBQ) {
+    getMyBookings: builder.query<
+      ApiEnvelope<CalendarBooking[]> & { pagination: BookingsPagination },
+      GetMyBookingsParams | void
+    >({
+      async queryFn(arg, _api, _extraOptions, fetchWithBQ) {
         const response = await fetchWithBQ({
-          url: "/api/business/bookings",
+          url: buildListQuery("/api/business/bookings", arg ?? undefined, {
+            tab: arg?.tab,
+          }),
           method: "GET",
         });
 
@@ -747,12 +817,21 @@ export const businessApi = baseApi.injectEndpoints({
           return { error: toMutationError(response.error) };
         }
 
-        const data = response.data as ApiEnvelope<CalendarBooking[]>;
+        const data = response.data as ApiEnvelope<CalendarBooking[]> & {
+          pagination?: ListPagination;
+        };
         if (!data.success) {
           return { error: customError(data.message || "Unable to load bookings.") };
         }
 
-        return { data: { ...data, data: Array.isArray(data.data) ? data.data : [] } };
+        const rows = Array.isArray(data.data) ? data.data : [];
+        const pagination = normalizeListPagination(data.pagination, {
+          page: arg?.page,
+          limit: arg?.limit,
+          total: rows.length,
+        });
+
+        return { data: { ...data, data: rows, pagination } };
       },
       providesTags: ["Bookings"],
     }),
@@ -779,7 +858,10 @@ export const businessApi = baseApi.injectEndpoints({
     }),
     updateBookingStatus: builder.mutation<ApiEnvelope<CalendarBooking>, UpdateBookingStatusRequest>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
-        const body: Record<string, string | number> = { status: payload.status };
+        const body: Record<string, string | number | boolean> = { status: payload.status };
+        if (payload.notification_event) body.notification_event = payload.notification_event;
+        if (payload.notify_incoming_er) body.notify_incoming_er = true;
+        if (payload.initiated_by) body.initiated_by = payload.initiated_by;
         if (payload.notes !== undefined) body.notes = payload.notes ?? "";
         if (payload.total_price !== undefined && payload.total_price !== null && payload.total_price !== "") {
           body.total_price = Number(payload.total_price);
@@ -809,9 +891,11 @@ export const businessApi = baseApi.injectEndpoints({
     }),
     updateMyBooking: builder.mutation<ApiEnvelope<CalendarBooking>, UpdateMyBookingRequest>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
-        const body: Record<string, string | number> = {};
+        const body: Record<string, string | number | boolean> = {};
         if (payload.status) body.status = payload.status;
         if (payload.prepayment_status) body.prepayment_status = payload.prepayment_status;
+        if (payload.notification_event) body.notification_event = payload.notification_event;
+        if (payload.notify_incoming_er) body.notify_incoming_er = true;
         if (payload.notes !== undefined) body.notes = payload.notes ?? "";
         if (payload.total_price !== undefined && payload.total_price !== null && payload.total_price !== "") {
           body.total_price = Number(payload.total_price);
@@ -839,6 +923,34 @@ export const businessApi = baseApi.injectEndpoints({
       },
       invalidatesTags: ["Calendar", "Bookings"],
     }),
+    dispatchBookingNotification: builder.mutation<
+      ApiEnvelope<{ bookingId: string; event: string }>,
+      DispatchBookingNotificationRequest
+    >({
+      async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
+        const body: Record<string, string> = { event: payload.event };
+        if (payload.initiated_by) body.initiated_by = payload.initiated_by;
+        if (payload.message) body.message = payload.message;
+
+        const response = await fetchWithBQ({
+          url: `/api/business/bookings/${payload.id}/notifications`,
+          method: "POST",
+          body,
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<{ bookingId: string; event: string }>;
+        if (!data.success) {
+          return { error: customError(data.message || "Unable to dispatch notification.") };
+        }
+
+        return { data };
+      },
+      invalidatesTags: ["Notifications"],
+    }),
     uploadBusinessMedia: builder.mutation<ApiEnvelope<{ business_media: string[] }>, File[]>({
       async queryFn(files, _api, _extraOptions, fetchWithBQ) {
         const formData = new FormData();
@@ -859,6 +971,50 @@ export const businessApi = baseApi.injectEndpoints({
         const data = response.data as ApiEnvelope<{ business_media: string[] }>;
         if (!data.success || !Array.isArray(data.data?.business_media)) {
           return { error: customError(data.message || "Unable to upload business media.") };
+        }
+
+        return { data };
+      },
+    }),
+    uploadBookingAttachments: builder.mutation<
+      ApiEnvelope<{
+        attachments: Array<{
+          id: string;
+          name: string;
+          mimeType: string;
+          kind: "image" | "document";
+          url: string;
+        }>;
+      }>,
+      File[]
+    >({
+      async queryFn(files, _api, _extraOptions, fetchWithBQ) {
+        const formData = new FormData();
+        for (const file of files) {
+          formData.append("files", file, file.name);
+        }
+
+        const response = await fetchWithBQ({
+          url: "/api/business/bookings/attachments",
+          method: "POST",
+          body: formData,
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<{
+          attachments: Array<{
+            id: string;
+            name: string;
+            mimeType: string;
+            kind: "image" | "document";
+            url: string;
+          }>;
+        }>;
+        if (!data.success || !Array.isArray(data.data?.attachments)) {
+          return { error: customError(data.message || "Unable to upload booking attachments.") };
         }
 
         return { data };
@@ -938,10 +1094,13 @@ export const businessApi = baseApi.injectEndpoints({
       },
       invalidatesTags: ["BusinessSetup"],
     }),
-    getProfessionalClients: builder.query<ApiEnvelope<ApiProfessionalClient[]>, void>({
-      async queryFn(_arg, _api, _extraOptions, fetchWithBQ) {
+    getProfessionalClients: builder.query<
+      ApiEnvelope<ApiProfessionalClient[]> & { pagination?: ListPagination },
+      ListPaginationParams | void
+    >({
+      async queryFn(arg, _api, _extraOptions, fetchWithBQ) {
         const response = await fetchWithBQ({
-          url: "/api/business/clients",
+          url: buildListQuery("/api/business/clients", arg ?? undefined),
           method: "GET",
         });
 
@@ -954,15 +1113,28 @@ export const businessApi = baseApi.injectEndpoints({
           return { error: customError(data.message || "Unable to fetch clients.") };
         }
 
-        return { data };
+        return {
+          data: {
+            ...data,
+            pagination: normalizeListPagination(data.pagination, {
+              page: arg?.page,
+              limit: arg?.limit,
+              total: data.data.length,
+            }),
+          },
+        };
       },
       providesTags: ["ProfessionalClients"],
     }),
-    getMollureClientDirectory: builder.query<ApiEnvelope<MollureClientDirectoryEntry[]>, { q?: string } | void>({
+    getMollureClientDirectory: builder.query<
+      ApiEnvelope<MollureClientDirectoryEntry[]> & { pagination?: ListPagination },
+      (ListPaginationParams & { q?: string }) | void
+    >({
       async queryFn(arg, _api, _extraOptions, fetchWithBQ) {
-        const q = arg?.q?.trim();
         const response = await fetchWithBQ({
-          url: q ? `/api/business/clients/mollure-directory?q=${encodeURIComponent(q)}` : "/api/business/clients/mollure-directory",
+          url: buildListQuery("/api/business/clients/mollure-directory", arg ?? undefined, {
+            q: arg?.q?.trim(),
+          }),
           method: "GET",
         });
 
@@ -975,7 +1147,16 @@ export const businessApi = baseApi.injectEndpoints({
           return { error: customError(data.message || "Unable to fetch Mollure directory.") };
         }
 
-        return { data };
+        return {
+          data: {
+            ...data,
+            pagination: normalizeListPagination(data.pagination, {
+              page: arg?.page,
+              limit: arg?.limit,
+              total: data.data.length,
+            }),
+          },
+        };
       },
       providesTags: ["ProfessionalClients"],
     }),
@@ -1106,7 +1287,9 @@ export const {
   useCreateBookingMutation,
   useUpdateBookingStatusMutation,
   useUpdateMyBookingMutation,
+  useDispatchBookingNotificationMutation,
   useUploadBusinessMediaMutation,
+  useUploadBookingAttachmentsMutation,
   useUpdateBusinessSetupActiveMutation,
   useCreateBusinessSubcategoryMutation,
   useUpsertBusinessSetupMutation,

@@ -27,7 +27,14 @@ export type ClientBookingDraftTeamMember = {
 
 export type ClientBookingDraftProjectDetails = {
   description: string;
-  uploads: Array<{ id: string; name: string; previewUrl?: string }>;
+  uploads: Array<{
+    id: string;
+    name: string;
+    url?: string;
+    mimeType?: string;
+    kind?: "image" | "document";
+    previewUrl?: string;
+  }>;
 };
 
 export type ClientBookingDraft = {

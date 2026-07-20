@@ -96,7 +96,7 @@ export const loginWithGoogle = async (req, res) => {
       });
     }
 
-    const user = await findOrCreateOAuthUser({
+    const { user } = await findOrCreateOAuthUser({
       provider: "google",
       subject: identity.subject,
       email: identity.email,
@@ -133,7 +133,7 @@ export const loginWithApple = async (req, res) => {
     }
 
     const identity = await verifyAppleIdToken(idToken);
-    const user = await findOrCreateOAuthUser({
+    const { user } = await findOrCreateOAuthUser({
       provider: "apple",
       subject: identity.subject,
       email: identity.email,

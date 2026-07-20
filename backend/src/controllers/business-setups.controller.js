@@ -4,24 +4,47 @@ import {
   groupRowsByBusinessSetupId,
   transformBusinessSetupForListing,
 } from "../utils/business-setup-listing.mapper.js";
+import {
+  listResponse,
+  parseListPagination,
+  sqlLimitOffset,
+  withPaginationParams,
+} from "../utils/pagination.js";
 
-export const listAllBusinessSetups = async (_req, res) => {
+export const listAllBusinessSetups = async (req, res) => {
   try {
+    const pagination = parseListPagination(req.query);
+    const { clause: limitClause } = sqlLimitOffset(1);
+
+    const countResult = await query(
+      `SELECT COUNT(*)::int AS total
+       FROM business_setups bs
+       WHERE bs.is_active = true`,
+    );
+    const total = countResult.rows[0]?.total ?? 0;
+
     const setupsResult = await query(
       `SELECT bs.*
        FROM business_setups bs
        WHERE bs.is_active = true
-       ORDER BY bs.updated_at DESC, bs.id DESC`,
+       ORDER BY bs.updated_at DESC, bs.id DESC
+       ${pagination.paginate ? limitClause : ""}`,
+      withPaginationParams([], pagination),
     );
 
     const setupRows = setupsResult.rows;
 
     if (!setupRows.length) {
-      return res.status(200).json({
-        success: true,
-        message: "Business setups fetched successfully",
-        data: [],
-      });
+      return res.status(200).json(
+        listResponse({
+          message: "Business setups fetched successfully",
+          data: [],
+          page: pagination.page,
+          limit: pagination.limit,
+          total,
+          paginate: pagination.paginate,
+        }),
+      );
     }
 
     const setupIds = setupRows.map((row) => row.id);
@@ -56,11 +79,16 @@ export const listAllBusinessSetups = async (_req, res) => {
       }),
     );
 
-    return res.status(200).json({
-      success: true,
-      message: "Business setups fetched successfully",
-      data,
-    });
+    return res.status(200).json(
+      listResponse({
+        message: "Business setups fetched successfully",
+        data,
+        page: pagination.page,
+        limit: pagination.limit,
+        total,
+        paginate: pagination.paginate,
+      }),
+    );
   } catch (error) {
     return res.status(500).json({
       success: false,

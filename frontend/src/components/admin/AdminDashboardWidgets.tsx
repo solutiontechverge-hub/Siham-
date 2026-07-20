@@ -3,6 +3,7 @@
 import * as React from "react";
 import OpenInNewOutlinedIcon from "@mui/icons-material/OpenInNewOutlined";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import {
   Box,
   Stack,
@@ -16,16 +17,21 @@ import { alpha, useTheme } from "@mui/material/styles";
 import AdminSectionCard from "./AdminSectionCard";
 import { ADMIN_CARD_PADDING as pad } from "./adminCardPadding";
 import { AdminSectionLink } from "./AdminDashboardHeader";
-import {
-  ADMIN_QUICK_LINKS,
-  dashboardRecentActivity,
-  dashboardSummaryOverview,
-  dashboardSystemStatus,
-  dashboardTopProfessionals,
-} from "./dashboardData";
+import { ADMIN_QUICK_LINKS } from "./dashboardData";
+import type {
+  AdminDashboardActivityItem,
+  AdminDashboardSummaryRow,
+  AdminDashboardSystemStatus,
+  AdminDashboardTopProfessional,
+} from "../../store/services/adminApi";
 
-export function TopProfessionalsWidget() {
+export function TopProfessionalsWidget({
+  professionals,
+}: {
+  professionals: AdminDashboardTopProfessional[];
+}) {
   const tokens = useTheme().palette.mollure;
+  const rows = professionals.slice(0, 4);
 
   return (
     <AdminSectionCard
@@ -36,7 +42,12 @@ export function TopProfessionalsWidget() {
       sx={{ height: "100%" }}
     >
       <Stack spacing={0.75}>
-        {dashboardTopProfessionals.slice(0, 4).map((pro, index) => (
+        {rows.length === 0 ? (
+          <Typography sx={{ fontSize: 12, color: tokens.bodyText, py: 1 }}>
+            No online bookings in this range.
+          </Typography>
+        ) : null}
+        {rows.map((pro, index) => (
           <Stack
             key={pro.id}
             direction="row"
@@ -83,10 +94,11 @@ export function TopProfessionalsWidget() {
   );
 }
 
-export function ActivityLogWidget() {
+export function ActivityLogWidget({ items }: { items: AdminDashboardActivityItem[] }) {
   const tokens = useTheme().palette.mollure;
+  const rows = items.slice(0, 3);
 
-  const dotColor = (color: (typeof dashboardRecentActivity)[number]["color"]) => {
+  const dotColor = (color: AdminDashboardActivityItem["color"]) => {
     switch (color) {
       case "teal":
         return tokens.teal;
@@ -108,7 +120,12 @@ export function ActivityLogWidget() {
       sx={{ height: "100%" }}
     >
       <Stack spacing={0}>
-        {dashboardRecentActivity.slice(0, 3).map((item, index) => (
+        {rows.length === 0 ? (
+          <Typography sx={{ fontSize: 12, color: tokens.bodyText, py: 1 }}>
+            No recent activity.
+          </Typography>
+        ) : null}
+        {rows.map((item, index) => (
           <Stack key={item.id} direction="row" spacing={1} sx={{ py: 0.85 }}>
             <Stack alignItems="center" sx={{ width: 16, flexShrink: 0 }}>
               <Box
@@ -120,7 +137,7 @@ export function ActivityLogWidget() {
                   mt: 0.5,
                 }}
               />
-              {index < dashboardRecentActivity.length - 1 ? (
+              {index < rows.length - 1 ? (
                 <Box sx={{ width: 2, flex: 1, bgcolor: tokens.cardBorder, minHeight: 24, mt: 0.5 }} />
               ) : null}
             </Stack>
@@ -145,14 +162,14 @@ export function ActivityLogWidget() {
   );
 }
 
-export function SummaryOverviewWidget() {
+export function SummaryOverviewWidget({ rows }: { rows: AdminDashboardSummaryRow[] }) {
   const tokens = useTheme().palette.mollure;
 
   return (
     <AdminSectionCard title="Summary Overview" noPadding compact sx={{ height: "100%" }}>
       <Table size="small">
         <TableBody>
-          {dashboardSummaryOverview.map((row) => (
+          {rows.map((row) => (
             <TableRow
               key={row.label}
               sx={{
@@ -183,36 +200,49 @@ export function SummaryOverviewWidget() {
   );
 }
 
-export function SystemStatusWidget() {
+export function SystemStatusWidget({ items }: { items: AdminDashboardSystemStatus[] }) {
   const tokens = useTheme().palette.mollure;
 
   return (
     <AdminSectionCard title="System Status" compact sx={{ height: "100%" }}>
       <Stack spacing={0.75}>
-        {dashboardSystemStatus.map((item) => (
-          <Stack
-            key={item.label}
-            direction="row"
-            justifyContent="space-between"
-            alignItems="center"
-            sx={{
-              px: 1.5,
-              py: 1,
-              borderRadius: 1.5,
-              bgcolor: tokens.surface,
-            }}
-          >
-            <Typography sx={{ fontSize: 12, fontWeight: 500, color: tokens.navy }}>
-              {item.label}
-            </Typography>
-            <Stack direction="row" alignItems="center" spacing={0.4}>
-              <CheckCircleOutlineIcon sx={{ fontSize: 14, color: tokens.teal }} />
-              <Typography sx={{ fontSize: 11, fontWeight: 600, color: tokens.teal }}>
-                {item.status}
+        {items.map((item) => {
+          const ok = item.status.toLowerCase() === "operational";
+          return (
+            <Stack
+              key={item.label}
+              direction="row"
+              justifyContent="space-between"
+              alignItems="center"
+              sx={{
+                px: 1.5,
+                py: 1,
+                borderRadius: 1.5,
+                bgcolor: tokens.surface,
+              }}
+            >
+              <Typography sx={{ fontSize: 12, fontWeight: 500, color: tokens.navy }}>
+                {item.label}
               </Typography>
+              <Stack direction="row" alignItems="center" spacing={0.4}>
+                {ok ? (
+                  <CheckCircleOutlineIcon sx={{ fontSize: 14, color: tokens.teal }} />
+                ) : (
+                  <ErrorOutlineIcon sx={{ fontSize: 14, color: tokens.requestAccent }} />
+                )}
+                <Typography
+                  sx={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: ok ? tokens.teal : tokens.requestAccent,
+                  }}
+                >
+                  {item.status}
+                </Typography>
+              </Stack>
             </Stack>
-          </Stack>
-        ))}
+          );
+        })}
       </Stack>
     </AdminSectionCard>
   );

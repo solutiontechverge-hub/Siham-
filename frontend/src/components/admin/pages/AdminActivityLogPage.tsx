@@ -6,6 +6,7 @@ import {
   Avatar,
   Box,
   Chip,
+  CircularProgress,
   Grid2 as Grid,
   IconButton,
   Menu,
@@ -57,13 +58,13 @@ import {
   ACTION_STYLES,
   MODULE_FILTER_OPTIONS,
   USER_FILTER_OPTIONS,
-  activityLogSummaryStats,
-  mockActivityLogRows,
+  type ActivityLogAction,
   type ActivityLogModule,
   type ActivityLogRow,
 } from "../activityLogData";
 import { exportActivityLogToExcel } from "../exportActivityLogExcel";
 import { exportActivityLogToPdf } from "../exportActivityLogPdf";
+import { useGetAdminActivityLogQuery } from "../../../store/services/adminApi";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50];
 
@@ -77,6 +78,7 @@ const MODULE_ICONS: Record<ActivityLogModule, React.ElementType> = {
   booking: EventOutlinedIcon,
   email: EmailOutlinedIcon,
   report: FlagOutlinedIcon,
+  access: LockOutlinedIcon,
 };
 
 function formatDisplayDate(iso: string) {
@@ -302,7 +304,6 @@ function ActivityRowActions({
 
 export default function AdminActivityLogPage() {
   const tokens = useTheme().palette.mollure;
-  const [logs, setLogs] = React.useState(mockActivityLogRows);
   const [drawerLogId, setDrawerLogId] = React.useState<string | null>(null);
   const [search, setSearch] = React.useState("");
   const [userFilter, setUserFilter] = React.useState("all");
@@ -314,29 +315,47 @@ export default function AdminActivityLogPage() {
   const [pageSize, setPageSize] = React.useState(PAGE_SIZE_OPTIONS[0]);
   const [exportMenuAnchor, setExportMenuAnchor] = React.useState<null | HTMLElement>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<ActivityLogRow | null>(null);
+  const [hiddenIds, setHiddenIds] = React.useState<Set<string>>(() => new Set());
 
-  const filteredLogs = React.useMemo(() => {
-    return logs.filter((row) => {
-      if (userFilter !== "all" && row.user.email !== userFilter) return false;
-      if (actionFilter !== "all" && row.action !== actionFilter) return false;
-      if (moduleFilter !== "all" && row.module !== moduleFilter) return false;
-      if (dateFrom && row.date < dateFrom) return false;
-      if (dateTo && row.date > dateTo) return false;
-      if (search.trim()) {
-        const q = search.trim().toLowerCase();
-        return (
-          row.user.name.toLowerCase().includes(q) ||
-          row.user.email.toLowerCase().includes(q) ||
-          row.actionLabel.toLowerCase().includes(q) ||
-          row.moduleLabel.toLowerCase().includes(q) ||
-          row.details.toLowerCase().includes(q) ||
-          row.ipAddress.includes(q)
-        );
-      }
-      return true;
-    });
-  }, [logs, userFilter, actionFilter, moduleFilter, dateFrom, dateTo, search]);
+  const queryArgs = React.useMemo(
+    () => ({
+      limit: 200,
+      offset: 0,
+      search: search.trim() || undefined,
+      action: actionFilter,
+      module: moduleFilter,
+      user: userFilter,
+      from: dateFrom || undefined,
+      to: dateTo || undefined,
+    }),
+    [search, actionFilter, moduleFilter, userFilter, dateFrom, dateTo],
+  );
 
+  const { data, isLoading, isFetching, isError, refetch } = useGetAdminActivityLogQuery(queryArgs, {
+    refetchOnMountOrArgChange: true,
+  });
+
+  const logs = React.useMemo<ActivityLogRow[]>(() => {
+    const items = data?.data?.items ?? [];
+    return items
+      .filter((item) => !hiddenIds.has(item.id))
+      .map((item) => ({
+        id: item.id,
+        date: item.date,
+        time: item.time,
+        user: item.user,
+        action: (item.action in ACTION_STYLES ? item.action : "system") as ActivityLogAction,
+        actionLabel: item.actionLabel || item.action,
+        module: (item.module in MODULE_ICONS ? item.module : "system") as ActivityLogModule,
+        moduleLabel: item.moduleLabel || item.module,
+        details: item.details,
+        ipAddress: item.ipAddress || "—",
+      }));
+  }, [data?.data?.items, hiddenIds]);
+
+  const summary = data?.data?.summary ?? { total: 0, today: 0, thisWeek: 0, thisMonth: 0 };
+
+  const filteredLogs = logs;
   const totalPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
   const pagedLogs = filteredLogs.slice((page - 1) * pageSize, page * pageSize);
   const drawerLog = logs.find((l) => l.id === drawerLogId) ?? null;
@@ -379,7 +398,7 @@ export default function AdminActivityLogPage() {
 
   const confirmDelete = () => {
     if (!deleteTarget) return;
-    setLogs((prev) => prev.filter((l) => l.id !== deleteTarget.id));
+    setHiddenIds((prev) => new Set(prev).add(deleteTarget.id));
     if (drawerLogId === deleteTarget.id) {
       setDrawerLogId(null);
     }
@@ -389,28 +408,28 @@ export default function AdminActivityLogPage() {
   const summaryItems = [
     {
       label: "Total Activities",
-      value: activityLogSummaryStats.total,
+      value: summary.total,
       icon: HistoryOutlinedIcon,
       iconBg: "rgba(127, 86, 217, 0.12)",
       iconColor: "#6941C6",
     },
     {
       label: "Today",
-      value: activityLogSummaryStats.today,
+      value: summary.today,
       icon: TodayOutlinedIcon,
       iconBg: "rgba(76, 175, 80, 0.12)",
       iconColor: "#2E7D32",
     },
     {
       label: "This Week",
-      value: activityLogSummaryStats.thisWeek,
+      value: summary.thisWeek,
       icon: DateRangeOutlinedIcon,
       iconBg: "rgba(59, 130, 246, 0.12)",
       iconColor: "#2563EB",
     },
     {
       label: "This Month",
-      value: activityLogSummaryStats.thisMonth,
+      value: summary.thisMonth,
       icon: CalendarMonthOutlinedIcon,
       iconBg: "rgba(220, 104, 3, 0.14)",
       iconColor: "#DC6803",
@@ -626,7 +645,38 @@ export default function AdminActivityLogPage() {
               </AdminFilterPanel>
             </Box>
 
-            <AdminDataTable columns={columns} rows={pagedLogs} getRowId={(r) => r.id} dense />
+            {isError ? (
+              <Box sx={{ px: pad.tableCellX, py: 2 }}>
+                <Typography sx={{ fontSize: 13, color: tokens.bodyText }}>
+                  Failed to load activity log.{" "}
+                  <Box
+                    component="button"
+                    onClick={() => void refetch()}
+                    sx={{
+                      border: 0,
+                      background: "none",
+                      color: tokens.teal,
+                      cursor: "pointer",
+                      font: "inherit",
+                      fontWeight: 700,
+                      p: 0,
+                    }}
+                  >
+                    Retry
+                  </Box>
+                </Typography>
+              </Box>
+            ) : null}
+
+            {isLoading && logs.length === 0 ? (
+              <Box sx={{ display: "grid", placeItems: "center", py: 6 }}>
+                <CircularProgress size={28} sx={{ color: tokens.teal }} />
+              </Box>
+            ) : (
+              <Box sx={{ opacity: isFetching ? 0.72 : 1 }}>
+                <AdminDataTable columns={columns} rows={pagedLogs} getRowId={(r) => r.id} dense />
+              </Box>
+            )}
 
             <Box sx={{ p: pad.bodyCompact, borderTop: `1px solid ${tokens.cardBorder}` }}>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ sm: "center" }} justifyContent="space-between">

@@ -36,6 +36,10 @@ type Props = {
   onSendBookingRequest?: () => void | Promise<void>;
   onDeleteBooking?: () => void;
   onDiscardBookingRequest?: () => void;
+  onDispatchBookingNotification?: (
+    event: "edit_request_outgoing" | "booking_date_changed" | "time_changed" | "service_edited" | "unique_item_edited",
+  ) => void | Promise<void>;
+  messagingHref?: string;
 };
 
 export default function ClientBookingDetailsHeader({
@@ -56,6 +60,8 @@ export default function ClientBookingDetailsHeader({
   onSendBookingRequest,
   onDeleteBooking,
   onDiscardBookingRequest,
+  onDispatchBookingNotification,
+  messagingHref,
 }: Props) {
   const m = useTheme().palette.mollure;
   const { showSnackbar } = useSnackbar();
@@ -71,6 +77,7 @@ export default function ClientBookingDetailsHeader({
 
   const handleSendEditRequest = () => {
     setEditAnchor(null);
+    void onDispatchBookingNotification?.("edit_request_outgoing");
     sendBookingEditRequest(bookingRef);
     editRequest.refresh();
     showSnackbar({

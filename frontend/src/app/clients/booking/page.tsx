@@ -47,7 +47,15 @@ import MessagingModalShell, {
   MessagingModalPrimaryButton,
 } from "../../../components/common/messaging/MessagingModalShell";
 import { ServiceSummaryMetaLine } from "../../../components/common/ServiceSummaryMetaLine";
-import { fmtMinutesToTimeLabel, parseTimeLabelToMinutes, serviceTimeRangeLabel } from "./booking-time";
+import {
+  CLIENT_BOOKING_MIN_LEAD_ERROR,
+  CLIENT_BOOKING_MIN_LEAD_MINUTES,
+  fmtMinutesToTimeLabel,
+  getNowMinutesFromMidnight,
+  isSameDayBookingTooSoon,
+  parseTimeLabelToMinutes,
+  serviceTimeRangeLabel,
+} from "./booking-time";
 import ClientBookingListView from "./ClientBookingListView";
 import ClientBookingPageShell from "./ClientBookingPageShell";
 import { parseBookingListTab } from "./bookingPillTabs";
@@ -61,6 +69,7 @@ import {
 import { resolveCreateCheckoutPath } from "./resolveCreateBookingStatus";
 import { submitClientBookingRequest } from "./submitClientBookingRequest";
 import { useSnackbar } from "../../../components/common/AppSnackbar";
+import { getApiErrorMessage } from "../../../lib/api-error";
 import { getServicesForLocationMode, getTeamForLocationMode } from "../../../data/businessPublicProfile.data";
 import { useBusinessPublicProfile } from "../../../hooks/useBusinessPublicProfile";
 import { extractUuidFromSyntheticId } from "./clientBookingApi.mapper";
@@ -75,7 +84,7 @@ import {
   type ProfessionalProfile,
   type ProfileResponse,
 } from "../../../store/services/profileApi";
-import { useCreateBookingMutation } from "../../../store/services/businessApi";
+import { useCreateBookingMutation, useUploadBookingAttachmentsMutation } from "../../../store/services/businessApi";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -161,6 +170,7 @@ function ClientBookingCreateView() {
     [businessSetups, shop?.shopId],
   );
   const [createBooking] = useCreateBookingMutation();
+  const [uploadBookingAttachments] = useUploadBookingAttachmentsMutation();
   const [isContinuing, setIsContinuing] = React.useState(false);
 
   const startOfDay = (d: Date) => {
@@ -239,21 +249,26 @@ function ClientBookingCreateView() {
     [selectedDate, today0],
   );
 
-  const nowMinutes = React.useMemo(() => {
-    const now = new Date();
-    return now.getHours() * 60 + now.getMinutes();
-  }, [selectedDate]);
+  const [nowTick, setNowTick] = React.useState(() => Date.now());
+  React.useEffect(() => {
+    if (!isSelectedToday) return;
+    const id = window.setInterval(() => setNowTick(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, [isSelectedToday]);
+
+  const nowMinutes = React.useMemo(() => getNowMinutesFromMidnight(new Date(nowTick)), [nowTick, selectedDate]);
+  const minBookableMinutes = nowMinutes + CLIENT_BOOKING_MIN_LEAD_MINUTES;
 
   const times = allDayTimes;
 
   const availableTimes = React.useMemo(() => {
     if (!isSelectedToday) return times;
-    return times.filter((t) => parseTimeLabelToMinutes(t) > nowMinutes);
-  }, [isSelectedToday, nowMinutes, times]);
+    return times.filter((t) => parseTimeLabelToMinutes(t) > minBookableMinutes);
+  }, [isSelectedToday, minBookableMinutes, times]);
 
-  const isTimePast = React.useCallback(
-    (t: string) => isSelectedToday && parseTimeLabelToMinutes(t) <= nowMinutes,
-    [isSelectedToday, nowMinutes],
+  const isTimeUnavailable = React.useCallback(
+    (t: string) => isSelectedToday && parseTimeLabelToMinutes(t) <= minBookableMinutes,
+    [isSelectedToday, minBookableMinutes],
   );
 
   const timeScrollRef = React.useRef<HTMLDivElement>(null);
@@ -320,11 +335,15 @@ function ClientBookingCreateView() {
   const hydrationSignatureRef = React.useRef<string | null>(null);
 
   const [selectedTime, setSelectedTime] = React.useState(() => {
-    const now = new Date();
-    const mins = now.getHours() * 60 + now.getMinutes();
+    const mins = getNowMinutesFromMidnight() + CLIENT_BOOKING_MIN_LEAD_MINUTES;
     const future = allDayTimes.filter((t) => parseTimeLabelToMinutes(t) > mins);
     return (future[0] ?? allDayTimes[0]) ?? "";
   });
+  const [timeValidationError, setTimeValidationError] = React.useState<string | null>(null);
+  const selectedTimeTooSoon = React.useMemo(
+    () => isSelectedToday && isSameDayBookingTooSoon(selectedTime, new Date(nowTick)),
+    [isSelectedToday, nowTick, selectedTime],
+  );
   const [combineServices, setCombineServices] = React.useState(true);
   const [selectedPersonId, setSelectedPersonId] = React.useState<string>("p-requester");
   const [selectedTeamMemberId, setSelectedTeamMemberId] = React.useState<string>("");
@@ -342,9 +361,9 @@ function ClientBookingCreateView() {
   /** Baseline services when opening EBR suggest-edit — used to mark Edited lines. */
   const ebrSuggestBaselineRef = React.useRef<Service[] | null>(null);
   const [projectDescription, setProjectDescription] = React.useState("");
-  const [projectUploads, setProjectUploads] = React.useState<Array<{ id: string; name: string; previewUrl: string }>>(
-    [],
-  );
+  const [projectUploads, setProjectUploads] = React.useState<
+    Array<{ id: string; name: string; previewUrl: string; file: File }>
+  >([]);
   const [participantMenuAnchor, setParticipantMenuAnchor] = React.useState<HTMLElement | null>(null);
   const [planningPersonId, setPlanningPersonId] = React.useState<string | null>(null);
   const [planningActivity, setPlanningActivity] = React.useState("");
@@ -604,6 +623,10 @@ function ClientBookingCreateView() {
   }, [isPastDay, selectedDate, today0]);
 
   React.useEffect(() => {
+    if (!selectedTimeTooSoon) setTimeValidationError(null);
+  }, [selectedTimeTooSoon]);
+
+  React.useEffect(() => {
     // If today has no remaining slots, move to tomorrow.
     if (isSelectedToday && availableTimes.length === 0) {
       setSelectedDate(addDays(today0, 1));
@@ -612,6 +635,7 @@ function ClientBookingCreateView() {
     // Keep selection on a bookable future slot (nearest by default).
     if (availableTimes.length > 0 && !availableTimes.includes(selectedTime)) {
       setSelectedTime(availableTimes[0]);
+      setTimeValidationError(null);
     }
   }, [availableTimes, isSelectedToday, selectedTime, today0]);
 
@@ -1022,13 +1046,13 @@ function ClientBookingCreateView() {
     const file = e.target.files?.[0];
     if (!file) return;
     const previewUrl = URL.createObjectURL(file);
-    const nextIndex = projectUploads.length + 1;
     setProjectUploads((prev) => [
       ...prev,
       {
-        id: `upload-${Date.now()}`,
-        name: `Img.jpg ${String(nextIndex).padStart(3, "0")}`,
+        id: `upload-${Date.now()}-${prev.length}`,
+        name: file.name || `upload-${prev.length + 1}`,
         previewUrl,
+        file,
       },
     ]);
     e.target.value = "";
@@ -1146,6 +1170,13 @@ function ClientBookingCreateView() {
   const onContinue = async () => {
     if (!shop?.shopId || services.length === 0 || !allServicesAssigned || isContinuing) return;
 
+    if (isSelectedToday && isSameDayBookingTooSoon(selectedTime)) {
+      setTimeValidationError(CLIENT_BOOKING_MIN_LEAD_ERROR);
+      showSnackbar({ severity: "error", message: CLIENT_BOOKING_MIN_LEAD_ERROR });
+      return;
+    }
+    setTimeValidationError(null);
+
     const peopleForDraft =
       planningPersonId != null
         ? people.map((p) =>
@@ -1260,6 +1291,43 @@ function ClientBookingCreateView() {
         window.sessionStorage.removeItem(CHECKOUT_REF_KEY);
       }
 
+      let projectDetailsUploads: Array<{
+        id: string;
+        name: string;
+        url?: string;
+        mimeType?: string;
+        kind?: "image" | "document";
+      }> = projectUploads.map((u) => ({ id: u.id, name: u.name }));
+      if (isDesiredLocation && projectUploads.length > 0) {
+        const uploaded = await uploadBookingAttachments(projectUploads.map((u) => u.file)).unwrap();
+        const attachments = uploaded.data?.attachments ?? [];
+        projectDetailsUploads = attachments.map((att) => ({
+          id: att.id,
+          name: att.name,
+          url: att.url,
+          mimeType: att.mimeType,
+          kind: att.kind,
+        }));
+      }
+
+      const payload = {
+        selectedDateISO: toISO(selectedDate),
+        selectedTime,
+        combineServices,
+        people: peopleForDraft,
+        services: servicesForDraft,
+        teamMembers: shopTeamMembers.map(({ id, name }) => ({ id, name })),
+        total,
+        ...(isDesiredLocation
+          ? {
+              projectDetails: {
+                description: projectDescription,
+                uploads: projectDetailsUploads,
+              },
+            }
+          : {}),
+      };
+
       const draftRecord = {
         id: `bk_draft_${Date.now()}`,
         bookingRef,
@@ -1291,10 +1359,10 @@ function ClientBookingCreateView() {
       const listTab = parseBookingListTab(searchParams?.get("tab"));
       const checkoutPath = resolveCreateCheckoutPath({ locationMode, requiresPrepayment });
       router.push(`${checkoutPath}?tab=${listTab}`);
-    } catch {
+    } catch (error) {
       showSnackbar({
         severity: "error",
-        message: "Unable to create booking. Please try again.",
+        message: getApiErrorMessage(error, "Unable to create booking. Please try again."),
       });
     } finally {
       setIsContinuing(false);
@@ -2372,17 +2440,21 @@ function ClientBookingCreateView() {
                         >
                           {times.map((t) => {
                             const active = t === selectedTime;
-                            const past = isTimePast(t);
+                            const unavailable = isTimeUnavailable(t);
                             return (
                               <Button
                                 key={t}
                                 data-time-slot={t}
                                 variant={active ? "contained" : "outlined"}
                                 onClick={() => {
-                                  if (past) return;
+                                  if (unavailable) {
+                                    setTimeValidationError(CLIENT_BOOKING_MIN_LEAD_ERROR);
+                                    return;
+                                  }
+                                  setTimeValidationError(null);
                                   setSelectedTime(t);
                                 }}
-                                disabled={past}
+                                disabled={unavailable}
                                 disableElevation
                                 sx={{
                                   flexShrink: 0,
@@ -2394,7 +2466,7 @@ function ClientBookingCreateView() {
                                   fontSize: 11.5,
                                   fontWeight: 900,
                                   whiteSpace: "nowrap",
-                                  ...(past
+                                  ...(unavailable
                                     ? {
                                         borderColor: alpha(m.navy, 0.08),
                                         bgcolor: alpha(m.navy, 0.03),
@@ -2436,6 +2508,21 @@ function ClientBookingCreateView() {
                           <ChevronRightRoundedIcon sx={{ fontSize: 18 }} />
                         </IconButton>
                       </Stack>
+
+                      {(timeValidationError || selectedTimeTooSoon) && (
+                        <Typography
+                          sx={{
+                            mt: 0.9,
+                            px: 0.25,
+                            fontSize: 11.5,
+                            fontWeight: 800,
+                            color: "#C62828",
+                            lineHeight: 1.35,
+                          }}
+                        >
+                          {timeValidationError || CLIENT_BOOKING_MIN_LEAD_ERROR}
+                        </Typography>
+                      )}
 
                       <Stack alignItems="flex-end" sx={{ mt: 1 }}>
                         <FormControlLabel
@@ -2536,18 +2623,36 @@ function ClientBookingCreateView() {
                                         <CloseRoundedIcon sx={{ fontSize: 12 }} />
                                       </IconButton>
                                       <Box
-                                        component="img"
-                                        src={img.previewUrl}
-                                        alt={img.name}
                                         sx={{
                                           width: 88,
                                           height: 62,
                                           borderRadius: "8px",
-                                          objectFit: "cover",
                                           border: `1px solid ${alpha(m.navy, 0.08)}`,
-                                          display: "block",
+                                          overflow: "hidden",
+                                          bgcolor: alpha(m.navy, 0.04),
+                                          display: "flex",
+                                          alignItems: "center",
+                                          justifyContent: "center",
                                         }}
-                                      />
+                                      >
+                                        {img.file.type.startsWith("image/") ? (
+                                          <Box
+                                            component="img"
+                                            src={img.previewUrl}
+                                            alt={img.name}
+                                            sx={{
+                                              width: "100%",
+                                              height: "100%",
+                                              objectFit: "cover",
+                                              display: "block",
+                                            }}
+                                          />
+                                        ) : (
+                                          <Typography sx={{ fontSize: 10, fontWeight: 800, color: alpha(m.navy, 0.45) }}>
+                                            PDF
+                                          </Typography>
+                                        )}
+                                      </Box>
                                       <Typography
                                         sx={{
                                           mt: 0.4,
@@ -3096,11 +3201,25 @@ function ClientBookingCreateView() {
                         </Typography>
                       ) : null}
 
+                      {allServicesAssigned && selectedTimeTooSoon ? (
+                        <Typography
+                          sx={{
+                            mt: 1,
+                            fontSize: 11,
+                            fontWeight: 800,
+                            color: "#C62828",
+                            lineHeight: 1.35,
+                          }}
+                        >
+                          {CLIENT_BOOKING_MIN_LEAD_ERROR}
+                        </Typography>
+                      ) : null}
+
                       <Button
                         fullWidth
                         variant="contained"
                         disableElevation
-                        disabled={!allServicesAssigned || isContinuing}
+                        disabled={!allServicesAssigned || isContinuing || selectedTimeTooSoon}
                         onClick={() => void onContinue()}
                         sx={{
                           mt: 1.25,
@@ -3110,7 +3229,7 @@ function ClientBookingCreateView() {
                           height: 40,
                           bgcolor: m.teal,
                           "&:hover": { bgcolor: m.tealDark },
-                          ...(allServicesAssigned && !isContinuing
+                          ...(allServicesAssigned && !isContinuing && !selectedTimeTooSoon
                             ? null
                             : {
                                 bgcolor: alpha(m.navy, 0.10),
