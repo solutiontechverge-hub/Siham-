@@ -26,6 +26,12 @@ import {
   parseUuid,
   parseUuidArray,
 } from "../utils/uuid.js";
+import {
+  listResponse,
+  parseListPagination,
+  sqlLimitOffset,
+  withPaginationParams,
+} from "../utils/pagination.js";
 
 const parseJsonValue = (value, fallback) => {
   if (value === undefined || value === null || value === "") {
@@ -379,8 +385,14 @@ const getBusinessSetupDetailByUserId = async (userId, client = { query }) => {
   return getBusinessSetupDetailById(businessSetup.id, client);
 };
 
-export const listCategories = async (_req, res) => {
+export const listCategories = async (req, res) => {
   try {
+    const pagination = parseListPagination(req.query);
+    const { clause: limitClause } = sqlLimitOffset(1);
+
+    const countResult = await query(`SELECT COUNT(*)::int AS total FROM categories`);
+    const total = countResult.rows[0]?.total ?? 0;
+
     const result = await query(
       `SELECT
          c.id,
@@ -401,14 +413,21 @@ export const listCategories = async (_req, res) => {
        FROM categories c
        LEFT JOIN subcategories s ON s.category_id = c.id
        GROUP BY c.id
-       ORDER BY c.title`,
+       ORDER BY c.title
+       ${pagination.paginate ? limitClause : ""}`,
+      withPaginationParams([], pagination),
     );
 
-    return res.status(200).json({
-      success: true,
-      message: "Categories fetched successfully.",
-      data: result.rows,
-    });
+    return res.status(200).json(
+      listResponse({
+        message: "Categories fetched successfully.",
+        data: result.rows,
+        page: pagination.page,
+        limit: pagination.limit,
+        total,
+        paginate: pagination.paginate,
+      }),
+    );
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -971,6 +990,17 @@ export const listCalendarEntries = async (req, res) => {
       });
     }
 
+    const pagination = parseListPagination(req.query);
+    const { clause: limitClause } = sqlLimitOffset(2);
+
+    const countResult = await query(
+      `SELECT COUNT(*)::int AS total
+       FROM calendar_entries
+       WHERE professional_profile_id = $1`,
+      [professionalProfile.id],
+    );
+    const total = countResult.rows[0]?.total ?? 0;
+
     const result = await query(
       `SELECT
          id,
@@ -994,15 +1024,21 @@ export const listCalendarEntries = async (req, res) => {
          updated_at
        FROM calendar_entries
        WHERE professional_profile_id = $1
-       ORDER BY created_at DESC`,
-      [professionalProfile.id],
+       ORDER BY created_at DESC
+       ${pagination.paginate ? limitClause : ""}`,
+      withPaginationParams([professionalProfile.id], pagination),
     );
 
-    return res.status(200).json({
-      success: true,
-      message: "Calendar entries fetched successfully.",
-      data: result.rows,
-    });
+    return res.status(200).json(
+      listResponse({
+        message: "Calendar entries fetched successfully.",
+        data: result.rows,
+        page: pagination.page,
+        limit: pagination.limit,
+        total,
+        paginate: pagination.paginate,
+      }),
+    );
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -1272,20 +1308,73 @@ export const upsertCalendarSettings = async (req, res) => {
   }
 };
 
+const parseBookingsTabFilter = (tab) => {
+  const normalized = String(tab ?? "").trim().toLowerCase();
+  if (normalized === "past") {
+    return `AND (
+      b.status IN ('completed', 'cancelled', 'no_show')
+      OR COALESCE(b.booking_date, b.start_time::date) < CURRENT_DATE
+    )`;
+  }
+  if (normalized === "ongoing") {
+    return `AND b.status NOT IN ('completed', 'cancelled', 'no_show')
+      AND COALESCE(b.booking_date, b.start_time::date) = CURRENT_DATE`;
+  }
+  if (normalized === "upcoming") {
+    return `AND b.status NOT IN ('completed', 'cancelled', 'no_show')
+      AND COALESCE(b.booking_date, b.start_time::date) > CURRENT_DATE`;
+  }
+  return "";
+};
+
+const mapBookingListRow = (booking) => {
+  const bookingDate = toIsoDate(booking.booking_date || booking.start_time);
+  return {
+    ...booking,
+    booking_date: bookingDate,
+    date: bookingDate,
+    start: toTimeLabel(booking.start_time),
+    end: toTimeLabel(booking.end_time),
+    booking_type:
+      booking.booking_type ||
+      (normalizeBookingStatus(booking.status, "confirmed") === "requested" ? "request" : "online"),
+    unique_code: booking.unique_code || `123${booking.id}`,
+  };
+};
+
 export const listBookings = async (req, res) => {
   try {
+    const pagination = parseListPagination(req.query);
+    const tabFilterSql = parseBookingsTabFilter(req.query.tab);
+    const { clause: limitClause } = sqlLimitOffset(2);
+
     let result;
+    let total = 0;
 
     if (req.user.user_type === "professional") {
       const businessSetup = await getBusinessSetupByUserId(req.user.id);
 
       if (!businessSetup) {
-        return res.status(200).json({
-          success: true,
-          message: "Bookings fetched successfully.",
-          data: [],
-        });
+        return res.status(200).json(
+          listResponse({
+            message: "Bookings fetched successfully.",
+            data: [],
+            page: 1,
+            limit: pagination.paginate ? pagination.limit : 0,
+            total: 0,
+            paginate: pagination.paginate,
+          }),
+        );
       }
+
+      const countResult = await query(
+        `SELECT COUNT(*)::int AS total
+         FROM bookings b
+         WHERE b.business_setup_id = $1
+         ${tabFilterSql}`,
+        [businessSetup.id],
+      );
+      total = countResult.rows[0]?.total ?? 0;
 
       result = await query(
         `SELECT
@@ -1311,10 +1400,21 @@ export const listBookings = async (req, res) => {
          LEFT JOIN users u ON u.id = b.customer_id
          LEFT JOIN individual_profiles ip ON ip.user_id = u.id
          WHERE b.business_setup_id = $1
-         ORDER BY COALESCE(b.start_time, b.created_at) DESC`,
-        [businessSetup.id],
+         ${tabFilterSql}
+         ORDER BY COALESCE(b.start_time, b.created_at) DESC
+         ${pagination.paginate ? limitClause : ""}`,
+        withPaginationParams([businessSetup.id], pagination),
       );
     } else {
+      const countResult = await query(
+        `SELECT COUNT(*)::int AS total
+         FROM bookings b
+         WHERE b.customer_id = $1
+         ${tabFilterSql}`,
+        [req.user.id],
+      );
+      total = countResult.rows[0]?.total ?? 0;
+
       result = await query(
         `SELECT
            b.*,
@@ -1331,31 +1431,25 @@ export const listBookings = async (req, res) => {
          LEFT JOIN subcategories s ON s.id = b.service_id
          LEFT JOIN business_team_members tm ON tm.id = b.team_member_id
          WHERE b.customer_id = $1
-         ORDER BY COALESCE(b.start_time, b.created_at) DESC`,
-        [req.user.id],
+         ${tabFilterSql}
+         ORDER BY COALESCE(b.start_time, b.created_at) DESC
+         ${pagination.paginate ? limitClause : ""}`,
+        withPaginationParams([req.user.id], pagination),
       );
     }
 
-    const bookings = result.rows.map((booking) => {
-      const bookingDate = toIsoDate(booking.booking_date || booking.start_time);
-      return {
-        ...booking,
-        booking_date: bookingDate,
-        date: bookingDate,
-        start: toTimeLabel(booking.start_time),
-        end: toTimeLabel(booking.end_time),
-        booking_type:
-          booking.booking_type ||
-          (normalizeBookingStatus(booking.status, "confirmed") === "requested" ? "request" : "online"),
-        unique_code: booking.unique_code || `123${booking.id}`,
-      };
-    });
+    const bookings = result.rows.map(mapBookingListRow);
 
-    return res.status(200).json({
-      success: true,
-      message: "Bookings fetched successfully.",
-      data: bookings,
-    });
+    return res.status(200).json(
+      listResponse({
+        message: "Bookings fetched successfully.",
+        data: bookings,
+        page: pagination.page,
+        limit: pagination.limit,
+        total,
+        paginate: pagination.paginate,
+      }),
+    );
   } catch (error) {
     return res.status(500).json({
       success: false,

@@ -697,14 +697,14 @@ export async function processPaymentDueReminders() {
   return sent;
 }
 
-export const listNotificationsForUser = async (userId, { limit = 50 } = {}) => {
+export const listNotificationsForUser = async (userId, { limit = 50, offset = 0 } = {}) => {
   const result = await query(
     `SELECT *
      FROM in_app_notifications
      WHERE recipient_user_id = $1
      ORDER BY created_at DESC
-     LIMIT $2`,
-    [userId, limit],
+     LIMIT $2 OFFSET $3`,
+    [userId, limit, offset],
   );
   return result.rows;
 };
