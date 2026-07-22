@@ -1,7 +1,7 @@
 import { GENDER_OPTIONS } from "../../../lib/gender-options";
 
 export const profilePageData = {
-  pageBg: "#E6F7F8",
+  pageBg: "#EAF9FB",
   header: {
     userDisplayNameFallback: "Sara Johnson",
   },

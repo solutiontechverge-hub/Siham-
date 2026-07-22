@@ -21,11 +21,13 @@ type SelectedProductItem = {
 type BookingDrawerSelectedItemsSectionProps = {
   services: readonly BookingServiceLineItem[];
   products: readonly SelectedProductItem[];
+  uniqueItems?: readonly SelectedProductItem[];
   showRemoveButtons?: boolean;
   resolveStaffName?: (staffResourceId?: string) => string | undefined;
   resolveServiceEditTag?: (serviceId: string) => BookingEditTagVariant | null;
   onRemoveService?: (serviceId: string) => void;
   onRemoveProduct?: (productId: string) => void;
+  onRemoveUniqueItem?: (itemId: string) => void;
   onServiceClick?: (service: BookingServiceLineItem) => void;
 };
 
@@ -39,16 +41,18 @@ function serviceTimeRange(service: BookingServiceLineItem) {
 export default function BookingDrawerSelectedItemsSection({
   services,
   products,
+  uniqueItems = [],
   showRemoveButtons = false,
   resolveStaffName,
   resolveServiceEditTag,
   onRemoveService,
   onRemoveProduct,
+  onRemoveUniqueItem,
   onServiceClick,
 }: BookingDrawerSelectedItemsSectionProps) {
   const m = useTheme().palette.mollure;
 
-  if (!services.length && !products.length) return null;
+  if (!services.length && !products.length && !uniqueItems.length) return null;
 
   const cardSx = {
     borderRadius: "10px",
@@ -149,6 +153,41 @@ export default function BookingDrawerSelectedItemsSection({
                       onClick={() => onRemoveProduct?.(product.id)}
                       sx={{ color: alpha(m.navy, 0.35), mt: -0.35 }}
                       aria-label={`Remove ${product.name}`}
+                    >
+                      <CloseRoundedIcon sx={{ fontSize: 17 }} />
+                    </IconButton>
+                  ) : null}
+                </Stack>
+              </Stack>
+            </Box>
+          ))}
+        </Stack>
+      ) : null}
+
+      {uniqueItems.length > 0 ? (
+        <Stack spacing={0.75}>
+          <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.72) }}>Unique Item</BodyText>
+          {uniqueItems.map((item) => (
+            <Box key={`unique-${item.id}`} sx={cardSx}>
+              <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1.25}>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <BodyText sx={{ fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.86), lineHeight: 1.25 }}>
+                    {item.name}
+                  </BodyText>
+                  <BodyText sx={{ mt: 0.35, fontSize: 10.5, fontWeight: 700, color: alpha(m.navy, 0.48) }}>
+                    Qty {item.quantity} · €{item.unitPrice.toFixed(2)} each
+                  </BodyText>
+                </Box>
+                <Stack direction="row" alignItems="flex-start" spacing={0.35} sx={{ flexShrink: 0 }}>
+                  <BodyText sx={{ fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
+                    €{item.price.toFixed(2)}
+                  </BodyText>
+                  {showRemoveButtons ? (
+                    <IconButton
+                      size="small"
+                      onClick={() => onRemoveUniqueItem?.(item.id)}
+                      sx={{ color: alpha(m.navy, 0.35), mt: -0.35 }}
+                      aria-label={`Remove ${item.name}`}
                     >
                       <CloseRoundedIcon sx={{ fontSize: 17 }} />
                     </IconButton>

@@ -393,6 +393,7 @@ export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compa
 export default function AppDatePicker({
   value,
   onChange,
+  label,
   placeholder = "DD/MM/YYYY",
   min,
   max,
@@ -412,7 +413,22 @@ export default function AppDatePicker({
   }
 
   return (
-    <>
+    <Box sx={{ width: fullWidth ? "100%" : "auto" }}>
+      {label ? (
+        <BodyText
+          component="label"
+          sx={{
+            display: "block",
+            fontSize: "0.75rem",
+            fontWeight: 500,
+            color: alpha(m.navy, 0.9),
+            lineHeight: 1.25,
+            mb: 0.75,
+          }}
+        >
+          {label}
+        </BodyText>
+      ) : null}
       <ButtonBase
         disabled={disabled}
         onClick={(e) => !disabled && setAnchor(e.currentTarget)}
@@ -471,6 +487,6 @@ export default function AppDatePicker({
       >
         <AppCalendarPanel value={value} onChange={onChange} min={min} max={max} onDaySelect={closePicker} />
       </Popover>
-    </>
+    </Box>
   );
 }

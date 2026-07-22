@@ -51,6 +51,15 @@ type StoredBookingNoteMeta = Partial<
     | "editedServiceIds"
     | "lastEditedBy"
     | "clientSnapshot"
+    | "services"
+    | "products"
+    | "guests"
+    | "clientEmail"
+    | "phoneCode"
+    | "phoneNumber"
+    | "desiredLocation"
+    | "totalDiscount"
+    | "originalServices"
   >
 > & {
   ebr?: StoredEbrNotePayload;
@@ -96,6 +105,15 @@ export function serializeCalendarEntryNotes(
     editedServiceIds: details?.editedServiceIds,
     lastEditedBy: details?.lastEditedBy,
     clientSnapshot: details?.clientSnapshot,
+    ...(details?.services?.length ? { services: details.services } : {}),
+    ...(details?.products?.length ? { products: details.products } : {}),
+    ...(details?.guests?.length ? { guests: details.guests } : {}),
+    ...(details?.clientEmail ? { clientEmail: details.clientEmail } : {}),
+    ...(details?.phoneCode ? { phoneCode: details.phoneCode } : {}),
+    ...(details?.phoneNumber ? { phoneNumber: details.phoneNumber } : {}),
+    ...(details?.desiredLocation ? { desiredLocation: details.desiredLocation } : {}),
+    ...(details?.totalDiscount ? { totalDiscount: details.totalDiscount } : {}),
+    ...(details?.originalServices?.length ? { originalServices: details.originalServices } : {}),
     ...(ebr ? { ebr } : {}),
   };
   const hasMeta = metaHasValues(meta);
@@ -271,8 +289,23 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
       ...(meta.editedServiceIds?.length ? { editedServiceIds: meta.editedServiceIds } : {}),
       ...(meta.lastEditedBy ? { lastEditedBy: meta.lastEditedBy } : {}),
       ...(meta.clientSnapshot ? { clientSnapshot: meta.clientSnapshot } : {}),
-      ...(ebr?.status !== "rejected" && ebr?.suggestedServices?.length ? { services: ebr.suggestedServices } : {}),
-      ...(ebr?.status !== "rejected" && ebr?.suggestedProducts?.length ? { products: ebr.suggestedProducts } : {}),
+      ...(meta.services?.length
+        ? { services: meta.services }
+        : ebr?.status !== "rejected" && ebr?.suggestedServices?.length
+          ? { services: ebr.suggestedServices }
+          : {}),
+      ...(meta.products?.length
+        ? { products: meta.products }
+        : ebr?.status !== "rejected" && ebr?.suggestedProducts?.length
+          ? { products: ebr.suggestedProducts }
+          : {}),
+      ...(meta.guests?.length ? { guests: meta.guests } : {}),
+      ...(meta.clientEmail ? { clientEmail: meta.clientEmail } : {}),
+      ...(meta.phoneCode ? { phoneCode: meta.phoneCode } : {}),
+      ...(meta.phoneNumber ? { phoneNumber: meta.phoneNumber } : {}),
+      ...(meta.desiredLocation ? { desiredLocation: meta.desiredLocation } : {}),
+      ...(meta.totalDiscount ? { totalDiscount: meta.totalDiscount } : {}),
+      ...(meta.originalServices?.length ? { originalServices: meta.originalServices } : {}),
       ...(ebr?.status !== "rejected" && ebr?.editedServiceIds?.length && !meta.editedServiceIds?.length
         ? { editedServiceIds: ebr.editedServiceIds }
         : {}),

@@ -108,7 +108,7 @@ export default function ClientBusinessProfilePage() {
 
   if (isLoading) {
     return (
-      <Box sx={{ minHeight: "100vh", bgcolor: "#EAF9FB", py: 4 }}>
+      <Box sx={{ minHeight: "100vh", bgcolor: "mollure.pageBg", py: 4 }}>
         <Container maxWidth="lg">
           <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
             <CircularProgress />
@@ -120,7 +120,7 @@ export default function ClientBusinessProfilePage() {
 
   if (isError || !profile) {
     return (
-      <Box sx={{ minHeight: "100vh", bgcolor: "#EAF9FB", py: 4 }}>
+      <Box sx={{ minHeight: "100vh", bgcolor: "mollure.pageBg", py: 4 }}>
         <Container maxWidth="lg">
           <Box sx={{ textAlign: "center", py: 8 }}>
             <Typography>{isError ? "Unable to load business profile." : "Business not found."}</Typography>
@@ -131,7 +131,7 @@ export default function ClientBusinessProfilePage() {
   }
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "#EAF9FB" }}>
+    <Box sx={{ minHeight: "100vh", bgcolor: "mollure.pageBg" }}>
       <MollureMarketingHeader
         navItems={[]}
         isAuthed

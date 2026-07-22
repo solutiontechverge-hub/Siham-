@@ -16,6 +16,9 @@ export type ProfessionalReviewItem = {
   rating: number; // 0..5
   reviewText: string;
   tags: readonly ReviewTag[];
+  /** Team member this review belongs to (when available from API). */
+  memberId?: string;
+  memberName?: string;
   reply?: ReviewReply;
 };
 

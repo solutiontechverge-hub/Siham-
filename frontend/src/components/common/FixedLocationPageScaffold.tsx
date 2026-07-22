@@ -14,7 +14,7 @@ export type FixedLocationPageScaffoldProps = {
 
 export default function FixedLocationPageScaffold({ activeTopTab, topTabs, children }: FixedLocationPageScaffoldProps) {
   return (
-    <Box sx={{ bgcolor: "#fff", minHeight: "100vh" }}>
+    <Box sx={{ bgcolor: "mollure.pageBg", minHeight: "100vh" }}>
       <Container maxWidth="lg" sx={{ py: 2.5 }}>
         <Stack spacing={2}>
           <FixedLocationTopTabs tabs={topTabs} activeLabel={activeTopTab} />

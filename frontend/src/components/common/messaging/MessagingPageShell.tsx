@@ -2,11 +2,10 @@
 
 import * as React from "react";
 import { Box, Container } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
+import { useTheme } from "@mui/material/styles";
 import { useAppSelector } from "../../../store/hooks";
 import { MarketingSiteFooter, MarketingSiteHeader, MollureMarketingHeader } from "..";
 import { marketingShellFooter, professionalsMarketingFooter } from "../../../data/marketingShell.data";
-import { profilePageData } from "../../../app/clients/profile/data-profile";
 import MessagingPageView from "./MessagingPageView";
 import type { MessagingAudience } from "./messagingRoutes";
 
@@ -28,7 +27,7 @@ export default function MessagingPageShell({ audience, homeHref }: MessagingPage
   const resolvedHome =
     homeHref ?? (audience === "client" ? "/" : "/professionals/fixed-location/calendar");
 
-  const pageBg = audience === "client" ? profilePageData.pageBg : alpha(m.teal, 0.08);
+  const pageBg = m.pageBg;
 
   React.useEffect(() => {
     if (audience !== "client") return;

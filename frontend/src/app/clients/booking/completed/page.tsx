@@ -15,7 +15,7 @@ export default function BookingCompletedPage() {
     <Box
       sx={{
         minHeight: "100vh",
-        bgcolor: "#EAF9FB",
+        bgcolor: "mollure.pageBg",
         py: { xs: 2.5, md: 3.5 },
         display: "flex",
         alignItems: "center",

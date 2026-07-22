@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
-import { Checkbox, MenuItem, type TextFieldProps } from "@mui/material";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
+import { Checkbox, InputAdornment, ListSubheader, MenuItem, type TextFieldProps } from "@mui/material";
 import AppTextField from "./AppTextField";
 
 export type AppDropdownOption = {
@@ -18,6 +19,9 @@ type AppDropdownProps = Omit<TextFieldProps, "select" | "onChange" | "children" 
   multiple?: boolean;
   /** Close the menu after each selection (useful for multi-select in modals). */
   closeOnSelect?: boolean;
+  /** Show a search field at the top of the menu to filter options by label. */
+  searchable?: boolean;
+  searchPlaceholder?: string;
   renderValue?: (selected: string | readonly string[]) => React.ReactNode;
   onChange: (
     value: string | readonly string[],
@@ -43,11 +47,14 @@ export default function AppDropdown({
   value,
   multiple,
   closeOnSelect = false,
+  searchable = false,
+  searchPlaceholder = "Search...",
   renderValue,
   placeholder,
   ...props
 }: AppDropdownProps) {
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [search, setSearch] = React.useState("");
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     onChange(normalizeSelectValue(event.target.value, multiple), event);
@@ -55,6 +62,10 @@ export default function AppDropdown({
       setMenuOpen(false);
     }
   };
+
+  const query = search.trim().toLowerCase();
+  const visibleOptions =
+    searchable && query ? options.filter((option) => option.label.toLowerCase().includes(query)) : options;
 
   return (
     <AppTextField
@@ -65,11 +76,14 @@ export default function AppDropdown({
         IconComponent: ExpandMoreRoundedIcon,
         multiple: Boolean(multiple),
         displayEmpty: true,
-        ...(closeOnSelect
+        onClose: () => {
+          setMenuOpen(false);
+          setSearch("");
+        },
+        ...(closeOnSelect || searchable
           ? {
               open: menuOpen,
               onOpen: () => setMenuOpen(true),
-              onClose: () => setMenuOpen(false),
             }
           : {}),
         renderValue:
@@ -85,7 +99,29 @@ export default function AppDropdown({
       }}
       {...props}
     >
-      {options.map((option) => {
+      {searchable ? (
+        <ListSubheader disableSticky sx={{ px: 1, py: 0.75, lineHeight: 1, bgcolor: "#fff" }}>
+          <AppTextField
+            size="small"
+            autoFocus
+            fullWidth
+            placeholder={searchPlaceholder}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== "Escape") e.stopPropagation();
+            }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchRoundedIcon sx={{ fontSize: 18, opacity: 0.5 }} />
+                </InputAdornment>
+              ),
+            }}
+          />
+        </ListSubheader>
+      ) : null}
+      {visibleOptions.map((option) => {
         const selected = Array.isArray(value) ? value.includes(option.value) : value === option.value;
         return (
           <MenuItem

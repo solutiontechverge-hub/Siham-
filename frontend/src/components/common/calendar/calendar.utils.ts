@@ -28,6 +28,7 @@ export type CalendarFilters = {
 
 export type BlockTimeDraft = {
   title: "Meeting" | "Training" | "Holiday" | "Custom";
+  customTitle?: string;
   teamIds: string[];
   locations: CalendarBookingLocation[];
   dayFrom: "Monday" | "Tuesday" | "Wednesday" | "Thursday" | "Friday" | "Saturday" | "Sunday";
@@ -220,6 +221,9 @@ const isBlockDayAllowed = (dow: number, dayFrom: BlockTimeDraft["dayFrom"], dayT
   return dow >= fromDow || dow <= toDow;
 };
 
+export const blockTitleFromDraft = (draft: BlockTimeDraft) =>
+  draft.title === "Custom" ? draft.customTitle?.trim() || "Custom" : draft.title;
+
 export function buildBlocksFromDraft(draft: BlockTimeDraft, teamIds: readonly string[]): CalendarBlock[] {
   const endDate = draft.dateTo || draft.dateFrom;
   const singleDay = draft.dateFrom === endDate;
@@ -236,7 +240,7 @@ export function buildBlocksFromDraft(draft: BlockTimeDraft, teamIds: readonly st
           date: cursor,
           start: draft.startTime,
           end: draft.endTime,
-          title: draft.title,
+          title: blockTitleFromDraft(draft),
           kind: "unavailable",
         });
       }

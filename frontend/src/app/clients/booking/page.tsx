@@ -1910,7 +1910,7 @@ function ClientBookingCreateView() {
   }
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "#EAF9FB", py: { xs: 2, md: 3.5 } }}>
+    <Box sx={{ minHeight: "100vh", bgcolor: "mollure.pageBg", py: { xs: 2, md: 3.5 } }}>
       <Container maxWidth="lg">
         <Dialog
           open={addServiceDialogOpen}

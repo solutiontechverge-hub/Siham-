@@ -261,22 +261,22 @@ export default function CalendarDesignModal({
                           width: 16,
                           height: 16,
                           borderRadius: "4px",
-                          bgcolor: color || alpha(m.navy, 0.08),
-                          border: `1px solid ${alpha(m.navy, color ? 0.18 : 0.1)}`,
+                          bgcolor: color || "transparent",
+                          border: `1px dashed ${alpha(m.navy, color ? 0.18 : 0.22)}`,
+                          ...(color
+                            ? { borderStyle: "solid", borderColor: alpha(m.navy, 0.18) }
+                            : null),
                         }}
                       />
-                      <span>Choose color</span>
+                      <span>{color ? color.toUpperCase() : "Choose color"}</span>
                     </Stack>
                     <input
                       type="color"
-                      value={color || "#22B8A7"}
+                      // Uncontrolled: no colour is selected until the professional picks one.
+                      key={`${key}-${color || "unset"}`}
+                      defaultValue={color || "#FFFFFF"}
                       onChange={(e) => {
-                        const nextColor = e.target.value;
-                        setColor(key, nextColor);
-                        if (!isServices && !isStatus && !isTeamMembers) {
-                          onColorSelect?.(key, nextColor);
-                        }
-                        e.currentTarget.blur();
+                        setColor(key, e.target.value);
                       }}
                       style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }}
                     />

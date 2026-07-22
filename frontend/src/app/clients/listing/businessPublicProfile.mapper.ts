@@ -225,6 +225,7 @@ function buildProfileServices(setup: BusinessSetupListing): BusinessPublicProfil
 
   const fromDetails = (setup.serviceDetails ?? [])
     .filter((detail) => detail.serviceTitle && detail.price != null)
+    .filter((detail) => detail.isVisible !== false)
     .map((detail, index) => {
       const categoryTitle = detail.categoryTitle?.trim() || "Services";
       const categoryId = detail.categoryId != null ? String(detail.categoryId) : slugifyCategory(categoryTitle);
@@ -254,6 +255,11 @@ function buildProfileServices(setup: BusinessSetupListing): BusinessPublicProfil
   }
 
   const fromCategories = (setup.serviceCategories ?? [])
+    .filter((entry) => {
+      const visibleFlag = (entry as { is_visible?: boolean; isVisible?: boolean }).is_visible
+        ?? (entry as { isVisible?: boolean }).isVisible;
+      return visibleFlag !== false;
+    })
     .map((entry, index): BusinessPublicProfileService | null => {
       const serviceId = String(entry.service_id ?? entry.serviceId ?? "").trim();
       const categoryId = String(entry.category_id ?? entry.categoryId ?? "").trim() || "services";

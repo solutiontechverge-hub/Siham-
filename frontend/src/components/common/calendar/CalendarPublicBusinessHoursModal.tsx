@@ -5,6 +5,7 @@ import { Box, Button, Checkbox, FormControlLabel, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDropdown from "../AppDropdown";
 import AppTextField from "../AppTextField";
+import AppTimePicker from "../AppTimePicker";
 import MollureModal from "../MollureModal";
 
 export type PublicBusinessHoursDraft = {
@@ -127,22 +128,24 @@ export default function CalendarPublicBusinessHoursModal({
           />
 
           <Stack direction="row" spacing={1.25}>
-            <AppTextField
-              label="Start Time (from)"
-              type="time"
-              value={draft.startTime}
-              onChange={(e) => setDraft((p) => ({ ...p, startTime: e.target.value }))}
-              fullWidth
-              InputLabelProps={{ shrink: true }}
-            />
-            <AppTextField
-              label="End Time (to)"
-              type="time"
-              value={draft.endTime}
-              onChange={(e) => setDraft((p) => ({ ...p, endTime: e.target.value }))}
-              fullWidth
-              InputLabelProps={{ shrink: true }}
-            />
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <AppTimePicker
+                label="Start Time (from)"
+                value={draft.startTime}
+                onChange={(val) => setDraft((p) => ({ ...p, startTime: val }))}
+                fullWidth
+                sx={{ minHeight: 40, py: 0.5 }}
+              />
+            </Box>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <AppTimePicker
+                label="End Time (to)"
+                value={draft.endTime}
+                onChange={(val) => setDraft((p) => ({ ...p, endTime: val }))}
+                fullWidth
+                sx={{ minHeight: 40, py: 0.5 }}
+              />
+            </Box>
           </Stack>
 
           <FormControlLabel

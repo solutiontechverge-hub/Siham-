@@ -79,7 +79,7 @@ export default function ClientListingPage() {
   }, [user?.email]);
 
   return (
-    <Box sx={{ bgcolor: "background.default", minHeight: "100vh" }}>
+    <Box sx={{ bgcolor: "mollure.pageBg", minHeight: "100vh" }}>
       <MollureMarketingHeader
         navItems={[]}
         isAuthed

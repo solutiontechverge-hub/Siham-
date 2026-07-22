@@ -1230,7 +1230,7 @@ export default function ClientBookingDetailsView({ variant }: { variant: ClientB
 
   const detailsContentKey = `${bookingRef}-${editRequest.status ?? "none"}-${bookingStatus}`;
   const isFullyCompleted = isCompleted && activeBooking?.paid === true && !isPaymentDue;
-  const pageBackground = isFullyCompleted ? "#EAECF0" : "#EAF9FB";
+  const pageBackground = isFullyCompleted ? "#EAECF0" : m.pageBg;
   const displayTotal = displayDraft?.total ?? draft?.total ?? 0;
   const displayPrepaidAmount = Math.round(((displayTotal * prepaymentPercent) / 100 + Number.EPSILON) * 100) / 100;
   const bookingNotesMeta = React.useMemo(

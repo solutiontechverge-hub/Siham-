@@ -1,7 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Box, Button, InputAdornment, MenuItem, Stack, Typography } from "@mui/material";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import { Box, Button, IconButton, InputAdornment, MenuItem, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDatePicker from "./AppDatePicker";
 import MollureFormField from "./MollureFormField";
@@ -25,6 +26,9 @@ type BusinessServiceFormModalProps = {
   submitLabel: string;
   disabled?: boolean;
   canSubmit?: boolean;
+  /** View-only mode: fields disabled, footer hidden, optional edit action in header. */
+  readOnly?: boolean;
+  onEdit?: () => void;
   onClose: () => void;
   onSubmit: () => void;
   onChange: (patch: Partial<BusinessServiceFormDraft>) => void;
@@ -38,12 +42,15 @@ export default function BusinessServiceFormModal({
   submitLabel,
   disabled = false,
   canSubmit = true,
+  readOnly = false,
+  onEdit,
   onClose,
   onSubmit,
   onChange,
 }: BusinessServiceFormModalProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
+  const fieldsDisabled = disabled || readOnly;
   const infoLabel =
     mode === "subservice"
       ? businessServiceModalCopy.subserviceInfoLabel
@@ -107,11 +114,29 @@ export default function BusinessServiceFormModal({
       open={open}
       onClose={onClose}
       title={title}
-      footer={footer}
+      footer={readOnly ? undefined : footer}
+      headerActions={
+        readOnly && onEdit ? (
+          <IconButton
+            size="small"
+            onClick={onEdit}
+            aria-label="Edit service"
+            sx={{
+              width: 30,
+              height: 30,
+              borderRadius: "999px",
+              bgcolor: alpha(m.navy, 0.05),
+              "&:hover": { bgcolor: alpha(m.navy, 0.10) },
+            }}
+          >
+            <EditRoundedIcon sx={{ fontSize: 17, color: alpha(m.navy, 0.55) }} />
+          </IconButton>
+        ) : undefined
+      }
     >
       <Box sx={{ px: 2.5, py: 2, width: "100%", boxSizing: "border-box" }}>
         <Stack spacing={2} sx={{ width: "100%", alignItems: "stretch" }}>
-          {mode === "subservice" ? (
+          {mode === "subservice" && !readOnly ? (
             <Typography sx={{ fontSize: 12.5, color: alpha(m.navy, 0.62), lineHeight: 1.45 }}>
               {businessServiceModalCopy.customServiceHint}
             </Typography>
@@ -121,7 +146,7 @@ export default function BusinessServiceFormModal({
             label={businessServiceModalCopy.nameLabel}
             value={draft.name}
             onChange={(e) => onChange({ name: e.target.value })}
-            disabled={disabled}
+            disabled={fieldsDisabled}
             fullWidth
             sx={fieldInputSx}
           />
@@ -133,7 +158,7 @@ export default function BusinessServiceFormModal({
             onChange={(e) => onChange({ info: e.target.value })}
             multiline
             minRows={3}
-            disabled={disabled}
+            disabled={fieldsDisabled}
             fullWidth
             sx={fieldInputSx}
           />
@@ -149,7 +174,7 @@ export default function BusinessServiceFormModal({
                   placeholder={businessServiceModalCopy.durationHoursPlaceholder}
                   value={draft.durationFromHours}
                   onChange={(e) => onChange({ durationFromHours: sanitizeDurationHours(e.target.value) })}
-                  disabled={disabled}
+                  disabled={fieldsDisabled}
                   fullWidth
                   sx={fieldInputSx}
                   InputProps={{
@@ -168,7 +193,7 @@ export default function BusinessServiceFormModal({
                   placeholder={businessServiceModalCopy.durationMinutesPlaceholder}
                   value={draft.durationFromMinutes}
                   onChange={(e) => onChange({ durationFromMinutes: sanitizeDurationMinutes(e.target.value) })}
-                  disabled={disabled}
+                  disabled={fieldsDisabled}
                   fullWidth
                   sx={fieldInputSx}
                   InputProps={{
@@ -194,7 +219,7 @@ export default function BusinessServiceFormModal({
                   placeholder={businessServiceModalCopy.durationHoursPlaceholder}
                   value={draft.durationToHours}
                   onChange={(e) => onChange({ durationToHours: sanitizeDurationHours(e.target.value) })}
-                  disabled={disabled}
+                  disabled={fieldsDisabled}
                   fullWidth
                   sx={fieldInputSx}
                   InputProps={{
@@ -213,7 +238,7 @@ export default function BusinessServiceFormModal({
                   placeholder={businessServiceModalCopy.durationMinutesPlaceholder}
                   value={draft.durationToMinutes}
                   onChange={(e) => onChange({ durationToMinutes: sanitizeDurationMinutes(e.target.value) })}
-                  disabled={disabled}
+                  disabled={fieldsDisabled}
                   fullWidth
                   sx={fieldInputSx}
                   InputProps={{
@@ -238,7 +263,7 @@ export default function BusinessServiceFormModal({
                 label={businessServiceModalCopy.priceTypeLabel}
                 value={draft.priceType}
                 onChange={(e) => onChange({ priceType: e.target.value as BusinessServiceFormDraft["priceType"] })}
-                disabled={disabled}
+                disabled={fieldsDisabled}
                 fullWidth
                 sx={fieldInputSx}
               >
@@ -255,7 +280,7 @@ export default function BusinessServiceFormModal({
                 placeholder="0"
                 value={draft.priceAmount}
                 onChange={(e) => onChange({ priceAmount: e.target.value.replace(/[^\d.,]/g, "") })}
-                disabled={disabled}
+                disabled={fieldsDisabled}
                 fullWidth
                 sx={fieldInputSx}
                 InputProps={{
@@ -299,7 +324,7 @@ export default function BusinessServiceFormModal({
                     onChange={(e) =>
                       onChange({ discountType: e.target.value as BusinessServiceFormDraft["discountType"] })
                     }
-                    disabled={disabled}
+                    disabled={fieldsDisabled}
                     fullWidth
                     sx={fieldInputSx}
                   >
@@ -326,7 +351,7 @@ export default function BusinessServiceFormModal({
                         onChange({ discountAmount: raw.replace(/[^\d.,]/g, "") });
                       }
                     }}
-                    disabled={disabled}
+                    disabled={fieldsDisabled}
                     fullWidth
                     sx={fieldInputSx}
                     InputProps={
@@ -362,7 +387,7 @@ export default function BusinessServiceFormModal({
                   <AppDatePicker
                     value={draft.discountStartDate}
                     onChange={(iso) => onChange({ discountStartDate: iso })}
-                    disabled={disabled}
+                    disabled={fieldsDisabled}
                     fullWidth
                     max={draft.discountEndDate || undefined}
                   />
@@ -371,7 +396,7 @@ export default function BusinessServiceFormModal({
                   <AppDatePicker
                     value={draft.discountEndDate}
                     onChange={(iso) => onChange({ discountEndDate: iso })}
-                    disabled={disabled}
+                    disabled={fieldsDisabled}
                     fullWidth
                     min={draft.discountStartDate || undefined}
                   />
@@ -382,7 +407,7 @@ export default function BusinessServiceFormModal({
                 label={businessServiceModalCopy.discountDescriptionLabel}
                 value={draft.discountDescription}
                 onChange={(e) => onChange({ discountDescription: e.target.value })}
-                disabled={disabled}
+                disabled={fieldsDisabled}
                 fullWidth
                 sx={fieldInputSx}
               />

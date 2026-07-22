@@ -1,16 +1,21 @@
 "use client";
 
-import ContentCutRoundedIcon from "@mui/icons-material/ContentCutRounded";
-import BrushRoundedIcon from "@mui/icons-material/BrushRounded";
-import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
-import GestureRoundedIcon from "@mui/icons-material/GestureRounded";
-import FaceRetouchingNaturalOutlinedIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
-import BackHandOutlinedIcon from "@mui/icons-material/BackHandOutlined";
+import Box from "@mui/material/Box";
 import SpaOutlinedIcon from "@mui/icons-material/SpaOutlined";
-import WaterDropOutlinedIcon from "@mui/icons-material/WaterDropOutlined";
 import CategoryOutlinedIcon from "@mui/icons-material/CategoryOutlined";
 import type { ServiceCategorySliderIconId } from "../../data/businessServiceCategorySlider.data";
 import { resolveServiceCategorySliderIconId } from "../../data/businessServiceCategorySlider.data";
+
+/** Brand SVG assets for service category icons (embedded bitmaps, not tintable). */
+export const SERVICE_CATEGORY_ICON_SRC: Partial<Record<ServiceCategorySliderIconId, string>> = {
+  hair: "/icons/service-categories/hair.svg",
+  makeup: "/icons/service-categories/makeup.svg",
+  lashes: "/icons/service-categories/lashes.svg",
+  brows: "/icons/service-categories/brows.svg",
+  facial: "/icons/service-categories/facial.svg",
+  nails: "/icons/service-categories/nails.svg",
+  waxing: "/icons/service-categories/waxing.svg",
+};
 
 export type ServiceCategoryIconProps = {
   iconId?: ServiceCategorySliderIconId;
@@ -27,6 +32,27 @@ export default function ServiceCategoryIcon({
   color = "primary.main",
 }: ServiceCategoryIconProps) {
   const resolved = iconId ?? (label ? resolveServiceCategorySliderIconId(label) : "generic");
+
+  const src = SERVICE_CATEGORY_ICON_SRC[resolved];
+  if (src) {
+    return (
+      <Box
+        component="img"
+        src={src}
+        alt=""
+        aria-hidden
+        sx={{
+          height: fontSize,
+          width: "auto",
+          maxWidth: fontSize * 1.6,
+          objectFit: "contain",
+          flexShrink: 0,
+          display: "block",
+        }}
+      />
+    );
+  }
+
   const sx = {
     fontSize,
     color,
@@ -38,22 +64,8 @@ export default function ServiceCategoryIcon({
   switch (resolved) {
     case "all":
       return null;
-    case "hair":
-      return <ContentCutRoundedIcon sx={sx} />;
-    case "makeup":
-      return <BrushRoundedIcon sx={sx} />;
-    case "lashes":
-      return <VisibilityRoundedIcon sx={sx} />;
-    case "brows":
-      return <GestureRoundedIcon sx={sx} />;
-    case "facial":
-      return <FaceRetouchingNaturalOutlinedIcon sx={sx} />;
-    case "nails":
-      return <BackHandOutlinedIcon sx={sx} />;
     case "body":
       return <SpaOutlinedIcon sx={sx} />;
-    case "waxing":
-      return <WaterDropOutlinedIcon sx={sx} />;
     case "generic":
     default:
       return <CategoryOutlinedIcon sx={sx} />;
