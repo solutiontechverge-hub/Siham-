@@ -15,19 +15,13 @@ type CalendarAddMenuProps = {
 const addMenuItems = [
   { label: "Booking", key: "booking" },
   { label: "Blocked time", key: "blocked" },
-  { label: "Public Business Hours", key: "public-hours" },
-  { label: "Design", key: "design" },
-  { label: "Add Note", key: "note" },
 ] as const;
 
 export default function CalendarAddMenu({
   anchorEl,
   onBlockedTime,
   onBooking,
-  onDesign,
-  onPublicBusinessHours,
   onClose,
-  onMockAction,
 }: CalendarAddMenuProps) {
   return (
     <Menu open={Boolean(anchorEl)} anchorEl={anchorEl} onClose={onClose}>
@@ -40,19 +34,7 @@ export default function CalendarAddMenu({
               onBooking();
               return;
             }
-            if (item.key === "blocked") {
-              onBlockedTime();
-              return;
-            }
-            if (item.key === "public-hours") {
-              onPublicBusinessHours();
-              return;
-            }
-            if (item.key === "design") {
-              onDesign();
-              return;
-            }
-            onMockAction(item.label);
+            onBlockedTime();
           }}
         >
           {item.label}

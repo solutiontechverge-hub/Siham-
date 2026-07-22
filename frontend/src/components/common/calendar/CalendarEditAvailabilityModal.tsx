@@ -6,7 +6,7 @@ import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import { Box, Button, IconButton, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../../ui/typography";
-import AppTextField from "../AppTextField";
+import AppTimePicker from "../AppTimePicker";
 import MollureModal from "../MollureModal";
 import type { CalendarBookingLocation, CalendarResource } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { ScheduleShift } from "./calendar-settings.types";
@@ -102,13 +102,40 @@ export default function CalendarEditAvailabilityModal({
           </Stack>
 
           {draft.shifts.map((shift, index) => (
-            <Stack key={`shift-${index}`} direction="row" spacing={1.25} alignItems="center">
-              <AppTextField label="Start" type="time" value={shift.start} onChange={(e) => setDraft((p) => ({ ...p, shifts: p.shifts.map((item, i) => (i === index ? { ...item, start: e.target.value } : item)) }))} fullWidth InputLabelProps={{ shrink: true }} />
-              <AppTextField label="End" type="time" value={shift.end} onChange={(e) => setDraft((p) => ({ ...p, shifts: p.shifts.map((item, i) => (i === index ? { ...item, end: e.target.value } : item)) }))} fullWidth InputLabelProps={{ shrink: true }} />
+            <Stack key={`shift-${index}`} direction="row" spacing={1.25} alignItems="flex-end">
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <AppTimePicker
+                  label="Start"
+                  value={shift.start}
+                  onChange={(val) =>
+                    setDraft((p) => ({
+                      ...p,
+                      shifts: p.shifts.map((item, i) => (i === index ? { ...item, start: val } : item)),
+                    }))
+                  }
+                  fullWidth
+                  sx={{ minHeight: 40, py: 0.5 }}
+                />
+              </Box>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <AppTimePicker
+                  label="End"
+                  value={shift.end}
+                  onChange={(val) =>
+                    setDraft((p) => ({
+                      ...p,
+                      shifts: p.shifts.map((item, i) => (i === index ? { ...item, end: val } : item)),
+                    }))
+                  }
+                  fullWidth
+                  sx={{ minHeight: 40, py: 0.5 }}
+                />
+              </Box>
               <IconButton
                 size="small"
                 disabled={draft.shifts.length === 1}
                 onClick={() => setDraft((p) => ({ ...p, shifts: p.shifts.filter((_, i) => i !== index) }))}
+                sx={{ mb: 0.5, color: alpha(m.navy, 0.45) }}
               >
                 <DeleteOutlineRoundedIcon fontSize="small" />
               </IconButton>
@@ -116,11 +143,41 @@ export default function CalendarEditAvailabilityModal({
           ))}
 
           <Button
-            startIcon={<AddRoundedIcon />}
             onClick={() => setDraft((p) => ({ ...p, shifts: [...p.shifts, { start: "09:00", end: "17:00" }] }))}
-            sx={{ alignSelf: "flex-start", textTransform: "none", fontWeight: 800, color: m.teal }}
+            sx={{
+              alignSelf: "flex-start",
+              textTransform: "none",
+              fontWeight: 600,
+              fontSize: 13.5,
+              color: m.slate,
+              px: 0,
+              minWidth: 0,
+              gap: 1,
+              "&:hover": {
+                bgcolor: "transparent",
+                color: alpha(m.navy, 0.78),
+                "& .add-shift-icon": {
+                  bgcolor: m.addSoftBgHover,
+                },
+              },
+            }}
           >
-            Add shift
+            <Box
+              className="add-shift-icon"
+              sx={{
+                width: 28,
+                height: 28,
+                borderRadius: "999px",
+                bgcolor: m.addSoftBg,
+                color: m.addSoftFg,
+                display: "grid",
+                placeItems: "center",
+                transition: "background-color 0.15s ease",
+              }}
+            >
+              <AddRoundedIcon sx={{ fontSize: 18 }} />
+            </Box>
+            Add Shift
           </Button>
         </Stack>
       </Box>

@@ -410,7 +410,8 @@ export default function CalendarTeamMemberSchedule({
   };
 
   const applyBlocked = () => {
-    if (!blockDraft.teamIds.length || !blockDraft.activity?.trim()) return;
+    if (!blockDraft.teamIds.length) return;
+    if (blockDraft.title === "Custom" && !blockDraft.customTitle?.trim() && !blockDraft.activity?.trim()) return;
     const nextEntry = buildBlockedEntryFromDraft(blockDraft, editingBlocked ?? undefined);
     if (blockMode === "add") {
       onBlockedChange([...blocked, nextEntry]);
@@ -531,7 +532,9 @@ export default function CalendarTeamMemberSchedule({
                     height: 28,
                     px: 1.25,
                     bgcolor: m.teal,
-                    "&:hover": { bgcolor: m.tealDark },
+                    color: "#fff",
+                    "&:hover": { bgcolor: m.tealDark, color: "#fff" },
+                    "& .MuiButton-endIcon": { color: "#fff" },
                   }}
                 >
                   Add
@@ -628,7 +631,7 @@ export default function CalendarTeamMemberSchedule({
 
                       <ScheduleTableSection
                         title="Blocked Time"
-                        columns={["Activity", "Date - Date", "Day - Day", "Time - Time", "Action"]}
+                        columns={["Title", "Date - Date", "Day - Day", "Time - Time", "Action"]}
                         emptyLabel="No blocked time entries."
                         rows={memberBlocked.map((entry) => (
                           <TableRow key={entry.id}>

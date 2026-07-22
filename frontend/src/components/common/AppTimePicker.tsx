@@ -8,6 +8,7 @@ import { alpha, useTheme, type SxProps, type Theme } from "@mui/material/styles"
 export type AppTimePickerProps = {
   value: string;
   onChange: (value: string) => void;
+  label?: string;
   placeholder?: string;
   disabled?: boolean;
   fullWidth?: boolean;
@@ -26,9 +27,7 @@ const MINUTE_OPTIONS = [0, 15, 30, 45] as const;
 export function formatTimeDisplay(value: string): string {
   if (!value || !/^\d{2}:\d{2}$/.test(value)) return "";
   const [hours, minutes] = value.split(":").map(Number);
-  const period = hours >= 12 ? "PM" : "AM";
-  const hour12 = hours % 12 || 12;
-  return `${hour12}:${String(minutes).padStart(2, "0")} ${period}`;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 }
 
 function parseTimeValue(value: string) {
@@ -176,6 +175,7 @@ export function AppTimePanel({ value, onChange, onDone, compact = false }: AppTi
 export default function AppTimePicker({
   value,
   onChange,
+  label,
   placeholder = "Select time",
   disabled = false,
   fullWidth = true,
@@ -189,6 +189,21 @@ export default function AppTimePicker({
 
   return (
     <>
+      {label ? (
+        <Typography
+          component="label"
+          sx={{
+            display: "block",
+            fontSize: "0.75rem",
+            fontWeight: 500,
+            color: alpha(m.navy, 0.9),
+            lineHeight: 1.25,
+            mb: 0.75,
+          }}
+        >
+          {label}
+        </Typography>
+      ) : null}
       <ButtonBase
         disabled={disabled}
         onClick={(e) => !disabled && setAnchor(e.currentTarget)}

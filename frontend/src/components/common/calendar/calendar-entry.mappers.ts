@@ -90,8 +90,9 @@ export function buildCreateCalendarEntryPayload(input: {
 }): CreateCalendarEntryRequest {
   const { selectedSlot, title, clientName, status, bookingType, location, serviceIds, notes, details } = input;
 
+  const teamMemberId = selectedSlot.resourceId?.trim() || "";
   return {
-    team_member_id: selectedSlot.resourceId?.trim() || null,
+    team_member_id: UUID_RE.test(teamMemberId) ? teamMemberId : null,
     status: statusToApi[status],
     title,
     start_time: toDateTimeInput(selectedSlot.date, selectedSlot.start),

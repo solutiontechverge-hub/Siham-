@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Box, Container, Stack } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
+import { useTheme } from "@mui/material/styles";
 import DesiredLocationTopTabs, { type DesiredLocationTopTab } from "./DesiredLocationTopTabs";
 import MarketingSiteFooter from "./MarketingSiteFooter";
 import { professionalsMarketingFooter } from "../../data/marketingShell.data";
@@ -22,7 +22,7 @@ export default function DesiredLocationPageScaffold({
   const m = theme.palette.mollure;
 
   return (
-    <Box sx={{ bgcolor: alpha(m.teal, 0.08), minHeight: "100vh" }}>
+    <Box sx={{ bgcolor: m.pageBg, minHeight: "100vh" }}>
       <Container maxWidth="lg" sx={{ py: 2.5 }}>
         <Stack spacing={2}>
           <DesiredLocationTopTabs tabs={topTabs} activeLabel={activeTopTab} />

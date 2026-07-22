@@ -51,7 +51,7 @@ export default function ClientProfessionalReviewsPage() {
 
   if (isLoading) {
     return (
-      <Box sx={{ minHeight: "100vh", bgcolor: "#EAF9FB", py: 4 }}>
+      <Box sx={{ minHeight: "100vh", bgcolor: "mollure.pageBg", py: 4 }}>
         <Container maxWidth="lg">
           <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
             <CircularProgress />
@@ -63,7 +63,7 @@ export default function ClientProfessionalReviewsPage() {
 
   if (isError || !profile || !member) {
     return (
-      <Box sx={{ minHeight: "100vh", bgcolor: "#EAF9FB", py: 4 }}>
+      <Box sx={{ minHeight: "100vh", bgcolor: "mollure.pageBg", py: 4 }}>
         <Container maxWidth="lg">
           <Box sx={{ textAlign: "center", py: 8 }}>
             <Typography>{isError ? "Unable to load reviews." : "Professional not found."}</Typography>
@@ -74,7 +74,7 @@ export default function ClientProfessionalReviewsPage() {
   }
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "#EAF9FB" }}>
+    <Box sx={{ minHeight: "100vh", bgcolor: "mollure.pageBg" }}>
       <MollureMarketingHeader
         navItems={[]}
         isAuthed

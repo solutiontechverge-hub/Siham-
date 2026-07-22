@@ -20,6 +20,8 @@ type MollureDrawerProps = Omit<DrawerProps, "children" | "title"> & {
   contentSx?: SxProps<Theme>;
   onBack?: () => void;
   hideDividers?: boolean;
+  /** Rendered in the header, before the close button. */
+  headerActions?: React.ReactNode;
 };
 
 export default function MollureDrawer({
@@ -31,6 +33,7 @@ export default function MollureDrawer({
   contentSx,
   onBack,
   hideDividers = false,
+  headerActions,
   onClose,
   anchor = "right",
   ...props
@@ -70,23 +73,26 @@ export default function MollureDrawer({
             ) : null}
             <SubHeading sx={{ fontSize: 16, color: alpha(m.navy, 0.88) }}>{title}</SubHeading>
           </Stack>
-          <IconButton
-            size="small"
-            onClick={() => onClose?.({}, "backdropClick")}
-            sx={{
-              width: 30,
-              height: 30,
-              borderRadius: "999px",
-              bgcolor: alpha(m.navy, 0.05),
-              "&:hover": { bgcolor: alpha(m.navy, 0.10) },
-            }}
-          >
-            <CloseRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.55) }} />
-          </IconButton>
+          <Stack direction="row" alignItems="center" spacing={0.75}>
+            {headerActions}
+            <IconButton
+              size="small"
+              onClick={() => onClose?.({}, "backdropClick")}
+              sx={{
+                width: 30,
+                height: 30,
+                borderRadius: "999px",
+                bgcolor: alpha(m.navy, 0.05),
+                "&:hover": { bgcolor: alpha(m.navy, 0.10) },
+              }}
+            >
+              <CloseRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.55) }} />
+            </IconButton>
+          </Stack>
         </Stack>
         {hideDividers ? null : <Divider sx={{ borderColor: alpha(m.navy, 0.08) }} />}
 
-        <Box sx={{ flex: 1, overflow: "auto", ...contentSx }}>{children}</Box>
+        <Box sx={{ flex: 1, overflowY: "auto", overflowX: "hidden", ...contentSx }}>{children}</Box>
 
         {footer ? (
           <>

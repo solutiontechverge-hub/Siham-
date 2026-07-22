@@ -6,6 +6,7 @@ import {
   Avatar,
   Box,
   Button,
+  ButtonBase,
   CircularProgress,
   Fade,
   Checkbox,
@@ -25,6 +26,7 @@ import {
   Switch,
 } from "@mui/material";
 import { alpha, useTheme, type Theme } from "@mui/material/styles";
+import { useRouter } from "next/navigation";
 import IosShareRoundedIcon from "@mui/icons-material/IosShareRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
@@ -52,9 +54,18 @@ import type {
 } from "../../store/services/businessApi";
 import {
   buildUpsertBusinessSetupBody,
+  useGetCalendarOverviewQuery,
   useUpdateBusinessSetupActiveMutation,
 } from "../../store/services/businessApi";
 import { getApiErrorMessage } from "../../lib/api-error";
+import { parseCalendarSettings } from "./calendar/calendar-settings.types";
+import {
+  isCategoryVisibleInServiceOrder,
+  sortCategoriesByServiceOrder,
+  sortServicesByServiceOrder,
+  serviceOrderLabelsMatch,
+} from "./calendar/serviceOrder.utils";
+import { toIsoLocalDate } from "./calendar/calendar.utils";
 import { useSnackbar } from "./AppSnackbar";
 import AppMultiSelect from "./AppMultiSelect";
 import MollureFormField from "./MollureFormField";
@@ -86,7 +97,7 @@ import {
 import { Typography } from "../ui/typography";
 import {
   BUSINESS_SERVICE_CATEGORY_CATALOG,
-  buildServiceCategoryTabs,
+  buildDynamicServiceCategoryTabs,
   resolveCategoryTabId,
   resolveServiceCategoryStorageId,
   resolveServiceCategorySliderIconId,
@@ -114,6 +125,7 @@ import {
   buildTeamBusinessServiceRefs,
   TEAM_MEMBER_DRAFT_PREVIEW_ID,
 } from "../../data/businessTeamMemberModal.data";
+import { ratingReviewReviewsHref } from "../../app/professionals/fixed-location/analytics/ratingReviewRoutes";
 import BusinessServiceFormModal from "./BusinessServiceFormModal";
 import BusinessTeamMemberFormModal from "./BusinessTeamMemberFormModal";
 
@@ -129,19 +141,45 @@ type TeamServiceSlots = {
   slot7: string;
 };
 
-const mapServiceItemsToCategories = (items: ServiceDetailUiItem[]) =>
-  items
+const mapServiceItemsToCategories = (items: ServiceDetailUiItem[], hiddenExtras: Array<Record<string, unknown>> = []) => {
+  const visible = items
     .filter((item) => item.serviceId && item.categoryId)
-    .map((item) => ({
-      category_id: String(item.categoryId),
-      service_id: String(item.serviceId),
-      category_title: item.categoryTitle?.trim() || null,
-      service_title: item.name?.trim() || null,
-      amount:
-        (parseEuroAmountString(item.priceAmount ?? "") ??
-          Number(String(item.priceLabel).replace(/[^0-9.]/g, ""))) || 0,
-      duration_label: (item.durationLabel ?? "").trim() || null,
-    }));
+    .map((item) => {
+      const parentId = String(item.parentServiceId ?? "").trim();
+      return {
+        category_id: String(item.categoryId),
+        service_id: String(item.serviceId),
+        category_title: item.categoryTitle?.trim() || null,
+        service_title: item.name?.trim() || null,
+        amount:
+          (parseEuroAmountString(item.priceAmount ?? "") ??
+            Number(String(item.priceLabel).replace(/[^0-9.]/g, ""))) || 0,
+        duration_label: (item.durationLabel ?? "").trim() || null,
+        parent_service_id: parentId && !parentId.startsWith("main-") ? parentId : null,
+        is_visible: true,
+      };
+    });
+
+  const visibleIds = new Set(visible.map((entry) => String(entry.service_id)));
+  const hidden = hiddenExtras
+    .filter((entry) => {
+      const serviceId = String(entry.service_id ?? entry.serviceId ?? "").trim();
+      return serviceId && !visibleIds.has(serviceId);
+    })
+    .map((entry) => ({
+      category_id: String(entry.category_id ?? entry.categoryId ?? ""),
+      service_id: String(entry.service_id ?? entry.serviceId ?? ""),
+      category_title: String(entry.category_title ?? entry.categoryTitle ?? "").trim() || null,
+      service_title: String(entry.service_title ?? entry.serviceTitle ?? "").trim() || null,
+      amount: Number(entry.amount) || 0,
+      duration_label: String(entry.duration_label ?? entry.durationLabel ?? "").trim() || null,
+      parent_service_id: String(entry.parent_service_id ?? entry.parentServiceId ?? "").trim() || null,
+      is_visible: false,
+    }))
+    .filter((entry) => entry.category_id && entry.service_id);
+
+  return [...visible, ...hidden];
+};
 
 function normalizePriceType(type: string | undefined): "fixed" | "from" {
   return normalizeBusinessServicePriceType(type);
@@ -327,14 +365,7 @@ type BusinessSetupSectionId =
   | "profile"
   | "location"
   | "serviceFor"
-  | "servicesDetails"
-  | "manageTeam"
   | "generalNotes"
-  | "price"
-  | "policy"
-  | "reschedulingPolicy"
-  | "cancellationPolicy"
-  | "noShowPolicy"
   | "portfolio";
 
 /** Circular “+” add buttons — nudged left so they sit inside the container edge */
@@ -496,9 +527,20 @@ export default function ProfessionalFixedLocationSetup({
 }: ProfessionalFixedLocationSetupProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
+  const router = useRouter();
   const { showSnackbar } = useSnackbar();
   const [updateBusinessSetupActive, { isLoading: isBusinessProfileStatusSaving }] =
     useUpdateBusinessSetupActiveMutation();
+  const todayIso = React.useMemo(() => toIsoLocalDate(new Date()), []);
+  const { data: calendarOverviewData } = useGetCalendarOverviewQuery(
+    { startDate: todayIso, endDate: todayIso },
+    { refetchOnMountOrArgChange: true },
+  );
+  const calendarServiceOrder = React.useMemo(() => {
+    const settings = calendarOverviewData?.data?.settings;
+    if (!settings) return null;
+    return parseCalendarSettings(settings.availability, settings.design).availability.serviceOrder ?? null;
+  }, [calendarOverviewData]);
 
   const isBusinessProfileActive = businessSetupData?.is_active !== false;
   type ProfileValidationField =
@@ -535,7 +577,7 @@ export default function ProfessionalFixedLocationSetup({
   const [activeSubTab, setActiveSubTab] = React.useState<string>(
     data.subTabsActive,
   );
-  const [activeServiceCategory, setActiveServiceCategory] = React.useState<string>("");
+  const [activeServiceCategory, setActiveServiceCategory] = React.useState<string>("all");
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
   const [mediaSlides, setMediaSlides] = React.useState<string[]>(["/professionals/hero.png"]);
   const [mediaIdx, setMediaIdx] = React.useState(0);
@@ -965,14 +1007,6 @@ export default function ProfessionalFixedLocationSetup({
       return next;
     });
   };
-  const ensureServicesDetailsEditing = React.useCallback(() => {
-    setEditingBusinessSections((prev) => {
-      if (prev.has("servicesDetails")) return prev;
-      const next = new Set(prev);
-      next.add("servicesDetails");
-      return next;
-    });
-  }, []);
   const isBusinessSectionEditing = (sectionId: BusinessSetupSectionId) => editingBusinessSections.has(sectionId);
   const isBusinessSectionDisabled = (sectionId: BusinessSetupSectionId) =>
     isBusinessSetupSaving || !editingBusinessSections.has(sectionId);
@@ -1032,24 +1066,22 @@ export default function ProfessionalFixedLocationSetup({
   const serviceForDisabled =
     isBusinessSectionDisabled("serviceFor") || isDesiredSyncLocked("serviceFor");
   const servicesDetailsDisabled =
-    isBusinessSectionDisabled("servicesDetails") || isDesiredSyncLocked("servicesDetails");
+    isBusinessSetupSaving || isDesiredSyncLocked("servicesDetails");
   const manageTeamDisabled =
-    isBusinessSectionDisabled("manageTeam") || isDesiredSyncLocked("manageTeam");
+    isBusinessSetupSaving || isDesiredSyncLocked("manageTeam");
   const generalNotesDisabled =
     isBusinessSectionDisabled("generalNotes") || isDesiredSyncLocked("infoAndPolicy");
-  const priceDisabled =
-    isBusinessSectionDisabled("price") || isDesiredSyncLocked("infoAndPolicy");
-  const policyDisabled = isBusinessSectionDisabled("policy");
-  const reschedulingPolicyDisabled = isBusinessSectionDisabled("reschedulingPolicy");
-  const cancellationPolicyDisabled = isBusinessSectionDisabled("cancellationPolicy");
-  const noShowPolicyDisabled = isBusinessSectionDisabled("noShowPolicy");
+  const priceDisabled = generalNotesDisabled;
+  const policyDisabled = generalNotesDisabled;
+  const reschedulingPolicyDisabled = generalNotesDisabled;
+  const cancellationPolicyDisabled = generalNotesDisabled;
+  const noShowPolicyDisabled = generalNotesDisabled;
   const portfolioDisabled =
-    isBusinessSectionDisabled("portfolio") || isDesiredSyncLocked("portfolio");
+    isBusinessSetupSaving || isDesiredSyncLocked("portfolio");
 
   const showFixedLocationSection = isFixedTemplateView;
   const showDesiredLocationSection = isDesiredTemplateView;
   const showKilometerAllowance = isDesiredTemplateView;
-  const showBookServices = isFixedTemplateView;
   const showProjectSection = isDesiredTemplateView;
 
   const locationSectionTitle = React.useMemo(() => {
@@ -1996,7 +2028,7 @@ export default function ProfessionalFixedLocationSetup({
       const durationLabel = categoryDurationByServiceId.get(item.service_id) || "";
       return {
         id: String(item.service_id),
-        parentServiceId: "",
+        parentServiceId: item.parent_service_id ? String(item.parent_service_id) : "",
         categoryId: String(item.category_id),
         serviceId: item.service_id,
         name: item.service_title || "",
@@ -2009,7 +2041,9 @@ export default function ProfessionalFixedLocationSetup({
       };
     };
 
-    const savedServices: BusinessSubserviceUi[] = businessSetupData.service_details.map(mapDetailToSubservice);
+    const savedServices: BusinessSubserviceUi[] = businessSetupData.service_details
+      .filter((item) => item.is_visible !== false)
+      .map(mapDetailToSubservice);
     const hydratedServices = hydrateMainAndSubservicesFromDetails(savedServices, categoryTitleById);
     setMainServicesFixed(hydratedServices.mains);
     setMainServicesDesired(hydratedServices.mains);
@@ -2057,6 +2091,50 @@ export default function ProfessionalFixedLocationSetup({
     (isBothOffering && templateSyncSettings.servicesDetails === "sync")
       ? mainServicesFixed
       : mainServicesDesired;
+
+  /** Categories from this business setup, ordered by Calendar Settings → Service Order Rules. "All" stays first. */
+  const serviceCategoryTabs = React.useMemo(() => {
+    const orderedCategories: Array<{ id: string; title: string }> = [];
+    const seen = new Set<string>();
+
+    for (const service of activeServices) {
+      const categoryId = String(service.categoryId ?? "").trim();
+      if (!categoryId || seen.has(categoryId)) continue;
+      seen.add(categoryId);
+      const titleFromApi = businessCategories.find((category) => String(category.id) === categoryId)?.title;
+      orderedCategories.push({
+        id: categoryId,
+        title: service.categoryTitle?.trim() || titleFromApi || `Category ${categoryId}`,
+      });
+    }
+
+    // Include settings categories that exist in catalog/API even if services list is temporarily empty.
+    for (const title of calendarServiceOrder?.categories ?? []) {
+      if (!isCategoryVisibleInServiceOrder(calendarServiceOrder, title)) continue;
+      if (orderedCategories.some((entry) => serviceOrderLabelsMatch(entry.title, title))) continue;
+      const apiCategory =
+        businessCategories.find((category) => serviceOrderLabelsMatch(category.title, title)) ??
+        BUSINESS_SERVICE_CATEGORY_CATALOG.find(
+          (entry) => serviceOrderLabelsMatch(entry.label, title) || serviceOrderLabelsMatch(entry.key, title),
+        );
+      if (!apiCategory) continue;
+      const id = "id" in apiCategory ? String(apiCategory.id) : apiCategory.key;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      orderedCategories.push({
+        id,
+        title: "title" in apiCategory ? apiCategory.title : apiCategory.label,
+      });
+    }
+
+    if (!orderedCategories.length) {
+      return [{ id: "all", label: "All", iconId: "all" as const }];
+    }
+
+    const sorted = sortCategoriesByServiceOrder(orderedCategories, calendarServiceOrder);
+    return buildDynamicServiceCategoryTabs(sorted);
+  }, [activeServices, businessCategories, calendarServiceOrder]);
+
   const setActiveServices = React.useCallback(
     (value: React.SetStateAction<ServiceDetailUiItem[]>) => {
       setIsBusinessPublishEnabled(true);
@@ -2064,13 +2142,21 @@ export default function ProfessionalFixedLocationSetup({
       if (activeBusinessTemplate === "Fixed Location") {
         setServicesFixed((prev) => {
           const next = typeof value === "function" ? value(prev) : value;
-          if (liveSync) setServicesDesired(next);
+          servicesFixedRef.current = next;
+          if (liveSync) {
+            servicesDesiredRef.current = next;
+            setServicesDesired(next);
+          }
           return next;
         });
       } else {
         setServicesDesired((prev) => {
           const next = typeof value === "function" ? value(prev) : value;
-          if (liveSync) setServicesFixed(next);
+          servicesDesiredRef.current = next;
+          if (liveSync) {
+            servicesFixedRef.current = next;
+            setServicesFixed(next);
+          }
           return next;
         });
       }
@@ -2159,11 +2245,6 @@ export default function ProfessionalFixedLocationSetup({
       setIsBusinessPublishEnabled(true);
     },
     [getCurrentBusinessState, mainServicesFixed, portfolioItemsFixed, servicesFixed, teamMembersFixed],
-  );
-
-  const serviceCategoryTabs = React.useMemo(
-    () => buildServiceCategoryTabs(businessCategories),
-    [businessCategories],
   );
 
   const teamBusinessServices = React.useMemo(
@@ -2273,37 +2354,38 @@ export default function ProfessionalFixedLocationSetup({
     onMainServiceCreated: (mainId) => {
       setExpandedMainServiceIds((prev) => ({ ...prev, [mainId]: true }));
     },
+    onSaveBusinessSetup: onSaveBusinessSetup
+      ? async () => {
+          await saveBusinessSetupData();
+        }
+      : undefined,
   });
 
   const handleEditSubservice = React.useCallback(
     (service: ServiceDetailUiItem) => {
-      ensureServicesDetailsEditing();
       serviceModal.openEditSubservice(service);
     },
-    [ensureServicesDetailsEditing, serviceModal],
+    [serviceModal],
   );
 
   const handleDeleteSubservice = React.useCallback(
     (service: ServiceDetailUiItem) => {
-      ensureServicesDetailsEditing();
       serviceModal.deleteSubservice(service.id);
       removeServiceIdFromTeamMembers(String(service.serviceId ?? service.id));
       showSnackbar({ severity: "info", message: "Service removed. Click Save to apply changes." });
     },
-    [ensureServicesDetailsEditing, removeServiceIdFromTeamMembers, serviceModal, showSnackbar],
+    [removeServiceIdFromTeamMembers, serviceModal, showSnackbar],
   );
 
   const handleEditMainService = React.useCallback(
     (main: BusinessMainServiceUi) => {
-      ensureServicesDetailsEditing();
       serviceModal.openEditService(main);
     },
-    [ensureServicesDetailsEditing, serviceModal],
+    [serviceModal],
   );
 
   const handleDeleteMainService = React.useCallback(
     (mainId: string) => {
-      ensureServicesDetailsEditing();
       const childServiceIds = (serviceModal.subservicesByParent.get(mainId) ?? []).map((item) =>
         String(item.serviceId ?? item.id),
       );
@@ -2312,7 +2394,7 @@ export default function ProfessionalFixedLocationSetup({
         removeServiceIdFromTeamMembers(serviceId);
       }
     },
-    [ensureServicesDetailsEditing, removeServiceIdFromTeamMembers, serviceModal],
+    [removeServiceIdFromTeamMembers, serviceModal],
   );
 
   const ensureCategoryParentMain = React.useCallback(
@@ -2355,7 +2437,6 @@ export default function ProfessionalFixedLocationSetup({
 
   const openAddServiceForCategory = React.useCallback(
     (categoryId: string) => {
-      ensureServicesDetailsEditing();
       const storageId = resolveServiceCategoryStorageId(
         categoryId,
         serviceCategoryTabs,
@@ -2366,13 +2447,7 @@ export default function ProfessionalFixedLocationSetup({
       const parentMainId = ensureCategoryParentMain(storageId);
       serviceModal.openAddSubservice(storageId, parentMainId);
     },
-    [
-      businessCategories,
-      ensureCategoryParentMain,
-      ensureServicesDetailsEditing,
-      serviceCategoryTabs,
-      serviceModal,
-    ],
+    [businessCategories, ensureCategoryParentMain, serviceCategoryTabs, serviceModal],
   );
 
   const openAddService = React.useCallback(() => {
@@ -2382,19 +2457,13 @@ export default function ProfessionalFixedLocationSetup({
 
   const openAddSubserviceForItem = React.useCallback(
     (item: ServiceDetailUiItem) => {
-      ensureServicesDetailsEditing();
       const storageId = resolveServiceCategoryStorageId(item.categoryId, serviceCategoryTabs, businessCategories);
       if (!storageId) return;
-      const parentMainId = item.parentServiceId?.trim() || ensureCategoryParentMain(storageId);
-      serviceModal.openAddSubservice(storageId, parentMainId);
+      // Nest the new service under the clicked service itself.
+      serviceModal.openAddSubservice(storageId, item.id);
+      setExpandedServiceDetailIds((prev) => ({ ...prev, [item.id]: true }));
     },
-    [
-      businessCategories,
-      ensureCategoryParentMain,
-      ensureServicesDetailsEditing,
-      serviceCategoryTabs,
-      serviceModal,
-    ],
+    [businessCategories, serviceCategoryTabs, serviceModal],
   );
 
   const toggleServiceDetailExpand = React.useCallback((id: string) => {
@@ -2406,9 +2475,11 @@ export default function ProfessionalFixedLocationSetup({
   }, []);
 
   const renderServiceDetailRow = React.useCallback(
-    (it: ServiceDetailUiItem) => {
+    (it: ServiceDetailUiItem, isChild = false): React.ReactNode => {
       const expanded = Boolean(expandedServiceDetailIds[it.id]);
       const cardPrice = getServiceCardPriceParts(it);
+      const childServices = isChild ? [] : (serviceModal.subservicesByParent.get(it.id) ?? []);
+
       return (
         <Paper
           key={it.id}
@@ -2434,7 +2505,7 @@ export default function ProfessionalFixedLocationSetup({
                 ) : null}
                 <Typography
                   component="button"
-                  onClick={() => serviceModal.openEditSubservice(it)}
+                  onClick={() => serviceModal.openViewSubservice(it)}
                   sx={{
                     border: "none",
                     background: "none",
@@ -2449,7 +2520,7 @@ export default function ProfessionalFixedLocationSetup({
                     "&:hover": { textDecoration: "underline" },
                   }}
                 >
-                  Edit
+                  View
                 </Typography>
               </Stack>
             </Box>
@@ -2483,15 +2554,17 @@ export default function ProfessionalFixedLocationSetup({
               </Stack>
 
               <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexShrink: 0 }}>
-                <IconButton
-                  size="small"
-                  aria-label="Add subservice"
-                  onClick={() => openAddSubserviceForItem(it)}
-                  disabled={isBusinessSetupSaving || servicesDetailsDisabled}
-                  sx={addSoftIconButtonSx(m, 32)}
-                >
-                  <AddRoundedIcon sx={{ fontSize: 18 }} />
-                </IconButton>
+                {!isChild ? (
+                  <IconButton
+                    size="small"
+                    aria-label="Add subservice"
+                    onClick={() => openAddSubserviceForItem(it)}
+                    disabled={isBusinessSetupSaving || servicesDetailsDisabled}
+                    sx={addSoftIconButtonSx(m, 32)}
+                  >
+                    <AddRoundedIcon sx={{ fontSize: 18 }} />
+                  </IconButton>
+                ) : null}
                 <IconButton
                   size="small"
                   aria-label="Edit service"
@@ -2510,23 +2583,31 @@ export default function ProfessionalFixedLocationSetup({
                 >
                   <DeleteOutlineRoundedIcon sx={{ fontSize: 20 }} />
                 </IconButton>
-                <IconButton
-                  size="small"
-                  aria-label={expanded ? "Collapse details" : "Expand details"}
-                  onClick={() => toggleServiceDetailExpand(it.id)}
-                  sx={{
-                    width: 32,
-                    height: 32,
-                    color: alpha(m.navy, 0.45),
-                    transform: expanded ? "rotate(180deg)" : "none",
-                    transition: "transform 0.2s ease",
-                  }}
-                >
-                  <KeyboardArrowDownRoundedIcon sx={{ fontSize: 22 }} />
-                </IconButton>
+                {!isChild && childServices.length > 0 ? (
+                  <IconButton
+                    size="small"
+                    aria-label={expanded ? "Collapse sub services" : "Expand sub services"}
+                    onClick={() => toggleServiceDetailExpand(it.id)}
+                    sx={{
+                      width: 32,
+                      height: 32,
+                      color: alpha(m.navy, 0.45),
+                      transform: expanded ? "rotate(180deg)" : "none",
+                      transition: "transform 0.2s ease",
+                    }}
+                  >
+                    <KeyboardArrowDownRoundedIcon sx={{ fontSize: 22 }} />
+                  </IconButton>
+                ) : null}
               </Stack>
             </Stack>
           </Stack>
+
+          {expanded && childServices.length > 0 ? (
+            <Stack spacing={1} sx={{ mt: 1.25, pl: { xs: 1, sm: 2 } }}>
+              {childServices.map((child) => renderServiceDetailRow(child, true))}
+            </Stack>
+          ) : null}
         </Paper>
       );
     },
@@ -2535,8 +2616,9 @@ export default function ProfessionalFixedLocationSetup({
       handleDeleteSubservice,
       handleEditSubservice,
       isBusinessSetupSaving,
-      m.navy,
+      m,
       openAddSubserviceForItem,
+      serviceModal.subservicesByParent,
       servicesDetailsDisabled,
       toggleServiceDetailExpand,
     ],
@@ -3104,8 +3186,8 @@ export default function ProfessionalFixedLocationSetup({
   );
 
   const getSubservicesForCategory = React.useCallback(
-    (categoryId: string) =>
-      activeServices.filter((service) =>
+    (categoryId: string) => {
+      const matched = activeServices.filter((service) =>
         serviceMatchesCategoryTab(
           {
             categoryId: service.categoryId,
@@ -3115,22 +3197,41 @@ export default function ProfessionalFixedLocationSetup({
           serviceCategoryTabs,
           businessCategories,
         ),
-      ),
-    [activeServices, businessCategories, resolveServiceCategoryTitle, serviceCategoryTabs],
+      );
+      const categoryTitle = resolveServiceCategoryTitle(categoryId);
+      const orderedNames = sortServicesByServiceOrder(
+        matched.map((service) => service.name),
+        categoryTitle,
+        calendarServiceOrder,
+      );
+      return orderedNames
+        .map((name) => matched.find((service) => serviceOrderLabelsMatch(service.name, name)))
+        .filter((service): service is (typeof matched)[number] => Boolean(service));
+    },
+    [
+      activeServices,
+      businessCategories,
+      calendarServiceOrder,
+      resolveServiceCategoryTitle,
+      serviceCategoryTabs,
+    ],
   );
 
   const getFlatSubservicesForCategory = React.useCallback(
     (categoryId: string) => {
       const explicitMains = getExplicitMainsForCategory(categoryId);
       const explicitMainIds = new Set(explicitMains.map((main) => main.id));
+      const allSubserviceIds = new Set(activeServices.map((service) => service.id));
 
       return getSubservicesForCategory(categoryId).filter((service) => {
         const parentId = String(service.parentServiceId ?? "").trim();
         if (!parentId || isHydratedMainServiceId(parentId)) return true;
+        // Nested under another service: rendered inside its parent row instead.
+        if (allSubserviceIds.has(parentId)) return false;
         return !explicitMainIds.has(parentId);
       });
     },
-    [getExplicitMainsForCategory, getSubservicesForCategory],
+    [activeServices, getExplicitMainsForCategory, getSubservicesForCategory],
   );
 
   const groupedServiceSections = React.useMemo(() => {
@@ -3191,106 +3292,6 @@ export default function ProfessionalFixedLocationSetup({
   );
 
 
-  /** Flat catalog of billable services (subcategories) for combo A + B picks. */
-  const allBookingServiceOptions = React.useMemo(
-    () =>
-      businessCategories.flatMap((category) =>
-        category.subcategories.map((subcategory) => ({
-          value: String(subcategory.id),
-          label: subcategory.title,
-          categoryId: String(category.id),
-          categoryLabel: category.title,
-        })),
-      ),
-    [businessCategories],
-  );
-
-  /** Booking combo row selects are read-only until that row’s edit (pencil) is toggled on. */
-  const [bookingComboEditId, setBookingComboEditId] = React.useState<string | null>(null);
-
-  const getBookingServiceOptions = React.useCallback(
-    (categoryId: string) => {
-      if (!categoryId) return allBookingServiceOptions;
-      return allBookingServiceOptions.filter((option) => option.categoryId === categoryId);
-    },
-    [allBookingServiceOptions],
-  );
-
-  const bookingServiceOptions = React.useMemo(
-    () => allBookingServiceOptions,
-    [allBookingServiceOptions],
-  );
-
-  const resolveBookingComboLabels = React.useCallback(
-    (firstServiceId: string, secondServiceId: string) => {
-      const first =
-        allBookingServiceOptions.find((option) => option.value === firstServiceId)?.label ?? "Service";
-      const second =
-        allBookingServiceOptions.find((option) => option.value === secondServiceId)?.label ?? "Service";
-      return { categoryLabel: first, serviceLabel: second };
-    },
-    [allBookingServiceOptions],
-  );
-
-  const addBookingCombo = React.useCallback(() => {
-    const firstServiceId = fixedBiz.bookCategory || allBookingServiceOptions[0]?.value || "";
-    const secondServiceId =
-      fixedBiz.bookService ||
-      allBookingServiceOptions.find((option) => option.value !== firstServiceId)?.value ||
-      "";
-    if (!firstServiceId || !secondServiceId || firstServiceId === secondServiceId) {
-      showSnackbar({ severity: "info", message: "Pick two different services for a combination." });
-      return;
-    }
-
-    const alreadyExists = fixedBiz.bookCombos.some(
-      (combo) =>
-        (combo.categoryId === firstServiceId && combo.serviceId === secondServiceId) ||
-        (combo.categoryId === secondServiceId && combo.serviceId === firstServiceId),
-    );
-    if (alreadyExists) {
-      showSnackbar({ severity: "info", message: "This service combination is already added." });
-      return;
-    }
-
-    const id = `combo-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    setBookingComboEditId(null);
-    setFixedBizField("bookCombos", [
-      ...fixedBiz.bookCombos,
-      { id, categoryId: firstServiceId, serviceId: secondServiceId },
-    ]);
-  }, [
-    allBookingServiceOptions,
-    fixedBiz.bookCategory,
-    fixedBiz.bookCombos,
-    fixedBiz.bookService,
-    setFixedBizField,
-    showSnackbar,
-  ]);
-
-  const updateBookingCombo = React.useCallback(
-    (id: string, patch: Partial<{ categoryId: string; serviceId: string }>) => {
-      setFixedBizField(
-        "bookCombos",
-        fixedBiz.bookCombos.map((combo) => {
-          if (combo.id !== id) return combo;
-          return { ...combo, ...patch };
-        }),
-      );
-    },
-    [fixedBiz.bookCombos, setFixedBizField],
-  );
-
-  const deleteBookingCombo = React.useCallback(
-    (id: string) => {
-      setBookingComboEditId((prev) => (prev === id ? null : prev));
-      setFixedBizField(
-        "bookCombos",
-        fixedBiz.bookCombos.filter((c) => c.id !== id),
-      );
-    },
-    [fixedBiz.bookCombos, setFixedBizField],
-  );
   const goPrevMedia = React.useCallback(() => {
     setMediaIdx((i) => (i - 1 + mediaSlides.length) % mediaSlides.length);
   }, [mediaSlides.length]);
@@ -3443,6 +3444,21 @@ export default function ProfessionalFixedLocationSetup({
     />
   );
 
+  const saveServicesDetails = React.useCallback(async () => {
+    if (!onSaveBusinessSetup) return;
+
+    try {
+      await saveBusinessSetupData();
+      setIsBusinessPublishEnabled(true);
+      showSnackbar({ severity: "success", message: "Services saved." });
+    } catch (error) {
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Unable to save services."),
+      });
+    }
+  }, [onSaveBusinessSetup, saveBusinessSetupData, showSnackbar]);
+
   const serviceFormModal = (
     <BusinessServiceFormModal
       open={serviceModal.open}
@@ -3452,9 +3468,12 @@ export default function ProfessionalFixedLocationSetup({
       submitLabel={serviceModal.submitLabel}
       disabled={isBusinessSetupSaving || serviceModal.isSaving}
       canSubmit={serviceModal.canSubmit}
+      readOnly={serviceModal.viewing}
+      onEdit={() => {
+        serviceModal.startEditing();
+      }}
       onClose={serviceModal.closeModal}
       onSubmit={() => {
-        ensureServicesDetailsEditing();
         void serviceModal.saveModal();
       }}
       onChange={serviceModal.updateDraft}
@@ -4139,7 +4158,6 @@ export default function ProfessionalFixedLocationSetup({
 
       <SectionShell
         title={data.servicesDetails.title}
-        action={renderSectionEditAction("servicesDetails")}
       >
         <Stack spacing={1.5}>
           <ServiceCategoryBar
@@ -4310,288 +4328,13 @@ export default function ProfessionalFixedLocationSetup({
           </Paper>
           ) : null}
 
-          {showBookServices ? (
-          <>
-          <Box sx={{ mt: 0.75 }}>
-            <Typography sx={{ fontWeight: 800, color: alpha(m.navy, 0.84), fontSize: 13 }}>
-              Book Services
-            </Typography>
-            <Typography sx={{ mt: 0.35, color: alpha(m.navy, 0.55), fontSize: 12, lineHeight: 1.45 }}>
-              Pick two services, then tap + to create a combo card you can edit or delete.
-            </Typography>
-          </Box>
-
-          <Paper
-            elevation={0}
-            sx={{
-              borderRadius: "10px",
-              border: `1px solid ${alpha(m.navy, 0.10)}`,
-              bgcolor: alpha(m.navy, 0.01),
-              px: 1.5,
-              py: 1.25,
-            }}
-          >
-            <Stack spacing={1.25}>
-              <Grid container spacing={1.5} alignItems="center">
-                <Grid item xs={12} md={5}>
-                  <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.6 }}>
-                    Select first service
-                  </Typography>
-                  <MollureFormField
-                    select
-                    value={fixedBiz.bookCategory}
-                    onChange={(e) => {
-                      const firstServiceId = e.target.value;
-                      setFixedBizField("bookCategory", firstServiceId);
-                      if (fixedBiz.bookService === firstServiceId) {
-                        setFixedBizField(
-                          "bookService",
-                          allBookingServiceOptions.find((option) => option.value !== firstServiceId)?.value ||
-                            "",
-                        );
-                      }
-                    }}
-                    sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                    disabled={servicesDetailsDisabled}
-                  >
-                    <MenuItem value="">Select first service</MenuItem>
-                    {allBookingServiceOptions.map((opt) => (
-                      <MenuItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </MenuItem>
-                    ))}
-                  </MollureFormField>
-                </Grid>
-                <Grid item xs={12} md={5}>
-                  <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.6 }}>
-                    Select second service
-                  </Typography>
-                  <MollureFormField
-                    select
-                    value={fixedBiz.bookService}
-                    onChange={(e) => setFixedBizField("bookService", e.target.value)}
-                    sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                    disabled={servicesDetailsDisabled}
-                  >
-                    <MenuItem value="">Select second service</MenuItem>
-                    {bookingServiceOptions
-                      .filter((opt) => opt.value !== fixedBiz.bookCategory)
-                      .map((opt) => (
-                        <MenuItem key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </MenuItem>
-                      ))}
-                  </MollureFormField>
-                </Grid>
-                <Grid item xs={12} md={2} sx={{ display: "flex", justifyContent: { md: "flex-end" }, pr: { md: 0.5 } }}>
-                  <IconButton
-                    onClick={addBookingCombo}
-                    disabled={
-                      servicesDetailsDisabled ||
-                      !fixedBiz.bookCategory ||
-                      !fixedBiz.bookService ||
-                      fixedBiz.bookCategory === fixedBiz.bookService
-                    }
-                    sx={addSoftIconButtonSx(m, 34)}
-                  >
-                    <AddRoundedIcon />
-                  </IconButton>
-                </Grid>
-              </Grid>
-
-              <Paper
-                elevation={0}
-                sx={{
-                  borderRadius: "10px",
-                  border: `1px solid ${alpha(m.navy, 0.10)}`,
-                  bgcolor: "#fff",
-                  px: 1.25,
-                  py: 1.1,
-                }}
-              >
-                <Stack spacing={1}>
-                  <Typography sx={{ fontWeight: 800, fontSize: 12.5, color: alpha(m.navy, 0.78) }}>
-                    Available Combinations
-                  </Typography>
-                  {fixedBiz.bookCombos.length === 0 ? (
-                    <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: alpha(m.navy, 0.5), py: 0.5 }}>
-                      Select two services above, then tap + to add a combination.
-                    </Typography>
-                  ) : (
-                    <Stack
-                      direction="row"
-                      spacing={1.25}
-                      useFlexGap
-                      flexWrap="wrap"
-                      sx={{ pb: 0.25 }}
-                    >
-                      {fixedBiz.bookCombos.map((c) => {
-                        const isEditing = bookingComboEditId === c.id;
-                        const { categoryLabel, serviceLabel } = resolveBookingComboLabels(c.categoryId, c.serviceId);
-                        const comboFieldsDisabled = servicesDetailsDisabled;
-
-                        return (
-                          <Paper
-                            key={c.id}
-                            elevation={0}
-                            sx={{
-                              flex: { xs: "1 1 100%", sm: "1 1 calc(50% - 8px)", md: "1 1 calc(33.333% - 9px)" },
-                              minWidth: { xs: "100%", sm: 260 },
-                              maxWidth: { md: 360 },
-                              borderRadius: "10px",
-                              border: `1px solid ${isEditing ? alpha(m.teal, 0.35) : alpha(m.navy, 0.10)}`,
-                              px: 1.25,
-                              py: 1,
-                              bgcolor: isEditing ? alpha(m.addSoftBg, 0.35) : alpha(m.navy, 0.02),
-                            }}
-                          >
-                            {isEditing ? (
-                              <Stack spacing={1}>
-                                <Stack
-                                  direction={{ xs: "column", sm: "row" }}
-                                  spacing={1}
-                                  alignItems={{ xs: "stretch", sm: "center" }}
-                                >
-                                  <MollureFormField
-                                    select
-                                    value={c.categoryId}
-                                    onChange={(e) => updateBookingCombo(c.id, { categoryId: e.target.value })}
-                                    disabled={comboFieldsDisabled}
-                                    sx={{
-                                      flex: 1,
-                                      minWidth: 0,
-                                      "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" },
-                                    }}
-                                  >
-                                    {allBookingServiceOptions.map((opt) => (
-                                      <MenuItem key={opt.value} value={opt.value}>
-                                        {opt.label}
-                                      </MenuItem>
-                                    ))}
-                                  </MollureFormField>
-                                  <Typography
-                                    sx={{
-                                      fontWeight: 800,
-                                      color: alpha(m.navy, 0.45),
-                                      textAlign: "center",
-                                      flexShrink: 0,
-                                    }}
-                                  >
-                                    +
-                                  </Typography>
-                                  <MollureFormField
-                                    select
-                                    value={c.serviceId}
-                                    onChange={(e) => updateBookingCombo(c.id, { serviceId: e.target.value })}
-                                    disabled={comboFieldsDisabled}
-                                    sx={{
-                                      flex: 1,
-                                      minWidth: 0,
-                                      "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" },
-                                    }}
-                                  >
-                                    {allBookingServiceOptions
-                                      .filter((opt) => opt.value !== c.categoryId)
-                                      .map((opt) => (
-                                        <MenuItem key={opt.value} value={opt.value}>
-                                          {opt.label}
-                                        </MenuItem>
-                                      ))}
-                                  </MollureFormField>
-                                </Stack>
-                                <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                                  <IconButton
-                                    size="small"
-                                    disabled={comboFieldsDisabled}
-                                    onClick={() => setBookingComboEditId(null)}
-                                    aria-label="Done editing combination"
-                                    sx={{
-                                      bgcolor: m.addSoftBg,
-                                      border: `1px solid ${m.addSoftBorder}`,
-                                      "&:hover": { bgcolor: m.addSoftBgHover },
-                                    }}
-                                  >
-                                    <CheckRoundedIcon sx={{ fontSize: 18, color: m.addSoftFg }} />
-                                  </IconButton>
-                                </Stack>
-                              </Stack>
-                            ) : (
-                              <Stack direction="row" alignItems="center" spacing={1}>
-                                <Box sx={{ flex: 1, minWidth: 0 }}>
-                                  <Typography
-                                    sx={{
-                                      fontSize: 13,
-                                      fontWeight: 800,
-                                      color: alpha(m.navy, 0.86),
-                                      lineHeight: 1.35,
-                                    }}
-                                  >
-                                    {categoryLabel} + {serviceLabel}
-                                  </Typography>
-                                </Box>
-                                <IconButton
-                                  size="small"
-                                  disabled={comboFieldsDisabled}
-                                  onClick={() => setBookingComboEditId(c.id)}
-                                  aria-label="Edit combination"
-                                  sx={{
-                                    width: 32,
-                                    height: 32,
-                                    borderRadius: "999px",
-                                    bgcolor: alpha(m.navy, 0.05),
-                                    border: `1px solid ${alpha(m.navy, 0.1)}`,
-                                    "&:hover": { bgcolor: alpha(m.navy, 0.09) },
-                                  }}
-                                >
-                                  <EditRoundedIcon sx={{ fontSize: 17, color: alpha(m.navy, 0.5) }} />
-                                </IconButton>
-                                <IconButton
-                                  size="small"
-                                  disabled={comboFieldsDisabled}
-                                  onClick={() => deleteBookingCombo(c.id)}
-                                  aria-label="Delete combination"
-                                  sx={{
-                                    width: 32,
-                                    height: 32,
-                                    borderRadius: "999px",
-                                    bgcolor: alpha(m.navy, 0.05),
-                                    border: `1px solid ${alpha(m.navy, 0.1)}`,
-                                    "&:hover": { bgcolor: alpha(m.navy, 0.09) },
-                                  }}
-                                >
-                                  <DeleteOutlineRoundedIcon sx={{ fontSize: 17, color: alpha(m.navy, 0.5) }} />
-                                </IconButton>
-                              </Stack>
-                            )}
-                          </Paper>
-                        );
-                      })}
-                    </Stack>
-                  )}
-                </Stack>
-              </Paper>
-
-              <MollureFormField
-                placeholder="Custom instructions for combo Service"
-                value={fixedBiz.bookComboInstructions}
-                onChange={(e) => setFixedBizField("bookComboInstructions", e.target.value)}
-                multiline
-                minRows={4}
-                disabled={servicesDetailsDisabled}
-                sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-              />
-            </Stack>
-          </Paper>
-          </>
-          ) : null}
         </Stack>
       </SectionShell>
 
       <SectionShell
         title={data.manageTeam.title}
-        action={renderSectionEditAction(
-          "manageTeam",
-          <>
+        action={
+          <Stack direction="row" spacing={1} alignItems="center">
             <FormControlLabel
               sx={{ m: 0 }}
               control={
@@ -4616,11 +4359,11 @@ export default function ProfessionalFixedLocationSetup({
             >
               <AddRoundedIcon sx={{ fontSize: 18 }} />
             </IconButton>
-          </>,
-        )}
+          </Stack>
+        }
       >
         <Stack spacing={1.5}>
-          {teamMembers.map((mem) => (
+          {teamMembers.map((mem, memIndex) => (
             <Paper
               key={mem.id}
               elevation={0}
@@ -4678,9 +4421,30 @@ export default function ProfessionalFixedLocationSetup({
                         size="small"
                         sx={{ fontSize: 14, "& .MuiRating-iconFilled": { color: "#FAAF00" } }}
                       />
-                      <Typography sx={{ fontSize: 10.5, color: alpha(m.navy, 0.50), fontWeight: 500 }}>
-                        {mem.reviewsLabel}
-                      </Typography>
+                      <ButtonBase
+                        disabled={mem.id === TEAM_MEMBER_DRAFT_PREVIEW_ID}
+                        onClick={() => {
+                          const persistedId = toPersistedTeamMemberId(mem.id);
+                          router.push(
+                            ratingReviewReviewsHref("Total Review", {
+                              memberId: persistedId,
+                              memberName: mem.name,
+                              memberIndex: memIndex + 1,
+                            }),
+                          );
+                        }}
+                        sx={{
+                          borderRadius: "6px",
+                          px: 0.25,
+                          "&:hover": { bgcolor: alpha(m.teal, 0.06) },
+                          "&.Mui-disabled": { opacity: 0.55 },
+                        }}
+                        aria-label={`View reviews for ${mem.name}`}
+                      >
+                        <Typography sx={{ fontSize: 10.5, color: alpha(m.navy, 0.50), fontWeight: 500 }}>
+                          {mem.reviewsLabel}
+                        </Typography>
+                      </ButtonBase>
                     </Stack>
                   </Box>
                 </Stack>
@@ -4971,7 +4735,7 @@ export default function ProfessionalFixedLocationSetup({
           />
         </SetupSubSection>
 
-        <SetupSubSection title="Price" action={renderSectionEditAction("price")}>
+        <SetupSubSection title="Price">
         <Stack spacing={2}>
           <Box>
             <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
@@ -5072,7 +4836,7 @@ export default function ProfessionalFixedLocationSetup({
         </Stack>
         </SetupSubSection>
 
-        <SetupSubSection title="Policy Section" action={renderSectionEditAction("policy")}>
+        <SetupSubSection title="Policy Section">
           <Stack spacing={1.6}>
             <Box>
               <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
@@ -5120,7 +4884,7 @@ export default function ProfessionalFixedLocationSetup({
           </Stack>
         </SetupSubSection>
 
-        <SetupSubSection title="Rescheduling Policy" action={renderSectionEditAction("reschedulingPolicy")}>
+        <SetupSubSection title="Rescheduling Policy">
           <Stack spacing={1.6}>
             <Box>
               <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
@@ -5185,7 +4949,7 @@ export default function ProfessionalFixedLocationSetup({
           </Stack>
         </SetupSubSection>
 
-        <SetupSubSection title="Cancellation Policy" action={renderSectionEditAction("cancellationPolicy")}>
+        <SetupSubSection title="Cancellation Policy">
           <Stack spacing={1.6}>
             <Box>
               <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
@@ -5250,7 +5014,7 @@ export default function ProfessionalFixedLocationSetup({
           </Stack>
         </SetupSubSection>
 
-        <SetupSubSection title="No Show Policy" action={renderSectionEditAction("noShowPolicy")}>
+        <SetupSubSection title="No Show Policy">
           <Stack spacing={1.6}>
             <Box>
               <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
@@ -5284,9 +5048,8 @@ export default function ProfessionalFixedLocationSetup({
 
       <SectionShell
         title="Portfolio"
-        action={renderSectionEditAction(
-          "portfolio",
-          <>
+        action={
+          <Stack direction="row" spacing={1} alignItems="center">
             <IconButton
               size="small"
               onClick={deleteSelectedPortfolio}
@@ -5323,8 +5086,8 @@ export default function ProfessionalFixedLocationSetup({
               hidden
               onChange={onPortfolioFilesSelected}
             />
-          </>,
-        )}
+          </Stack>
+        }
       >
         <Box
           sx={{
@@ -5353,6 +5116,7 @@ export default function ProfessionalFixedLocationSetup({
                 }}
                 sx={{
                   position: "relative",
+                  aspectRatio: "1 / 1",
                   borderRadius: "10px",
                   overflow: "hidden",
                   cursor: portfolioDisabled ? "default" : "pointer",
@@ -5366,9 +5130,9 @@ export default function ProfessionalFixedLocationSetup({
                   src={it.src}
                   alt="Portfolio image"
                   width={520}
-                  height={360}
+                  height={520}
                   unoptimized
-                  style={{ width: "100%", height: "140px", objectFit: "cover", display: "block" }}
+                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
                 />
                 <Box
                   aria-hidden
@@ -5531,7 +5295,7 @@ export default function ProfessionalFixedLocationSetup({
   if (!chrome) return innerWithDrawer;
 
   return (
-    <Box sx={{ bgcolor: "#fff", minHeight: "100vh" }}>
+    <Box sx={{ bgcolor: "mollure.pageBg", minHeight: "100vh" }}>
       <Container maxWidth="lg" sx={{ py: 2.5 }}>
         <Stack spacing={2}>{innerWithDrawer}</Stack>
       </Container>

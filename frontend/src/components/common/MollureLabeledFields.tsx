@@ -86,35 +86,12 @@ function MollureTopLabel({
   );
 }
 
-const inCellInputSx = {
-  "& .MuiOutlinedInput-root": {
-    borderRadius: 0,
-    bgcolor: "transparent",
-    minHeight: "unset",
-    px: 0,
-    "& fieldset": { border: "none" },
-    "&:hover fieldset": { border: "none" },
-    "&.Mui-focused fieldset": { border: "none" },
-  },
-  "& .MuiOutlinedInput-input": {
-    fontSize: "0.8125rem",
-    padding: 0,
-    paddingTop: 0,
-    paddingBottom: 0,
-  },
-  "& .MuiSelect-select": {
-    padding: "0 !important",
-    minHeight: "unset !important",
-  },
-} as const;
-
 function MollureInCellShell({
   fieldId,
   fieldLabel,
   required,
   error,
   helperText,
-  disabled,
   children,
 }: {
   fieldId: string;
@@ -122,7 +99,6 @@ function MollureInCellShell({
   required?: boolean;
   error?: boolean;
   helperText?: React.ReactNode;
-  disabled?: boolean;
   children: React.ReactNode;
 }) {
   const theme = useTheme();
@@ -130,42 +106,26 @@ function MollureInCellShell({
 
   return (
     <Box>
-      <Box
+      <Typography
+        component="label"
+        htmlFor={fieldId}
         sx={{
-          borderRadius: "6px",
-          border: `1px solid ${error ? theme.palette.error.main : m.inputBorder}`,
-          bgcolor: disabled ? alpha(m.navy, 0.04) : (m.white ?? "#fff"),
-          px: 1.25,
-          py: 0.625,
-          minHeight: 40,
-          transition: "border-color 0.15s",
-          "&:focus-within": {
-            borderColor: error ? theme.palette.error.main : m.teal,
-          },
-          ...(disabled ? { opacity: 0.85 } : null),
+          display: "block",
+          fontSize: "0.6875rem",
+          fontWeight: 600,
+          color: alpha(m.navy, 0.52),
+          lineHeight: 1.25,
+          mb: 0.5,
         }}
       >
-        <Typography
-          component="label"
-          htmlFor={fieldId}
-          sx={{
-            display: "block",
-            fontSize: "0.6875rem",
-            fontWeight: 600,
-            color: alpha(m.navy, 0.52),
-            lineHeight: 1.25,
-            mb: 0.25,
-          }}
-        >
-          {fieldLabel}
-          {required ? (
-            <Box component="span" sx={{ color: "error.main", fontWeight: 700 }}>
-              {" *"}
-            </Box>
-          ) : null}
-        </Typography>
-        {children}
-      </Box>
+        {fieldLabel}
+        {required ? (
+          <Box component="span" sx={{ color: "error.main", fontWeight: 700 }}>
+            {" *"}
+          </Box>
+        ) : null}
+      </Typography>
+      {children}
       {helperText ? (
         <FormHelperText error={error} sx={{ mx: 0, mt: 0.5 }}>
           {helperText}
@@ -215,7 +175,6 @@ export function MollureLabeledField({
         required={required}
         error={error}
         helperText={helperText}
-        disabled={props.disabled}
       >
         <MollureTextField
           id={fieldId}
@@ -223,7 +182,6 @@ export function MollureLabeledField({
           error={error}
           helperText={undefined}
           {...props}
-          sx={[inCellInputSx, props.sx] as any}
         />
       </MollureInCellShell>
     );
@@ -300,7 +258,6 @@ export function MollureLabeledPasswordField({
         required={required}
         error={error}
         helperText={helperText}
-        disabled={props.disabled}
       >
         <MollurePasswordField
           id={fieldId}
@@ -308,7 +265,6 @@ export function MollureLabeledPasswordField({
           error={error}
           helperText={undefined}
           {...props}
-          sx={[inCellInputSx, props.sx] as any}
         />
       </MollureInCellShell>
     );

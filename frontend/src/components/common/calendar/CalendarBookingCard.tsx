@@ -77,13 +77,15 @@ export default function CalendarBookingCard({
   const isFixedLocation = event.location === "FL";
   const hasNote = Boolean(event.details?.internalNote?.trim());
   const accentColor = serviceColor ?? accent.color;
-  const backgroundColor = serviceColor ? alpha(serviceColor, isDesiredLocation ? 0.08 : 0.075) : accent.bg;
-  const borderColor =
-    serviceColor
-      ? alpha(serviceColor, 0.34)
-      : event.status === "Requested"
-        ? accent.border
-        : accent.border;
+  // Keep custom appearance colors readable on the grid until the user changes them.
+  const backgroundColor = serviceColor
+    ? alpha(serviceColor, isDesiredLocation ? 0.22 : 0.2)
+    : accent.bg;
+  const borderColor = serviceColor
+    ? alpha(serviceColor, 0.55)
+    : event.status === "Requested"
+      ? accent.border
+      : accent.border;
   const cardPattern = isDesiredLocation ? "dots" : isFixedLocation ? "lines" : "none";
   const isIncomingEbr =
     event.bookingScenario === "EBR" && event.details?.requestDirection !== "outgoing";

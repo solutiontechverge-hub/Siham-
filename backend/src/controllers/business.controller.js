@@ -205,6 +205,8 @@ const normalizeServiceCategories = (value) => {
       const durationLabel = String(item.duration_label ?? item.duration ?? "").trim() || null;
       const categoryTitle = String(item.category_title ?? item.categoryTitle ?? "").trim() || null;
       const serviceTitle = String(item.service_title ?? item.serviceTitle ?? "").trim() || null;
+      const parentServiceId =
+        String(item.parent_service_id ?? item.parentServiceId ?? "").trim() || null;
 
       if (!categoryId || !serviceId) {
         return null;
@@ -217,6 +219,8 @@ const normalizeServiceCategories = (value) => {
         service_title: serviceTitle,
         amount: amount ?? 0,
         duration_label: durationLabel,
+        parent_service_id: parentServiceId,
+        is_visible: item.is_visible === false || item.isVisible === false ? false : true,
       };
     })
     .filter(Boolean);

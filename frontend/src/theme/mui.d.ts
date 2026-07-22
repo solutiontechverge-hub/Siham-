@@ -29,6 +29,7 @@ declare module "@mui/material/styles" {
     navy: string;
     slate: string;
     surface: string;
+    pageBg: string;
     footer: string;
     footerText: string;
     footerMuted: string;
@@ -79,6 +80,10 @@ declare module "@mui/material/styles" {
     addSoftBgHover: string;
     addSoftFg: string;
     addSoftBorder: string;
+    /** Calendar blocked-time slot fill */
+    blockedTimeBg: string;
+    /** Calendar blocked-time label / accent */
+    blockedTimeFg: string;
     salesVolumeStackDark: string;
     salesVolumeStackMid: string;
     salesVolumeStackLight: string;

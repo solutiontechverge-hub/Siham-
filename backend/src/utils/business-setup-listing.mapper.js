@@ -64,6 +64,7 @@ const mapServiceDetail = (detail, durationByServiceId = new Map()) => ({
   serviceTitle: toNullableString(detail.service_title),
   categoryId: detail.category_id ?? null,
   categoryTitle: toNullableString(detail.category_title),
+  isVisible: detail.is_visible === false || detail.isVisible === false ? false : true,
   createdAt: toIsoTimestamp(detail.created_at),
 });
 

@@ -419,7 +419,7 @@ export default function MollureMarketingHeader({
                   </Button>
                 )}
 
-                {professionalLinkLabel ? (
+                {!isAuthed && professionalLinkLabel ? (
                   professionalHref ? (
                     <Button
                       component={Link}

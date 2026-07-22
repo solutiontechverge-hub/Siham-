@@ -3,18 +3,12 @@
 import * as React from "react";
 import { Stack, Typography, Box } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import ContentCutRoundedIcon from "@mui/icons-material/ContentCutRounded";
-import BrushRoundedIcon from "@mui/icons-material/BrushRounded";
-import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
-import GestureRoundedIcon from "@mui/icons-material/GestureRounded";
-import FaceRetouchingNaturalOutlinedIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
-import BackHandOutlinedIcon from "@mui/icons-material/BackHandOutlined";
 import SpaOutlinedIcon from "@mui/icons-material/SpaOutlined";
-import WaterDropOutlinedIcon from "@mui/icons-material/WaterDropOutlined";
 import CategoryOutlinedIcon from "@mui/icons-material/CategoryOutlined";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import AppCard from "./AppCard";
 import type { ServiceCategorySliderIconId } from "../../data/businessServiceCategorySlider.data";
+import { SERVICE_CATEGORY_ICON_SRC } from "./ServiceCategoryIcon";
 import { mollureGradientIconSx, useMollureIconGradient } from "./MollureIconGradient";
 
 /** Fixed width for horizontal-scroll category strips */
@@ -45,31 +39,38 @@ function CategoryIcon({
   barStyle: boolean;
   tealColor: string;
 }) {
+  const contentOpacity = active ? 1 : 0.5;
+  const src = SERVICE_CATEGORY_ICON_SRC[iconId];
+  if (src) {
+    return (
+      <Box
+        component="img"
+        src={src}
+        alt=""
+        aria-hidden
+        sx={{
+          height: 26,
+          width: "auto",
+          maxWidth: 42,
+          objectFit: "contain",
+          display: "block",
+          opacity: contentOpacity,
+        }}
+      />
+    );
+  }
+
   const sx = barStyle
-    ? { fontSize: 26, color: tealColor }
+    ? { fontSize: 26, color: tealColor, opacity: contentOpacity }
     : active
       ? mollureGradientIconSx(gradientFill)
-      : { fontSize: 26, color: mutedColor };
+      : { fontSize: 26, color: mutedColor, opacity: contentOpacity };
   switch (iconId) {
     case "all":
       return null;
-    case "hair":
-      return <ContentCutRoundedIcon sx={sx} />;
-    case "makeup":
-      return <BrushRoundedIcon sx={sx} />;
-    case "lashes":
-      return <VisibilityRoundedIcon sx={sx} />;
-    case "brows":
-      return <GestureRoundedIcon sx={sx} />;
-    case "facial":
-      return <FaceRetouchingNaturalOutlinedIcon sx={sx} />;
-    case "nails":
-      return <BackHandOutlinedIcon sx={sx} />;
     case "body":
       return <SpaOutlinedIcon sx={sx} />;
-    case "waxing":
-      return <WaterDropOutlinedIcon sx={sx} />;
-    case "generic":
+    default:
       return <CategoryOutlinedIcon sx={sx} />;
   }
 }
@@ -83,7 +84,7 @@ const ServiceCategorySliderCard = React.forwardRef<HTMLButtonElement, ServiceCat
     const tealDark = theme.palette.primary.dark ?? m.tealDark ?? teal;
 
     const barStyle = equalWidth;
-    const cardBg = active ? m.white : m.fxGrayF2F4F7;
+    const cardBg = active ? m.white : m.fxGrayF9FAFB;
     const borderColor = barStyle
       ? active
         ? teal
@@ -101,6 +102,7 @@ const ServiceCategorySliderCard = React.forwardRef<HTMLButtonElement, ServiceCat
         : iconId === "all"
           ? alpha(teal, 0.65)
           : alpha(m.navy, 0.42);
+    const labelOpacity = active ? 1 : 0.5;
     const mutedIconColor = alpha(m.navy, 0.32);
     const cardWidth = `var(${SERVICE_CATEGORY_SLIDER_CARD_WIDTH_VAR}, ${SERVICE_CATEGORY_SLIDER_CARD_WIDTH}px)`;
 
@@ -178,6 +180,7 @@ const ServiceCategorySliderCard = React.forwardRef<HTMLButtonElement, ServiceCat
                 fontWeight: active ? 700 : barStyle ? 600 : 500,
                 lineHeight: 1.25,
                 color: labelColor,
+                opacity: labelOpacity,
                 px: 0.5,
                 display: "-webkit-box",
                 WebkitLineClamp: 2,

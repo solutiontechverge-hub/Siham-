@@ -4,7 +4,17 @@ import type {
   TeamScheduleBlockedEntry,
   TeamScheduleTimeRange,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
-import type { BlockTimeDraft } from "./calendar.utils";
+import { blockTitleFromDraft, type BlockTimeDraft } from "./calendar.utils";
+
+const KNOWN_BLOCK_TITLES = ["Meeting", "Training", "Holiday"] as const;
+
+function titlePartsFromActivity(activity: string): Pick<BlockTimeDraft, "title" | "customTitle"> {
+  const trimmed = activity.trim();
+  if ((KNOWN_BLOCK_TITLES as readonly string[]).includes(trimmed)) {
+    return { title: trimmed as (typeof KNOWN_BLOCK_TITLES)[number] };
+  }
+  return { title: "Custom", customTitle: trimmed };
+}
 
 export type AvailabilityDraft = {
   teamIds: string[];
@@ -75,18 +85,21 @@ export const availabilityEntryToDraft = (entry: TeamScheduleAvailabilityEntry): 
 export const blockedEntryToDraft = (
   entry: TeamScheduleBlockedEntry,
   supportedLocations: readonly CalendarBookingLocation[],
-): BlockTimeDraft & { activity: string } => ({
-  title: "Custom",
-  teamIds: [entry.resourceId],
-  locations: [...supportedLocations],
-  dateFrom: entry.dateFrom,
-  dateTo: entry.dateTo,
-  dayFrom: toDayFull(entry.dayFrom),
-  dayTo: toDayFull(entry.dayTo),
-  startTime: entry.times[0]?.start ?? "09:00",
-  endTime: entry.times[0]?.end ?? "17:00",
-  activity: entry.activity,
-});
+): BlockTimeDraft & { activity: string } => {
+  const titleParts = titlePartsFromActivity(entry.activity);
+  return {
+    ...titleParts,
+    teamIds: [entry.resourceId],
+    locations: [...supportedLocations],
+    dateFrom: entry.dateFrom,
+    dateTo: entry.dateTo,
+    dayFrom: toDayFull(entry.dayFrom),
+    dayTo: toDayFull(entry.dayTo),
+    startTime: entry.times[0]?.start ?? "09:00",
+    endTime: entry.times[0]?.end ?? "17:00",
+    activity: entry.activity,
+  };
+};
 
 export const buildAvailabilityEntriesFromDraft = (
   draft: AvailabilityDraft,
@@ -136,7 +149,7 @@ export const buildBlockedEntryFromDraft = (
 ): TeamScheduleBlockedEntry => ({
   id: editingEntry?.id ?? `blocked-${Date.now()}`,
   resourceId: draft.teamIds[0] ?? editingEntry?.resourceId ?? "",
-  activity: draft.activity?.trim() || draft.title,
+  activity: blockTitleFromDraft(draft),
   dateFrom: draft.dateFrom,
   dateTo: draft.dateTo,
   dayFrom: toDayAbbr(draft.dayFrom),
