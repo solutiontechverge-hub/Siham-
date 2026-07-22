@@ -1,10 +1,23 @@
 import type { FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { baseApi } from "./baseApi";
+import {
+  buildListQuery,
+  normalizeListPagination,
+  type ListPagination,
+  type ListPaginationParams,
+} from "../../lib/listPagination";
 
 type ApiEnvelope<T> = {
   success: boolean;
   message: string;
   data: T;
+  pagination?: ListPagination;
+};
+
+export type BookingsPagination = ListPagination;
+
+export type GetMyBookingsParams = ListPaginationParams & {
+  tab?: "past" | "ongoing" | "upcoming";
 };
 
 export type BusinessSubcategory = {
@@ -606,10 +619,13 @@ const customError = (message: string): MutationError => ({
 
 export const businessApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    getBusinessCategories: builder.query<ApiEnvelope<BusinessCategory[]>, void>({
-      async queryFn(_arg, _api, _extraOptions, fetchWithBQ) {
+    getBusinessCategories: builder.query<
+      ApiEnvelope<BusinessCategory[]> & { pagination?: ListPagination },
+      ListPaginationParams | void
+    >({
+      async queryFn(arg, _api, _extraOptions, fetchWithBQ) {
         const response = await fetchWithBQ({
-          url: "/api/business/categories",
+          url: buildListQuery("/api/business/categories", arg ?? undefined),
           method: "GET",
         });
 
@@ -622,14 +638,26 @@ export const businessApi = baseApi.injectEndpoints({
           return { error: customError(data.message || "Unable to fetch business categories.") };
         }
 
-        return { data };
+        return {
+          data: {
+            ...data,
+            pagination: normalizeListPagination(data.pagination, {
+              page: arg?.page,
+              limit: arg?.limit,
+              total: data.data.length,
+            }),
+          },
+        };
       },
       providesTags: ["BusinessCategories"],
     }),
-    getAllBusinessSetups: builder.query<ApiEnvelope<BusinessSetupListing[]>, void>({
-      async queryFn(_arg, _api, _extraOptions, fetchWithBQ) {
+    getAllBusinessSetups: builder.query<
+      ApiEnvelope<BusinessSetupListing[]> & { pagination?: ListPagination },
+      ListPaginationParams | void
+    >({
+      async queryFn(arg, _api, _extraOptions, fetchWithBQ) {
         const response = await fetchWithBQ({
-          url: "/api/business-setups/all",
+          url: buildListQuery("/api/business-setups/all", arg ?? undefined),
           method: "GET",
         });
 
@@ -642,7 +670,16 @@ export const businessApi = baseApi.injectEndpoints({
           return { error: customError(data.message || "Unable to fetch business listings.") };
         }
 
-        return { data };
+        return {
+          data: {
+            ...data,
+            pagination: normalizeListPagination(data.pagination, {
+              page: arg?.page,
+              limit: arg?.limit,
+              total: data.data.length,
+            }),
+          },
+        };
       },
       providesTags: ["BusinessSetupsListing"],
     }),
@@ -777,10 +814,15 @@ export const businessApi = baseApi.injectEndpoints({
       },
       invalidatesTags: ["Calendar"],
     }),
-    getMyBookings: builder.query<ApiEnvelope<CalendarBooking[]>, void>({
-      async queryFn(_arg, _api, _extraOptions, fetchWithBQ) {
+    getMyBookings: builder.query<
+      ApiEnvelope<CalendarBooking[]> & { pagination: BookingsPagination },
+      GetMyBookingsParams | void
+    >({
+      async queryFn(arg, _api, _extraOptions, fetchWithBQ) {
         const response = await fetchWithBQ({
-          url: "/api/business/bookings",
+          url: buildListQuery("/api/business/bookings", arg ?? undefined, {
+            tab: arg?.tab,
+          }),
           method: "GET",
         });
 
@@ -788,12 +830,21 @@ export const businessApi = baseApi.injectEndpoints({
           return { error: toMutationError(response.error) };
         }
 
-        const data = response.data as ApiEnvelope<CalendarBooking[]>;
+        const data = response.data as ApiEnvelope<CalendarBooking[]> & {
+          pagination?: ListPagination;
+        };
         if (!data.success) {
           return { error: customError(data.message || "Unable to load bookings.") };
         }
 
-        return { data: { ...data, data: Array.isArray(data.data) ? data.data : [] } };
+        const rows = Array.isArray(data.data) ? data.data : [];
+        const pagination = normalizeListPagination(data.pagination, {
+          page: arg?.page,
+          limit: arg?.limit,
+          total: rows.length,
+        });
+
+        return { data: { ...data, data: rows, pagination } };
       },
       providesTags: ["Bookings"],
     }),
@@ -1056,10 +1107,13 @@ export const businessApi = baseApi.injectEndpoints({
       },
       invalidatesTags: ["BusinessSetup"],
     }),
-    getProfessionalClients: builder.query<ApiEnvelope<ApiProfessionalClient[]>, void>({
-      async queryFn(_arg, _api, _extraOptions, fetchWithBQ) {
+    getProfessionalClients: builder.query<
+      ApiEnvelope<ApiProfessionalClient[]> & { pagination?: ListPagination },
+      ListPaginationParams | void
+    >({
+      async queryFn(arg, _api, _extraOptions, fetchWithBQ) {
         const response = await fetchWithBQ({
-          url: "/api/business/clients",
+          url: buildListQuery("/api/business/clients", arg ?? undefined),
           method: "GET",
         });
 
@@ -1072,15 +1126,28 @@ export const businessApi = baseApi.injectEndpoints({
           return { error: customError(data.message || "Unable to fetch clients.") };
         }
 
-        return { data };
+        return {
+          data: {
+            ...data,
+            pagination: normalizeListPagination(data.pagination, {
+              page: arg?.page,
+              limit: arg?.limit,
+              total: data.data.length,
+            }),
+          },
+        };
       },
       providesTags: ["ProfessionalClients"],
     }),
-    getMollureClientDirectory: builder.query<ApiEnvelope<MollureClientDirectoryEntry[]>, { q?: string } | void>({
+    getMollureClientDirectory: builder.query<
+      ApiEnvelope<MollureClientDirectoryEntry[]> & { pagination?: ListPagination },
+      (ListPaginationParams & { q?: string }) | void
+    >({
       async queryFn(arg, _api, _extraOptions, fetchWithBQ) {
-        const q = arg?.q?.trim();
         const response = await fetchWithBQ({
-          url: q ? `/api/business/clients/mollure-directory?q=${encodeURIComponent(q)}` : "/api/business/clients/mollure-directory",
+          url: buildListQuery("/api/business/clients/mollure-directory", arg ?? undefined, {
+            q: arg?.q?.trim(),
+          }),
           method: "GET",
         });
 
@@ -1093,7 +1160,16 @@ export const businessApi = baseApi.injectEndpoints({
           return { error: customError(data.message || "Unable to fetch Mollure directory.") };
         }
 
-        return { data };
+        return {
+          data: {
+            ...data,
+            pagination: normalizeListPagination(data.pagination, {
+              page: arg?.page,
+              limit: arg?.limit,
+              total: data.data.length,
+            }),
+          },
+        };
       },
       providesTags: ["ProfessionalClients"],
     }),

@@ -1,4 +1,5 @@
 import { submitContactMessage, replyToContactMessage } from "../services/contact.service.js";
+import { logAdminActivityFromRequest } from "../services/adminActivity.service.js";
 
 export const createContactMessage = async (req, res) => {
   try {
@@ -41,6 +42,14 @@ export const adminReplyContactMessage = async (req, res) => {
         data: null,
       });
     }
+
+    void logAdminActivityFromRequest(req, {
+      action: "Replied to contact message",
+      detail: `Contact message #${req.params.id}`,
+      color: "navy",
+      module: "email",
+      actionType: "updated",
+    });
 
     return res.status(200).json({
       success: true,

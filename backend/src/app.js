@@ -5,6 +5,7 @@ import express from "express";
 import { fileURLToPath } from "url";
 import { getUploadsDir } from "./config/uploads-dir.js";
 import { query } from "./db/index.js";
+import adminRoutes from "./routes/admin.routes.js";
 import authRoutes from "./routes/auth.routes.js";
 import businessRoutes from "./routes/business.routes.js";
 import businessSetupsRoutes from "./routes/business-setups.routes.js";
@@ -51,6 +52,7 @@ app.use("/api/finance", financeRoutes);
 app.use("/api/contact", contactRoutes);
 app.use("/api/messaging", messagingRoutes);
 app.use("/api/notifications", notificationsRoutes);
+app.use("/api/admin", adminRoutes);
 
 app.use((req, res) => {
   res.status(404).json({

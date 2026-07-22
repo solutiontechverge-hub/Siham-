@@ -1,3 +1,9 @@
+/** Same-day bookings must start at least this many minutes from now. */
+export const CLIENT_BOOKING_MIN_LEAD_MINUTES = 15;
+
+export const CLIENT_BOOKING_MIN_LEAD_ERROR =
+  "Please select a time at least 15 minutes from now.";
+
 export function parseTimeLabelToMinutes(label: string) {
   const m = label.trim().match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
   if (!m) return 0;
@@ -10,6 +16,19 @@ export function parseTimeLabelToMinutes(label: string) {
     hh += 12;
   }
   return hh * 60 + mm;
+}
+
+export function getNowMinutesFromMidnight(date = new Date()) {
+  return date.getHours() * 60 + date.getMinutes();
+}
+
+/** True when booking today and the slot starts within the minimum lead window. */
+export function isSameDayBookingTooSoon(
+  timeLabel: string,
+  now = new Date(),
+  minLeadMinutes = CLIENT_BOOKING_MIN_LEAD_MINUTES,
+) {
+  return parseTimeLabelToMinutes(timeLabel) <= getNowMinutesFromMidnight(now) + minLeadMinutes;
 }
 
 export function fmtMinutesToIsoTime(mins: number) {

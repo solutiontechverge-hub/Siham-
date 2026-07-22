@@ -6,6 +6,7 @@ import {
   uploadProfileMulterFilesToS3,
 } from "../services/s3-upload.service.js";
 import { updateProfessionalValidation } from "../services/authEmail.service.js";
+import { logAdminActivityFromRequest } from "../services/adminActivity.service.js";
 
 const SALT_ROUNDS = 12;
 
@@ -291,6 +292,21 @@ export const setProfessionalValidation = async (req, res) => {
         data: null,
       });
     }
+
+    const statusLabel =
+      validationStatus === "validated"
+        ? "Validated professional"
+        : validationStatus === "not_validated"
+          ? "Rejected professional"
+          : "Set professional pending";
+
+    void logAdminActivityFromRequest(req, {
+      action: statusLabel,
+      detail: `User ID ${req.params.userId} → ${validationStatus}`,
+      color: validationStatus === "validated" ? "teal" : validationStatus === "not_validated" ? "warning" : "navy",
+      module: "professional",
+      actionType: "changed_status",
+    });
 
     return res.status(200).json({
       success: true,
