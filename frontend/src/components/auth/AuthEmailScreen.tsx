@@ -46,11 +46,8 @@ export default function AuthEmailScreen({ children, icon, maxWidth = 520 }: Auth
       />
 
       <Box sx={{ position: "relative", width: "100%", maxWidth, zIndex: 1 }}>
-        <Stack alignItems="center" spacing={0.5} sx={{ mb: 3 }}>
-          <Image src={Logo} alt="Mollure" width={36} height={36} />
-          <Typography sx={{ fontWeight: 800, fontSize: 22, color: alpha(m.navy, 0.82), letterSpacing: "-0.02em" }}>
-            Mollure
-          </Typography>
+        <Stack alignItems="center" sx={{ mb: 3 }}>
+          <Image src={Logo} alt="Mollure" width={72} height={72} priority />
         </Stack>
 
         <Box

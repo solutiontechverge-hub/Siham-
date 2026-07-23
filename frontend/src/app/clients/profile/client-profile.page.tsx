@@ -487,6 +487,10 @@ export default function ClientProfilePage() {
                       value={form.birthDate}
                       onChange={(iso) => handleChange({ target: { name: "birthDate", value: iso } } as React.ChangeEvent<HTMLInputElement>)}
                       disabled={fieldsDisabled}
+                      max={(() => {
+                        const d = new Date();
+                        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+                      })()}
                       fullWidth
                     />
                   </Stack>
