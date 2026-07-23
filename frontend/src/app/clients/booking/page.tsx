@@ -678,7 +678,7 @@ function ClientBookingCreateView() {
         if (session?.shop?.shopId) {
           setShop({
             shopId: session.shop.shopId,
-            shopName: session.shop.shopName,
+            shopName: session.shop.shopName ?? "Salon",
             municipalityLabel: session.shop.municipalityLabel,
             addressLabel: session.shop.addressLabel,
             locationMode: session.shop.locationMode,
@@ -828,9 +828,10 @@ function ClientBookingCreateView() {
         draftPeople[0];
       if (personWithServices?.id) setSelectedPersonId(personWithServices.id);
 
-      if (existing.draft.teamMembers?.length) {
+      const draftTeamMembers = existing.draft.teamMembers;
+      if (draftTeamMembers?.length) {
         setShopTeamMembers((prev) => {
-          const fromDraft = existing.draft.teamMembers!.map((tm) => ({
+          const fromDraft = draftTeamMembers.map((tm) => ({
             id: tm.id,
             name: tm.name,
             locationModes: (prev.find((p) => p.id === tm.id)?.locationModes ?? [

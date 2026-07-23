@@ -344,7 +344,13 @@ export default function ProfessionalFixedLocationCalendar({
   const [slotLocation, setSlotLocation] = React.useState<CalendarBookingLocation>(data.supportedLocations[0] ?? "FL");
   const [slotBookingType, setSlotBookingType] = React.useState<CalendarBookingType>("Requests");
   const [slotStatus, setSlotStatus] = React.useState<
-    "Confirmed" | "Requested" | "No Show" | "Completed" | "Cancelled" | "Invalid"
+    | "Confirmed"
+    | "Requested"
+    | "In Progress"
+    | "No Show"
+    | "Completed"
+    | "Cancelled"
+    | "Invalid"
   >(
     "Requested",
   );
@@ -2292,7 +2298,7 @@ export default function ProfessionalFixedLocationCalendar({
       const ebr = parseStoredEbrFromNotes(viewingBookingEvent.notes);
       const isClientEbr =
         viewingBookingEvent.bookingScenario === "EBR" &&
-        Boolean(ebr) &&
+        ebr != null &&
         (ebr.status === "pending" || ebr.status === "suggested") &&
         (ebr.lastEditedBy === "client" || viewingBookingEvent.details?.lastEditedBy === "client");
 
@@ -2421,7 +2427,7 @@ export default function ProfessionalFixedLocationCalendar({
     const ebr = parseStoredEbrFromNotes(viewingBookingEvent.notes);
     const isClientEbr =
       viewingBookingEvent.bookingScenario === "EBR" &&
-      Boolean(ebr) &&
+      ebr != null &&
       (ebr.status === "pending" || ebr.status === "suggested") &&
       (ebr.lastEditedBy === "client" || viewingBookingEvent.details?.lastEditedBy === "client");
 
