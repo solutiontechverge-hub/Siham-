@@ -452,7 +452,7 @@ function buildBookCombos(setup: BusinessSetupListing): BusinessPublicProfileBook
         durationMins: durationMins > 0 ? durationMins : 45,
       };
     })
-    .filter((combo): combo is BusinessPublicProfileBookCombo => combo != null);
+    .filter((combo): combo is NonNullable<typeof combo> => combo != null);
 }
 
 function buildServiceForItems(setup: BusinessSetupListing): BusinessPublicProfileServiceForItem[] {

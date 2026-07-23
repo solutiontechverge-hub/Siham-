@@ -66,12 +66,25 @@ function buildCalendarCells(year: number, month: number) {
   return { firstDay, daysInMonth };
 }
 
+/** Local calendar date as YYYY-MM-DD (avoids UTC off-by-one). */
+function localTodayIso(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 function monthFromValue(value: string) {
   if (value && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
     const [y, mo] = value.split("-").map(Number);
     return new Date(y, mo - 1, 1);
   }
   return new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+}
+
+function isIsoOutOfRange(iso: string, min?: string, max?: string): boolean {
+  if (!iso) return false;
+  if (min && iso < min) return true;
+  if (max && iso > max) return true;
+  return false;
 }
 
 export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compact = false, daySx }: AppCalendarPanelProps) {
@@ -103,10 +116,7 @@ export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compa
   }
 
   function isDayDisabled(day: number) {
-    const iso = isoOf(day);
-    if (min && iso < min) return true;
-    if (max && iso > max) return true;
-    return false;
+    return isIsoOutOfRange(isoOf(day), min, max);
   }
 
   function isMonthDisabled(monthIndex: number) {
@@ -117,6 +127,27 @@ export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compa
     if (max && startIso > max) return true;
     return false;
   }
+
+  const canGoPrevMonth = (() => {
+    if (!min) return true;
+    const prev = new Date(year, month - 1, 1);
+    const endDay = new Date(prev.getFullYear(), prev.getMonth() + 1, 0).getDate();
+    const endIso = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}-${String(endDay).padStart(2, "0")}`;
+    return endIso >= min;
+  })();
+
+  const canGoNextMonth = (() => {
+    if (!max) return true;
+    const next = new Date(year, month + 1, 1);
+    const startIso = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-01`;
+    return startIso <= max;
+  })();
+
+  const selectDay = (iso: string) => {
+    if (isIsoOutOfRange(iso, min, max)) return;
+    onChange(iso);
+    onDaySelect?.();
+  };
 
   function isYearDisabled(yearValue: number) {
     const startIso = `${yearValue}-01-01`;
@@ -185,14 +216,22 @@ export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compa
             </Box>
             <IconButton
               size="small"
-              onClick={() => setDisplayMonth((p) => new Date(p.getFullYear(), p.getMonth() - 1, 1))}
+              disabled={!canGoPrevMonth}
+              onClick={() => {
+                if (!canGoPrevMonth) return;
+                setDisplayMonth((p) => new Date(p.getFullYear(), p.getMonth() - 1, 1));
+              }}
               sx={{ width: 28, height: 28, borderRadius: "8px", color: alpha(m.navy, 0.6) }}
             >
               <ChevronLeftRoundedIcon sx={{ fontSize: 18 }} />
             </IconButton>
             <IconButton
               size="small"
-              onClick={() => setDisplayMonth((p) => new Date(p.getFullYear(), p.getMonth() + 1, 1))}
+              disabled={!canGoNextMonth}
+              onClick={() => {
+                if (!canGoNextMonth) return;
+                setDisplayMonth((p) => new Date(p.getFullYear(), p.getMonth() + 1, 1));
+              }}
               sx={{ width: 28, height: 28, borderRadius: "8px", color: alpha(m.navy, 0.6) }}
             >
               <ChevronRightRoundedIcon sx={{ fontSize: 18 }} />
@@ -257,18 +296,17 @@ export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compa
                 const iso = isoOf(day);
                 const selected = iso === value;
                 const off = isDayDisabled(day);
-                const todayIso = new Date().toISOString().slice(0, 10);
+                const todayIso = localTodayIso();
                 const isToday = iso === todayIso;
-                const isPast = !off && iso < todayIso;
+                // Only fade "past" when there is no max (scheduling-style calendars).
+                // Birth-date style (max=today) keeps allowed past dates fully readable.
+                const isPast = !max && !off && iso < todayIso;
                 const extraDaySx = daySx?.(iso) ?? {};
                 return (
                   <ButtonBase
                     key={iso}
                     disabled={off}
-                    onClick={() => {
-                      onChange(iso);
-                      onDaySelect?.();
-                    }}
+                    onClick={() => selectDay(iso)}
                     sx={{
                       height: dayCellH,
                       borderRadius: compact ? "999px" : "9px",
@@ -288,7 +326,7 @@ export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compa
                       bgcolor: selected ? m.teal : "transparent",
                       border: isToday && !selected ? `1.5px solid ${alpha(m.teal, 0.4)}` : "none",
                       cursor: off ? "not-allowed" : "pointer",
-                      "&.Mui-disabled": { pointerEvents: "auto" },
+                      "&.Mui-disabled": { pointerEvents: "none", opacity: 1 },
                       "&:hover": { bgcolor: off ? "transparent" : selected ? m.tealDark : alpha(m.teal, 0.09) },
                       ...extraDaySx,
                     }}
@@ -311,6 +349,7 @@ export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compa
                   key={label}
                   disabled={off}
                   onClick={() => {
+                    if (off) return;
                     setDisplayMonth(new Date(year, idx, 1));
                     setPanelView("days");
                   }}
@@ -322,6 +361,7 @@ export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compa
                     color: off ? alpha(m.navy, 0.22) : selected ? "#fff" : alpha(m.navy, 0.72),
                     bgcolor: selected ? m.teal : "transparent",
                     border: `1px solid ${selected ? alpha(m.teal, 0.2) : alpha(m.navy, 0.08)}`,
+                    "&.Mui-disabled": { pointerEvents: "none", opacity: 1 },
                     "&:hover": { bgcolor: off ? "transparent" : selected ? m.tealDark : alpha(m.teal, 0.09) },
                   }}
                 >
@@ -343,6 +383,7 @@ export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compa
                     key={yearValue}
                     disabled={off}
                     onClick={() => {
+                      if (off) return;
                       setDisplayMonth(new Date(yearValue, month, 1));
                       setPanelView("days");
                     }}
@@ -354,6 +395,7 @@ export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compa
                       color: off ? alpha(m.navy, 0.22) : selected ? "#fff" : alpha(m.navy, 0.72),
                       bgcolor: selected ? m.teal : "transparent",
                       border: `1px solid ${selected ? alpha(m.teal, 0.2) : alpha(m.navy, 0.08)}`,
+                      "&.Mui-disabled": { pointerEvents: "none", opacity: 1 },
                       "&:hover": { bgcolor: off ? "transparent" : selected ? m.tealDark : alpha(m.teal, 0.09) },
                     }}
                   >
@@ -411,6 +453,11 @@ export default function AppDatePicker({
   function closePicker() {
     setAnchor(null);
   }
+
+  const handleChange = (iso: string) => {
+    if (isIsoOutOfRange(iso, min, max)) return;
+    onChange(iso);
+  };
 
   return (
     <Box sx={{ width: fullWidth ? "100%" : "auto" }}>
@@ -485,7 +532,7 @@ export default function AppDatePicker({
           },
         }}
       >
-        <AppCalendarPanel value={value} onChange={onChange} min={min} max={max} onDaySelect={closePicker} />
+        <AppCalendarPanel value={value} onChange={handleChange} min={min} max={max} onDaySelect={closePicker} />
       </Popover>
     </Box>
   );

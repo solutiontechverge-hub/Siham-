@@ -1,5 +1,6 @@
 import type {
   CalendarBookingDetails,
+  CalendarBookingServiceItem,
   CalendarEvent,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { ManualEntryDiscount } from "../../sections/finance/manualEntry.data";
@@ -248,6 +249,39 @@ export function clearEbrSuggestionsFromNotes(
   return serializeCalendarEntryNotes(internalNote, nextDetails, null);
 }
 
+/**
+ * Client bookings store every line in `clientSnapshot.services`, while the API
+ * booking row only keeps a single `service_id`. Map requester / unassigned lines
+ * into drawer `services` so each appears as its own card. Guest / model lines stay
+ * under BookingDrawerClientSnapshotSection.
+ */
+export function mainDrawerServicesFromClientSnapshot(
+  snapshot: CalendarBookingDetails["clientSnapshot"] | undefined,
+): CalendarBookingServiceItem[] | undefined {
+  const services = snapshot?.services;
+  if (!services?.length) return undefined;
+
+  const nonRequesterIds = new Set(
+    (snapshot?.people ?? []).filter((person) => !person.isRequester).map((person) => person.id),
+  );
+
+  const mainServices = services.filter((service) => {
+    const guestId = service.guestId != null ? String(service.guestId) : "";
+    if (!guestId) return true;
+    return !nonRequesterIds.has(guestId);
+  });
+
+  if (!mainServices.length) return undefined;
+
+  return mainServices.map((service) => ({
+    id: service.id,
+    name: service.name,
+    price: Number(service.price) || 0,
+    durationMins: Math.max(15, Number(service.durationMins) || 15),
+    ...(service.teamMemberId ? { staffResourceId: String(service.teamMemberId) } : {}),
+  }));
+}
+
 export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingDetails | undefined {
   if (!notes?.trim()) return undefined;
   const markerIndex = notes.indexOf(NOTES_META_PREFIX);
@@ -262,6 +296,7 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
   try {
     const meta = JSON.parse(metaRaw) as StoredBookingNoteMeta;
     const ebr = meta.ebr;
+    const snapshotServices = mainDrawerServicesFromClientSnapshot(meta.clientSnapshot);
     return {
       internalNote,
       showInternalNote: Boolean(internalNote) || Boolean(meta.showInternalNote),
@@ -293,7 +328,9 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
         ? { services: meta.services }
         : ebr?.status !== "rejected" && ebr?.suggestedServices?.length
           ? { services: ebr.suggestedServices }
-          : {}),
+          : snapshotServices?.length
+            ? { services: snapshotServices }
+            : {}),
       ...(meta.products?.length
         ? { products: meta.products }
         : ebr?.status !== "rejected" && ebr?.suggestedProducts?.length
@@ -391,10 +428,14 @@ export function resolveBookingDetailsFromEvent(ev: CalendarEvent): CalendarBooki
 
 export function hydrateBookingDrawerFromEvent(ev: CalendarEvent): BookingDrawerHydration {
   const details = resolveBookingDetailsFromEvent(ev);
+  const services =
+    details.services?.length
+      ? details.services
+      : (mainDrawerServicesFromClientSnapshot(details.clientSnapshot) ?? []);
 
   return {
     clientEmail: details.clientEmail ?? "",
-    services: details.services ?? [],
+    services,
     products: details.products ?? [],
     guests: details.guests ?? [],
     phoneCode: details.phoneCode ?? "",

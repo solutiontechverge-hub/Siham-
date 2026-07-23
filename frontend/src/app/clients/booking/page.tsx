@@ -678,7 +678,7 @@ function ClientBookingCreateView() {
         if (session?.shop?.shopId) {
           setShop({
             shopId: session.shop.shopId,
-            shopName: session.shop.shopName,
+            shopName: session.shop.shopName ?? "Salon",
             municipalityLabel: session.shop.municipalityLabel,
             addressLabel: session.shop.addressLabel,
             locationMode: session.shop.locationMode,
@@ -828,9 +828,10 @@ function ClientBookingCreateView() {
         draftPeople[0];
       if (personWithServices?.id) setSelectedPersonId(personWithServices.id);
 
-      if (existing.draft.teamMembers?.length) {
+      const draftTeamMembers = existing.draft.teamMembers;
+      if (draftTeamMembers?.length) {
         setShopTeamMembers((prev) => {
-          const fromDraft = existing.draft.teamMembers!.map((tm) => ({
+          const fromDraft = draftTeamMembers.map((tm) => ({
             id: tm.id,
             name: tm.name,
             locationModes: (prev.find((p) => p.id === tm.id)?.locationModes ?? [
@@ -1042,17 +1043,17 @@ function ClientBookingCreateView() {
   const planningFormIsLocked = Boolean(selectedPerson?.planningIsLocked);
 
   const handleProjectFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const previewUrl = URL.createObjectURL(file);
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+    const stamp = Date.now();
     setProjectUploads((prev) => [
       ...prev,
-      {
-        id: `upload-${Date.now()}-${prev.length}`,
-        name: file.name || `upload-${prev.length + 1}`,
-        previewUrl,
+      ...files.map((file, index) => ({
+        id: `upload-${stamp}-${prev.length + index}`,
+        name: file.name || `upload-${prev.length + index + 1}`,
+        previewUrl: URL.createObjectURL(file),
         file,
-      },
+      })),
     ]);
     e.target.value = "";
   };
@@ -2597,6 +2598,7 @@ function ClientBookingCreateView() {
                                   ref={projectFileInputRef}
                                   type="file"
                                   accept="image/*,.pdf"
+                                  multiple
                                   hidden
                                   onChange={handleProjectFilePick}
                                 />

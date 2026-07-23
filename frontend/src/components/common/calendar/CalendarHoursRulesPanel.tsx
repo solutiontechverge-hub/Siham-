@@ -5,7 +5,7 @@ import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import { Box, Button, IconButton, Paper, Stack, Tooltip } from "@mui/material";
+import { Box, Button, Checkbox, IconButton, Paper, Stack, Tooltip } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDropdown from "../AppDropdown";
 import AppTextField from "../AppTextField";
@@ -606,7 +606,7 @@ export default function CalendarHoursRulesPanel({
                 </BodyText>
                 <BodyText sx={{ fontSize: 11.5, color: alpha(m.navy, 0.45), mb: 1.1, lineHeight: 1.4 }}>
                   {serviceOrderEditing
-                    ? "Tap to show/hide in business setup. Drag to change placement (1 appears first)."
+                    ? "Check to show, uncheck to hide. Drag to change placement (1 appears first)."
                     : "Edit to show/hide categories and rearrange their order."}
                 </BodyText>
                 <Box
@@ -625,47 +625,42 @@ export default function CalendarHoursRulesPanel({
                   {categories.map((category, index) => {
                     const meta = resolveCategoryMeta(category);
                     const visible = isCategoryVisibleInServiceOrder(serviceOrder, category);
-                    const isActive = activeCategory === category;
                     return (
-                      <Box
+                      <CalendarServiceOrderCard
                         key={category}
-                        sx={{
-                          outline: isActive ? `2px solid ${alpha(m.teal, 0.45)}` : "none",
-                          outlineOffset: 2,
-                          borderRadius: "12px",
+                        label={meta.label}
+                        iconId={meta.iconId}
+                        order={index + 1}
+                        checked={visible}
+                        showCheckbox={serviceOrderEditing}
+                        active={false}
+                        draggable={serviceOrderEditing}
+                        isDragging={draggingCategory === category}
+                        onCheckedChange={(nextChecked) => {
+                          if (!serviceOrderEditing) return;
+                          if (visible === nextChecked) return;
+                          onServiceOrderChange(toggleHiddenCategory(serviceOrder, category));
                         }}
-                      >
-                        <CalendarServiceOrderCard
-                          label={meta.label}
-                          iconId={meta.iconId}
-                          order={index + 1}
-                          selected={visible}
-                          draggable={serviceOrderEditing}
-                          isDragging={draggingCategory === category}
-                          onClick={() => {
-                            if (serviceOrderEditing) {
-                              onServiceOrderChange(toggleHiddenCategory(serviceOrder, category));
-                              setSelectedCategory(category);
-                              return;
-                            }
-                            setSelectedCategory(category);
-                          }}
-                          onDragStart={() => setDraggingCategory(category)}
-                          onDragEnd={() => setDraggingCategory(null)}
-                          onDragOver={(event) => event.preventDefault()}
-                          onDrop={() => {
-                            if (!serviceOrderEditing || !draggingCategory || draggingCategory === category) return;
-                            const from = categories.indexOf(draggingCategory);
-                            const to = categories.indexOf(category);
-                            if (from < 0 || to < 0) return;
-                            onServiceOrderChange({
-                              ...serviceOrder,
-                              categories: reorderList(categories, from, to),
-                            });
-                            setDraggingCategory(null);
-                          }}
-                        />
-                      </Box>
+                        onClick={
+                          serviceOrderEditing
+                            ? () => setSelectedCategory(category)
+                            : undefined
+                        }
+                        onDragStart={() => setDraggingCategory(category)}
+                        onDragEnd={() => setDraggingCategory(null)}
+                        onDragOver={(event) => event.preventDefault()}
+                        onDrop={() => {
+                          if (!serviceOrderEditing || !draggingCategory || draggingCategory === category) return;
+                          const from = categories.indexOf(draggingCategory);
+                          const to = categories.indexOf(category);
+                          if (from < 0 || to < 0) return;
+                          onServiceOrderChange({
+                            ...serviceOrder,
+                            categories: reorderList(categories, from, to),
+                          });
+                          setDraggingCategory(null);
+                        }}
+                      />
                     );
                   })}
                 </Box>
@@ -677,7 +672,7 @@ export default function CalendarHoursRulesPanel({
                 </BodyText>
                 <BodyText sx={{ fontSize: 11.5, color: alpha(m.navy, 0.45), mb: 1.1, lineHeight: 1.4 }}>
                   {serviceOrderEditing
-                    ? "Tap to show/hide. Drag to rearrange within this category."
+                    ? "Check to show, uncheck to hide. Drag to rearrange within this category."
                     : activeCategory
                       ? `Services in ${resolveCategoryMeta(activeCategory).label}`
                       : "Select a category"}
@@ -712,10 +707,6 @@ export default function CalendarHoursRulesPanel({
                             });
                             setDraggingService(null);
                           }}
-                          onClick={() => {
-                            if (!serviceOrderEditing || !activeCategory) return;
-                            onServiceOrderChange(toggleHiddenService(serviceOrder, activeCategory, service));
-                          }}
                           sx={{
                             display: "flex",
                             alignItems: "center",
@@ -747,9 +738,29 @@ export default function CalendarHoursRulesPanel({
                               {index + 1}
                             </Box>
                           </Box>
-                          <BodyText sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, visible ? 0.72 : 0.45) }}>
+                          <BodyText sx={{ flex: 1, fontSize: 13, fontWeight: 700, color: alpha(m.navy, visible ? 0.72 : 0.45) }}>
                             {service}
                           </BodyText>
+                          {serviceOrderEditing ? (
+                            <Checkbox
+                              size="small"
+                              checked={visible}
+                              disabled={!activeCategory}
+                              onClick={(event) => event.stopPropagation()}
+                              onChange={(event) => {
+                                event.stopPropagation();
+                                if (!activeCategory) return;
+                                if (visible === event.target.checked) return;
+                                onServiceOrderChange(toggleHiddenService(serviceOrder, activeCategory, service));
+                              }}
+                              inputProps={{ "aria-label": visible ? `Hide ${service}` : `Show ${service}` }}
+                              sx={{
+                                p: 0.35,
+                                color: alpha(m.navy, 0.35),
+                                "&.Mui-checked": { color: m.teal },
+                              }}
+                            />
+                          ) : null}
                         </Box>
                       );
                     })

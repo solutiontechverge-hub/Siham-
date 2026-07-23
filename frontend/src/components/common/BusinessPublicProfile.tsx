@@ -702,7 +702,6 @@ export default function BusinessPublicProfile({
 
   const [projectEnabled, setProjectEnabled] = React.useState(data.projectEnabled);
   const showProjectSection = showDesiredOfferingContent && projectEnabled;
-  const showBookCombosSection = data.bookCombos.length > 0;
 
   const [portfolioLightboxIndex, setPortfolioLightboxIndex] = React.useState<number | null>(null);
   const [activeCategory, setActiveCategory] = React.useState("all");
@@ -712,7 +711,6 @@ export default function BusinessPublicProfile({
   const [selectedScheduleId, setSelectedScheduleId] = React.useState(data.defaultScheduleOptionId);
   const [serviceQty, setServiceQty] = React.useState<Record<string, number>>({});
   const [selectedServiceIds, setSelectedServiceIds] = React.useState<Record<string, boolean>>({});
-  const [selectedComboIds, setSelectedComboIds] = React.useState<Record<string, boolean>>({});
   const [memberSlotSelections, setMemberSlotSelections] = React.useState<Record<string, string>>({});
 
   const activeServices = React.useMemo(
@@ -739,7 +737,6 @@ export default function BusinessPublicProfile({
     setActiveCategory("all");
     setSearch("");
     setSelectedServiceIds({});
-    setSelectedComboIds({});
     setServiceQty({});
   }, [locationMode]);
 
@@ -784,37 +781,28 @@ export default function BusinessPublicProfile({
     [activeServices, selectedServiceIds],
   );
 
-  const selectedCombos = React.useMemo(
-    () => data.bookCombos.filter((combo) => selectedComboIds[combo.id]),
-    [data.bookCombos, selectedComboIds],
-  );
-
   const selectionSummary = React.useMemo(() => {
-    const serviceCount = selectedServices.reduce((sum, s) => sum + (serviceQty[s.id] ?? 1), 0);
-    const comboCount = selectedCombos.length;
-    const count = serviceCount + comboCount;
-    const totalMins =
-      selectedServices.reduce((sum, s) => sum + s.durationMins * (serviceQty[s.id] ?? 1), 0) +
-      selectedCombos.reduce((sum, c) => sum + c.durationMins, 0);
-    const totalPrice =
-      selectedServices.reduce((sum, s) => sum + s.priceValue * (serviceQty[s.id] ?? 1), 0) +
-      selectedCombos.reduce((sum, c) => sum + c.priceValue, 0);
+    const count = selectedServices.reduce((sum, s) => sum + (serviceQty[s.id] ?? 1), 0);
+    const totalMins = selectedServices.reduce(
+      (sum, s) => sum + s.durationMins * (serviceQty[s.id] ?? 1),
+      0,
+    );
+    const totalPrice = selectedServices.reduce(
+      (sum, s) => sum + s.priceValue * (serviceQty[s.id] ?? 1),
+      0,
+    );
     const hours = Math.floor(totalMins / 60);
     const mins = totalMins % 60;
     const durationLabel =
       hours > 0 && mins > 0 ? `${hours} hour${hours > 1 ? "s" : ""}, ${mins} mins` : hours > 0 ? `${hours} hour${hours > 1 ? "s" : ""}` : `${mins} mins`;
     return { count, durationLabel, totalPrice };
-  }, [selectedCombos, selectedServices, serviceQty]);
+  }, [selectedServices, serviceQty]);
 
   const toggleService = (id: string, checked: boolean) => {
     setSelectedServiceIds((prev) => ({ ...prev, [id]: checked }));
     if (checked) {
       setServiceQty((prev) => ({ ...prev, [id]: prev[id] ?? 1 }));
     }
-  };
-
-  const toggleCombo = (id: string, checked: boolean) => {
-    setSelectedComboIds((prev) => ({ ...prev, [id]: checked }));
   };
 
   const adjustQty = (id: string, delta: number) => {
@@ -1235,57 +1223,6 @@ export default function BusinessPublicProfile({
           </Paper>
         ) : null}
 
-        {showBookCombosSection ? (
-        <SectionCard title="Services combo">
-          <Stack spacing={1}>
-            {data.bookCombos.map((combo) => {
-              const checked = Boolean(selectedComboIds[combo.id]);
-              return (
-                <Box
-                  key={combo.id}
-                  sx={{
-                    borderRadius: "10px",
-                    border: `1px solid ${alpha(m.navy, 0.08)}`,
-                    px: 1.25,
-                    py: 1,
-                    bgcolor: alpha(m.navy, 0.015),
-                  }}
-                >
-                  <Stack direction="row" alignItems="center" spacing={1}>
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
-                        {combo.categoryLabel} + {combo.serviceLabel}
-                      </Typography>
-                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: m.teal }}>
-                        {combo.durationLabel}
-                      </Typography>
-                    </Box>
-                    <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78), mr: 0.5 }}>
-                      {combo.priceLabel}
-                    </Typography>
-                    <Checkbox
-                      checked={checked}
-                      onChange={(e) => toggleCombo(combo.id, e.target.checked)}
-                      sx={{ p: 0.25, "&.Mui-checked": { color: m.teal } }}
-                    />
-                  </Stack>
-                </Box>
-              );
-            })}
-          </Stack>
-          {data.bookComboInstructions ? (
-            <Box sx={{ mt: 1.25 }}>
-              <MutedInstructionBox>{data.bookComboInstructions}</MutedInstructionBox>
-            </Box>
-          ) : null}
-          <Typography sx={{ mt: 1.25, fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.5) }}>
-            {isDesiredLocation
-              ? "Appointment at your location — Monday – Saturday, 10 AM – 8 PM"
-              : "Appointment at the salon — Monday – Saturday, 10 AM – 8 PM"}
-          </Typography>
-        </SectionCard>
-        ) : null}
-
         <SectionCard title="Our Professional Team">
           <Stack spacing={1.25}>
             {visibleTeamMembers.length === 0 ? (
@@ -1688,7 +1625,7 @@ export default function BusinessPublicProfile({
                     locationMode: effectiveLocationMode,
                     selectedServiceIds,
                     serviceQty,
-                    selectedComboIds,
+                    selectedComboIds: {},
                     teamAssignments: {},
                     projectEnabled,
                   }),
