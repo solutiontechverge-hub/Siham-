@@ -7,8 +7,17 @@ import {
 } from "../../sections/finance/manualEntry.data";
 import { mapCalendarBookingToEvent } from "./calendar-overview.mappers";
 import { parseApiCalendarEventId } from "./bookingEventDetails";
+import { isBookingRequestRejected } from "./bookingStatus";
 import { getSalesCardMeta, listSalesAddonsForBookings } from "./salesOverview.storage";
-import type { SalesAddonRecord, SalesLineItem, SalesOverviewCardData } from "./salesOverview.types";
+import type {
+  SalesAddonRecord,
+  SalesClientKind,
+  SalesLineItem,
+  SalesOverviewCardData,
+  SalesPaymentState,
+  SalesSubCardData,
+} from "./salesOverview.types";
+import { buildSplitPaymentAmounts, resolveSalesPayerShares } from "./salesSplitBill";
 
 function roundMoney(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
@@ -17,24 +26,38 @@ function roundMoney(value: number): number {
 function formatDateLabel(iso?: string | null): string {
   const d = iso ? new Date(iso) : new Date();
   if (Number.isNaN(d.getTime())) {
-    return new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    return new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
   }
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  return d.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
 }
 
-function formatDateTimeLabel(iso?: string | null): string {
+function formatMethodDateTime(method: string, iso?: string | null): string {
   const d = iso ? new Date(iso) : new Date();
-  if (Number.isNaN(d.getTime())) return formatDateLabel();
+  if (Number.isNaN(d.getTime())) return method;
   const date = formatDateLabel(d.toISOString());
   const time = d
     .toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true })
     .replace(/\s/g, "")
-    .toUpperCase();
-  return `${date} - ${time}`;
+    .toLowerCase();
+  return `${method}, ${date} ${time}`;
 }
 
-function paymentMethodLabel(method?: "online" | "offline" | "onlineDirect" | "offlineDirect" | null): string {
+function formatDueDateLabel(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
+
+function paymentMethodLabel(
+  method?: string | null,
+): string {
   if (method === "offline" || method === "offlineDirect") return "Offline Direct";
+  if (method === "onlineNonDirect") return "Online Non-Direct";
+  if (method === "offlineNonDirect") return "Offline Non-Direct";
   return "Online Direct";
 }
 
@@ -52,11 +75,38 @@ function buildLinesFromEvent(event: CalendarEvent): { lines: SalesLineItem[]; su
   const lines: SalesLineItem[] = [];
   let subtotal = 0;
 
-  for (const service of details?.services ?? []) {
-    lines.push({ id: service.id, label: service.name, amount: roundMoney(service.price) });
-    subtotal += service.price;
+  const snapshotServices = details?.clientSnapshot?.services;
+  if (snapshotServices?.length) {
+    for (const service of snapshotServices) {
+      lines.push({ id: service.id, label: service.name, amount: roundMoney(service.price) });
+      subtotal += service.price;
+    }
+  } else {
+    for (const service of details?.services ?? []) {
+      lines.push({ id: service.id, label: service.name, amount: roundMoney(service.price) });
+      subtotal += service.price;
+    }
+    for (const guest of details?.guests ?? []) {
+      for (const service of guest.services ?? []) {
+        if (lines.some((line) => line.id === service.id)) continue;
+        lines.push({ id: service.id, label: service.name, amount: roundMoney(service.price) });
+        subtotal += service.price;
+      }
+      for (const product of guest.products ?? []) {
+        if (lines.some((line) => line.id === product.id)) continue;
+        const amount = roundMoney(product.price);
+        lines.push({
+          id: product.id,
+          label: product.quantity > 1 ? `${product.name} ×${product.quantity}` : product.name,
+          amount,
+        });
+        subtotal += product.price;
+      }
+    }
   }
+
   for (const product of details?.products ?? []) {
+    if (lines.some((line) => line.id === product.id)) continue;
     const amount = roundMoney(product.price);
     lines.push({
       id: product.id,
@@ -78,12 +128,70 @@ function buildLinesFromEvent(event: CalendarEvent): { lines: SalesLineItem[]; su
 function applyMeta(card: SalesOverviewCardData): SalesOverviewCardData {
   const meta = getSalesCardMeta(card.id);
   if (!meta) return card;
-  return {
+
+  const next: SalesOverviewCardData = {
     ...card,
     note: meta.note ?? card.note,
     voided: Boolean(meta.voided),
     refunded: Boolean(meta.refunded),
+    canceled: Boolean(meta.canceled),
+    dueDate: meta.dueDate ?? card.dueDate,
+    penaltyAmount: meta.penaltyAmount ?? card.penaltyAmount,
+    paymentMethod: meta.paymentMethod ?? card.paymentMethod,
   };
+
+  if (meta.editedLines?.length) {
+    next.lines = meta.editedLines.map((line) => ({
+      id: line.id,
+      label: line.quantity > 1 ? `${line.name} ×${line.quantity}` : line.name,
+      amount: roundMoney(lineTotal(line)),
+    }));
+    if (meta.discountAmount && meta.discountAmount > 0) {
+      next.lines.push({
+        id: `${card.id}-discount`,
+        label:
+          meta.discount?.type === "percentage"
+            ? `Discount (${meta.discount.amount}%)`
+            : "Discount",
+        amount: -roundMoney(meta.discountAmount),
+      });
+    }
+    if (typeof meta.totalPrice === "number") {
+      next.total = roundMoney(meta.totalPrice);
+      next.highlightAmount = roundMoney(meta.totalPrice);
+      next.documentAmount = roundMoney(meta.totalPrice);
+    }
+  }
+
+  if (meta.paymentMethod) {
+    next.paymentMethodLabel = paymentMethodLabel(meta.paymentMethod);
+  }
+
+  if (meta.dueDate && (meta.paymentMethod === "onlineNonDirect" || meta.paymentMethod === "offlineNonDirect")) {
+    next.methodDateLine = `${next.paymentMethodLabel} (Due date ${formatDueDateLabel(meta.dueDate)})`;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const due = new Date(`${meta.dueDate}T00:00:00`);
+    const isOverdue = !Number.isNaN(due.getTime()) && due < today && !meta.canceled;
+    next.paymentState = isOverdue ? "overdue" : "payment_due";
+    next.statusBadge = "Payment Due";
+    next.title = "Reissued Invoice Summary";
+    next.kind = "reissued_invoice";
+    next.limitedMenu = true;
+    next.highlightLabel = "Payment";
+    if (meta.penaltyAmount && meta.penaltyAmount > 0) {
+      next.highlightAmount = roundMoney(next.highlightAmount + meta.penaltyAmount);
+      next.documentAmount = next.highlightAmount;
+      next.total = roundMoney(next.total + meta.penaltyAmount);
+    }
+  }
+
+  if (meta.canceled) {
+    next.statusBadge = "Canceled";
+    next.canceled = true;
+  }
+
+  return next;
 }
 
 function buildAddonCard(record: SalesAddonRecord): SalesOverviewCardData {
@@ -113,9 +221,10 @@ function buildAddonCard(record: SalesAddonRecord): SalesOverviewCardData {
     clientEmail: record.clientEmail,
     lines,
     total: roundMoney(record.totalPrice),
+    totalLabel: "Total",
     highlightLabel: `Paid · ${paymentMethodLabel(record.paymentMethod)}`,
     highlightAmount: roundMoney(record.totalPrice),
-    metaLines: [`Paid: ${formatDateTimeLabel(record.createdAt)}`],
+    methodDateLine: formatMethodDateTime(paymentMethodLabel(record.paymentMethod), record.createdAt),
     showAddOns: false,
     voided: record.voided,
     refunded: record.refunded,
@@ -126,15 +235,29 @@ function buildAddonCard(record: SalesAddonRecord): SalesOverviewCardData {
   });
 }
 
+function bookingEndIso(event: CalendarEvent, booking?: CalendarBooking): string | null {
+  if (booking?.end_time) return booking.end_time;
+  if (event.date && event.end) return `${event.date}T${event.end}:00`;
+  return null;
+}
+
+function hasBookingEnded(endIso: string | null): boolean {
+  if (!endIso) return false;
+  const end = new Date(endIso);
+  if (Number.isNaN(end.getTime())) return false;
+  return end.getTime() <= Date.now();
+}
+
 function buildCardsForEvent(input: {
   event: CalendarEvent;
   booking?: CalendarBooking;
   clientName: string;
   clientEmail?: string;
   clientPhone?: string;
+  clientKind?: SalesClientKind;
   isCurrent?: boolean;
 }): SalesOverviewCardData[] {
-  const { event, booking, clientName, clientEmail, clientPhone, isCurrent } = input;
+  const { event, booking, clientName, clientEmail, clientPhone, clientKind } = input;
   const { lines, subtotal } = buildLinesFromEvent(event);
   if (!lines.length && !booking) return [];
 
@@ -158,21 +281,38 @@ function buildCardsForEvent(input: {
 
   const prepayStatus = String(booking?.prepayment_status ?? event.details?.prepaymentStatus ?? "").toLowerCase();
   const showPrepayment =
-    Boolean(event.details?.showPrepayment) || prepayStatus === "paid" || prepayStatus === "required";
+    Boolean(event.details?.showPrepayment) ||
+    prepayStatus === "paid" ||
+    prepayStatus === "required" ||
+    prepayStatus === "pending" ||
+    prepayStatus === "confirmed";
   const prepaymentPercent = Number(event.details?.prepaymentPercent) || 0;
   const prepaidAmount =
     showPrepayment && prepaymentPercent > 0
       ? roundMoney((total * prepaymentPercent) / 100)
-      : showPrepayment && prepayStatus === "paid"
+      : showPrepayment && (prepayStatus === "paid" || prepayStatus === "confirmed")
         ? roundMoney(total * 0.25)
-        : 0;
+        : showPrepayment
+          ? roundMoney(prepaymentPercent > 0 ? (total * prepaymentPercent) / 100 : total * 0.5)
+          : 0;
 
+  const isPrepayPaid = prepayStatus === "paid" || prepayStatus === "confirmed";
   const status = String(booking?.status ?? event.status ?? "").toLowerCase();
   const isCompleted = status === "completed";
-  const isPaid = prepayStatus === "paid" || isCompleted;
+  const isCancelled = status === "cancelled" || status === "canceled";
+  const isInvalid = status === "invalid" || isBookingRequestRejected(event);
+  const isPendingRequest = status === "requested";
+  const isAccepted =
+    status === "confirmed" || status === "completed" || status === "in_progress" || status === "in progress";
+
+  // Rejected / cancelled requests are never kept in Sales.
+  if (isInvalid || isCancelled) return [];
+
   const method = paymentMethodLabel(event.details?.paymentMethod);
   const occurredAt =
     booking?.created_at || booking?.start_time || `${event.date}T${event.start}:00`;
+  const endAt = bookingEndIso(event, booking);
+  const ended = hasBookingEnded(endAt);
   const name = clientName || event.showClientName || booking?.customer_name || booking?.client_name || "Client";
   const email = clientEmail || event.details?.clientEmail || booking?.customer_email || undefined;
   const phone =
@@ -181,10 +321,79 @@ function buildCardsForEvent(input: {
     booking?.contact_number ||
     undefined;
 
+  const shares = resolveSalesPayerShares({
+    event,
+    allLines: effectiveLines.filter((line) => line.amount >= 0),
+    mainClientName: name,
+    mainClientEmail: email,
+    mainClientPhone: phone,
+  });
+  const guestModelSharesBase = shares.filter((s) => s.role !== "main_client");
+  const mainShareBase = shares.find((s) => s.role === "main_client") ?? shares[0];
+
   const cards: SalesOverviewCardData[] = [];
 
-  if (showPrepayment && prepaidAmount > 0) {
-    const percentLabel = prepaymentPercent > 0 ? ` (${prepaymentPercent}%)` : "";
+  // Incoming / pending request → title "Summary" only (not saved after reject).
+  if (isPendingRequest) {
+    if (!mainShareBase) return [];
+    // Unpaid prepayment → Prepayment Due; paid → Prepaid (never Pending here).
+    const requestBadge = isPrepayPaid ? "Prepaid" : "Prepayment Due";
+    const requestState: SalesPaymentState = isPrepayPaid ? "prepaid" : "prepayment_due";
+
+    const subCards: SalesSubCardData[] = guestModelSharesBase.map((share) => ({
+      id: `${bookingId}-sub-${share.key}`,
+      bookingId,
+      bookingCode,
+      payerRole: share.role,
+      payerLabel: share.label,
+      payerName: share.displayName,
+      lines: share.lines,
+      total: share.subtotal,
+      highlightLabel: "Total Amount",
+      highlightAmount: share.subtotal,
+      methodDateLine: method,
+      showAddOns: true,
+      parentClientName: name,
+    }));
+
+    cards.push(
+      applyMeta({
+        id: `${bookingId}-summary`,
+        bookingId,
+        bookingCode,
+        kind: "after_treatment",
+        title: "Summary",
+        clientName: name,
+        payerRole: "main_client",
+        payerKey: mainShareBase.key,
+        clientEmail: email,
+        clientPhone: phone,
+        clientKind,
+        statusBadge: requestBadge,
+        paymentState: requestState,
+        // All main-client services
+        lines: mainShareBase.lines,
+        highlightedLineIds: mainShareBase.lines.map((line) => line.id),
+        subCards: subCards.length ? subCards : undefined,
+        total,
+        totalLabel: "Total",
+        highlightLabel: "Payment",
+        highlightAmount: mainShareBase.subtotal,
+        methodDateLine: method,
+        showAddOns: true,
+        paymentMethodLabel: method,
+        documentAmount: mainShareBase.subtotal,
+        occurredAt,
+        bookingEndAt: endAt,
+      }),
+    );
+    return cards;
+  }
+
+  // Accepted booking: Prepayment Summary while prepay is configured.
+  if (isAccepted && showPrepayment && prepaidAmount > 0) {
+    const percentLabel = prepaymentPercent > 0 ? `(${prepaymentPercent}%)` : "";
+    const paymentState: SalesPaymentState = isPrepayPaid ? "prepaid" : "prepayment_due";
     cards.push(
       applyMeta({
         id: `${bookingId}-prepayment`,
@@ -193,52 +402,107 @@ function buildCardsForEvent(input: {
         kind: "prepayment",
         title: "Prepayment Summary",
         clientName: name,
+        payerRole: "main_client",
+        payerKey: "main-client",
         clientEmail: email,
         clientPhone: phone,
-        statusBadge: isCurrent || isPaid ? "CONFIRM" : undefined,
-        lines: effectiveLines,
+        clientKind,
+        statusBadge: isPrepayPaid ? "Prepaid" : "Prepayment Due",
+        paymentState,
+        lines: effectiveLines.filter((line) => line.amount >= 0),
         total,
-        highlightLabel: `Prepaid${percentLabel} on ${formatDateLabel(occurredAt)}`,
+        totalLabel: "Total Amount",
+        highlightLabel: `Prepayment${percentLabel ? ` ${percentLabel}` : ""}`,
         highlightAmount: prepaidAmount,
-        metaLines: [`Status: ${isPaid ? "PAID" : "PENDING"}`, method],
+        methodDateLine: isPrepayPaid ? formatMethodDateTime(method, occurredAt) : method,
         paymentMethodLabel: method,
         documentAmount: prepaidAmount,
         occurredAt,
+        bookingEndAt: endAt,
       }),
     );
   }
 
-  if (isCompleted || isPaid || isCurrent) {
-    const remaining = roundMoney(Math.max(0, total - prepaidAmount));
-    const secondaryRows: SalesLineItem[] =
-      prepaidAmount > 0 ? [{ id: "prepaid-deduction", label: "Prepaid", amount: -prepaidAmount }] : [];
+  // After treatment Summary only after the service end time (or completed).
+  const showAfterTreatment = ended || isCompleted;
+  if (showAfterTreatment && isAccepted) {
+    const splitPayments = buildSplitPaymentAmounts({
+      shares,
+      prepaidAmount: isPrepayPaid ? prepaidAmount : 0,
+    });
+    const guestModelShares = splitPayments.filter((s) => s.role !== "main_client");
+    const mainShare = splitPayments.find((s) => s.role === "main_client") ?? splitPayments[0];
 
-    cards.push(
-      applyMeta({
-        id: `${bookingId}-after-treatment`,
-        bookingId,
-        bookingCode,
-        kind: "after_treatment",
-        title: "After treatment Summary",
-        clientName: name,
-        clientEmail: email,
-        clientPhone: phone,
-        statusBadge: isCurrent || isCompleted ? "CONFIRM" : undefined,
-        lines: effectiveLines,
-        total,
-        secondaryRows,
-        highlightLabel: "Payment",
-        highlightAmount: remaining > 0 ? remaining : total,
-        metaLines: [
-          `Paid: ${formatDateTimeLabel(occurredAt)}`,
-          method === "Offline Direct" ? "FPP: I (Cash)" : `Method: ${method}`,
-        ],
-        showAddOns: true,
-        paymentMethodLabel: method,
-        documentAmount: remaining > 0 ? remaining : total,
-        occurredAt,
-      }),
-    );
+    const resolveAfterState = (paidHint: boolean): { badge: string; state: SalesPaymentState } => {
+      // Pending only after service time has passed / booking completed (final payment waiting).
+      if (paidHint) return { badge: "Paid", state: "paid" };
+      return { badge: "Pending", state: "pending" };
+    };
+
+    if (mainShare) {
+      const mainState = resolveAfterState(false);
+      const secondaryRows: SalesLineItem[] =
+        isPrepayPaid && prepaidAmount > 0
+          ? [{ id: "prepaid-deduction", label: "Prepaid", amount: -prepaidAmount }]
+          : [];
+
+      const subCards: SalesSubCardData[] = guestModelShares.map((share) => {
+        const subState = resolveAfterState(false);
+        return {
+          id: `${bookingId}-sub-${share.key}`,
+          bookingId,
+          bookingCode,
+          payerRole: share.role,
+          payerLabel: share.label,
+          payerName: share.displayName,
+          lines: share.lines,
+          total: share.subtotal,
+          highlightLabel: "Total Amount",
+          highlightAmount: share.paymentAmount,
+          statusBadge: subState.badge,
+          paymentState: subState.state,
+          methodDateLine:
+            subState.state === "paid" ? formatMethodDateTime(method, occurredAt) : method,
+          showAddOns: true,
+          parentClientName: name,
+        };
+      });
+
+      cards.push(
+        applyMeta({
+          id: `${bookingId}-after-treatment`,
+          bookingId,
+          bookingCode,
+          kind: "after_treatment",
+          title: "After treatment Summary",
+          clientName: name,
+          payerRole: "main_client",
+          payerKey: mainShare.key,
+          clientEmail: email,
+          clientPhone: phone,
+          clientKind,
+          statusBadge: mainState.badge,
+          paymentState: mainState.state,
+          lines: mainShare.lines,
+          highlightedLineIds: mainShare.lines.map((line) => line.id),
+          subCards: subCards.length ? subCards : undefined,
+          total,
+          totalLabel: "Total",
+          secondaryRows,
+          highlightLabel: "Payment",
+          highlightAmount: mainShare.paymentAmount,
+          methodDateLine:
+            mainState.state === "paid" || mainState.state === "prepaid"
+              ? formatMethodDateTime(method, occurredAt)
+              : method,
+          showAddOns: true,
+          paymentMethodLabel: method,
+          documentAmount: mainShare.paymentAmount,
+          occurredAt,
+          bookingEndAt: endAt,
+        }),
+      );
+    }
   }
 
   return cards;
@@ -250,6 +514,7 @@ export type BuildSalesOverviewInput = {
   clientName?: string;
   clientEmail?: string;
   clientPhone?: string;
+  clientKind?: SalesClientKind;
   fallbackResourceId?: string;
 };
 
@@ -260,6 +525,7 @@ export function buildSalesOverviewCards(input: BuildSalesOverviewInput): SalesOv
     clientName = "",
     clientEmail = "",
     clientPhone = "",
+    clientKind,
     fallbackResourceId = "unassigned",
   } = input;
 
@@ -275,15 +541,17 @@ export function buildSalesOverviewCards(input: BuildSalesOverviewInput): SalesOv
         return false;
       }) ?? undefined;
 
-    const currentCards = buildCardsForEvent({
-      event: currentEvent,
-      booking: matchingBooking,
-      clientName,
-      clientEmail,
-      clientPhone,
-      isCurrent: true,
-    });
-    cards.push(...currentCards);
+    cards.push(
+      ...buildCardsForEvent({
+        event: currentEvent,
+        booking: matchingBooking,
+        clientName,
+        clientEmail,
+        clientPhone,
+        clientKind,
+        isCurrent: true,
+      }),
+    );
     if (currentBookingId) seenBookingIds.add(String(currentBookingId));
     if (matchingBooking) seenBookingIds.add(String(matchingBooking.id));
   }
@@ -301,7 +569,18 @@ export function buildSalesOverviewCards(input: BuildSalesOverviewInput): SalesOv
 
     const status = String(booking.status ?? "").toLowerCase();
     const prepay = String(booking.prepayment_status ?? "").toLowerCase();
-    if (status !== "completed" && prepay !== "paid" && prepay !== "required") continue;
+    if (status === "invalid" || status === "cancelled" || status === "canceled") continue;
+    if (
+      status !== "completed" &&
+      status !== "confirmed" &&
+      status !== "in_progress" &&
+      status !== "requested" &&
+      prepay !== "paid" &&
+      prepay !== "required" &&
+      prepay !== "pending"
+    ) {
+      continue;
+    }
 
     const event = mapCalendarBookingToEvent(booking, fallbackResourceId);
     cards.push(
@@ -311,6 +590,7 @@ export function buildSalesOverviewCards(input: BuildSalesOverviewInput): SalesOv
         clientName: clientName || booking.customer_name || booking.client_name || "Client",
         clientEmail: clientEmail || booking.customer_email || "",
         clientPhone: clientPhone || booking.contact_number || "",
+        clientKind,
         isCurrent: false,
       }),
     );
@@ -321,9 +601,18 @@ export function buildSalesOverviewCards(input: BuildSalesOverviewInput): SalesOv
     cards.push(buildAddonCard(record));
   }
 
-  return cards.sort((a, b) => {
-    const at = new Date(a.occurredAt).getTime();
-    const bt = new Date(b.occurredAt).getTime();
-    return bt - at;
-  });
+  return cards
+    .filter((card) => !card.canceled && !card.voided)
+    .sort((a, b) => {
+      const at = new Date(a.occurredAt).getTime();
+      const bt = new Date(b.occurredAt).getTime();
+      if (bt !== at) return bt - at;
+      const kindRank = (card: SalesOverviewCardData) => {
+        if (card.kind === "prepayment") return 0;
+        if (card.kind === "after_treatment") return 1;
+        if (card.kind === "reissued_invoice") return 2;
+        return 3;
+      };
+      return kindRank(a) - kindRank(b);
+    });
 }

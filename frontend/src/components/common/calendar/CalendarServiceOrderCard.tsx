@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Box, Stack, Typography } from "@mui/material";
+import { Box, Checkbox, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import SpaOutlinedIcon from "@mui/icons-material/SpaOutlined";
 import CategoryOutlinedIcon from "@mui/icons-material/CategoryOutlined";
@@ -12,10 +12,15 @@ export type CalendarServiceOrderCardProps = {
   label: string;
   iconId: ServiceCategorySliderIconId;
   order: number;
-  /** When false, category is hidden from business setup / listing. */
-  selected?: boolean;
+  /** Checked = shown in business setup / client listing. */
+  checked?: boolean;
+  /** Show the visibility checkbox (only while editing). */
+  showCheckbox?: boolean;
+  /** Soft highlight for the category whose services are being viewed. */
+  active?: boolean;
   draggable?: boolean;
   isDragging?: boolean;
+  onCheckedChange?: (checked: boolean) => void;
   onDragStart?: () => void;
   onDragEnd?: () => void;
   onDragOver?: (event: React.DragEvent) => void;
@@ -50,9 +55,12 @@ export default function CalendarServiceOrderCard({
   label,
   iconId,
   order,
-  selected = true,
+  checked = true,
+  showCheckbox = false,
+  active = false,
   draggable = false,
   isDragging = false,
+  onCheckedChange,
   onDragStart,
   onDragEnd,
   onDragOver,
@@ -88,15 +96,15 @@ export default function CalendarServiceOrderCard({
         minWidth: 108,
         maxWidth: 108,
         borderRadius: "10px",
-        border: `1px ${selected ? "solid" : "dashed"} ${selected ? alpha(teal, 0.45) : alpha(m.navy, 0.18)}`,
-        bgcolor: selected ? "#fff" : alpha(m.navy, 0.03),
+        border: `1px solid ${active ? alpha(teal, 0.55) : alpha(m.navy, 0.12)}`,
+        bgcolor: checked ? "#fff" : alpha(m.navy, 0.03),
         px: 1,
         pt: 1.5,
         pb: 1.1,
         textAlign: "center",
         overflow: "hidden",
         cursor: onClick || draggable ? (draggable ? "grab" : "pointer") : "default",
-        opacity: isDragging ? 0.55 : selected ? 1 : 0.55,
+        opacity: isDragging ? 0.55 : checked ? 1 : 0.55,
         transition: "opacity 0.15s ease, border-color 0.15s ease, background-color 0.15s ease",
         userSelect: "none",
       }}
@@ -110,7 +118,7 @@ export default function CalendarServiceOrderCard({
           width: 18,
           height: 18,
           borderRadius: "999px",
-          bgcolor: selected ? teal : alpha(m.navy, 0.35),
+          bgcolor: checked ? teal : alpha(m.navy, 0.35),
           color: "#fff",
           display: "flex",
           alignItems: "center",
@@ -132,6 +140,29 @@ export default function CalendarServiceOrderCard({
           {order}
         </Box>
       </Box>
+
+      {showCheckbox ? (
+        <Checkbox
+          size="small"
+          checked={checked}
+          onClick={(event) => event.stopPropagation()}
+          onChange={(event) => {
+            event.stopPropagation();
+            onCheckedChange?.(event.target.checked);
+          }}
+          inputProps={{ "aria-label": checked ? `Hide ${label}` : `Show ${label}` }}
+          sx={{
+            position: "absolute",
+            top: 2,
+            right: 2,
+            zIndex: 2,
+            p: 0.35,
+            color: alpha(m.navy, 0.35),
+            "&.Mui-checked": { color: teal },
+          }}
+        />
+      ) : null}
+
       <Stack
         spacing={0.6}
         alignItems="center"
@@ -147,7 +178,7 @@ export default function CalendarServiceOrderCard({
             fontSize: 11,
             fontWeight: 700,
             lineHeight: 1.25,
-            color: alpha(m.navy, 0.72),
+            color: alpha(m.navy, checked ? 0.72 : 0.45),
             px: 0.25,
             display: "-webkit-box",
             WebkitLineClamp: 2,

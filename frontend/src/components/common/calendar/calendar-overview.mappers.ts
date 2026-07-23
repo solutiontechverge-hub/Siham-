@@ -6,7 +6,8 @@ import type {
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { CalendarBooking, CalendarEntry } from "../../../store/services/businessApi";
 import { wallClockDateFromDateTime, wallClockTimeFromDateTime } from "./calendar.utils";
-import { parseCalendarEntryNotes, parseStoredEbrFromNotes } from "./bookingEventDetails";
+import { mainDrawerServicesFromClientSnapshot, parseCalendarEntryNotes, parseStoredEbrFromNotes } from "./bookingEventDetails";
+import { mapApiPrepaymentStatus } from "./prepaymentStatus";
 
 const statusFromApi: Record<string, CalendarBookingStatus> = {
   requested: "Requested",
@@ -84,9 +85,17 @@ export function mapCalendarBookingToEvent(
   const start = booking.start || timeFromIso(booking.start_time);
   const end = booking.end || timeFromIso(booking.end_time);
   const parsedNotes = parseCalendarEntryNotes(booking.notes);
-  const ebrServices = parsedNotes?.services?.length ? parsedNotes.services : null;
+  const snapshotMainServices = mainDrawerServicesFromClientSnapshot(parsedNotes?.clientSnapshot);
+  const ebrServices = parsedNotes?.services?.length
+    ? parsedNotes.services
+    : snapshotMainServices?.length
+      ? snapshotMainServices
+      : null;
   const title = ebrServices?.[0]?.name || booking.service_title || "Booking";
   const clientName = booking.customer_name || booking.client_name || undefined;
+  const apiPrepay = String(booking.prepayment_status ?? "").toLowerCase();
+  const mappedPrepayStatus = mapApiPrepaymentStatus(booking.prepayment_status);
+  const showPrepaymentFromApi = apiPrepay === "paid" || apiPrepay === "required" || apiPrepay === "pending";
   const isRequestBooking =
     isRequested || booking.booking_type === "request" || booking.status?.toLowerCase() === "requested";
   const teamMemberId =
@@ -150,8 +159,8 @@ export function mapCalendarBookingToEvent(
         ? { responseStatus: parsedNotes.responseStatus }
         : {}),
       phoneNumber: booking.contact_number ?? "",
-      showPrepayment: String(booking.prepayment_status ?? "").toLowerCase() === "paid"
-        || String(booking.prepayment_status ?? "").toLowerCase() === "required",
+      showPrepayment: showPrepaymentFromApi || Boolean(parsedNotes?.showPrepayment),
+      ...(mappedPrepayStatus ? { prepaymentStatus: mappedPrepayStatus } : {}),
       ...(noteText
         ? {
             internalNote: noteText,
@@ -164,13 +173,18 @@ export function mapCalendarBookingToEvent(
             lateRescheduleFeePercent: parsedNotes.lateRescheduleFeePercent,
             showLateCancellation: parsedNotes.showLateCancellation,
             lateCancellationFeePercent: parsedNotes.lateCancellationFeePercent,
-            showPrepayment: parsedNotes.showPrepayment || String(booking.prepayment_status ?? "").toLowerCase() === "paid"
-              || String(booking.prepayment_status ?? "").toLowerCase() === "required",
+            showPrepayment: Boolean(parsedNotes.showPrepayment) || showPrepaymentFromApi,
             prepaymentPercent: parsedNotes.prepaymentPercent,
+            ...(mappedPrepayStatus
+              ? { prepaymentStatus: mappedPrepayStatus }
+              : parsedNotes.prepaymentStatus
+                ? { prepaymentStatus: parsedNotes.prepaymentStatus }
+                : {}),
             paymentMethod: parsedNotes.paymentMethod,
             showKilometerAllowance: parsedNotes.showKilometerAllowance,
             ...(parsedNotes.cancellationReason ? { cancellationReason: parsedNotes.cancellationReason } : {}),
             ...(parsedNotes.clientSnapshot ? { clientSnapshot: parsedNotes.clientSnapshot } : {}),
+            ...(parsedNotes.guests?.length ? { guests: parsedNotes.guests } : {}),
           }
         : {}),
     },
