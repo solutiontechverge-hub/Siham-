@@ -5,7 +5,7 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import { Box, Button, Checkbox, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import FinanceDrawer from "../../common/FinanceDrawer";
+import AppDrawer from "../../common/AppDrawer";
 import { FinanceDrawerActionsFooter } from "../../common/FinanceDrawerFooter";
 import MollureFormField from "../../common/MollureFormField";
 import type { ManualEntryCatalogOption } from "./manualEntry.data";
@@ -97,11 +97,12 @@ export default function ManualEntryCatalogDrawer({
   };
 
   return (
-    <FinanceDrawer
+    <AppDrawer
       open={open}
       onClose={onClose}
       title={title}
       onBack={onClose}
+      contentVariant="muted"
       sx={{ zIndex: (theme) => theme.zIndex.drawer + 2 }}
       footer={
         <FinanceDrawerActionsFooter
@@ -174,6 +175,6 @@ export default function ManualEntryCatalogDrawer({
           </Stack>
         )}
       </Stack>
-    </FinanceDrawer>
+    </AppDrawer>
   );
 }

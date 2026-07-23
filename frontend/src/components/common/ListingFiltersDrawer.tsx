@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Box, Button, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import MollureDrawer from "./MollureDrawer";
+import AppDrawer from "./AppDrawer";
 import MessagingFilterCheckboxList from "./messaging/MessagingFilterCheckboxList";
 import {
   defaultListingDrawerFilters,
@@ -95,14 +95,13 @@ export default function ListingFiltersDrawer({ open, onClose, filters, onChange,
   );
 
   return (
-    <MollureDrawer
+    <AppDrawer
       anchor="right"
       open={open}
       onClose={onClose}
-      title="Filters"
+      title="Filter listings"
       contentSx={{ px: 2.5, py: 1 }}
       footer={footer}
-      hideDividers
     >
       <MessagingFilterCheckboxList
         title="Search for"
@@ -150,6 +149,6 @@ export default function ListingFiltersDrawer({ open, onClose, filters, onChange,
           }
         />
       </Box>
-    </MollureDrawer>
+    </AppDrawer>
   );
 }

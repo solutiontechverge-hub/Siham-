@@ -5,7 +5,7 @@ import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import { Box, Button, Chip, Paper, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import FinanceDrawer from "../../common/FinanceDrawer";
+import AppDrawer from "../../common/AppDrawer";
 import { FinanceDrawerActionsFooter } from "../../common/FinanceDrawerFooter";
 import MollureFormField from "../../common/MollureFormField";
 import { BodyText } from "../../ui/typography";
@@ -225,10 +225,11 @@ export default function ManualEntryDrawer({ open, onClose, onSave }: ManualEntry
   });
 
   return (
-    <FinanceDrawer
+    <AppDrawer
       open={open}
       onClose={onClose}
       title={`New Sales — ${STEPS[step]}`}
+      contentVariant="muted"
       footer={
         <FinanceDrawerActionsFooter
           onCancel={step === 0 ? onClose : () => setStep((s) => Math.max(0, s - 1))}
@@ -718,6 +719,6 @@ export default function ManualEntryDrawer({ open, onClose, onSave }: ManualEntry
         onClose={() => setDiscountModalOpen(false)}
         onApply={setDiscount}
       />
-    </FinanceDrawer>
+    </AppDrawer>
   );
 }

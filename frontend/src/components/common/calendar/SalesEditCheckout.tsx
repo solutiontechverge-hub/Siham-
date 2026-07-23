@@ -635,7 +635,7 @@ export default function SalesEditCheckout({
         title="Add product"
         options={productOptions}
         onClose={() => setProductDrawerOpen(false)}
-        onConfirm={(selected) => {
+        onSave={(selected) => {
           addLinesFromCatalog("product", selected);
           setProductDrawerOpen(false);
         }}
@@ -645,7 +645,7 @@ export default function SalesEditCheckout({
         title="Add service"
         options={itemOptions}
         onClose={() => setItemDrawerOpen(false)}
-        onConfirm={(selected) => {
+        onSave={(selected) => {
           addLinesFromCatalog("item", selected);
           setItemDrawerOpen(false);
         }}

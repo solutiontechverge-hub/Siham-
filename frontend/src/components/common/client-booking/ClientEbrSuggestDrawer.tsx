@@ -41,6 +41,7 @@ export default function ClientEbrSuggestDrawer({ open, draft, onClose, onEditSer
       onClose={onClose}
       title="Suggest changes"
       subtitle="Write a note for the professional, then edit services or products if needed."
+      contentSx={{ px: 2.5, pb: 3 }}
     >
       <Stack spacing={2.5}>
         <AppTextField

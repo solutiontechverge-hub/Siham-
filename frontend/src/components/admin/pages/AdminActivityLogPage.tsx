@@ -43,7 +43,7 @@ import {
   AppPagination,
   AppSearchField,
   AppSelect,
-  MollureDrawer,
+  AppDrawer,
 } from "../../common";
 import MollureModal from "../../common/MollureModal";
 import AdminFilterDateRange from "../AdminFilterDateRange";
@@ -704,15 +704,14 @@ export default function AdminActivityLogPage() {
         </Grid>
       </Grid>
 
-      <MollureDrawer
+      <AppDrawer
         open={Boolean(drawerLog)}
         onClose={() => setDrawerLogId(null)}
         title="Activity Details"
-        hideDividers
         panelWidth={{ xs: "100%", sm: 420 }}
       >
         {drawerLog ? <ActivityDetailContent entry={drawerLog} /> : null}
-      </MollureDrawer>
+      </AppDrawer>
 
       <AdminDashboardFooter />
 

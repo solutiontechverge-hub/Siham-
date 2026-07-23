@@ -32,7 +32,7 @@ import {
   AppPagination,
   AppSearchField,
   AppSelect,
-  MollureDrawer,
+  AppDrawer,
 } from "../../common";
 import MollureModal from "../../common/MollureModal";
 import AdminFilterDateRange from "../AdminFilterDateRange";
@@ -687,11 +687,10 @@ export default function AdminReportsPage({ embedded = false }: AdminReportsPageP
         </Grid>
       </Grid>
 
-      <MollureDrawer
+      <AppDrawer
         open={Boolean(drawerReport)}
         onClose={() => setDrawerReportId(null)}
         title="Report Details"
-        hideDividers
         panelWidth={{ xs: "100%", sm: 420 }}
       >
         {drawerReport ? (
@@ -701,7 +700,7 @@ export default function AdminReportsPage({ embedded = false }: AdminReportsPageP
             onDeleteRequest={() => setDeleteTarget(drawerReport)}
           />
         ) : null}
-      </MollureDrawer>
+      </AppDrawer>
 
       {!embedded ? <AdminDashboardFooter /> : null}
 

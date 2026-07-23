@@ -11,7 +11,7 @@ import {
 import { alpha, useTheme } from "@mui/material/styles";
 import type { TransactionRow } from "../../../app/professionals/fixed-location/finance/data/transactions";
 import AppSegmentTabs from "../../common/AppSegmentTabs";
-import FinanceDrawer from "../../common/FinanceDrawer";
+import AppDrawer from "../../common/AppDrawer";
 import { FinanceDrawerActionsFooter } from "../../common/FinanceDrawerFooter";
 import MollureFormField from "../../common/MollureFormField";
 import { BodyText } from "../../ui/typography";
@@ -118,10 +118,11 @@ export default function RefundSalesDrawer({ open, onClose, transactions, onSave 
   };
 
   return (
-    <FinanceDrawer
+    <AppDrawer
       open={open}
       onClose={onClose}
       title="Refund Sales"
+      contentVariant="muted"
       footer={
         <FinanceDrawerActionsFooter
           onCancel={onClose}
@@ -253,6 +254,6 @@ export default function RefundSalesDrawer({ open, onClose, transactions, onSave 
           </Stack>
         )}
       </Stack>
-    </FinanceDrawer>
+    </AppDrawer>
   );
 }

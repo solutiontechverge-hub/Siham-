@@ -6,7 +6,7 @@ import { Box, Button, IconButton, InputAdornment, MenuItem, Stack, Typography } 
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDatePicker from "./AppDatePicker";
 import MollureFormField from "./MollureFormField";
-import MollureDrawer from "./MollureDrawer";
+import AppDrawer from "./AppDrawer";
 import {
   businessServiceModalCopy,
   businessServiceModalDiscountTypes,
@@ -110,26 +110,15 @@ export default function BusinessServiceFormModal({
   );
 
   return (
-    <MollureDrawer
+    <AppDrawer
       open={open}
       onClose={onClose}
       title={title}
       footer={readOnly ? undefined : footer}
       headerActions={
         readOnly && onEdit ? (
-          <IconButton
-            size="small"
-            onClick={onEdit}
-            aria-label="Edit service"
-            sx={{
-              width: 30,
-              height: 30,
-              borderRadius: "999px",
-              bgcolor: alpha(m.navy, 0.05),
-              "&:hover": { bgcolor: alpha(m.navy, 0.10) },
-            }}
-          >
-            <EditRoundedIcon sx={{ fontSize: 17, color: alpha(m.navy, 0.55) }} />
+          <IconButton size="small" onClick={onEdit} aria-label="Edit service">
+            <EditRoundedIcon sx={{ fontSize: 17 }} />
           </IconButton>
         ) : undefined
       }
@@ -415,6 +404,6 @@ export default function BusinessServiceFormModal({
           </Box>
         </Stack>
       </Box>
-    </MollureDrawer>
+    </AppDrawer>
   );
 }

@@ -4,7 +4,7 @@ import * as React from "react";
 import { Box, Button, Checkbox, Divider, FormControlLabel, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../../ui/typography";
-import MollureDrawer from "../MollureDrawer";
+import AppDrawer from "../AppDrawer";
 import type {
   CalendarBookingLocation,
   CalendarBookingType,
@@ -41,11 +41,11 @@ export default function CalendarFiltersDrawer({
   const m = theme.palette.mollure;
 
   return (
-    <MollureDrawer
+    <AppDrawer
       anchor="right"
       open={open}
       onClose={onClose}
-      title="Filters"
+      title="Filter calendar"
       footer={
         <Box sx={{ p: 2 }}>
           <Stack direction="row" spacing={1}>
@@ -217,6 +217,6 @@ export default function CalendarFiltersDrawer({
           </Box>
         </Stack>
       </Box>
-    </MollureDrawer>
+    </AppDrawer>
   );
 }

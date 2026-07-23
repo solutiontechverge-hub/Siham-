@@ -33,7 +33,7 @@ import StickyNote2OutlinedIcon from "@mui/icons-material/StickyNote2Outlined";
 import AppDatePicker, { normalizeDateToIso } from "../../../../components/common/AppDatePicker";
 import MollureFormField from "../../../../components/common/MollureFormField";
 import MollureModal from "../../../../components/common/MollureModal";
-import MollureDrawer from "../../../../components/common/MollureDrawer";
+import AppDrawer from "../../../../components/common/AppDrawer";
 import MollureListToolbar from "../../../../components/common/MollureListToolbar";
 import { AppCountryPhoneFields, ClientListDataCard, ClientListHeaderCard, MollureSnackbar } from "../../../../components/common";
 import { useFixedLocationClientPage } from "./useFixedLocationClientPage";
@@ -785,7 +785,7 @@ export default function FixedLocationClientPage() {
       </MollureModal>
 
       {/* Client details (View) */}
-      <MollureDrawer
+      <AppDrawer
         anchor="right"
         open={Boolean(viewClient)}
         onClose={closeClientDetailsDrawer}
@@ -1195,7 +1195,7 @@ export default function FixedLocationClientPage() {
               )}
           </>
         ) : null}
-      </MollureDrawer>
+      </AppDrawer>
 
       {/* Add Mollure Client Modal */}
       <MollureModal
@@ -1344,7 +1344,7 @@ export default function FixedLocationClientPage() {
       </MollureModal>
 
       {/* Add Non-Mollure Client Drawer */}
-      <MollureDrawer
+      <AppDrawer
         anchor="right"
         open={addNonMollureOpen}
         onClose={() => setAddNonMollureOpen(false)}
@@ -1704,7 +1704,7 @@ export default function FixedLocationClientPage() {
             />
           </Stack>
         </Box>
-      </MollureDrawer>
+      </AppDrawer>
     </>
   );
 }

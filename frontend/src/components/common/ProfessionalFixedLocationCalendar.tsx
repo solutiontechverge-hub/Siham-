@@ -19,7 +19,7 @@ import { BodyText } from "../ui/typography";
 import { useSnackbar } from "./AppSnackbar";
 import { getApiErrorMessage } from "../../lib/api-error";
 import AppPillTabs from "./AppPillTabs";
-import MollureDrawer from "./MollureDrawer";
+import AppDrawer from "./AppDrawer";
 import AppDatePicker from "./AppDatePicker";
 import { AppCalendarPanel } from "./AppDatePicker";
 import AppTextField from "./AppTextField";
@@ -592,6 +592,7 @@ export default function ProfessionalFixedLocationCalendar({
     setAppliedFilters,
     setDraftFilters,
   } = useCalendarFilters(data.resources, data.supportedLocations);
+
   React.useEffect(() => {
     if (!data.supportedLocations.includes(slotLocation)) {
       setSlotLocation(data.supportedLocations[0] ?? "FL");
@@ -4148,7 +4149,7 @@ export default function ProfessionalFixedLocationCalendar({
         />
       ) : null}
 
-      <MollureDrawer
+      <AppDrawer
         anchor="right"
         open={slotDrawerOpen}
         onClose={closeBookingDrawer}
@@ -4157,9 +4158,28 @@ export default function ProfessionalFixedLocationCalendar({
             ? activityDetailItem.detailType === "cancellation"
               ? "Activity Details"
               : "Edit request details"
-            : isBookingDetailsSubScreen
-              ? "Booking Details"
-              : ""
+            : slotBookingScreen === "select-services"
+              ? "Select services"
+              : slotBookingScreen === "edit-service"
+                ? "Edit service"
+                : slotBookingScreen === "select-products"
+                  ? "Select products"
+                  : slotBookingScreen === "add-unique-item"
+                    ? "Add unique item"
+                    : slotBookingScreen === "add-client-choice"
+                      ? "Add Client"
+                      : slotBookingScreen === "guest"
+                        ? "Add Guest"
+                        : slotBookingScreen === "non-mollure-individual" ||
+                            slotBookingScreen === "non-mollure-company"
+                          ? "Add Non-Mollure Client"
+                          : slotDrawerTab === "sales"
+                            ? "Sales"
+                            : slotDrawerTab === "activity"
+                              ? "Activity"
+                              : editingEventId || isViewingExisting
+                                ? "Booking Details"
+                                : "New Booking"
         }
         onBack={
           activityDetailItem
@@ -4177,7 +4197,6 @@ export default function ProfessionalFixedLocationCalendar({
                   )
               : undefined
         }
-        hideDividers
         footer={
           selectedSlot && slotDrawerTab === "booking" && !activityDetailItem ? (
             <Box sx={{ px: 2.5, py: 2 }}>
@@ -6685,22 +6704,22 @@ export default function ProfessionalFixedLocationCalendar({
             </BodyText>
           )}
         </Box>
-      </MollureDrawer>
+      </AppDrawer>
       {renderTeamActionPopover()}
       <CalendarFiltersDrawer
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
         appliedFilters={appliedFilters}
-        bookingTypes={bookingTypes}
         draftFilters={draftFilters}
         initialFilters={initialFilters}
         locations={locations}
-        onApply={(nextFilters) => {
-          setAppliedFilters(nextFilters);
-          setFiltersOpen(false);
-        }}
-        onClose={() => setFiltersOpen(false)}
-        open={filtersOpen}
+        bookingTypes={bookingTypes}
         resources={data.resources}
         setDraftFilters={setDraftFilters}
+        onApply={(filters) => {
+          setAppliedFilters(filters);
+          setFiltersOpen(false);
+        }}
       />
       <CalendarBlockTimeModal
         availableLocations={data.supportedLocations}

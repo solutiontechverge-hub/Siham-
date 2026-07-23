@@ -1,7 +1,7 @@
 import * as React from "react";
 import { Box, Checkbox, Divider, FormControlLabel, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import FinanceDrawer from "../../common/FinanceDrawer";
+import AppDrawer from "../../common/AppDrawer";
 import { FinanceDrawerFiltersFooter } from "../../common/FinanceDrawerFooter";
 import { BodyText, CardTitle } from "../../ui/typography";
 
@@ -84,10 +84,11 @@ export default function FinanceFiltersDrawerView({
   }, [open, value]);
 
   return (
-    <FinanceDrawer
+    <AppDrawer
       open={open}
       onClose={onClose}
-      title="Filters"
+      title="Filter transactions"
+      contentVariant="muted"
       footer={
         <FinanceDrawerFiltersFooter
           onCancel={() => {
@@ -129,6 +130,6 @@ export default function FinanceFiltersDrawerView({
             </Box>
           ))}
         </Stack>
-    </FinanceDrawer>
+    </AppDrawer>
   );
 }

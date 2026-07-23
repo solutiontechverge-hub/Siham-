@@ -12,7 +12,7 @@ type BookingActivityOverviewProps = {
   title?: string;
   items: BookingActivityItem[];
   emptyMessage?: string;
-  /** Controlled detail selection — parent MollureDrawer owns back/title */
+  /** Controlled detail selection — parent AppDrawer owns back/title */
   selectedDetail?: BookingActivityItem | null;
   onSelectedDetailChange?: (item: BookingActivityItem | null) => void;
 };

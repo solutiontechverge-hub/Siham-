@@ -1,15 +1,19 @@
 "use client";
 
 import * as React from "react";
-import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
-import { Box, Button, Drawer, IconButton, Stack, Typography } from "@mui/material";
+import { Box, Button, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import AppDrawer from "../AppDrawer";
 import MessagingFilterCheckboxList from "./MessagingFilterCheckboxList";
 import MessagingInsetOverlay from "./MessagingInsetOverlay";
-import type { MessagingDrawerFilters, MessagingBookingStatus } from "./messagingTypes";
-import { MOLLURE_DRAWER_WIDTH } from "../MollureDrawer";
+import type { MessagingDrawerFilters } from "./messagingTypes";
 
-const SEARCH_OPTIONS: { key: MessagingDrawerFilters["searchFor"]; label: string; info?: boolean; professionalOnly?: boolean }[] = [
+const SEARCH_OPTIONS: {
+  key: MessagingDrawerFilters["searchFor"];
+  label: string;
+  info?: boolean;
+  professionalOnly?: boolean;
+}[] = [
   { key: "all", label: "All" },
   { key: "completed", label: "Completed" },
   { key: "confirmed", label: "Confirmed" },
@@ -92,37 +96,39 @@ function FiltersFooter({
   const m = useTheme().palette.mollure;
 
   return (
-    <Stack direction="row" spacing={1.5} sx={{ width: "100%" }}>
-      <Button
-        fullWidth
-        variant="outlined"
-        onClick={onCancel}
-        sx={{
-          textTransform: "none",
-          fontWeight: 800,
-          borderRadius: "10px",
-          borderColor: alpha(m.navy, 0.18),
-          color: alpha(m.navy, 0.7),
-        }}
-      >
-        Cancel
-      </Button>
-      <Button
-        fullWidth
-        variant="contained"
-        disableElevation
-        onClick={onApply}
-        sx={{
-          textTransform: "none",
-          fontWeight: 800,
-          borderRadius: "10px",
-          bgcolor: m.teal,
-          "&:hover": { bgcolor: m.tealDark },
-        }}
-      >
-        Apply
-      </Button>
-    </Stack>
+    <Box sx={{ px: 2.5, py: 2, width: "100%" }}>
+      <Stack direction="row" spacing={1.5} sx={{ width: "100%" }}>
+        <Button
+          fullWidth
+          variant="outlined"
+          onClick={onCancel}
+          sx={{
+            textTransform: "none",
+            fontWeight: 800,
+            borderRadius: "10px",
+            borderColor: alpha(m.navy, 0.18),
+            color: alpha(m.navy, 0.7),
+          }}
+        >
+          Cancel
+        </Button>
+        <Button
+          fullWidth
+          variant="contained"
+          disableElevation
+          onClick={onApply}
+          sx={{
+            textTransform: "none",
+            fontWeight: 800,
+            borderRadius: "10px",
+            bgcolor: m.teal,
+            "&:hover": { bgcolor: m.tealDark },
+          }}
+        >
+          Apply
+        </Button>
+      </Stack>
+    </Box>
   );
 }
 
@@ -136,40 +142,27 @@ export default function MessagingFiltersDrawer({
   audience = "client",
   embedded = false,
 }: Props) {
-  const m = useTheme().palette.mollure;
+  const footer = <FiltersFooter onCancel={onCancel} onApply={onApply} />;
+  const body = <FiltersContent filters={filters} onChange={onChange} audience={audience} />;
 
   if (embedded) {
     return (
-      <MessagingInsetOverlay
-        open={open}
-        title="Filters"
-        onClose={onClose}
-        maxWidth={560}
-        footer={<FiltersFooter onCancel={onCancel} onApply={onApply} />}
-      >
-        <FiltersContent filters={filters} onChange={onChange} audience={audience} />
+      <MessagingInsetOverlay open={open} title="Filter messages" onClose={onClose} maxWidth={560} footer={footer}>
+        {body}
       </MessagingInsetOverlay>
     );
   }
 
   return (
-    <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: MOLLURE_DRAWER_WIDTH, borderRadius: "12px 0 0 12px" } }}>
-      <Box sx={{ p: 2.5, height: "100%", display: "flex", flexDirection: "column" }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
-          <Typography sx={{ fontWeight: 900, fontSize: 16, color: alpha(m.navy, 0.88) }}>Filters</Typography>
-          <IconButton size="small" onClick={onClose} aria-label="Close filters">
-            <CloseRoundedIcon sx={{ color: alpha(m.navy, 0.45) }} />
-          </IconButton>
-        </Stack>
-
-        <Box sx={{ flex: 1, overflowY: "auto" }}>
-          <FiltersContent filters={filters} onChange={onChange} audience={audience} />
-        </Box>
-
-        <Box sx={{ mt: 2, pt: 2 }}>
-          <FiltersFooter onCancel={onCancel} onApply={onApply} />
-        </Box>
-      </Box>
-    </Drawer>
+    <AppDrawer
+      anchor="right"
+      open={open}
+      onClose={onClose}
+      title="Filter messages"
+      footer={footer}
+      contentSx={{ px: 2.5, py: 1 }}
+    >
+      {body}
+    </AppDrawer>
   );
 }

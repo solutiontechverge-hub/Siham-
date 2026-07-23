@@ -8,7 +8,7 @@ import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import { Box, Button, IconButton, MenuItem, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import MollureFormField from "./MollureFormField";
-import MollureDrawer from "./MollureDrawer";
+import AppDrawer from "./AppDrawer";
 import {
   addTeamMemberServiceSelection,
   buildTeamCategoryOptions,
@@ -142,7 +142,7 @@ export default function BusinessTeamMemberFormModal({
   );
 
   return (
-    <MollureDrawer
+    <AppDrawer
       open={open}
       onClose={onClose}
       title={title}
@@ -388,6 +388,6 @@ export default function BusinessTeamMemberFormModal({
           </Box>
         </Stack>
       </Box>
-    </MollureDrawer>
+    </AppDrawer>
   );
 }

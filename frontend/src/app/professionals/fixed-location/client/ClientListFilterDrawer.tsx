@@ -10,7 +10,7 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import MollureDrawer from "../../../../components/common/MollureDrawer";
+import AppDrawer from "../../../../components/common/AppDrawer";
 import {
   CLIENT_LIST_FILTER_OPTIONS,
   type ClientListFilterKey,
@@ -34,7 +34,7 @@ export default function ClientListFilterDrawer({
   const m = useTheme().palette.mollure;
 
   return (
-    <MollureDrawer
+    <AppDrawer
       anchor="right"
       open={open}
       onClose={onClose}
@@ -97,6 +97,6 @@ export default function ClientListFilterDrawer({
           ))}
         </Stack>
       </Box>
-    </MollureDrawer>
+    </AppDrawer>
   );
 }

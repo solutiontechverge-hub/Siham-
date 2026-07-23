@@ -3841,6 +3841,7 @@ export default function ProfessionalFixedLocationSetup({
         onClose={() => setTemplateSyncDrawerOpen(false)}
         title="Template sync settings"
         subtitle="Control how Fixed and Desired templates share section data."
+        contentSx={{ px: 2.5, pb: 3 }}
       >
         <Box sx={{ maxHeight: "calc(100vh - 180px)", overflow: "auto", pr: 0.5 }}>
           <TemplateSyncSettingsForm

@@ -2,23 +2,15 @@
 
 import * as React from "react";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
-import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import CancelRoundedIcon from "@mui/icons-material/CancelRounded";
 import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
-import {
-  Box,
-  Button,
-  Divider,
-  Drawer,
-  IconButton,
-  Stack,
-} from "@mui/material";
+import { Box, Button, Divider, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useRouter } from "next/navigation";
 import { Typography } from "../ui/typography";
 import type { ClientNotificationItem } from "../../data/clientNotifications.data";
-import { MOLLURE_DRAWER_WIDTH } from "./MollureDrawer";
+import AppDrawer from "./AppDrawer";
 
 export type ClientNotificationsDrawerProps = {
   open: boolean;
@@ -64,57 +56,22 @@ export default function ClientNotificationsDrawer({
     }
   };
 
+  const markAllReadAction =
+    onMarkAllRead && items.some((item) => !item.read) ? (
+      <Button size="small" onClick={onMarkAllRead} sx={{ textTransform: "none", fontWeight: 800, fontSize: 12, minWidth: 0, px: 1 }}>
+        Mark all read
+      </Button>
+    ) : null;
+
   return (
-    <Drawer
+    <AppDrawer
       anchor="right"
       open={open}
       onClose={onClose}
-      PaperProps={{
-        sx: {
-          width: MOLLURE_DRAWER_WIDTH,
-          maxWidth: "100vw",
-          bgcolor: "#fff",
-          borderTopLeftRadius: 4,
-          borderBottomLeftRadius: 4,
-          boxShadow: "0 22px 70px rgba(16, 24, 40, 0.22)",
-          overflow: "hidden",
-        },
-      }}
+      title={title}
+      headerActions={markAllReadAction}
+      contentSx={{ px: 0, py: 0 }}
     >
-      <Box sx={{ p: 3 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <Typography sx={{ fontWeight: 900, color: m.navy, fontSize: 22 }}>
-            {title}
-          </Typography>
-          <Stack direction="row" alignItems="center" spacing={0.5}>
-            {onMarkAllRead && items.some((item) => !item.read) ? (
-              <Button
-                size="small"
-                onClick={onMarkAllRead}
-                sx={{ textTransform: "none", fontWeight: 800, fontSize: 12, minWidth: 0, px: 1 }}
-              >
-                Mark all read
-              </Button>
-            ) : null}
-            <IconButton
-            onClick={onClose}
-            sx={{
-              width: 42,
-              height: 42,
-              bgcolor: "rgba(52, 74, 102, 0.06)",
-              color: m.slate,
-              "&:hover": { bgcolor: "rgba(33, 184, 191, 0.12)", color: m.teal },
-            }}
-            aria-label="Close notifications"
-          >
-            <CloseRoundedIcon />
-          </IconButton>
-          </Stack>
-        </Stack>
-      </Box>
-
-      <Divider sx={{ borderColor: alpha(m.border, 0.9) }} />
-
       <Box sx={{ bgcolor: "#fff" }}>
         {items.length === 0 ? (
           <Box sx={{ px: 3, py: 4 }}>
@@ -124,41 +81,40 @@ export default function ClientNotificationsDrawer({
           </Box>
         ) : (
           items.map((n, idx) => (
-          <Box key={n.id}>
-            <Box
-              sx={{
-                px: 3,
-                py: 2.25,
-                cursor: n.href ? "pointer" : "default",
-                bgcolor: n.read ? "transparent" : alpha(m.teal, 0.04),
-                "&:hover": n.href ? { bgcolor: alpha(m.teal, 0.06) } : undefined,
-              }}
-              onClick={() => handleItemClick(n)}
-            >
-              <Typography sx={{ fontWeight: 800, color: m.navy, fontSize: 14 }}>
-                {n.actorName ?? n.professionalName}
-              </Typography>
+            <Box key={n.id}>
+              <Box
+                sx={{
+                  px: 3,
+                  py: 2.25,
+                  cursor: n.href ? "pointer" : "default",
+                  bgcolor: n.read ? "transparent" : alpha(m.teal, 0.04),
+                  "&:hover": n.href ? { bgcolor: alpha(m.teal, 0.06) } : undefined,
+                }}
+                onClick={() => handleItemClick(n)}
+              >
+                <Typography sx={{ fontWeight: 800, color: m.navy, fontSize: 14 }}>
+                  {n.actorName ?? n.professionalName}
+                </Typography>
 
-              <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 0.5 }}>
-                <Typography sx={{ color: m.slate, fontSize: 13 }}>{n.statusLabel}</Typography>
-                <StatusIcon type={n.statusType} />
-              </Stack>
+                <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 0.5 }}>
+                  <Typography sx={{ color: m.slate, fontSize: 13 }}>{n.statusLabel}</Typography>
+                  <StatusIcon type={n.statusType} />
+                </Stack>
 
-              <Typography sx={{ color: m.slate, fontSize: 13, mt: 0.5 }}>
-                {n.bookingIdLabel}
-              </Typography>
+                <Typography sx={{ color: m.slate, fontSize: 13, mt: 0.5 }}>
+                  {n.bookingIdLabel}
+                </Typography>
 
-              <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 0.75 }}>
-                <AccessTimeRoundedIcon sx={{ fontSize: 16, color: alpha(m.slate, 0.65) }} />
-                <Typography sx={{ color: alpha(m.slate, 0.8), fontSize: 12.5 }}>{n.timeLabel}</Typography>
-              </Stack>
+                <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 0.75 }}>
+                  <AccessTimeRoundedIcon sx={{ fontSize: 16, color: alpha(m.slate, 0.65) }} />
+                  <Typography sx={{ color: alpha(m.slate, 0.8), fontSize: 12.5 }}>{n.timeLabel}</Typography>
+                </Stack>
+              </Box>
+              {idx < items.length - 1 ? <Divider sx={{ borderColor: alpha(m.border, 0.8) }} /> : null}
             </Box>
-            {idx < items.length - 1 ? <Divider sx={{ borderColor: alpha(m.border, 0.8) }} /> : null}
-          </Box>
           ))
         )}
       </Box>
-    </Drawer>
+    </AppDrawer>
   );
 }
-
