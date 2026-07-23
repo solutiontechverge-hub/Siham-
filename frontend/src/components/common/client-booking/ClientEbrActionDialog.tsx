@@ -3,10 +3,7 @@
 import { Box, Typography } from "@mui/material";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { alpha, useTheme } from "@mui/material/styles";
-import MessagingModalShell, {
-  MessagingModalCancelButton,
-  MessagingModalPrimaryButton,
-} from "../messaging/MessagingModalShell";
+import AppModal, { MessagingModalCancelButton, MessagingModalPrimaryButton } from "../AppModal";
 
 export type ClientEbrActionKind = "accept" | "suggest" | "reject";
 
@@ -46,10 +43,13 @@ export default function ClientEbrActionDialog({ open, action, onClose, onConfirm
   const copy = COPY[action];
 
   return (
-    <MessagingModalShell
+    <AppModal
+      contentSx={{ px: 2.5 }}
+      footerVariant="actions"
       open={open}
       title={copy.title}
       onClose={onClose}
+      headerTone={action === "reject" ? "danger" : "default"}
       footer={
         <>
           <MessagingModalCancelButton onClick={onClose} />
@@ -71,6 +71,6 @@ export default function ClientEbrActionDialog({ open, action, onClose, onConfirm
           {copy.body}
         </Typography>
       </Box>
-    </MessagingModalShell>
+    </AppModal>
   );
 }

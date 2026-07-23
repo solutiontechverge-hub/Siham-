@@ -7,7 +7,7 @@ import AppDatePicker from "../AppDatePicker";
 import AppDropdown from "../AppDropdown";
 import AppTextField from "../AppTextField";
 import AppTimePicker from "../AppTimePicker";
-import MollureModal from "../MollureModal";
+import AppModal from "../AppModal";
 import type { CalendarBookingLocation, CalendarResource } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { BlockTimeDraft } from "./calendar.utils";
 
@@ -67,7 +67,7 @@ export default function CalendarBlockTimeModal({
   );
 
   return (
-    <MollureModal
+    <AppModal
       open={open}
       onClose={onClose}
       title={modalTitle}
@@ -257,6 +257,6 @@ export default function CalendarBlockTimeModal({
           </Stack>
         </Stack>
       </Box>
-    </MollureModal>
+    </AppModal>
   );
 }

@@ -3,10 +3,7 @@
 import { Box, Typography } from "@mui/material";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { alpha, useTheme } from "@mui/material/styles";
-import MessagingModalShell, {
-  MessagingModalCancelButton,
-  MessagingModalPrimaryButton,
-} from "../messaging/MessagingModalShell";
+import AppModal, { MessagingModalCancelButton, MessagingModalPrimaryButton } from "../AppModal";
 
 export type CalendarBookingAction = "cancel" | "in_progress";
 
@@ -41,11 +38,14 @@ export default function CalendarBookingActionConfirmDialog({ open, action, onClo
   const copy = COPY[action];
 
   return (
-    <MessagingModalShell
+    <AppModal
+      contentSx={{ px: 2.5 }}
+      footerVariant="actions"
       open={open}
       title={copy.title}
       onClose={onClose}
       maxWidth="sm"
+      headerTone={action === "cancel" ? "danger" : "default"}
       footer={
         <>
           <MessagingModalCancelButton onClick={onClose} />
@@ -67,6 +67,6 @@ export default function CalendarBookingActionConfirmDialog({ open, action, onClo
           {copy.body}
         </Typography>
       </Box>
-    </MessagingModalShell>
+    </AppModal>
   );
 }

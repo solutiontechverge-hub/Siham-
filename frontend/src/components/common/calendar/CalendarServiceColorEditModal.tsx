@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Box, Button, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import MollureModal from "../MollureModal";
+import AppModal from "../AppModal";
 import { BodyText } from "../../ui/typography";
 
 type CalendarServiceColorEditModalProps = {
@@ -29,7 +29,7 @@ export default function CalendarServiceColorEditModal({
   }, [color, open]);
 
   return (
-    <MollureModal
+    <AppModal
       open={open}
       onClose={onClose}
       title={`${serviceLabel} colour`}
@@ -100,6 +100,6 @@ export default function CalendarServiceColorEditModal({
           />
         </Button>
       </Box>
-    </MollureModal>
+    </AppModal>
   );
 }

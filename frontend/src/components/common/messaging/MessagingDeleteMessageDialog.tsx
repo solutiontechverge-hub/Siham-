@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Box, FormControlLabel, Radio, RadioGroup, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import MessagingModalShell, { MessagingModalCancelButton, MessagingModalPrimaryButton } from "./MessagingModalShell";
+import AppModal, { MessagingModalCancelButton, MessagingModalPrimaryButton } from "../AppModal";
 
 export type MessagingMessageDeleteScope = "me" | "everyone";
 
@@ -30,9 +30,12 @@ export default function MessagingDeleteMessageDialog({
   }, [canDeleteForEveryone, open]);
 
   return (
-    <MessagingModalShell
+    <AppModal
+      contentSx={{ px: 2.5 }}
+      footerVariant="actions"
+      headerTone="danger"
       open={open}
-      title="Delete message"
+      title="Delete this message?"
       onClose={onClose}
       embedded={embedded}
       maxWidth="xs"
@@ -50,9 +53,6 @@ export default function MessagingDeleteMessageDialog({
       }
     >
       <Box sx={{ py: 1 }}>
-        <Typography sx={{ fontSize: 13, fontWeight: 600, color: alpha(m.navy, 0.55), mb: 1.5, textAlign: "center" }}>
-          Delete this message?
-        </Typography>
         <RadioGroup value={scope} onChange={(_, value) => setScope(value as MessagingMessageDeleteScope)}>
           <FormControlLabel
             value="me"
@@ -72,6 +72,6 @@ export default function MessagingDeleteMessageDialog({
           ) : null}
         </RadioGroup>
       </Box>
-    </MessagingModalShell>
+    </AppModal>
   );
 }

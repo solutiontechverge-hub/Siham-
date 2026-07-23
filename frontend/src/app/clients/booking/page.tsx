@@ -11,10 +11,6 @@ import {
   Chip,
   CircularProgress,
   Container,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,  
   Divider,
   FormControlLabel,
   Grid,
@@ -42,10 +38,7 @@ import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
 import ModeEditOutlineRoundedIcon from "@mui/icons-material/ModeEditOutlineRounded";
 import { AppDropdown, ClientPageTabsBar, clientTopTabsActiveLabel, MarketingSiteFooter, MollureMarketingHeader } from "../../../components/common";
-import MessagingModalShell, {
-  MessagingModalCancelButton,
-  MessagingModalPrimaryButton,
-} from "../../../components/common/messaging/MessagingModalShell";
+import AppModal, { MessagingModalCancelButton, MessagingModalPrimaryButton } from "../../../components/common/AppModal";
 import { ServiceSummaryMetaLine } from "../../../components/common/ServiceSummaryMetaLine";
 import {
   CLIENT_BOOKING_MIN_LEAD_ERROR,
@@ -1913,22 +1906,47 @@ function ClientBookingCreateView() {
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "mollure.pageBg", py: { xs: 2, md: 3.5 } }}>
       <Container maxWidth="lg">
-        <Dialog
+        <AppModal
           open={addServiceDialogOpen}
           onClose={() => setAddServiceDialogOpen(false)}
-          fullWidth
+          title="Add service to assignment list"
           maxWidth="sm"
-          PaperProps={{
-            sx: {
-              borderRadius: "14px",
-              border: `1px solid ${alpha(m.navy, 0.08)}`,
-            },
-          }}
+          contentSx={{ px: 2.5, pt: 0.5, pb: 1 }}
+          footer={
+            <Stack direction="row" spacing={1.5} justifyContent="flex-end" sx={{ px: 2.5, py: 2 }}>
+              <Button
+                onClick={() => setAddServiceDialogOpen(false)}
+                variant="outlined"
+                sx={{
+                  borderRadius: "10px",
+                  textTransform: "none",
+                  fontWeight: 900,
+                  borderColor: alpha(m.navy, 0.12),
+                  color: alpha(m.navy, 0.72),
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={confirmAddService}
+                variant="contained"
+                disableElevation
+                disabled={
+                  !Object.values(addServiceCatalogIds).some(Boolean) || !addServiceGuestId || !selectedTeamMemberId
+                }
+                sx={{
+                  borderRadius: "10px",
+                  textTransform: "none",
+                  fontWeight: 900,
+                  bgcolor: m.teal,
+                  "&:hover": { bgcolor: m.tealDark },
+                }}
+              >
+                Add service
+              </Button>
+            </Stack>
+          }
         >
-          <DialogTitle sx={{ fontWeight: 900, color: alpha(m.navy, 0.82), pb: 1 }}>
-            Add service to assignment list
-          </DialogTitle>
-          <DialogContent sx={{ pt: 0.5 }}>
             <Typography sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.72), mb: 0.75 }}>
               Professional
             </Typography>
@@ -2038,45 +2056,15 @@ function ClientBookingCreateView() {
                 },
               }}
             />
-          </DialogContent>
-          <DialogActions sx={{ px: 2.5, pb: 2.25 }}>
-            <Button
-              onClick={() => setAddServiceDialogOpen(false)}
-              variant="outlined"
-              sx={{
-                borderRadius: "10px",
-                textTransform: "none",
-                fontWeight: 900,
-                borderColor: alpha(m.navy, 0.12),
-                color: alpha(m.navy, 0.72),
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={confirmAddService}
-              variant="contained"
-              disableElevation
-              disabled={
-                !Object.values(addServiceCatalogIds).some(Boolean) || !addServiceGuestId || !selectedTeamMemberId
-              }
-              sx={{
-                borderRadius: "10px",
-                textTransform: "none",
-                fontWeight: 900,
-                bgcolor: m.teal,
-                "&:hover": { bgcolor: m.tealDark },
-              }}
-            >
-              Add service
-            </Button>
-          </DialogActions>
-        </Dialog>
+        </AppModal>
 
-        <MessagingModalShell
+        <AppModal
+      contentSx={{ px: 2.5 }}
+      footerVariant="actions"
           open={Boolean(servicePendingRemove)}
           title="Remove service"
           onClose={() => setServicePendingRemove(null)}
+          headerTone="danger"
           footer={
             <>
               <MessagingModalCancelButton onClick={() => setServicePendingRemove(null)} />
@@ -2090,7 +2078,7 @@ function ClientBookingCreateView() {
               {servicePendingRemove?.name ? ` (${servicePendingRemove.name})` : ""}?
             </Typography>
           </Box>
-        </MessagingModalShell>
+        </AppModal>
 
         <Paper
           elevation={0}

@@ -4,7 +4,7 @@ import * as React from "react";
 import { Box, Button, Stack, Typography } from "@mui/material";
 import WarningRoundedIcon from "@mui/icons-material/WarningRounded";
 import { alpha, useTheme } from "@mui/material/styles";
-import MollureModal from "../MollureModal";
+import AppModal from "../AppModal";
 import AppDropdown from "../AppDropdown";
 import AppTextField from "../AppTextField";
 
@@ -43,7 +43,7 @@ export default function CalendarCancelBookingModal({
   }, [open]);
 
   return (
-    <MollureModal open={open} onClose={onClose} title="Cancel Booking" maxWidth="sm" fullWidth>
+    <AppModal open={open} onClose={onClose} title="Cancel Booking" maxWidth="sm" fullWidth headerTone="danger">
       <Box sx={{ px: 2.5, py: 2.5 }}>
         <Stack alignItems="center" spacing={1.25} sx={{ mb: 2 }}>
           <WarningRoundedIcon sx={{ fontSize: 52, color: "#E85D5D" }} />
@@ -120,6 +120,6 @@ export default function CalendarCancelBookingModal({
           </Button>
         </Stack>
       </Box>
-    </MollureModal>
+    </AppModal>
   );
 }

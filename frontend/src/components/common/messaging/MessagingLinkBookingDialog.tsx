@@ -4,7 +4,7 @@ import * as React from "react";
 import { Box, Radio, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { formatLinkableBookingLabel, linkableBookingsMock, type LinkableBooking } from "./messagingBookingsMock";
-import MessagingModalShell, { MessagingModalCancelButton, MessagingModalPrimaryButton } from "./MessagingModalShell";
+import AppModal, { MessagingModalCancelButton, MessagingModalPrimaryButton } from "../AppModal";
 
 type Props = {
   open: boolean;
@@ -32,7 +32,9 @@ export default function MessagingLinkBookingDialog({
   const selected = bookings.find((b) => b.id === selectedId);
 
   return (
-    <MessagingModalShell
+    <AppModal
+      contentSx={{ px: 2.5 }}
+      footerVariant="actions"
       open={open}
       title="Link to Booking"
       onClose={onClose}
@@ -92,6 +94,6 @@ export default function MessagingLinkBookingDialog({
           );
         })}
       </Stack>
-    </MessagingModalShell>
+    </AppModal>
   );
 }

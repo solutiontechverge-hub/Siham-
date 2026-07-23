@@ -3,7 +3,7 @@
 import { Box, Typography } from "@mui/material";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { alpha, useTheme } from "@mui/material/styles";
-import MessagingModalShell, { MessagingModalCancelButton, MessagingModalPrimaryButton } from "../messaging/MessagingModalShell";
+import AppModal, { MessagingModalCancelButton, MessagingModalPrimaryButton } from "../AppModal";
 
 type DiscardEbrDialogProps = {
   open: boolean;
@@ -15,11 +15,14 @@ export default function DiscardEbrDialog({ open, onClose, onConfirm }: DiscardEb
   const m = useTheme().palette.mollure;
 
   return (
-    <MessagingModalShell
+    <AppModal
+      contentSx={{ px: 2.5 }}
+      footerVariant="actions"
       open={open}
       title="Discard EBR"
       onClose={onClose}
       maxWidth="sm"
+      headerTone="danger"
       footer={
         <>
           <MessagingModalCancelButton onClick={onClose} />
@@ -39,6 +42,6 @@ export default function DiscardEbrDialog({ open, onClose, onConfirm }: DiscardEb
           This will end the EBR. The client will no longer be able to respond.
         </Typography>
       </Box>
-    </MessagingModalShell>
+    </AppModal>
   );
 }

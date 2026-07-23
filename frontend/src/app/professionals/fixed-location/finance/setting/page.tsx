@@ -31,7 +31,7 @@ import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText, CardTitle, SubHeading } from "../../../../../components/ui/typography";
 import AppCard from "../../../../../components/common/AppCard";
 import MollureFormField from "../../../../../components/common/MollureFormField";
-import MollureModal from "../../../../../components/common/MollureModal";
+import AppModal from "../../../../../components/common/AppModal";
 import { useSnackbar } from "../../../../../components/common/AppSnackbar";
 import FinanceDocumentPreviewDrawer from "../../../../../components/sections/finance/FinanceDocumentPreviewDrawer";
 import {
@@ -1341,7 +1341,7 @@ function InvoiceSettings() {
         </Box>
       </AppCard>
 
-      <MollureModal
+      <AppModal
         open={addProductOpen}
         onClose={() => {
           setAddProductOpen(false);
@@ -1429,9 +1429,9 @@ function InvoiceSettings() {
             </Box>
           </Stack>
         </Box>
-      </MollureModal>
+      </AppModal>
 
-      <MollureModal
+      <AppModal
         open={addServiceOpen}
         onClose={() => {
           setAddServiceOpen(false);
@@ -1507,7 +1507,7 @@ function InvoiceSettings() {
             </Box>
           </Stack>
         </Box>
-      </MollureModal>
+      </AppModal>
 
       <FinanceDocumentPreviewDrawer
         open={invoiceDrawerOpen}

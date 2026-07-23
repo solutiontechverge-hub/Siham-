@@ -11,17 +11,16 @@ import type { MessagingDrawerFilters } from "./messagingTypes";
 const SEARCH_OPTIONS: {
   key: MessagingDrawerFilters["searchFor"];
   label: string;
-  info?: boolean;
   professionalOnly?: boolean;
 }[] = [
   { key: "all", label: "All" },
   { key: "completed", label: "Completed" },
   { key: "confirmed", label: "Confirmed" },
-  { key: "requested", label: "Requests", info: true },
+  { key: "requested", label: "Requests" },
   { key: "cancelled", label: "Cancelled" },
   { key: "invalid", label: "Invalid" },
   { key: "no_show", label: "No Show", professionalOnly: true },
-  { key: "unlinked", label: "No booking status", info: true },
+  { key: "unlinked", label: "No booking status" },
 ];
 
 type Props = {
@@ -160,7 +159,7 @@ export default function MessagingFiltersDrawer({
       onClose={onClose}
       title="Filter messages"
       footer={footer}
-      contentSx={{ px: 2.5, py: 1 }}
+      contentSx={{ px: 2.5, pt: 2.25, pb: 1.5 }}
     >
       {body}
     </AppDrawer>

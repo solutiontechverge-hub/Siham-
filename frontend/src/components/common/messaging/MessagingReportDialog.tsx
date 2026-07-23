@@ -14,7 +14,7 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import MessagingModalShell, { MessagingModalCancelButton, MessagingModalPrimaryButton } from "./MessagingModalShell";
+import AppModal, { MessagingModalCancelButton, MessagingModalPrimaryButton } from "../AppModal";
 import {
   MESSAGING_REPORT_REASONS,
   type MessagingReportPayload,
@@ -50,12 +50,15 @@ export default function MessagingReportDialog({ open, title, onClose, onSubmit, 
   const canSubmit = Boolean(reasonId) && (!isOther || otherText.trim().length > 0);
 
   return (
-    <MessagingModalShell
+    <AppModal
+      contentSx={{ px: 2.5 }}
+      footerVariant="actions"
       open={open}
       title={title}
       onClose={onClose}
       maxWidth="sm"
       embedded={embedded}
+      headerTone="danger"
       footer={
         <>
           <MessagingModalCancelButton onClick={onClose} />
@@ -159,6 +162,6 @@ export default function MessagingReportDialog({ open, title, onClose, onSubmit, 
           }}
         />
       </Collapse>
-    </MessagingModalShell>
+    </AppModal>
   );
 }

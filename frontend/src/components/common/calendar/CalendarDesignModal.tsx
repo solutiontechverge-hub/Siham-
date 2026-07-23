@@ -5,7 +5,7 @@ import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import { Box, Button, IconButton, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDropdown from "../AppDropdown";
-import MollureModal from "../MollureModal";
+import AppModal from "../AppModal";
 import { BodyText } from "../../ui/typography";
 import { BUSINESS_SERVICE_CATEGORY_CATALOG } from "../../../data/businessServiceCategorySlider.data";
 import type { CalendarBookingStatus } from "../../../app/professionals/fixed-location/calendar/calendar.data";
@@ -123,29 +123,10 @@ export default function CalendarDesignModal({
   );
 
   return (
-    <MollureModal
+    <AppModal
       open={open}
       onClose={onClose}
-      title={
-        <Stack direction="row" spacing={0.75} alignItems="center">
-          <span>Background colour</span>
-          <Box
-            sx={{
-              width: 16,
-              height: 16,
-              borderRadius: "50%",
-              border: `1px solid ${alpha(m.tealDark, 0.35)}`,
-              color: m.teal,
-              display: "grid",
-              placeItems: "center",
-              fontSize: 11,
-              fontWeight: 900,
-            }}
-          >
-            i
-          </Box>
-        </Stack>
-      }
+      title="Background colour"
       maxWidth="sm"
       fullWidth
       footer={
@@ -303,6 +284,6 @@ export default function CalendarDesignModal({
           </Box>
         </Stack>
       </Box>
-    </MollureModal>
+    </AppModal>
   );
 }

@@ -45,7 +45,7 @@ import {
   AppSelect,
   AppDrawer,
 } from "../../common";
-import MollureModal from "../../common/MollureModal";
+import AppModal from "../../common/AppModal";
 import AdminFilterDateRange from "../AdminFilterDateRange";
 import AdminFilterPanel, { AdminFilterPanelRow } from "../AdminFilterPanel";
 import AdminSectionCard from "../AdminSectionCard";
@@ -715,12 +715,13 @@ export default function AdminActivityLogPage() {
 
       <AdminDashboardFooter />
 
-      <MollureModal
+      <AppModal
         open={Boolean(deleteTarget)}
         onClose={() => setDeleteTarget(null)}
         title="Delete activity log"
         maxWidth="xs"
         fullWidth
+        headerTone="danger"
         footer={
           <Stack direction="row" spacing={1.5} justifyContent="flex-end" sx={{ px: 2.5, py: 2 }}>
             <AppButton variant="outlined" onClick={() => setDeleteTarget(null)} sx={{ textTransform: "none" }}>
@@ -748,7 +749,7 @@ export default function AdminActivityLogPage() {
             </Box>
           </Stack>
         </Stack>
-      </MollureModal>
+      </AppModal>
     </>
   );
 }

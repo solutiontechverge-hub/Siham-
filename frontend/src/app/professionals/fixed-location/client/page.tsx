@@ -32,7 +32,7 @@ import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import StickyNote2OutlinedIcon from "@mui/icons-material/StickyNote2Outlined";
 import AppDatePicker, { normalizeDateToIso } from "../../../../components/common/AppDatePicker";
 import MollureFormField from "../../../../components/common/MollureFormField";
-import MollureModal from "../../../../components/common/MollureModal";
+import AppModal from "../../../../components/common/AppModal";
 import AppDrawer from "../../../../components/common/AppDrawer";
 import MollureListToolbar from "../../../../components/common/MollureListToolbar";
 import { AppCountryPhoneFields, ClientListDataCard, ClientListHeaderCard, MollureSnackbar } from "../../../../components/common";
@@ -645,13 +645,14 @@ export default function FixedLocationClientPage() {
       </Paper>
 
       {/* Block client modal */}
-      <MollureModal
+      <AppModal
         open={Boolean(blockClient)}
         onClose={() => setBlockClientId(null)}
         fullWidth
         maxWidth="xs"
         title="Block Client"
         contentMinHeight={250}
+        headerTone="danger"
         footer={
           <Stack direction="row" spacing={1} justifyContent="center" sx={{ px: 2.5, py: 2 }}>
             <Button
@@ -704,16 +705,17 @@ export default function FixedLocationClientPage() {
             </Typography>
           )}
         </Box>
-      </MollureModal>
+      </AppModal>
 
       {/* Delete client modal */}
-      <MollureModal
+      <AppModal
         open={Boolean(deleteClient)}
         onClose={() => setDeleteClientId(null)}
         fullWidth
         maxWidth="xs"
         title="Delete Client"
         contentMinHeight={260}
+        headerTone="danger"
         footer={
           <Stack direction="row" spacing={1} justifyContent="center" sx={{ px: 2.5, py: 2 }}>
             <Button
@@ -782,7 +784,7 @@ export default function FixedLocationClientPage() {
             </Typography>
           )}
         </Box>
-      </MollureModal>
+      </AppModal>
 
       {/* Client details (View) */}
       <AppDrawer
@@ -1198,7 +1200,7 @@ export default function FixedLocationClientPage() {
       </AppDrawer>
 
       {/* Add Mollure Client Modal */}
-      <MollureModal
+      <AppModal
         open={addMollureOpen}
         onClose={() => setAddMollureOpen(false)}
         fullWidth
@@ -1341,7 +1343,7 @@ export default function FixedLocationClientPage() {
             )}
           </Box>
         </Box>
-      </MollureModal>
+      </AppModal>
 
       {/* Add Non-Mollure Client Drawer */}
       <AppDrawer

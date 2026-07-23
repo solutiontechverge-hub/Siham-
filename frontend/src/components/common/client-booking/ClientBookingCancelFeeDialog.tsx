@@ -3,10 +3,7 @@
 import * as React from "react";
 import { Box, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import MessagingModalShell, {
-  MessagingModalCancelButton,
-  MessagingModalPrimaryButton,
-} from "../messaging/MessagingModalShell";
+import AppModal, { MessagingModalCancelButton, MessagingModalPrimaryButton } from "../AppModal";
 import type { BusinessPublicProfilePolicySection } from "../../../data/businessPublicProfile.data";
 import type { CancellationFeeSettlement } from "./settleCancellationFee";
 
@@ -45,7 +42,9 @@ export default function ClientBookingCancelFeeDialog({
       : "Confirm cancellation";
 
   return (
-    <MessagingModalShell
+    <AppModal
+      contentSx={{ px: 2.5 }}
+      footerVariant="actions"
       open={open}
       title="Cancellation policy"
       onClose={onClose}
@@ -149,7 +148,7 @@ export default function ClientBookingCancelFeeDialog({
             : ""}
         </Typography>
       </Box>
-    </MessagingModalShell>
+    </AppModal>
   );
 }
 

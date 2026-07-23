@@ -4,7 +4,7 @@ import * as React from "react";
 import { Button, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import MollureFormField from "../../common/MollureFormField";
-import MollureModal from "../../common/MollureModal";
+import AppModal from "../../common/AppModal";
 
 type TransactionNoteModalProps = {
   open: boolean;
@@ -38,7 +38,7 @@ export default function TransactionNoteModal({
   };
 
   return (
-    <MollureModal
+    <AppModal
       open={open}
       onClose={onClose}
       title="Add Note"
@@ -121,6 +121,6 @@ export default function TransactionNoteModal({
           sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" } }}
         />
       </Stack>
-    </MollureModal>
+    </AppModal>
   );
 }

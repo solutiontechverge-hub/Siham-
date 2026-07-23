@@ -4,7 +4,7 @@ import * as React from "react";
 import { Button, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import MollureFormField from "../../common/MollureFormField";
-import MollureModal from "../../common/MollureModal";
+import AppModal from "../../common/AppModal";
 import type { ManualEntryLine } from "./manualEntry.data";
 
 type ManualEntryUniqueItemModalProps = {
@@ -47,7 +47,7 @@ export default function ManualEntryUniqueItemModal({
   };
 
   return (
-    <MollureModal
+    <AppModal
       open={open}
       onClose={onClose}
       title="Add unique item"
@@ -81,6 +81,6 @@ export default function ManualEntryUniqueItemModal({
           fullWidth
         />
       </Stack>
-    </MollureModal>
+    </AppModal>
   );
 }

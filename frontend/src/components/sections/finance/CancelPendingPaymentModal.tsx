@@ -4,7 +4,7 @@ import * as React from "react";
 import ReportProblemRoundedIcon from "@mui/icons-material/ReportProblemRounded";
 import { Box, Button, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import MollureModal from "../../common/MollureModal";
+import AppModal from "../../common/AppModal";
 
 export type CancelPendingPaymentModalProps = {
   open: boolean;
@@ -65,13 +65,14 @@ export default function CancelPendingPaymentModal({
   );
 
   return (
-    <MollureModal
+    <AppModal
       open={open}
       onClose={onClose}
       fullWidth
       maxWidth="xs"
       title={title}
       contentMinHeight={220}
+      headerTone="danger"
       footer={footer}
     >
       <Box sx={{ px: 2.5, py: 3, textAlign: "center" }}>
@@ -103,6 +104,6 @@ export default function CancelPendingPaymentModal({
           {message}
         </Typography>
       </Box>
-    </MollureModal>
+    </AppModal>
   );
 }

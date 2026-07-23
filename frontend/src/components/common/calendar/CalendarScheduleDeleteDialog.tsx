@@ -3,7 +3,7 @@
 import { Box, Button, Stack, Typography } from "@mui/material";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { alpha, useTheme } from "@mui/material/styles";
-import MollureModal from "../MollureModal";
+import AppModal from "../AppModal";
 
 export type CalendarScheduleDeleteVariant = "availability" | "blocked";
 
@@ -37,12 +37,13 @@ export default function CalendarScheduleDeleteDialog({
   const copy = copyByVariant[variant];
 
   return (
-    <MollureModal
+    <AppModal
       open={open}
       onClose={onClose}
       title={copy.title}
       maxWidth="sm"
       fullWidth
+      headerTone="danger"
       footer={
         <Box sx={{ px: 2.5, py: 2 }}>
           <Stack direction="row" justifyContent="center" spacing={1.25}>
@@ -91,6 +92,6 @@ export default function CalendarScheduleDeleteDialog({
           {copy.message}
         </Typography>
       </Box>
-    </MollureModal>
+    </AppModal>
   );
 }

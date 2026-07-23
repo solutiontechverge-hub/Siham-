@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Box, Button, Checkbox, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import MollureModal from "../MollureModal";
+import AppModal from "../AppModal";
 
 export type NoShowParticipant = {
   id: string;
@@ -70,7 +70,7 @@ export default function CalendarNoShowModal({
   ];
 
   return (
-    <MollureModal open={open} onClose={onClose} title="No Show" maxWidth="sm" fullWidth>
+    <AppModal open={open} onClose={onClose} title="No Show" maxWidth="sm" fullWidth headerTone="danger">
       <Box sx={{ px: 2.5, py: 2 }}>
         <Box
           sx={{
@@ -148,6 +148,6 @@ export default function CalendarNoShowModal({
           </Button>
         </Stack>
       </Box>
-    </MollureModal>
+    </AppModal>
   );
 }

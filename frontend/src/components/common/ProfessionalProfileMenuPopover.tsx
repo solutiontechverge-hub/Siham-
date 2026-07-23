@@ -11,7 +11,7 @@ import { useAppDispatch } from "../../store/hooks";
 import { useSnackbar } from "./AppSnackbar";
 import { queueSnackbarFlash } from "../../lib/snackbarFlash";
 import { clearAuthSession } from "../../store/slices/authSlice";
-import MollureModal from "./MollureModal";
+import AppModal from "./AppModal";
 
 function getInitials(emailOrName?: string) {
   const base = (emailOrName ?? "").trim();
@@ -230,13 +230,14 @@ export default function ProfessionalProfileMenuPopover({
         </Stack>
       </Popover>
 
-      <MollureModal
+      <AppModal
         open={deleteDialogOpen}
         onClose={closeDeleteDialog}
         fullWidth
         maxWidth="xs"
         title="Delete account"
         contentMinHeight={220}
+        headerTone="danger"
         footer={deleteDialogFooter}
       >
         <Box sx={{ px: 2.5, py: 3, textAlign: "center" }}>
@@ -268,7 +269,7 @@ export default function ProfessionalProfileMenuPopover({
             This will permanently delete your professional account and cannot be undone.
           </Typography>
         </Box>
-      </MollureModal>
+      </AppModal>
     </>
   );
 }

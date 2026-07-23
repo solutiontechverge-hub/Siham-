@@ -4,7 +4,6 @@ import * as React from "react";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
-import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import CancelRoundedIcon from "@mui/icons-material/CancelRounded";
@@ -18,8 +17,6 @@ import {
   CircularProgress,
   Container,
   Divider,
-  Dialog,
-  DialogContent,
   IconButton,
   Grid,
   MenuItem,
@@ -37,7 +34,7 @@ import { PROFILE_IMAGE_FILE_ACCEPT } from "../../../lib/profileImageUpload";
 import { REVIEW_NAME_MODES, reviewNameOptionLabel } from "../../../lib/reviewNameDisplay";
 import { profilePageData } from "./data-profile";
 import { useClientProfilePage } from "./use-profile";
-import { ClientPageTabsBar, clientTopTabsActiveLabel, MollureMarketingHeader } from "../../../components/common";
+import { AppModal, ClientPageTabsBar, clientTopTabsActiveLabel, MollureMarketingHeader } from "../../../components/common";
 import { MarketingSiteFooter } from "../../../components/common";
 import { marketingShellFooter } from "../../../data/marketingShell.data";
 import {
@@ -227,48 +224,52 @@ export default function ClientProfilePage() {
         </Stack>
       </Popover>
 
-      <Dialog
+      <AppModal
         open={isManageSharingOpen}
         onClose={closeManageSharing}
         fullWidth
         maxWidth="sm"
-        PaperProps={{
-          sx: {
-            borderRadius: 4,
-            overflow: "hidden",
-            boxShadow: "0 22px 70px rgba(16, 24, 40, 0.22)",
-          },
-        }}
-      >
-        <DialogContent sx={{ p: { xs: 3, sm: 4 } }}>
-          <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={2}>
-            <Box>
-              <Typography sx={{ fontWeight: 900, color: tokens.navy, fontSize: 22 }}>
-                {profilePageData.popovers.manageSharing.title}
-              </Typography>
-              <Typography sx={{ mt: 1.25, color: tokens.slate, lineHeight: 1.7 }}>
-                {profilePageData.popovers.manageSharing.description}
-              </Typography>
-            </Box>
-            <IconButton
+        title={profilePageData.popovers.manageSharing.title}
+        subtitle={profilePageData.popovers.manageSharing.description}
+        contentSx={{ px: { xs: 3, sm: 4 }, pt: 2, pb: 1 }}
+        footer={
+          <Stack direction="row" justifyContent="flex-end" spacing={2} sx={{ px: { xs: 3, sm: 4 }, py: 2.5 }}>
+            <Button
               onClick={closeManageSharing}
+              variant="outlined"
               sx={{
-                width: 42,
-                height: 42,
-                bgcolor: "rgba(52, 74, 102, 0.06)",
-                color: tokens.slate,
-                "&:hover": { bgcolor: "rgba(33, 184, 191, 0.12)", color: tokens.teal },
+                minWidth: 120,
+                borderRadius: 2,
+                textTransform: "none",
+                fontWeight: 800,
+                color: tokens.navy,
+                borderColor: tokens.border,
+                "&:hover": { borderColor: tokens.inputBorderHover, bgcolor: "rgba(52, 74, 102, 0.03)" },
               }}
-              aria-label="Close dialog"
             >
-              <CloseRoundedIcon />
-            </IconButton>
+              {profilePageData.popovers.manageSharing.cancelLabel}
+            </Button>
+            <Button
+              onClick={closeManageSharing}
+              variant="contained"
+              disableElevation
+              sx={{
+                minWidth: 120,
+                borderRadius: 2,
+                textTransform: "none",
+                fontWeight: 900,
+                bgcolor: tokens.teal,
+                "&:hover": { bgcolor: tokens.tealDark },
+              }}
+            >
+              {profilePageData.popovers.manageSharing.doneLabel}
+            </Button>
           </Stack>
-
+        }
+      >
           <Paper
             elevation={0}
             sx={{
-              mt: 3,
               borderRadius: 3,
               border: `1px solid ${tokens.border}`,
               p: 2,
@@ -318,41 +319,7 @@ export default function ClientProfilePage() {
               </Stack>
             </Box>
           </Paper>
-
-          <Stack direction="row" justifyContent="flex-end" spacing={2} sx={{ mt: 3 }}>
-            <Button
-              onClick={closeManageSharing}
-              variant="outlined"
-              sx={{
-                minWidth: 120,
-                borderRadius: 2,
-                textTransform: "none",
-                fontWeight: 800,
-                color: tokens.navy,
-                borderColor: tokens.border,
-                "&:hover": { borderColor: tokens.inputBorderHover, bgcolor: "rgba(52, 74, 102, 0.03)" },
-              }}
-            >
-              {profilePageData.popovers.manageSharing.cancelLabel}
-            </Button>
-            <Button
-              onClick={closeManageSharing}
-              variant="contained"
-              disableElevation
-              sx={{
-                minWidth: 120,
-                borderRadius: 2,
-                textTransform: "none",
-                fontWeight: 900,
-                bgcolor: tokens.teal,
-                "&:hover": { bgcolor: tokens.tealDark },
-              }}
-            >
-              {profilePageData.popovers.manageSharing.doneLabel}
-            </Button>
-          </Stack>
-        </DialogContent>
-      </Dialog>
+      </AppModal>
 
       <Container maxWidth="md" sx={{ py: { xs: 3, md: 4 } }}>
         <Paper

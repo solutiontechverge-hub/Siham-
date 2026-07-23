@@ -4,7 +4,7 @@ import { Box, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import type { MessagingAudience } from "./messagingRoutes";
 import { getBlockModalCopy } from "./messagingPeerLabels";
-import MessagingModalShell, { MessagingModalCancelButton, MessagingModalPrimaryButton } from "./MessagingModalShell";
+import AppModal, { MessagingModalCancelButton, MessagingModalPrimaryButton } from "../AppModal";
 
 type Props = {
   open: boolean;
@@ -19,11 +19,14 @@ export default function MessagingBlockDialog({ open, audience, onClose, onConfir
   const copy = getBlockModalCopy(audience);
 
   return (
-    <MessagingModalShell
+    <AppModal
+      contentSx={{ px: 2.5 }}
+      footerVariant="actions"
       open={open}
       title={copy.title}
       onClose={onClose}
       embedded={embedded}
+      headerTone="danger"
       footer={
         <>
           <MessagingModalCancelButton onClick={onClose} />
@@ -42,6 +45,6 @@ export default function MessagingBlockDialog({ open, audience, onClose, onConfir
           {copy.message}
         </Typography>
       </Box>
-    </MessagingModalShell>
+    </AppModal>
   );
 }

@@ -6,7 +6,7 @@ import AddOutlinedIcon from "@mui/icons-material/AddOutlined";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { alpha, useTheme } from "@mui/material/styles";
 import { AppButton, AppSelect, AppTextField } from "../../common";
-import MollureModal from "../../common/MollureModal";
+import AppModal from "../../common/AppModal";
 import AdminPageHeader from "../AdminPageHeader";
 import AdminSectionCard from "../AdminSectionCard";
 import AdminUnderlineTabs from "../AdminUnderlineTabs";
@@ -322,7 +322,7 @@ export default function AdminAccessPage() {
 
       {mounted ? (
         <>
-      <MollureModal
+      <AppModal
         open={modal === "add" || modal === "edit"}
         onClose={closeModal}
         title={addModalTitle}
@@ -401,14 +401,15 @@ export default function AdminAccessPage() {
             </RadioGroup>
           </Box>
         </Stack>
-      </MollureModal>
+      </AppModal>
 
-      <MollureModal
+      <AppModal
         open={modal === "disable"}
         onClose={closeModal}
         title="Disable admin user"
         maxWidth="sm"
         fullWidth
+        headerTone="danger"
         footer={
           <Box sx={{ px: 2.5, py: 2 }}>
             <Stack direction="row" justifyContent="center" spacing={1.25}>
@@ -432,14 +433,15 @@ export default function AdminAccessPage() {
             Are you sure you want to disable {selectedUser?.name}? They will lose access to the admin panel.
           </Typography>
         </Box>
-      </MollureModal>
+      </AppModal>
 
-      <MollureModal
+      <AppModal
         open={modal === "delete"}
         onClose={closeModal}
         title="Delete admin user"
         maxWidth="sm"
         fullWidth
+        headerTone="danger"
         footer={
           <Box sx={{ px: 2.5, py: 2 }}>
             <Stack direction="row" justifyContent="center" spacing={1.25}>
@@ -464,7 +466,7 @@ export default function AdminAccessPage() {
             Are you sure you want to permanently delete {selectedUser?.name}? This action cannot be undone.
           </Typography>
         </Box>
-      </MollureModal>
+      </AppModal>
         </>
       ) : null}
     </>

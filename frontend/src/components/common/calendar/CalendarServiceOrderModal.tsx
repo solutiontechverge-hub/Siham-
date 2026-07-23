@@ -5,7 +5,7 @@ import DragIndicatorRoundedIcon from "@mui/icons-material/DragIndicatorRounded";
 import { Box, Button, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../../ui/typography";
-import MollureModal from "../MollureModal";
+import AppModal from "../AppModal";
 import { normalizeServiceOrderSettings, type ServiceOrderSettings } from "./calendar-settings.types";
 
 type CalendarServiceOrderModalProps = {
@@ -52,7 +52,7 @@ export default function CalendarServiceOrderModal({ draft, onApply, onClose, ope
   };
 
   return (
-    <MollureModal
+    <AppModal
       open={open}
       onClose={onClose}
       title="Service Order Rules"
@@ -134,6 +134,6 @@ export default function CalendarServiceOrderModal({ draft, onApply, onClose, ope
           ))}
         </Stack>
       </Box>
-    </MollureModal>
+    </AppModal>
   );
 }

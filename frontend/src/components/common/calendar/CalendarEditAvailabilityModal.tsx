@@ -7,7 +7,7 @@ import { Box, Button, IconButton, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../../ui/typography";
 import AppTimePicker from "../AppTimePicker";
-import MollureModal from "../MollureModal";
+import AppModal from "../AppModal";
 import type { CalendarBookingLocation, CalendarResource } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { ScheduleShift } from "./calendar-settings.types";
 
@@ -49,7 +49,7 @@ export default function CalendarEditAvailabilityModal({
   };
 
   return (
-    <MollureModal
+    <AppModal
       open={open}
       onClose={onClose}
       title="Edit Availability"
@@ -181,6 +181,6 @@ export default function CalendarEditAvailabilityModal({
           </Button>
         </Stack>
       </Box>
-    </MollureModal>
+    </AppModal>
   );
 }

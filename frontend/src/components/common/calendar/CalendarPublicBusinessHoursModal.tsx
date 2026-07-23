@@ -6,7 +6,7 @@ import { alpha, useTheme } from "@mui/material/styles";
 import AppDropdown from "../AppDropdown";
 import AppTextField from "../AppTextField";
 import AppTimePicker from "../AppTimePicker";
-import MollureModal from "../MollureModal";
+import AppModal from "../AppModal";
 
 export type PublicBusinessHoursDraft = {
   location: "" | "FL" | "DL";
@@ -47,7 +47,7 @@ export default function CalendarPublicBusinessHoursModal({
   const m = theme.palette.mollure;
 
   return (
-    <MollureModal
+    <AppModal
       open={open}
       onClose={onClose}
       title="Public Business Hours"
@@ -173,7 +173,7 @@ export default function CalendarPublicBusinessHoursModal({
           />
         </Stack>
       </Box>
-    </MollureModal>
+    </AppModal>
   );
 }
 

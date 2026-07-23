@@ -4,7 +4,7 @@ import * as React from "react";
 import { Button, InputAdornment, MenuItem, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import MollureFormField from "../../common/MollureFormField";
-import MollureModal from "../../common/MollureModal";
+import AppModal from "../../common/AppModal";
 import type { ManualEntryDiscount, ManualEntryDiscountType } from "./manualEntry.data";
 
 type ManualEntryDiscountModalProps = {
@@ -42,7 +42,7 @@ export default function ManualEntryDiscountModal({
   };
 
   return (
-    <MollureModal
+    <AppModal
       open={open}
       onClose={onClose}
       title="Add Discount"
@@ -120,6 +120,6 @@ export default function ManualEntryDiscountModal({
           }
         />
       </Stack>
-    </MollureModal>
+    </AppModal>
   );
 }

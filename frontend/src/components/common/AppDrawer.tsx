@@ -33,6 +33,8 @@ type AppDrawerProps = Omit<DrawerProps, "children" | "title"> & {
   headerActions?: React.ReactNode;
   /** Soft muted body background (finance-style). */
   contentVariant?: "default" | "muted";
+  /** Soft teal by default; soft red for cancel/delete/destructive drawers. */
+  headerTone?: "default" | "danger";
 };
 
 /** Single shared Mollure panel drawer — soft teal header, scroll body, optional footer. */
@@ -46,6 +48,7 @@ export default function AppDrawer({
   onBack,
   headerActions,
   contentVariant = "default",
+  headerTone = "default",
   onClose,
   anchor = "right",
   PaperProps,
@@ -56,6 +59,7 @@ export default function AppDrawer({
   const m = theme.palette.mollure;
   const useMuted = contentVariant === "muted";
   const paperSx = PaperProps?.sx;
+  const headerBg = headerTone === "danger" ? alpha("#E85D5D", 0.14) : alpha(m.teal, 0.12);
 
   const mergedContentSx = (
     useMuted ? (contentSx ? [mutedContentSx(m.navy), contentSx] : mutedContentSx(m.navy)) : contentSx
@@ -107,7 +111,7 @@ export default function AppDrawer({
             px: 2.5,
             py: 1.75,
             flexShrink: 0,
-            bgcolor: alpha(m.teal, 0.12),
+            bgcolor: headerBg,
             color: m.navy,
           }}
         >

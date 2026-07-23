@@ -5,7 +5,7 @@ import { Button, InputAdornment, MenuItem, Stack, Typography } from "@mui/materi
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDatePicker from "../AppDatePicker";
 import MollureFormField from "../MollureFormField";
-import MollureModal from "../MollureModal";
+import AppModal from "../AppModal";
 
 type SalesOverdueReissueModalProps = {
   open: boolean;
@@ -50,7 +50,7 @@ export default function SalesOverdueReissueModal({
       : Math.round((parsed + Number.EPSILON) * 100) / 100;
 
   return (
-    <MollureModal
+    <AppModal
       open={open}
       onClose={onClose}
       title="Reissue overdue invoice"
@@ -132,6 +132,6 @@ export default function SalesOverdueReissueModal({
           fullWidth
         />
       </Stack>
-    </MollureModal>
+    </AppModal>
   );
 }

@@ -69,7 +69,7 @@ import { toIsoLocalDate } from "./calendar/calendar.utils";
 import { useSnackbar } from "./AppSnackbar";
 import AppMultiSelect from "./AppMultiSelect";
 import MollureFormField from "./MollureFormField";
-import MollureModal from "./MollureModal";
+import AppModal from "./AppModal";
 import AppDrawer from "./AppDrawer";
 import TemplateSyncSettingsForm from "./TemplateSyncSettingsForm";
 import {
@@ -3763,7 +3763,7 @@ export default function ProfessionalFixedLocationSetup({
         </Paper>
       ) : null}
 
-      <MollureModal
+      <AppModal
         open={templateSyncModalOpen}
         onClose={() => {
           setBusinessOfferingSelect("Both");
@@ -3833,7 +3833,7 @@ export default function ProfessionalFixedLocationSetup({
             to choose how each section syncs between them — or keep the defaults and change this later.
           </Typography>
         </Box>
-      </MollureModal>
+      </AppModal>
 
       <AppDrawer
         anchor="right"

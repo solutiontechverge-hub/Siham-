@@ -2,7 +2,7 @@
 
 import { Button, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import MollureModal from "../MollureModal";
+import AppModal from "../AppModal";
 
 export type SalesDownloadFormat = "pdf" | "excel";
 
@@ -20,7 +20,7 @@ export default function SalesDownloadFormatModal({
   const m = useTheme().palette.mollure;
 
   return (
-    <MollureModal open={open} onClose={onClose} title="Download Invoice" maxWidth="xs">
+    <AppModal open={open} onClose={onClose} title="Download Invoice" maxWidth="xs">
       <Typography sx={{ fontSize: 13, fontWeight: 650, color: alpha(m.navy, 0.62), mb: 1.5 }}>
         Choose a file format
       </Typography>
@@ -56,6 +56,6 @@ export default function SalesDownloadFormatModal({
           Excel
         </Button>
       </Stack>
-    </MollureModal>
+    </AppModal>
   );
 }

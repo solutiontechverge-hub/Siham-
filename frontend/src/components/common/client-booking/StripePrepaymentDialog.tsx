@@ -1,22 +1,12 @@
 "use client";
 
 import * as React from "react";
-import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
-import {
-  Box,
-  Button,
-  CircularProgress,
-  Dialog,
-  DialogContent,
-  DialogTitle,
-  IconButton,
-  Stack,
-  Typography,
-} from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
+import { Box, Button, CircularProgress, Stack, Typography } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
 import type { StripeElementsOptions } from "@stripe/stripe-js";
 import { getStripeJs } from "../../../lib/stripe/client";
+import AppModal from "../AppModal";
 
 type Props = {
   open: boolean;
@@ -191,46 +181,25 @@ export default function StripePrepaymentDialog({
     : undefined;
 
   return (
-    <Dialog
+    <AppModal
       open={open}
       onClose={onClose}
+      title={title}
+      subtitle={`${subtitlePrefix} #${bookingRef} · €${amount.toFixed(2)}`}
       maxWidth="sm"
-      fullWidth
-      PaperProps={{ sx: { borderRadius: "14px" } }}
+      contentSx={{ px: 2.5, pt: 1.5, pb: 2.5 }}
     >
-      <DialogTitle
-        sx={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          fontWeight: 900,
-          fontSize: 16,
-          color: alpha(m.navy, 0.88),
-          pr: 1,
-        }}
-      >
-        {title}
-        <IconButton aria-label="Close" onClick={onClose} size="small" disabled={loading}>
-          <CloseRoundedIcon />
-        </IconButton>
-      </DialogTitle>
-      <DialogContent sx={{ pt: 0, pb: 2.5 }}>
-        <Typography sx={{ mb: 2, fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.55) }}>
-          {subtitlePrefix} #{bookingRef} · €{amount.toFixed(2)}
-        </Typography>
-
-        {loading ? (
-          <Stack alignItems="center" py={4}>
-            <CircularProgress size={32} sx={{ color: m.teal }} />
-          </Stack>
-        ) : setupError ? (
-          <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#C62828" }}>{setupError}</Typography>
-        ) : clientSecret && elementsOptions ? (
-          <Elements stripe={getStripeJs()} options={elementsOptions}>
-            <PaymentForm amount={amount} bookingRef={bookingRef} onClose={onClose} onSuccess={onSuccess} />
-          </Elements>
-        ) : null}
-      </DialogContent>
-    </Dialog>
+      {loading ? (
+        <Stack alignItems="center" py={4}>
+          <CircularProgress size={32} sx={{ color: m.teal }} />
+        </Stack>
+      ) : setupError ? (
+        <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#C62828" }}>{setupError}</Typography>
+      ) : clientSecret && elementsOptions ? (
+        <Elements stripe={getStripeJs()} options={elementsOptions}>
+          <PaymentForm amount={amount} bookingRef={bookingRef} onClose={onClose} onSuccess={onSuccess} />
+        </Elements>
+      ) : null}
+    </AppModal>
   );
 }

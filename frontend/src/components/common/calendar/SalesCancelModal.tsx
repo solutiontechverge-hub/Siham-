@@ -3,7 +3,7 @@
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { Box, Button, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import MollureModal from "../MollureModal";
+import AppModal from "../AppModal";
 
 type SalesCancelModalProps = {
   open: boolean;
@@ -21,11 +21,12 @@ export default function SalesCancelModal({
   const m = useTheme().palette.mollure;
 
   return (
-    <MollureModal
+    <AppModal
       open={open}
       onClose={onClose}
       title="Cancel Sales"
       maxWidth="xs"
+      headerTone="danger"
       footer={
         <Stack direction="row" spacing={1.25} justifyContent="flex-end" sx={{ px: 2.5, py: 2 }}>
           <Button
@@ -84,6 +85,6 @@ export default function SalesCancelModal({
           will no longer be able to complete the payment
         </Typography>
       </Stack>
-    </MollureModal>
+    </AppModal>
   );
 }

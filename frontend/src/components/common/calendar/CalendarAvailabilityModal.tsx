@@ -8,7 +8,7 @@ import { alpha, useTheme } from "@mui/material/styles";
 import AppDatePicker from "../AppDatePicker";
 import AppDropdown from "../AppDropdown";
 import AppTimePicker from "../AppTimePicker";
-import MollureModal from "../MollureModal";
+import AppModal from "../AppModal";
 import type { CalendarBookingLocation, CalendarResource } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { BlockTimeDraft } from "./calendar.utils";
 import type { ScheduleShift } from "./calendar-settings.types";
@@ -60,7 +60,7 @@ export default function CalendarAvailabilityModal({
   const m = theme.palette.mollure;
 
   return (
-    <MollureModal
+    <AppModal
       open={open}
       onClose={onClose}
       title={title}
@@ -288,6 +288,6 @@ export default function CalendarAvailabilityModal({
           </Button>
         </Stack>
       </Box>
-    </MollureModal>
+    </AppModal>
   );
 }

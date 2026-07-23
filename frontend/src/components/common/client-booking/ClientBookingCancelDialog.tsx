@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Box, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import MessagingModalShell, { MessagingModalCancelButton, MessagingModalPrimaryButton } from "../messaging/MessagingModalShell";
+import AppModal, { MessagingModalCancelButton, MessagingModalPrimaryButton } from "../AppModal";
 import AppTextField from "../AppTextField";
 
 type Props = {
@@ -21,11 +21,14 @@ export default function ClientBookingCancelDialog({ open, onClose, onConfirm }: 
   }, [open]);
 
   return (
-    <MessagingModalShell
+    <AppModal
+      contentSx={{ px: 2.5 }}
+      footerVariant="actions"
       open={open}
       title="Cancel booking"
       onClose={onClose}
       maxWidth="sm"
+      headerTone="danger"
       footer={
         <>
           <MessagingModalCancelButton onClick={onClose} label="Keep booking" />
@@ -61,6 +64,6 @@ export default function ClientBookingCancelDialog({ open, onClose, onConfirm }: 
           />
         </Box>
       </Box>
-    </MessagingModalShell>
+    </AppModal>
   );
 }

@@ -31,7 +31,7 @@ import NoteAddOutlinedIcon from "@mui/icons-material/NoteAddOutlined";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { alpha, useTheme } from "@mui/material/styles";
 import { AppButton, AppMultiSelect, AppPagination, AppSearchField, AppSelect, AppTextField } from "../../common";
-import MollureModal from "../../common/MollureModal";
+import AppModal from "../../common/AppModal";
 import AdminFilterDateRange from "../AdminFilterDateRange";
 import AdminPageHeader from "../AdminPageHeader";
 import AdminSectionCard from "../AdminSectionCard";
@@ -878,7 +878,7 @@ export default function AdminClientsPage() {
 
       {mounted ? (
         <>
-          <MollureModal
+          <AppModal
             open={modal === "view" && Boolean(activeClient)}
             onClose={closeModal}
             title="Client details"
@@ -932,14 +932,15 @@ export default function AdminClientsPage() {
                 {activeClient.note?.trim() ? <DetailRow label="Note" value={activeClient.note} /> : null}
               </Stack>
             ) : null}
-          </MollureModal>
+          </AppModal>
 
-          <MollureModal
+          <AppModal
             open={modal === "disable" && Boolean(activeClient)}
             onClose={closeModal}
             title={isDisabling ? "Disable client" : "Enable client"}
             maxWidth="sm"
             fullWidth
+            headerTone={isDisabling ? "danger" : "default"}
             footer={
               <Box sx={{ px: 2.5, py: 2 }}>
                 <Stack direction="row" justifyContent="center" spacing={1.25}>
@@ -961,14 +962,15 @@ export default function AdminClientsPage() {
                   : `Are you sure you want to re-enable ${activeClient?.name}? They will regain access to booking.`}
               </Typography>
             </Box>
-          </MollureModal>
+          </AppModal>
 
-          <MollureModal
+          <AppModal
             open={modal === "delete" && Boolean(activeClient)}
             onClose={closeModal}
             title="Delete client"
             maxWidth="sm"
             fullWidth
+            headerTone="danger"
             footer={
               <Box sx={{ px: 2.5, py: 2 }}>
                 <Stack direction="row" justifyContent="center" spacing={1.25}>
@@ -993,9 +995,9 @@ export default function AdminClientsPage() {
                 Are you sure you want to delete {activeClient?.name}? This will mark the account as deleted.
               </Typography>
             </Box>
-          </MollureModal>
+          </AppModal>
 
-          <MollureModal
+          <AppModal
             open={modal === "note" && Boolean(activeClient)}
             onClose={closeModal}
             title={activeClient?.note?.trim() ? "Client note" : "Add note"}
@@ -1028,7 +1030,7 @@ export default function AdminClientsPage() {
                 placeholder="Add internal notes about this client..."
               />
             </Stack>
-          </MollureModal>
+          </AppModal>
         </>
       ) : null}
     </>

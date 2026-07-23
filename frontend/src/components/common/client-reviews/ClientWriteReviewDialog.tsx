@@ -4,7 +4,7 @@ import * as React from "react";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
 import { Box, Button, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import MessagingModalShell, { MessagingModalCancelButton, MessagingModalPrimaryButton } from "../messaging/MessagingModalShell";
+import AppModal, { MessagingModalCancelButton, MessagingModalPrimaryButton } from "../AppModal";
 import AppTextField from "../AppTextField";
 
 type Props = {
@@ -32,7 +32,9 @@ export default function ClientWriteReviewDialog({ open, onClose, onSubmit }: Pro
   };
 
   return (
-    <MessagingModalShell
+    <AppModal
+      contentSx={{ px: 2.5 }}
+      footerVariant="actions"
       open={open}
       title="Write a review"
       onClose={onClose}
@@ -62,7 +64,7 @@ export default function ClientWriteReviewDialog({ open, onClose, onSubmit }: Pro
           fullWidth
         />
       </Stack>
-    </MessagingModalShell>
+    </AppModal>
   );
 }
 
