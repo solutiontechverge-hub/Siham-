@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import AddCircleOutlineRoundedIcon from "@mui/icons-material/AddCircleOutlineRounded";
+import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import { Box, Button, IconButton, Menu, MenuItem, Stack, Typography } from "@mui/material";
@@ -34,6 +35,48 @@ function formatEur(amount: number): string {
   const abs = Math.abs(rounded);
   const text = Number.isInteger(abs) ? String(abs) : abs.toFixed(2);
   return `${rounded < 0 ? "-" : ""}€${text}`;
+}
+
+function formatDueDateDisplay(iso?: string | null): string {
+  if (!iso) return "";
+  const d = new Date(`${iso}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+}
+
+function MethodDateLine({
+  methodDateLine,
+  dueDate,
+  paymentMethodLabel,
+}: {
+  methodDateLine?: string;
+  dueDate?: string | null;
+  paymentMethodLabel?: string;
+}) {
+  const m = useTheme().palette.mollure;
+  if (!methodDateLine && !dueDate) return null;
+
+  const dueLabel = formatDueDateDisplay(dueDate);
+  const showCalendar = Boolean(dueDate && dueLabel);
+  const line =
+    methodDateLine ||
+    (dueLabel
+      ? `${paymentMethodLabel || "Payment"} (Due date ${dueLabel})`
+      : "");
+
+  if (!line) return null;
+
+  return (
+    <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.85 }}>
+      {showCalendar ? (
+        <CalendarMonthRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.45), flexShrink: 0 }} />
+      ) : null}
+      <Typography sx={{ fontSize: 11.5, fontWeight: 650, color: alpha(m.navy, 0.5) }}>{line}</Typography>
+    </Stack>
+  );
 }
 
 function LineRow({ line }: { line: SalesLineItem }) {
@@ -277,10 +320,11 @@ function SubSummaryCard({
         </Typography>
       </Stack>
 
-      {sub.methodDateLine ? (
-        <Typography sx={{ fontSize: 11.5, fontWeight: 650, color: alpha(m.navy, 0.5), mb: 0.85 }}>
-          {sub.methodDateLine}
-        </Typography>
+      {sub.methodDateLine || sub.dueDate ? (
+        <MethodDateLine
+          methodDateLine={sub.methodDateLine}
+          dueDate={sub.dueDate}
+        />
       ) : null}
 
       <Stack direction="row" alignItems="center" spacing={1}>
@@ -531,10 +575,12 @@ export default function SalesOverviewCard({
         </Typography>
       </Box>
 
-      {card.methodDateLine ? (
-        <Typography sx={{ fontSize: 11.5, fontWeight: 650, color: alpha(m.navy, 0.5), mb: 0.35 }}>
-          {card.methodDateLine}
-        </Typography>
+      {card.methodDateLine || card.dueDate ? (
+        <MethodDateLine
+          methodDateLine={card.methodDateLine}
+          dueDate={card.dueDate}
+          paymentMethodLabel={card.paymentMethodLabel}
+        />
       ) : null}
 
       {card.note ? (

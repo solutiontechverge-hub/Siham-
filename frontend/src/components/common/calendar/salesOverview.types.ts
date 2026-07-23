@@ -45,6 +45,7 @@ export type SalesSubCardData = {
   statusBadge?: string;
   paymentState?: SalesPaymentState;
   methodDateLine?: string;
+  dueDate?: string | null;
   showAddOns?: boolean;
   /** Parent client name for context on invoices. */
   parentClientName?: string;

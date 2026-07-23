@@ -184,7 +184,51 @@ export function mapCalendarBookingToEvent(
             showKilometerAllowance: parsedNotes.showKilometerAllowance,
             ...(parsedNotes.cancellationReason ? { cancellationReason: parsedNotes.cancellationReason } : {}),
             ...(parsedNotes.clientSnapshot ? { clientSnapshot: parsedNotes.clientSnapshot } : {}),
-            ...(parsedNotes.guests?.length ? { guests: parsedNotes.guests } : {}),
+            ...(parsedNotes.guests?.length
+              ? { guests: parsedNotes.guests }
+              : (() => {
+                  const snapshot = parsedNotes.clientSnapshot;
+                  if (!snapshot?.people?.length || !snapshot.services?.length) return {};
+                  const guests = snapshot.people
+                    .filter(
+                      (person) =>
+                        !person.isRequester &&
+                        person.participantType !== "planning" &&
+                        person.name?.trim() !== "Planning",
+                    )
+                    .map((person) => {
+                      const personId = String(person.id);
+                      const services = (snapshot.services ?? [])
+                        .filter((service) => String(service.guestId ?? "") === personId)
+                        .map((service) => ({
+                          id: String(service.id),
+                          name: service.name,
+                          price: Number(service.price) || 0,
+                          durationMins: Math.max(15, Number(service.durationMins) || 15),
+                          ...(service.teamMemberId
+                            ? { staffResourceId: String(service.teamMemberId) }
+                            : {}),
+                        }));
+                      return {
+                        id: personId,
+                        name: person.name,
+                        participantType:
+                          person.participantType === "model"
+                            ? ("model" as const)
+                            : ("guest" as const),
+                        services,
+                        products: [] as Array<{
+                          id: string;
+                          name: string;
+                          price: number;
+                          quantity: number;
+                          unitPrice: number;
+                        }>,
+                      };
+                    })
+                    .filter((guest) => guest.services.length > 0);
+                  return guests.length ? { guests } : {};
+                })()),
           }
         : {}),
     },

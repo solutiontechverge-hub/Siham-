@@ -2,11 +2,13 @@
 
 import * as React from "react";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
+import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import StorefrontOutlinedIcon from "@mui/icons-material/StorefrontOutlined";
 import {
   Box,
   Button,
   IconButton,
+  Popover,
   Radio,
   Stack,
   Typography,
@@ -33,7 +35,7 @@ import {
   type ManualEntryLineKind,
 } from "../../sections/finance/manualEntry.data";
 import { useFinanceInvoiceSettings } from "../../sections/finance/useFinanceInvoiceSettings";
-import AppDatePicker from "../AppDatePicker";
+import { AppCalendarPanel } from "../AppDatePicker";
 import type {
   SalesCheckoutPaymentMethod,
   SalesClientKind,
@@ -117,6 +119,7 @@ export default function SalesEditCheckout({
   const [paymentMethod, setPaymentMethod] =
     React.useState<SalesCheckoutPaymentMethod>(card.paymentMethod || "onlineDirect");
   const [dueDate, setDueDate] = React.useState(card.dueDate || tomorrowIso());
+  const [dueDateAnchor, setDueDateAnchor] = React.useState<null | HTMLElement>(null);
   const [productDrawerOpen, setProductDrawerOpen] = React.useState(false);
   const [itemDrawerOpen, setItemDrawerOpen] = React.useState(false);
   const [uniqueItemOpen, setUniqueItemOpen] = React.useState(false);
@@ -376,8 +379,12 @@ export default function SalesEditCheckout({
           <Stack spacing={1}>
             {paymentOptions.map((option) => {
               const selected = paymentMethod === option.id;
-              const showDue =
-                selected && (option.id === "onlineNonDirect" || option.id === "offlineNonDirect");
+              const showCalendarIcon =
+                option.id === "onlineNonDirect" || option.id === "offlineNonDirect";
+              const dueLabel =
+                dueDate && selected
+                  ? dueDate.split("-").reverse().join("/")
+                  : null;
               return (
                 <Box
                   key={option.id}
@@ -388,37 +395,107 @@ export default function SalesEditCheckout({
                     bgcolor: selected ? alpha(m.navy, 0.03) : "#fff",
                     px: 1.5,
                     py: 1.25,
+                    minHeight: 52,
                     cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
                   }}
                 >
-                  <Stack direction="row" alignItems="center" spacing={1.25}>
-                    <StorefrontOutlinedIcon sx={{ fontSize: 20, color: alpha(m.navy, 0.45) }} />
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    spacing={1.25}
+                    sx={{ width: "100%", minWidth: 0 }}
+                  >
+                    <StorefrontOutlinedIcon
+                      sx={{ fontSize: 20, color: alpha(m.navy, 0.45), flexShrink: 0 }}
+                    />
                     <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography sx={{ fontSize: 13.5, fontWeight: 800, color: alpha(m.navy, 0.82) }}>
+                      <Typography
+                        sx={{
+                          fontSize: 13.5,
+                          fontWeight: 800,
+                          color: alpha(m.navy, 0.82),
+                          lineHeight: 1.25,
+                        }}
+                      >
                         {option.label}
                       </Typography>
-                      {showDue ? (
-                        <Box sx={{ mt: 1 }} onClick={(e) => e.stopPropagation()}>
-                          <AppDatePicker
-                            label="Due Date"
-                            value={dueDate}
-                            min={tomorrowIso()}
-                            onChange={setDueDate}
-                            fullWidth
-                          />
-                        </Box>
+                      {showCalendarIcon && dueLabel ? (
+                        <Typography
+                          sx={{ fontSize: 11, fontWeight: 650, color: alpha(m.navy, 0.48), mt: 0.15 }}
+                        >
+                          Due {dueLabel}
+                        </Typography>
                       ) : null}
                     </Box>
+                    {showCalendarIcon ? (
+                      <IconButton
+                        size="small"
+                        aria-label="Pick due date"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPaymentMethod(option.id);
+                          setDueDateAnchor(e.currentTarget);
+                        }}
+                        sx={{
+                          width: 34,
+                          height: 34,
+                          flexShrink: 0,
+                          color: selected ? m.teal : alpha(m.navy, 0.45),
+                          border: `1px solid ${
+                            selected ? alpha(m.teal, 0.35) : alpha(m.navy, 0.12)
+                          }`,
+                          borderRadius: "8px",
+                          bgcolor: "#fff",
+                        }}
+                      >
+                        <CalendarMonthRoundedIcon sx={{ fontSize: 18 }} />
+                      </IconButton>
+                    ) : null}
                     <Radio
                       checked={selected}
                       value={option.id}
-                      sx={{ color: alpha(m.navy, 0.3), "&.Mui-checked": { color: m.teal } }}
+                      sx={{
+                        flexShrink: 0,
+                        p: 0.5,
+                        color: alpha(m.navy, 0.3),
+                        "&.Mui-checked": { color: m.teal },
+                      }}
                     />
                   </Stack>
                 </Box>
               );
             })}
           </Stack>
+
+          <Popover
+            open={Boolean(dueDateAnchor)}
+            anchorEl={dueDateAnchor}
+            onClose={() => setDueDateAnchor(null)}
+            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+            transformOrigin={{ vertical: "top", horizontal: "right" }}
+            PaperProps={{
+              elevation: 0,
+              sx: {
+                mt: 0.75,
+                borderRadius: "14px",
+                border: `1px solid ${alpha(m.navy, 0.1)}`,
+                boxShadow: "0 16px 40px rgba(16, 35, 63, 0.13)",
+                overflow: "hidden",
+                bgcolor: "#fff",
+              },
+            }}
+          >
+            <AppCalendarPanel
+              value={dueDate}
+              min={tomorrowIso()}
+              onChange={(iso) => {
+                setDueDate(iso);
+              }}
+              onDaySelect={() => setDueDateAnchor(null)}
+            />
+          </Popover>
         </Box>
       ) : null}
 
@@ -481,7 +558,20 @@ export default function SalesEditCheckout({
               €{totalPrice % 1 === 0 ? totalPrice : totalPrice.toFixed(2)}
             </Typography>
           </Stack>
-          <Typography sx={{ fontSize: 12, fontWeight: 650, color: alpha(m.navy, 0.5) }}>
+          <Typography
+            component="div"
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 0.75,
+              fontSize: 12,
+              fontWeight: 650,
+              color: alpha(m.navy, 0.5),
+            }}
+          >
+            {needsDueDate ? (
+              <CalendarMonthRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.45) }} />
+            ) : null}
             {needsDueDate
               ? `${paymentLabel} (Due date ${dueDate.split("-").reverse().join("/")})`
               : paymentLabel}

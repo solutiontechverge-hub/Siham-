@@ -125,19 +125,74 @@ function buildLinesFromEvent(event: CalendarEvent): { lines: SalesLineItem[]; su
   return { lines, subtotal: roundMoney(Math.max(0, subtotal)) };
 }
 
-function applyMeta(card: SalesOverviewCardData): SalesOverviewCardData {
-  const meta = getSalesCardMeta(card.id);
-  if (!meta) return card;
+function applyDueDateMeta<T extends {
+  paymentMethodLabel?: string;
+  methodDateLine?: string;
+  paymentState?: SalesPaymentState;
+  statusBadge?: string;
+  dueDate?: string | null;
+  paymentMethod?: SalesOverviewCardData["paymentMethod"];
+  highlightLabel?: string;
+  highlightAmount: number;
+  documentAmount?: number;
+  total: number;
+  title?: string;
+  kind?: SalesOverviewCardData["kind"];
+  limitedMenu?: boolean;
+  penaltyAmount?: number;
+}>(
+  next: T,
+  meta: {
+    dueDate?: string | null;
+    paymentMethod?: SalesOverviewCardData["paymentMethod"];
+    canceled?: boolean;
+    penaltyAmount?: number;
+  },
+): T {
+  if (!meta.dueDate) return next;
+  if (meta.paymentMethod !== "onlineNonDirect" && meta.paymentMethod !== "offlineNonDirect") {
+    return next;
+  }
 
-  const next: SalesOverviewCardData = {
-    ...card,
-    note: meta.note ?? card.note,
-    voided: Boolean(meta.voided),
-    refunded: Boolean(meta.refunded),
-    canceled: Boolean(meta.canceled),
-    dueDate: meta.dueDate ?? card.dueDate,
-    penaltyAmount: meta.penaltyAmount ?? card.penaltyAmount,
-    paymentMethod: meta.paymentMethod ?? card.paymentMethod,
+  const methodLabel = next.paymentMethodLabel || paymentMethodLabel(meta.paymentMethod);
+  next.methodDateLine = `${methodLabel} (Due date ${formatDueDateLabel(meta.dueDate)})`;
+  next.dueDate = meta.dueDate;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const due = new Date(`${meta.dueDate}T00:00:00`);
+  const isOverdue = !Number.isNaN(due.getTime()) && due < today && !meta.canceled;
+  next.paymentState = isOverdue ? "overdue" : "payment_due";
+  next.statusBadge = "Payment Due";
+  next.highlightLabel = "Payment";
+
+  if (typeof next.title === "string") {
+    next.title = "Reissued Invoice Summary";
+  }
+  if (next.kind) {
+    next.kind = "reissued_invoice";
+  }
+  next.limitedMenu = true;
+
+  if (meta.penaltyAmount && meta.penaltyAmount > 0) {
+    next.highlightAmount = roundMoney(next.highlightAmount + meta.penaltyAmount);
+    if (typeof next.documentAmount === "number") {
+      next.documentAmount = next.highlightAmount;
+    }
+    next.total = roundMoney(next.total + meta.penaltyAmount);
+    next.penaltyAmount = meta.penaltyAmount;
+  }
+
+  return next;
+}
+
+function applySubMeta(sub: SalesSubCardData): SalesSubCardData {
+  const meta = getSalesCardMeta(sub.id);
+  if (!meta) return sub;
+
+  const next: SalesSubCardData = {
+    ...sub,
+    dueDate: meta.dueDate ?? sub.dueDate,
   };
 
   if (meta.editedLines?.length) {
@@ -148,7 +203,7 @@ function applyMeta(card: SalesOverviewCardData): SalesOverviewCardData {
     }));
     if (meta.discountAmount && meta.discountAmount > 0) {
       next.lines.push({
-        id: `${card.id}-discount`,
+        id: `${sub.id}-discount`,
         label:
           meta.discount?.type === "percentage"
             ? `Discount (${meta.discount.amount}%)`
@@ -159,36 +214,78 @@ function applyMeta(card: SalesOverviewCardData): SalesOverviewCardData {
     if (typeof meta.totalPrice === "number") {
       next.total = roundMoney(meta.totalPrice);
       next.highlightAmount = roundMoney(meta.totalPrice);
-      next.documentAmount = roundMoney(meta.totalPrice);
     }
   }
 
   if (meta.paymentMethod) {
-    next.paymentMethodLabel = paymentMethodLabel(meta.paymentMethod);
+    next.methodDateLine =
+      meta.dueDate && (meta.paymentMethod === "onlineNonDirect" || meta.paymentMethod === "offlineNonDirect")
+        ? `${paymentMethodLabel(meta.paymentMethod)} (Due date ${formatDueDateLabel(meta.dueDate)})`
+        : paymentMethodLabel(meta.paymentMethod);
   }
 
-  if (meta.dueDate && (meta.paymentMethod === "onlineNonDirect" || meta.paymentMethod === "offlineNonDirect")) {
-    next.methodDateLine = `${next.paymentMethodLabel} (Due date ${formatDueDateLabel(meta.dueDate)})`;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const due = new Date(`${meta.dueDate}T00:00:00`);
-    const isOverdue = !Number.isNaN(due.getTime()) && due < today && !meta.canceled;
-    next.paymentState = isOverdue ? "overdue" : "payment_due";
-    next.statusBadge = "Payment Due";
-    next.title = "Reissued Invoice Summary";
-    next.kind = "reissued_invoice";
-    next.limitedMenu = true;
-    next.highlightLabel = "Payment";
-    if (meta.penaltyAmount && meta.penaltyAmount > 0) {
-      next.highlightAmount = roundMoney(next.highlightAmount + meta.penaltyAmount);
-      next.documentAmount = next.highlightAmount;
-      next.total = roundMoney(next.total + meta.penaltyAmount);
-    }
-  }
+  applyDueDateMeta(next, meta);
 
   if (meta.canceled) {
     next.statusBadge = "Canceled";
-    next.canceled = true;
+  }
+
+  return next;
+}
+
+function applyMeta(card: SalesOverviewCardData): SalesOverviewCardData {
+  const meta = getSalesCardMeta(card.id);
+  let next: SalesOverviewCardData = meta
+    ? {
+        ...card,
+        note: meta.note ?? card.note,
+        voided: Boolean(meta.voided),
+        refunded: Boolean(meta.refunded),
+        canceled: Boolean(meta.canceled),
+        dueDate: meta.dueDate ?? card.dueDate,
+        penaltyAmount: meta.penaltyAmount ?? card.penaltyAmount,
+        paymentMethod: meta.paymentMethod ?? card.paymentMethod,
+      }
+    : { ...card };
+
+  if (meta) {
+    if (meta.editedLines?.length) {
+      next.lines = meta.editedLines.map((line) => ({
+        id: line.id,
+        label: line.quantity > 1 ? `${line.name} ×${line.quantity}` : line.name,
+        amount: roundMoney(lineTotal(line)),
+      }));
+      if (meta.discountAmount && meta.discountAmount > 0) {
+        next.lines.push({
+          id: `${card.id}-discount`,
+          label:
+            meta.discount?.type === "percentage"
+              ? `Discount (${meta.discount.amount}%)`
+              : "Discount",
+          amount: -roundMoney(meta.discountAmount),
+        });
+      }
+      if (typeof meta.totalPrice === "number") {
+        next.total = roundMoney(meta.totalPrice);
+        next.highlightAmount = roundMoney(meta.totalPrice);
+        next.documentAmount = roundMoney(meta.totalPrice);
+      }
+    }
+
+    if (meta.paymentMethod) {
+      next.paymentMethodLabel = paymentMethodLabel(meta.paymentMethod);
+    }
+
+    applyDueDateMeta(next, meta);
+
+    if (meta.canceled) {
+      next.statusBadge = "Canceled";
+      next.canceled = true;
+    }
+  }
+
+  if (next.subCards?.length) {
+    next = { ...next, subCards: next.subCards.map(applySubMeta) };
   }
 
   return next;
@@ -351,6 +448,9 @@ function buildCardsForEvent(input: {
       total: share.subtotal,
       highlightLabel: "Total Amount",
       highlightAmount: share.subtotal,
+      // Guest/model keep their own status inside their dashed card.
+      statusBadge: "Pending",
+      paymentState: "pending",
       methodDateLine: method,
       showAddOns: true,
       parentClientName: name,
@@ -369,6 +469,7 @@ function buildCardsForEvent(input: {
         clientEmail: email,
         clientPhone: phone,
         clientKind,
+        // Main-card badge reflects the main client's prepayment only.
         statusBadge: requestBadge,
         paymentState: requestState,
         // All main-client services
