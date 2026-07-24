@@ -1,12 +1,12 @@
 "use client";
 
+import AppButton from "../../../../components/common/AppButton";
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
   Box,
-  Button,
   Container,
   Paper,
   Stack,
@@ -33,15 +33,19 @@ export default function VerifyOtpPage() {
   const router = useRouter();
   const { showSnackbar } = useSnackbar();
   const [email, setEmail] = React.useState("");
-  const [digits, setDigits] = React.useState<string[]>(() => Array(OTP_LEN).fill(""));
+  const [digits, setDigits] = React.useState<string[]>(() =>
+    Array(OTP_LEN).fill(""),
+  );
   const inputRefs = React.useRef<Array<HTMLInputElement | null>>([]);
   const [verifyOtp, { isLoading: isVerifying }] = useVerifyOtpMutation();
-  const [forgotPassword, { isLoading: isResending }] = useForgotPasswordMutation();
+  const [forgotPassword, { isLoading: isResending }] =
+    useForgotPasswordMutation();
 
   const cardBorder = m.cardBorder ?? alpha(m.navy, 0.12);
 
   React.useEffect(() => {
-    const savedEmail = window.sessionStorage.getItem("mollure_reset_email") || "";
+    const savedEmail =
+      window.sessionStorage.getItem("mollure_reset_email") || "";
     if (savedEmail) {
       setEmail(savedEmail);
     }
@@ -62,7 +66,10 @@ export default function VerifyOtpPage() {
     }
   };
 
-  const handleDigitKeyDown = (index: number, event: React.KeyboardEvent<HTMLDivElement>) => {
+  const handleDigitKeyDown = (
+    index: number,
+    event: React.KeyboardEvent<HTMLDivElement>,
+  ) => {
     if (event.key === "Backspace" && !digits[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
     }
@@ -73,7 +80,10 @@ export default function VerifyOtpPage() {
 
     const otp = digits.join("");
     if (otp.length !== OTP_LEN) {
-      showSnackbar({ severity: "error", message: "Please enter the 4-digit verification code." });
+      showSnackbar({
+        severity: "error",
+        message: "Please enter the 4-digit verification code.",
+      });
       return;
     }
 
@@ -83,21 +93,36 @@ export default function VerifyOtpPage() {
         otp,
       }).unwrap();
 
-      window.sessionStorage.setItem("mollure_reset_email", email.trim().toLowerCase());
-      window.sessionStorage.setItem("mollure_reset_user_id", String(result.data.user_id));
-      showSnackbar({ severity: "success", message: "OTP verified. You can now set a new password." });
+      window.sessionStorage.setItem(
+        "mollure_reset_email",
+        email.trim().toLowerCase(),
+      );
+      window.sessionStorage.setItem(
+        "mollure_reset_user_id",
+        String(result.data.user_id),
+      );
+      showSnackbar({
+        severity: "success",
+        message: "OTP verified. You can now set a new password.",
+      });
 
       window.setTimeout(() => {
         router.push("/auth/reset-password/new");
       }, 700);
     } catch (error) {
-      showSnackbar({ severity: "error", message: getApiErrorMessage(error, "OTP verification failed.") });
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "OTP verification failed."),
+      });
     }
   };
 
   const handleResend = async () => {
     if (!email.trim()) {
-      showSnackbar({ severity: "error", message: "Enter your email address first." });
+      showSnackbar({
+        severity: "error",
+        message: "Enter your email address first.",
+      });
       return;
     }
 
@@ -106,10 +131,19 @@ export default function VerifyOtpPage() {
         email: email.trim().toLowerCase(),
       }).unwrap();
 
-      window.sessionStorage.setItem("mollure_reset_email", email.trim().toLowerCase());
-      showSnackbar({ severity: "success", message: result.message || "OTP sent again." });
+      window.sessionStorage.setItem(
+        "mollure_reset_email",
+        email.trim().toLowerCase(),
+      );
+      showSnackbar({
+        severity: "success",
+        message: result.message || "OTP sent again.",
+      });
     } catch (error) {
-      showSnackbar({ severity: "error", message: getApiErrorMessage(error, "Unable to resend OTP.") });
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Unable to resend OTP."),
+      });
     }
   };
 
@@ -248,18 +282,25 @@ export default function VerifyOtpPage() {
                       lineHeight: 1.45,
                     }}
                   >
-                    Enter The 4 Digit Verification Code That Was Sent To Your Email To Change Your Password
+                    Enter The 4 Digit Verification Code That Was Sent To Your
+                    Email To Change Your Password
                   </BodyText>
                 </Box>
 
                 <Box component="form" onSubmit={handleSubmit}>
                   <Stack spacing={2.25}>
-                    <Stack direction="row" spacing={1.5} justifyContent="center">
+                    <Stack
+                      direction="row"
+                      spacing={1.5}
+                      justifyContent="center"
+                    >
                       {digits.map((digit, index) => (
                         <TextField
                           key={index}
                           value={digit}
-                          onChange={(event) => handleDigitChange(index, event.target.value)}
+                          onChange={(event) =>
+                            handleDigitChange(index, event.target.value)
+                          }
                           onKeyDown={(e) => handleDigitKeyDown(index, e)}
                           inputRef={(el) => {
                             inputRefs.current[index] = el;
@@ -297,27 +338,21 @@ export default function VerifyOtpPage() {
                       ))}
                     </Stack>
 
-                    <Button
+                    <AppButton
+                      tone="primary"
                       type="submit"
-                      variant="contained"
-                      disableElevation
                       fullWidth
                       disabled={isVerifying}
                       sx={{
-                        borderRadius: "10px",
-                        textTransform: "uppercase",
                         letterSpacing: "0.04em",
-                        fontWeight: 700,
                         fontSize: "0.9375rem",
                         py: 1.2,
                         minHeight: 44,
-                        bgcolor: m.teal,
                         color: m.white,
-                        "&:hover": { bgcolor: m.tealDark },
                       }}
                     >
                       {isVerifying ? "Verifying..." : "Send OTP"}
-                    </Button>
+                    </AppButton>
 
                     <Box textAlign="center">
                       <Typography
@@ -329,7 +364,7 @@ export default function VerifyOtpPage() {
                       >
                         Didn&apos;t receive a code?{" "}
                       </Typography>
-                      <Button
+                      <AppButton
                         type="button"
                         variant="text"
                         onClick={handleResend}
@@ -342,17 +377,27 @@ export default function VerifyOtpPage() {
                           fontSize: "0.8125rem",
                           color: m.navy,
                           verticalAlign: "baseline",
-                          "&:hover": { bgcolor: "transparent", color: m.tealDark },
+                          "&:hover": {
+                            bgcolor: "transparent",
+                            color: m.tealDark,
+                          },
                         }}
                       >
                         {isResending ? "Resending..." : "Resend"}
-                      </Button>
+                      </AppButton>
                     </Box>
 
-                    <BodyText textAlign="center" sx={{ color: alpha(m.navy, 0.48), fontSize: "0.8125rem" }}>
+                    <BodyText
+                      textAlign="center"
+                      sx={{ color: alpha(m.navy, 0.48), fontSize: "0.8125rem" }}
+                    >
                       <Link
                         href="/auth/forgot-password"
-                        style={{ color: m.teal, textDecoration: "none", fontWeight: 600 }}
+                        style={{
+                          color: m.teal,
+                          textDecoration: "none",
+                          fontWeight: 600,
+                        }}
                       >
                         Back to forgot password
                       </Link>

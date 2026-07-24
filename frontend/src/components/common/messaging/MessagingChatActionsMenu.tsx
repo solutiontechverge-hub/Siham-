@@ -1,11 +1,18 @@
 "use client";
 
+import AppButton from "../AppButton";
 import * as React from "react";
-import { Button, Menu, MenuItem, Stack } from "@mui/material";
+import { Menu, MenuItem, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import MessagingInsetOverlay from "./MessagingInsetOverlay";
 
-export type MessagingChatAction = "clearChat" | "deleteForMe" | "deleteForEveryone" | "block" | "link" | "report";
+export type MessagingChatAction =
+  | "clearChat"
+  | "deleteForMe"
+  | "deleteForEveryone"
+  | "block"
+  | "link"
+  | "report";
 
 type Props = {
   anchorEl: HTMLElement | null;
@@ -15,7 +22,13 @@ type Props = {
   embedded?: boolean;
 };
 
-export default function MessagingChatActionsMenu({ anchorEl, open, onClose, onAction, embedded = false }: Props) {
+export default function MessagingChatActionsMenu({
+  anchorEl,
+  open,
+  onClose,
+  onAction,
+  embedded = false,
+}: Props) {
   const m = useTheme().palette.mollure;
   const items: { action: MessagingChatAction; label: string }[] = [
     { action: "clearChat", label: "Clear chat" },
@@ -33,28 +46,30 @@ export default function MessagingChatActionsMenu({ anchorEl, open, onClose, onAc
 
   if (embedded) {
     return (
-      <MessagingInsetOverlay open={open} title="Chat actions" onClose={onClose} maxWidth={320}>
+      <MessagingInsetOverlay
+        open={open}
+        title="Chat actions"
+        onClose={onClose}
+        maxWidth={320}
+      >
         <Stack spacing={1}>
           {items.map((item) => (
-            <Button
+            <AppButton
+              tone="secondary"
               key={item.action}
               fullWidth
-              variant="outlined"
               onClick={() => handleAction(item.action)}
               sx={{
                 justifyContent: "flex-start",
-                textTransform: "none",
-                fontWeight: 700,
-                fontSize: 13,
-                borderRadius: "10px",
-                borderColor: alpha(m.navy, 0.12),
-                color: alpha(m.navy, 0.72),
                 py: 1.1,
-                "&:hover": { borderColor: m.teal, bgcolor: alpha(m.teal, 0.04) },
+                "&:hover": {
+                  borderColor: m.teal,
+                  bgcolor: alpha(m.teal, 0.04),
+                },
               }}
             >
               {item.label}
-            </Button>
+            </AppButton>
           ))}
         </Stack>
       </MessagingInsetOverlay>
@@ -82,7 +97,12 @@ export default function MessagingChatActionsMenu({ anchorEl, open, onClose, onAc
         <MenuItem
           key={item.action}
           onClick={() => handleAction(item.action)}
-          sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.62), py: 1 }}
+          sx={{
+            fontSize: 13,
+            fontWeight: 700,
+            color: alpha(m.navy, 0.62),
+            py: 1,
+          }}
         >
           {item.label}
         </MenuItem>

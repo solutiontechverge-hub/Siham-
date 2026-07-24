@@ -1,8 +1,9 @@
 "use client";
 
+import AppButton from "./AppButton";
 import * as React from "react";
 import Link from "next/link";
-import { Box, Button } from "@mui/material";
+import { Box } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 
 export type AppPillTab = {
@@ -19,7 +20,12 @@ export type AppPillTabsProps = {
   alignStart?: boolean;
 };
 
-export default function AppPillTabs({ tabs, active, onChange, alignStart = true }: AppPillTabsProps) {
+export default function AppPillTabs({
+  tabs,
+  active,
+  onChange,
+  alignStart = true,
+}: AppPillTabsProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
 
@@ -46,7 +52,13 @@ export default function AppPillTabs({ tabs, active, onChange, alignStart = true 
           textTransform: "none" as const,
           fontWeight: 800,
           fontSize: 13,
-          borderRadius: isActive ? "8px" : isFirst ? "8px 4px 4px 8px" : isLast ? "4px 8px 8px 4px" : "6px",
+          borderRadius: isActive
+            ? "8px"
+            : isFirst
+              ? "8px 4px 4px 8px"
+              : isLast
+                ? "4px 8px 8px 4px"
+                : "6px",
           px: 2.75,
           py: 0.95,
           minHeight: 38,
@@ -63,16 +75,27 @@ export default function AppPillTabs({ tabs, active, onChange, alignStart = true 
 
         if (t.href) {
           return (
-            <Button key={t.href} component={Link} href={t.href} disableElevation sx={tabSx}>
+            <AppButton
+              key={t.href}
+              component={Link}
+              href={t.href}
+              disableElevation
+              sx={tabSx}
+            >
               {t.label}
-            </Button>
+            </AppButton>
           );
         }
 
         return (
-          <Button key={v} onClick={() => onChange?.(v)} disableElevation sx={tabSx}>
+          <AppButton
+            key={v}
+            onClick={() => onChange?.(v)}
+            disableElevation
+            sx={tabSx}
+          >
             {t.label}
-          </Button>
+          </AppButton>
         );
       })}
     </Box>

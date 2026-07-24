@@ -1,9 +1,10 @@
 "use client";
 
+import AppButton from "../AppButton";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
-import { Button, Stack } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
+import { Stack } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 
 type Props = {
   onAccept: () => void;
@@ -11,69 +12,59 @@ type Props = {
   onReject: () => void;
 };
 
+const ACTION_SX = {
+  flex: 1,
+  fontSize: 13,
+  py: 1.1,
+  minHeight: 40,
+} as const;
+
 /** Accept / Suggest Change / Reject row shown when an EBR is incoming on the client booking page. */
-export default function ClientEbrResponseActions({ onAccept, onSuggestChange, onReject }: Props) {
+export default function ClientEbrResponseActions({
+  onAccept,
+  onSuggestChange,
+  onReject,
+}: Props) {
   const m = useTheme().palette.mollure;
 
   return (
-    <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ mt: 2 }}>
-      <Button
+    <Stack
+      direction={{ xs: "column", sm: "row" }}
+      spacing={1.25}
+      sx={{ mt: 2 }}
+    >
+      <AppButton
         fullWidth
         variant="contained"
         disableElevation
         startIcon={<CheckRoundedIcon />}
         onClick={onAccept}
         sx={{
-          flex: 1,
-          borderRadius: "10px",
-          textTransform: "none",
-          fontWeight: 900,
-          fontSize: 14,
-          py: 1.2,
+          ...ACTION_SX,
           bgcolor: m.success,
-          "&:hover": { bgcolor: m.successDark },
+          color: "#fff",
+          "&:hover": { bgcolor: m.successDark, color: "#fff" },
         }}
       >
         Accept
-      </Button>
-      <Button
+      </AppButton>
+      <AppButton
+        tone="secondary"
         fullWidth
-        variant="outlined"
         onClick={onSuggestChange}
-        sx={{
-          flex: 1,
-          borderRadius: "10px",
-          textTransform: "none",
-          fontWeight: 900,
-          fontSize: 14,
-          py: 1.2,
-          borderColor: alpha(m.navy, 0.14),
-          color: alpha(m.navy, 0.72),
-          bgcolor: "#fff",
-          "&:hover": { bgcolor: alpha(m.navy, 0.04), borderColor: alpha(m.navy, 0.22) },
-        }}
+        sx={ACTION_SX}
       >
         Suggest Change
-      </Button>
-      <Button
+      </AppButton>
+      <AppButton
+        tone="danger"
         fullWidth
-        variant="contained"
-        disableElevation
         startIcon={<CloseRoundedIcon />}
         onClick={onReject}
-        sx={{
-          flex: 1,
-          borderRadius: "10px",
-          textTransform: "none",
-          fontWeight: 900,
-          fontSize: 14,
-          py: 1.2,
-          bgcolor: "#E85D5D",
-          "&:hover": { bgcolor: "#D94545" },
-        }}
+        sx={ACTION_SX}
       >
         Reject
-      </Button>
+      </AppButton>
     </Stack>
   );
 }

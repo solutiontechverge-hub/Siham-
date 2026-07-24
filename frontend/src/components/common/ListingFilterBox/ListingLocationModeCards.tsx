@@ -44,11 +44,31 @@ function LocationModeCard({
         textAlign: "left",
       }}
     >
-      <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
-        <Box sx={{ width: 20, height: 20, flexShrink: 0, display: "grid", placeItems: "center" }}>
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={1}
+        sx={{ minWidth: 0 }}
+      >
+        <Box
+          sx={{
+            width: 20,
+            height: 20,
+            flexShrink: 0,
+            display: "grid",
+            placeItems: "center",
+          }}
+        >
           <Image src={icon} alt="" width={20} height={20} />
         </Box>
-        <Typography sx={{ fontSize: 13, fontWeight: 700, color: alpha(tokens.navy, 0.78) }} noWrap>
+        <Typography
+          sx={{
+            fontSize: 13,
+            fontWeight: 700,
+            color: alpha(tokens.navy, 0.78),
+          }}
+          noWrap
+        >
           {label}
         </Typography>
       </Stack>
@@ -67,10 +87,15 @@ function LocationModeCard({
   );
 }
 
-export default function ListingLocationModeCards({ value, onChange }: ListingLocationModeCardsProps) {
+export default function ListingLocationModeCards({
+  value,
+  onChange,
+}: ListingLocationModeCardsProps) {
   const toggleMode = (mode: ListingLocationMode) => {
     const selected = value.includes(mode);
-    onChange(selected ? value.filter((item) => item !== mode) : [...value, mode]);
+    onChange(
+      selected ? value.filter((item) => item !== mode) : [...value, mode],
+    );
   };
 
   return (

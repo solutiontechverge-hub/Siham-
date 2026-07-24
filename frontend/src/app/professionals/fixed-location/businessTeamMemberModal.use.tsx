@@ -56,8 +56,12 @@ export function useBusinessTeamMemberModal({
   );
   const { showSnackbar } = useSnackbar();
   const [open, setOpen] = React.useState(false);
-  const [editingMemberId, setEditingMemberId] = React.useState<string | null>(null);
-  const [draft, setDraft] = React.useState<TeamMemberFormDraft>(() => createEmptyTeamMemberFormDraft());
+  const [editingMemberId, setEditingMemberId] = React.useState<string | null>(
+    null,
+  );
+  const [draft, setDraft] = React.useState<TeamMemberFormDraft>(() =>
+    createEmptyTeamMemberFormDraft(),
+  );
   const photoInputRef = React.useRef<HTMLInputElement | null>(null);
   const blobUrlsRef = React.useRef<string[]>([]);
 
@@ -82,7 +86,9 @@ export function useBusinessTeamMemberModal({
       const displayName = draftState.name.trim() || "New team member";
 
       setTeamMembers((prev) => {
-        const withoutPreview = prev.filter((member) => member.id !== TEAM_MEMBER_DRAFT_PREVIEW_ID);
+        const withoutPreview = prev.filter(
+          (member) => member.id !== TEAM_MEMBER_DRAFT_PREVIEW_ID,
+        );
 
         if (editingMemberId) {
           return withoutPreview.map((member) =>
@@ -116,14 +122,18 @@ export function useBusinessTeamMemberModal({
   );
 
   const closeModal = React.useCallback(() => {
-    setTeamMembers((prev) => prev.filter((member) => member.id !== TEAM_MEMBER_DRAFT_PREVIEW_ID));
+    setTeamMembers((prev) =>
+      prev.filter((member) => member.id !== TEAM_MEMBER_DRAFT_PREVIEW_ID),
+    );
     setOpen(false);
     setEditingMemberId(null);
     setDraft(createEmptyTeamMemberFormDraft());
   }, [setTeamMembers]);
 
   const openAdd = React.useCallback(() => {
-    setTeamMembers((prev) => prev.filter((member) => member.id !== TEAM_MEMBER_DRAFT_PREVIEW_ID));
+    setTeamMembers((prev) =>
+      prev.filter((member) => member.id !== TEAM_MEMBER_DRAFT_PREVIEW_ID),
+    );
     setEditingMemberId(null);
     setDraft(createEmptyTeamMemberFormDraft());
     setOpen(true);
@@ -136,7 +146,11 @@ export function useBusinessTeamMemberModal({
         name: member.name,
         photoSrc: member.photoSrc,
         pendingPhotoFile: member.pendingPhotoFile ?? null,
-        selectedGroups: groupsFromTeamService(member.services, businessCategories, serviceContext),
+        selectedGroups: groupsFromTeamService(
+          member.services,
+          businessCategories,
+          serviceContext,
+        ),
         categoryId: "",
         serviceId: "",
       });
@@ -158,9 +172,12 @@ export function useBusinessTeamMemberModal({
     [syncDraftToMainScreen],
   );
 
-  const pickService = React.useCallback((categoryId: string, serviceId: string) => {
-    setDraft((prev) => ({ ...prev, categoryId, serviceId }));
-  }, []);
+  const pickService = React.useCallback(
+    (categoryId: string, serviceId: string) => {
+      setDraft((prev) => ({ ...prev, categoryId, serviceId }));
+    },
+    [],
+  );
 
   const removeServiceGroup = React.useCallback(
     (categoryId: string) => {
@@ -199,17 +216,28 @@ export function useBusinessTeamMemberModal({
   const saveModal = React.useCallback(async () => {
     let effectiveDraft = draft;
     if (draft.categoryId && draft.serviceId) {
-      effectiveDraft = addTeamMemberServiceSelection(draft, businessCategories, serviceContext);
+      effectiveDraft = addTeamMemberServiceSelection(
+        draft,
+        businessCategories,
+        serviceContext,
+      );
     }
 
-    if (!effectiveDraft.selectedGroups.some((group) => group.subServiceIds.length > 0)) return;
+    if (
+      !effectiveDraft.selectedGroups.some(
+        (group) => group.subServiceIds.length > 0,
+      )
+    )
+      return;
 
     const name = effectiveDraft.name.trim() || "New team member";
     const services = groupsToTeamService(effectiveDraft.selectedGroups);
     const role = "Team member";
     let nextMembers: TeamMemberUi[];
 
-    const persistedMembers = teamMembers.filter((member) => member.id !== TEAM_MEMBER_DRAFT_PREVIEW_ID);
+    const persistedMembers = teamMembers.filter(
+      (member) => member.id !== TEAM_MEMBER_DRAFT_PREVIEW_ID,
+    );
 
     if (editingMemberId) {
       nextMembers = persistedMembers.map((member) =>
@@ -248,7 +276,9 @@ export function useBusinessTeamMemberModal({
       onMarkUnpublished?.();
       showSnackbar({
         severity: "success",
-        message: editingMemberId ? "Team member updated." : "Team member added.",
+        message: editingMemberId
+          ? "Team member updated."
+          : "Team member added.",
       });
       return;
     }

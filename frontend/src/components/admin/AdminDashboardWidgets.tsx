@@ -37,7 +37,9 @@ export function TopProfessionalsWidget({
     <AdminSectionCard
       title="Top Professionals"
       description="By online bookings"
-      actions={<AdminSectionLink href="/admin/professionals" label="View All" />}
+      actions={
+        <AdminSectionLink href="/admin/professionals" label="View All" />
+      }
       compact
       sx={{ height: "100%" }}
     >
@@ -57,7 +59,10 @@ export function TopProfessionalsWidget({
               p: 1.25,
               borderRadius: 1.5,
               bgcolor: index === 0 ? tokens.mintSoft : "transparent",
-              border: index === 0 ? `1px solid ${alpha(tokens.teal, 0.2)}` : "1px solid transparent",
+              border:
+                index === 0
+                  ? `1px solid ${alpha(tokens.teal, 0.2)}`
+                  : "1px solid transparent",
             }}
           >
             <Box
@@ -77,14 +82,24 @@ export function TopProfessionalsWidget({
               {index + 1}
             </Box>
             <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }} noWrap>
+              <Typography
+                sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}
+                noWrap
+              >
                 {pro.name}
               </Typography>
               <Typography sx={{ fontSize: 10, color: tokens.bodyText }} noWrap>
                 {pro.city}, {pro.province}
               </Typography>
             </Box>
-            <Typography sx={{ fontSize: 12, fontWeight: 700, color: tokens.teal, flexShrink: 0 }}>
+            <Typography
+              sx={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: tokens.teal,
+                flexShrink: 0,
+              }}
+            >
               {pro.bookings}
             </Typography>
           </Stack>
@@ -94,7 +109,11 @@ export function TopProfessionalsWidget({
   );
 }
 
-export function ActivityLogWidget({ items }: { items: AdminDashboardActivityItem[] }) {
+export function ActivityLogWidget({
+  items,
+}: {
+  items: AdminDashboardActivityItem[];
+}) {
   const tokens = useTheme().palette.mollure;
   const rows = items.slice(0, 3);
 
@@ -138,16 +157,36 @@ export function ActivityLogWidget({ items }: { items: AdminDashboardActivityItem
                 }}
               />
               {index < rows.length - 1 ? (
-                <Box sx={{ width: 2, flex: 1, bgcolor: tokens.cardBorder, minHeight: 24, mt: 0.5 }} />
+                <Box
+                  sx={{
+                    width: 2,
+                    flex: 1,
+                    bgcolor: tokens.cardBorder,
+                    minHeight: 24,
+                    mt: 0.5,
+                  }}
+                />
               ) : null}
             </Stack>
             <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography sx={{ fontSize: 11, fontWeight: 600, color: tokens.navy }}>
+              <Typography
+                sx={{ fontSize: 11, fontWeight: 600, color: tokens.navy }}
+              >
                 {item.admin}
               </Typography>
-              <Typography sx={{ fontSize: 11, color: tokens.bodyText, mt: 0.15, lineHeight: 1.35 }}>
+              <Typography
+                sx={{
+                  fontSize: 11,
+                  color: tokens.bodyText,
+                  mt: 0.15,
+                  lineHeight: 1.35,
+                }}
+              >
                 {item.action}{" "}
-                <Box component="span" sx={{ fontWeight: 600, color: tokens.navy }}>
+                <Box
+                  component="span"
+                  sx={{ fontWeight: 600, color: tokens.navy }}
+                >
                   {item.detail}
                 </Box>
               </Typography>
@@ -162,11 +201,20 @@ export function ActivityLogWidget({ items }: { items: AdminDashboardActivityItem
   );
 }
 
-export function SummaryOverviewWidget({ rows }: { rows: AdminDashboardSummaryRow[] }) {
+export function SummaryOverviewWidget({
+  rows,
+}: {
+  rows: AdminDashboardSummaryRow[];
+}) {
   const tokens = useTheme().palette.mollure;
 
   return (
-    <AdminSectionCard title="Summary Overview" noPadding compact sx={{ height: "100%" }}>
+    <AdminSectionCard
+      title="Summary Overview"
+      noPadding
+      compact
+      sx={{ height: "100%" }}
+    >
       <Table size="small">
         <TableBody>
           {rows.map((row) => (
@@ -177,18 +225,54 @@ export function SummaryOverviewWidget({ rows }: { rows: AdminDashboardSummaryRow
                 "&:hover": { bgcolor: tokens.surface },
               }}
             >
-              <TableCell sx={{ py: pad.tableCellY, px: pad.tableCellX, borderColor: tokens.cardBorder, width: "32%" }}>
-                <Typography sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy, lineHeight: 1.3 }}>
+              <TableCell
+                sx={{
+                  py: pad.tableCellY,
+                  px: pad.tableCellX,
+                  borderColor: tokens.cardBorder,
+                  width: "32%",
+                }}
+              >
+                <Typography
+                  sx={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: tokens.navy,
+                    lineHeight: 1.3,
+                  }}
+                >
                   {row.label}
                 </Typography>
               </TableCell>
-              <TableCell sx={{ py: pad.tableCellY, px: 1.5, borderColor: tokens.cardBorder, width: "16%", whiteSpace: "nowrap" }}>
-                <Typography sx={{ fontSize: 15, fontWeight: 700, color: tokens.tealDark }}>
+              <TableCell
+                sx={{
+                  py: pad.tableCellY,
+                  px: 1.5,
+                  borderColor: tokens.cardBorder,
+                  width: "16%",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <Typography
+                  sx={{ fontSize: 15, fontWeight: 700, color: tokens.tealDark }}
+                >
                   {row.value}
                 </Typography>
               </TableCell>
-              <TableCell sx={{ py: pad.tableCellY, px: pad.tableCellX, borderColor: tokens.cardBorder }}>
-                <Typography sx={{ fontSize: 11, color: tokens.bodyText, lineHeight: 1.35 }}>
+              <TableCell
+                sx={{
+                  py: pad.tableCellY,
+                  px: pad.tableCellX,
+                  borderColor: tokens.cardBorder,
+                }}
+              >
+                <Typography
+                  sx={{
+                    fontSize: 11,
+                    color: tokens.bodyText,
+                    lineHeight: 1.35,
+                  }}
+                >
                   {row.breakdown}
                 </Typography>
               </TableCell>
@@ -200,7 +284,11 @@ export function SummaryOverviewWidget({ rows }: { rows: AdminDashboardSummaryRow
   );
 }
 
-export function SystemStatusWidget({ items }: { items: AdminDashboardSystemStatus[] }) {
+export function SystemStatusWidget({
+  items,
+}: {
+  items: AdminDashboardSystemStatus[];
+}) {
   const tokens = useTheme().palette.mollure;
 
   return (
@@ -221,14 +309,20 @@ export function SystemStatusWidget({ items }: { items: AdminDashboardSystemStatu
                 bgcolor: tokens.surface,
               }}
             >
-              <Typography sx={{ fontSize: 12, fontWeight: 500, color: tokens.navy }}>
+              <Typography
+                sx={{ fontSize: 12, fontWeight: 500, color: tokens.navy }}
+              >
                 {item.label}
               </Typography>
               <Stack direction="row" alignItems="center" spacing={0.4}>
                 {ok ? (
-                  <CheckCircleOutlineIcon sx={{ fontSize: 14, color: tokens.teal }} />
+                  <CheckCircleOutlineIcon
+                    sx={{ fontSize: 14, color: tokens.teal }}
+                  />
                 ) : (
-                  <ErrorOutlineIcon sx={{ fontSize: 14, color: tokens.requestAccent }} />
+                  <ErrorOutlineIcon
+                    sx={{ fontSize: 14, color: tokens.requestAccent }}
+                  />
                 )}
                 <Typography
                   sx={{
@@ -293,12 +387,23 @@ export function QuickLinksWidget() {
               {link.logoLabel}
             </Box>
             <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy, lineHeight: 1.2 }}>
+              <Typography
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: tokens.navy,
+                  lineHeight: 1.2,
+                }}
+              >
                 {link.title}
               </Typography>
               <Stack direction="row" alignItems="center" spacing={0.35}>
-                <Typography sx={{ fontSize: 10, color: tokens.teal }}>Open in new tab</Typography>
-                <OpenInNewOutlinedIcon sx={{ fontSize: 11, color: tokens.teal }} />
+                <Typography sx={{ fontSize: 10, color: tokens.teal }}>
+                  Open in new tab
+                </Typography>
+                <OpenInNewOutlinedIcon
+                  sx={{ fontSize: 11, color: tokens.teal }}
+                />
               </Stack>
             </Box>
           </Box>

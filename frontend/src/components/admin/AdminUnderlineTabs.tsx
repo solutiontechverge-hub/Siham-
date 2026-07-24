@@ -14,12 +14,22 @@ type AdminUnderlineTabsProps = {
   embedded?: boolean;
 };
 
-export default function AdminUnderlineTabs({ tabs, value, onChange, embedded = false }: AdminUnderlineTabsProps) {
+export default function AdminUnderlineTabs({
+  tabs,
+  value,
+  onChange,
+  embedded = false,
+}: AdminUnderlineTabsProps) {
   const theme = useTheme();
   const tokens = theme.palette.mollure;
 
   return (
-    <Box sx={{ borderBottom: `1px solid ${tokens.cardBorder}`, mb: embedded ? 0 : 3 }}>
+    <Box
+      sx={{
+        borderBottom: `1px solid ${tokens.cardBorder}`,
+        mb: embedded ? 0 : 3,
+      }}
+    >
       <Stack direction="row" spacing={4} sx={{ px: 0.25 }}>
         {tabs.map((tab) => {
           const active = tab.id === value;

@@ -7,7 +7,10 @@ import { useSnackbar } from "../../../../components/common/AppSnackbar";
 import { getApiErrorMessage } from "../../../../lib/api-error";
 import { desiredLocationPageData } from "../desiredLocation.data";
 import { desiredLocationTopTabs } from "../desiredLocationTopTabs";
-import { useGetProfileQuery, useUpdateProfileMutation } from "../../../../store/services/profileApi";
+import {
+  useGetProfileQuery,
+  useUpdateProfileMutation,
+} from "../../../../store/services/profileApi";
 import {
   useGetBusinessCategoriesQuery,
   useGetBusinessSetupQuery,
@@ -15,11 +18,19 @@ import {
 } from "../../../../store/services/businessApi";
 
 const ProfessionalDesiredLocationSetup = dynamic(
-  () => import("../../../../components/common/ProfessionalDesiredLocationSetup"),
+  () =>
+    import("../../../../components/common/ProfessionalDesiredLocationSetup"),
   {
     ssr: false,
     loading: () => (
-      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", py: 8 }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          py: 8,
+        }}
+      >
         <CircularProgress size={32} />
       </Box>
     ),
@@ -30,12 +41,17 @@ export default function DesiredLocationProfilePage() {
   const { data } = useGetProfileQuery();
   const { data: businessCategoriesData } = useGetBusinessCategoriesQuery();
   const { data: businessSetupData } = useGetBusinessSetupQuery();
-  const [updateProfile, { isLoading: isProfileSaving }] = useUpdateProfileMutation();
-  const [upsertBusinessSetup, { isLoading: isBusinessSetupSaving }] = useUpsertBusinessSetupMutation();
+  const [updateProfile, { isLoading: isProfileSaving }] =
+    useUpdateProfileMutation();
+  const [upsertBusinessSetup, { isLoading: isBusinessSetupSaving }] =
+    useUpsertBusinessSetupMutation();
   const { showSnackbar } = useSnackbar();
 
   return (
-    <DesiredLocationPageScaffold activeTopTab="Profile" topTabs={desiredLocationTopTabs}>
+    <DesiredLocationPageScaffold
+      activeTopTab="Profile"
+      topTabs={desiredLocationTopTabs}
+    >
       <ProfessionalDesiredLocationSetup
         data={desiredLocationPageData}
         chrome={false}
@@ -49,13 +65,17 @@ export default function DesiredLocationProfilePage() {
             const result = await updateProfile(payload).unwrap();
             showSnackbar({
               severity: "success",
-              message: result.message || "Professional profile updated successfully.",
+              message:
+                result.message || "Professional profile updated successfully.",
             });
             return result.data;
           } catch (error) {
             showSnackbar({
               severity: "error",
-              message: getApiErrorMessage(error, "Unable to update professional profile."),
+              message: getApiErrorMessage(
+                error,
+                "Unable to update professional profile.",
+              ),
             });
             throw error;
           }
@@ -66,7 +86,10 @@ export default function DesiredLocationProfilePage() {
           } catch (error) {
             showSnackbar({
               severity: "error",
-              message: getApiErrorMessage(error, "Unable to update business setup."),
+              message: getApiErrorMessage(
+                error,
+                "Unable to update business setup.",
+              ),
             });
             throw error;
           }
@@ -75,4 +98,3 @@ export default function DesiredLocationProfilePage() {
     </DesiredLocationPageScaffold>
   );
 }
-

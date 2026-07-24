@@ -44,7 +44,9 @@ export default function AdminDataTable<T>({
   const tokens = theme.palette.mollure;
 
   return (
-    <TableContainer sx={{ borderRadius: 2, border: `1px solid ${tokens.cardBorder}` }}>
+    <TableContainer
+      sx={{ borderRadius: 2, border: `1px solid ${tokens.cardBorder}` }}
+    >
       <Table size={dense ? "small" : "medium"}>
         <TableHead>
           <TableRow sx={{ bgcolor: tokens.mintSoft }}>
@@ -70,8 +72,13 @@ export default function AdminDataTable<T>({
         <TableBody>
           {rows.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={columns.length} sx={{ py: 4, textAlign: "center" }}>
-                <Typography sx={{ fontSize: 14, color: tokens.bodyText }}>{emptyMessage}</Typography>
+              <TableCell
+                colSpan={columns.length}
+                sx={{ py: 4, textAlign: "center" }}
+              >
+                <Typography sx={{ fontSize: 14, color: tokens.bodyText }}>
+                  {emptyMessage}
+                </Typography>
               </TableCell>
             </TableRow>
           ) : (
@@ -79,34 +86,38 @@ export default function AdminDataTable<T>({
               const rowId = getRowId(row);
               const highlighted = highlightedIds?.has(rowId);
               return (
-              <TableRow
-                key={rowId}
-                hover
-                sx={{
-                  "&:last-child td": { borderBottom: 0 },
-                  bgcolor: highlighted ? alpha(tokens.teal, 0.08) : undefined,
-                  "&:hover": { bgcolor: highlighted ? alpha(tokens.teal, 0.12) : tokens.surface },
-                  transition: "background-color 200ms ease",
-                }}
-              >
-                {columns.map((col) => (
-                  <TableCell
-                    key={col.id}
-                    align={col.align ?? "left"}
-                    sx={{
-                      fontSize: 13,
-                      color: tokens.navy,
-                      borderBottom: `1px solid ${tokens.cardBorder}`,
-                      py: dense ? pad.tableCellY : 1.75,
-                      px: pad.tableCellX,
-                      verticalAlign: "top",
-                    }}
-                  >
-                    {col.render(row)}
-                  </TableCell>
-                ))}
-              </TableRow>
-            );
+                <TableRow
+                  key={rowId}
+                  hover
+                  sx={{
+                    "&:last-child td": { borderBottom: 0 },
+                    bgcolor: highlighted ? alpha(tokens.teal, 0.08) : undefined,
+                    "&:hover": {
+                      bgcolor: highlighted
+                        ? alpha(tokens.teal, 0.12)
+                        : tokens.surface,
+                    },
+                    transition: "background-color 200ms ease",
+                  }}
+                >
+                  {columns.map((col) => (
+                    <TableCell
+                      key={col.id}
+                      align={col.align ?? "left"}
+                      sx={{
+                        fontSize: 13,
+                        color: tokens.navy,
+                        borderBottom: `1px solid ${tokens.cardBorder}`,
+                        py: dense ? pad.tableCellY : 1.75,
+                        px: pad.tableCellX,
+                        verticalAlign: "top",
+                      }}
+                    >
+                      {col.render(row)}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              );
             })
           )}
         </TableBody>
@@ -172,11 +183,24 @@ export function AdminSummaryGrid({
               >
                 {item.label}
               </Typography>
-              <Typography sx={{ fontSize: 22, fontWeight: 700, color: tokens.navy, lineHeight: 1.1 }}>
-                {typeof item.value === "number" ? item.value.toLocaleString() : item.value}
+              <Typography
+                sx={{
+                  fontSize: 22,
+                  fontWeight: 700,
+                  color: tokens.navy,
+                  lineHeight: 1.1,
+                }}
+              >
+                {typeof item.value === "number"
+                  ? item.value.toLocaleString()
+                  : item.value}
               </Typography>
               {item.sub ? (
-                <Typography sx={{ fontSize: 11, color: tokens.bodyText, mt: 0.75 }}>{item.sub}</Typography>
+                <Typography
+                  sx={{ fontSize: 11, color: tokens.bodyText, mt: 0.75 }}
+                >
+                  {item.sub}
+                </Typography>
               ) : null}
             </Box>
             {Icon ? (

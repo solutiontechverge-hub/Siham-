@@ -1,7 +1,7 @@
+import AppButton from "../../common/AppButton";
 import * as React from "react";
 import {
   Box,
-  Button,
   Checkbox,
   Chip,
   Link as MuiLink,
@@ -35,19 +35,20 @@ function clientTypeChipSx(theme: Theme) {
   };
 }
 
-function statusChipSx(status: TransactionStatus, m: { navy: string; teal: string }) {
+function statusChipSx(status: TransactionStatus, theme: Theme) {
   const tone = getTransactionStatusTone(status);
+  const m = theme.palette.mollure;
   switch (tone) {
     case "success":
-      return { bgcolor: alpha("#2E7D32", 0.12), color: "#2E7D32" };
+      return { bgcolor: m.statusGreenBg, color: m.statusGreenFg };
     case "warning":
-      return { bgcolor: alpha("#E65100", 0.12), color: "#E65100" };
+      return { bgcolor: m.statusOrangeBg, color: m.statusOrangeFg };
     case "danger":
-      return { bgcolor: alpha("#C62828", 0.12), color: "#C62828" };
+      return { bgcolor: m.statusOrangeBg, color: m.statusOrangeFg };
     case "muted":
-      return { bgcolor: alpha("#6B7280", 0.12), color: "#4B5563" };
+      return { bgcolor: m.fxGrayF2F4F7, color: m.statusGreyFg };
     default:
-      return { bgcolor: alpha(m.navy, 0.08), color: alpha(m.navy, 0.62) };
+      return { bgcolor: m.fxGrayF2F4F7, color: m.statusGreyFg };
   }
 }
 
@@ -57,7 +58,9 @@ function netAmountTooltip(row: TransactionRow): string | null {
   if (row.stripeFee) parts.push(`Stripe fee: ${row.stripeFee}`);
   if (row.mollureFee) parts.push(`Mollure fee: ${row.mollureFee}`);
   if (row.stripeFee || row.mollureFee) {
-    const feeTotal = [row.stripeFee, row.mollureFee].filter(Boolean).join(" + ");
+    const feeTotal = [row.stripeFee, row.mollureFee]
+      .filter(Boolean)
+      .join(" + ");
     parts.push(`Net = Gross − (${feeTotal})`);
   }
   return parts.join("\n");
@@ -68,7 +71,10 @@ export type TransactionsTableProps = {
   selected: Record<string, boolean>;
   onToggleOne: (id: string) => void;
   onToggleAll: (checked: boolean) => void;
-  onOpenDocument: (row: TransactionRow, documentType: "invoice" | "receipt") => void;
+  onOpenDocument: (
+    row: TransactionRow,
+    documentType: "invoice" | "receipt",
+  ) => void;
   onOpenNote?: (row: TransactionRow) => void;
   onEntryClick?: (row: TransactionRow) => void;
   onClientClick?: (row: TransactionRow) => void;
@@ -94,7 +100,8 @@ export default function TransactionsTable({
   theme,
   m,
 }: TransactionsTableProps) {
-  const allVisibleSelected = rows.length > 0 && rows.every((r) => selected[r.id]);
+  const allVisibleSelected =
+    rows.length > 0 && rows.every((r) => selected[r.id]);
   const someVisibleSelected = rows.some((r) => selected[r.id]);
 
   return (
@@ -111,7 +118,10 @@ export default function TransactionsTable({
         <Table size="small">
           <TableHead>
             <TableRow sx={{ bgcolor: alpha(m.navy, 0.02) }}>
-              <TableCell padding="checkbox" sx={{ borderBottom: `1px solid ${alpha(m.navy, 0.08)}` }}>
+              <TableCell
+                padding="checkbox"
+                sx={{ borderBottom: `1px solid ${alpha(m.navy, 0.08)}` }}
+              >
                 <Checkbox
                   size="small"
                   indeterminate={someVisibleSelected && !allVisibleSelected}
@@ -152,61 +162,52 @@ export default function TransactionsTable({
           </TableHead>
           <TableBody>
             {rows.map((row) => {
-              const clientTypeLabel = getTransactionClientTypeLabel(row.clientType);
+              const clientTypeLabel = getTransactionClientTypeLabel(
+                row.clientType,
+              );
               const showClientEmail = shouldShowTransactionClientEmail(row);
-              const entryDisplay = formatEntryIdDisplay(row.entryType, row.entryId, row.entryLabel);
+              const entryDisplay = formatEntryIdDisplay(
+                row.entryType,
+                row.entryId,
+                row.entryLabel,
+              );
               const dateDisplay = formatTransactionDate(row.date);
               const tooltip = netAmountTooltip(row);
               const invoiceNo = row.document?.documentNumber;
               const receiptNo = row.document?.receiptNumber;
-              const clientClickable = isTransactionClientClickable(row.clientType);
+              const clientClickable = isTransactionClientClickable(
+                row.clientType,
+              );
 
               return (
-              <TableRow key={row.id} hover sx={{ "& td": { borderBottom: `1px solid ${alpha(m.navy, 0.06)}` } }}>
-                <TableCell padding="checkbox">
-                  <Checkbox size="small" checked={Boolean(selected[row.id])} onChange={() => onToggleOne(row.id)} sx={{ p: 0.5 }} />
-                </TableCell>
-                <TableCell sx={{ verticalAlign: "top" }}>
-                  {row.bookingId && onEntryClick ? (
-                    <MuiLink
-                      component="button"
-                      type="button"
-                      underline="hover"
-                      onClick={() => onEntryClick(row)}
-                      sx={{
-                        fontSize: 12.5,
-                        fontWeight: 800,
-                        color: theme.palette.primary.main,
-                        border: 0,
-                        bgcolor: "transparent",
-                        p: 0,
-                        cursor: "pointer",
-                        textAlign: "left",
-                      }}
-                    >
-                      {entryDisplay}
-                    </MuiLink>
-                  ) : (
-                    <BodyText component="span" sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.78) }}>
-                      {entryDisplay}
-                    </BodyText>
-                  )}
-                </TableCell>
-                <TableCell sx={{ verticalAlign: "top" }}>
-                  <Stack spacing={0.35}>
-                    <BodyText component="span" sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.75) }}>
-                      {dateDisplay}
-                    </BodyText>
-                    {row.note?.trim() ? (
+                <TableRow
+                  key={row.id}
+                  hover
+                  sx={{
+                    "& td": {
+                      borderBottom: `1px solid ${alpha(m.navy, 0.06)}`,
+                    },
+                  }}
+                >
+                  <TableCell padding="checkbox">
+                    <Checkbox
+                      size="small"
+                      checked={Boolean(selected[row.id])}
+                      onChange={() => onToggleOne(row.id)}
+                      sx={{ p: 0.5 }}
+                    />
+                  </TableCell>
+                  <TableCell sx={{ verticalAlign: "top" }}>
+                    {row.bookingId && onEntryClick ? (
                       <MuiLink
                         component="button"
                         type="button"
                         underline="hover"
-                        onClick={() => onOpenNote?.(row)}
+                        onClick={() => onEntryClick(row)}
                         sx={{
-                          fontSize: 11,
-                          fontWeight: 700,
-                          color: m.teal,
+                          fontSize: 12.5,
+                          fontWeight: 800,
+                          color: theme.palette.primary.main,
                           border: 0,
                           bgcolor: "transparent",
                           p: 0,
@@ -214,169 +215,296 @@ export default function TransactionsTable({
                           textAlign: "left",
                         }}
                       >
-                        View note
+                        {entryDisplay}
                       </MuiLink>
-                    ) : null}
-                  </Stack>
-                </TableCell>
-                <TableCell sx={{ verticalAlign: "top", minWidth: 160 }}>
-                  <Stack spacing={0.35}>
-                    <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
-                      {clientClickable && onClientClick ? (
-                        <MuiLink
-                          component="button"
-                          type="button"
-                          underline="hover"
-                          onClick={() => onClientClick(row)}
-                          sx={{
-                            fontWeight: 900,
-                            fontSize: 12.5,
-                            color: theme.palette.primary.main,
-                            border: 0,
-                            bgcolor: "transparent",
-                            p: 0,
-                            cursor: "pointer",
-                          }}
-                        >
-                          {row.clientName}
-                        </MuiLink>
-                      ) : (
-                        <BodyText component="span" sx={{ fontWeight: 900, fontSize: 12.5, color: alpha(m.navy, 0.86) }}>
-                          {row.clientName}
-                        </BodyText>
-                      )}
-                      {clientTypeLabel ? (
-                        <Chip
-                          label={clientTypeLabel}
-                          size="small"
-                          sx={{
-                            height: 18,
-                            borderRadius: "999px",
-                            fontSize: 9,
-                            fontWeight: 900,
-                            px: 0.25,
-                            textTransform: "none",
-                            ...clientTypeChipSx(theme),
-                          }}
-                        />
-                      ) : null}
-                    </Stack>
-                    {showClientEmail ? (
-                      <BodyText component="span" sx={{ fontSize: 11.5, fontWeight: 600, color: alpha(m.navy, 0.5) }}>
-                        {row.clientEmail}
-                      </BodyText>
-                    ) : null}
-                  </Stack>
-                </TableCell>
-                <TableCell sx={{ verticalAlign: "top" }}>
-                  {tooltip ? (
-                    <Tooltip title={<Box sx={{ whiteSpace: "pre-line", fontSize: 11 }}>{tooltip}</Box>} arrow>
+                    ) : (
                       <BodyText
                         component="span"
                         sx={{
                           fontSize: 12.5,
                           fontWeight: 800,
                           color: alpha(m.navy, 0.78),
-                          borderBottom: `1px dashed ${alpha(m.navy, 0.25)}`,
-                          cursor: "help",
+                        }}
+                      >
+                        {entryDisplay}
+                      </BodyText>
+                    )}
+                  </TableCell>
+                  <TableCell sx={{ verticalAlign: "top" }}>
+                    <Stack spacing={0.35}>
+                      <BodyText
+                        component="span"
+                        sx={{
+                          fontSize: 12.5,
+                          fontWeight: 700,
+                          color: alpha(m.navy, 0.75),
+                        }}
+                      >
+                        {dateDisplay}
+                      </BodyText>
+                      {row.note?.trim() ? (
+                        <MuiLink
+                          component="button"
+                          type="button"
+                          underline="hover"
+                          onClick={() => onOpenNote?.(row)}
+                          sx={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: m.teal,
+                            border: 0,
+                            bgcolor: "transparent",
+                            p: 0,
+                            cursor: "pointer",
+                            textAlign: "left",
+                          }}
+                        >
+                          View note
+                        </MuiLink>
+                      ) : null}
+                    </Stack>
+                  </TableCell>
+                  <TableCell sx={{ verticalAlign: "top", minWidth: 160 }}>
+                    <Stack spacing={0.35}>
+                      <Stack
+                        direction="row"
+                        spacing={0.75}
+                        alignItems="center"
+                        flexWrap="wrap"
+                        useFlexGap
+                      >
+                        {clientClickable && onClientClick ? (
+                          <MuiLink
+                            component="button"
+                            type="button"
+                            underline="hover"
+                            onClick={() => onClientClick(row)}
+                            sx={{
+                              fontWeight: 800,
+                              fontSize: 13.5,
+                              color: theme.palette.primary.main,
+                              border: 0,
+                              bgcolor: "transparent",
+                              p: 0,
+                              cursor: "pointer",
+                              lineHeight: 1.2,
+                            }}
+                          >
+                            {row.clientName}
+                          </MuiLink>
+                        ) : (
+                          <BodyText
+                            component="span"
+                            sx={{
+                              fontWeight: 800,
+                              fontSize: 13.5,
+                              color: alpha(m.navy, 0.86),
+                              lineHeight: 1.2,
+                            }}
+                          >
+                            {row.clientName}
+                          </BodyText>
+                        )}
+                        {clientTypeLabel ? (
+                          <Chip
+                            label={clientTypeLabel}
+                            size="small"
+                            sx={{
+                              height: 16,
+                              borderRadius: "999px",
+                              fontWeight: 700,
+                              textTransform: "none",
+                              "& .MuiChip-label": {
+                                fontSize: 9,
+                                px: 0.65,
+                                py: 0,
+                                lineHeight: 1.2,
+                              },
+                              ...clientTypeChipSx(theme),
+                            }}
+                          />
+                        ) : null}
+                      </Stack>
+                      {showClientEmail ? (
+                        <BodyText
+                          component="span"
+                          sx={{
+                            fontSize: 11.5,
+                            fontWeight: 600,
+                            color: alpha(m.navy, 0.5),
+                          }}
+                        >
+                          {row.clientEmail}
+                        </BodyText>
+                      ) : null}
+                    </Stack>
+                  </TableCell>
+                  <TableCell sx={{ verticalAlign: "top" }}>
+                    {tooltip ? (
+                      <Tooltip
+                        title={
+                          <Box sx={{ whiteSpace: "pre-line", fontSize: 11 }}>
+                            {tooltip}
+                          </Box>
+                        }
+                        arrow
+                      >
+                        <BodyText
+                          component="span"
+                          sx={{
+                            fontSize: 12.5,
+                            fontWeight: 800,
+                            color: alpha(m.navy, 0.78),
+                            borderBottom: `1px dashed ${alpha(m.navy, 0.25)}`,
+                            cursor: "help",
+                          }}
+                        >
+                          {row.netAmount}
+                        </BodyText>
+                      </Tooltip>
+                    ) : (
+                      <BodyText
+                        component="span"
+                        sx={{
+                          fontSize: 12.5,
+                          fontWeight: 800,
+                          color: alpha(m.navy, 0.78),
                         }}
                       >
                         {row.netAmount}
                       </BodyText>
-                    </Tooltip>
-                  ) : (
-                    <BodyText component="span" sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.78) }}>
-                      {row.netAmount}
-                    </BodyText>
-                  )}
-                </TableCell>
-                <TableCell sx={{ verticalAlign: "top", maxWidth: 200 }}>
-                  <BodyText component="div" sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.82) }}>
-                    {row.methodTitle}
-                  </BodyText>
-                  {row.methodDetail ? (
-                    <BodyText component="div" sx={{ fontSize: 11, fontWeight: 600, color: alpha(m.navy, 0.48), mt: 0.25 }}>
-                      {row.methodDetail}
-                    </BodyText>
-                  ) : null}
-                </TableCell>
-                <TableCell sx={{ verticalAlign: "top" }}>
-                  <Stack spacing={0.35}>
-                    <Chip
-                      label={row.status}
-                      size="small"
+                    )}
+                  </TableCell>
+                  <TableCell sx={{ verticalAlign: "top", maxWidth: 200 }}>
+                    <BodyText
+                      component="div"
                       sx={{
-                        height: 22,
-                        borderRadius: "8px",
-                        fontSize: 11,
+                        fontSize: 12.5,
                         fontWeight: 800,
-                        width: "fit-content",
-                        ...statusChipSx(row.status, m),
+                        color: alpha(m.navy, 0.82),
                       }}
-                    />
-                    {row.statusDetail ? (
-                      <BodyText component="span" sx={{ fontSize: 10.5, fontWeight: 600, color: alpha(m.navy, 0.48), maxWidth: 160 }}>
-                        {row.statusDetail}
-                      </BodyText>
-                    ) : null}
-                  </Stack>
-                </TableCell>
-                <TableCell sx={{ verticalAlign: "top" }}>
-                  <Stack spacing={0.35}>
-                    {invoiceNo ? (
-                      <MuiLink
-                        component="button"
-                        type="button"
-                        disabled={disableDocumentLinks}
-                        onClick={() => onOpenDocument(row, "invoice")}
-                        underline="hover"
+                    >
+                      {row.methodTitle}
+                    </BodyText>
+                    {row.methodDetail ? (
+                      <BodyText
+                        component="div"
                         sx={{
-                          fontSize: 11.5,
-                          fontWeight: 700,
-                          color: disableDocumentLinks ? alpha(m.navy, 0.28) : theme.palette.primary.main,
-                          cursor: disableDocumentLinks ? "not-allowed" : "pointer",
-                          border: 0,
-                          bgcolor: "transparent",
-                          p: 0,
-                          textAlign: "left",
-                          display: "block",
-                          pointerEvents: disableDocumentLinks ? "none" : "auto",
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: alpha(m.navy, 0.48),
+                          mt: 0.25,
                         }}
                       >
-                        {invoiceNo}
-                      </MuiLink>
-                    ) : null}
-                    {receiptNo ? (
-                      <MuiLink
-                        component="button"
-                        type="button"
-                        disabled={disableDocumentLinks}
-                        onClick={() => onOpenDocument(row, "receipt")}
-                        underline="hover"
-                        sx={{
-                          fontSize: 11.5,
-                          fontWeight: 700,
-                          color: disableDocumentLinks ? alpha(m.navy, 0.28) : theme.palette.primary.main,
-                          cursor: disableDocumentLinks ? "not-allowed" : "pointer",
-                          border: 0,
-                          bgcolor: "transparent",
-                          p: 0,
-                          textAlign: "left",
-                          display: "block",
-                          pointerEvents: disableDocumentLinks ? "none" : "auto",
-                        }}
-                      >
-                        Receipt
-                      </MuiLink>
-                    ) : null}
-                    {!invoiceNo && !receiptNo ? (
-                      <BodyText component="span" sx={{ fontSize: 11.5, color: alpha(m.navy, 0.35) }}>
-                        —
+                        {row.methodDetail}
                       </BodyText>
                     ) : null}
-                  </Stack>
-                </TableCell>
-              </TableRow>
+                  </TableCell>
+                  <TableCell sx={{ verticalAlign: "top" }}>
+                    <Stack spacing={0.35}>
+                      <Chip
+                        label={row.status}
+                        size="small"
+                        sx={{
+                          height: 18,
+                          borderRadius: "6px",
+                          fontWeight: 700,
+                          width: "fit-content",
+                          "& .MuiChip-label": {
+                            fontSize: 10,
+                            px: 0.75,
+                            py: 0,
+                            lineHeight: 1.2,
+                          },
+                          ...statusChipSx(row.status, theme),
+                        }}
+                      />
+                      {row.statusDetail ? (
+                        <BodyText
+                          component="span"
+                          sx={{
+                            fontSize: 10.5,
+                            fontWeight: 600,
+                            color: alpha(m.navy, 0.48),
+                            maxWidth: 160,
+                          }}
+                        >
+                          {row.statusDetail}
+                        </BodyText>
+                      ) : null}
+                    </Stack>
+                  </TableCell>
+                  <TableCell sx={{ verticalAlign: "top" }}>
+                    <Stack spacing={0.35}>
+                      {invoiceNo ? (
+                        <MuiLink
+                          component="button"
+                          type="button"
+                          disabled={disableDocumentLinks}
+                          onClick={() => onOpenDocument(row, "invoice")}
+                          underline="hover"
+                          sx={{
+                            fontSize: 11.5,
+                            fontWeight: 700,
+                            color: disableDocumentLinks
+                              ? alpha(m.navy, 0.28)
+                              : theme.palette.primary.main,
+                            cursor: disableDocumentLinks
+                              ? "not-allowed"
+                              : "pointer",
+                            border: 0,
+                            bgcolor: "transparent",
+                            p: 0,
+                            textAlign: "left",
+                            display: "block",
+                            pointerEvents: disableDocumentLinks
+                              ? "none"
+                              : "auto",
+                          }}
+                        >
+                          {invoiceNo}
+                        </MuiLink>
+                      ) : null}
+                      {receiptNo ? (
+                        <MuiLink
+                          component="button"
+                          type="button"
+                          disabled={disableDocumentLinks}
+                          onClick={() => onOpenDocument(row, "receipt")}
+                          underline="hover"
+                          sx={{
+                            fontSize: 11.5,
+                            fontWeight: 700,
+                            color: disableDocumentLinks
+                              ? alpha(m.navy, 0.28)
+                              : theme.palette.primary.main,
+                            cursor: disableDocumentLinks
+                              ? "not-allowed"
+                              : "pointer",
+                            border: 0,
+                            bgcolor: "transparent",
+                            p: 0,
+                            textAlign: "left",
+                            display: "block",
+                            pointerEvents: disableDocumentLinks
+                              ? "none"
+                              : "auto",
+                          }}
+                        >
+                          Receipt
+                        </MuiLink>
+                      ) : null}
+                      {!invoiceNo && !receiptNo ? (
+                        <BodyText
+                          component="span"
+                          sx={{ fontSize: 11.5, color: alpha(m.navy, 0.35) }}
+                        >
+                          —
+                        </BodyText>
+                      ) : null}
+                    </Stack>
+                  </TableCell>
+                </TableRow>
               );
             })}
           </TableBody>
@@ -385,22 +513,15 @@ export default function TransactionsTable({
 
       {canLoadMore ? (
         <Stack alignItems="center" sx={{ mt: 2 }}>
-          <Button
-            variant="outlined"
+          <AppButton
+            tone="secondary"
             onClick={onLoadMore}
             sx={{
-              borderRadius: "8px",
-              textTransform: "none",
-              fontWeight: 800,
-              borderColor: alpha(m.navy, 0.14),
-              color: alpha(m.navy, 0.72),
-              bgcolor: "#fff",
               px: 3,
-              height: 36,
             }}
           >
             Load More
-          </Button>
+          </AppButton>
         </Stack>
       ) : null}
     </Box>

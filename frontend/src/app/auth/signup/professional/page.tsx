@@ -1,12 +1,12 @@
 "use client";
 
+import AppButton from "../../../../components/common/AppButton";
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Box,
-  Button,
   Checkbox,
   CircularProgress,
   Container,
@@ -112,24 +112,33 @@ export default function ProfessionalSignupPage() {
   const m = theme.palette.mollure;
   const router = useRouter();
   const [form, setForm] = React.useState<FormState>(initialForm);
-  const [errors, setErrors] = React.useState<Partial<Record<keyof FormState, string>>>({});
+  const [errors, setErrors] = React.useState<
+    Partial<Record<keyof FormState, string>>
+  >({});
   const { showSnackbar } = useSnackbar();
   const [register, { isLoading }] = useRegisterMutation();
   const passwordStrength = getPasswordStrength(form.password);
 
   const cardBorder = m.cardBorder ?? alpha(m.navy, 0.12);
 
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (
+    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
     const { name, value, type, checked } = event.target as HTMLInputElement;
 
     setForm((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
-    setErrors((prev) => (prev[name as keyof FormState] ? { ...prev, [name]: undefined } : prev));
+    setErrors((prev) =>
+      prev[name as keyof FormState] ? { ...prev, [name]: undefined } : prev,
+    );
   };
 
-  const isValidEmail = React.useCallback((email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()), []);
+  const isValidEmail = React.useCallback(
+    (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()),
+    [],
+  );
   const isValidName = React.useCallback((name: string) => {
     const trimmed = name.trim();
     if (!trimmed) return false;
@@ -140,34 +149,50 @@ export default function ProfessionalSignupPage() {
     event.preventDefault();
 
     const nextErrors: Partial<Record<keyof FormState, string>> = {};
-    if (!form.contactEmail.trim()) nextErrors.contactEmail = "Email is required.";
-    else if (!isValidEmail(form.contactEmail)) nextErrors.contactEmail = "Enter a valid email address.";
+    if (!form.contactEmail.trim())
+      nextErrors.contactEmail = "Email is required.";
+    else if (!isValidEmail(form.contactEmail))
+      nextErrors.contactEmail = "Enter a valid email address.";
 
-    if (!form.legalName.trim()) nextErrors.legalName = "Legal name is required.";
-    else if (!isValidName(form.legalName)) nextErrors.legalName = "Enter a valid legal name.";
+    if (!form.legalName.trim())
+      nextErrors.legalName = "Legal name is required.";
+    else if (!isValidName(form.legalName))
+      nextErrors.legalName = "Enter a valid legal name.";
 
-    if (!form.contactFirstName.trim()) nextErrors.contactFirstName = "First name is required.";
-    else if (!isValidName(form.contactFirstName)) nextErrors.contactFirstName = "Enter a valid first name.";
+    if (!form.contactFirstName.trim())
+      nextErrors.contactFirstName = "First name is required.";
+    else if (!isValidName(form.contactFirstName))
+      nextErrors.contactFirstName = "Enter a valid first name.";
 
-    if (!form.contactLastName.trim()) nextErrors.contactLastName = "Last name is required.";
-    else if (!isValidName(form.contactLastName)) nextErrors.contactLastName = "Enter a valid last name.";
+    if (!form.contactLastName.trim())
+      nextErrors.contactLastName = "Last name is required.";
+    else if (!isValidName(form.contactLastName))
+      nextErrors.contactLastName = "Enter a valid last name.";
 
     if (!form.password) nextErrors.password = "Password is required.";
-    if (!form.confirmPassword) nextErrors.confirmPassword = "Repeat password is required.";
+    if (!form.confirmPassword)
+      nextErrors.confirmPassword = "Repeat password is required.";
 
-    if (!form.acceptTerms) nextErrors.acceptTerms = "Please accept the terms and conditions.";
+    if (!form.acceptTerms)
+      nextErrors.acceptTerms = "Please accept the terms and conditions.";
 
-    if (!form.cccNumber.trim()) nextErrors.cccNumber = "COC number is required.";
+    if (!form.cccNumber.trim())
+      nextErrors.cccNumber = "COC number is required.";
     else if (!COC_NUMBER_REGEX.test(form.cccNumber.trim())) {
       nextErrors.cccNumber = "COC number must be exactly 8 digits.";
     }
 
-    if (!form.vatNumber.trim()) nextErrors.vatNumber = "VAT number is required.";
+    if (!form.vatNumber.trim())
+      nextErrors.vatNumber = "VAT number is required.";
     else if (!VAT_NUMBER_REGEX.test(form.vatNumber.trim())) {
       nextErrors.vatNumber = "VAT number must match NL123456789B01 format.";
     }
 
-    const hasPortfolioLink = [form.website, form.instagram, form.otherLink].some((link) => link.trim());
+    const hasPortfolioLink = [
+      form.website,
+      form.instagram,
+      form.otherLink,
+    ].some((link) => link.trim());
     if (!hasPortfolioLink) {
       nextErrors.website = "At least one portfolio link is required.";
     }
@@ -175,25 +200,44 @@ export default function ProfessionalSignupPage() {
     if (Object.keys(nextErrors).length) {
       setErrors(nextErrors);
       const firstMessage = Object.values(nextErrors).find(Boolean);
-      if (firstMessage) showSnackbar({ severity: "error", message: firstMessage });
+      if (firstMessage)
+        showSnackbar({ severity: "error", message: firstMessage });
       return;
     }
 
     if (form.password !== form.confirmPassword) {
-      setErrors((prev) => ({ ...prev, confirmPassword: "Password and repeat password must match." }));
-      showSnackbar({ severity: "error", message: "Password and repeat password must match." });
+      setErrors((prev) => ({
+        ...prev,
+        confirmPassword: "Password and repeat password must match.",
+      }));
+      showSnackbar({
+        severity: "error",
+        message: "Password and repeat password must match.",
+      });
       return;
     }
 
     if (!passwordStrength.isStrong) {
-      setErrors((prev) => ({ ...prev, password: "Please choose a strong password to continue." }));
-      showSnackbar({ severity: "error", message: "Please choose a strong password to continue." });
+      setErrors((prev) => ({
+        ...prev,
+        password: "Please choose a strong password to continue.",
+      }));
+      showSnackbar({
+        severity: "error",
+        message: "Please choose a strong password to continue.",
+      });
       return;
     }
 
     if (!form.acceptTerms) {
-      setErrors((prev) => ({ ...prev, acceptTerms: "Please accept the terms and conditions." }));
-      showSnackbar({ severity: "error", message: "Please accept the terms and conditions." });
+      setErrors((prev) => ({
+        ...prev,
+        acceptTerms: "Please accept the terms and conditions.",
+      }));
+      showSnackbar({
+        severity: "error",
+        message: "Please accept the terms and conditions.",
+      });
       return;
     }
 
@@ -221,12 +265,19 @@ export default function ProfessionalSignupPage() {
       showSnackbar({
         severity: "success",
         message:
-          result.message || "Professional account created successfully. Please check your email.",
+          result.message ||
+          "Professional account created successfully. Please check your email.",
       });
       setForm(initialForm);
       try {
-        window.sessionStorage.setItem("mollure_signup_email", form.contactEmail.trim().toLowerCase());
-        window.sessionStorage.setItem("mollure_signup_user_type", "professional");
+        window.sessionStorage.setItem(
+          "mollure_signup_email",
+          form.contactEmail.trim().toLowerCase(),
+        );
+        window.sessionStorage.setItem(
+          "mollure_signup_user_type",
+          "professional",
+        );
       } catch {
         // ignore
       }
@@ -236,7 +287,10 @@ export default function ProfessionalSignupPage() {
     } catch (error) {
       showSnackbar({
         severity: "error",
-        message: getApiErrorMessage(error, "Registration failed. Please check the details."),
+        message: getApiErrorMessage(
+          error,
+          "Registration failed. Please check the details.",
+        ),
       });
     }
   };
@@ -328,7 +382,9 @@ export default function ProfessionalSignupPage() {
           localeLabel={authSignupHeaderProfessional.localeLabel}
           loginLabel={authSignupHeaderProfessional.loginLabel}
           loginHref={authSignupHeaderProfessional.loginHref}
-          professionalLinkLabel={authSignupHeaderProfessional.professionalLinkLabel}
+          professionalLinkLabel={
+            authSignupHeaderProfessional.professionalLinkLabel
+          }
           professionalHref={authSignupHeaderProfessional.professionalHref}
           homeHref="/"
         />
@@ -541,7 +597,13 @@ export default function ProfessionalSignupPage() {
                             Portfolio links
                           </Typography>
                           {errors.website ? (
-                            <Typography sx={{ fontSize: 12, color: "error.main", mb: 0.5 }}>
+                            <Typography
+                              sx={{
+                                fontSize: 12,
+                                color: "error.main",
+                                mb: 0.5,
+                              }}
+                            >
                               {errors.website}
                             </Typography>
                           ) : null}
@@ -675,10 +737,16 @@ export default function ProfessionalSignupPage() {
                         />
                       }
                       label={
-                        <BodyText component="span" sx={{ fontSize: "0.875rem", color: alpha(m.navy, 0.55) }}>
+                        <BodyText
+                          component="span"
+                          sx={{
+                            fontSize: "0.875rem",
+                            color: alpha(m.navy, 0.55),
+                          }}
+                        >
                           Accept our{" "}
                           <Link
-                            href="/terms"
+                            href="/terms-and-conditions"
                             style={{
                               color: m.teal,
                               fontWeight: 600,
@@ -687,40 +755,42 @@ export default function ProfessionalSignupPage() {
                           >
                             Terms & Conditions
                           </Link>
-                          <Typography component="span" sx={{ color: "error.main", fontWeight: 600 }}>
+                          <Typography
+                            component="span"
+                            sx={{ color: "error.main", fontWeight: 600 }}
+                          >
                             *
                           </Typography>
                         </BodyText>
                       }
                     />
 
-                    <Button
+                    <AppButton
+                      tone="primary"
                       type="submit"
-                      variant="contained"
-                      disableElevation
                       fullWidth
                       disabled={isLoading || !passwordStrength.isStrong}
                       sx={{
-                        borderRadius: "10px",
-                        textTransform: "none",
-                        fontWeight: 700,
                         fontSize: "1rem",
                         py: 1.2,
                         minHeight: 44,
-                        bgcolor: m.teal,
                         color: m.white,
-                        "&:hover": { bgcolor: m.tealDark },
                       }}
                     >
                       {isLoading ? (
-                        <Stack direction="row" spacing={1.25} alignItems="center" justifyContent="center">
+                        <Stack
+                          direction="row"
+                          spacing={1.25}
+                          alignItems="center"
+                          justifyContent="center"
+                        >
                           <CircularProgress size={20} sx={{ color: m.white }} />
                           <span>Registering...</span>
                         </Stack>
                       ) : (
                         "Register"
                       )}
-                    </Button>
+                    </AppButton>
                   </Stack>
                 </Box>
               </Stack>

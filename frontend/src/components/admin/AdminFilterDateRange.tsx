@@ -15,6 +15,7 @@ type AdminFilterDateRangeProps = {
   minWidth?: number | string | Record<string, number | string>;
   /** Removes outer border for use inside segmented filter bars. */
   embedded?: boolean;
+  height?: number;
 };
 
 function formatDisplay(iso: string) {
@@ -37,6 +38,7 @@ export default function AdminFilterDateRange({
   placeholder = "Select date range",
   minWidth = 240,
   embedded = false,
+  height = 40,
 }: AdminFilterDateRangeProps) {
   const tokens = useTheme().palette.mollure;
   const anchorRef = React.useRef<HTMLButtonElement>(null);
@@ -72,7 +74,8 @@ export default function AdminFilterDateRange({
   const handleApply = () => {
     if (!draftStart) return;
     const finish = draftEnd || draftStart;
-    const [from, to] = draftStart <= finish ? [draftStart, finish] : [finish, draftStart];
+    const [from, to] =
+      draftStart <= finish ? [draftStart, finish] : [finish, draftStart];
     onChange(from, to);
     setOpen(false);
   };
@@ -99,22 +102,29 @@ export default function AdminFilterDateRange({
           borderRadius: embedded ? 0 : 2,
           border: embedded
             ? "none"
-            : `1px solid ${open ? tokens.teal : tokens.inputBorder ?? tokens.cardBorder}`,
+            : `1px solid ${open ? tokens.teal : (tokens.inputBorder ?? tokens.cardBorder)}`,
           bgcolor: embedded ? "transparent" : tokens.white,
           minWidth: embedded ? 0 : minWidth,
-          width: embedded ? "100%" : undefined,
-          height: 40,
+          width: embedded || minWidth === 0 || minWidth === "100%" ? "100%" : undefined,
+          maxWidth: "100%",
+          height,
           justifyContent: "flex-start",
+          boxSizing: "border-box",
           transition: "border-color 160ms ease",
-          "&:hover": embedded ? { bgcolor: alpha(tokens.teal, 0.04) } : { borderColor: tokens.teal },
+          "&:hover": embedded
+            ? { bgcolor: alpha(tokens.teal, 0.04) }
+            : { borderColor: tokens.teal },
         }}
       >
-        <CalendarTodayOutlinedIcon sx={{ fontSize: 18, color: tokens.teal, flexShrink: 0 }} />
+        <CalendarTodayOutlinedIcon
+          sx={{ fontSize: 18, color: tokens.teal, flexShrink: 0 }}
+        />
         <Typography
           sx={{
             fontSize: 12,
             fontWeight: 500,
-            color: start || end ? tokens.navy : tokens.placeholder ?? tokens.slate,
+            color:
+              start || end ? tokens.navy : (tokens.placeholder ?? tokens.slate),
             textAlign: "left",
             flex: 1,
             whiteSpace: "nowrap",
@@ -143,7 +153,9 @@ export default function AdminFilterDateRange({
         }}
       >
         <Box sx={{ p: 2, width: { xs: 310, sm: 340 } }}>
-          <Typography sx={{ fontSize: 14, fontWeight: 600, color: tokens.navy, mb: 0.5 }}>
+          <Typography
+            sx={{ fontSize: 14, fontWeight: 600, color: tokens.navy, mb: 0.5 }}
+          >
             Select date range
           </Typography>
           <Typography sx={{ fontSize: 12, color: tokens.bodyText, mb: 1.5 }}>
@@ -160,17 +172,35 @@ export default function AdminFilterDateRange({
               const inRange = isDateInRange(iso, rangeStart, end);
               const isEdge = iso === rangeStart || iso === draftEnd;
               if (isEdge) {
-                return { bgcolor: tokens.teal, color: tokens.white, fontWeight: 700 };
+                return {
+                  bgcolor: tokens.teal,
+                  color: tokens.white,
+                  fontWeight: 700,
+                };
               }
               if (inRange) {
-                return { bgcolor: alpha(tokens.teal, 0.14), color: tokens.tealDark, fontWeight: 600 };
+                return {
+                  bgcolor: alpha(tokens.teal, 0.14),
+                  color: tokens.tealDark,
+                  fontWeight: 600,
+                };
               }
               return undefined;
             }}
           />
 
-          <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ mt: 2 }}>
-            <AppButton variant="outlined" size="small" onClick={handleClear} sx={{ textTransform: "none" }}>
+          <Stack
+            direction="row"
+            spacing={1}
+            justifyContent="flex-end"
+            sx={{ mt: 2 }}
+          >
+            <AppButton
+              variant="outlined"
+              size="small"
+              onClick={handleClear}
+              sx={{ textTransform: "none" }}
+            >
               Clear
             </AppButton>
             <AppButton

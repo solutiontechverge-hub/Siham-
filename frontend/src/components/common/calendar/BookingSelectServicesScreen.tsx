@@ -58,13 +58,16 @@ export default function BookingSelectServicesScreen({
   );
 
   const getServiceName = React.useCallback(
-    (service: BookingCatalogService) => serviceOverrides[service.id]?.name ?? service.name,
+    (service: BookingCatalogService) =>
+      serviceOverrides[service.id]?.name ?? service.name,
     [serviceOverrides],
   );
 
   return (
     <Stack spacing={1.5}>
-      <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 15 }}>
+      <BodyText
+        sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 15 }}
+      >
         Select Services
       </BodyText>
 
@@ -80,7 +83,13 @@ export default function BookingSelectServicesScreen({
                 mb: 0.75,
               }}
             >
-              <BodyText sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.72) }}>
+              <BodyText
+                sx={{
+                  fontSize: 12.5,
+                  fontWeight: 900,
+                  color: alpha(m.navy, 0.72),
+                }}
+              >
                 {group.category}
               </BodyText>
             </Box>
@@ -97,7 +106,7 @@ export default function BookingSelectServicesScreen({
                     onClick={() => onToggle(service)}
                     sx={{
                       width: "100%",
-                      border: `1px solid ${alpha(m.navy, 0.10)}`,
+                      border: `1px solid ${alpha(m.navy, 0.1)}`,
                       borderRadius: "10px",
                       px: 1.25,
                       py: 1.1,
@@ -110,16 +119,33 @@ export default function BookingSelectServicesScreen({
                       opacity: disabled ? 0.55 : 1,
                       transition: "border-color 0.15s, background-color 0.15s",
                       "&:hover": {
-                        borderColor: disabled ? alpha(m.navy, 0.10) : alpha(m.teal, 0.35),
+                        borderColor: disabled
+                          ? alpha(m.navy, 0.1)
+                          : alpha(m.teal, 0.35),
                         bgcolor: disabled ? "#fff" : alpha(m.teal, 0.03),
                       },
                     }}
                   >
                     <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <BodyText sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.82), lineHeight: 1.25 }}>
+                      <BodyText
+                        sx={{
+                          fontSize: 12.5,
+                          fontWeight: 900,
+                          color: alpha(m.navy, 0.82),
+                          lineHeight: 1.25,
+                        }}
+                      >
                         {getServiceName(service)}
                       </BodyText>
-                      <BodyText sx={{ mt: 0.35, fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.48), lineHeight: 1.2 }}>
+                      <BodyText
+                        sx={{
+                          mt: 0.35,
+                          fontSize: 11.5,
+                          fontWeight: 700,
+                          color: alpha(m.navy, 0.48),
+                          lineHeight: 1.2,
+                        }}
+                      >
                         {getServiceMeta(service)}
                       </BodyText>
                     </Box>
@@ -135,7 +161,10 @@ export default function BookingSelectServicesScreen({
                         aria-label={`Edit ${service.name}`}
                         sx={{
                           color: alpha(m.navy, 0.42),
-                          "&:hover": { color: m.teal, bgcolor: alpha(m.teal, 0.08) },
+                          "&:hover": {
+                            color: m.teal,
+                            bgcolor: alpha(m.teal, 0.08),
+                          },
                         }}
                       >
                         <EditRoundedIcon sx={{ fontSize: 17 }} />

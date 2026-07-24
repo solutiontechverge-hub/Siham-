@@ -28,5 +28,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     return content;
   }
 
-  return <GoogleOAuthProvider clientId={googleClientId}>{content}</GoogleOAuthProvider>;
+  return (
+    <GoogleOAuthProvider clientId={googleClientId}>
+      {content}
+    </GoogleOAuthProvider>
+  );
 }

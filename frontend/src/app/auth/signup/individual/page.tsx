@@ -1,5 +1,6 @@
 "use client";
 
+import AppButton from "../../../../components/common/AppButton";
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -8,7 +9,6 @@ import VisibilityOffOutlinedIcon from "@mui/icons-material/VisibilityOffOutlined
 import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import {
   Box,
-  Button,
   Checkbox,
   CircularProgress,
   Container,
@@ -77,7 +77,9 @@ export default function IndividualSignupPage() {
   const m = theme.palette.mollure;
   const router = useRouter();
   const [form, setForm] = React.useState<FormState>(initialForm);
-  const [errors, setErrors] = React.useState<Partial<Record<keyof FormState, string>>>({});
+  const [errors, setErrors] = React.useState<
+    Partial<Record<keyof FormState, string>>
+  >({});
   const { showSnackbar } = useSnackbar();
   const [register, { isLoading }] = useRegisterMutation();
   const passwordStrength = getPasswordStrength(form.password);
@@ -110,10 +112,15 @@ export default function IndividualSignupPage() {
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
-    setErrors((prev) => (prev[name as keyof FormState] ? { ...prev, [name]: undefined } : prev));
+    setErrors((prev) =>
+      prev[name as keyof FormState] ? { ...prev, [name]: undefined } : prev,
+    );
   };
 
-  const isValidEmail = React.useCallback((email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()), []);
+  const isValidEmail = React.useCallback(
+    (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()),
+    [],
+  );
   const isValidName = React.useCallback((name: string) => {
     const trimmed = name.trim();
     if (!trimmed) return false;
@@ -125,21 +132,30 @@ export default function IndividualSignupPage() {
 
     const nextErrors: Partial<Record<keyof FormState, string>> = {};
     if (!form.email.trim()) nextErrors.email = "Email is required.";
-    else if (!isValidEmail(form.email)) nextErrors.email = "Enter a valid email address.";
+    else if (!isValidEmail(form.email))
+      nextErrors.email = "Enter a valid email address.";
 
-    if (!form.firstName.trim()) nextErrors.firstName = "First name is required.";
-    else if (!isValidName(form.firstName)) nextErrors.firstName = "Enter a valid first name.";
+    if (!form.firstName.trim())
+      nextErrors.firstName = "First name is required.";
+    else if (!isValidName(form.firstName))
+      nextErrors.firstName = "Enter a valid first name.";
 
     if (!form.lastName.trim()) nextErrors.lastName = "Last name is required.";
-    else if (!isValidName(form.lastName)) nextErrors.lastName = "Enter a valid last name.";
+    else if (!isValidName(form.lastName))
+      nextErrors.lastName = "Enter a valid last name.";
 
     if (!form.password) nextErrors.password = "Password is required.";
-    if (!form.confirmPassword) nextErrors.confirmPassword = "Repeat password is required.";
+    if (!form.confirmPassword)
+      nextErrors.confirmPassword = "Repeat password is required.";
 
-    if (!form.acceptTerms) nextErrors.acceptTerms = "Please accept the terms and conditions.";
+    if (!form.acceptTerms)
+      nextErrors.acceptTerms = "Please accept the terms and conditions.";
 
-    const phoneErrors = getPhoneValidationErrors(form.countryCode, form.phone, { required: false });
-    if (phoneErrors.countryCode) nextErrors.countryCode = phoneErrors.countryCode;
+    const phoneErrors = getPhoneValidationErrors(form.countryCode, form.phone, {
+      required: false,
+    });
+    if (phoneErrors.countryCode)
+      nextErrors.countryCode = phoneErrors.countryCode;
     if (phoneErrors.phone) nextErrors.phone = phoneErrors.phone;
     if (form.phone.trim() && !form.countryCode.trim()) {
       nextErrors.countryCode = "Country code is required.";
@@ -148,25 +164,44 @@ export default function IndividualSignupPage() {
     if (Object.keys(nextErrors).length) {
       setErrors(nextErrors);
       const firstMessage = Object.values(nextErrors).find(Boolean);
-      if (firstMessage) showSnackbar({ severity: "error", message: firstMessage });
+      if (firstMessage)
+        showSnackbar({ severity: "error", message: firstMessage });
       return;
     }
 
     if (form.password !== form.confirmPassword) {
-      setErrors((prev) => ({ ...prev, confirmPassword: "Password and repeat password must match." }));
-      showSnackbar({ severity: "error", message: "Password and repeat password must match." });
+      setErrors((prev) => ({
+        ...prev,
+        confirmPassword: "Password and repeat password must match.",
+      }));
+      showSnackbar({
+        severity: "error",
+        message: "Password and repeat password must match.",
+      });
       return;
     }
 
     if (!passwordStrength.isStrong) {
-      setErrors((prev) => ({ ...prev, password: "Please choose a strong password to continue." }));
-      showSnackbar({ severity: "error", message: "Please choose a strong password to continue." });
+      setErrors((prev) => ({
+        ...prev,
+        password: "Please choose a strong password to continue.",
+      }));
+      showSnackbar({
+        severity: "error",
+        message: "Please choose a strong password to continue.",
+      });
       return;
     }
 
     if (!form.acceptTerms) {
-      setErrors((prev) => ({ ...prev, acceptTerms: "Please accept the terms and conditions." }));
-      showSnackbar({ severity: "error", message: "Please accept the terms and conditions." });
+      setErrors((prev) => ({
+        ...prev,
+        acceptTerms: "Please accept the terms and conditions.",
+      }));
+      showSnackbar({
+        severity: "error",
+        message: "Please accept the terms and conditions.",
+      });
       return;
     }
 
@@ -179,11 +214,17 @@ export default function IndividualSignupPage() {
         first_name: form.firstName.trim(),
         last_name: form.lastName.trim(),
         display_name:
-          resolveDisplayNameFromMode(form.reviewNameMode, form.firstName, form.lastName) || undefined,
+          resolveDisplayNameFromMode(
+            form.reviewNameMode,
+            form.firstName,
+            form.lastName,
+          ) || undefined,
         date_of_birth: form.birthDate || undefined,
         gender: form.gender || undefined,
         country_code:
-          (findCountryDialCode(form.countryCode)?.dialCode ?? form.countryCode.trim()) || undefined,
+          (findCountryDialCode(form.countryCode)?.dialCode ??
+            form.countryCode.trim()) ||
+          undefined,
         phone: form.phone.trim() || undefined,
       }).unwrap();
 
@@ -195,11 +236,17 @@ export default function IndividualSignupPage() {
             first_name: form.firstName.trim(),
             last_name: form.lastName.trim(),
             display_name:
-          resolveDisplayNameFromMode(form.reviewNameMode, form.firstName, form.lastName) || undefined,
+              resolveDisplayNameFromMode(
+                form.reviewNameMode,
+                form.firstName,
+                form.lastName,
+              ) || undefined,
             date_of_birth: form.birthDate || undefined,
             gender: form.gender || undefined,
             country_code:
-          (findCountryDialCode(form.countryCode)?.dialCode ?? form.countryCode.trim()) || undefined,
+              (findCountryDialCode(form.countryCode)?.dialCode ??
+                form.countryCode.trim()) ||
+              undefined,
             phone: form.phone.trim() || undefined,
             email: form.email.trim().toLowerCase(),
             avatar_url: null,
@@ -211,11 +258,16 @@ export default function IndividualSignupPage() {
 
       showSnackbar({
         severity: "success",
-        message: result.message || "Account created successfully. Please check your email.",
+        message:
+          result.message ||
+          "Account created successfully. Please check your email.",
       });
       setForm(initialForm);
       try {
-        window.sessionStorage.setItem("mollure_signup_email", form.email.trim().toLowerCase());
+        window.sessionStorage.setItem(
+          "mollure_signup_email",
+          form.email.trim().toLowerCase(),
+        );
         window.sessionStorage.setItem("mollure_signup_user_type", "individual");
       } catch {
         // ignore
@@ -226,7 +278,10 @@ export default function IndividualSignupPage() {
     } catch (error) {
       showSnackbar({
         severity: "error",
-        message: getApiErrorMessage(error, "Registration failed. Please check the details."),
+        message: getApiErrorMessage(
+          error,
+          "Registration failed. Please check the details.",
+        ),
       });
     }
   };
@@ -427,13 +482,23 @@ export default function IndividualSignupPage() {
                         </Grid>
                         <Grid item xs={12} sm={6}>
                           <Stack spacing={0.75}>
-                            <Typography sx={{ fontSize: 12, fontWeight: 700, color: "text.secondary" }}>
+                            <Typography
+                              sx={{
+                                fontSize: 12,
+                                fontWeight: 700,
+                                color: "text.secondary",
+                              }}
+                            >
                               Birth date
                             </Typography>
                             <AppDatePicker
                               name="birthDate"
                               value={form.birthDate}
-                              onChange={(iso) => handleChange({ target: { name: "birthDate", value: iso } } as React.ChangeEvent<HTMLInputElement>)}
+                              onChange={(iso) =>
+                                handleChange({
+                                  target: { name: "birthDate", value: iso },
+                                } as React.ChangeEvent<HTMLInputElement>)
+                              }
                               max={maxDob}
                               fullWidth
                             />
@@ -475,7 +540,10 @@ export default function IndividualSignupPage() {
                             phone={form.phone}
                             onCountryCodeChange={(dialCode) =>
                               handleChange({
-                                target: { name: "countryCode", value: dialCode },
+                                target: {
+                                  name: "countryCode",
+                                  value: dialCode,
+                                },
                               } as React.ChangeEvent<HTMLInputElement>)
                             }
                             onPhoneChange={(phone) =>
@@ -486,7 +554,11 @@ export default function IndividualSignupPage() {
                             countryCodeError={errors.countryCode}
                             phoneError={errors.phone}
                             onClearErrors={() =>
-                              setErrors((prev) => ({ ...prev, countryCode: undefined, phone: undefined }))
+                              setErrors((prev) => ({
+                                ...prev,
+                                countryCode: undefined,
+                                phone: undefined,
+                              }))
                             }
                             phonePlaceholder="Enter phone number"
                             required={false}
@@ -549,10 +621,16 @@ export default function IndividualSignupPage() {
                         />
                       }
                       label={
-                        <BodyText component="span" sx={{ fontSize: "0.875rem", color: alpha(m.navy, 0.55) }}>
+                        <BodyText
+                          component="span"
+                          sx={{
+                            fontSize: "0.875rem",
+                            color: alpha(m.navy, 0.55),
+                          }}
+                        >
                           Accept{" "}
                           <Link
-                            href="/terms"
+                            href="/terms-and-conditions"
                             style={{
                               color: m.teal,
                               fontWeight: 600,
@@ -572,40 +650,42 @@ export default function IndividualSignupPage() {
                           >
                             Policies
                           </Link>
-                          <Typography component="span" sx={{ color: "error.main", fontWeight: 600 }}>
+                          <Typography
+                            component="span"
+                            sx={{ color: "error.main", fontWeight: 600 }}
+                          >
                             *
                           </Typography>
                         </BodyText>
                       }
                     />
 
-                    <Button
+                    <AppButton
+                      tone="primary"
                       type="submit"
-                      variant="contained"
-                      disableElevation
                       fullWidth
                       disabled={isLoading || !passwordStrength.isStrong}
                       sx={{
-                        borderRadius: "10px",
-                        textTransform: "none",
-                        fontWeight: 700,
                         fontSize: "1rem",
                         py: 1.2,
                         minHeight: 44,
-                        bgcolor: m.teal,
                         color: m.white,
-                        "&:hover": { bgcolor: m.tealDark },
                       }}
                     >
                       {isLoading ? (
-                        <Stack direction="row" spacing={1.25} alignItems="center" justifyContent="center">
+                        <Stack
+                          direction="row"
+                          spacing={1.25}
+                          alignItems="center"
+                          justifyContent="center"
+                        >
                           <CircularProgress size={20} sx={{ color: m.white }} />
                           <span>Registering...</span>
                         </Stack>
                       ) : (
                         "Register"
                       )}
-                    </Button>
+                    </AppButton>
                   </Stack>
                 </Box>
               </Stack>

@@ -23,7 +23,12 @@ export function ActivitySummaryWidget() {
         {activitySummaryCounts.map((item) => {
           const style = ACTION_STYLES[item.action];
           return (
-            <Stack key={item.action} direction="row" alignItems="center" justifyContent="space-between">
+            <Stack
+              key={item.action}
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+            >
               <Stack direction="row" alignItems="center" spacing={1}>
                 <Box
                   sx={{
@@ -34,11 +39,15 @@ export function ActivitySummaryWidget() {
                     flexShrink: 0,
                   }}
                 />
-                <Typography sx={{ fontSize: 12, color: tokens.navy, fontWeight: 500 }}>
+                <Typography
+                  sx={{ fontSize: 12, color: tokens.navy, fontWeight: 500 }}
+                >
                   {style.label}
                 </Typography>
               </Stack>
-              <Typography sx={{ fontSize: 12, fontWeight: 700, color: tokens.navy }}>
+              <Typography
+                sx={{ fontSize: 12, fontWeight: 700, color: tokens.navy }}
+              >
                 {item.count.toLocaleString()}
               </Typography>
             </Stack>
@@ -56,7 +65,12 @@ export function TopActivityUsersWidget() {
     <AdminSectionCard title="Top Users" compact>
       <Stack spacing={1.25}>
         {topActivityUsers.map((user) => (
-          <Stack key={user.id} direction="row" alignItems="center" spacing={1.25}>
+          <Stack
+            key={user.id}
+            direction="row"
+            alignItems="center"
+            spacing={1.25}
+          >
             <Avatar
               sx={{
                 width: 32,
@@ -70,14 +84,24 @@ export function TopActivityUsersWidget() {
               {user.initials}
             </Avatar>
             <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }} noWrap>
+              <Typography
+                sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}
+                noWrap
+              >
                 {user.name}
               </Typography>
               <Typography sx={{ fontSize: 10.5, color: tokens.slate }} noWrap>
                 {user.email}
               </Typography>
             </Box>
-            <Typography sx={{ fontSize: 12, fontWeight: 700, color: tokens.teal, flexShrink: 0 }}>
+            <Typography
+              sx={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: tokens.teal,
+                flexShrink: 0,
+              }}
+            >
               {user.count.toLocaleString()}
             </Typography>
           </Stack>
@@ -109,7 +133,12 @@ export function RecentActivityAlertsWidget() {
           const Icon = ALERT_ICONS[alert.severity];
           const color = ALERT_COLORS[alert.severity];
           return (
-            <Stack key={alert.id} direction="row" spacing={1.25} alignItems="flex-start">
+            <Stack
+              key={alert.id}
+              direction="row"
+              spacing={1.25}
+              alignItems="flex-start"
+            >
               <Box
                 sx={{
                   width: 28,
@@ -124,15 +153,32 @@ export function RecentActivityAlertsWidget() {
                 <Icon sx={{ fontSize: 16, color }} />
               </Box>
               <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-                  <Typography sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }} noWrap>
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  spacing={1}
+                >
+                  <Typography
+                    sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}
+                    noWrap
+                  >
                     {alert.title}
                   </Typography>
-                  <Typography sx={{ fontSize: 10.5, color: tokens.slate, flexShrink: 0 }}>
+                  <Typography
+                    sx={{ fontSize: 10.5, color: tokens.slate, flexShrink: 0 }}
+                  >
                     {alert.time}
                   </Typography>
                 </Stack>
-                <Typography sx={{ fontSize: 11, color: tokens.bodyText, mt: 0.25, lineHeight: 1.4 }}>
+                <Typography
+                  sx={{
+                    fontSize: 11,
+                    color: tokens.bodyText,
+                    mt: 0.25,
+                    lineHeight: 1.4,
+                  }}
+                >
                   {alert.description}
                 </Typography>
               </Box>

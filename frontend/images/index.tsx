@@ -1,4 +1,5 @@
 export const Logo = require("./logo.svg");
+export const LogoOnDark = require("./logo-on-dark.svg");
 export const Profile = require("./avatar.svg");
 export const ListingBG = require("./BG.svg");
 export const FixedLocationIcon = require("./Fixed-location.svg");

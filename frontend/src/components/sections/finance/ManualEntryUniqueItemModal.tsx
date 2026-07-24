@@ -1,10 +1,15 @@
 "use client";
 
 import * as React from "react";
-import { Button, Stack } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
-import MollureFormField from "../../common/MollureFormField";
-import MollureModal from "../../common/MollureModal";
+import AppDrawer from "../../common/AppDrawer";
+import { FinanceDrawerActionsFooter } from "../../common/FinanceDrawerFooter";
+import BookingAddUniqueItemScreen from "../../common/calendar/BookingAddUniqueItemScreen";
+import {
+  buildUniqueItemLine,
+  emptyBookingUniqueItemDraft,
+  getUniqueItemDraftErrors,
+  type BookingUniqueItemDraft,
+} from "../../../data/bookingUniqueItem.data";
 import type { ManualEntryLine } from "./manualEntry.data";
 
 type ManualEntryUniqueItemModalProps = {
@@ -13,74 +18,67 @@ type ManualEntryUniqueItemModalProps = {
   onSave: (line: ManualEntryLine) => void;
 };
 
+/** Unique-item create flow — same form as Calendar booking, in common AppDrawer. */
 export default function ManualEntryUniqueItemModal({
   open,
   onClose,
   onSave,
 }: ManualEntryUniqueItemModalProps) {
-  const m = useTheme().palette.mollure;
-  const [name, setName] = React.useState("");
-  const [price, setPrice] = React.useState("0");
-  const [vat, setVat] = React.useState("21");
-  const [quantity, setQuantity] = React.useState("1");
+  const [draft, setDraft] = React.useState<BookingUniqueItemDraft>(
+    emptyBookingUniqueItemDraft(),
+  );
+  const [attempted, setAttempted] = React.useState(false);
 
   React.useEffect(() => {
     if (!open) return;
-    setName("");
-    setPrice("0");
-    setVat("21");
-    setQuantity("1");
+    setDraft(emptyBookingUniqueItemDraft());
+    setAttempted(false);
   }, [open]);
 
+  const errors = React.useMemo(
+    () => (attempted ? getUniqueItemDraftErrors(draft) : {}),
+    [attempted, draft],
+  );
+
   const handleSave = () => {
-    const qty = Math.max(1, Number.parseInt(quantity, 10) || 1);
-    const unitPrice = Math.max(0, Number.parseFloat(price.replace(",", ".")) || 0);
-    const label = name.trim() || "Unique item";
+    setAttempted(true);
+    const line = buildUniqueItemLine(draft);
+    if (!line) return;
+
+    const effectiveUnitPrice =
+      line.quantity > 0 ? line.price / line.quantity : line.unitPrice;
+
     onSave({
-      id: `unique-${Date.now()}`,
+      id: line.id,
       kind: "item",
-      name: `${label} (VAT ${vat}%)`,
-      quantity: qty,
-      unitPrice,
+      name: draft.productName.trim(),
+      quantity: line.quantity,
+      unitPrice: effectiveUnitPrice,
     });
     onClose();
   };
 
   return (
-    <MollureModal
+    <AppDrawer
       open={open}
       onClose={onClose}
-      title="Add unique item"
-      maxWidth="xs"
+      title="Add Unique Item"
+      onBack={onClose}
+      contentVariant="muted"
+      sx={{ zIndex: (theme) => theme.zIndex.drawer + 2 }}
       footer={
-        <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ px: 2.5, py: 2 }}>
-          <Button onClick={onClose} variant="outlined" sx={{ textTransform: "none", fontWeight: 800 }}>
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            disableElevation
-            onClick={handleSave}
-            sx={{ textTransform: "none", fontWeight: 900, bgcolor: m.teal, "&:hover": { bgcolor: m.tealDark } }}
-          >
-            Add item
-          </Button>
-        </Stack>
+        <FinanceDrawerActionsFooter
+          onCancel={onClose}
+          onPrimary={handleSave}
+          primaryLabel="Save"
+        />
       }
     >
-      <Stack spacing={1.5} sx={{ px: 2.5, pb: 2 }}>
-        <MollureFormField label="Product / item name" value={name} onChange={(e) => setName(e.target.value)} fullWidth />
-        <MollureFormField label="Price (€)" value={price} onChange={(e) => setPrice(e.target.value)} fullWidth />
-        <MollureFormField label="VAT (%)" value={vat} onChange={(e) => setVat(e.target.value)} fullWidth />
-        <MollureFormField
-          label="Number of units"
-          type="number"
-          value={quantity}
-          onChange={(e) => setQuantity(e.target.value)}
-          inputProps={{ min: 1 }}
-          fullWidth
-        />
-      </Stack>
-    </MollureModal>
+      <BookingAddUniqueItemScreen
+        draft={draft}
+        errors={errors}
+        onChange={(patch) => setDraft((prev) => ({ ...prev, ...patch }))}
+      />
+    </AppDrawer>
   );
 }

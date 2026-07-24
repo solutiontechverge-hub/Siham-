@@ -117,7 +117,11 @@ export const marketingShellFooter = {
     },
     {
       title: "Legal",
-      items: ["Privacy", "Terms", "Security"],
+      items: [
+        "Privacy",
+        { label: "Terms", href: "/terms-and-conditions" },
+        "Security",
+      ],
     },
   ] satisfies MarketingFooterColumn[],
   copyright: "2026 Mollure. All rights reserved.",
@@ -151,7 +155,11 @@ export const professionalsMarketingFooter = {
     },
     {
       title: "Legal",
-      items: ["Privacy", "Terms", "Security"],
+      items: [
+        "Privacy",
+        { label: "Terms", href: "/terms-and-conditions" },
+        "Security",
+      ],
     },
   ] satisfies MarketingFooterColumn[],
   copyright: "2026 Mollure. All rights reserved.",

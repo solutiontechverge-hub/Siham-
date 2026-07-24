@@ -1,13 +1,25 @@
 "use client";
 
+import AppButton from "../AppButton";
 import * as React from "react";
 import AddCircleOutlineRoundedIcon from "@mui/icons-material/AddCircleOutlineRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
-import { Box, Button, IconButton, Menu, MenuItem, Stack, Typography } from "@mui/material";
+import {
+  Box,
+  IconButton,
+  Menu,
+  MenuItem,
+  Stack,
+  Typography,
+} from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import type { SalesLineItem, SalesOverviewCardData, SalesSubCardData } from "./salesOverview.types";
+import type {
+  SalesLineItem,
+  SalesOverviewCardData,
+  SalesSubCardData,
+} from "./salesOverview.types";
 
 export type SalesCardMenuAction =
   | "editSales"
@@ -27,7 +39,10 @@ type SalesOverviewCardProps = {
   onSubViewInvoice?: (sub: SalesSubCardData) => void;
   onSubViewReceipt?: (sub: SalesSubCardData) => void;
   onSubAddOns?: (sub: SalesSubCardData) => void;
-  onSubMenuAction?: (sub: SalesSubCardData, action: SalesCardMenuAction) => void;
+  onSubMenuAction?: (
+    sub: SalesSubCardData,
+    action: SalesCardMenuAction,
+  ) => void;
 };
 
 function formatEur(amount: number): string {
@@ -72,9 +87,15 @@ function MethodDateLine({
   return (
     <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.85 }}>
       {showCalendar ? (
-        <CalendarMonthRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.45), flexShrink: 0 }} />
+        <CalendarMonthRoundedIcon
+          sx={{ fontSize: 16, color: alpha(m.navy, 0.45), flexShrink: 0 }}
+        />
       ) : null}
-      <Typography sx={{ fontSize: 11.5, fontWeight: 650, color: alpha(m.navy, 0.5) }}>{line}</Typography>
+      <Typography
+        sx={{ fontSize: 11.5, fontWeight: 650, color: alpha(m.navy, 0.5) }}
+      >
+        {line}
+      </Typography>
     </Stack>
   );
 }
@@ -83,7 +104,9 @@ function LineRow({ line }: { line: SalesLineItem }) {
   const m = useTheme().palette.mollure;
   return (
     <Stack direction="row" justifyContent="space-between" spacing={1.5}>
-      <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.72) }}>
+      <Typography
+        sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.72) }}
+      >
         {line.label}
       </Typography>
       <Typography
@@ -100,10 +123,20 @@ function LineRow({ line }: { line: SalesLineItem }) {
   );
 }
 
-function statusBadgeSx(badge?: string) {
+function statusBadgeSx(
+  badge: string | undefined,
+  m: {
+    statusOrangeBg: string;
+    statusOrangeFg: string;
+    statusGreenBg: string;
+    statusGreenFg: string;
+    statusGreyFg: string;
+    fxGrayF2F4F7: string;
+  },
+) {
   const value = String(badge ?? "").toLowerCase();
   if (value === "prepaid" || value === "paid") {
-    return { color: "#039855", bgcolor: alpha("#12B76A", 0.14) };
+    return { color: m.statusGreenFg, bgcolor: m.statusGreenBg };
   }
   if (
     value === "prepayment due" ||
@@ -112,14 +145,15 @@ function statusBadgeSx(badge?: string) {
     value === "not paid" ||
     value === "overdue"
   ) {
-    return { color: "#B54708", bgcolor: alpha("#F79009", 0.16) };
+    return { color: m.statusOrangeFg, bgcolor: m.statusOrangeBg };
   }
-  return { color: "#475467", bgcolor: alpha("#98A2B3", 0.16) };
+  return { color: m.statusGreyFg, bgcolor: m.fxGrayF2F4F7 };
 }
 
 function useActionsMenu(onAction?: (action: SalesCardMenuAction) => void) {
   const [menuAnchor, setMenuAnchor] = React.useState<null | HTMLElement>(null);
-  const [downloadAnchor, setDownloadAnchor] = React.useState<null | HTMLElement>(null);
+  const [downloadAnchor, setDownloadAnchor] =
+    React.useState<null | HTMLElement>(null);
 
   const closeAll = () => {
     setMenuAnchor(null);
@@ -131,7 +165,14 @@ function useActionsMenu(onAction?: (action: SalesCardMenuAction) => void) {
     onAction?.(action);
   };
 
-  return { menuAnchor, setMenuAnchor, downloadAnchor, setDownloadAnchor, closeAll, run };
+  return {
+    menuAnchor,
+    setMenuAnchor,
+    downloadAnchor,
+    setDownloadAnchor,
+    closeAll,
+    run,
+  };
 }
 
 function SalesActionsMenu({
@@ -150,7 +191,10 @@ function SalesActionsMenu({
   run: (action: SalesCardMenuAction) => void;
 }) {
   const m = useTheme().palette.mollure;
-  const items: Array<{ id: SalesCardMenuAction | "downloadInvoice"; label: string }> = limitedMenu
+  const items: Array<{
+    id: SalesCardMenuAction | "downloadInvoice";
+    label: string;
+  }> = limitedMenu
     ? [
         { id: "editSales", label: "Edit Sales" },
         { id: "downloadInvoice", label: "Download Invoice" },
@@ -193,11 +237,16 @@ function SalesActionsMenu({
                 py: 1.1,
                 display: "flex",
                 justifyContent: "space-between",
-                borderBottom: index < arr.length - 1 ? `1px solid ${alpha(m.navy, 0.06)}` : "none",
+                borderBottom:
+                  index < arr.length - 1
+                    ? `1px solid ${alpha(m.navy, 0.06)}`
+                    : "none",
               }}
             >
               {item.label}
-              <ChevronRightRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.4) }} />
+              <ChevronRightRoundedIcon
+                sx={{ fontSize: 18, color: alpha(m.navy, 0.4) }}
+              />
             </MenuItem>
           ) : (
             <MenuItem
@@ -208,7 +257,10 @@ function SalesActionsMenu({
                 fontWeight: 700,
                 color: alpha(m.navy, 0.78),
                 py: 1.1,
-                borderBottom: index < arr.length - 1 ? `1px solid ${alpha(m.navy, 0.06)}` : "none",
+                borderBottom:
+                  index < arr.length - 1
+                    ? `1px solid ${alpha(m.navy, 0.06)}`
+                    : "none",
               }}
             >
               {item.label}
@@ -235,7 +287,12 @@ function SalesActionsMenu({
       >
         <MenuItem
           onClick={() => run("downloadInvoicePdf")}
-          sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.78), py: 1.1 }}
+          sx={{
+            fontSize: 13,
+            fontWeight: 700,
+            color: alpha(m.navy, 0.78),
+            py: 1.1,
+          }}
         >
           PDF
         </MenuItem>
@@ -272,9 +329,15 @@ function SubSummaryCard({
   onMenuAction?: (action: SalesCardMenuAction) => void;
 }) {
   const m = useTheme().palette.mollure;
-  const badge = statusBadgeSx(sub.statusBadge);
-  const { menuAnchor, setMenuAnchor, downloadAnchor, setDownloadAnchor, closeAll, run } =
-    useActionsMenu(onMenuAction);
+  const badge = statusBadgeSx(sub.statusBadge, m);
+  const {
+    menuAnchor,
+    setMenuAnchor,
+    downloadAnchor,
+    setDownloadAnchor,
+    closeAll,
+    run,
+  } = useActionsMenu(onMenuAction);
   const showReceipt = sub.paymentState === "paid";
 
   return (
@@ -287,20 +350,31 @@ function SubSummaryCard({
         py: 1.1,
       }}
     >
-      <Stack direction="row" alignItems="flex-start" justifyContent="space-between" sx={{ mb: 0.75 }}>
+      <Stack
+        direction="row"
+        alignItems="flex-start"
+        justifyContent="space-between"
+        sx={{ mb: 0.75 }}
+      >
         <Box>
-          <Typography sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.82) }}>
+          <Typography
+            sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.82) }}
+          >
             {sub.payerLabel}
           </Typography>
           {sub.payerName && sub.payerName !== sub.payerLabel ? (
-            <Typography sx={{ fontSize: 12, fontWeight: 650, color: alpha(m.navy, 0.5) }}>
+            <Typography
+              sx={{ fontSize: 12, fontWeight: 650, color: alpha(m.navy, 0.5) }}
+            >
               {sub.payerName}
             </Typography>
           ) : null}
         </Box>
         {sub.statusBadge ? (
           <Box sx={{ px: 0.85, py: 0.25, borderRadius: "999px", ...badge }}>
-            <Typography sx={{ fontSize: 10.5, fontWeight: 800 }}>{sub.statusBadge}</Typography>
+            <Typography sx={{ fontSize: 10.5, fontWeight: 800 }}>
+              {sub.statusBadge}
+            </Typography>
           </Box>
         ) : null}
       </Stack>
@@ -311,11 +385,20 @@ function SubSummaryCard({
         ))}
       </Stack>
 
-      <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mb: 0.75 }}>
-        <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.55) }}>
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="baseline"
+        sx={{ mb: 0.75 }}
+      >
+        <Typography
+          sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.55) }}
+        >
           {sub.highlightLabel}
         </Typography>
-        <Typography sx={{ fontSize: 22, fontWeight: 900, color: m.teal, lineHeight: 1.1 }}>
+        <Typography
+          sx={{ fontSize: 22, fontWeight: 900, color: m.teal, lineHeight: 1.1 }}
+        >
           {formatEur(sub.highlightAmount)}
         </Typography>
       </Stack>
@@ -328,43 +411,31 @@ function SubSummaryCard({
       ) : null}
 
       <Stack direction="row" alignItems="center" spacing={1}>
-        <Button
-          variant="outlined"
+        <AppButton
+          tone="secondary"
           size="small"
           onClick={onViewInvoice}
           sx={{
-            textTransform: "none",
-            fontWeight: 800,
             fontSize: 11.5,
-            borderRadius: "8px",
-            borderColor: alpha(m.navy, 0.16),
-            color: alpha(m.navy, 0.7),
-            bgcolor: "#fff",
             px: 1.25,
             height: 32,
           }}
         >
           View Invoice
-        </Button>
+        </AppButton>
         {showReceipt ? (
-          <Button
-            variant="outlined"
+          <AppButton
+            tone="secondary"
             size="small"
             onClick={onViewReceipt}
             sx={{
-              textTransform: "none",
-              fontWeight: 800,
               fontSize: 11.5,
-              borderRadius: "8px",
-              borderColor: alpha(m.navy, 0.16),
-              color: alpha(m.navy, 0.7),
-              bgcolor: "#fff",
               px: 1.25,
               height: 32,
             }}
           >
             View Receipt
-          </Button>
+          </AppButton>
         ) : null}
         <IconButton
           size="small"
@@ -385,7 +456,7 @@ function SubSummaryCard({
       </Stack>
 
       {sub.showAddOns ? (
-        <Button
+        <AppButton
           onClick={onAddOns}
           startIcon={<AddCircleOutlineRoundedIcon sx={{ fontSize: 18 }} />}
           sx={{
@@ -400,7 +471,7 @@ function SubSummaryCard({
           }}
         >
           + Add-ons
-        </Button>
+        </AppButton>
       ) : null}
 
       <SalesActionsMenu
@@ -429,8 +500,14 @@ export default function SalesOverviewCard({
 }: SalesOverviewCardProps) {
   const m = useTheme().palette.mollure;
   const muted = Boolean(card.voided || card.refunded || card.canceled);
-  const { menuAnchor, setMenuAnchor, downloadAnchor, setDownloadAnchor, closeAll, run } =
-    useActionsMenu(onMenuAction);
+  const {
+    menuAnchor,
+    setMenuAnchor,
+    downloadAnchor,
+    setDownloadAnchor,
+    closeAll,
+    run,
+  } = useActionsMenu(onMenuAction);
 
   const highlightSet = React.useMemo(
     () => new Set(card.highlightedLineIds ?? []),
@@ -444,11 +521,17 @@ export default function SalesOverviewCard({
     ? card.lines.filter((line) => !highlightSet.has(line.id))
     : [];
 
-  const isGuestOrModel = card.payerRole === "guest" || card.payerRole === "model";
-  const badge = statusBadgeSx(card.statusBadge);
+  const isGuestOrModel =
+    card.payerRole === "guest" || card.payerRole === "model";
+  const badge = statusBadgeSx(card.statusBadge, m);
   const clientBadge =
-    card.clientKind === "company" ? "CC Client" : card.clientKind === "individual" ? "IC Client" : null;
-  const showReceipt = card.paymentState === "prepaid" || card.paymentState === "paid";
+    card.clientKind === "company"
+      ? "CC Client"
+      : card.clientKind === "individual"
+        ? "IC Client"
+        : null;
+  const showReceipt =
+    card.paymentState === "prepaid" || card.paymentState === "paid";
 
   return (
     <Box
@@ -461,20 +544,38 @@ export default function SalesOverviewCard({
         opacity: muted ? 0.62 : 1,
       }}
     >
-      <Stack direction="row" alignItems="flex-start" justifyContent="space-between" sx={{ mb: 1.1 }}>
-        <Typography sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}>
+      <Stack
+        direction="row"
+        alignItems="flex-start"
+        justifyContent="space-between"
+        sx={{ mb: 1.1 }}
+      >
+        <Typography
+          sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}
+        >
           {card.title}
         </Typography>
         {card.statusBadge ? (
           <Box sx={{ px: 1, py: 0.3, borderRadius: "999px", ...badge }}>
-            <Typography sx={{ fontSize: 11, fontWeight: 800 }}>{card.statusBadge}</Typography>
+            <Typography sx={{ fontSize: 11, fontWeight: 800 }}>
+              {card.statusBadge}
+            </Typography>
           </Box>
         ) : null}
       </Stack>
 
-      <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.15, flexWrap: "wrap" }}>
-        <Typography sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.82) }}>
-          {isGuestOrModel ? card.payerLabel || card.clientName : card.clientName}
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={0.75}
+        sx={{ mb: 0.15, flexWrap: "wrap" }}
+      >
+        <Typography
+          sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.82) }}
+        >
+          {isGuestOrModel
+            ? card.payerLabel || card.clientName
+            : card.clientName}
         </Typography>
         {clientBadge ? (
           <Box
@@ -485,19 +586,35 @@ export default function SalesOverviewCard({
               bgcolor: alpha(m.teal, 0.12),
             }}
           >
-            <Typography sx={{ fontSize: 10.5, fontWeight: 800, color: m.teal }}>{clientBadge}</Typography>
+            <Typography sx={{ fontSize: 10.5, fontWeight: 800, color: m.teal }}>
+              {clientBadge}
+            </Typography>
           </Box>
         ) : null}
       </Stack>
 
       {isGuestOrModel && card.clientName ? (
-        <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.55), mb: 0.35 }}>
+        <Typography
+          sx={{
+            fontSize: 12,
+            fontWeight: 700,
+            color: alpha(m.navy, 0.55),
+            mb: 0.35,
+          }}
+        >
           {card.clientName}
         </Typography>
       ) : null}
 
       {card.clientEmail ? (
-        <Typography sx={{ fontSize: 11.5, fontWeight: 600, color: alpha(m.navy, 0.5), mb: 1.15 }}>
+        <Typography
+          sx={{
+            fontSize: 11.5,
+            fontWeight: 600,
+            color: alpha(m.navy, 0.5),
+            mb: 1.15,
+          }}
+        >
           {card.clientEmail}
         </Typography>
       ) : (
@@ -541,14 +658,17 @@ export default function SalesOverviewCard({
       </Stack>
 
       <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.85 }}>
-        <Typography sx={{ fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
+        <Typography
+          sx={{ fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.82) }}
+        >
           {card.totalLabel || "Total"}
         </Typography>
         <Typography
           sx={{
             fontSize: card.kind === "reissued_invoice" ? 22 : 13,
             fontWeight: 900,
-            color: card.kind === "reissued_invoice" ? m.teal : alpha(m.navy, 0.88),
+            color:
+              card.kind === "reissued_invoice" ? m.teal : alpha(m.navy, 0.88),
           }}
         >
           {formatEur(card.total)}
@@ -556,21 +676,39 @@ export default function SalesOverviewCard({
       </Stack>
 
       {card.secondaryRows?.map((row) => (
-        <Stack key={row.id} direction="row" justifyContent="space-between" sx={{ mb: 0.55 }}>
-          <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.62) }}>
+        <Stack
+          key={row.id}
+          direction="row"
+          justifyContent="space-between"
+          sx={{ mb: 0.55 }}
+        >
+          <Typography
+            sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.62) }}
+          >
             {row.label}
           </Typography>
-          <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.72) }}>
+          <Typography
+            sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.72) }}
+          >
             {formatEur(row.amount)}
           </Typography>
         </Stack>
       ))}
 
       <Box sx={{ mt: 0.75, mb: 0.85 }}>
-        <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.55), mb: 0.2 }}>
+        <Typography
+          sx={{
+            fontSize: 12,
+            fontWeight: 700,
+            color: alpha(m.navy, 0.55),
+            mb: 0.2,
+          }}
+        >
           {card.highlightLabel}
         </Typography>
-        <Typography sx={{ fontSize: 28, fontWeight: 900, color: m.teal, lineHeight: 1.1 }}>
+        <Typography
+          sx={{ fontSize: 28, fontWeight: 900, color: m.teal, lineHeight: 1.1 }}
+        >
           {formatEur(card.highlightAmount)}
         </Typography>
       </Box>
@@ -584,13 +722,20 @@ export default function SalesOverviewCard({
       ) : null}
 
       {card.note ? (
-        <Typography sx={{ mt: 0.75, fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.55) }}>
+        <Typography
+          sx={{
+            mt: 0.75,
+            fontSize: 11.5,
+            fontWeight: 700,
+            color: alpha(m.navy, 0.55),
+          }}
+        >
           Note: {card.note}
         </Typography>
       ) : null}
 
       {card.paymentState === "overdue" && onOverdueAction ? (
-        <Button
+        <AppButton
           variant="outlined"
           size="small"
           onClick={onOverdueAction}
@@ -606,47 +751,35 @@ export default function SalesOverviewCard({
           }}
         >
           Add penalty & reissue due date
-        </Button>
+        </AppButton>
       ) : null}
 
       <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 1.35 }}>
-        <Button
-          variant="outlined"
+        <AppButton
+          tone="secondary"
           size="small"
           onClick={onViewInvoice}
           sx={{
-            textTransform: "none",
-            fontWeight: 800,
             fontSize: 11.5,
-            borderRadius: "8px",
-            borderColor: alpha(m.navy, 0.16),
-            color: alpha(m.navy, 0.7),
-            bgcolor: "#fff",
             px: 1.25,
             height: 32,
           }}
         >
           View Invoice
-        </Button>
+        </AppButton>
         {showReceipt ? (
-          <Button
-            variant="outlined"
+          <AppButton
+            tone="secondary"
             size="small"
             onClick={onViewReceipt}
             sx={{
-              textTransform: "none",
-              fontWeight: 800,
               fontSize: 11.5,
-              borderRadius: "8px",
-              borderColor: alpha(m.navy, 0.16),
-              color: alpha(m.navy, 0.7),
-              bgcolor: "#fff",
               px: 1.25,
               height: 32,
             }}
           >
             View Receipt
-          </Button>
+          </AppButton>
         ) : null}
         <IconButton
           size="small"
@@ -666,7 +799,7 @@ export default function SalesOverviewCard({
       </Stack>
 
       {card.showAddOns ? (
-        <Button
+        <AppButton
           onClick={onAddOns}
           startIcon={<AddCircleOutlineRoundedIcon sx={{ fontSize: 18 }} />}
           sx={{
@@ -681,7 +814,7 @@ export default function SalesOverviewCard({
           }}
         >
           + Add-ons
-        </Button>
+        </AppButton>
       ) : null}
 
       <SalesActionsMenu

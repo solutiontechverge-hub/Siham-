@@ -1,11 +1,12 @@
 "use client";
 
+import AppButton from "../AppButton";
 import * as React from "react";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
-import { Box, Button, IconButton, Stack } from "@mui/material";
+import { Box, IconButton, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDropdown from "../AppDropdown";
-import MollureModal from "../MollureModal";
+import AppModal from "../AppModal";
 import { BodyText } from "../../ui/typography";
 import { BUSINESS_SERVICE_CATEGORY_CATALOG } from "../../../data/businessServiceCategorySlider.data";
 import type { CalendarBookingStatus } from "../../../app/professionals/fixed-location/calendar/calendar.data";
@@ -31,7 +32,9 @@ type CalendarDesignModalProps = {
 };
 
 export function getCalendarDesignServiceLabel(key: string): string {
-  const entry = BUSINESS_SERVICE_CATEGORY_CATALOG.find((item) => item.key === key);
+  const entry = BUSINESS_SERVICE_CATEGORY_CATALOG.find(
+    (item) => item.key === key,
+  );
   if (!entry) return key;
   if (entry.key === "hair") return "Haar";
   return entry.label;
@@ -57,13 +60,18 @@ export default function CalendarDesignModal({
 
   const colorRows = React.useMemo<ColorRow[]>(() => {
     if (isTeamMembers) {
-      return teamMemberOptions.map((member) => ({ key: member.id, label: member.name }));
+      return teamMemberOptions.map((member) => ({
+        key: member.id,
+        label: member.name,
+      }));
     }
     if (isStatus) {
-      return (Object.keys(BOOKING_STATUS_THEME) as CalendarBookingStatus[]).map((status) => ({
-        key: status,
-        label: status,
-      }));
+      return (Object.keys(BOOKING_STATUS_THEME) as CalendarBookingStatus[]).map(
+        (status) => ({
+          key: status,
+          label: status,
+        }),
+      );
     }
     if (isServices) {
       return serviceOptions.map((label) => ({ key: label, label }));
@@ -79,18 +87,33 @@ export default function CalendarDesignModal({
       const safe = hex?.startsWith("#") ? hex : `#${hex}`;
       setDraft((p) => {
         if (isTeamMembers) {
-          return { ...p, colorsByTeamMember: { ...(p.colorsByTeamMember ?? {}), [key]: safe } };
+          return {
+            ...p,
+            colorsByTeamMember: {
+              ...(p.colorsByTeamMember ?? {}),
+              [key]: safe,
+            },
+          };
         }
         if (isStatus) {
           return {
             ...p,
-            colorsByStatus: { ...(p.colorsByStatus ?? {}), [key as CalendarBookingStatus]: safe },
+            colorsByStatus: {
+              ...(p.colorsByStatus ?? {}),
+              [key as CalendarBookingStatus]: safe,
+            },
           };
         }
         if (isServices) {
-          return { ...p, colorsByService: { ...(p.colorsByService ?? {}), [key]: safe } };
+          return {
+            ...p,
+            colorsByService: { ...(p.colorsByService ?? {}), [key]: safe },
+          };
         }
-        return { ...p, colorsByCategory: { ...p.colorsByCategory, [key]: safe } };
+        return {
+          ...p,
+          colorsByCategory: { ...p.colorsByCategory, [key]: safe },
+        };
       });
     },
     [isServices, isStatus, isTeamMembers, setDraft],
@@ -123,66 +146,35 @@ export default function CalendarDesignModal({
   );
 
   return (
-    <MollureModal
+    <AppModal
       open={open}
       onClose={onClose}
-      title={
-        <Stack direction="row" spacing={0.75} alignItems="center">
-          <span>Background colour</span>
-          <Box
-            sx={{
-              width: 16,
-              height: 16,
-              borderRadius: "50%",
-              border: `1px solid ${alpha(m.tealDark, 0.35)}`,
-              color: m.teal,
-              display: "grid",
-              placeItems: "center",
-              fontSize: 11,
-              fontWeight: 900,
-            }}
-          >
-            i
-          </Box>
-        </Stack>
-      }
+      title="Background colour"
       maxWidth="sm"
       fullWidth
       footer={
         <Box sx={{ px: 2.5, py: 2 }}>
           <Stack direction="row" justifyContent="flex-end" spacing={1.25}>
-            <Button
-              variant="outlined"
+            <AppButton
+              tone="secondary"
               onClick={onClose}
               sx={{
-                borderRadius: "10px",
-                textTransform: "none",
-                fontWeight: 800,
                 height: 38,
-                borderColor: alpha(m.navy, 0.14),
-                color: alpha(m.navy, 0.72),
-                bgcolor: "#fff",
                 minWidth: 110,
               }}
             >
               Cancel
-            </Button>
-            <Button
-              variant="contained"
-              disableElevation
+            </AppButton>
+            <AppButton
+              tone="primary"
               onClick={onApply}
               sx={{
-                borderRadius: "10px",
-                textTransform: "none",
-                fontWeight: 800,
                 height: 38,
-                bgcolor: m.teal,
-                "&:hover": { bgcolor: m.tealDark },
                 minWidth: 110,
               }}
             >
               Apply
-            </Button>
+            </AppButton>
           </Stack>
         </Box>
       }
@@ -192,7 +184,12 @@ export default function CalendarDesignModal({
           <AppDropdown
             label=""
             value={draft.scope}
-            onChange={(val) => setDraft((p) => ({ ...p, scope: String(val) as CalendarDesignDraft["scope"] }))}
+            onChange={(val) =>
+              setDraft((p) => ({
+                ...p,
+                scope: String(val) as CalendarDesignDraft["scope"],
+              }))
+            }
             options={[
               { label: "Categories", value: "Categories" },
               { label: "Services", value: "Services" },
@@ -233,21 +230,22 @@ export default function CalendarDesignModal({
                     "&:last-of-type": { borderBottom: "none" },
                   }}
                 >
-                  <BodyText sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.7) }}>{label}</BodyText>
-
-                  <Button
-                    component="label"
-                    variant="outlined"
+                  <BodyText
                     sx={{
-                      borderRadius: "10px",
-                      textTransform: "none",
-                      fontWeight: 800,
+                      fontSize: 12.5,
+                      fontWeight: 700,
+                      color: alpha(m.navy, 0.7),
+                    }}
+                  >
+                    {label}
+                  </BodyText>
+
+                  <AppButton
+                    tone="secondary"
+                    component="label"
+                    sx={{
                       height: 30,
                       px: 1.25,
-                      borderColor: alpha(m.navy, 0.12),
-                      color: alpha(m.navy, 0.6),
-                      bgcolor: "#fff",
-                      "&:hover": { borderColor: alpha(m.navy, 0.18), bgcolor: alpha(m.navy, 0.02) },
                       minWidth: 110,
                       display: "inline-flex",
                       alignItems: "center",
@@ -264,11 +262,16 @@ export default function CalendarDesignModal({
                           bgcolor: color || "transparent",
                           border: `1px dashed ${alpha(m.navy, color ? 0.18 : 0.22)}`,
                           ...(color
-                            ? { borderStyle: "solid", borderColor: alpha(m.navy, 0.18) }
+                            ? {
+                                borderStyle: "solid",
+                                borderColor: alpha(m.navy, 0.18),
+                              }
                             : null),
                         }}
                       />
-                      <span>{color ? color.toUpperCase() : "Choose color"}</span>
+                      <span>
+                        {color ? color.toUpperCase() : "Choose color"}
+                      </span>
                     </Stack>
                     <input
                       type="color"
@@ -278,9 +281,14 @@ export default function CalendarDesignModal({
                       onChange={(e) => {
                         setColor(key, e.target.value);
                       }}
-                      style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }}
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        opacity: 0,
+                        cursor: "pointer",
+                      }}
                     />
-                  </Button>
+                  </AppButton>
 
                   <IconButton
                     size="small"
@@ -303,6 +311,6 @@ export default function CalendarDesignModal({
           </Box>
         </Stack>
       </Box>
-    </MollureModal>
+    </AppModal>
   );
 }

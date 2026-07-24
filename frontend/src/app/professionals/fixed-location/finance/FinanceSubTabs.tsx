@@ -10,7 +10,8 @@ const SETTING_HREF = "/professionals/finance/setting";
 export default function FinanceSubTabs() {
   const pathname = usePathname();
 
-  const isOverview = pathname === OVERVIEW_HREF || pathname === "/professionals/finance";
+  const isOverview =
+    pathname === OVERVIEW_HREF || pathname === "/professionals/finance";
   const isSetting = pathname?.includes("/finance/setting") ?? false;
 
   return (

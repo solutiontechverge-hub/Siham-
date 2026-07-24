@@ -49,9 +49,20 @@ export default function AdminKpiCard({
         height: "100%",
       }}
     >
-      <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="flex-start"
+      >
         <Stack spacing={0.75} sx={{ flex: 1, minWidth: 0 }}>
-          <Typography sx={{ fontSize: compact ? 12 : 13, fontWeight: 500, color: tokens.slate, lineHeight: 1.3 }}>
+          <Typography
+            sx={{
+              fontSize: compact ? 12 : 13,
+              fontWeight: 500,
+              color: tokens.slate,
+              lineHeight: 1.3,
+            }}
+          >
             {label}
           </Typography>
           <Typography
@@ -65,14 +76,23 @@ export default function AdminKpiCard({
             {typeof value === "number" ? value.toLocaleString() : value}
           </Typography>
           {sublabel ? (
-            <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>{sublabel}</Typography>
+            <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>
+              {sublabel}
+            </Typography>
           ) : null}
           {trend !== undefined ? (
-            <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.5 }}>
+            <Stack
+              direction="row"
+              alignItems="center"
+              spacing={0.5}
+              sx={{ mt: 0.5 }}
+            >
               {trendUp ? (
                 <TrendingUpIcon sx={{ fontSize: 16, color: tokens.teal }} />
               ) : (
-                <TrendingDownIcon sx={{ fontSize: 16, color: tokens.requestAccent }} />
+                <TrendingDownIcon
+                  sx={{ fontSize: 16, color: tokens.requestAccent }}
+                />
               )}
               <Typography
                 sx={{

@@ -17,6 +17,7 @@ export { default as MessagingLinkBookingDialog } from "./MessagingLinkBookingDia
 export { default as MessagingReportDialog } from "./MessagingReportDialog";
 export { default as MessagingDeleteChatDialog } from "./MessagingDeleteChatDialog";
 export { default as MessagingBlockDialog } from "./MessagingBlockDialog";
+/** @deprecated Use AppModal from `../AppModal` or `components/common`. */
 export { default as MessagingModalShell } from "./MessagingModalShell";
 export { getMessagingHref, messagingSearchPlaceholder } from "./messagingRoutes";
 export { getBlockModalCopy, getReportModalTitle, getMessagingPeerTypeLabel } from "./messagingPeerLabels";

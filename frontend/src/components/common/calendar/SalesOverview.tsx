@@ -8,6 +8,7 @@ import {
   useGetProfessionalClientsQuery,
   useUpdateBookingStatusMutation,
 } from "../../../store/services/businessApi";
+import { useReissueFinanceInvoiceMutation } from "../../../store/services/financeApi";
 import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { TransactionRow } from "../../../app/professionals/fixed-location/finance/data/transactions";
 import { useSnackbar } from "../AppSnackbar";
@@ -23,8 +24,13 @@ import SalesAddOnCheckout from "./SalesAddOnCheckout";
 import SalesCancelModal from "./SalesCancelModal";
 import SalesEditCheckout from "./SalesEditCheckout";
 import SalesOverdueReissueModal from "./SalesOverdueReissueModal";
-import SalesOverviewCard, { type SalesCardMenuAction } from "./SalesOverviewCard";
-import { downloadSalesInvoiceExcel, downloadSalesInvoicePdf } from "./salesInvoiceDownload";
+import SalesOverviewCard, {
+  type SalesCardMenuAction,
+} from "./SalesOverviewCard";
+import {
+  downloadSalesInvoiceExcel,
+  downloadSalesInvoicePdf,
+} from "./salesInvoiceDownload";
 import {
   saveSalesAddon,
   updateSalesAddon,
@@ -49,23 +55,26 @@ type SalesOverviewProps = {
 };
 
 function cardToDraft(card: SalesOverviewCardData): ClientBookingDraft {
-  const sourceLines =
-    card.highlightedLineIds?.length
-      ? card.lines.filter((line) => card.highlightedLineIds!.includes(line.id) && line.amount >= 0)
-      : card.lines.filter((line) => line.amount >= 0);
+  const sourceLines = card.highlightedLineIds?.length
+    ? card.lines.filter(
+        (line) =>
+          card.highlightedLineIds!.includes(line.id) && line.amount >= 0,
+      )
+    : card.lines.filter((line) => line.amount >= 0);
 
   return {
     selectedDateISO: card.occurredAt.slice(0, 10),
     selectedTime: "",
     combineServices: false,
-    services: (sourceLines.length ? sourceLines : card.lines.filter((line) => line.amount >= 0)).map(
-      (line) => ({
-        id: line.id,
-        name: line.label,
-        price: line.amount,
-        durationMins: 30,
-      }),
-    ),
+    services: (sourceLines.length
+      ? sourceLines
+      : card.lines.filter((line) => line.amount >= 0)
+    ).map((line) => ({
+      id: line.id,
+      name: line.label,
+      price: line.amount,
+      durationMins: 30,
+    })),
     total: card.documentAmount,
     people: [],
     teamMembers: [],
@@ -85,25 +94,43 @@ export default function SalesOverview({
   const { showSnackbar } = useSnackbar();
   const { settings: financeSettings } = useFinanceInvoiceSettings();
   const { data: clientsResponse } = useGetProfessionalClientsQuery();
-  const [updateBookingStatus, { isLoading: cancelling }] = useUpdateBookingStatusMutation();
+  const [updateBookingStatus, { isLoading: cancelling }] =
+    useUpdateBookingStatusMutation();
+  const [reissueFinanceInvoice] = useReissueFinanceInvoiceMutation();
 
   const [revision, setRevision] = React.useState(0);
-  const [checkoutBookingId, setCheckoutBookingId] = React.useState<string | null>(null);
+  const [checkoutBookingId, setCheckoutBookingId] = React.useState<
+    string | null
+  >(null);
   const [checkoutBookingCode, setCheckoutBookingCode] = React.useState("");
-  const [checkoutCardId, setCheckoutCardId] = React.useState<string | null>(null);
-  const [editingCard, setEditingCard] = React.useState<SalesOverviewCardData | null>(null);
+  const [checkoutCardId, setCheckoutCardId] = React.useState<string | null>(
+    null,
+  );
+  const [editingCard, setEditingCard] =
+    React.useState<SalesOverviewCardData | null>(null);
   const [docOpen, setDocOpen] = React.useState(false);
-  const [docType, setDocType] = React.useState<"invoice" | "receipt">("invoice");
+  const [docType, setDocType] = React.useState<"invoice" | "receipt">(
+    "invoice",
+  );
   const [docRow, setDocRow] = React.useState<TransactionRow | null>(null);
-  const [noteCard, setNoteCard] = React.useState<SalesOverviewCardData | null>(null);
-  const [cancelCard, setCancelCard] = React.useState<SalesOverviewCardData | null>(null);
-  const [overdueCard, setOverdueCard] = React.useState<SalesOverviewCardData | null>(null);
+  const [noteCard, setNoteCard] = React.useState<SalesOverviewCardData | null>(
+    null,
+  );
+  const [cancelCard, setCancelCard] =
+    React.useState<SalesOverviewCardData | null>(null);
+  const [overdueCard, setOverdueCard] =
+    React.useState<SalesOverviewCardData | null>(null);
 
   const clientKind = React.useMemo<SalesClientKind | undefined>(() => {
-    const email = (clientEmail || currentEvent?.details?.clientEmail || "").trim().toLowerCase();
+    const email = (clientEmail || currentEvent?.details?.clientEmail || "")
+      .trim()
+      .toLowerCase();
     if (!email) return undefined;
     const match = (clientsResponse?.data ?? []).find(
-      (row) => String(row.email || "").trim().toLowerCase() === email,
+      (row) =>
+        String(row.email || "")
+          .trim()
+          .toLowerCase() === email,
     );
     return match?.client_kind;
   }, [clientEmail, clientsResponse?.data, currentEvent?.details?.clientEmail]);
@@ -121,11 +148,23 @@ export default function SalesOverview({
       }),
     // revision forces rebuild after localStorage mutations
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [bookings, currentEvent, clientName, clientEmail, clientPhone, clientKind, fallbackResourceId, revision],
+    [
+      bookings,
+      currentEvent,
+      clientName,
+      clientEmail,
+      clientPhone,
+      clientKind,
+      fallbackResourceId,
+      revision,
+    ],
   );
 
   const subToCard = React.useCallback(
-    (sub: SalesSubCardData, parent: SalesOverviewCardData): SalesOverviewCardData => ({
+    (
+      sub: SalesSubCardData,
+      parent: SalesOverviewCardData,
+    ): SalesOverviewCardData => ({
       id: sub.id,
       bookingId: sub.bookingId || parent.bookingId,
       bookingCode: sub.bookingCode || parent.bookingCode,
@@ -158,7 +197,9 @@ export default function SalesOverview({
     if (!checkoutBookingId) return null;
 
     let match: SalesOverviewCardData | null =
-      (checkoutCardId ? cards.find((card) => card.id === checkoutCardId) : null) ?? null;
+      (checkoutCardId
+        ? cards.find((card) => card.id === checkoutCardId)
+        : null) ?? null;
 
     if (!match && checkoutCardId) {
       for (const card of cards) {
@@ -172,7 +213,11 @@ export default function SalesOverview({
 
     if (!match) {
       match =
-        cards.find((card) => card.bookingId === checkoutBookingId && card.kind === "after_treatment") ??
+        cards.find(
+          (card) =>
+            card.bookingId === checkoutBookingId &&
+            card.kind === "after_treatment",
+        ) ??
         cards.find((card) => card.bookingId === checkoutBookingId) ??
         null;
     }
@@ -183,7 +228,8 @@ export default function SalesOverview({
         : match?.clientName || clientName || "Client";
     return {
       bookingId: checkoutBookingId,
-      bookingCode: checkoutBookingCode || match?.bookingCode || checkoutBookingId,
+      bookingCode:
+        checkoutBookingCode || match?.bookingCode || checkoutBookingId,
       clientName: displayName,
       clientEmail: match?.clientEmail || clientEmail,
     };
@@ -201,7 +247,10 @@ export default function SalesOverview({
     (card: SalesOverviewCardData, type: "invoice" | "receipt") => {
       const draft = cardToDraft(card);
       if (!draft.services.length) {
-        showSnackbar({ severity: "warning", message: "No line items available for this document." });
+        showSnackbar({
+          severity: "warning",
+          message: "No line items available for this document.",
+        });
         return;
       }
       const row = buildClientBookingTransactionRow({
@@ -214,8 +263,12 @@ export default function SalesOverview({
         requesterEmail: card.clientEmail,
         financeSettings,
         documentAmount: card.documentAmount,
-        methodTitle: card.paymentMethodLabel?.includes("Offline") ? "Offline - Direct" : "Online - Direct",
-        methodDetail: card.paymentMethodLabel?.includes("Offline") ? "Cash" : "Card",
+        methodTitle: card.paymentMethodLabel?.includes("Offline")
+          ? "Offline - Direct"
+          : "Online - Direct",
+        methodDetail: card.paymentMethodLabel?.includes("Offline")
+          ? "Cash"
+          : "Card",
       });
       setDocRow(row);
       setDocType(type);
@@ -231,7 +284,10 @@ export default function SalesOverview({
       try {
         if (format === "pdf") await downloadSalesInvoicePdf(card);
         else await downloadSalesInvoiceExcel(card);
-        showSnackbar({ severity: "success", message: `Invoice downloaded as ${format.toUpperCase()}.` });
+        showSnackbar({
+          severity: "success",
+          message: `Invoice downloaded as ${format.toUpperCase()}.`,
+        });
       } catch {
         showSnackbar({ severity: "error", message: "Download failed." });
       }
@@ -239,7 +295,10 @@ export default function SalesOverview({
     [showSnackbar],
   );
 
-  const handleMenuAction = async (card: SalesOverviewCardData, action: SalesCardMenuAction) => {
+  const handleMenuAction = async (
+    card: SalesOverviewCardData,
+    action: SalesCardMenuAction,
+  ) => {
     if (action === "editSales") {
       setEditingCard(card);
       return;
@@ -283,7 +342,10 @@ export default function SalesOverview({
       setCancelCard(null);
       bump();
       onBookingCancelled?.();
-      showSnackbar({ severity: "success", message: "Sale canceled. Booking marked cancelled." });
+      showSnackbar({
+        severity: "success",
+        message: "Sale canceled. Booking marked cancelled.",
+      });
     } catch {
       showSnackbar({ severity: "error", message: "Failed to cancel booking." });
     }
@@ -308,17 +370,62 @@ export default function SalesOverview({
     setCheckoutBookingCode("");
     setCheckoutCardId(null);
     bump();
-    showSnackbar({ severity: "success", message: "Add-ons saved to this sale." });
+    showSnackbar({
+      severity: "success",
+      message: "Add-ons saved to this sale.",
+    });
   };
 
-  const handleSaveEdit = (payload: SalesEditCheckoutPayload) => {
+  const notifyClientInvoiceReissue = async (input: {
+    bookingId: string;
+    bookingCode?: string;
+    dueDate: string;
+    penaltyAmount?: number;
+    totalPrice?: number;
+    clientEmail?: string;
+    clientName?: string;
+    paymentMethod?: string;
+  }) => {
+    try {
+      const result = await reissueFinanceInvoice({
+        bookingId: input.bookingId,
+        bookingRef: input.bookingCode,
+        dueDate: input.dueDate,
+        penaltyAmount: input.penaltyAmount,
+        totalPrice: input.totalPrice,
+        clientEmail: input.clientEmail || clientEmail || undefined,
+        clientName: input.clientName || clientName || undefined,
+        paymentMethod: input.paymentMethod,
+      }).unwrap();
+
+      if (result.data?.emailSent) {
+        showSnackbar({
+          severity: "success",
+          message: `Client notified${result.data.emailTo ? ` at ${result.data.emailTo}` : ""} (app + email).`,
+        });
+      } else if (result.data?.notificationSent) {
+        showSnackbar({
+          severity: "success",
+          message: "Client notified in app. Email could not be sent.",
+        });
+      }
+    } catch {
+      showSnackbar({
+        severity: "warning",
+        message: "Sale saved, but client notification failed.",
+      });
+    }
+  };
+
+  const handleSaveEdit = async (payload: SalesEditCheckoutPayload) => {
     if (!editingCard) return;
+    const isReissue =
+      payload.paymentMethod === "onlineNonDirect" ||
+      payload.paymentMethod === "offlineNonDirect";
+
     upsertSalesCardMeta({
       bookingId: editingCard.bookingId,
-      cardKind:
-        payload.paymentMethod === "onlineNonDirect" || payload.paymentMethod === "offlineNonDirect"
-          ? "reissued_invoice"
-          : editingCard.kind,
+      cardKind: isReissue ? "reissued_invoice" : editingCard.kind,
       cardId: editingCard.id,
       note: editingCard.note,
       paymentMethod: payload.paymentMethod,
@@ -327,34 +434,64 @@ export default function SalesOverview({
       discount: payload.discount,
       discountAmount: payload.discountAmount,
       totalPrice: payload.totalPrice,
+      ...(isReissue && payload.dueDate
+        ? { reissuedAt: new Date().toISOString() }
+        : {}),
     });
     setEditingCard(null);
     bump();
     showSnackbar({ severity: "success", message: "Sale updated." });
+
+    if (isReissue && payload.dueDate) {
+      await notifyClientInvoiceReissue({
+        bookingId: editingCard.bookingId,
+        bookingCode: editingCard.bookingCode,
+        dueDate: payload.dueDate,
+        totalPrice: payload.totalPrice,
+        clientEmail: editingCard.clientEmail,
+        clientName: editingCard.clientName,
+        paymentMethod: payload.paymentMethod,
+      });
+    }
   };
 
-  const handleReissue = (payload: {
+  const handleReissue = async (payload: {
     penaltyType: "fixed" | "percentage";
     penaltyValue: number;
     penaltyAmount: number;
     dueDate: string;
   }) => {
     if (!overdueCard) return;
+    const card = overdueCard;
     upsertSalesCardMeta({
-      bookingId: overdueCard.bookingId,
+      bookingId: card.bookingId,
       cardKind: "reissued_invoice",
-      cardId: overdueCard.id,
-      note: overdueCard.note,
-      paymentMethod: overdueCard.paymentMethod || "onlineNonDirect",
+      cardId: card.id,
+      note: card.note,
+      paymentMethod: card.paymentMethod || "onlineNonDirect",
       dueDate: payload.dueDate,
       penaltyAmount: payload.penaltyAmount,
       penaltyType: payload.penaltyType,
       reissuedAt: new Date().toISOString(),
-      totalPrice: overdueCard.total + payload.penaltyAmount,
+      totalPrice: card.total + payload.penaltyAmount,
     });
     setOverdueCard(null);
     bump();
-    showSnackbar({ severity: "success", message: "Invoice reissued with new due date." });
+    showSnackbar({
+      severity: "success",
+      message: "Invoice reissued with new due date.",
+    });
+
+    await notifyClientInvoiceReissue({
+      bookingId: card.bookingId,
+      bookingCode: card.bookingCode,
+      dueDate: payload.dueDate,
+      penaltyAmount: payload.penaltyAmount,
+      totalPrice: card.total + payload.penaltyAmount,
+      clientEmail: card.clientEmail,
+      clientName: card.clientName,
+      paymentMethod: card.paymentMethod || "onlineNonDirect",
+    });
   };
 
   if (editingCard) {
@@ -385,7 +522,14 @@ export default function SalesOverview({
 
   return (
     <Box>
-      <Typography sx={{ fontSize: 15, fontWeight: 900, color: alpha(m.navy, 0.88), mb: 1.5 }}>
+      <Typography
+        sx={{
+          fontSize: 15,
+          fontWeight: 900,
+          color: alpha(m.navy, 0.88),
+          mb: 1.5,
+        }}
+      >
         Sales Overview
       </Typography>
 
@@ -408,16 +552,24 @@ export default function SalesOverview({
               }}
               onMenuAction={(action) => void handleMenuAction(card, action)}
               onOverdueAction={
-                card.paymentState === "overdue" ? () => setOverdueCard(card) : undefined
+                card.paymentState === "overdue"
+                  ? () => setOverdueCard(card)
+                  : undefined
               }
-              onSubViewInvoice={(sub) => openDocument(subToCard(sub, card), "invoice")}
-              onSubViewReceipt={(sub) => openDocument(subToCard(sub, card), "receipt")}
+              onSubViewInvoice={(sub) =>
+                openDocument(subToCard(sub, card), "invoice")
+              }
+              onSubViewReceipt={(sub) =>
+                openDocument(subToCard(sub, card), "receipt")
+              }
               onSubAddOns={(sub) => {
                 setCheckoutBookingId(sub.bookingId || card.bookingId);
                 setCheckoutBookingCode(sub.bookingCode || card.bookingCode);
                 setCheckoutCardId(sub.id);
               }}
-              onSubMenuAction={(sub, action) => void handleMenuAction(subToCard(sub, card), action)}
+              onSubMenuAction={(sub, action) =>
+                void handleMenuAction(subToCard(sub, card), action)
+              }
             />
           ))}
         </Stack>
@@ -461,7 +613,9 @@ export default function SalesOverview({
             ? () => {
                 if (!noteCard) return;
                 if (noteCard.kind === "addon") {
-                  updateSalesAddon(noteCard.id.replace(/^addon-/, ""), { note: "" });
+                  updateSalesAddon(noteCard.id.replace(/^addon-/, ""), {
+                    note: "",
+                  });
                 } else {
                   upsertSalesCardMeta({
                     bookingId: noteCard.bookingId,

@@ -31,7 +31,9 @@ type UseBusinessServiceModalArgs = {
   businessCategories: BusinessCategory[];
   mainServices: BusinessMainServiceUi[];
   subservices: BusinessSubserviceUi[];
-  setMainServices: React.Dispatch<React.SetStateAction<BusinessMainServiceUi[]>>;
+  setMainServices: React.Dispatch<
+    React.SetStateAction<BusinessMainServiceUi[]>
+  >;
   setSubservices: React.Dispatch<React.SetStateAction<BusinessSubserviceUi[]>>;
   onPersistChange?: () => void;
   onMainServiceCreated?: (mainId: string) => void;
@@ -51,15 +53,20 @@ export function useBusinessServiceModal({
 }: UseBusinessServiceModalArgs) {
   const { showSnackbar } = useSnackbar();
   const [createBusinessSubcategory] = useCreateBusinessSubcategoryMutation();
-  const { refetch: refetchBusinessCategories } = useGetBusinessCategoriesQuery();
+  const { refetch: refetchBusinessCategories } =
+    useGetBusinessCategoriesQuery();
   const [open, setOpen] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
   const [mode, setMode] = React.useState<BusinessServiceModalMode>("service");
-  const [draft, setDraft] = React.useState<BusinessServiceFormDraft>(() => createEmptyBusinessServiceFormDraft());
+  const [draft, setDraft] = React.useState<BusinessServiceFormDraft>(() =>
+    createEmptyBusinessServiceFormDraft(),
+  );
   const [editingMainId, setEditingMainId] = React.useState<string | null>(null);
   const [editingSubId, setEditingSubId] = React.useState<string | null>(null);
   const [viewing, setViewing] = React.useState(false);
-  const [target, setTarget] = React.useState<BusinessServiceModalTarget | null>(null);
+  const [target, setTarget] = React.useState<BusinessServiceModalTarget | null>(
+    null,
+  );
 
   const modalTitle = React.useMemo(() => {
     if (mode === "subservice") {
@@ -67,17 +74,22 @@ export function useBusinessServiceModal({
       if (editingSubId) return businessServiceModalCopy.editSubserviceTitle;
       // Parent ids starting with "main-" are UI-only category groups; a real
       // service id as parent means we are nesting a sub service under it.
-      const parentId = target?.kind === "subservice" ? target.parentServiceId : "";
-      const isNestedUnderService = Boolean(parentId) && !parentId.startsWith("main-");
+      const parentId =
+        target?.kind === "subservice" ? target.parentServiceId : "";
+      const isNestedUnderService =
+        Boolean(parentId) && !parentId.startsWith("main-");
       return isNestedUnderService
         ? businessServiceModalCopy.addNestedSubserviceTitle
         : businessServiceModalCopy.addSubserviceTitle;
     }
-    return editingMainId ? businessServiceModalCopy.editServiceTitle : businessServiceModalCopy.addServiceTitle;
+    return editingMainId
+      ? businessServiceModalCopy.editServiceTitle
+      : businessServiceModalCopy.addServiceTitle;
   }, [editingMainId, editingSubId, mode, target, viewing]);
 
   const submitLabel = React.useMemo(() => {
-    if (editingMainId || editingSubId) return businessServiceModalCopy.updateLabel;
+    if (editingMainId || editingSubId)
+      return businessServiceModalCopy.updateLabel;
     return businessServiceModalCopy.addLabel;
   }, [editingMainId, editingSubId]);
 
@@ -102,11 +114,15 @@ export function useBusinessServiceModal({
 
   const openAddSubservice = React.useCallback(
     (categoryId: string, parentServiceId: string) => {
-      const category = resolveBusinessCategoryRecord(categoryId, businessCategories);
+      const category = resolveBusinessCategoryRecord(
+        categoryId,
+        businessCategories,
+      );
       if (!category) {
         showSnackbar({
           severity: "error",
-          message: "This category could not be found. Refresh the page and try again.",
+          message:
+            "This category could not be found. Refresh the page and try again.",
         });
         return;
       }
@@ -137,7 +153,11 @@ export function useBusinessServiceModal({
     setEditingSubId(sub.id);
     setEditingMainId(null);
     setViewing(false);
-    setTarget({ kind: "subservice", categoryId: sub.categoryId, parentServiceId: sub.parentServiceId });
+    setTarget({
+      kind: "subservice",
+      categoryId: sub.categoryId,
+      parentServiceId: sub.parentServiceId,
+    });
     setDraft(draftFromSubservice(sub));
     setOpen(true);
   }, []);
@@ -148,7 +168,11 @@ export function useBusinessServiceModal({
     setEditingSubId(sub.id);
     setEditingMainId(null);
     setViewing(true);
-    setTarget({ kind: "subservice", categoryId: sub.categoryId, parentServiceId: sub.parentServiceId });
+    setTarget({
+      kind: "subservice",
+      categoryId: sub.categoryId,
+      parentServiceId: sub.parentServiceId,
+    });
     setDraft(draftFromSubservice(sub));
     setOpen(true);
   }, []);
@@ -157,19 +181,29 @@ export function useBusinessServiceModal({
     setViewing(false);
   }, []);
 
-  const updateDraft = React.useCallback((patch: Partial<BusinessServiceFormDraft>) => {
-    setDraft((prev) => ({ ...prev, ...patch }));
-  }, []);
+  const updateDraft = React.useCallback(
+    (patch: Partial<BusinessServiceFormDraft>) => {
+      setDraft((prev) => ({ ...prev, ...patch }));
+    },
+    [],
+  );
 
-  const canSubmit = React.useMemo(() => draft.name.trim().length > 0, [draft.name]);
+  const canSubmit = React.useMemo(
+    () => draft.name.trim().length > 0,
+    [draft.name],
+  );
 
   const resolveCustomServiceId = React.useCallback(
     async (categoryId: string, serviceName: string): Promise<string | null> => {
-      const categoryRecord = resolveBusinessCategoryRecord(categoryId, businessCategories);
+      const categoryRecord = resolveBusinessCategoryRecord(
+        categoryId,
+        businessCategories,
+      );
       if (!categoryRecord) {
         showSnackbar({
           severity: "error",
-          message: "This category could not be found. Refresh the page and try again.",
+          message:
+            "This category could not be found. Refresh the page and try again.",
         });
         return null;
       }
@@ -178,7 +212,12 @@ export function useBusinessServiceModal({
       const trimmedName = serviceName.trim();
 
       if (
-        hasDuplicateServiceNameInCategory(resolvedCategoryId, trimmedName, subservices, editingSubId)
+        hasDuplicateServiceNameInCategory(
+          resolvedCategoryId,
+          trimmedName,
+          subservices,
+          editingSubId,
+        )
       ) {
         showSnackbar({
           severity: "error",
@@ -191,13 +230,18 @@ export function useBusinessServiceModal({
         subservices
           .filter(
             (item) =>
-              item.id !== editingSubId && String(item.categoryId) === String(resolvedCategoryId),
+              item.id !== editingSubId &&
+              String(item.categoryId) === String(resolvedCategoryId),
           )
           .map((item) => String(item.serviceId)),
       );
 
       let categories = businessCategories;
-      let existingId = findSubcategoryIdByTitle(resolvedCategoryId, trimmedName, categories);
+      let existingId = findSubcategoryIdByTitle(
+        resolvedCategoryId,
+        trimmedName,
+        categories,
+      );
 
       if (existingId) {
         if (usedIds.has(existingId)) {
@@ -220,7 +264,11 @@ export function useBusinessServiceModal({
       } catch {
         const refreshed = await refetchBusinessCategories();
         categories = refreshed.data?.data ?? businessCategories;
-        existingId = findSubcategoryIdByTitle(resolvedCategoryId, trimmedName, categories);
+        existingId = findSubcategoryIdByTitle(
+          resolvedCategoryId,
+          trimmedName,
+          categories,
+        );
 
         if (existingId) {
           if (usedIds.has(existingId)) {
@@ -259,7 +307,9 @@ export function useBusinessServiceModal({
       const id = editingMainId ?? `main-${Date.now()}`;
       const next = mainServiceFromDraft(draft, id, target.categoryId);
       if (editingMainId) {
-        setMainServices((prev) => prev.map((item) => (item.id === editingMainId ? next : item)));
+        setMainServices((prev) =>
+          prev.map((item) => (item.id === editingMainId ? next : item)),
+        );
       } else {
         setMainServices((prev) => [next, ...prev]);
         onMainServiceCreated?.(id);
@@ -275,7 +325,8 @@ export function useBusinessServiceModal({
         } catch {
           showSnackbar({
             severity: "error",
-            message: "Service saved locally. Click Save to permanently apply changes.",
+            message:
+              "Service saved locally. Click Save to permanently apply changes.",
           });
         }
       }
@@ -295,15 +346,23 @@ export function useBusinessServiceModal({
 
       if (!serviceId) return;
 
-      const categoryRecord = resolveBusinessCategoryRecord(target.categoryId, businessCategories);
+      const categoryRecord = resolveBusinessCategoryRecord(
+        target.categoryId,
+        businessCategories,
+      );
       const category =
         categoryRecord ??
         businessCategories.find((item) =>
-          item.subcategories.some((sub) => String(sub.id) === String(serviceId)),
+          item.subcategories.some(
+            (sub) => String(sub.id) === String(serviceId),
+          ),
         );
       const id = editingSubId ?? String(serviceId);
-      const parentServiceId = target.kind === "subservice" ? target.parentServiceId : "";
-      const resolvedCategoryId = category ? String(category.id) : String(target.categoryId);
+      const parentServiceId =
+        target.kind === "subservice" ? target.parentServiceId : "";
+      const resolvedCategoryId = category
+        ? String(category.id)
+        : String(target.categoryId);
       const next = subserviceFromDraft(
         draft,
         id,
@@ -314,9 +373,14 @@ export function useBusinessServiceModal({
       );
 
       if (editingSubId) {
-        setSubservices((prev) => prev.map((item) => (item.id === editingSubId ? next : item)));
+        setSubservices((prev) =>
+          prev.map((item) => (item.id === editingSubId ? next : item)),
+        );
       } else {
-        setSubservices((prev) => [next, ...prev.filter((item) => item.serviceId !== serviceId)]);
+        setSubservices((prev) => [
+          next,
+          ...prev.filter((item) => item.serviceId !== serviceId),
+        ]);
       }
       closeModal();
 
@@ -330,7 +394,8 @@ export function useBusinessServiceModal({
         } catch {
           showSnackbar({
             severity: "error",
-            message: "Service saved locally. Click Save to permanently apply changes.",
+            message:
+              "Service saved locally. Click Save to permanently apply changes.",
           });
         }
       }
@@ -361,7 +426,9 @@ export function useBusinessServiceModal({
     (mainId: string) => {
       onPersistChange?.();
       setMainServices((prev) => prev.filter((item) => item.id !== mainId));
-      setSubservices((prev) => prev.filter((item) => item.parentServiceId !== mainId));
+      setSubservices((prev) =>
+        prev.filter((item) => item.parentServiceId !== mainId),
+      );
     },
     [onPersistChange, setMainServices, setSubservices],
   );
@@ -370,7 +437,11 @@ export function useBusinessServiceModal({
     (subId: string) => {
       onPersistChange?.();
       // Remove the service and any services nested under it.
-      setSubservices((prev) => prev.filter((item) => item.id !== subId && item.parentServiceId !== subId));
+      setSubservices((prev) =>
+        prev.filter(
+          (item) => item.id !== subId && item.parentServiceId !== subId,
+        ),
+      );
     },
     [onPersistChange, setSubservices],
   );
@@ -426,4 +497,3 @@ export function useBusinessServiceModal({
     subservices,
   };
 }
-

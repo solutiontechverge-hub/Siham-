@@ -27,7 +27,14 @@ type RemoteAwareImageProps = Omit<ImageProps, "src"> & {
  * Uses a plain img for remote URLs (S3, CDN) to avoid next/image hostname config issues.
  * Local/static imports still use next/image.
  */
-export default function RemoteAwareImage({ src, alt, fill, style, priority, ...rest }: RemoteAwareImageProps) {
+export default function RemoteAwareImage({
+  src,
+  alt,
+  fill,
+  style,
+  priority,
+  ...rest
+}: RemoteAwareImageProps) {
   const resolved = toImageSrc(src);
 
   if (!resolved) {
@@ -47,7 +54,8 @@ export default function RemoteAwareImage({ src, alt, fill, style, priority, ...r
             inset: 0,
             width: "100%",
             height: "100%",
-            objectFit: (style as React.CSSProperties | undefined)?.objectFit ?? "cover",
+            objectFit:
+              (style as React.CSSProperties | undefined)?.objectFit ?? "cover",
           }}
         />
       );
@@ -61,7 +69,8 @@ export default function RemoteAwareImage({ src, alt, fill, style, priority, ...r
         sx={{
           width: rest.width ?? "100%",
           height: rest.height ?? "auto",
-          objectFit: (style as React.CSSProperties | undefined)?.objectFit ?? "cover",
+          objectFit:
+            (style as React.CSSProperties | undefined)?.objectFit ?? "cover",
         }}
       />
     );

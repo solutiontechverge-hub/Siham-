@@ -14,7 +14,11 @@ function isProfessionalUser(userType?: string) {
   return userType === "professional";
 }
 
-function MessagingRealtimeSyncGate({ audience }: { audience: MessagingAudience }) {
+function MessagingRealtimeSyncGate({
+  audience,
+}: {
+  audience: MessagingAudience;
+}) {
   useMessagingRealtimeSync(audience);
   return null;
 }
@@ -22,7 +26,9 @@ function MessagingRealtimeSyncGate({ audience }: { audience: MessagingAudience }
 export default function MessagingRealtimeBridge() {
   const user = useAppSelector((state) => state.auth.user);
   const accessToken = useAppSelector((state) => state.auth.accessToken);
-  const [persistedToken, setPersistedToken] = React.useState<string | null>(null);
+  const [persistedToken, setPersistedToken] = React.useState<string | null>(
+    null,
+  );
 
   React.useEffect(() => {
     setPersistedToken(getPersistedAuthSession()?.accessToken ?? null);

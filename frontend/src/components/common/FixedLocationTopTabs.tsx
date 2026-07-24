@@ -27,7 +27,11 @@ export default function FixedLocationTopTabs({
   const [, startTransition] = React.useTransition();
 
   const handleTabClick = React.useCallback(
-    (event: React.MouseEvent<HTMLAnchorElement>, href: string, isActive: boolean) => {
+    (
+      event: React.MouseEvent<HTMLAnchorElement>,
+      href: string,
+      isActive: boolean,
+    ) => {
       if (isActive) {
         event.preventDefault();
         return;
@@ -104,7 +108,9 @@ export default function FixedLocationTopTabs({
               href={t.href}
               prefetch
               scroll={false}
-              onClick={(event: React.MouseEvent<HTMLAnchorElement>) => handleTabClick(event, t.href, active)}
+              onClick={(event: React.MouseEvent<HTMLAnchorElement>) =>
+                handleTabClick(event, t.href, active)
+              }
               sx={{
                 textDecoration: "none",
                 whiteSpace: "nowrap",
@@ -113,7 +119,9 @@ export default function FixedLocationTopTabs({
                 letterSpacing: "-0.01em",
                 bgcolor: "#fff",
                 "&:hover": { bgcolor: "#fff" },
-                color: active ? theme.palette.text.primary : alpha(theme.palette.text.secondary, 0.75),
+                color: active
+                  ? theme.palette.text.primary
+                  : alpha(theme.palette.text.secondary, 0.75),
                 fontSize: 16,
                 pt: 1.6,
                 pb: 1.55,
@@ -130,9 +138,7 @@ export default function FixedLocationTopTabs({
                   right: 0,
                   bottom: 0,
                   height: 2,
-                  bgcolor: active
-                    ? theme.palette.primary.main
-                    : "transparent",
+                  bgcolor: active ? theme.palette.primary.main : "transparent",
                   borderRadius: 0,
                 },
               }}

@@ -6,7 +6,10 @@ import { alpha, useTheme } from "@mui/material/styles";
 import AppCountryCodeSelect from "./AppCountryCodeSelect";
 import AppTextField from "./AppTextField";
 import { BodyText } from "../ui/typography";
-import { getPhoneValidationErrors, sanitizePhoneInput } from "../../lib/phone-validation";
+import {
+  getPhoneValidationErrors,
+  sanitizePhoneInput,
+} from "../../lib/phone-validation";
 
 export type AppCountryPhoneFieldsProps = {
   countryCode: string;
@@ -41,7 +44,10 @@ export default function AppCountryPhoneFields({
 }: AppCountryPhoneFieldsProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
-  const [localErrors, setLocalErrors] = React.useState<{ countryCode?: string; phone?: string }>({});
+  const [localErrors, setLocalErrors] = React.useState<{
+    countryCode?: string;
+    phone?: string;
+  }>({});
 
   const runValidation = React.useCallback(() => {
     const next = getPhoneValidationErrors(countryCode, phone, { required });
@@ -61,7 +67,16 @@ export default function AppCountryPhoneFields({
   return (
     <Box>
       {label ? (
-        <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65), mb: 0.75 }}>{label}</BodyText>
+        <BodyText
+          sx={{
+            fontSize: 12,
+            fontWeight: 900,
+            color: alpha(m.navy, 0.65),
+            mb: 0.75,
+          }}
+        >
+          {label}
+        </BodyText>
       ) : null}
       <Stack direction="row" spacing={1.25}>
         <Box sx={{ width: countryCodeWidth, flexShrink: 0 }}>
@@ -72,7 +87,9 @@ export default function AppCountryPhoneFields({
               onClearErrors?.();
               setLocalErrors((prev) => ({ ...prev, countryCode: undefined }));
               if (phone.trim()) {
-                const next = getPhoneValidationErrors(dialCode, phone, { required });
+                const next = getPhoneValidationErrors(dialCode, phone, {
+                  required,
+                });
                 setLocalErrors((prev) => ({ ...prev, phone: next.phone }));
               }
             }}

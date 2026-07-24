@@ -20,7 +20,13 @@ export function useMollureIconGradient() {
       width={1}
       height={1}
       aria-hidden
-      style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", pointerEvents: "none" }}
+      style={{
+        position: "absolute",
+        width: 1,
+        height: 1,
+        overflow: "hidden",
+        pointerEvents: "none",
+      }}
     >
       <defs>
         <linearGradient id={id} x1="0%" y1="0%" x2="0%" y2="100%">

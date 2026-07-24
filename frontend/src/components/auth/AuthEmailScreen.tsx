@@ -1,9 +1,10 @@
 "use client";
 
+import AppButton from "../common/AppButton";
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Box, Button, Stack, Typography } from "@mui/material";
+import { Box, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { Logo, SignupBg } from "../../../images";
 
@@ -13,7 +14,11 @@ type AuthEmailScreenProps = {
   maxWidth?: number;
 };
 
-export default function AuthEmailScreen({ children, icon, maxWidth = 520 }: AuthEmailScreenProps) {
+export default function AuthEmailScreen({
+  children,
+  icon,
+  maxWidth = 520,
+}: AuthEmailScreenProps) {
   const m = useTheme().palette.mollure;
 
   return (
@@ -46,8 +51,8 @@ export default function AuthEmailScreen({ children, icon, maxWidth = 520 }: Auth
       />
 
       <Box sx={{ position: "relative", width: "100%", maxWidth, zIndex: 1 }}>
-        <Stack alignItems="center" sx={{ mb: 3 }}>
-          <Image src={Logo} alt="Mollure" width={72} height={72} priority />
+        <Stack alignItems="center" sx={{ mb: 3.5 }}>
+          <Image src={Logo} alt="Mollure" width={200} height={48} priority />
         </Stack>
 
         <Box
@@ -59,7 +64,13 @@ export default function AuthEmailScreen({ children, icon, maxWidth = 520 }: Auth
             overflow: "hidden",
           }}
         >
-          <Box sx={{ px: { xs: 2.5, sm: 4 }, py: { xs: 3, sm: 4 }, textAlign: "center" }}>
+          <Box
+            sx={{
+              px: { xs: 2.5, sm: 4 },
+              py: { xs: 3, sm: 4 },
+              textAlign: "center",
+            }}
+          >
             {icon ? (
               <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
                 {icon}
@@ -76,7 +87,12 @@ export default function AuthEmailScreen({ children, icon, maxWidth = 520 }: Auth
               textAlign: "center",
             }}
           >
-            <Stack direction="row" justifyContent="center" spacing={1.5} sx={{ mb: 1 }}>
+            <Stack
+              direction="row"
+              justifyContent="center"
+              spacing={1.5}
+              sx={{ mb: 1 }}
+            >
               {["f", "ig", "web"].map((label) => (
                 <Box
                   key={label}
@@ -96,25 +112,56 @@ export default function AuthEmailScreen({ children, icon, maxWidth = 520 }: Auth
                 </Box>
               ))}
             </Stack>
-            <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.45), lineHeight: 1.5 }}>
+            <Typography
+              sx={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.45),
+                lineHeight: 1.5,
+              }}
+            >
               Mollure Inc. © {new Date().getFullYear()}. All Rights Reserved.
             </Typography>
-            <Typography sx={{ fontSize: 10.5, fontWeight: 600, color: alpha(m.navy, 0.38), mt: 0.35 }}>
+            <Typography
+              sx={{
+                fontSize: 10.5,
+                fontWeight: 600,
+                color: alpha(m.navy, 0.38),
+                mt: 0.35,
+              }}
+            >
               123 Beauty Lane, Suite 100, Wellness City, 90210
             </Typography>
-            <Stack direction="row" justifyContent="center" spacing={1} sx={{ mt: 1 }}>
+            <Stack
+              direction="row"
+              justifyContent="center"
+              spacing={1}
+              sx={{ mt: 1 }}
+            >
               <Typography
                 component={Link}
                 href="/contact-us"
-                sx={{ fontSize: 10.5, fontWeight: 700, color: alpha(m.navy, 0.42), textDecoration: "none" }}
+                sx={{
+                  fontSize: 10.5,
+                  fontWeight: 700,
+                  color: alpha(m.navy, 0.42),
+                  textDecoration: "none",
+                }}
               >
                 Unsubscribe
               </Typography>
-              <Typography sx={{ fontSize: 10.5, color: alpha(m.navy, 0.25) }}>|</Typography>
+              <Typography sx={{ fontSize: 10.5, color: alpha(m.navy, 0.25) }}>
+                |
+              </Typography>
               <Typography
                 component={Link}
                 href="/privacy-policy"
-                sx={{ fontSize: 10.5, fontWeight: 700, color: alpha(m.navy, 0.42), textDecoration: "none" }}
+                sx={{
+                  fontSize: 10.5,
+                  fontWeight: 700,
+                  color: alpha(m.navy, 0.42),
+                  textDecoration: "none",
+                }}
               >
                 Privacy Policy
               </Typography>
@@ -135,8 +182,13 @@ export function AuthEmailStatusIcon({
 }) {
   const m = useTheme().palette.mollure;
   const bg =
-    variant === "success" ? m.teal : variant === "error" ? alpha("#E85D5D", 0.12) : alpha(m.teal, 0.12);
-  const color = variant === "success" ? "#fff" : variant === "error" ? "#E85D5D" : m.teal;
+    variant === "success"
+      ? m.teal
+      : variant === "error"
+        ? alpha("#E85D5D", 0.12)
+        : alpha(m.teal, 0.12);
+  const color =
+    variant === "success" ? "#fff" : variant === "error" ? "#E85D5D" : m.teal;
   const glyph = variant === "success" ? "✓" : variant === "error" ? "✕" : "✉";
 
   return (
@@ -172,46 +224,34 @@ export function AuthEmailPrimaryButton({
 
   if (href) {
     return (
-      <Button
+      <AppButton
+        tone="primary"
         component={Link}
         href={href}
-        variant="contained"
-        disableElevation
         fullWidth
         sx={{
           mt: 2.5,
-          borderRadius: "10px",
-          textTransform: "none",
-          fontWeight: 900,
           fontSize: 15,
           py: 1.35,
-          bgcolor: m.teal,
-          "&:hover": { bgcolor: m.tealDark },
         }}
       >
         {children}
-      </Button>
+      </AppButton>
     );
   }
 
   return (
-    <Button
-      variant="contained"
-      disableElevation
+    <AppButton
+      tone="primary"
       fullWidth
       onClick={onClick}
       sx={{
         mt: 2.5,
-        borderRadius: "10px",
-        textTransform: "none",
-        fontWeight: 900,
         fontSize: 15,
         py: 1.35,
-        bgcolor: m.teal,
-        "&:hover": { bgcolor: m.tealDark },
       }}
     >
       {children}
-    </Button>
+    </AppButton>
   );
 }

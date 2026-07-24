@@ -1,10 +1,10 @@
 "use client";
 
+import AppButton from "../../common/AppButton";
 import * as React from "react";
-import { Button, Stack } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
+import { Stack } from "@mui/material";
 import MollureFormField from "../../common/MollureFormField";
-import MollureModal from "../../common/MollureModal";
+import AppModal from "../../common/AppModal";
 import type { ManualEntryLine } from "./manualEntry.data";
 
 type ManualEntryLineEditModalProps = {
@@ -20,7 +20,6 @@ export default function ManualEntryLineEditModal({
   onClose,
   onSave,
 }: ManualEntryLineEditModalProps) {
-  const m = useTheme().palette.mollure;
   const [name, setName] = React.useState("");
   const [quantity, setQuantity] = React.useState("1");
   const [unitPrice, setUnitPrice] = React.useState("0");
@@ -35,56 +34,48 @@ export default function ManualEntryLineEditModal({
   const handleSave = () => {
     if (!line) return;
     const qty = Math.max(1, Number.parseInt(quantity, 10) || 1);
-    const price = Math.max(0, Number.parseFloat(unitPrice.replace(",", ".")) || 0);
-    onSave({ ...line, name: name.trim() || line.name, quantity: qty, unitPrice: price });
+    const price = Math.max(
+      0,
+      Number.parseFloat(unitPrice.replace(",", ".")) || 0,
+    );
+    onSave({
+      ...line,
+      name: name.trim() || line.name,
+      quantity: qty,
+      unitPrice: price,
+    });
     onClose();
   };
 
   return (
-    <MollureModal
+    <AppModal
       open={open}
       onClose={onClose}
       title={line?.kind === "product" ? "Edit Product" : "Edit Item"}
       maxWidth="xs"
       footer={
-        <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ px: 2.5, py: 2 }}>
-          <Button
-            onClick={onClose}
-            variant="outlined"
-            sx={{
-              borderRadius: "8px",
-              textTransform: "none",
-              fontWeight: 800,
-              borderColor: alpha(m.navy, 0.14),
-              color: alpha(m.navy, 0.72),
-              bgcolor: "#fff",
-              height: 36,
-              px: 2.25,
-            }}
-          >
+        <Stack
+          direction="row"
+          spacing={1}
+          justifyContent="flex-end"
+          sx={{ px: 2.5, py: 2 }}
+        >
+          <AppButton tone="secondary" onClick={onClose}>
             Cancel
-          </Button>
-          <Button
-            variant="contained"
-            disableElevation
-            onClick={handleSave}
-            sx={{
-              borderRadius: "8px",
-              textTransform: "none",
-              fontWeight: 900,
-              bgcolor: m.teal,
-              "&:hover": { bgcolor: m.tealDark },
-              height: 36,
-              px: 2.25,
-            }}
-          >
+          </AppButton>
+          <AppButton tone="primary" onClick={handleSave}>
             Save
-          </Button>
+          </AppButton>
         </Stack>
       }
     >
       <Stack spacing={1.5} sx={{ px: 2.5, pb: 2 }}>
-        <MollureFormField label="Name" value={name} onChange={(e) => setName(e.target.value)} fullWidth />
+        <MollureFormField
+          label="Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          fullWidth
+        />
         <MollureFormField
           label="Quantity"
           type="number"
@@ -100,6 +91,6 @@ export default function ManualEntryLineEditModal({
           fullWidth
         />
       </Stack>
-    </MollureModal>
+    </AppModal>
   );
 }

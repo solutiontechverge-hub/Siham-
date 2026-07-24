@@ -126,6 +126,24 @@ export const buildProfessionalActionEmail = (ctx) =>
     ctaLabel: "View booking section",
   });
 
+export const buildReviewInviteEmail = (ctx) => {
+  const reviewUrl =
+    ctx.reviewUrl ||
+    `${getFrontendBaseUrl()}/reviews/write?token=${encodeURIComponent(String(ctx.inviteToken || ""))}`;
+
+  return bookingCardEmail({
+    title: "How was your visit?",
+    salonName: ctx.salonName,
+    professionalName: ctx.professionalName,
+    startTime: ctx.startTime,
+    uniqueCode: ctx.uniqueCode,
+    iconType: "confirmed",
+    status: "completed",
+    ctaLabel: "Write a review",
+    ctaUrl: reviewUrl,
+  });
+};
+
 export const buildNewBookingRequestEmail = (ctx) =>
   bookingCardEmail({
     title: "New booking request",
@@ -169,6 +187,29 @@ export const buildPostTreatmentPaymentEmail = (ctx) => {
     </div>
   `);
   const text = `After/Post treatment payment\n${ctx.salonName}\nInvoice: ${invoiceUrl}\nPayment: ${paymentUrl}`;
+  return { html, text };
+};
+
+/** Generic email mirroring an in-app notification. */
+export const buildNotificationCompanionEmail = (ctx) => {
+  const base = getFrontendBaseUrl().replace(/\/$/, "");
+  const path = String(ctx.href || "").startsWith("/") ? ctx.href : `/${ctx.href || ""}`;
+  const detailsUrl = `${base}${path || "/"}`;
+  const rows = [];
+  if (ctx.actorName) rows.push({ label: "From", value: ctx.actorName });
+  if (ctx.bookingRef) rows.push({ label: "Booking ID", value: formatBookingId(ctx.bookingRef) });
+  if (ctx.message) rows.push({ label: "Details", value: ctx.message });
+
+  const html = wrapEmail(`
+    ${statusIcon(ctx.iconType || "info")}
+    <h1 style="margin:0 0 8px;font-size:24px;color:#1a2b42;">${escapeHtml(ctx.title || "Update")}</h1>
+    <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#5c6778;">
+      ${escapeHtml(ctx.message || "You have a new update on Mollure.")}
+    </p>
+    ${rows.length ? detailsBox(rows) : ""}
+    ${primaryButton(ctx.ctaLabel || "Open Mollure", detailsUrl)}
+  `);
+  const text = `${ctx.title || "Update"}\n${ctx.message || ""}\n${detailsUrl}`;
   return { html, text };
 };
 

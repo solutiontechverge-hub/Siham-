@@ -11,7 +11,11 @@ export type MollureCardHeaderProps = {
   tone?: "default" | "tinted";
 };
 
-export default function MollureCardHeader({ title, subtitle, tone = "default" }: MollureCardHeaderProps) {
+export default function MollureCardHeader({
+  title,
+  subtitle,
+  tone = "default",
+}: MollureCardHeaderProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
 
@@ -32,4 +36,3 @@ export default function MollureCardHeader({ title, subtitle, tone = "default" }:
     </Box>
   );
 }
-

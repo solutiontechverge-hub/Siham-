@@ -1,14 +1,18 @@
 "use client";
 
+import AppButton from "../AppButton";
 import * as React from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
-import { Box, Button, IconButton, Stack } from "@mui/material";
+import { Box, IconButton, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../../ui/typography";
 import AppTimePicker from "../AppTimePicker";
-import MollureModal from "../MollureModal";
-import type { CalendarBookingLocation, CalendarResource } from "../../../app/professionals/fixed-location/calendar/calendar.data";
+import AppModal from "../AppModal";
+import type {
+  CalendarBookingLocation,
+  CalendarResource,
+} from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { ScheduleShift } from "./calendar-settings.types";
 
 export type EditAvailabilityDraft = {
@@ -43,13 +47,18 @@ export default function CalendarEditAvailabilityModal({
   const toggleLocation = (location: CalendarBookingLocation) => {
     setDraft((prev) => {
       const has = prev.locations.includes(location);
-      const next = has ? prev.locations.filter((item) => item !== location) : [...prev.locations, location];
-      return { ...prev, locations: next.length ? next : [...availableLocations] };
+      const next = has
+        ? prev.locations.filter((item) => item !== location)
+        : [...prev.locations, location];
+      return {
+        ...prev,
+        locations: next.length ? next : [...availableLocations],
+      };
     });
   };
 
   return (
-    <MollureModal
+    <AppModal
       open={open}
       onClose={onClose}
       title="Edit Availability"
@@ -58,24 +67,21 @@ export default function CalendarEditAvailabilityModal({
       footer={
         <Box sx={{ px: 2.5, py: 2 }}>
           <Stack direction="row" justifyContent="flex-end" spacing={1.25}>
-            <Button variant="outlined" onClick={onClose} sx={{ borderRadius: "10px", textTransform: "none", fontWeight: 800, height: 38 }}>
+            <AppButton tone="secondary" onClick={onClose} sx={{ height: 38 }}>
               Cancel
-            </Button>
-            <Button
-              variant="contained"
-              disableElevation
-              onClick={onApply}
-              sx={{ borderRadius: "10px", textTransform: "none", fontWeight: 800, height: 38, bgcolor: m.teal, "&:hover": { bgcolor: m.tealDark } }}
-            >
+            </AppButton>
+            <AppButton tone="primary" onClick={onApply} sx={{ height: 38 }}>
               Save
-            </Button>
+            </AppButton>
           </Stack>
         </Box>
       }
     >
       <Box sx={{ px: 2.5, py: 2 }}>
         <Stack spacing={1.75}>
-          <BodyText sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.72) }}>
+          <BodyText
+            sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.72) }}
+          >
             {resource?.name ?? "Team member"} · {draft.date}
           </BodyText>
 
@@ -83,7 +89,7 @@ export default function CalendarEditAvailabilityModal({
             {availableLocations.map((location) => {
               const active = draft.locations.includes(location);
               return (
-                <Button
+                <AppButton
                   key={location}
                   variant={active ? "contained" : "outlined"}
                   onClick={() => toggleLocation(location)}
@@ -92,17 +98,24 @@ export default function CalendarEditAvailabilityModal({
                     textTransform: "none",
                     fontWeight: 800,
                     bgcolor: active ? m.teal : "#fff",
-                    "&:hover": { bgcolor: active ? m.tealDark : alpha(m.teal, 0.04) },
+                    "&:hover": {
+                      bgcolor: active ? m.tealDark : alpha(m.teal, 0.04),
+                    },
                   }}
                 >
                   {location}
-                </Button>
+                </AppButton>
               );
             })}
           </Stack>
 
           {draft.shifts.map((shift, index) => (
-            <Stack key={`shift-${index}`} direction="row" spacing={1.25} alignItems="flex-end">
+            <Stack
+              key={`shift-${index}`}
+              direction="row"
+              spacing={1.25}
+              alignItems="flex-end"
+            >
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <AppTimePicker
                   label="Start"
@@ -110,7 +123,9 @@ export default function CalendarEditAvailabilityModal({
                   onChange={(val) =>
                     setDraft((p) => ({
                       ...p,
-                      shifts: p.shifts.map((item, i) => (i === index ? { ...item, start: val } : item)),
+                      shifts: p.shifts.map((item, i) =>
+                        i === index ? { ...item, start: val } : item,
+                      ),
                     }))
                   }
                   fullWidth
@@ -124,7 +139,9 @@ export default function CalendarEditAvailabilityModal({
                   onChange={(val) =>
                     setDraft((p) => ({
                       ...p,
-                      shifts: p.shifts.map((item, i) => (i === index ? { ...item, end: val } : item)),
+                      shifts: p.shifts.map((item, i) =>
+                        i === index ? { ...item, end: val } : item,
+                      ),
                     }))
                   }
                   fullWidth
@@ -134,7 +151,12 @@ export default function CalendarEditAvailabilityModal({
               <IconButton
                 size="small"
                 disabled={draft.shifts.length === 1}
-                onClick={() => setDraft((p) => ({ ...p, shifts: p.shifts.filter((_, i) => i !== index) }))}
+                onClick={() =>
+                  setDraft((p) => ({
+                    ...p,
+                    shifts: p.shifts.filter((_, i) => i !== index),
+                  }))
+                }
                 sx={{ mb: 0.5, color: alpha(m.navy, 0.45) }}
               >
                 <DeleteOutlineRoundedIcon fontSize="small" />
@@ -142,8 +164,13 @@ export default function CalendarEditAvailabilityModal({
             </Stack>
           ))}
 
-          <Button
-            onClick={() => setDraft((p) => ({ ...p, shifts: [...p.shifts, { start: "09:00", end: "17:00" }] }))}
+          <AppButton
+            onClick={() =>
+              setDraft((p) => ({
+                ...p,
+                shifts: [...p.shifts, { start: "09:00", end: "17:00" }],
+              }))
+            }
             sx={{
               alignSelf: "flex-start",
               textTransform: "none",
@@ -178,9 +205,9 @@ export default function CalendarEditAvailabilityModal({
               <AddRoundedIcon sx={{ fontSize: 18 }} />
             </Box>
             Add Shift
-          </Button>
+          </AppButton>
         </Stack>
       </Box>
-    </MollureModal>
+    </AppModal>
   );
 }

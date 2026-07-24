@@ -322,6 +322,16 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
   const priceEach = names.length > 1 ? Math.round((total / names.length) * 100) / 100 : total;
   const prepaid = String(booking.prepayment_status ?? "").toLowerCase() === "paid";
   const isEbrIncoming = incomingEditRequest?.status === "suggested";
+  const notesRequestDirection = notesDetails?.requestDirection;
+  // Notes requestDirection is from the professional's perspective:
+  // outgoing = pro sent BR → client sees incoming; incoming = client sent → outgoing.
+  const bookingRequestDirection = isEbrIncoming
+    ? "incoming"
+    : status === "requested"
+      ? notesRequestDirection === "outgoing"
+        ? "incoming"
+        : "outgoing"
+      : undefined;
 
   const locationDetails =
     booking.location_details && typeof booking.location_details === "object"
@@ -368,11 +378,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
     bookingRef: booking.unique_code ?? undefined,
     status,
     bookingRequestSent: status === "requested",
-    bookingRequestDirection: isEbrIncoming
-      ? "incoming"
-      : status === "requested"
-        ? "outgoing"
-        : undefined,
+    bookingRequestDirection,
     shop: {
       shopId: booking.business_setup_id,
       shopName: booking.business_name ?? "Salon",

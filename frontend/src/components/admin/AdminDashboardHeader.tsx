@@ -21,7 +21,10 @@ type AdminDashboardHeaderProps = {
   onRangeChange: (range: AdminDashboardRangeValue) => void;
 };
 
-export default function AdminDashboardHeader({ range, onRangeChange }: AdminDashboardHeaderProps) {
+export default function AdminDashboardHeader({
+  range,
+  onRangeChange,
+}: AdminDashboardHeaderProps) {
   const theme = useTheme();
   const tokens = theme.palette.mollure;
   const [search, setSearch] = React.useState("");
@@ -34,8 +37,15 @@ export default function AdminDashboardHeader({ range, onRangeChange }: AdminDash
       spacing={2}
       sx={{ mb: 2 }}
     >
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ sm: "center" }}>
-        <Typography variant="mainHeading" sx={{ fontSize: { xs: 26, md: 30 }, whiteSpace: "nowrap" }}>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={2}
+        alignItems={{ sm: "center" }}
+      >
+        <Typography
+          variant="mainHeading"
+          sx={{ fontSize: { xs: 26, md: 30 }, whiteSpace: "nowrap" }}
+        >
           Dashboard
         </Typography>
         <Box sx={{ minWidth: { xs: "100%", sm: 220 } }}>
@@ -43,55 +53,108 @@ export default function AdminDashboardHeader({ range, onRangeChange }: AdminDash
         </Box>
       </Stack>
 
-      <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="flex-end">
+      <Stack
+        direction="row"
+        spacing={1.25}
+        alignItems="center"
+        justifyContent="flex-end"
+      >
         <AppSearchField
           placeholder="Search anything..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           size="small"
-          sx={{ width: { xs: "100%", sm: 260 }, display: { xs: "none", md: "block" } }}
+          sx={{
+            width: { xs: "100%", sm: 260 },
+            display: { xs: "none", md: "block" },
+          }}
         />
         <IconButton
           sx={{
+            width: 40,
+            height: 40,
             border: `1px solid ${tokens.cardBorder}`,
             bgcolor: tokens.white,
-            borderRadius: 2,
+            borderRadius: 999,
+            "&:hover": { bgcolor: alpha(tokens.navy, 0.04) },
           }}
           aria-label="Notifications"
         >
-          <Badge badgeContent={3} color="error">
-            <NotificationsNoneOutlinedIcon sx={{ color: tokens.navy }} />
+          <Badge
+            badgeContent={3}
+            color="error"
+            sx={{
+              "& .MuiBadge-badge": {
+                fontSize: 10,
+                fontWeight: 700,
+                minWidth: 16,
+                height: 16,
+                px: 0.5,
+              },
+            }}
+          >
+            <NotificationsNoneOutlinedIcon
+              sx={{ fontSize: 20, color: tokens.navy }}
+            />
           </Badge>
         </IconButton>
         <Stack
           direction="row"
-          spacing={1.25}
+          spacing={1}
           alignItems="center"
           sx={{
-            px: 1.5,
-            py: 0.75,
-            borderRadius: 2,
+            height: 40,
+            pl: 0.5,
+            pr: 1.25,
+            borderRadius: 999,
             border: `1px solid ${tokens.cardBorder}`,
             bgcolor: tokens.white,
+            maxWidth: { sm: 200 },
           }}
         >
           <Avatar
             sx={{
-              width: 36,
-              height: 36,
-              bgcolor: alpha(tokens.teal, 0.15),
+              width: 30,
+              height: 30,
+              bgcolor: alpha(tokens.teal, 0.16),
               color: tokens.tealDark,
-              fontSize: 14,
+              fontSize: 12,
               fontWeight: 700,
             }}
           >
             AU
           </Avatar>
-          <Box sx={{ display: { xs: "none", sm: "block" } }}>
-            <Typography sx={{ fontSize: 13, fontWeight: 600, color: tokens.navy, lineHeight: 1.2 }}>
+          <Box
+            sx={{
+              display: { xs: "none", sm: "flex" },
+              flexDirection: "column",
+              justifyContent: "center",
+              minWidth: 0,
+            }}
+          >
+            <Typography
+              sx={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: tokens.navy,
+                lineHeight: 1.15,
+                whiteSpace: "nowrap",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+              }}
+            >
               Admin User
             </Typography>
-            <Typography sx={{ fontSize: 11, color: tokens.slate }}>Super Admin</Typography>
+            <Typography
+              sx={{
+                fontSize: 11,
+                color: tokens.slate,
+                lineHeight: 1.15,
+                whiteSpace: "nowrap",
+              }}
+            >
+              Super Admin
+            </Typography>
           </Box>
         </Stack>
       </Stack>
@@ -118,7 +181,13 @@ export function AdminDashboardFooter() {
   );
 }
 
-export function AdminSectionLink({ href, label }: { href: string; label: string }) {
+export function AdminSectionLink({
+  href,
+  label,
+}: {
+  href: string;
+  label: string;
+}) {
   const tokens = useTheme().palette.mollure;
 
   return (

@@ -1,16 +1,24 @@
 "use client";
 
+import AppButton from "../AppButton";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
-import { Button, Stack } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
+import { Stack } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 
 type BookingRequestResponseActionsProps = {
   onAccept: () => void;
   onEdit: () => void;
   onReject: () => void;
 };
+
+const ACTION_SX = {
+  flex: 1,
+  fontSize: 13,
+  py: 1.1,
+  minHeight: 40,
+} as const;
 
 export default function BookingRequestResponseActions({
   onAccept,
@@ -21,64 +29,39 @@ export default function BookingRequestResponseActions({
 
   return (
     <Stack direction="row" spacing={1}>
-      <Button
+      <AppButton
         fullWidth
         variant="contained"
         disableElevation
         startIcon={<CheckRoundedIcon />}
         onClick={onAccept}
         sx={{
-          flex: 1,
-          borderRadius: "10px",
-          textTransform: "none",
-          fontWeight: 900,
-          fontSize: 13,
-          py: 1.1,
+          ...ACTION_SX,
           bgcolor: m.success,
-          "&:hover": { bgcolor: m.successDark },
+          color: "#fff",
+          "&:hover": { bgcolor: m.successDark, color: "#fff" },
         }}
       >
         Accept
-      </Button>
-      <Button
+      </AppButton>
+      <AppButton
+        tone="secondary"
         fullWidth
-        variant="outlined"
         startIcon={<EditRoundedIcon sx={{ fontSize: 18 }} />}
         onClick={onEdit}
-        sx={{
-          flex: 1,
-          borderRadius: "10px",
-          textTransform: "none",
-          fontWeight: 900,
-          fontSize: 13,
-          py: 1.1,
-          borderColor: alpha(m.navy, 0.14),
-          color: alpha(m.navy, 0.68),
-          bgcolor: alpha(m.navy, 0.03),
-          "&:hover": { bgcolor: alpha(m.navy, 0.06), borderColor: alpha(m.navy, 0.2) },
-        }}
+        sx={ACTION_SX}
       >
         Edit
-      </Button>
-      <Button
+      </AppButton>
+      <AppButton
+        tone="danger"
         fullWidth
-        variant="contained"
-        disableElevation
         startIcon={<CloseRoundedIcon />}
         onClick={onReject}
-        sx={{
-          flex: 1,
-          borderRadius: "10px",
-          textTransform: "none",
-          fontWeight: 900,
-          fontSize: 13,
-          py: 1.1,
-          bgcolor: "#E85D5D",
-          "&:hover": { bgcolor: "#D94545" },
-        }}
+        sx={ACTION_SX}
       >
         Reject
-      </Button>
+      </AppButton>
     </Stack>
   );
 }

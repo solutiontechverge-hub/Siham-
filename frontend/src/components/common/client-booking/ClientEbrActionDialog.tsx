@@ -3,10 +3,10 @@
 import { Box, Typography } from "@mui/material";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { alpha, useTheme } from "@mui/material/styles";
-import MessagingModalShell, {
+import AppModal, {
   MessagingModalCancelButton,
   MessagingModalPrimaryButton,
-} from "../messaging/MessagingModalShell";
+} from "../AppModal";
 
 export type ClientEbrActionKind = "accept" | "suggest" | "reject";
 
@@ -39,21 +39,30 @@ const COPY: Record<
   },
 };
 
-export default function ClientEbrActionDialog({ open, action, onClose, onConfirm }: Props) {
+export default function ClientEbrActionDialog({
+  open,
+  action,
+  onClose,
+  onConfirm,
+}: Props) {
   const m = useTheme().palette.mollure;
   if (!action) return null;
 
   const copy = COPY[action];
 
   return (
-    <MessagingModalShell
+    <AppModal
+      contentSx={{ px: 2.5 }}
+      footerVariant="actions"
       open={open}
       title={copy.title}
       onClose={onClose}
+      headerTone={action === "reject" ? "danger" : "default"}
       footer={
         <>
           <MessagingModalCancelButton onClick={onClose} />
           <MessagingModalPrimaryButton
+            tone={action === "reject" ? "danger" : "primary"}
             label={copy.confirmLabel}
             onClick={() => {
               onConfirm();
@@ -65,12 +74,22 @@ export default function ClientEbrActionDialog({ open, action, onClose, onConfirm
     >
       <Box sx={{ py: 2.5, textAlign: "center" }}>
         {copy.showWarning ? (
-          <WarningAmberRoundedIcon sx={{ fontSize: 52, color: "#E85D5D", mb: 1.5 }} />
+          <WarningAmberRoundedIcon
+            sx={{ fontSize: 52, color: "#E85D5D", mb: 1.5 }}
+          />
         ) : null}
-        <Typography sx={{ fontWeight: 900, fontSize: 14, color: alpha(m.navy, 0.88), lineHeight: 1.55, px: 1 }}>
+        <Typography
+          sx={{
+            fontWeight: 900,
+            fontSize: 14,
+            color: alpha(m.navy, 0.88),
+            lineHeight: 1.55,
+            px: 1,
+          }}
+        >
           {copy.body}
         </Typography>
       </Box>
-    </MessagingModalShell>
+    </AppModal>
   );
 }

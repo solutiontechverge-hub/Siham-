@@ -2,6 +2,18 @@ import { configureStore } from "@reduxjs/toolkit";
 import authReducer from "./slices/authSlice";
 import { baseApi } from "./services/baseApi";
 
+// Ensure all injectEndpoints modules register on the shared baseApi
+// before the store middleware handles mutations/tag invalidation.
+import "./services/authApi";
+import "./services/profileApi";
+import "./services/businessApi";
+import "./services/financeApi";
+import "./services/messagingApi";
+import "./services/notificationsApi";
+import "./services/contactApi";
+import "./services/adminApi";
+import "./services/reviewsApi";
+
 export const makeStore = () =>
   configureStore({
     reducer: {

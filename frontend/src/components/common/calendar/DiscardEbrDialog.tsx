@@ -3,7 +3,10 @@
 import { Box, Typography } from "@mui/material";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { alpha, useTheme } from "@mui/material/styles";
-import MessagingModalShell, { MessagingModalCancelButton, MessagingModalPrimaryButton } from "../messaging/MessagingModalShell";
+import AppModal, {
+  MessagingModalCancelButton,
+  MessagingModalPrimaryButton,
+} from "../AppModal";
 
 type DiscardEbrDialogProps = {
   open: boolean;
@@ -11,15 +14,22 @@ type DiscardEbrDialogProps = {
   onConfirm: () => void;
 };
 
-export default function DiscardEbrDialog({ open, onClose, onConfirm }: DiscardEbrDialogProps) {
+export default function DiscardEbrDialog({
+  open,
+  onClose,
+  onConfirm,
+}: DiscardEbrDialogProps) {
   const m = useTheme().palette.mollure;
 
   return (
-    <MessagingModalShell
+    <AppModal
+      contentSx={{ px: 2.5 }}
+      footerVariant="actions"
       open={open}
       title="Discard EBR"
       onClose={onClose}
       maxWidth="sm"
+      headerTone="danger"
       footer={
         <>
           <MessagingModalCancelButton onClick={onClose} />
@@ -34,11 +44,21 @@ export default function DiscardEbrDialog({ open, onClose, onConfirm }: DiscardEb
       }
     >
       <Box sx={{ py: 2.5, textAlign: "center" }}>
-        <WarningAmberRoundedIcon sx={{ fontSize: 52, color: "#E85D5D", mb: 1.5 }} />
-        <Typography sx={{ fontWeight: 900, fontSize: 14, color: alpha(m.navy, 0.88), lineHeight: 1.55, px: 1 }}>
+        <WarningAmberRoundedIcon
+          sx={{ fontSize: 52, color: "#E85D5D", mb: 1.5 }}
+        />
+        <Typography
+          sx={{
+            fontWeight: 900,
+            fontSize: 14,
+            color: alpha(m.navy, 0.88),
+            lineHeight: 1.55,
+            px: 1,
+          }}
+        >
           This will end the EBR. The client will no longer be able to respond.
         </Typography>
       </Box>
-    </MessagingModalShell>
+    </AppModal>
   );
 }

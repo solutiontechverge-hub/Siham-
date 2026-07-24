@@ -1,9 +1,15 @@
 "use client";
 
+import AppButton from "./AppButton";
 import * as React from "react";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
-import { Box, Button, ButtonBase, Popover, Stack, Typography } from "@mui/material";
-import { alpha, useTheme, type SxProps, type Theme } from "@mui/material/styles";
+import { Box, ButtonBase, Popover, Stack, Typography } from "@mui/material";
+import {
+  alpha,
+  useTheme,
+  type SxProps,
+  type Theme,
+} from "@mui/material/styles";
 
 export type AppTimePickerProps = {
   value: string;
@@ -45,7 +51,12 @@ function toTimeValue(hour: number, minute: number) {
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
-export function AppTimePanel({ value, onChange, onDone, compact = false }: AppTimePanelProps) {
+export function AppTimePanel({
+  value,
+  onChange,
+  onDone,
+  compact = false,
+}: AppTimePanelProps) {
   const m = useTheme().palette.mollure;
   const parsed = parseTimeValue(value);
   const [hour, setHour] = React.useState(parsed.hour);
@@ -80,13 +91,27 @@ export function AppTimePanel({ value, onChange, onDone, compact = false }: AppTi
         }}
       >
         <AccessTimeRoundedIcon sx={{ fontSize: 18, color: m.teal }} />
-        <Typography sx={{ flex: 1, fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.82) }}>
+        <Typography
+          sx={{
+            flex: 1,
+            fontSize: 13,
+            fontWeight: 800,
+            color: alpha(m.navy, 0.82),
+          }}
+        >
           {formatTimeDisplay(toTimeValue(hour, minute)) || "Select time"}
         </Typography>
       </Box>
 
       <Box sx={{ px: 1.5, py: 1.25 }}>
-        <Typography sx={{ fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.45), mb: 0.75 }}>
+        <Typography
+          sx={{
+            fontSize: 11,
+            fontWeight: 800,
+            color: alpha(m.navy, 0.45),
+            mb: 0.75,
+          }}
+        >
           Hour
         </Typography>
         <Box
@@ -113,7 +138,9 @@ export function AppTimePanel({ value, onChange, onDone, compact = false }: AppTi
                   color: active ? "#fff" : alpha(m.navy, 0.72),
                   bgcolor: active ? m.teal : alpha(m.navy, 0.04),
                   border: `1px solid ${active ? m.teal : alpha(m.navy, 0.08)}`,
-                  "&:hover": { bgcolor: active ? m.tealDark : alpha(m.teal, 0.1) },
+                  "&:hover": {
+                    bgcolor: active ? m.tealDark : alpha(m.teal, 0.1),
+                  },
                 }}
               >
                 {String(h).padStart(2, "0")}
@@ -122,10 +149,23 @@ export function AppTimePanel({ value, onChange, onDone, compact = false }: AppTi
           })}
         </Box>
 
-        <Typography sx={{ fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.45), mb: 0.75 }}>
+        <Typography
+          sx={{
+            fontSize: 11,
+            fontWeight: 800,
+            color: alpha(m.navy, 0.45),
+            mb: 0.75,
+          }}
+        >
           Minute
         </Typography>
-        <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 0.5 }}>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: 0.5,
+          }}
+        >
           {MINUTE_OPTIONS.map((min) => {
             const active = minute === min;
             return (
@@ -140,7 +180,9 @@ export function AppTimePanel({ value, onChange, onDone, compact = false }: AppTi
                   color: active ? "#fff" : alpha(m.navy, 0.72),
                   bgcolor: active ? m.teal : alpha(m.navy, 0.04),
                   border: `1px solid ${active ? m.teal : alpha(m.navy, 0.08)}`,
-                  "&:hover": { bgcolor: active ? m.tealDark : alpha(m.teal, 0.1) },
+                  "&:hover": {
+                    bgcolor: active ? m.tealDark : alpha(m.teal, 0.1),
+                  },
                 }}
               >
                 {String(min).padStart(2, "0")}
@@ -150,22 +192,16 @@ export function AppTimePanel({ value, onChange, onDone, compact = false }: AppTi
         </Box>
 
         {onDone ? (
-          <Button
+          <AppButton
+            tone="primary"
             fullWidth
-            disableElevation
             onClick={onDone}
             sx={{
               mt: 1.25,
-              borderRadius: 2,
-              textTransform: "none",
-              fontWeight: 800,
-              bgcolor: m.teal,
-              color: "#fff",
-              "&:hover": { bgcolor: m.tealDark },
             }}
           >
             Done
-          </Button>
+          </AppButton>
         ) : null}
       </Box>
     </Box>
@@ -222,7 +258,10 @@ export default function AppTimePicker({
           textAlign: "left",
           transition: "border-color 0.15s",
           "&:hover": { borderColor: disabled ? alpha(m.navy, 0.14) : m.teal },
-          "&:focus-visible": { outline: `2px solid ${m.teal}`, outlineOffset: 2 },
+          "&:focus-visible": {
+            outline: `2px solid ${m.teal}`,
+            outlineOffset: 2,
+          },
           ...sx,
         }}
       >

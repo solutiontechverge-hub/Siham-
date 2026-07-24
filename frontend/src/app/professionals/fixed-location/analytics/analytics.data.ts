@@ -28,8 +28,8 @@ export type AttendanceNoShowRow = {
   isTotal?: boolean;
 };
 
-export type BookingByServiceCategoryRow = {
-  category: string;
+export type TransactionSummaryRow = {
+  channel: string;
   count: number;
   sharePct: number;
   isTotal?: boolean;
@@ -86,9 +86,9 @@ export type ProfessionalFixedLocationAnalyticsData = {
       explanationLabel: string;
       explanationContent?: AnalyticsExplanationContent;
     };
-    bookingByServiceCategory: {
+    transactionSummary: {
       title: string;
-      rows: readonly BookingByServiceCategoryRow[];
+      rows: readonly TransactionSummaryRow[];
       explanationLabel: string;
       explanationContent?: AnalyticsExplanationContent;
     };
@@ -147,7 +147,7 @@ export const professionalFixedLocationAnalyticsData: ProfessionalFixedLocationAn
       },
     },
     bookingStatusSummary: {
-      title: "1.2 Booking Status Summary",
+      title: "1.2 Booking Outcome Summary",
       rows: [
         { status: "Requested", count: 60, sharePct: 30 },
         { status: "Confirmed", count: 120, sharePct: 60 },
@@ -161,7 +161,7 @@ export const professionalFixedLocationAnalyticsData: ProfessionalFixedLocationAn
       explanationContent: {
         blocks: [
           {
-            title: "Booking Status Summary",
+            title: "Booking Outcome Summary",
             paragraphs: [
               "All metrics below count bookings as a whole, regardless of how many people are included in each booking.",
             ],
@@ -192,7 +192,7 @@ export const professionalFixedLocationAnalyticsData: ProfessionalFixedLocationAn
       },
     },
     attendanceNoShowAnalytics: {
-      title: "1.3 Attendance / No-Show Analytics",
+      title: "1.3 Attendance / No-Show Summary",
       rows: [
         { bookingType: "Fixed Location (FL)", noShowCount: 10, sharePct: 5 },
         { bookingType: "Desired Location (Normal DL)", noShowCount: 8, sharePct: 4 },
@@ -211,13 +211,16 @@ export const professionalFixedLocationAnalyticsData: ProfessionalFixedLocationAn
         ],
       },
     },
-    bookingByServiceCategory: {
-      title: "1.4 Transaction Summary",
+    transactionSummary: {
+      title: "1.6 Transaction Summary",
       rows: [
-        { category: "Hair", count: 42, sharePct: 21 },
-        { category: "Make-up", count: 30, sharePct: 15 },
-        { category: "Lashes", count: 18, sharePct: 9 },
-        { category: "Brows", count: 10, sharePct: 5 },
+        { channel: "Online Direct", count: 50, sharePct: 25 },
+        { channel: "Online Non-Direct", count: 40, sharePct: 20 },
+        { channel: "Total Online", count: 90, sharePct: 45, isTotal: true },
+        { channel: "Offline Direct", count: 60, sharePct: 30 },
+        { channel: "Offline Non-Direct", count: 50, sharePct: 25 },
+        { channel: "Total Offline", count: 110, sharePct: 55, isTotal: true },
+        { channel: "Grand Total", count: 200, sharePct: 100, isTotal: true },
       ],
       explanationLabel: "View Explanation",
       explanationContent: {

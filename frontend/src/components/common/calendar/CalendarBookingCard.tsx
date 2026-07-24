@@ -8,10 +8,20 @@ import BookingTimelineCard from "../BookingTimelineCard";
 import { useProfessionalMessagingUnread } from "../messaging/useProfessionalMessagingUnread";
 import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import { extractBookingId } from "./calendar.utils";
-import { getBookingScenarioIndicators, statusCardAccent, statusChipSxWithOverride, isBookingRequestAccepted, isBookingRequestRejected } from "./bookingStatus";
+import {
+  getBookingScenarioIndicators,
+  statusCardAccent,
+  statusChipSxWithOverride,
+  isBookingRequestAccepted,
+  isBookingRequestRejected,
+} from "./bookingStatus";
 import { resolveBookingResponseIndicators } from "./bookingResponseStatus";
 import { resolveProfessionalBookingRequestDirection } from "./BookingRequestBadge";
-import { resolveCalendarPrepaymentStatus, toPrepaymentIconVariant } from "./prepaymentStatus";
+import {
+  resolveCalendarPrepaymentStatus,
+  toPrepaymentIconVariant,
+} from "./prepaymentStatus";
+import { useBookingPaymentDueMeta } from "./resolveBookingPaymentDueMeta";
 
 export type CalendarBookingCardProps = {
   event: CalendarEvent;
@@ -38,7 +48,9 @@ function scenarioBadgeResponseIndicators(
 ) {
   if (label === "BR" || label === "EBR") return responseIndicators;
   if (label === "ER" || label === "E") {
-    return responseIndicators.filter((indicator) => indicator === "overdue_response");
+    return responseIndicators.filter(
+      (indicator) => indicator === "overdue_response",
+    );
   }
   return [];
 }
@@ -72,7 +84,10 @@ export default function CalendarBookingCard({
   const scenarioIndicators = getBookingScenarioIndicators(event);
   const responseIndicators = resolveBookingResponseIndicators(event);
   const prepaymentStatus = resolveCalendarPrepaymentStatus(event);
-  const prepaymentIconVariant = prepaymentStatus ? toPrepaymentIconVariant(prepaymentStatus) : undefined;
+  const prepaymentIconVariant = prepaymentStatus
+    ? toPrepaymentIconVariant(prepaymentStatus)
+    : undefined;
+  const paymentDueMeta = useBookingPaymentDueMeta(event);
   const isDesiredLocation = event.location === "DL";
   const isFixedLocation = event.location === "FL";
   const hasNote = Boolean(event.details?.internalNote?.trim());
@@ -86,9 +101,14 @@ export default function CalendarBookingCard({
     : event.status === "Requested"
       ? accent.border
       : accent.border;
-  const cardPattern = isDesiredLocation ? "dots" : isFixedLocation ? "lines" : "none";
+  const cardPattern = isDesiredLocation
+    ? "dots"
+    : isFixedLocation
+      ? "lines"
+      : "none";
   const isIncomingEbr =
-    event.bookingScenario === "EBR" && event.details?.requestDirection !== "outgoing";
+    event.bookingScenario === "EBR" &&
+    event.details?.requestDirection !== "outgoing";
   const emphasizeRequest = isIncomingEbr || event.bookingScenario === "BR";
 
   return (
@@ -150,10 +170,16 @@ export default function CalendarBookingCard({
         scenarioBadges={scenarioIndicators.map((label) => ({
           label,
           showRequestSentIcon: label === "BR",
-          requestDirection: label === "BR" ? resolveProfessionalBookingRequestDirection(event) : undefined,
+          requestDirection:
+            label === "BR"
+              ? resolveProfessionalBookingRequestDirection(event)
+              : undefined,
           requestAccepted: label === "BR" && isBookingRequestAccepted(event),
           requestRejected: label === "BR" && isBookingRequestRejected(event),
-          responseIndicators: label === "EBR" ? scenarioBadgeResponseIndicators(label, responseIndicators) : [],
+          responseIndicators:
+            label === "EBR"
+              ? scenarioBadgeResponseIndicators(label, responseIndicators)
+              : [],
           prepaymentStatus:
             label === "EBR"
               ? prepaymentIconVariant === "pending"
@@ -164,6 +190,17 @@ export default function CalendarBookingCard({
           bold: label === "EBR" || label === "BR",
         }))}
         prepaymentStatus={prepaymentIconVariant}
+        paymentDue={
+          paymentDueMeta
+            ? {
+                label: paymentDueMeta.reissued
+                  ? "Reissue Invoice"
+                  : "Payment Due",
+                dateLabel: paymentDueMeta.dateLabel,
+                showIcon: true,
+              }
+            : null
+        }
         responseIndicators={
           scenarioIndicators.includes("BR")
             ? responseIndicators
@@ -212,7 +249,13 @@ export default function CalendarBookingCard({
               }
             : undefined
         }
-        actionRailSx={dense ? { width: 40 } : isTicket ? { width: isCompactTicket ? 44 : 52 } : undefined}
+        actionRailSx={
+          dense
+            ? { width: 40 }
+            : isTicket
+              ? { width: isCompactTicket ? 44 : 52 }
+              : undefined
+        }
       />
     </Box>
   );

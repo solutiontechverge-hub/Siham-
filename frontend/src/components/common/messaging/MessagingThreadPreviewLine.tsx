@@ -14,7 +14,15 @@ export default function MessagingThreadPreviewLine({ thread }: Props) {
 
   if (!preview) {
     return (
-      <Typography sx={{ mt: 0.5, fontSize: 11.5, lineHeight: 1.45, fontWeight: 500, color: alpha(m.navy, 0.42) }}>
+      <Typography
+        sx={{
+          mt: 0.5,
+          fontSize: 11.5,
+          lineHeight: 1.45,
+          fontWeight: 500,
+          color: alpha(m.navy, 0.42),
+        }}
+      >
         {thread.isNewConversation ? "Tap to start a conversation" : ""}
       </Typography>
     );

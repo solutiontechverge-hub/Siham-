@@ -189,18 +189,34 @@ export function MollureLabeledField({
 
   return (
     <Stack spacing={0.75}>
-      <MollureTopLabel htmlFor={fieldId} label={fieldLabel} required={required} />
-      <MollureTextField id={fieldId} required={required} error={error} helperText={helperText} {...props} />
+      <MollureTopLabel
+        htmlFor={fieldId}
+        label={fieldLabel}
+        required={required}
+      />
+      <MollureTextField
+        id={fieldId}
+        required={required}
+        error={error}
+        helperText={helperText}
+        {...props}
+      />
     </Stack>
   );
 }
 
-export type MollurePasswordFieldProps = Omit<TextFieldProps, "type" | "InputProps"> & {
+export type MollurePasswordFieldProps = Omit<
+  TextFieldProps,
+  "type" | "InputProps"
+> & {
   /** Defaults to "password". */
   typeWhenHidden?: "password" | "text";
 };
 
-export function MollurePasswordField({ typeWhenHidden = "password", ...props }: MollurePasswordFieldProps) {
+export function MollurePasswordField({
+  typeWhenHidden = "password",
+  ...props
+}: MollurePasswordFieldProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
   const [show, setShow] = React.useState(false);
@@ -272,13 +288,26 @@ export function MollureLabeledPasswordField({
 
   return (
     <Stack spacing={0.75}>
-      <MollureTopLabel htmlFor={fieldId} label={fieldLabel} required={required} />
-      <MollurePasswordField id={fieldId} required={required} error={error} helperText={helperText} {...props} />
+      <MollureTopLabel
+        htmlFor={fieldId}
+        label={fieldLabel}
+        required={required}
+      />
+      <MollurePasswordField
+        id={fieldId}
+        required={required}
+        error={error}
+        helperText={helperText}
+        {...props}
+      />
     </Stack>
   );
 }
 
-export type MollureLabeledSelectProps<T> = Omit<SelectProps<T>, "label" | "notched"> & {
+export type MollureLabeledSelectProps<T> = Omit<
+  SelectProps<T>,
+  "label" | "notched"
+> & {
   fieldLabel: React.ReactNode;
   helperText?: React.ReactNode;
   errorText?: React.ReactNode;
@@ -304,7 +333,11 @@ export function MollureLabeledSelect<T>(props: MollureLabeledSelectProps<T>) {
 
   return (
     <Stack spacing={0.75}>
-      <MollureTopLabel htmlFor={fieldId} label={fieldLabel} required={required} />
+      <MollureTopLabel
+        htmlFor={fieldId}
+        label={fieldLabel}
+        required={required}
+      />
       <FormControl fullWidth size="small" disabled={disabled} error={hasError}>
         <Select
           {...selectProps}
@@ -322,4 +355,3 @@ export function MollureLabeledSelect<T>(props: MollureLabeledSelectProps<T>) {
     </Stack>
   );
 }
-

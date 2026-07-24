@@ -74,11 +74,21 @@ export default function RefundSalesSelectField({
     setOpen(false);
   };
 
-  const borderColor = open || (highlightBorderWhenValue && value) ? m.teal : alpha(m.navy, 0.12);
+  const borderColor =
+    open || (highlightBorderWhenValue && value) ? m.teal : alpha(m.navy, 0.12);
 
   return (
     <Box ref={rootRef}>
-      <BodyText sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.55), mb: 0.75 }}>{label}</BodyText>
+      <BodyText
+        sx={{
+          fontSize: 12,
+          fontWeight: 700,
+          color: alpha(m.navy, 0.55),
+          mb: 0.75,
+        }}
+      >
+        {label}
+      </BodyText>
       <Box
         role="button"
         tabIndex={0}
@@ -164,10 +174,15 @@ export default function RefundSalesSelectField({
                   py: 1.15,
                   cursor: "pointer",
                   bgcolor: active ? alpha(m.teal, 0.08) : "#fff",
-                  borderBottom: index < options.length - 1 ? `1px solid ${alpha(m.navy, 0.06)}` : 0,
+                  borderBottom:
+                    index < options.length - 1
+                      ? `1px solid ${alpha(m.navy, 0.06)}`
+                      : 0,
                 }}
               >
-                {optionStyle === "checkbox" && checkboxAlign === "left" ? checkboxNode : null}
+                {optionStyle === "checkbox" && checkboxAlign === "left"
+                  ? checkboxNode
+                  : null}
                 <Typography
                   sx={{
                     flex: 1,
@@ -191,7 +206,9 @@ export default function RefundSalesSelectField({
                     }}
                   />
                 ) : null}
-                {optionStyle === "checkbox" && checkboxAlign === "right" ? checkboxNode : null}
+                {optionStyle === "checkbox" && checkboxAlign === "right"
+                  ? checkboxNode
+                  : null}
               </Box>
             );
           })}

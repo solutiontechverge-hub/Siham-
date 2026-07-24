@@ -31,9 +31,12 @@ export default function VerifyEmailPage() {
 
     const verify = async () => {
       try {
-        const response = await fetch(apiUrl(`/api/auth/verify-email?token=${encodeURIComponent(token)}`), {
-          method: "GET",
-        });
+        const response = await fetch(
+          apiUrl(`/api/auth/verify-email?token=${encodeURIComponent(token)}`),
+          {
+            method: "GET",
+          },
+        );
         const payload = (await response.json()) as {
           success?: boolean;
           message?: string;
@@ -47,7 +50,10 @@ export default function VerifyEmailPage() {
 
         const user = payload.data;
         try {
-          window.sessionStorage.setItem(VERIFY_RESULT_KEY, JSON.stringify(user));
+          window.sessionStorage.setItem(
+            VERIFY_RESULT_KEY,
+            JSON.stringify(user),
+          );
         } catch {
           // ignore
         }
@@ -59,14 +65,19 @@ export default function VerifyEmailPage() {
 
         if (user.user_type === "professional") {
           const stripe = user.stripe_connect_status ?? "not_connected";
-          router.replace(`/auth/account-approved?stripe=${encodeURIComponent(stripe)}`);
+          router.replace(
+            `/auth/account-approved?stripe=${encodeURIComponent(stripe)}`,
+          );
           return;
         }
 
         router.replace("/auth/email-verified");
       } catch {
         setMessage("Unable to verify your email. Redirecting…");
-        window.setTimeout(() => router.replace("/auth/account-not-approved?reason=error"), 1200);
+        window.setTimeout(
+          () => router.replace("/auth/account-not-approved?reason=error"),
+          1200,
+        );
       }
     };
 
@@ -76,7 +87,11 @@ export default function VerifyEmailPage() {
   return (
     <AuthEmailScreen>
       <CircularProgress size={36} sx={{ color: m.teal, mb: 2 }} />
-      <Typography sx={{ fontWeight: 800, fontSize: 16, color: alpha(m.navy, 0.72) }}>{message}</Typography>
+      <Typography
+        sx={{ fontWeight: 800, fontSize: 16, color: alpha(m.navy, 0.72) }}
+      >
+        {message}
+      </Typography>
     </AuthEmailScreen>
   );
 }

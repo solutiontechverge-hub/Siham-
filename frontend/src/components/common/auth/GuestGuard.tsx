@@ -21,7 +21,9 @@ export default function GuestGuard({ children }: GuestGuardProps) {
     const isAuthenticated = Boolean(accessToken || persisted?.accessToken);
 
     if (isAuthenticated) {
-      router.replace(getDefaultRouteForUser(user?.user_type || persisted?.user?.user_type));
+      router.replace(
+        getDefaultRouteForUser(user?.user_type || persisted?.user?.user_type),
+      );
       return;
     }
 

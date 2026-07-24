@@ -1,7 +1,8 @@
 "use client";
 
+import AppButton from "../AppButton";
 import * as React from "react";
-import { Box, Button, ButtonBase, Popover, Stack, Typography } from "@mui/material";
+import { Box, ButtonBase, Popover, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { AppTimePanel, formatTimeDisplay } from "../AppTimePicker";
 import { AppCalendarPanel } from "../AppDatePicker";
@@ -26,7 +27,9 @@ const DATE_MODE_OPTIONS = [
   { label: "any date", value: "any" as const },
 ];
 
-const TIME_PRESET_ROWS: Array<Array<{ label: string; value: ListingTimePreset }>> = [
+const TIME_PRESET_ROWS: Array<
+  Array<{ label: string; value: ListingTimePreset }>
+> = [
   [
     { label: "any time", value: "any" },
     { label: "morning", value: "morning" },
@@ -51,8 +54,12 @@ export default function CalendarPopover({
 }: CalendarPopoverProps) {
   const tokens = useTheme().palette.mollure;
   const today = React.useMemo(() => todayIsoDate(), []);
-  const [draft, setDraft] = React.useState<ListingDateTimeFilter>(() => mergeDraft(value));
-  const [activeTimeField, setActiveTimeField] = React.useState<"timeFrom" | "timeTo" | null>(null);
+  const [draft, setDraft] = React.useState<ListingDateTimeFilter>(() =>
+    mergeDraft(value),
+  );
+  const [activeTimeField, setActiveTimeField] = React.useState<
+    "timeFrom" | "timeTo" | null
+  >(null);
 
   React.useEffect(() => {
     if (open) {
@@ -156,7 +163,14 @@ export default function CalendarPopover({
       }}
     >
       <Box sx={{ px: 2, py: 2 }}>
-        <Typography sx={{ fontWeight: 800, color: alpha(tokens.navy, 0.55), fontSize: 13, mb: 1.25 }}>
+        <Typography
+          sx={{
+            fontWeight: 800,
+            color: alpha(tokens.navy, 0.55),
+            fontSize: 13,
+            mb: 1.25,
+          }}
+        >
           Select Date
         </Typography>
 
@@ -198,12 +212,25 @@ export default function CalendarPopover({
           borderTop: `1px solid ${alpha(tokens.navy, 0.08)}`,
         }}
       >
-        <Typography sx={{ fontWeight: 800, color: alpha(tokens.navy, 0.55), fontSize: 13, mb: 1.25 }}>
+        <Typography
+          sx={{
+            fontWeight: 800,
+            color: alpha(tokens.navy, 0.55),
+            fontSize: 13,
+            mb: 1.25,
+          }}
+        >
           Select Time
         </Typography>
 
         <Stack spacing={0.75}>
-          <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 0.75 }}>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+              gap: 0.75,
+            }}
+          >
             {TIME_PRESET_ROWS[0].map((option) => (
               <ButtonBase
                 key={option.value}
@@ -214,7 +241,13 @@ export default function CalendarPopover({
               </ButtonBase>
             ))}
           </Box>
-          <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 0.75 }}>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+              gap: 0.75,
+            }}
+          >
             {TIME_PRESET_ROWS[1].map((option) => (
               <ButtonBase
                 key={option.value}
@@ -231,17 +264,26 @@ export default function CalendarPopover({
         <Stack spacing={1.25} sx={{ mt: 1.5 }}>
           <Box>
             <ButtonBase
-              onClick={() => setActiveTimeField((prev) => (prev === "timeFrom" ? null : "timeFrom"))}
+              onClick={() =>
+                setActiveTimeField((prev) =>
+                  prev === "timeFrom" ? null : "timeFrom",
+                )
+              }
               sx={{
                 ...timeFieldSx,
-                borderColor: activeTimeField === "timeFrom" ? tokens.teal : alpha(tokens.navy, 0.14),
+                borderColor:
+                  activeTimeField === "timeFrom"
+                    ? tokens.teal
+                    : alpha(tokens.navy, 0.14),
               }}
             >
               <Typography
                 sx={{
                   fontSize: 13,
                   fontWeight: draft.timeFrom ? 700 : 500,
-                  color: draft.timeFrom ? alpha(tokens.navy, 0.78) : alpha(tokens.navy, 0.42),
+                  color: draft.timeFrom
+                    ? alpha(tokens.navy, 0.78)
+                    : alpha(tokens.navy, 0.42),
                 }}
               >
                 {draft.timeFrom ? formatTimeDisplay(draft.timeFrom) : "From"}
@@ -268,17 +310,26 @@ export default function CalendarPopover({
 
           <Box>
             <ButtonBase
-              onClick={() => setActiveTimeField((prev) => (prev === "timeTo" ? null : "timeTo"))}
+              onClick={() =>
+                setActiveTimeField((prev) =>
+                  prev === "timeTo" ? null : "timeTo",
+                )
+              }
               sx={{
                 ...timeFieldSx,
-                borderColor: activeTimeField === "timeTo" ? tokens.teal : alpha(tokens.navy, 0.14),
+                borderColor:
+                  activeTimeField === "timeTo"
+                    ? tokens.teal
+                    : alpha(tokens.navy, 0.14),
               }}
             >
               <Typography
                 sx={{
                   fontSize: 13,
                   fontWeight: draft.timeTo ? 700 : 500,
-                  color: draft.timeTo ? alpha(tokens.navy, 0.78) : alpha(tokens.navy, 0.42),
+                  color: draft.timeTo
+                    ? alpha(tokens.navy, 0.78)
+                    : alpha(tokens.navy, 0.42),
                 }}
               >
                 {draft.timeTo ? formatTimeDisplay(draft.timeTo) : "To"}
@@ -305,7 +356,7 @@ export default function CalendarPopover({
         </Stack>
 
         <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
-          <Button
+          <AppButton
             onClick={clear}
             variant="outlined"
             sx={{
@@ -315,12 +366,15 @@ export default function CalendarPopover({
               fontWeight: 800,
               borderColor: tokens.border,
               color: tokens.navy,
-              "&:hover": { borderColor: tokens.inputBorderHover, bgcolor: "rgba(52, 74, 102, 0.03)" },
+              "&:hover": {
+                borderColor: tokens.inputBorderHover,
+                bgcolor: "rgba(52, 74, 102, 0.03)",
+              },
             }}
           >
             Clear
-          </Button>
-          <Button
+          </AppButton>
+          <AppButton
             onClick={apply}
             variant="contained"
             disableElevation
@@ -334,12 +388,21 @@ export default function CalendarPopover({
             }}
           >
             Done
-          </Button>
+          </AppButton>
         </Stack>
       </Box>
     </Popover>
   );
 }
 
-export type { CalendarPopoverValue, ListingDateTimeFilter, ListingDateMode, ListingTimePreset } from "./listingDateTime";
-export { formatListingDateTimeDisplay, defaultListingDateTimeFilter, timePresetRange } from "./listingDateTime";
+export type {
+  CalendarPopoverValue,
+  ListingDateTimeFilter,
+  ListingDateMode,
+  ListingTimePreset,
+} from "./listingDateTime";
+export {
+  formatListingDateTimeDisplay,
+  defaultListingDateTimeFilter,
+  timePresetRange,
+} from "./listingDateTime";

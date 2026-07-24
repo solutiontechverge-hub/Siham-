@@ -1,11 +1,19 @@
 "use client";
 
+import AppButton from "../AppButton";
 import * as React from "react";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import { Box, Button, Checkbox, IconButton, Paper, Stack, Tooltip } from "@mui/material";
+import {
+  Box,
+  Checkbox,
+  IconButton,
+  Paper,
+  Stack,
+  Tooltip,
+} from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDropdown from "../AppDropdown";
 import AppTextField from "../AppTextField";
@@ -16,7 +24,10 @@ import {
   type ServiceCategorySliderIconId,
 } from "../../../data/businessServiceCategorySlider.data";
 import type { CalendarBookingLocation } from "../../../app/professionals/fixed-location/calendar/calendar.data";
-import type { BookingRules, ServiceOrderSettings } from "./calendar-settings.types";
+import type {
+  BookingRules,
+  ServiceOrderSettings,
+} from "./calendar-settings.types";
 import type { CalendarDesignDraft } from "./CalendarDesignModal";
 import { getCalendarDesignServiceLabel } from "./CalendarDesignModal";
 import type { PublicBusinessHoursDraft } from "./CalendarPublicBusinessHoursModal";
@@ -77,7 +88,11 @@ function SettingsSection({
           bgcolor: alpha(m.navy, 0.02),
         }}
       >
-        <SubHeading sx={{ fontSize: 15, fontWeight: 800, color: alpha(m.navy, 0.82) }}>{title}</SubHeading>
+        <SubHeading
+          sx={{ fontSize: 15, fontWeight: 800, color: alpha(m.navy, 0.82) }}
+        >
+          {title}
+        </SubHeading>
         {action}
       </Stack>
       <Box sx={{ p: 2 }}>{children}</Box>
@@ -85,29 +100,28 @@ function SettingsSection({
   );
 }
 
-function SetButton({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
+function SetButton({
+  onClick,
+  disabled,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+}) {
   const m = useTheme().palette.mollure;
   return (
-    <Button
-      variant="contained"
-      disableElevation
+    <AppButton
+      tone="primary"
       disabled={disabled}
       onClick={onClick}
       sx={{
-        borderRadius: "8px",
-        textTransform: "none",
-        fontWeight: 800,
         fontSize: 12.5,
         minWidth: 58,
         height: 30,
         px: 1.75,
-        bgcolor: m.teal,
-        color: "#fff",
-        "&:hover": { bgcolor: m.tealDark, color: "#fff" },
       }}
     >
       Set
-    </Button>
+    </AppButton>
   );
 }
 
@@ -141,29 +155,28 @@ function EditSectionButton({
   );
 }
 
-function SectionSaveButton({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
+function SectionSaveButton({
+  onClick,
+  disabled,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+}) {
   const m = useTheme().palette.mollure;
   return (
-    <Button
-      variant="contained"
-      disableElevation
+    <AppButton
+      tone="primary"
       disabled={disabled}
       onClick={onClick}
       sx={{
-        borderRadius: "8px",
-        textTransform: "none",
-        fontWeight: 800,
         fontSize: 12.5,
         minWidth: 72,
         height: 30,
         px: 1.75,
-        bgcolor: m.teal,
-        color: "#fff",
-        "&:hover": { bgcolor: m.tealDark, color: "#fff" },
       }}
     >
       Save
-    </Button>
+    </AppButton>
   );
 }
 
@@ -203,33 +216,73 @@ function DurationInput({
 
   return (
     <Box>
-      <BodyText sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.72), mb: 0.85 }}>{label}</BodyText>
+      <BodyText
+        sx={{
+          fontSize: 12.5,
+          fontWeight: 700,
+          color: alpha(m.navy, 0.72),
+          mb: 0.85,
+        }}
+      >
+        {label}
+      </BodyText>
       <Stack direction="row" spacing={1.25} alignItems="center">
         <AppTextField
           value={hours}
           onChange={(e) => onHoursChange(sanitize(e.target.value))}
           disabled={disabled}
-          inputProps={{ inputMode: "numeric", maxLength: 2, "aria-label": `${label} hours` }}
+          inputProps={{
+            inputMode: "numeric",
+            maxLength: 2,
+            "aria-label": `${label} hours`,
+          }}
           sx={{ ...fieldSx, flex: 1, minWidth: 0 }}
         />
-        <BodyText sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.5) }}>h</BodyText>
+        <BodyText
+          sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.5) }}
+        >
+          h
+        </BodyText>
         <AppTextField
           value={minutes}
           onChange={(e) => onMinutesChange(sanitize(e.target.value))}
           disabled={disabled}
-          inputProps={{ inputMode: "numeric", maxLength: 2, "aria-label": `${label} minutes` }}
+          inputProps={{
+            inputMode: "numeric",
+            maxLength: 2,
+            "aria-label": `${label} minutes`,
+          }}
           sx={{ ...fieldSx, flex: 1, minWidth: 0 }}
         />
-        <BodyText sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.5) }}>min</BodyText>
+        <BodyText
+          sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.5) }}
+        >
+          min
+        </BodyText>
       </Stack>
       {helperText ? (
-        <BodyText sx={{ mt: 1, fontSize: 11.5, color: alpha(m.navy, 0.45), lineHeight: 1.45 }}>{helperText}</BodyText>
+        <BodyText
+          sx={{
+            mt: 1,
+            fontSize: 11.5,
+            color: alpha(m.navy, 0.45),
+            lineHeight: 1.45,
+          }}
+        >
+          {helperText}
+        </BodyText>
       ) : null}
     </Box>
   );
 }
 
-function LocationRulesCard({ title, children }: { title: string; children: React.ReactNode }) {
+function LocationRulesCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   const m = useTheme().palette.mollure;
   return (
     <Box
@@ -241,7 +294,16 @@ function LocationRulesCard({ title, children }: { title: string; children: React
         py: 1.75,
       }}
     >
-      <BodyText sx={{ fontSize: 13.5, fontWeight: 800, color: alpha(m.navy, 0.78), mb: 1.5 }}>{title}</BodyText>
+      <BodyText
+        sx={{
+          fontSize: 13.5,
+          fontWeight: 800,
+          color: alpha(m.navy, 0.78),
+          mb: 1.5,
+        }}
+      >
+        {title}
+      </BodyText>
       {children}
     </Box>
   );
@@ -293,11 +355,35 @@ function LocationHoursBlock({
         py: 1.5,
       }}
     >
-      <BodyText sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.78), mb: 1.25 }}>{title}</BodyText>
-      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-        <Stack direction="row" spacing={0.75} alignItems="center" sx={{ minWidth: 148 }}>
+      <BodyText
+        sx={{
+          fontSize: 13,
+          fontWeight: 800,
+          color: alpha(m.navy, 0.78),
+          mb: 1.25,
+        }}
+      >
+        {title}
+      </BodyText>
+      <Stack
+        direction="row"
+        spacing={1}
+        alignItems="center"
+        flexWrap="wrap"
+        useFlexGap
+      >
+        <Stack
+          direction="row"
+          spacing={0.75}
+          alignItems="center"
+          sx={{ minWidth: 148 }}
+        >
           <AccessTimeRoundedIcon sx={{ fontSize: 18, color: m.teal }} />
-          <BodyText sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.62) }}>{scheduleLabel}</BodyText>
+          <BodyText
+            sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.62) }}
+          >
+            {scheduleLabel}
+          </BodyText>
         </Stack>
         <Box sx={{ flex: 1, minWidth: 220 }}>
           <AppDropdown
@@ -324,7 +410,9 @@ function resolveCategoryMeta(category: string): {
   iconId: ServiceCategorySliderIconId;
 } {
   const catalog = BUSINESS_SERVICE_CATEGORY_CATALOG.find(
-    (entry) => entry.key === category || entry.label.toLowerCase() === category.toLowerCase(),
+    (entry) =>
+      entry.key === category ||
+      entry.label.toLowerCase() === category.toLowerCase(),
   );
   if (catalog) {
     return {
@@ -338,7 +426,11 @@ function resolveCategoryMeta(category: string): {
   };
 }
 
-function reorderList<T>(list: readonly T[], fromIndex: number, toIndex: number): T[] {
+function reorderList<T>(
+  list: readonly T[],
+  fromIndex: number,
+  toIndex: number,
+): T[] {
   const next = [...list];
   const [item] = next.splice(fromIndex, 1);
   next.splice(toIndex, 0, item);
@@ -368,9 +460,15 @@ export default function CalendarHoursRulesPanel({
 
   const [bookingRulesEditing, setBookingRulesEditing] = React.useState(false);
   const [serviceOrderEditing, setServiceOrderEditing] = React.useState(false);
-  const [draggingCategory, setDraggingCategory] = React.useState<string | null>(null);
-  const [draggingService, setDraggingService] = React.useState<string | null>(null);
-  const [selectedCategory, setSelectedCategory] = React.useState<string | null>(null);
+  const [draggingCategory, setDraggingCategory] = React.useState<string | null>(
+    null,
+  );
+  const [draggingService, setDraggingService] = React.useState<string | null>(
+    null,
+  );
+  const [selectedCategory, setSelectedCategory] = React.useState<string | null>(
+    null,
+  );
   const [flHoursId, setFlHoursId] = React.useState("");
   const [dlHoursId, setDlHoursId] = React.useState("");
 
@@ -389,18 +487,25 @@ export default function CalendarHoursRulesPanel({
 
   React.useEffect(() => {
     if (flEntries.length && !flHoursId) {
-      setFlHoursId(hoursOptionId(flEntries[flEntries.length - 1], flEntries.length - 1));
+      setFlHoursId(
+        hoursOptionId(flEntries[flEntries.length - 1], flEntries.length - 1),
+      );
     }
   }, [flEntries, flHoursId]);
 
   React.useEffect(() => {
     if (dlEntries.length && !dlHoursId) {
-      setDlHoursId(hoursOptionId(dlEntries[dlEntries.length - 1], dlEntries.length - 1));
+      setDlHoursId(
+        hoursOptionId(dlEntries[dlEntries.length - 1], dlEntries.length - 1),
+      );
     }
   }, [dlEntries, dlHoursId]);
 
   const categories = serviceOrder.categories ?? [];
-  const activeCategory = selectedCategory && categories.includes(selectedCategory) ? selectedCategory : categories[0] ?? null;
+  const activeCategory =
+    selectedCategory && categories.includes(selectedCategory)
+      ? selectedCategory
+      : (categories[0] ?? null);
   const servicesForActive = React.useMemo(() => {
     if (!activeCategory) return [];
     const byCategory = serviceOrder.servicesByCategory ?? {};
@@ -410,7 +515,7 @@ export default function CalendarHoursRulesPanel({
       const right = activeCategory.toLowerCase().trim();
       return left === right || left.includes(right) || right.includes(left);
     });
-    return matchedKey ? byCategory[matchedKey] ?? [] : [];
+    return matchedKey ? (byCategory[matchedKey] ?? []) : [];
   }, [activeCategory, serviceOrder.servicesByCategory]);
 
   const appearanceItems = React.useMemo(() => {
@@ -502,7 +607,11 @@ export default function CalendarHoursRulesPanel({
           borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
         }}
       >
-        <SubHeading sx={{ fontSize: 18, fontWeight: 800, color: alpha(m.navy, 0.72) }}>Settings</SubHeading>
+        <SubHeading
+          sx={{ fontSize: 18, fontWeight: 800, color: alpha(m.navy, 0.72) }}
+        >
+          Settings
+        </SubHeading>
       </Box>
 
       <Stack spacing={1.75} sx={{ px: 2.5, py: 2.25 }}>
@@ -511,7 +620,9 @@ export default function CalendarHoursRulesPanel({
           action={
             <SetButton
               disabled={isSaving}
-              onClick={() => onOpenPublicHours(showFl ? "FL" : showDl ? "DL" : undefined)}
+              onClick={() =>
+                onOpenPublicHours(showFl ? "FL" : showDl ? "DL" : undefined)
+              }
             />
           }
         >
@@ -542,9 +653,16 @@ export default function CalendarHoursRulesPanel({
           title="Booking Rules"
           action={
             bookingRulesEditing ? (
-              <SectionSaveButton disabled={isSaving} onClick={() => void handleSaveBookingRules()} />
+              <SectionSaveButton
+                disabled={isSaving}
+                onClick={() => void handleSaveBookingRules()}
+              />
             ) : (
-              <EditSectionButton active={false} disabled={isSaving} onClick={handleBookingRulesEdit} />
+              <EditSectionButton
+                active={false}
+                disabled={isSaving}
+                onClick={handleBookingRulesEdit}
+              />
             )
           }
         >
@@ -555,8 +673,18 @@ export default function CalendarHoursRulesPanel({
                   label="Interval Between Bookings"
                   hours={bookingRules.flIntervalHours}
                   minutes={bookingRules.flIntervalMinutes}
-                  onHoursChange={(value) => onBookingRulesChange({ ...bookingRules, flIntervalHours: value })}
-                  onMinutesChange={(value) => onBookingRulesChange({ ...bookingRules, flIntervalMinutes: value })}
+                  onHoursChange={(value) =>
+                    onBookingRulesChange({
+                      ...bookingRules,
+                      flIntervalHours: value,
+                    })
+                  }
+                  onMinutesChange={(value) =>
+                    onBookingRulesChange({
+                      ...bookingRules,
+                      flIntervalMinutes: value,
+                    })
+                  }
                   helperText="Set the minimum time between consecutive bookings"
                   disabled={!bookingRulesEditing || isSaving}
                 />
@@ -569,16 +697,36 @@ export default function CalendarHoursRulesPanel({
                     label="Interval Between Bookings"
                     hours={bookingRules.dlIntervalHours}
                     minutes={bookingRules.dlIntervalMinutes}
-                    onHoursChange={(value) => onBookingRulesChange({ ...bookingRules, dlIntervalHours: value })}
-                    onMinutesChange={(value) => onBookingRulesChange({ ...bookingRules, dlIntervalMinutes: value })}
+                    onHoursChange={(value) =>
+                      onBookingRulesChange({
+                        ...bookingRules,
+                        dlIntervalHours: value,
+                      })
+                    }
+                    onMinutesChange={(value) =>
+                      onBookingRulesChange({
+                        ...bookingRules,
+                        dlIntervalMinutes: value,
+                      })
+                    }
                     disabled={!bookingRulesEditing || isSaving}
                   />
                   <DurationInput
                     label="Minimum Timeslot"
                     hours={bookingRules.dlMinTimeslotHours}
                     minutes={bookingRules.dlMinTimeslotMinutes}
-                    onHoursChange={(value) => onBookingRulesChange({ ...bookingRules, dlMinTimeslotHours: value })}
-                    onMinutesChange={(value) => onBookingRulesChange({ ...bookingRules, dlMinTimeslotMinutes: value })}
+                    onHoursChange={(value) =>
+                      onBookingRulesChange({
+                        ...bookingRules,
+                        dlMinTimeslotHours: value,
+                      })
+                    }
+                    onMinutesChange={(value) =>
+                      onBookingRulesChange({
+                        ...bookingRules,
+                        dlMinTimeslotMinutes: value,
+                      })
+                    }
                     helperText="Minimum required team member time at DL location"
                     disabled={!bookingRulesEditing || isSaving}
                   />
@@ -592,19 +740,40 @@ export default function CalendarHoursRulesPanel({
           title="Service Order Rules"
           action={
             serviceOrderEditing ? (
-              <SectionSaveButton disabled={isSaving} onClick={() => void handleSaveServiceOrder()} />
+              <SectionSaveButton
+                disabled={isSaving}
+                onClick={() => void handleSaveServiceOrder()}
+              />
             ) : (
-              <EditSectionButton active={false} disabled={isSaving} onClick={handleServiceOrderEdit} />
+              <EditSectionButton
+                active={false}
+                disabled={isSaving}
+                onClick={handleServiceOrderEdit}
+              />
             )
           }
         >
           {categories.length ? (
             <Stack spacing={2}>
               <Box>
-                <BodyText sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.5 }}>
+                <BodyText
+                  sx={{
+                    fontSize: 12.5,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.62),
+                    mb: 0.5,
+                  }}
+                >
                   Select Categories
                 </BodyText>
-                <BodyText sx={{ fontSize: 11.5, color: alpha(m.navy, 0.45), mb: 1.1, lineHeight: 1.4 }}>
+                <BodyText
+                  sx={{
+                    fontSize: 11.5,
+                    color: alpha(m.navy, 0.45),
+                    mb: 1.1,
+                    lineHeight: 1.4,
+                  }}
+                >
                   {serviceOrderEditing
                     ? "Check to show, uncheck to hide. Drag to change placement (1 appears first)."
                     : "Edit to show/hide categories and rearrange their order."}
@@ -624,7 +793,10 @@ export default function CalendarHoursRulesPanel({
                 >
                   {categories.map((category, index) => {
                     const meta = resolveCategoryMeta(category);
-                    const visible = isCategoryVisibleInServiceOrder(serviceOrder, category);
+                    const visible = isCategoryVisibleInServiceOrder(
+                      serviceOrder,
+                      category,
+                    );
                     return (
                       <CalendarServiceOrderCard
                         key={category}
@@ -639,7 +811,9 @@ export default function CalendarHoursRulesPanel({
                         onCheckedChange={(nextChecked) => {
                           if (!serviceOrderEditing) return;
                           if (visible === nextChecked) return;
-                          onServiceOrderChange(toggleHiddenCategory(serviceOrder, category));
+                          onServiceOrderChange(
+                            toggleHiddenCategory(serviceOrder, category),
+                          );
                         }}
                         onClick={
                           serviceOrderEditing
@@ -650,7 +824,12 @@ export default function CalendarHoursRulesPanel({
                         onDragEnd={() => setDraggingCategory(null)}
                         onDragOver={(event) => event.preventDefault()}
                         onDrop={() => {
-                          if (!serviceOrderEditing || !draggingCategory || draggingCategory === category) return;
+                          if (
+                            !serviceOrderEditing ||
+                            !draggingCategory ||
+                            draggingCategory === category
+                          )
+                            return;
                           const from = categories.indexOf(draggingCategory);
                           const to = categories.indexOf(category);
                           if (from < 0 || to < 0) return;
@@ -667,10 +846,24 @@ export default function CalendarHoursRulesPanel({
               </Box>
 
               <Box>
-                <BodyText sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.5 }}>
+                <BodyText
+                  sx={{
+                    fontSize: 12.5,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.62),
+                    mb: 0.5,
+                  }}
+                >
                   Services
                 </BodyText>
-                <BodyText sx={{ fontSize: 11.5, color: alpha(m.navy, 0.45), mb: 1.1, lineHeight: 1.4 }}>
+                <BodyText
+                  sx={{
+                    fontSize: 11.5,
+                    color: alpha(m.navy, 0.45),
+                    mb: 1.1,
+                    lineHeight: 1.4,
+                  }}
+                >
                   {serviceOrderEditing
                     ? "Check to show, uncheck to hide. Drag to rearrange within this category."
                     : activeCategory
@@ -682,7 +875,11 @@ export default function CalendarHoursRulesPanel({
                     servicesForActive.map((service, index) => {
                       const visible =
                         Boolean(activeCategory) &&
-                        isServiceVisibleInServiceOrder(serviceOrder, activeCategory as string, service);
+                        isServiceVisibleInServiceOrder(
+                          serviceOrder,
+                          activeCategory as string,
+                          service,
+                        );
                       return (
                         <Box
                           key={`${activeCategory}-${service}`}
@@ -691,10 +888,18 @@ export default function CalendarHoursRulesPanel({
                           onDragEnd={() => setDraggingService(null)}
                           onDragOver={(event) => event.preventDefault()}
                           onDrop={() => {
-                            if (!serviceOrderEditing || !activeCategory || !draggingService || draggingService === service) {
+                            if (
+                              !serviceOrderEditing ||
+                              !activeCategory ||
+                              !draggingService ||
+                              draggingService === service
+                            ) {
                               return;
                             }
-                            const list = serviceOrder.servicesByCategory?.[activeCategory] ?? servicesForActive;
+                            const list =
+                              serviceOrder.servicesByCategory?.[
+                                activeCategory
+                              ] ?? servicesForActive;
                             const from = list.indexOf(draggingService);
                             const to = list.indexOf(service);
                             if (from < 0 || to < 0) return;
@@ -713,11 +918,18 @@ export default function CalendarHoursRulesPanel({
                             gap: 1,
                             borderRadius: "6px",
                             border: `1px ${visible ? "solid" : "dashed"} ${alpha(m.navy, visible ? 0.08 : 0.14)}`,
-                            bgcolor: visible ? alpha(m.navy, 0.015) : alpha(m.navy, 0.03),
+                            bgcolor: visible
+                              ? alpha(m.navy, 0.015)
+                              : alpha(m.navy, 0.03),
                             px: 1.5,
                             py: 1,
                             cursor: serviceOrderEditing ? "grab" : "default",
-                            opacity: draggingService === service ? 0.55 : visible ? 1 : 0.55,
+                            opacity:
+                              draggingService === service
+                                ? 0.55
+                                : visible
+                                  ? 1
+                                  : 0.55,
                             userSelect: "none",
                           }}
                         >
@@ -734,11 +946,26 @@ export default function CalendarHoursRulesPanel({
                               flexShrink: 0,
                             }}
                           >
-                            <Box component="span" sx={{ fontSize: 10, fontWeight: 800, lineHeight: 1, transform: "translateY(0.5px)" }}>
+                            <Box
+                              component="span"
+                              sx={{
+                                fontSize: 10,
+                                fontWeight: 800,
+                                lineHeight: 1,
+                                transform: "translateY(0.5px)",
+                              }}
+                            >
                               {index + 1}
                             </Box>
                           </Box>
-                          <BodyText sx={{ flex: 1, fontSize: 13, fontWeight: 700, color: alpha(m.navy, visible ? 0.72 : 0.45) }}>
+                          <BodyText
+                            sx={{
+                              flex: 1,
+                              fontSize: 13,
+                              fontWeight: 700,
+                              color: alpha(m.navy, visible ? 0.72 : 0.45),
+                            }}
+                          >
                             {service}
                           </BodyText>
                           {serviceOrderEditing ? (
@@ -751,9 +978,19 @@ export default function CalendarHoursRulesPanel({
                                 event.stopPropagation();
                                 if (!activeCategory) return;
                                 if (visible === event.target.checked) return;
-                                onServiceOrderChange(toggleHiddenService(serviceOrder, activeCategory, service));
+                                onServiceOrderChange(
+                                  toggleHiddenService(
+                                    serviceOrder,
+                                    activeCategory,
+                                    service,
+                                  ),
+                                );
                               }}
-                              inputProps={{ "aria-label": visible ? `Hide ${service}` : `Show ${service}` }}
+                              inputProps={{
+                                "aria-label": visible
+                                  ? `Hide ${service}`
+                                  : `Show ${service}`,
+                              }}
                               sx={{
                                 p: 0.35,
                                 color: alpha(m.navy, 0.35),
@@ -773,7 +1010,13 @@ export default function CalendarHoursRulesPanel({
                         py: 1.25,
                       }}
                     >
-                      <BodyText sx={{ fontSize: 12.5, fontWeight: 600, color: alpha(m.navy, 0.42) }}>
+                      <BodyText
+                        sx={{
+                          fontSize: 12.5,
+                          fontWeight: 600,
+                          color: alpha(m.navy, 0.42),
+                        }}
+                      >
                         No services in this category
                       </BodyText>
                     </Box>
@@ -793,14 +1036,24 @@ export default function CalendarHoursRulesPanel({
                 px: 2,
               }}
             >
-              <BodyText sx={{ fontSize: 13, fontWeight: 600, color: alpha(m.navy, 0.42), textAlign: "center" }}>
+              <BodyText
+                sx={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: alpha(m.navy, 0.42),
+                  textAlign: "center",
+                }}
+              >
                 Add services in setup to define booking order
               </BodyText>
             </Box>
           )}
         </SettingsSection>
 
-        <SettingsSection title="Calendar Appearance" action={<SetButton disabled={isSaving} onClick={onOpenDesign} />}>
+        <SettingsSection
+          title="Calendar Appearance"
+          action={<SetButton disabled={isSaving} onClick={onOpenDesign} />}
+        >
           {appearanceItems.length ? (
             <Stack spacing={1}>
               {appearanceItems.map((item) => (
@@ -827,7 +1080,13 @@ export default function CalendarHoursRulesPanel({
                       border: `1px solid ${alpha(m.navy, 0.14)}`,
                     }}
                   />
-                  <BodyText sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.72) }}>
+                  <BodyText
+                    sx={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: alpha(m.navy, 0.72),
+                    }}
+                  >
                     {item.label} colour {item.color}
                   </BodyText>
                   <IconButton
@@ -871,7 +1130,14 @@ export default function CalendarHoursRulesPanel({
                 px: 2,
               }}
             >
-              <BodyText sx={{ fontSize: 13, fontWeight: 600, color: alpha(m.navy, 0.42), textAlign: "center" }}>
+              <BodyText
+                sx={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: alpha(m.navy, 0.42),
+                  textAlign: "center",
+                }}
+              >
                 Customize Your Calendar Based On Categories Or Services
               </BodyText>
             </Box>

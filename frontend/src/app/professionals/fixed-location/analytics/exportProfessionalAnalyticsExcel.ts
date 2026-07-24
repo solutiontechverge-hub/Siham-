@@ -123,9 +123,9 @@ function appendBookingSheet(workbook: XLSX.WorkBook, data: ProfessionalFixedLoca
         rows: sections.attendanceNoShowAnalytics.rows.map((r) => [r.bookingType, r.noShowCount, formatPct(r.sharePct)]),
       },
       {
-        title: sections.bookingByServiceCategory.title,
-        headers: ["Category", "Count", "Share (%)"],
-        rows: sections.bookingByServiceCategory.rows.map((r) => [r.category, r.count, formatPct(r.sharePct)]),
+        title: sections.transactionSummary.title,
+        headers: ["Transaction Channel", "Count", "Share (%)"],
+        rows: sections.transactionSummary.rows.map((r) => [r.channel, r.count, formatPct(r.sharePct)]),
       },
     ]),
     sanitizeSheetName("Booking and Operational"),

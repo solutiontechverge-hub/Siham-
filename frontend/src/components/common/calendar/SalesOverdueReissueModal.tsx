@@ -1,11 +1,12 @@
 "use client";
 
+import AppButton from "../AppButton";
 import * as React from "react";
-import { Button, InputAdornment, MenuItem, Stack, Typography } from "@mui/material";
+import { InputAdornment, MenuItem, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDatePicker from "../AppDatePicker";
 import MollureFormField from "../MollureFormField";
-import MollureModal from "../MollureModal";
+import AppModal from "../AppModal";
 
 type SalesOverdueReissueModalProps = {
   open: boolean;
@@ -32,7 +33,9 @@ export default function SalesOverdueReissueModal({
   onConfirm,
 }: SalesOverdueReissueModalProps) {
   const m = useTheme().palette.mollure;
-  const [penaltyType, setPenaltyType] = React.useState<"fixed" | "percentage">("fixed");
+  const [penaltyType, setPenaltyType] = React.useState<"fixed" | "percentage">(
+    "fixed",
+  );
   const [penaltyValue, setPenaltyValue] = React.useState("0");
   const [dueDate, setDueDate] = React.useState(tomorrowIso());
 
@@ -43,37 +46,33 @@ export default function SalesOverdueReissueModal({
     setDueDate(tomorrowIso());
   }, [open]);
 
-  const parsed = Math.max(0, Number.parseFloat(penaltyValue.replace(",", ".")) || 0);
+  const parsed = Math.max(
+    0,
+    Number.parseFloat(penaltyValue.replace(",", ".")) || 0,
+  );
   const penaltyAmount =
     penaltyType === "percentage"
       ? Math.round(((unpaidAmount * parsed) / 100 + Number.EPSILON) * 100) / 100
       : Math.round((parsed + Number.EPSILON) * 100) / 100;
 
   return (
-    <MollureModal
+    <AppModal
       open={open}
       onClose={onClose}
       title="Reissue overdue invoice"
       maxWidth="xs"
       footer={
-        <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ px: 2.5, py: 2 }}>
-          <Button
-            onClick={onClose}
-            variant="outlined"
-            sx={{
-              borderRadius: "8px",
-              textTransform: "none",
-              fontWeight: 800,
-              borderColor: alpha(m.navy, 0.14),
-              color: alpha(m.navy, 0.72),
-              height: 36,
-            }}
-          >
+        <Stack
+          direction="row"
+          spacing={1}
+          justifyContent="flex-end"
+          sx={{ px: 2.5, py: 2 }}
+        >
+          <AppButton tone="secondary" onClick={onClose}>
             Cancel
-          </Button>
-          <Button
-            variant="contained"
-            disableElevation
+          </AppButton>
+          <AppButton
+            tone="primary"
             disabled={!dueDate}
             onClick={() =>
               onConfirm({
@@ -83,30 +82,25 @@ export default function SalesOverdueReissueModal({
                 dueDate,
               })
             }
-            sx={{
-              borderRadius: "8px",
-              textTransform: "none",
-              fontWeight: 900,
-              bgcolor: m.teal,
-              color: "#fff",
-              "&:hover": { bgcolor: m.tealDark },
-              height: 36,
-            }}
           >
             Reissue
-          </Button>
+          </AppButton>
         </Stack>
       }
     >
       <Stack spacing={1.5} sx={{ pt: 0.5 }}>
-        <Typography sx={{ fontSize: 12.5, fontWeight: 650, color: alpha(m.navy, 0.55) }}>
+        <Typography
+          sx={{ fontSize: 12.5, fontWeight: 650, color: alpha(m.navy, 0.55) }}
+        >
           Unpaid amount: €{unpaidAmount.toFixed(2)}
         </Typography>
         <MollureFormField
           select
           label="Penalty type"
           value={penaltyType}
-          onChange={(e) => setPenaltyType(e.target.value as "fixed" | "percentage")}
+          onChange={(e) =>
+            setPenaltyType(e.target.value as "fixed" | "percentage")
+          }
         >
           <MenuItem value="fixed">Fixed amount (€)</MenuItem>
           <MenuItem value="percentage">Percentage (%)</MenuItem>
@@ -117,11 +111,15 @@ export default function SalesOverdueReissueModal({
           onChange={(e) => setPenaltyValue(e.target.value)}
           InputProps={{
             endAdornment: (
-              <InputAdornment position="end">{penaltyType === "percentage" ? "%" : "€"}</InputAdornment>
+              <InputAdornment position="end">
+                {penaltyType === "percentage" ? "%" : "€"}
+              </InputAdornment>
             ),
           }}
         />
-        <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.7) }}>
+        <Typography
+          sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.7) }}
+        >
           Penalty total: €{penaltyAmount.toFixed(2)}
         </Typography>
         <AppDatePicker
@@ -132,6 +130,6 @@ export default function SalesOverdueReissueModal({
           fullWidth
         />
       </Stack>
-    </MollureModal>
+    </AppModal>
   );
 }

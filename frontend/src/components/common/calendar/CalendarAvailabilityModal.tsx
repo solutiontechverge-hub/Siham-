@@ -1,15 +1,19 @@
 "use client";
 
+import AppButton from "../AppButton";
 import * as React from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
-import { Box, Button, IconButton, Stack } from "@mui/material";
+import { Box, IconButton, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDatePicker from "../AppDatePicker";
 import AppDropdown from "../AppDropdown";
 import AppTimePicker from "../AppTimePicker";
-import MollureModal from "../MollureModal";
-import type { CalendarBookingLocation, CalendarResource } from "../../../app/professionals/fixed-location/calendar/calendar.data";
+import AppModal from "../AppModal";
+import type {
+  CalendarBookingLocation,
+  CalendarResource,
+} from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { BlockTimeDraft } from "./calendar.utils";
 import type { ScheduleShift } from "./calendar-settings.types";
 
@@ -60,7 +64,7 @@ export default function CalendarAvailabilityModal({
   const m = theme.palette.mollure;
 
   return (
-    <MollureModal
+    <AppModal
       open={open}
       onClose={onClose}
       title={title}
@@ -69,38 +73,26 @@ export default function CalendarAvailabilityModal({
       footer={
         <Box sx={{ px: 2.5, py: 2 }}>
           <Stack direction="row" justifyContent="flex-end" spacing={1.25}>
-            <Button
-              variant="outlined"
+            <AppButton
+              tone="secondary"
               onClick={onClose}
               sx={{
-                borderRadius: "10px",
-                textTransform: "none",
-                fontWeight: 800,
                 height: 38,
                 minWidth: 110,
-                borderColor: alpha(m.navy, 0.14),
-                color: alpha(m.navy, 0.72),
-                bgcolor: "#fff",
               }}
             >
               Cancel
-            </Button>
-            <Button
-              variant="contained"
-              disableElevation
+            </AppButton>
+            <AppButton
+              tone="primary"
               onClick={onApply}
               sx={{
-                borderRadius: "10px",
-                textTransform: "none",
-                fontWeight: 800,
                 height: 38,
                 minWidth: 110,
-                bgcolor: m.teal,
-                "&:hover": { bgcolor: m.tealDark },
               }}
             >
               Apply
-            </Button>
+            </AppButton>
           </Stack>
         </Box>
       }
@@ -118,7 +110,9 @@ export default function CalendarAvailabilityModal({
               if (ids.length === resources.length) return "All";
               return ids.map((id) => teamLabelById.get(id) ?? id).join(", ");
             }}
-            onChange={(val) => setDraft((p) => ({ ...p, teamIds: val as string[] }))}
+            onChange={(val) =>
+              setDraft((p) => ({ ...p, teamIds: val as string[] }))
+            }
             options={resources.map((resource) => ({
               label: teamLabelById.get(resource.id) ?? resource.name,
               value: resource.id,
@@ -177,7 +171,10 @@ export default function CalendarAvailabilityModal({
                 label="Day (From)"
                 value={draft.dayFrom}
                 onChange={(val) =>
-                  setDraft((p) => ({ ...p, dayFrom: String(val) as AvailabilityDraft["dayFrom"] }))
+                  setDraft((p) => ({
+                    ...p,
+                    dayFrom: String(val) as AvailabilityDraft["dayFrom"],
+                  }))
                 }
                 options={dayOptions}
                 fullWidth
@@ -188,7 +185,10 @@ export default function CalendarAvailabilityModal({
                 label="Day (To)"
                 value={draft.dayTo}
                 onChange={(val) =>
-                  setDraft((p) => ({ ...p, dayTo: String(val) as AvailabilityDraft["dayTo"] }))
+                  setDraft((p) => ({
+                    ...p,
+                    dayTo: String(val) as AvailabilityDraft["dayTo"],
+                  }))
                 }
                 options={dayOptions}
                 fullWidth
@@ -197,7 +197,12 @@ export default function CalendarAvailabilityModal({
           </Stack>
 
           {draft.shifts.map((shift, index) => (
-            <Stack key={`shift-${index}`} direction="row" spacing={1.25} alignItems="flex-end">
+            <Stack
+              key={`shift-${index}`}
+              direction="row"
+              spacing={1.25}
+              alignItems="flex-end"
+            >
               <Box sx={{ flex: 1, minWidth: 0 }}>
                 <AppTimePicker
                   label="Start Time"
@@ -205,7 +210,9 @@ export default function CalendarAvailabilityModal({
                   onChange={(val) =>
                     setDraft((p) => ({
                       ...p,
-                      shifts: p.shifts.map((item, i) => (i === index ? { ...item, start: val } : item)),
+                      shifts: p.shifts.map((item, i) =>
+                        i === index ? { ...item, start: val } : item,
+                      ),
                     }))
                   }
                   fullWidth
@@ -219,7 +226,9 @@ export default function CalendarAvailabilityModal({
                   onChange={(val) =>
                     setDraft((p) => ({
                       ...p,
-                      shifts: p.shifts.map((item, i) => (i === index ? { ...item, end: val } : item)),
+                      shifts: p.shifts.map((item, i) =>
+                        i === index ? { ...item, end: val } : item,
+                      ),
                     }))
                   }
                   fullWidth
@@ -244,7 +253,7 @@ export default function CalendarAvailabilityModal({
             </Stack>
           ))}
 
-          <Button
+          <AppButton
             onClick={() =>
               setDraft((p) => ({
                 ...p,
@@ -285,9 +294,9 @@ export default function CalendarAvailabilityModal({
               <AddRoundedIcon sx={{ fontSize: 18 }} />
             </Box>
             Add Shift
-          </Button>
+          </AppButton>
         </Stack>
       </Box>
-    </MollureModal>
+    </AppModal>
   );
 }

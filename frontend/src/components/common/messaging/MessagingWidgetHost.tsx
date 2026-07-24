@@ -16,13 +16,19 @@ function isProfessionalUser(userType?: string) {
   return userType === "professional";
 }
 
-function MessagingWidgetGate({ audience }: { audience: "client" | "professional" }) {
+function MessagingWidgetGate({
+  audience,
+}: {
+  audience: "client" | "professional";
+}) {
   const pathname = usePathname();
   const { open } = useMessagingWidget();
   const accessToken = useAppSelector((state) => state.auth.accessToken);
   const user = useAppSelector((state) => state.auth.user);
   const [persistedReady, setPersistedReady] = React.useState(false);
-  const [persistedToken, setPersistedToken] = React.useState<string | null>(null);
+  const [persistedToken, setPersistedToken] = React.useState<string | null>(
+    null,
+  );
 
   React.useEffect(() => {
     const persisted = getPersistedAuthSession();
@@ -32,12 +38,18 @@ function MessagingWidgetGate({ audience }: { audience: "client" | "professional"
 
   const isAuthed = Boolean(accessToken || persistedToken);
   const onAudienceRoute =
-    audience === "professional" ? pathname?.startsWith("/professionals") : pathname?.startsWith("/clients");
+    audience === "professional"
+      ? pathname?.startsWith("/professionals")
+      : pathname?.startsWith("/clients");
   const roleMatches =
-    audience === "client" ? isClientUser(user?.user_type) : isProfessionalUser(user?.user_type);
+    audience === "client"
+      ? isClientUser(user?.user_type)
+      : isProfessionalUser(user?.user_type);
   const routeFallback = !user?.user_type && Boolean(onAudienceRoute);
   const showWidget =
-    persistedReady && isAuthed && (roleMatches || routeFallback || (open && Boolean(onAudienceRoute)));
+    persistedReady &&
+    isAuthed &&
+    (roleMatches || routeFallback || (open && Boolean(onAudienceRoute)));
 
   if (!showWidget) return null;
 

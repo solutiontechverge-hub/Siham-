@@ -1,12 +1,16 @@
+"use client";
+
 import * as React from "react";
-import { Box, Checkbox, Divider, FormControlLabel, Stack } from "@mui/material";
+import { Box, Checkbox, Divider, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import FinanceDrawer from "../../common/FinanceDrawer";
+import AppDrawer from "../../common/AppDrawer";
 import { FinanceDrawerFiltersFooter } from "../../common/FinanceDrawerFooter";
-import { BodyText, CardTitle } from "../../ui/typography";
 
 type Option = { key: string; label: string };
-export type FinanceFiltersSection = { title: string; options: readonly Option[] };
+export type FinanceFiltersSection = {
+  title: string;
+  options: readonly Option[];
+};
 
 export type FinanceFiltersValue = Record<string, boolean>;
 
@@ -59,11 +63,89 @@ const DEFAULT_SECTIONS: readonly FinanceFiltersSection[] = [
       { key: "status:paymentDue", label: "Payment due" },
       { key: "status:failed", label: "Failed" },
       { key: "status:overdueInvoice", label: "Overdue (past due date)" },
-      { key: "status:overdueResponse", label: "Overdue (late response/prepayment)" },
+      {
+        key: "status:overdueResponse",
+        label: "Overdue (late response/prepayment)",
+      },
       { key: "status:voided", label: "Voided" },
     ],
   },
 ];
+
+function FilterRow({
+  checked,
+  label,
+  onChange,
+}: {
+  checked: boolean;
+  label: string;
+  onChange: (next: boolean) => void;
+}) {
+  const m = useTheme().palette.mollure;
+
+  return (
+    <Box
+      component="label"
+      sx={{
+        display: "flex",
+        flexDirection: "row",
+        alignItems: "center",
+        gap: "8px",
+        margin: 0,
+        padding: "2px 0",
+        cursor: "pointer",
+        userSelect: "none",
+      }}
+    >
+      <Checkbox
+        size="small"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        disableRipple
+        sx={{
+          padding: 0,
+          margin: 0,
+          width: 18,
+          height: 18,
+          color: alpha(m.navy, 0.35),
+          "&.Mui-checked": { color: m.teal },
+          "& .MuiSvgIcon-root": { fontSize: 18 },
+        }}
+      />
+      <Typography
+        component="span"
+        sx={{
+          fontSize: 12,
+          lineHeight: "18px",
+          fontWeight: 500,
+          color: alpha(m.navy, 0.72),
+          margin: 0,
+          padding: 0,
+        }}
+      >
+        {label}
+      </Typography>
+    </Box>
+  );
+}
+
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  const m = useTheme().palette.mollure;
+  return (
+    <Typography
+      component="div"
+      sx={{
+        fontSize: 12,
+        fontWeight: 900,
+        lineHeight: 1.2,
+        color: alpha(m.navy, 0.7),
+        mb: 0.75,
+      }}
+    >
+      {children}
+    </Typography>
+  );
+}
 
 export default function FinanceFiltersDrawerView({
   open,
@@ -74,9 +156,7 @@ export default function FinanceFiltersDrawerView({
   onCancel,
   sections = DEFAULT_SECTIONS,
 }: FinanceFiltersDrawerProps) {
-  const theme = useTheme();
-  const m = theme.palette.mollure;
-
+  const m = useTheme().palette.mollure;
   const [draft, setDraft] = React.useState<FinanceFiltersValue>(value);
 
   React.useEffect(() => {
@@ -84,10 +164,11 @@ export default function FinanceFiltersDrawerView({
   }, [open, value]);
 
   return (
-    <FinanceDrawer
+    <AppDrawer
       open={open}
       onClose={onClose}
-      title="Filters"
+      title="Filter transactions"
+      contentVariant="muted"
       footer={
         <FinanceDrawerFiltersFooter
           onCancel={() => {
@@ -105,30 +186,31 @@ export default function FinanceFiltersDrawerView({
         />
       }
     >
-        <Stack spacing={2}>
-          {sections.map((section, idx) => (
-            <Box key={section.title}>
-              <CardTitle sx={{ fontSize: 12, color: alpha(m.navy, 0.7), mb: 0.75 }}>{section.title}</CardTitle>
-              <Stack spacing={0.5}>
-                {section.options.map((opt) => (
-                  <FormControlLabel
-                    key={opt.key}
-                    control={
-                      <Checkbox
-                        size="small"
-                        checked={Boolean(draft[opt.key])}
-                        onChange={(e) => setDraft((prev) => ({ ...prev, [opt.key]: e.target.checked }))}
-                      />
-                    }
-                    label={<BodyText sx={{ fontSize: 12, color: alpha(m.navy, 0.72) }}>{opt.label}</BodyText>}
-                    sx={{ m: 0, alignItems: "flex-start", "& .MuiFormControlLabel-label": { mt: "2px" } }}
-                  />
-                ))}
-              </Stack>
-              {idx !== sections.length - 1 ? <Divider sx={{ mt: 1.5, borderColor: alpha(m.navy, 0.08) }} /> : null}
-            </Box>
-          ))}
-        </Stack>
-    </FinanceDrawer>
+      <Stack spacing={2}>
+        {sections.map((section, idx) => (
+          <Box key={section.title}>
+            <SectionHeading>{section.title}</SectionHeading>
+            <Stack spacing={0.75}>
+              {section.options.map((opt) => (
+                <FilterRow
+                  key={opt.key}
+                  label={opt.label}
+                  checked={Boolean(draft[opt.key])}
+                  onChange={(checked) =>
+                    setDraft((prev) => ({
+                      ...prev,
+                      [opt.key]: checked,
+                    }))
+                  }
+                />
+              ))}
+            </Stack>
+            {idx !== sections.length - 1 ? (
+              <Divider sx={{ mt: 1.5, borderColor: alpha(m.navy, 0.08) }} />
+            ) : null}
+          </Box>
+        ))}
+      </Stack>
+    </AppDrawer>
   );
 }

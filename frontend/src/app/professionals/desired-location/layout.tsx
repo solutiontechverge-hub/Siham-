@@ -1,7 +1,11 @@
 import { ProfessionalMarketingHeader } from "../../../components/common";
 import AuthGuard from "../../../components/common/auth/AuthGuard";
 
-export default function DesiredLocationLayout({ children }: { children: React.ReactNode }) {
+export default function DesiredLocationLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <AuthGuard allowedRoles={["professional"]}>
       <ProfessionalMarketingHeader
@@ -15,4 +19,3 @@ export default function DesiredLocationLayout({ children }: { children: React.Re
     </AuthGuard>
   );
 }
-

@@ -14,6 +14,7 @@ import contactRoutes from "./routes/contact.routes.js";
 import messagingRoutes from "./routes/messaging.routes.js";
 import notificationsRoutes from "./routes/notifications.routes.js";
 import userRoutes from "./routes/user.routes.js";
+import reviewRoutes from "./routes/review.routes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -53,6 +54,7 @@ app.use("/api/contact", contactRoutes);
 app.use("/api/messaging", messagingRoutes);
 app.use("/api/notifications", notificationsRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/reviews", reviewRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
