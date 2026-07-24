@@ -123,10 +123,20 @@ function LineRow({ line }: { line: SalesLineItem }) {
   );
 }
 
-function statusBadgeSx(badge?: string) {
+function statusBadgeSx(
+  badge: string | undefined,
+  m: {
+    statusOrangeBg: string;
+    statusOrangeFg: string;
+    statusGreenBg: string;
+    statusGreenFg: string;
+    statusGreyFg: string;
+    fxGrayF2F4F7: string;
+  },
+) {
   const value = String(badge ?? "").toLowerCase();
   if (value === "prepaid" || value === "paid") {
-    return { color: "#039855", bgcolor: alpha("#12B76A", 0.14) };
+    return { color: m.statusGreenFg, bgcolor: m.statusGreenBg };
   }
   if (
     value === "prepayment due" ||
@@ -135,9 +145,9 @@ function statusBadgeSx(badge?: string) {
     value === "not paid" ||
     value === "overdue"
   ) {
-    return { color: "#B54708", bgcolor: alpha("#F79009", 0.16) };
+    return { color: m.statusOrangeFg, bgcolor: m.statusOrangeBg };
   }
-  return { color: "#475467", bgcolor: alpha("#98A2B3", 0.16) };
+  return { color: m.statusGreyFg, bgcolor: m.fxGrayF2F4F7 };
 }
 
 function useActionsMenu(onAction?: (action: SalesCardMenuAction) => void) {
@@ -319,7 +329,7 @@ function SubSummaryCard({
   onMenuAction?: (action: SalesCardMenuAction) => void;
 }) {
   const m = useTheme().palette.mollure;
-  const badge = statusBadgeSx(sub.statusBadge);
+  const badge = statusBadgeSx(sub.statusBadge, m);
   const {
     menuAnchor,
     setMenuAnchor,
@@ -513,7 +523,7 @@ export default function SalesOverviewCard({
 
   const isGuestOrModel =
     card.payerRole === "guest" || card.payerRole === "model";
-  const badge = statusBadgeSx(card.statusBadge);
+  const badge = statusBadgeSx(card.statusBadge, m);
   const clientBadge =
     card.clientKind === "company"
       ? "CC Client"

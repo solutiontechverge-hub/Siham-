@@ -3,9 +3,10 @@
 import * as React from "react";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
+import EventSeatRoundedIcon from "@mui/icons-material/EventSeatRounded";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
-import LocationOnRoundedIcon from "@mui/icons-material/LocationOnRounded";
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
+import PersonPinCircleRoundedIcon from "@mui/icons-material/PersonPinCircleRounded";
 import StickyNote2OutlinedIcon from "@mui/icons-material/StickyNote2Outlined";
 import {
   Box,
@@ -30,6 +31,7 @@ import PrepaymentStatusIcon, {
   type PrepaymentStatusIconVariant,
 } from "../calendar/PrepaymentStatusIcon";
 import { PREPAYMENT_STATUS_LABELS } from "../calendar/PrepaymentStatusIcon";
+import PaymentDueIcon from "../client-booking/PaymentDueIcon";
 
 /** Icon size for status/prepayment indicators on calendar booking cards. */
 const CARD_INDICATOR_ICON_SIZE = 16;
@@ -76,6 +78,14 @@ export type BookingTimelineCardProfileAction = BookingTimelineCardAction & {
   name?: React.ReactNode;
 };
 
+export type BookingTimelineCardPaymentDue = {
+  /** e.g. Reissue Invoice */
+  label?: string;
+  /** Formatted due/reissue date, e.g. 25/07/2026 */
+  dateLabel: string;
+  showIcon?: boolean;
+};
+
 export type BookingTimelineCardProps = {
   idLabel: React.ReactNode;
   title: React.ReactNode;
@@ -90,6 +100,8 @@ export type BookingTimelineCardProps = {
   scenarioBadges?: readonly BookingTimelineCardScenarioBadge[];
   prepaymentStatus?: PrepaymentStatusIconVariant;
   responseIndicators?: readonly BookingIndicatorVariant[];
+  /** Payment due / reissued invoice hint shown on the card body. */
+  paymentDue?: BookingTimelineCardPaymentDue | null;
   calendarAction?: BookingTimelineCardAction;
   notesAction?: BookingTimelineCardAction;
   messageAction?: BookingTimelineCardAction & { count?: number };
@@ -295,6 +307,7 @@ export default function BookingTimelineCard({
   notesAction,
   onClick,
   pattern = "lines",
+  paymentDue = null,
   profileAction,
   requestBadge = false,
   scenarioBadges,
@@ -457,6 +470,20 @@ export default function BookingTimelineCard({
           {showStandaloneResponse && responseIndicators
             ? renderResponseIndicators(responseIndicators)
             : null}
+          {paymentDue?.showIcon !== false && paymentDue?.dateLabel ? (
+            <Tooltip title="Payment due" placement="top">
+              <Box
+                sx={{
+                  display: "grid",
+                  placeItems: "center",
+                  lineHeight: 0,
+                  flexShrink: 0,
+                }}
+              >
+                <PaymentDueIcon size={CARD_INDICATOR_ICON_SIZE + 2} />
+              </Box>
+            </Tooltip>
+          ) : null}
         </Stack>
 
         <BodyText
@@ -486,7 +513,7 @@ export default function BookingTimelineCard({
             position: "absolute",
             top: 44,
             left: 8,
-            right: 6,
+            right: paymentDue?.dateLabel ? 118 : 6,
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
@@ -494,6 +521,67 @@ export default function BookingTimelineCard({
         >
           {timeLabel}
         </BodyText>
+        {paymentDue?.dateLabel ? (
+          <Tooltip
+            title={`${paymentDue.label || "Reissue Invoice"} · ${paymentDue.dateLabel}`}
+            placement="top"
+          >
+            <Stack
+              direction="row"
+              alignItems="center"
+              spacing={0.45}
+              sx={{
+                position: "absolute",
+                top: 42,
+                right: 6,
+                maxWidth: 118,
+                height: 20,
+                px: 0.7,
+                borderRadius: "999px",
+                bgcolor: alpha(m.teal, 0.12),
+                border: `1px solid ${alpha(m.teal, 0.28)}`,
+                boxShadow: `0 1px 4px ${alpha(m.teal, 0.08)}`,
+                pointerEvents: "auto",
+              }}
+            >
+              <BodyText
+                sx={{
+                  fontSize: 8.5,
+                  fontWeight: 800,
+                  color: m.teal,
+                  lineHeight: 1,
+                  letterSpacing: "0.01em",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+              >
+                {paymentDue.label || "Reissue Invoice"}
+              </BodyText>
+              <Box
+                sx={{
+                  width: 3,
+                  height: 3,
+                  borderRadius: "50%",
+                  bgcolor: alpha(m.teal, 0.55),
+                  flexShrink: 0,
+                }}
+              />
+              <BodyText
+                sx={{
+                  fontSize: 8.5,
+                  fontWeight: 900,
+                  color: alpha(m.navy, 0.72),
+                  lineHeight: 1,
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                }}
+              >
+                {paymentDue.dateLabel}
+              </BodyText>
+            </Stack>
+          </Tooltip>
+        ) : null}
         {locationLabel ? (
           <Stack
             direction="row"
@@ -506,9 +594,15 @@ export default function BookingTimelineCard({
               height: 16,
             }}
           >
-            <LocationOnRoundedIcon
-              sx={{ fontSize: 14, color: alpha(m.navy, 0.62), flexShrink: 0 }}
-            />
+            {locationLabel === "FL" ? (
+              <EventSeatRoundedIcon
+                sx={{ fontSize: 14, color: alpha(m.navy, 0.62), flexShrink: 0 }}
+              />
+            ) : (
+              <PersonPinCircleRoundedIcon
+                sx={{ fontSize: 14, color: alpha(m.navy, 0.62), flexShrink: 0 }}
+              />
+            )}
             <BodyText
               sx={{
                 fontSize: 12,

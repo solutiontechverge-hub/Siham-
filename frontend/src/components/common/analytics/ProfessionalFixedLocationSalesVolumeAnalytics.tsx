@@ -79,10 +79,13 @@ function HorizontalBarChart({
   }, [page, safePage]);
 
   const w = 760;
-  const h = 260;
-  const margin = { top: 20, right: 140, bottom: 44, left: 100 };
+  const h = 280;
+  const margin = { top: 20, right: 140, bottom: 56, left: 100 };
   const innerW = w - margin.left - margin.right;
   const innerH = h - margin.top - margin.bottom;
+  /** Keep bars clear of the x-axis line so labels don't collide. */
+  const axisGap = 14;
+  const plotH = Math.max(0, innerH - axisGap);
 
   const max = Math.max(1, ...pageData.map((d) => d.value));
   const ticks = 6;
@@ -95,13 +98,13 @@ function HorizontalBarChart({
         22,
         Math.min(
           44,
-          (innerH - barGap * (pageData.length - 1)) / pageData.length,
+          (plotH - barGap * (pageData.length - 1)) / pageData.length,
         ),
       )
     : 30;
   const usedH =
     pageData.length * barH + Math.max(0, pageData.length - 1) * barGap;
-  const y0 = margin.top + (innerH - usedH) / 2;
+  const y0 = margin.top + (plotH - usedH) / 2;
 
   return (
     <Paper
@@ -156,8 +159,9 @@ function HorizontalBarChart({
                   />
                   <text
                     x={x}
-                    y={margin.top + innerH + 18}
+                    y={margin.top + innerH + 6}
                     textAnchor="middle"
+                    dominantBaseline="hanging"
                     fontSize={11}
                     fontFamily="inherit"
                     fill={alpha(m.navy, 0.55)}
@@ -214,7 +218,7 @@ function HorizontalBarChart({
               );
             })}
 
-            {/* x axis line */}
+            {/* x axis line — sits above tick labels */}
             <line
               x1={margin.left}
               y1={margin.top + innerH}
@@ -227,7 +231,7 @@ function HorizontalBarChart({
             {/* x label */}
             <text
               x={margin.left + innerW / 2}
-              y={h - 8}
+              y={h - 10}
               textAnchor="middle"
               fontSize={12}
               fontFamily="inherit"

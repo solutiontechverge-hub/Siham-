@@ -7,8 +7,8 @@ import {
   parseTextArray,
 } from "./business-setup-parsers.js";
 
-const LISTING_RATING = 4.8;
-const LISTING_TOTAL_REVIEWS = 120;
+const LISTING_RATING = 0;
+const LISTING_TOTAL_REVIEWS = 0;
 
 const toNullableString = (value) => {
   if (value === undefined || value === null) {
@@ -70,7 +70,7 @@ const mapServiceDetail = (detail, durationByServiceId = new Map()) => ({
 
 export const transformBusinessSetupForListing = (
   row,
-  { teamMembers = [], serviceDetails = [] } = {},
+  { teamMembers = [], serviceDetails = [], ratingStats = null } = {},
 ) => {
   if (!row) {
     return null;
@@ -79,14 +79,22 @@ export const transformBusinessSetupForListing = (
   const normalizedTeamMembers = Array.isArray(teamMembers) ? teamMembers : [];
   const normalizedServiceDetails = Array.isArray(serviceDetails) ? serviceDetails : [];
   const durationByServiceId = buildDurationByServiceId(row.service_categories);
+  const rating =
+    ratingStats && Number.isFinite(Number(ratingStats.rating))
+      ? Number(ratingStats.rating)
+      : LISTING_RATING;
+  const totalReviews =
+    ratingStats && Number.isFinite(Number(ratingStats.totalReviews))
+      ? Number(ratingStats.totalReviews)
+      : LISTING_TOTAL_REVIEWS;
 
   return {
     id: row.id,
     professionalProfileId: row.professional_profile_id ?? null,
     businessName: toNullableString(row.business_name),
     about: toNullableString(row.business_about),
-    rating: LISTING_RATING,
-    totalReviews: LISTING_TOTAL_REVIEWS,
+    rating,
+    totalReviews,
     media: parseTextArray(row.business_media),
     locationMode: row.location_mode ?? null,
     salonName: toNullableString(row.salon_name),

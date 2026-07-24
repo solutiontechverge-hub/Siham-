@@ -1,5 +1,12 @@
 import { query } from "../db/index.js";
-import { dispatchPaymentDueSetNotification } from "../services/bookingNotification.service.js";
+import {
+  dispatchInvoiceReissuedNotification,
+  dispatchPaymentDueSetNotification,
+} from "../services/bookingNotification.service.js";
+import {
+  FINANCE_EMAIL_TYPES,
+  sendFinanceClientEmail,
+} from "../services/financeEmail.service.js";
 import { parseUuid } from "../utils/uuid.js";
 import {
   buildPaginationMeta,
@@ -11,47 +18,16 @@ import {
   processOverdueInvoiceReissues,
   syncBookingToFinanceTransaction,
 } from "../services/finance-sync.service.js";
+import {
+  DEFAULT_INVOICE_SETTINGS,
+  mergeInvoiceSettings,
+} from "../helpers/financeInvoiceSettings.js";
 
 const DEFAULT_TRANSACTION_OPTIONS = {
   onlineImmediate: true,
   onlineInvoiceDueDate: true,
   offlineImmediate: true,
   offlineInvoiceDueDate: false,
-};
-
-const DEFAULT_INVOICE_SETTINGS = {
-  logoDataUrl: null,
-  defaultInvoiceType: "individual",
-  products: [
-    { id: "p1", name: "Shampoo", price: "30EUR", vat: "21%" },
-    { id: "p2", name: "Eye Lashes", price: "50EUR", vat: "21%" },
-  ],
-  services: [
-    { id: "s1", category: "Hair", service: "Dye", vat: "21%" },
-    { id: "s2", category: "Makeup", service: "Eye Makeup", vat: "9%" },
-  ],
-  paymentTerms: {
-    originalDueValue: "2",
-    originalDueUnit: "Weeks",
-    originalPenaltyValue: "10",
-    originalPenaltyUnit: "%",
-    firstReissueTrigger: "Automatic",
-    firstReissueDueValue: "2",
-    firstReissueDueUnit: "Weeks",
-    firstReissuePenaltyValue: "20",
-    firstReissuePenaltyUnit: "%",
-    secondReissueTrigger: "Automatic",
-    secondReissueDueValue: "2",
-    secondReissueDueUnit: "Weeks",
-    secondReissuePenaltyValue: "20",
-    secondReissuePenaltyUnit: "%",
-  },
-  reminders: {
-    reminder1Value: "1",
-    reminder1Unit: "Weeks",
-    reminder2Value: "3",
-    reminder2Unit: "Days",
-  },
 };
 
 const getProfessionalProfile = async (userId) => {
@@ -84,18 +60,6 @@ const toIsoDate = (value) => {
   const text = String(value);
   const wallClock = text.match(/^(\d{4}-\d{2}-\d{2})/);
   return wallClock ? wallClock[1] : text.length >= 10 ? text.slice(0, 10) : text;
-};
-
-const mergeInvoiceSettings = (raw) => {
-  if (!raw || typeof raw !== "object") return { ...DEFAULT_INVOICE_SETTINGS };
-  return {
-    ...DEFAULT_INVOICE_SETTINGS,
-    ...raw,
-    paymentTerms: { ...DEFAULT_INVOICE_SETTINGS.paymentTerms, ...(raw.paymentTerms ?? {}) },
-    reminders: { ...DEFAULT_INVOICE_SETTINGS.reminders, ...(raw.reminders ?? {}) },
-    products: Array.isArray(raw.products) ? raw.products : DEFAULT_INVOICE_SETTINGS.products,
-    services: Array.isArray(raw.services) ? raw.services : DEFAULT_INVOICE_SETTINGS.services,
-  };
 };
 
 const mapTransactionRow = (row) => ({
@@ -602,6 +566,18 @@ export const bulkFinanceTransactionAction = async (req, res) => {
         [profile.id, parsedIds],
       );
 
+      const notRefundable = rows.rows.filter(
+        (row) => row.status !== "Paid" && row.status !== "Prepaid",
+      );
+      if (notRefundable.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Refund is only available for Paid or Prepaid transactions. Overdue or unpaid entries cannot be refunded.",
+          data: null,
+        });
+      }
+
       for (const row of rows.rows) {
         const doc = row.document ?? {};
         const creditNoteNumber = `CR-${Date.now().toString().slice(-6)}`;
@@ -789,6 +765,196 @@ export const processFinanceInvoiceReissues = async (req, res) => {
       success: true,
       message: `Processed ${created} overdue invoice reissue(s).`,
       data: { created },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message, data: null });
+  }
+};
+
+/**
+ * Professional reissues invoice / extends due date for a booking.
+ * Updates finance transaction, then notifies client in-app + by email.
+ */
+export const reissueFinanceInvoiceForBooking = async (req, res) => {
+  try {
+    const profile = await requireProfessional(req, res);
+    if (!profile) return;
+
+    const body = req.body ?? {};
+    const dueDate = toIsoDate(body.dueDate);
+    if (!dueDate) {
+      return res.status(400).json({
+        success: false,
+        message: "dueDate is required (YYYY-MM-DD).",
+        data: null,
+      });
+    }
+
+    const bookingId = await resolveBookingIdFromRequest(body);
+    if (!bookingId) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid bookingId or bookingRef is required.",
+        data: null,
+      });
+    }
+
+    const bookingLookup = await query(
+      `SELECT
+         b.id,
+         b.unique_code,
+         b.total_price,
+         b.customer_id,
+         u.email AS customer_email,
+         COALESCE(
+           NULLIF(TRIM(COALESCE(ip.display_name, ip.first_name || ' ' || ip.last_name)), ''),
+           u.email,
+           'Client'
+         ) AS customer_name
+       FROM bookings b
+       INNER JOIN business_setups bs ON bs.id = b.business_setup_id
+       LEFT JOIN users u ON u.id = b.customer_id
+       LEFT JOIN individual_profiles ip ON ip.user_id = u.id
+       WHERE b.id = $1
+         AND bs.professional_profile_id = $2
+       LIMIT 1`,
+      [bookingId, profile.id],
+    );
+
+    const booking = bookingLookup.rows[0];
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found for this professional.",
+        data: null,
+      });
+    }
+
+    const bookingRef = booking.unique_code;
+    const penaltyAmount = Number(body.penaltyAmount) || 0;
+    const totalOverride =
+      body.totalPrice != null && body.totalPrice !== ""
+        ? Number(body.totalPrice)
+        : null;
+
+    let txId = null;
+    const existingTx = await query(
+      `SELECT id, document, net_amount, gross_amount, status, client_email, client_name
+       FROM finance_transactions
+       WHERE professional_profile_id = $1
+         AND booking_id = $2
+         AND status NOT IN ('Paid', 'Refunded', 'Voided', 'Prepaid')
+       ORDER BY
+         CASE WHEN status IN ('Payment due', 'Overdue', 'Pending') THEN 0 ELSE 1 END,
+         updated_at DESC NULLS LAST,
+         created_at DESC NULLS LAST
+       LIMIT 1`,
+      [profile.id, bookingRef],
+    );
+
+    if (existingTx.rows[0]) {
+      txId = existingTx.rows[0].id;
+    } else {
+      txId = await syncBookingToFinanceTransaction(bookingId, {
+        paymentPhase: "full",
+        paymentMethod: body.paymentMethod || "onlineNonDirect",
+        amountOverride:
+          totalOverride != null && Number.isFinite(totalOverride)
+            ? totalOverride
+            : null,
+        statusOverride: "Payment due",
+      });
+    }
+
+    if (!txId) {
+      return res.status(404).json({
+        success: false,
+        message: "Unable to find or create a finance transaction for this booking.",
+        data: null,
+      });
+    }
+
+    const current = await query(`SELECT * FROM finance_transactions WHERE id = $1`, [txId]);
+    const row = current.rows[0];
+    if (!row) {
+      return res.status(404).json({
+        success: false,
+        message: "Finance transaction not found.",
+        data: null,
+      });
+    }
+
+    const doc = row.document && typeof row.document === "object" ? { ...row.document } : {};
+    const prevNumber = doc.documentNumber || `INV-${bookingRef}`;
+    const reissueNumber = String(prevNumber).includes("-R")
+      ? prevNumber
+      : `${prevNumber}-R${Date.now().toString().slice(-4)}`;
+
+    const baseAmount =
+      totalOverride != null && Number.isFinite(totalOverride)
+        ? totalOverride
+        : Number(row.net_amount ?? row.gross_amount ?? booking.total_price ?? 0) || 0;
+    const nextAmount = Math.round((baseAmount + (Number.isFinite(penaltyAmount) ? penaltyAmount : 0)) * 100) / 100;
+
+    const nextDoc = {
+      ...doc,
+      documentNumber: reissueNumber,
+      invoiceDate: toIsoDate(new Date()),
+      dueDate,
+      totalPrice: formatEuro(nextAmount),
+      reissuedAt: new Date().toISOString(),
+      ...(penaltyAmount > 0 ? { penaltyAmount } : {}),
+    };
+
+    const clientEmail =
+      String(body.clientEmail ?? "").trim() ||
+      String(row.client_email ?? "").trim() ||
+      String(booking.customer_email ?? "").trim() ||
+      "";
+    const clientName =
+      String(body.clientName ?? "").trim() ||
+      String(row.client_name ?? "").trim() ||
+      String(booking.customer_name ?? "").trim() ||
+      "Client";
+
+    const updated = await query(
+      `UPDATE finance_transactions
+       SET status = 'Payment due',
+           status_detail = $2,
+           document = $3::jsonb,
+           gross_amount = $4,
+           net_amount = $4,
+           client_email = CASE WHEN $5 = '' THEN client_email ELSE $5 END,
+           client_name = CASE WHEN $6 = '' THEN client_name ELSE $6 END,
+           updated_at = NOW()
+       WHERE id = $1
+       RETURNING *`,
+      [
+        txId,
+        `Reissue of ${prevNumber}`,
+        JSON.stringify(nextDoc),
+        nextAmount,
+        clientEmail,
+        clientName,
+      ],
+    );
+
+    const dueDateLabel = dueDate.split("-").reverse().join("/");
+    const notification = await dispatchInvoiceReissuedNotification(txId, dueDateLabel);
+    const email = await sendFinanceClientEmail(txId, FINANCE_EMAIL_TYPES.INVOICE_REISSUED, {
+      forceKey: dueDate,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Invoice reissued. Client notified.",
+      data: {
+        transaction: mapTransactionRow(updated.rows[0]),
+        notificationSent: Boolean(notification),
+        emailSent: Boolean(email?.sent),
+        emailTo: email?.to ?? null,
+        emailReason: email?.reason ?? null,
+      },
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message, data: null });

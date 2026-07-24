@@ -8,6 +8,7 @@ import {
   useGetProfessionalClientsQuery,
   useUpdateBookingStatusMutation,
 } from "../../../store/services/businessApi";
+import { useReissueFinanceInvoiceMutation } from "../../../store/services/financeApi";
 import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { TransactionRow } from "../../../app/professionals/fixed-location/finance/data/transactions";
 import { useSnackbar } from "../AppSnackbar";
@@ -95,6 +96,7 @@ export default function SalesOverview({
   const { data: clientsResponse } = useGetProfessionalClientsQuery();
   const [updateBookingStatus, { isLoading: cancelling }] =
     useUpdateBookingStatusMutation();
+  const [reissueFinanceInvoice] = useReissueFinanceInvoiceMutation();
 
   const [revision, setRevision] = React.useState(0);
   const [checkoutBookingId, setCheckoutBookingId] = React.useState<
@@ -374,15 +376,56 @@ export default function SalesOverview({
     });
   };
 
-  const handleSaveEdit = (payload: SalesEditCheckoutPayload) => {
+  const notifyClientInvoiceReissue = async (input: {
+    bookingId: string;
+    bookingCode?: string;
+    dueDate: string;
+    penaltyAmount?: number;
+    totalPrice?: number;
+    clientEmail?: string;
+    clientName?: string;
+    paymentMethod?: string;
+  }) => {
+    try {
+      const result = await reissueFinanceInvoice({
+        bookingId: input.bookingId,
+        bookingRef: input.bookingCode,
+        dueDate: input.dueDate,
+        penaltyAmount: input.penaltyAmount,
+        totalPrice: input.totalPrice,
+        clientEmail: input.clientEmail || clientEmail || undefined,
+        clientName: input.clientName || clientName || undefined,
+        paymentMethod: input.paymentMethod,
+      }).unwrap();
+
+      if (result.data?.emailSent) {
+        showSnackbar({
+          severity: "success",
+          message: `Client notified${result.data.emailTo ? ` at ${result.data.emailTo}` : ""} (app + email).`,
+        });
+      } else if (result.data?.notificationSent) {
+        showSnackbar({
+          severity: "success",
+          message: "Client notified in app. Email could not be sent.",
+        });
+      }
+    } catch {
+      showSnackbar({
+        severity: "warning",
+        message: "Sale saved, but client notification failed.",
+      });
+    }
+  };
+
+  const handleSaveEdit = async (payload: SalesEditCheckoutPayload) => {
     if (!editingCard) return;
+    const isReissue =
+      payload.paymentMethod === "onlineNonDirect" ||
+      payload.paymentMethod === "offlineNonDirect";
+
     upsertSalesCardMeta({
       bookingId: editingCard.bookingId,
-      cardKind:
-        payload.paymentMethod === "onlineNonDirect" ||
-        payload.paymentMethod === "offlineNonDirect"
-          ? "reissued_invoice"
-          : editingCard.kind,
+      cardKind: isReissue ? "reissued_invoice" : editingCard.kind,
       cardId: editingCard.id,
       note: editingCard.note,
       paymentMethod: payload.paymentMethod,
@@ -391,36 +434,63 @@ export default function SalesOverview({
       discount: payload.discount,
       discountAmount: payload.discountAmount,
       totalPrice: payload.totalPrice,
+      ...(isReissue && payload.dueDate
+        ? { reissuedAt: new Date().toISOString() }
+        : {}),
     });
     setEditingCard(null);
     bump();
     showSnackbar({ severity: "success", message: "Sale updated." });
+
+    if (isReissue && payload.dueDate) {
+      await notifyClientInvoiceReissue({
+        bookingId: editingCard.bookingId,
+        bookingCode: editingCard.bookingCode,
+        dueDate: payload.dueDate,
+        totalPrice: payload.totalPrice,
+        clientEmail: editingCard.clientEmail,
+        clientName: editingCard.clientName,
+        paymentMethod: payload.paymentMethod,
+      });
+    }
   };
 
-  const handleReissue = (payload: {
+  const handleReissue = async (payload: {
     penaltyType: "fixed" | "percentage";
     penaltyValue: number;
     penaltyAmount: number;
     dueDate: string;
   }) => {
     if (!overdueCard) return;
+    const card = overdueCard;
     upsertSalesCardMeta({
-      bookingId: overdueCard.bookingId,
+      bookingId: card.bookingId,
       cardKind: "reissued_invoice",
-      cardId: overdueCard.id,
-      note: overdueCard.note,
-      paymentMethod: overdueCard.paymentMethod || "onlineNonDirect",
+      cardId: card.id,
+      note: card.note,
+      paymentMethod: card.paymentMethod || "onlineNonDirect",
       dueDate: payload.dueDate,
       penaltyAmount: payload.penaltyAmount,
       penaltyType: payload.penaltyType,
       reissuedAt: new Date().toISOString(),
-      totalPrice: overdueCard.total + payload.penaltyAmount,
+      totalPrice: card.total + payload.penaltyAmount,
     });
     setOverdueCard(null);
     bump();
     showSnackbar({
       severity: "success",
       message: "Invoice reissued with new due date.",
+    });
+
+    await notifyClientInvoiceReissue({
+      bookingId: card.bookingId,
+      bookingCode: card.bookingCode,
+      dueDate: payload.dueDate,
+      penaltyAmount: payload.penaltyAmount,
+      totalPrice: card.total + payload.penaltyAmount,
+      clientEmail: card.clientEmail,
+      clientName: card.clientName,
+      paymentMethod: card.paymentMethod || "onlineNonDirect",
     });
   };
 

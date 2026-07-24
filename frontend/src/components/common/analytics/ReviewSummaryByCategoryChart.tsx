@@ -12,17 +12,13 @@ type Props = {
 };
 
 const BAR_HEIGHT = 46;
-const ROW_GAP = 14;
 const LABEL_COL_W = 112;
-const GRID_GAP = 6;
+const TOTAL_LABEL_W = 110;
 const TICK_STEP = 1000;
-/** Scale: 1 review = N units on 0–6000 axis */
 const REVIEW_SCALE = 200;
 const MAX_AXIS = 6000;
 const TICK_COUNT = MAX_AXIS / TICK_STEP + 1;
-const TOTAL_LABEL_W = 80;
 
-/** Teal shades: bad (dark), good (medium), excellent (light) */
 const SEG_COLORS = ["#169BA1", "#21B8BF", "#6DC8CD"] as const;
 
 function pctLabel(pct: number) {
@@ -60,174 +56,161 @@ export default function ReviewSummaryByCategoryChart({ title, bars }: Props) {
         </Box>
       ) : null}
 
-      <Box sx={{ px: 2.25, pt: 1, pb: 0.5 }}>
+      <Stack spacing={1.75} sx={{ px: 2.25, pt: 1, pb: 1 }}>
+        {bars.map((bar) => {
+          const barWidthPct = Math.min(
+            100,
+            ((bar.totalReviews * REVIEW_SCALE) / MAX_AXIS) * 100,
+          );
+          const segments = [
+            { pct: bar.badPct, color: SEG_COLORS[0] },
+            { pct: bar.goodPct, color: SEG_COLORS[1] },
+            { pct: bar.excellentPct, color: SEG_COLORS[2] },
+          ];
+
+          return (
+            <Box
+              key={bar.category}
+              sx={{
+                display: "grid",
+                gridTemplateColumns: `${LABEL_COL_W}px minmax(0, 1fr) ${TOTAL_LABEL_W}px`,
+                columnGap: 1,
+                alignItems: "center",
+                width: "100%",
+              }}
+            >
+              <BodyText
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: alpha(m.navy, 0.72),
+                  textAlign: "right",
+                  lineHeight: 1.2,
+                }}
+              >
+                {bar.category}
+              </BodyText>
+
+              <Box
+                sx={{
+                  position: "relative",
+                  height: BAR_HEIGHT,
+                  minWidth: 0,
+                  overflow: "hidden",
+                }}
+              >
+                <Box
+                  sx={{
+                    height: "100%",
+                    width: `${barWidthPct}%`,
+                    display: "flex",
+                    overflow: "hidden",
+                  }}
+                >
+                  {segments.map((seg, si) => {
+                    const showLabel = seg.pct >= 14;
+                    return (
+                      <Box
+                        key={si}
+                        sx={{
+                          position: "relative",
+                          width: `${seg.pct}%`,
+                          minWidth: 0,
+                          height: "100%",
+                          bgcolor: seg.color,
+                          overflow: "hidden",
+                        }}
+                      >
+                        {showLabel ? (
+                          <Box
+                            sx={{
+                              position: "absolute",
+                              inset: 0,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              pointerEvents: "none",
+                            }}
+                          >
+                            <BodyText
+                              component="span"
+                              sx={{
+                                fontSize: 11,
+                                fontWeight: 700,
+                                whiteSpace: "nowrap",
+                                color: "#fff",
+                                textShadow: "0 1px 3px rgba(0, 60, 70, 0.45)",
+                              }}
+                            >
+                              {pctLabel(seg.pct)}
+                            </BodyText>
+                          </Box>
+                        ) : null}
+                      </Box>
+                    );
+                  })}
+                </Box>
+              </Box>
+
+              <BodyText
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: alpha(m.navy, 0.65),
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {bar.totalReviews} Reviews
+              </BodyText>
+            </Box>
+          );
+        })}
+
         <Box
           sx={{
             display: "grid",
-            gridTemplateColumns: `${LABEL_COL_W}px minmax(0, 1fr)`,
-            columnGap: `${GRID_GAP}px`,
-            rowGap: `${ROW_GAP}px`,
-            alignItems: "center",
+            gridTemplateColumns: `${LABEL_COL_W}px minmax(0, 1fr) ${TOTAL_LABEL_W}px`,
+            columnGap: 1,
+            width: "100%",
           }}
         >
-          {bars.map((bar) => {
-            const barWidthPct =
-              ((bar.totalReviews * REVIEW_SCALE) / MAX_AXIS) * 100;
-            const segments = [
-              { pct: bar.badPct, color: SEG_COLORS[0] },
-              { pct: bar.goodPct, color: SEG_COLORS[1] },
-              { pct: bar.excellentPct, color: SEG_COLORS[2] },
-            ];
-
-            return (
-              <Box key={bar.category} sx={{ display: "contents" }}>
-                <BodyText
-                  sx={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: alpha(m.navy, 0.72),
-                    textAlign: "right",
-                    pr: 0.25,
-                    lineHeight: 1.2,
-                  }}
-                >
-                  {bar.category}
-                </BodyText>
-
-                <Box
-                  sx={{
-                    display: "grid",
-                    gridTemplateColumns: `minmax(0, 1fr) ${TOTAL_LABEL_W}px`,
-                    alignItems: "center",
-                    columnGap: 1,
-                    minHeight: BAR_HEIGHT,
-                  }}
-                >
-                  <Box sx={{ position: "relative", height: BAR_HEIGHT }}>
-                    <Box
-                      sx={{
-                        position: "absolute",
-                        left: 0,
-                        top: 0,
-                        height: BAR_HEIGHT,
-                        width: `${barWidthPct}%`,
-                        display: "flex",
-                        flexDirection: "row",
-                      }}
-                    >
-                      {segments.map((seg, si) => {
-                        const showLabel = seg.pct >= 14;
-                        const isWhiteText = si < 2;
-                        return (
-                          <Box
-                            key={si}
-                            sx={{
-                              position: "relative",
-                              width: `${seg.pct}%`,
-                              minWidth: 0,
-                              height: "100%",
-                              bgcolor: seg.color,
-                              overflow: "hidden",
-                              flexShrink: 0,
-                            }}
-                          >
-                            {showLabel && (
-                              <Box
-                                sx={{
-                                  position: "absolute",
-                                  inset: 0,
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  color: isWhiteText
-                                    ? "#fff"
-                                    : alpha(m.navy, 0.72),
-                                  textShadow: isWhiteText
-                                    ? "0 1px 3px rgba(0,60,70,0.45)"
-                                    : "none",
-                                  pointerEvents: "none",
-                                }}
-                              >
-                                <BodyText
-                                  component="span"
-                                  sx={{
-                                    fontSize: 11,
-                                    fontWeight: 700,
-                                    whiteSpace: "nowrap",
-                                  }}
-                                >
-                                  {pctLabel(seg.pct)}
-                                </BodyText>
-                              </Box>
-                            )}
-                          </Box>
-                        );
-                      })}
-                    </Box>
-                  </Box>
-
-                  <BodyText
-                    sx={{
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: alpha(m.navy, 0.65),
-                      whiteSpace: "nowrap",
-                      textAlign: "left",
-                    }}
-                  >
-                    {bar.totalReviews} Reviews
-                  </BodyText>
-                </Box>
-              </Box>
-            );
-          })}
-
-          {/* X-axis */}
           <Box />
-          <Box sx={{ gridColumn: 2, pt: 0.5, pb: 0.5 }}>
+          <Box sx={{ minWidth: 0 }}>
             <Box
               sx={{
-                display: "grid",
-                gridTemplateColumns: `minmax(0, 1fr) ${TOTAL_LABEL_W}px`,
-                columnGap: 1,
+                height: "1px",
+                width: "100%",
+                bgcolor: alpha(m.navy, 0.35),
+              }}
+            />
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                mt: 0.75,
+                width: "100%",
               }}
             >
-              <Box>
-                <Box
+              {Array.from({ length: TICK_COUNT }).map((_, i) => (
+                <BodyText
+                  key={i}
+                  component="span"
                   sx={{
-                    height: 1,
-                    bgcolor: alpha(m.navy, 0.35),
-                    width: "100%",
+                    fontSize: 10.5,
+                    fontWeight: 500,
+                    color: alpha(m.navy, 0.5),
+                    lineHeight: 1,
                   }}
-                />
-                <Stack
-                  direction="row"
-                  justifyContent="space-between"
-                  sx={{ mt: 0.75 }}
                 >
-                  {Array.from({ length: TICK_COUNT }).map((_, i) => (
-                    <BodyText
-                      key={i}
-                      component="span"
-                      sx={{
-                        fontSize: 10.5,
-                        fontWeight: 500,
-                        color: alpha(m.navy, 0.5),
-                        lineHeight: 1,
-                      }}
-                    >
-                      {(TICK_STEP * i).toLocaleString()}
-                    </BodyText>
-                  ))}
-                </Stack>
-              </Box>
-              <Box />
+                  {(TICK_STEP * i).toLocaleString()}
+                </BodyText>
+              ))}
             </Box>
           </Box>
+          <Box />
         </Box>
-      </Box>
+      </Stack>
 
-      {/* Legend */}
       <Box sx={{ px: 2.25, pt: 1.5, pb: 2 }}>
         <Stack direction="row" spacing={3} justifyContent="center">
           {(["Bad", "Good", "Excellent"] as const).map((label, i) => (

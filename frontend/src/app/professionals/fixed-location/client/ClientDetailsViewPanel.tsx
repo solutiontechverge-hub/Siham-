@@ -182,8 +182,9 @@ export default function ClientDetailsViewPanel({
               <Typography
                 sx={{
                   fontWeight: 800,
-                  fontSize: 14,
+                  fontSize: 15,
                   color: alpha(m.navy, 0.9),
+                  lineHeight: 1.2,
                 }}
               >
                 {client.name}
@@ -193,12 +194,17 @@ export default function ClientDetailsViewPanel({
                   label="Blocked"
                   size="small"
                   sx={{
-                    height: 20,
+                    height: 16,
                     borderRadius: "999px",
                     bgcolor: alpha(theme.palette.error.main, 0.12),
                     color: theme.palette.error.main,
-                    fontSize: 10,
-                    fontWeight: 800,
+                    fontWeight: 700,
+                    "& .MuiChip-label": {
+                      fontSize: 9,
+                      px: 0.65,
+                      py: 0,
+                      lineHeight: 1.2,
+                    },
                   }}
                 />
               ) : null}
@@ -207,12 +213,17 @@ export default function ClientDetailsViewPanel({
                   label="No show"
                   size="small"
                   sx={{
-                    height: 20,
+                    height: 16,
                     borderRadius: "999px",
-                    bgcolor: alpha("#7B1FA2", 0.12),
-                    color: "#7B1FA2",
-                    fontSize: 10,
-                    fontWeight: 800,
+                    bgcolor: m.statusNoShowBg,
+                    color: m.statusNoShowFg,
+                    fontWeight: 700,
+                    "& .MuiChip-label": {
+                      fontSize: 9,
+                      px: 0.65,
+                      py: 0,
+                      lineHeight: 1.2,
+                    },
                   }}
                 />
               ) : null}
@@ -221,12 +232,17 @@ export default function ClientDetailsViewPanel({
                   label="CC"
                   size="small"
                   sx={{
-                    height: 20,
+                    height: 16,
                     borderRadius: "999px",
-                    bgcolor: m.teal,
-                    color: "#fff",
-                    fontSize: 10,
-                    fontWeight: 800,
+                    bgcolor: alpha(m.teal, 0.12),
+                    color: m.teal,
+                    fontWeight: 700,
+                    "& .MuiChip-label": {
+                      fontSize: 9,
+                      px: 0.65,
+                      py: 0,
+                      lineHeight: 1.2,
+                    },
                   }}
                 />
               ) : (
@@ -234,12 +250,17 @@ export default function ClientDetailsViewPanel({
                   label="IC"
                   size="small"
                   sx={{
-                    height: 20,
+                    height: 16,
                     borderRadius: "999px",
-                    bgcolor: alpha(m.navy, 0.08),
-                    color: alpha(m.navy, 0.65),
-                    fontSize: 10,
-                    fontWeight: 800,
+                    bgcolor: alpha(m.teal, 0.12),
+                    color: m.teal,
+                    fontWeight: 700,
+                    "& .MuiChip-label": {
+                      fontSize: 9,
+                      px: 0.65,
+                      py: 0,
+                      lineHeight: 1.2,
+                    },
                   }}
                 />
               )}
@@ -248,12 +269,17 @@ export default function ClientDetailsViewPanel({
                   label="Non-Mollure"
                   size="small"
                   sx={{
-                    height: 20,
+                    height: 16,
                     borderRadius: "999px",
                     bgcolor: alpha(m.teal, 0.14),
                     color: m.teal,
-                    fontSize: 10,
-                    fontWeight: 800,
+                    fontWeight: 700,
+                    "& .MuiChip-label": {
+                      fontSize: 9,
+                      px: 0.65,
+                      py: 0,
+                      lineHeight: 1.2,
+                    },
                   }}
                 />
               ) : (
@@ -261,12 +287,17 @@ export default function ClientDetailsViewPanel({
                   label="Mollure"
                   size="small"
                   sx={{
-                    height: 20,
+                    height: 16,
                     borderRadius: "999px",
                     bgcolor: alpha(m.teal, 0.14),
                     color: m.teal,
-                    fontSize: 10,
-                    fontWeight: 800,
+                    fontWeight: 700,
+                    "& .MuiChip-label": {
+                      fontSize: 9,
+                      px: 0.65,
+                      py: 0,
+                      lineHeight: 1.2,
+                    },
                   }}
                 />
               )}

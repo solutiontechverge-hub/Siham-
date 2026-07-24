@@ -111,7 +111,8 @@ export default function CalendarNoShowModal({
               mb: 1.25,
             }}
           >
-            Mark The Entire Booking As No Show Or Select Individual Persons
+            Client booked but did not arrive. Mark the booking as no show
+            (select who did not show).
           </Typography>
           <Stack spacing={1}>
             {rows.map((row) => (

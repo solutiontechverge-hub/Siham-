@@ -73,6 +73,29 @@ export const buildInvoicePostDueReminderEmail = (ctx) => {
   return { html, text };
 };
 
+export const buildInvoiceReissuedEmail = (ctx) => {
+  const paymentUrl = ctx.paymentUrl || buildPaymentUrl(ctx.bookingId);
+  const invoiceUrl = ctx.invoiceUrl || buildInvoiceUrl(ctx.bookingId);
+  const html = wrapEmail(`
+    <h1 style="margin:0 0 8px;font-size:24px;color:#1a2b42;">Invoice reissued</h1>
+    <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#5c6778;">
+      Your salon has reissued your invoice with a new payment due date. Please complete your payment by the date below.
+    </p>
+    ${detailsBox([
+      { label: "Invoice", value: ctx.documentNumber || "—" },
+      { label: "Amount", value: formatEuro(ctx.amount) },
+      { label: "New due date", value: formatDate(ctx.dueDate) },
+      { label: "Salon", value: ctx.salonName || "—" },
+    ])}
+    <div style="margin-top:8px;">
+      ${secondaryButton("Invoice PDF", invoiceUrl)}
+      ${primaryButton("Payment link", paymentUrl)}
+    </div>
+  `);
+  const text = `Invoice reissued\nNew due date: ${formatDate(ctx.dueDate)}\nAmount: ${formatEuro(ctx.amount)}\nPay: ${paymentUrl}`;
+  return { html, text };
+};
+
 export const buildRespondToRequestReminderEmail = (ctx) =>
   simpleEmail({
     title: "Reminder: respond to booking request",

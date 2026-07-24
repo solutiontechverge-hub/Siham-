@@ -116,11 +116,13 @@ export default function SalesAddOnCheckout({
 
   const addLinesFromCatalog = (
     kind: ManualEntryLineKind,
-    options: ManualEntryCatalogOption[],
+    options: Array<ManualEntryCatalogOption & { quantity?: number }>,
   ) => {
     setLines((prev) => [
       ...prev,
-      ...options.map((option) => createManualEntryLineFromOption(kind, option)),
+      ...options.map((option) =>
+        createManualEntryLineFromOption(kind, option, option.quantity ?? 1),
+      ),
     ]);
   };
 
@@ -578,6 +580,8 @@ export default function SalesAddOnCheckout({
         title="Select products"
         options={productOptions}
         emptyLabel="No products configured yet."
+        withQuantity
+        allowAddProduct
         onSave={(selected) => addLinesFromCatalog("product", selected)}
       />
       <ManualEntryCatalogDrawer
@@ -586,6 +590,9 @@ export default function SalesAddOnCheckout({
         title="Select items"
         options={itemOptions}
         emptyLabel="No services configured yet."
+        withQuantity
+        allowAddProduct
+        addProductLabel="Add Item"
         onSave={(selected) => addLinesFromCatalog("item", selected)}
       />
       <ManualEntryUniqueItemModal

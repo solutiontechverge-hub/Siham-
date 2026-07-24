@@ -4,11 +4,13 @@ import * as React from "react";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import {
   Box,
+  ListSubheader,
   MenuItem,
   Stack,
   Typography,
   type TextFieldProps,
 } from "@mui/material";
+import AppSearchField from "./AppSearchField";
 import AppTextField from "./AppTextField";
 import {
   COUNTRY_DIAL_CODES,
@@ -17,6 +19,7 @@ import {
   dialCodeFromSelectValue,
   findCountryDialCode,
   resolveCountrySelectValue,
+  type CountryDialCode,
 } from "../../data/countryDialCodes";
 
 export type AppCountryCodeSelectProps = Omit<
@@ -27,6 +30,19 @@ export type AppCountryCodeSelectProps = Omit<
   onChange: (dialCode: string) => void;
   placeholder?: string;
 };
+
+function matchesCountrySearch(entry: CountryDialCode, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const dialDigits = entry.dialCode.replace(/\D/g, "");
+  const queryDigits = q.replace(/\D/g, "");
+  return (
+    entry.name.toLowerCase().includes(q) ||
+    entry.iso.toLowerCase().includes(q) ||
+    entry.dialCode.toLowerCase().includes(q) ||
+    (queryDigits.length > 0 && dialDigits.includes(queryDigits))
+  );
+}
 
 function CountryCodeMenuItem({
   iso,
@@ -98,6 +114,13 @@ export default function AppCountryCodeSelect({
   ...props
 }: AppCountryCodeSelectProps) {
   const selectValue = resolveCountrySelectValue(value);
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const [search, setSearch] = React.useState("");
+
+  const query = search.trim();
+  const visibleCountries = COUNTRY_DIAL_CODES.filter((entry) =>
+    matchesCountrySearch(entry, query),
+  );
 
   return (
     <AppTextField
@@ -109,7 +132,16 @@ export default function AppCountryCodeSelect({
       SelectProps={{
         IconComponent: ExpandMoreRoundedIcon,
         displayEmpty: true,
-        MenuProps: { PaperProps: { sx: { maxHeight: 320 } } },
+        open: menuOpen,
+        onOpen: () => setMenuOpen(true),
+        onClose: () => {
+          setMenuOpen(false);
+          setSearch("");
+        },
+        MenuProps: {
+          autoFocus: false,
+          PaperProps: { sx: { maxHeight: 360 } },
+        },
         renderValue: (selected) => {
           if (!selected) {
             return <span style={{ opacity: 0.6 }}>{placeholder}</span>;
@@ -119,21 +151,56 @@ export default function AppCountryCodeSelect({
       }}
       {...props}
     >
+      <ListSubheader
+        disableSticky
+        sx={{ px: 1, py: 0.75, lineHeight: 1, bgcolor: "#fff" }}
+      >
+        <AppSearchField
+          autoFocus
+          fullWidth
+          placeholder="Search country or code"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onClear={() => setSearch("")}
+          onKeyDown={(e) => {
+            if (e.key !== "Escape") e.stopPropagation();
+          }}
+          onClick={(e) => e.stopPropagation()}
+        />
+      </ListSubheader>
       <MenuItem value="">
         <em>{placeholder}</em>
       </MenuItem>
-      {COUNTRY_DIAL_CODES.map((entry) => (
-        <MenuItem
-          key={countryDialOptionValue(entry)}
-          value={countryDialOptionValue(entry)}
+      {visibleCountries.length === 0 ? (
+        <ListSubheader
+          disableSticky
+          sx={{
+            px: 2,
+            py: 1.25,
+            lineHeight: 1.4,
+            bgcolor: "#fff",
+            color: "text.secondary",
+            fontSize: 13,
+            fontWeight: 400,
+            fontStyle: "normal",
+          }}
         >
-          <CountryCodeMenuItem
-            iso={entry.iso}
-            dialCode={entry.dialCode}
-            name={entry.name}
-          />
-        </MenuItem>
-      ))}
+          No countries found
+        </ListSubheader>
+      ) : (
+        visibleCountries.map((entry) => (
+          <MenuItem
+            key={countryDialOptionValue(entry)}
+            value={countryDialOptionValue(entry)}
+          >
+            <CountryCodeMenuItem
+              iso={entry.iso}
+              dialCode={entry.dialCode}
+              name={entry.name}
+            />
+          </MenuItem>
+        ))
+      )}
     </AppTextField>
   );
 }

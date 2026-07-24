@@ -31,11 +31,11 @@ import ProfessionalFixedLocationPerformanceAnalytics from "./ProfessionalFixedLo
 import ProfessionalFixedLocationRatingReviewAnalytics from "./ProfessionalFixedLocationRatingReviewAnalytics";
 import type {
   AttendanceNoShowRow,
-  BookingByServiceCategoryRow,
   BookingOriginRow,
   BookingStatusSummaryRow,
   ProfessionalAnalyticsSubTab,
   ProfessionalFixedLocationAnalyticsData,
+  TransactionSummaryRow,
 } from "../../../app/professionals/fixed-location/analytics/analytics.data";
 import { useSnackbar } from "../AppSnackbar";
 
@@ -422,15 +422,15 @@ function AttendanceNoShowAnalyticsTable({
   );
 }
 
-function BookingByServiceCategoryTable({
+function TransactionSummaryTable({
   rows,
 }: {
-  rows: readonly BookingByServiceCategoryRow[];
+  rows: readonly TransactionSummaryRow[];
 }) {
   const theme = useTheme();
   const m = theme.palette.mollure;
 
-  const headers = ["Category", "Count", "Share (%)"] as const;
+  const headers = ["Transaction Channel", "Count", "Share (%)"] as const;
 
   return (
     <TableContainer
@@ -483,7 +483,7 @@ function BookingByServiceCategoryTable({
 
             return (
               <TableRow
-                key={r.category}
+                key={r.channel}
                 hover
                 sx={{
                   "& td": { borderBottom: `1px solid ${alpha(m.navy, 0.06)}` },
@@ -491,7 +491,7 @@ function BookingByServiceCategoryTable({
               >
                 <TableCell sx={cellSx}>
                   <BodyText component="span" sx={textSx}>
-                    {r.category}
+                    {r.channel}
                   </BodyText>
                 </TableCell>
                 <TableCell sx={cellSx}>
@@ -559,7 +559,7 @@ export default function ProfessionalFixedLocationAnalytics({
   const section11 = data.sections.bookingOriginAndType;
   const section12 = data.sections.bookingStatusSummary;
   const section13 = data.sections.attendanceNoShowAnalytics;
-  const section16 = data.sections.bookingByServiceCategory;
+  const section16 = data.sections.transactionSummary;
 
   const exportExcel = React.useCallback(
     (scope: ProfessionalAnalyticsExportSelection) => {
@@ -844,7 +844,7 @@ export default function ProfessionalFixedLocationAnalytics({
               {section16.title}
             </BodyText>
 
-            <BookingByServiceCategoryTable rows={section16.rows} />
+            <TransactionSummaryTable rows={section16.rows} />
 
             {section16.explanationContent ? (
               <AnalyticsSectionExplanation

@@ -530,8 +530,6 @@ function InvoiceSettings() {
     setEditingServiceId,
     addServiceDraft,
     setAddServiceDraft,
-    isProcessingReissues,
-    handleProcessReissues,
     logoInputRef,
     invoiceDrawerOpen,
     setInvoiceDrawerOpen,
@@ -895,14 +893,14 @@ function InvoiceSettings() {
                       >
                         <Stack
                           direction="row"
-                          spacing={0.75}
+                          spacing={0.6}
                           alignItems="center"
                         >
                           <Box
                             sx={{
-                              width: 22,
-                              height: 22,
-                              borderRadius: "8px",
+                              width: 16,
+                              height: 16,
+                              borderRadius: "5px",
                               bgcolor: m.addSoftBg,
                               color: m.addSoftFg,
                               display: "grid",
@@ -910,7 +908,7 @@ function InvoiceSettings() {
                               flex: "0 0 auto",
                             }}
                           >
-                            <AddRoundedIcon sx={{ fontSize: 18 }} />
+                            <AddRoundedIcon sx={{ fontSize: 14 }} />
                           </Box>
                           <BodyText
                             sx={{
@@ -1028,14 +1026,14 @@ function InvoiceSettings() {
                       >
                         <Stack
                           direction="row"
-                          spacing={0.75}
+                          spacing={0.6}
                           alignItems="center"
                         >
                           <Box
                             sx={{
-                              width: 22,
-                              height: 22,
-                              borderRadius: "8px",
+                              width: 16,
+                              height: 16,
+                              borderRadius: "5px",
                               bgcolor: alpha(m.teal, 0.14),
                               color: m.teal,
                               display: "grid",
@@ -1043,7 +1041,7 @@ function InvoiceSettings() {
                               flex: "0 0 auto",
                             }}
                           >
-                            <AddRoundedIcon sx={{ fontSize: 18 }} />
+                            <AddRoundedIcon sx={{ fontSize: 14 }} />
                           </Box>
                           <BodyText
                             sx={{
@@ -1496,39 +1494,6 @@ function InvoiceSettings() {
                       </Stack>
                     </Box>
                   </Box>
-
-                  {showDueDateSettings ? (
-                    <Box>
-                      <CardTitle sx={{ color: alpha(m.navy, 0.86) }}>
-                        Overdue Invoice Re-issues
-                      </CardTitle>
-                      <Box sx={{ mt: 1.25, ...formPanelSx, bgcolor: "#fff" }}>
-                        <BodyText
-                          sx={{
-                            fontSize: 12.5,
-                            color: alpha(m.navy, 0.58),
-                            fontWeight: 700,
-                          }}
-                        >
-                          Manually process overdue invoices and create re-issued
-                          invoices with updated due dates and penalty fees per
-                          your payment terms.
-                        </BodyText>
-                        <AppButton
-                          tone="secondary"
-                          disabled={isProcessingReissues}
-                          onClick={() => void handleProcessReissues()}
-                          sx={{
-                            mt: 1.5,
-                          }}
-                        >
-                          {isProcessingReissues
-                            ? "Processing…"
-                            : "Process overdue re-issues"}
-                        </AppButton>
-                      </Box>
-                    </Box>
-                  ) : null}
                 </Stack>
               </Box>
             </Box>

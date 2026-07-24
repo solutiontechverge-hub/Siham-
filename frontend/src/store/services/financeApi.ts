@@ -204,6 +204,33 @@ const financeApi = baseApi.injectEndpoints({
       invalidatesTags: ["FinanceTransactions"],
     }),
 
+    reissueFinanceInvoice: builder.mutation<
+      ApiEnvelope<{
+        transaction: TransactionRow;
+        notificationSent: boolean;
+        emailSent: boolean;
+        emailTo: string | null;
+        emailReason: string | null;
+      }>,
+      {
+        bookingId?: string;
+        bookingRef?: string;
+        dueDate: string;
+        penaltyAmount?: number;
+        totalPrice?: number;
+        clientEmail?: string;
+        clientName?: string;
+        paymentMethod?: string;
+      }
+    >({
+      query: (body) => ({
+        url: "/api/finance/invoices/reissue",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["FinanceTransactions", "Notifications"],
+    }),
+
     createStripeConnectLink: builder.mutation<
       ApiEnvelope<{ url: string | null; simulated?: boolean; accountId?: string }>,
       { refreshUrl?: string; returnUrl?: string; accountId?: string } | void
@@ -232,6 +259,7 @@ export const {
   useGetPublicTransactionOptionsQuery,
   useGetPublicInvoiceSettingsQuery,
   useProcessFinanceInvoiceReissuesMutation,
+  useReissueFinanceInvoiceMutation,
   useCreateStripeConnectLinkMutation,
 } = financeApi;
 

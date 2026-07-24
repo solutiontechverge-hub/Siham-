@@ -3,6 +3,14 @@ import type { SalesAddonRecord, SalesCardMetaRecord } from "./salesOverview.type
 const ADDONS_KEY = "mollure.sales.addons.v1";
 const META_KEY = "mollure.sales.cardMeta.v1";
 
+/** Dispatched after sales card meta is written so calendar cards can refresh. */
+export const SALES_META_CHANGED_EVENT = "mollure:sales-meta-changed";
+
+function emitSalesMetaChanged() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(SALES_META_CHANGED_EVENT));
+}
+
 function readJson<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
   try {
@@ -34,6 +42,7 @@ export function saveSalesAddon(record: SalesAddonRecord) {
   const all = readJson<SalesAddonRecord[]>(ADDONS_KEY, []);
   const next = [record, ...all.filter((row) => row.id !== record.id)];
   writeJsonValue(ADDONS_KEY, next);
+  emitSalesMetaChanged();
 }
 
 export function updateSalesAddon(
@@ -45,6 +54,7 @@ export function updateSalesAddon(
     ADDONS_KEY,
     all.map((row) => (row.id === id ? { ...row, ...patch } : row)),
   );
+  emitSalesMetaChanged();
 }
 
 export function getSalesCardMeta(cardId: string): SalesCardMetaRecord | null {
@@ -59,4 +69,5 @@ export function upsertSalesCardMeta(record: SalesCardMetaRecord) {
   const all = readJson<SalesCardMetaRecord[]>(META_KEY, []);
   const next = [...all.filter((row) => row.cardId !== record.cardId), record];
   writeJsonValue(META_KEY, next);
+  emitSalesMetaChanged();
 }

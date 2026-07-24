@@ -40,7 +40,7 @@ export const profilePageData = {
   ],
   genderOptions: [...GENDER_OPTIONS],
   links: {
-    terms: { label: "Terms & Conditions", href: "/terms" },
+    terms: { label: "Terms & Conditions", href: "/terms-and-conditions" },
   },
   actions: {
     update: "Update",

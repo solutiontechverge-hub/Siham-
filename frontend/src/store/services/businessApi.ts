@@ -18,6 +18,8 @@ export type BookingsPagination = ListPagination;
 
 export type GetMyBookingsParams = ListPaginationParams & {
   tab?: "past" | "ongoing" | "upcoming";
+  /** Search by booking ID, salon name, service, or address. */
+  q?: string;
 };
 
 export type BusinessSubcategory = {
@@ -822,6 +824,7 @@ export const businessApi = baseApi.injectEndpoints({
         const response = await fetchWithBQ({
           url: buildListQuery("/api/business/bookings", arg ?? undefined, {
             tab: arg?.tab,
+            q: arg?.q,
           }),
           method: "GET",
         });

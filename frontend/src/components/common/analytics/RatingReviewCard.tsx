@@ -82,8 +82,8 @@ function ReviewTags({ tags }: { tags: readonly { label: string }[] }) {
 
 export type RatingReviewCardProps = {
   review: ProfessionalReviewItem;
-  onSendReply?: (message: string) => void;
-  onDeleteReply?: () => void;
+  onSendReply?: (message: string) => void | Promise<void>;
+  onDeleteReply?: () => void | Promise<void>;
 };
 
 export default function RatingReviewCard({
@@ -108,7 +108,7 @@ export default function RatingReviewCard({
     }
   }, [review.reply, editing]);
 
-  function handleSendReply() {
+  async function handleSendReply() {
     const message = draftReply.trim();
     if (!message) {
       showSnackbar({
@@ -117,11 +117,14 @@ export default function RatingReviewCard({
       });
       return;
     }
-    onSendReply?.(message);
-    setDraftReply("");
-    setComposeOpen(false);
-    setEditing(false);
-    showSnackbar({ severity: "success", message: "Reply sent successfully." });
+    try {
+      await onSendReply?.(message);
+      setDraftReply("");
+      setComposeOpen(false);
+      setEditing(false);
+    } catch {
+      // Parent handles error toast.
+    }
   }
 
   function handleEditReply() {
@@ -132,21 +135,26 @@ export default function RatingReviewCard({
     setComposeOpen(true);
   }
 
-  function handleDeleteReply() {
+  async function handleDeleteReply() {
     setAnchorEl(null);
-    onDeleteReply?.();
-    setDraftReply("");
-    setComposeOpen(false);
-    setEditing(false);
-    showSnackbar({ severity: "success", message: "Reply deleted." });
+    try {
+      await onDeleteReply?.();
+      setDraftReply("");
+      setComposeOpen(false);
+      setEditing(false);
+    } catch {
+      // Parent handles error toast.
+    }
   }
 
+  const canManageReply = Boolean(onSendReply);
+
   const handleReplyClick = () => {
-    if (review.reply) return;
+    if (!canManageReply || review.reply) return;
     setComposeOpen(true);
   };
 
-  const showCompose = composeOpen && (!review.reply || editing);
+  const showCompose = canManageReply && composeOpen && (!review.reply || editing);
 
   return (
     <Paper
@@ -220,7 +228,7 @@ export default function RatingReviewCard({
 
           <ReviewTags tags={review.tags} />
 
-          {!review.reply ? (
+          {!review.reply && canManageReply ? (
             <BodyText
               component="button"
               type="button"
@@ -277,23 +285,26 @@ export default function RatingReviewCard({
                   </BodyText>
                 </Box>
 
-                <IconButton
-                  size="small"
-                  onClick={(e) => setAnchorEl(e.currentTarget)}
-                  sx={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: "8px",
-                    border: `1px solid ${alpha(m.navy, 0.08)}`,
-                    bgcolor: "#fff",
-                  }}
-                  aria-label="Reply actions"
-                >
-                  <MoreVertRoundedIcon
-                    sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }}
-                  />
-                </IconButton>
+                {canManageReply ? (
+                  <IconButton
+                    size="small"
+                    onClick={(e) => setAnchorEl(e.currentTarget)}
+                    sx={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: "8px",
+                      border: `1px solid ${alpha(m.navy, 0.08)}`,
+                      bgcolor: "#fff",
+                    }}
+                    aria-label="Reply actions"
+                  >
+                    <MoreVertRoundedIcon
+                      sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }}
+                    />
+                  </IconButton>
+                ) : null}
 
+                {canManageReply ? (
                 <Menu
                   anchorEl={anchorEl}
                   open={menuOpen}
@@ -332,6 +343,7 @@ export default function RatingReviewCard({
                     Delete
                   </MenuItem>
                 </Menu>
+                ) : null}
               </Stack>
             </Box>
           ) : null}

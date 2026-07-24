@@ -18,12 +18,11 @@ import { BodyText, SubHeading } from "../ui/typography";
 /** Canonical right-panel drawer width — shared across all app drawers. */
 export const MOLLURE_DRAWER_WIDTH = { xs: "100%", sm: 560 } as const;
 
-const DRAWER_LEFT_RADIUS = 16;
-
 function mutedContentSx(navy: string): SxProps<Theme> {
   return {
     bgcolor: alpha(navy, 0.03),
-    px: 2.25,
+    // Match header / footer horizontal padding (px: 2.5)
+    px: 2.5,
     py: 2,
   };
 }
@@ -98,9 +97,13 @@ export default function AppDrawer({
           {
             width: resolvedWidth,
             maxWidth: "100vw",
+            height: "100%",
+            margin: 0,
+            top: 0,
             overflow: "hidden",
-            borderTopLeftRadius: DRAWER_LEFT_RADIUS,
-            borderBottomLeftRadius: DRAWER_LEFT_RADIUS,
+            // Soft left corners on right-anchored panels (right edge stays flush to screen)
+            borderRadius:
+              anchor === "left" ? "0 14px 14px 0" : "14px 0 0 14px",
             boxShadow: "0 22px 70px rgba(16, 24, 40, 0.22)",
           },
           ...(Array.isArray(paperSx) ? paperSx : paperSx ? [paperSx] : []),

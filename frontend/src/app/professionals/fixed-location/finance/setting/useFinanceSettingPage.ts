@@ -10,7 +10,6 @@ import {
 import { useGetProfileQuery } from "../../../../../store/services/profileApi";
 import { useProfessionalStripeStatus } from "../useProfessionalStripeStatus";
 import { useFinanceTransactionOptions } from "../../../../../components/common/finance-documents/useFinanceTransactionOptions";
-import { useProcessFinanceInvoiceReissuesMutation } from "../../../../../store/services/financeApi";
 import {
   DEFAULT_PRODUCT_DRAFT,
   DEFAULT_SERVICE_DRAFT,
@@ -143,8 +142,6 @@ export function useInvoiceSettingsSection() {
   const { settings, setSettings } = useFinanceInvoiceSettings();
   const { options: txOptions } = useFinanceTransactionOptions();
   const { data: profileResponse } = useGetProfileQuery();
-  const [processReissues, { isLoading: isProcessingReissues }] =
-    useProcessFinanceInvoiceReissuesMutation();
   const showDueDateSettings =
     txOptions.onlineInvoiceDueDate || txOptions.offlineInvoiceDueDate;
   const [paymentsEditing, setPaymentsEditing] = React.useState(false);
@@ -160,25 +157,6 @@ export function useInvoiceSettingsSection() {
   );
   const [addServiceDraft, setAddServiceDraft] =
     React.useState<ServiceDraft>(DEFAULT_SERVICE_DRAFT);
-
-  const handleProcessReissues = React.useCallback(async () => {
-    try {
-      const result = await processReissues().unwrap();
-      const created = result.data?.created ?? 0;
-      showSnackbar({
-        severity: "success",
-        message:
-          created > 0
-            ? `Created ${created} re-issued invoice${created === 1 ? "" : "s"} for overdue payments.`
-            : "No overdue invoices required re-issuing.",
-      });
-    } catch {
-      showSnackbar({
-        severity: "error",
-        message: "Could not process invoice re-issues.",
-      });
-    }
-  }, [processReissues, showSnackbar]);
 
   const logoInputRef = React.useRef<HTMLInputElement | null>(null);
   const [invoiceDrawerOpen, setInvoiceDrawerOpen] = React.useState(false);
@@ -390,8 +368,6 @@ export function useInvoiceSettingsSection() {
     setEditingServiceId,
     addServiceDraft,
     setAddServiceDraft,
-    isProcessingReissues,
-    handleProcessReissues,
     logoInputRef,
     invoiceDrawerOpen,
     setInvoiceDrawerOpen,

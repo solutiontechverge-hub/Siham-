@@ -35,22 +35,20 @@ function clientTypeChipSx(theme: Theme) {
   };
 }
 
-function statusChipSx(
-  status: TransactionStatus,
-  m: { navy: string; teal: string },
-) {
+function statusChipSx(status: TransactionStatus, theme: Theme) {
   const tone = getTransactionStatusTone(status);
+  const m = theme.palette.mollure;
   switch (tone) {
     case "success":
-      return { bgcolor: alpha("#2E7D32", 0.12), color: "#2E7D32" };
+      return { bgcolor: m.statusGreenBg, color: m.statusGreenFg };
     case "warning":
-      return { bgcolor: alpha("#E65100", 0.12), color: "#E65100" };
+      return { bgcolor: m.statusOrangeBg, color: m.statusOrangeFg };
     case "danger":
-      return { bgcolor: alpha("#C62828", 0.12), color: "#C62828" };
+      return { bgcolor: m.statusOrangeBg, color: m.statusOrangeFg };
     case "muted":
-      return { bgcolor: alpha("#6B7280", 0.12), color: "#4B5563" };
+      return { bgcolor: m.fxGrayF2F4F7, color: m.statusGreyFg };
     default:
-      return { bgcolor: alpha(m.navy, 0.08), color: alpha(m.navy, 0.62) };
+      return { bgcolor: m.fxGrayF2F4F7, color: m.statusGreyFg };
   }
 }
 
@@ -282,13 +280,14 @@ export default function TransactionsTable({
                             underline="hover"
                             onClick={() => onClientClick(row)}
                             sx={{
-                              fontWeight: 900,
-                              fontSize: 12.5,
+                              fontWeight: 800,
+                              fontSize: 13.5,
                               color: theme.palette.primary.main,
                               border: 0,
                               bgcolor: "transparent",
                               p: 0,
                               cursor: "pointer",
+                              lineHeight: 1.2,
                             }}
                           >
                             {row.clientName}
@@ -297,9 +296,10 @@ export default function TransactionsTable({
                           <BodyText
                             component="span"
                             sx={{
-                              fontWeight: 900,
-                              fontSize: 12.5,
+                              fontWeight: 800,
+                              fontSize: 13.5,
                               color: alpha(m.navy, 0.86),
+                              lineHeight: 1.2,
                             }}
                           >
                             {row.clientName}
@@ -310,12 +310,16 @@ export default function TransactionsTable({
                             label={clientTypeLabel}
                             size="small"
                             sx={{
-                              height: 18,
+                              height: 16,
                               borderRadius: "999px",
-                              fontSize: 9,
-                              fontWeight: 900,
-                              px: 0.25,
+                              fontWeight: 700,
                               textTransform: "none",
+                              "& .MuiChip-label": {
+                                fontSize: 9,
+                                px: 0.65,
+                                py: 0,
+                                lineHeight: 1.2,
+                              },
                               ...clientTypeChipSx(theme),
                             }}
                           />
@@ -402,12 +406,17 @@ export default function TransactionsTable({
                         label={row.status}
                         size="small"
                         sx={{
-                          height: 22,
-                          borderRadius: "8px",
-                          fontSize: 11,
-                          fontWeight: 800,
+                          height: 18,
+                          borderRadius: "6px",
+                          fontWeight: 700,
                           width: "fit-content",
-                          ...statusChipSx(row.status, m),
+                          "& .MuiChip-label": {
+                            fontSize: 10,
+                            px: 0.75,
+                            py: 0,
+                            lineHeight: 1.2,
+                          },
+                          ...statusChipSx(row.status, theme),
                         }}
                       />
                       {row.statusDetail ? (

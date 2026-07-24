@@ -1540,10 +1540,10 @@ export default function ClientBookingCreateView() {
                             const unavailable = isTimeUnavailable(t);
                             return (
                               <AppButton
-                                tone="primary"
+                                tone="secondary"
                                 key={t}
                                 data-time-slot={t}
-                                variant={active ? "contained" : "outlined"}
+                                variant="outlined"
                                 onClick={() => {
                                   if (unavailable) {
                                     setTimeValidationError(
@@ -1562,17 +1562,32 @@ export default function ClientBookingCreateView() {
                                   height: 32,
                                   fontSize: 11.5,
                                   whiteSpace: "nowrap",
+                                  bgcolor: active
+                                    ? alpha(m.teal, 0.14)
+                                    : "#fff",
+                                  color: active ? m.tealDark : m.teal,
+                                  borderColor: active
+                                    ? m.teal
+                                    : alpha(m.teal, 0.45),
+                                  "&:hover": {
+                                    bgcolor: active
+                                      ? alpha(m.teal, 0.2)
+                                      : alpha(m.teal, 0.08),
+                                    color: m.tealDark,
+                                    borderColor: m.teal,
+                                  },
                                   ...(unavailable
                                     ? {
+                                        bgcolor: "#fff",
                                         borderColor: alpha(m.navy, 0.08),
                                         color: alpha(m.navy, 0.32),
+                                        "&:hover": {
+                                          bgcolor: "#fff",
+                                          borderColor: alpha(m.navy, 0.08),
+                                          color: alpha(m.navy, 0.32),
+                                        },
                                       }
-                                    : !active
-                                      ? {
-                                          borderColor: alpha(m.navy, 0.1),
-                                          color: alpha(m.navy, 0.65),
-                                        }
-                                      : {}),
+                                    : {}),
                                 }}
                               >
                                 {t}

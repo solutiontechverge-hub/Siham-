@@ -23,6 +23,7 @@ import { Logo } from "../../../../images";
 import { HeaderNavText } from "../../ui/typography";
 import ClientProfileMenuPopover from "../ClientProfileMenuPopover";
 import ClientNotificationsDrawer from "../ClientNotificationsDrawer";
+import NotificationBookingSummaryModal from "../NotificationBookingSummaryModal";
 import {
   useGetMyNotificationsQuery,
   useGetUnreadNotificationCountQuery,
@@ -30,6 +31,7 @@ import {
   useMarkNotificationReadMutation,
   type AppNotificationItem,
 } from "../../../store/services/notificationsApi";
+import type { ClientNotificationItem } from "../../../data/clientNotifications.data";
 import { useAppSelector } from "../../../store/hooks";
 import { getPersistedAuthSession } from "../../../lib/auth-storage";
 import ProfessionalProfileMenuPopover from "../ProfessionalProfileMenuPopover";
@@ -100,7 +102,9 @@ function toDisplayName(userName?: string, userLabel?: string) {
  * Marketing strip header: white bar, teal bottom rule, logo + nav + locale / login / secondary pill.
  * Pass `navItems` (and optional `homeHref`, CTAs) for each screen.
  */
-function mapNotificationToDrawerItem(item: AppNotificationItem) {
+function mapNotificationToDrawerItem(
+  item: AppNotificationItem,
+): ClientNotificationItem {
   return {
     id: item.id,
     professionalName: item.actorName ?? "—",
@@ -111,6 +115,9 @@ function mapNotificationToDrawerItem(item: AppNotificationItem) {
     timeLabel: item.timeLabel,
     href: item.href,
     read: item.read,
+    bookingId: item.bookingId,
+    bookingRef: item.bookingRef,
+    message: item.message,
   };
 }
 
@@ -182,8 +189,21 @@ export default function MollureMarketingHeader({
   const openProfileMenu = (anchor: HTMLElement) => setProfileAnchor(anchor);
   const closeProfileMenu = () => setProfileAnchor(null);
   const [notificationsOpen, setNotificationsOpen] = React.useState(false);
+  const [selectedNotification, setSelectedNotification] =
+    React.useState<ClientNotificationItem | null>(null);
   const openNotifications = () => setNotificationsOpen(true);
   const closeNotifications = () => setNotificationsOpen(false);
+  const closeNotificationSummary = () => setSelectedNotification(null);
+
+  const handleNotificationItemClick = (item: ClientNotificationItem) => {
+    if (!item.read) void markNotificationRead(item.id);
+    setSelectedNotification(item);
+    closeNotifications();
+  };
+
+  const handleMarkAllNotificationsRead = () => {
+    void markAllNotificationsRead();
+  };
 
   React.useEffect(() => {
     setMounted(true);
@@ -527,16 +547,22 @@ export default function MollureMarketingHeader({
       ) : null}
 
       {showNotifications ? (
-        <ClientNotificationsDrawer
-          open={notificationsOpen}
-          onClose={closeNotifications}
-          title="Notifications"
-          items={notificationItems}
-          onMarkAllRead={() => void markAllNotificationsRead()}
-          onItemClick={(item) => {
-            if (!item.read) void markNotificationRead(item.id);
-          }}
-        />
+        <>
+          <ClientNotificationsDrawer
+            open={notificationsOpen}
+            onClose={closeNotifications}
+            title="Notifications"
+            items={notificationItems}
+            onMarkAllRead={handleMarkAllNotificationsRead}
+            onItemClick={handleNotificationItemClick}
+          />
+          <NotificationBookingSummaryModal
+            open={Boolean(selectedNotification)}
+            onClose={closeNotificationSummary}
+            notification={selectedNotification}
+            isProfessional={isProfessionalContext}
+          />
+        </>
       ) : null}
     </Box>
   );

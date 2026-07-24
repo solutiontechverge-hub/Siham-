@@ -3,6 +3,7 @@
 import AppButton from "../AppButton";
 import * as React from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   Avatar,
   Box,
@@ -72,7 +73,10 @@ import { toIsoLocalDate } from "../calendar/calendar.utils";
 import { useSnackbar } from "../AppSnackbar";
 import AppMultiSelect from "../AppMultiSelect";
 import MollureFormField from "../MollureFormField";
-import AppModal from "../AppModal";
+import AppModal, {
+  AppModalCancelButton,
+  AppModalPrimaryButton,
+} from "../AppModal";
 import AppDrawer from "../AppDrawer";
 import TemplateSyncSettingsForm from "./TemplateSyncSettingsForm";
 import {
@@ -128,7 +132,7 @@ import {
   buildTeamBusinessServiceRefs,
   TEAM_MEMBER_DRAFT_PREVIEW_ID,
 } from "../../../data/businessTeamMemberModal.data";
-import { ratingReviewReviewsHref } from "../../../app/professionals/fixed-location/analytics/ratingReviewRoutes";
+import { clientReviewsHref } from "../../../data/clientProfessionalReviews";
 import BusinessServiceFormModal from "./BusinessServiceFormModal";
 import BusinessTeamMemberFormModal from "./BusinessTeamMemberFormModal";
 
@@ -478,18 +482,32 @@ function SetupSubSection({
   title,
   action,
   children,
+  toned = false,
 }: {
   title: React.ReactNode;
   action?: React.ReactNode;
   children: React.ReactNode;
+  /** Light grey panel (theme container grey) — Price / Policy blocks */
+  toned?: boolean;
 }) {
   const theme = useTheme();
   const m = theme.palette.mollure;
   return (
-    <Box>
+    <Box
+      sx={
+        toned
+          ? {
+              mx: 2.25,
+              borderRadius: "10px",
+              bgcolor: m.fxGrayF2F4F7,
+              overflow: "hidden",
+            }
+          : undefined
+      }
+    >
       <Box
         sx={{
-          px: 2.25,
+          px: toned ? 2 : 2.25,
           py: 1.6,
           display: "flex",
           alignItems: "center",
@@ -508,7 +526,9 @@ function SetupSubSection({
         )}
         {action}
       </Box>
-      <Box sx={{ px: 2.25, pt: 0 }}>{children}</Box>
+      <Box sx={{ px: toned ? 2 : 2.25, pt: 0, pb: toned ? 2 : 0 }}>
+        {children}
+      </Box>
     </Box>
   );
 }
@@ -635,6 +655,8 @@ export default function ProfessionalFixedLocationSetup({
     "/professionals/hero.png",
   ]);
   const [mediaIdx, setMediaIdx] = React.useState(0);
+  const [mediaDeleteConfirmOpen, setMediaDeleteConfirmOpen] =
+    React.useState(false);
 
   // ── Portfolio ─────────────────────────────────────────────────────────────
   const portfolioInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -3755,6 +3777,22 @@ export default function ProfessionalFixedLocationSetup({
           </Grid>
         </Grid>
       </Box>
+
+      <Box sx={{ mt: 0.5 }}>
+        <Typography
+          component={Link}
+          href="/terms-and-conditions"
+          sx={{
+            color: "primary.main",
+            fontWeight: 700,
+            fontSize: 14,
+            textDecoration: "none",
+            "&:hover": { textDecoration: "underline" },
+          }}
+        >
+          Terms & Conditions
+        </Typography>
+      </Box>
     </Stack>
   );
 
@@ -3766,6 +3804,16 @@ export default function ProfessionalFixedLocationSetup({
   const onUploadMedia = React.useCallback(() => {
     fileInputRef.current?.click();
   }, []);
+
+  const onConfirmDeleteMedia = React.useCallback(() => {
+    const next = mediaSlides.filter((_, i) => i !== mediaIdx);
+    const fallback =
+      next.length > 0 ? next : ["/professionals/hero.png"];
+    setMediaSlides(fallback);
+    setMediaIdx(Math.min(mediaIdx, fallback.length - 1));
+    setIsBusinessPublishEnabled(true);
+    setMediaDeleteConfirmOpen(false);
+  }, [mediaIdx, mediaSlides]);
 
   const onFilesSelected = React.useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -4486,6 +4534,34 @@ export default function ProfessionalFixedLocationSetup({
       ) : null}
 
       <AppModal
+        open={mediaDeleteConfirmOpen}
+        onClose={() => setMediaDeleteConfirmOpen(false)}
+        title="Delete this image?"
+        headerTone="danger"
+        maxWidth="xs"
+        fullWidth
+        contentSx={{ px: 2.5, py: 1 }}
+        footerVariant="actions"
+        footer={
+          <>
+            <AppModalCancelButton
+              onClick={() => setMediaDeleteConfirmOpen(false)}
+            />
+            <AppModalPrimaryButton
+              tone="danger"
+              label="Delete"
+              onClick={onConfirmDeleteMedia}
+            />
+          </>
+        }
+      >
+        <Typography sx={{ fontSize: 13, color: alpha(m.navy, 0.68) }}>
+          This image will be removed from your business profile. Save your
+          profile to apply the change.
+        </Typography>
+      </AppModal>
+
+      <AppModal
         open={templateSyncModalOpen}
         onClose={() => {
           setBusinessOfferingSelect("Both");
@@ -4649,6 +4725,32 @@ export default function ProfessionalFixedLocationSetup({
                     />
                   </Box>
                 </Fade>
+
+                <IconButton
+                  aria-label="Delete image"
+                  onClick={() => setMediaDeleteConfirmOpen(true)}
+                  disabled={profileDisabled || isBusinessMediaUploading}
+                  size="small"
+                  sx={{
+                    position: "absolute",
+                    top: 10,
+                    right: 10,
+                    zIndex: 2,
+                    width: 34,
+                    height: 34,
+                    bgcolor: alpha("#fff", 0.92),
+                    border: `1px solid ${alpha(m.navy, 0.1)}`,
+                    boxShadow: `0 2px 8px ${alpha("#000", 0.12)}`,
+                    "&:hover": { bgcolor: "#fff" },
+                    "&.Mui-disabled": {
+                      bgcolor: alpha("#fff", 0.7),
+                    },
+                  }}
+                >
+                  <DeleteOutlineRoundedIcon
+                    sx={{ fontSize: 18, color: alpha(m.navy, 0.55) }}
+                  />
+                </IconButton>
 
                 <IconButton
                   aria-label="Previous image"
@@ -5288,42 +5390,48 @@ export default function ProfessionalFixedLocationSetup({
                     >
                       {mem.name}
                     </Typography>
-                    <Stack
-                      direction="row"
-                      spacing={0.5}
-                      alignItems="center"
-                      sx={{ mt: 0.35 }}
+                    <ButtonBase
+                      disabled={
+                        mem.id === TEAM_MEMBER_DRAFT_PREVIEW_ID ||
+                        !businessSetupData?.id
+                      }
+                      onClick={() => {
+                        if (!businessSetupData?.id) return;
+                        const persistedId = toPersistedTeamMemberId(mem.id);
+                        router.push(
+                          clientReviewsHref(
+                            String(businessSetupData.id),
+                            persistedId,
+                            { returnTo: "/professionals/profile" },
+                          ),
+                        );
+                      }}
+                      sx={{
+                        mt: 0.35,
+                        borderRadius: "6px",
+                        px: 0.25,
+                        py: 0.15,
+                        "&:hover": { bgcolor: alpha(m.teal, 0.06) },
+                        "&.Mui-disabled": { opacity: 0.55 },
+                      }}
+                      aria-label={`View reviews for ${mem.name}`}
                     >
-                      <Rating
-                        value={mem.rating}
-                        precision={0.5}
-                        readOnly
-                        size="small"
-                        sx={{
-                          fontSize: 14,
-                          "& .MuiRating-iconFilled": { color: "#FAAF00" },
-                        }}
-                      />
-                      <ButtonBase
-                        disabled={mem.id === TEAM_MEMBER_DRAFT_PREVIEW_ID}
-                        onClick={() => {
-                          const persistedId = toPersistedTeamMemberId(mem.id);
-                          router.push(
-                            ratingReviewReviewsHref("Total Review", {
-                              memberId: persistedId,
-                              memberName: mem.name,
-                              memberIndex: memIndex + 1,
-                            }),
-                          );
-                        }}
-                        sx={{
-                          borderRadius: "6px",
-                          px: 0.25,
-                          "&:hover": { bgcolor: alpha(m.teal, 0.06) },
-                          "&.Mui-disabled": { opacity: 0.55 },
-                        }}
-                        aria-label={`View reviews for ${mem.name}`}
+                      <Stack
+                        direction="row"
+                        spacing={0.5}
+                        alignItems="center"
                       >
+                        <Rating
+                          value={mem.rating}
+                          precision={0.5}
+                          readOnly
+                          size="small"
+                          sx={{
+                            fontSize: 14,
+                            pointerEvents: "none",
+                            "& .MuiRating-iconFilled": { color: "#FAAF00" },
+                          }}
+                        />
                         <Typography
                           sx={{
                             fontSize: 10.5,
@@ -5333,8 +5441,8 @@ export default function ProfessionalFixedLocationSetup({
                         >
                           {mem.reviewsLabel}
                         </Typography>
-                      </ButtonBase>
-                    </Stack>
+                      </Stack>
+                    </ButtonBase>
                   </Box>
                 </Stack>
 
@@ -5683,7 +5791,7 @@ export default function ProfessionalFixedLocationSetup({
           />
         </SetupSubSection>
 
-        <SetupSubSection title="Price">
+        <SetupSubSection title="Price" toned>
           <Stack spacing={2}>
             <Box>
               <Typography
@@ -5825,7 +5933,7 @@ export default function ProfessionalFixedLocationSetup({
           </Stack>
         </SetupSubSection>
 
-        <SetupSubSection title="Policy Section">
+        <SetupSubSection title="Policy Section" toned>
           <Stack spacing={1.6}>
             <Box>
               <Typography
@@ -5888,7 +5996,7 @@ export default function ProfessionalFixedLocationSetup({
           </Stack>
         </SetupSubSection>
 
-        <SetupSubSection title="Rescheduling Policy">
+        <SetupSubSection title="Rescheduling Policy" toned>
           <Stack spacing={1.6}>
             <Box>
               <Typography
@@ -5981,7 +6089,7 @@ export default function ProfessionalFixedLocationSetup({
           </Stack>
         </SetupSubSection>
 
-        <SetupSubSection title="Cancellation Policy">
+        <SetupSubSection title="Cancellation Policy" toned>
           <Stack spacing={1.6}>
             <Box>
               <Typography
@@ -6072,7 +6180,7 @@ export default function ProfessionalFixedLocationSetup({
           </Stack>
         </SetupSubSection>
 
-        <SetupSubSection title="No Show Policy">
+        <SetupSubSection title="No Show Policy" toned>
           <Stack spacing={1.6}>
             <Box>
               <Typography

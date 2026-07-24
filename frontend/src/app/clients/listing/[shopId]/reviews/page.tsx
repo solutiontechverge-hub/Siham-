@@ -9,6 +9,7 @@ import {
 } from "../../../../../components/common";
 import ClientProfessionalReviewsView from "../../../../../components/common/client-reviews/ClientProfessionalReviewsView";
 import { marketingShellFooter } from "../../../../../data/marketingShell.data";
+import { resolveReviewsBackHref } from "../../../../../data/clientProfessionalReviews";
 import { useBusinessPublicProfile } from "../../../../../hooks/useBusinessPublicProfile";
 import { useAppSelector } from "../../../../../store/hooks";
 
@@ -17,6 +18,8 @@ export default function ClientProfessionalReviewsPage() {
   const searchParams = useSearchParams();
   const shopId = typeof params?.shopId === "string" ? params.shopId : "";
   const memberIdParam = searchParams?.get("memberId") ?? "";
+  const returnToParam = searchParams?.get("returnTo");
+  const backHref = resolveReviewsBackHref(shopId, returnToParam);
   const { profile, isLoading, isError } = useBusinessPublicProfile(shopId);
   const user = useAppSelector((s) => s.auth.user);
 
@@ -56,10 +59,6 @@ export default function ClientProfessionalReviewsPage() {
     }
     return profile.teamMembers[0];
   }, [memberIdParam, profile]);
-
-  const seedDemoReviews = Boolean(
-    profile && member && profile.teamMembers[0]?.id === member.id,
-  );
 
   if (isLoading) {
     return (
@@ -103,7 +102,7 @@ export default function ClientProfessionalReviewsPage() {
           member={member}
           locationMode={locationMode}
           reviewerName={displayName}
-          seedDemoReviews={seedDemoReviews}
+          backHref={backHref}
         />
       </Container>
 

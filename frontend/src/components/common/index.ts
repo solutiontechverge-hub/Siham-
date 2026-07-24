@@ -88,6 +88,7 @@ export {
 } from "./client-booking";
 export type { ClientBookingDetailsVariant, ClientBookingDraft } from "./client-booking";
 export { default as ClientNotificationsDrawer } from "./ClientNotificationsDrawer";
+export { default as NotificationBookingSummaryModal } from "./NotificationBookingSummaryModal";
 export {
   MessagingPageView,
   MessagingPageShell,
@@ -124,7 +125,6 @@ export { default as AuthAwareHeader } from "./AuthAwareHeader";
 export { default as ProfessionalFixedLocationSetup } from "./ProfessionalFixedLocationSetup";
 export { default as MollureCardHeader } from "./MollureCardHeader";
 export { default as ProfessionalFixedLocationAnalytics } from "./ProfessionalFixedLocationAnalytics";
-export { default as ProfessionalFixedLocationRatingReviewsPage } from "./ProfessionalFixedLocationRatingReviewsPage";
 export { default as RatingReviewCard } from "./RatingReviewCard";
 export { default as ProfessionalFixedLocationCalendar } from "./ProfessionalFixedLocationCalendar";
 // export type { MarketingNavItem } from "./MarketingSiteHeader";

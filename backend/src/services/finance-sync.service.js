@@ -1,4 +1,17 @@
 import { query } from "../db/index.js";
+import {
+  addDaysIso,
+  computePenaltyAmount,
+  durationToDays,
+  isAutomaticTrigger,
+  mergeInvoiceSettings,
+  toIsoDateOnly,
+} from "../helpers/financeInvoiceSettings.js";
+import {
+  FINANCE_EMAIL_TYPES,
+  sendFinanceClientEmail,
+} from "./financeEmail.service.js";
+import { dispatchInvoiceReissuedNotification } from "./bookingNotification.service.js";
 
 const formatEuro = (value) => {
   const n = Number(value);
@@ -12,17 +25,24 @@ const formatEuro = (value) => {
 
 const roundMoney = (value) => Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 
-const toIsoDate = (value) => {
-  if (!value) return new Date().toISOString().slice(0, 10);
-  if (value instanceof Date) {
-    const y = value.getFullYear();
-    const m = String(value.getMonth() + 1).padStart(2, "0");
-    const d = String(value.getDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
-  }
-  const wallClock = String(value).match(/^(\d{4}-\d{2}-\d{2})/);
-  return wallClock ? wallClock[1] : String(value).slice(0, 10);
-};
+const toIsoDate = (value) => toIsoDateOnly(value);
+
+async function loadInvoiceSettingsForProfessional(professionalProfileId) {
+  const result = await query(
+    `SELECT invoice_settings
+     FROM professional_finance_settings
+     WHERE professional_profile_id = $1
+     LIMIT 1`,
+    [professionalProfileId],
+  );
+  return mergeInvoiceSettings(result.rows[0]?.invoice_settings);
+}
+
+function resolveOriginalDueDate(invoiceDate, paymentTerms) {
+  const days =
+    durationToDays(paymentTerms?.originalDueValue, paymentTerms?.originalDueUnit) ?? 14;
+  return addDaysIso(invoiceDate, days);
+}
 
 function parseBookingNotes(notes) {
   if (!notes || typeof notes !== "string") return {};
@@ -329,14 +349,23 @@ async function insertFinanceTransaction({
   const { methodTitle, methodDetail } = resolveMethod(booking, paymentMethod);
   const entryId = booking.unique_code?.replace(/\D/g, "") || null;
   const docNumber = `INV-${booking.unique_code}${docSuffix || ""}`;
+  const invoiceDate = toIsoDate(new Date());
+  const invoiceSettings = await loadInvoiceSettingsForProfessional(
+    booking.professional_profile_id,
+  );
+  const dueDate =
+    status === "Payment due" || status === "Pending" || status === "Overdue"
+      ? resolveOriginalDueDate(invoiceDate, invoiceSettings.paymentTerms)
+      : toIsoDate(booking.booking_date);
 
   const document = {
     documentNumber: docNumber,
     receiptNumber:
       status === "Paid" || status === "Prepaid" ? `RCP-${booking.unique_code}${docSuffix || ""}` : undefined,
     serviceDate: toIsoDate(booking.booking_date),
-    invoiceDate: toIsoDate(new Date()),
-    dueDate: toIsoDate(booking.booking_date),
+    invoiceDate,
+    dueDate,
+    reissueLevel: 0,
     paymentPhase,
     payerKey: payerKey || "",
     payerRole: payerRole || "main_client",
@@ -530,54 +559,127 @@ export async function syncBookingToFinanceTransaction(bookingId, options = {}) {
   return createdIds[0] ?? null;
 }
 
+/**
+ * Apply one automatic reissue step to an overdue unpaid invoice using
+ * professional payment-term settings (updates in place, like manual reissue).
+ */
+async function applySettingsBasedReissue(row, paymentTerms, level) {
+  const terms = paymentTerms ?? {};
+  const prefix = level === 1 ? "first" : "second";
+  const trigger = terms[`${prefix}ReissueTrigger`];
+  if (!isAutomaticTrigger(trigger)) {
+    return { applied: false, reason: "trigger_not_automatic" };
+  }
+
+  const dueDays =
+    durationToDays(terms[`${prefix}ReissueDueValue`], terms[`${prefix}ReissueDueUnit`]) ?? 14;
+  const dueDate = addDaysIso(toIsoDate(new Date()), dueDays);
+  const baseAmount = Number(row.net_amount ?? row.gross_amount ?? 0) || 0;
+  const penaltyAmount = computePenaltyAmount(
+    baseAmount,
+    terms[`${prefix}ReissuePenaltyValue`],
+    terms[`${prefix}ReissuePenaltyUnit`],
+  );
+  const nextAmount = Math.round((baseAmount + penaltyAmount) * 100) / 100;
+
+  const doc = row.document && typeof row.document === "object" ? { ...row.document } : {};
+  const prevNumber = doc.documentNumber || `INV-${row.booking_id || row.id}`;
+  const reissueNumber = String(prevNumber).includes("-R")
+    ? prevNumber
+    : `${prevNumber}-R${Date.now().toString().slice(-4)}`;
+
+  const nextDoc = {
+    ...doc,
+    documentNumber: reissueNumber,
+    invoiceDate: toIsoDate(new Date()),
+    dueDate,
+    totalPrice: formatEuro(nextAmount),
+    reissuedAt: new Date().toISOString(),
+    reissueLevel: level,
+    ...(penaltyAmount > 0 ? { penaltyAmount } : {}),
+  };
+
+  await query(
+    `UPDATE finance_transactions
+     SET status = 'Payment due',
+         status_detail = $2,
+         document = $3::jsonb,
+         gross_amount = $4,
+         net_amount = $4,
+         updated_at = NOW()
+     WHERE id = $1`,
+    [row.id, `Reissue of ${prevNumber}`, JSON.stringify(nextDoc), nextAmount],
+  );
+
+  const dueDateLabel = dueDate.split("-").reverse().join("/");
+  await dispatchInvoiceReissuedNotification(row.id, dueDateLabel);
+  await sendFinanceClientEmail(row.id, FINANCE_EMAIL_TYPES.INVOICE_REISSUED, {
+    forceKey: dueDate,
+  });
+
+  return { applied: true, transactionId: row.id, dueDate, level };
+}
+
+/**
+ * Process overdue invoice reissues for one professional using their
+ * Payments & Reminders settings (first/second Automatic triggers).
+ */
 export async function processOverdueInvoiceReissues(professionalProfileId) {
+  const settings = await loadInvoiceSettingsForProfessional(professionalProfileId);
+  const paymentTerms = settings.paymentTerms;
+
   const overdue = await query(
-    `SELECT * FROM finance_transactions
+    `SELECT *
+     FROM finance_transactions
      WHERE professional_profile_id = $1
        AND status IN ('Payment due', 'Overdue')
-       AND transaction_date < NOW() - INTERVAL '7 days'`,
+       AND NULLIF(document->>'dueDate', '') IS NOT NULL
+       AND (document->>'dueDate')::date < CURRENT_DATE`,
     [professionalProfileId],
   );
 
   let created = 0;
   for (const row of overdue.rows) {
     const doc = row.document ?? {};
-    const prevNumber = doc.documentNumber ?? "INV-UNKNOWN";
-    const reissueNumber = `${prevNumber}-R${Date.now().toString().slice(-4)}`;
-    const gross = Number(row.net_amount ?? 0) * 1.1;
+    const level = Number(doc.reissueLevel) || 0;
+    if (level >= 2) continue;
 
-    await query(
-      `INSERT INTO finance_transactions (
-        professional_profile_id, entry_type, entry_id, transaction_date,
-        client_name, client_email, client_type,
-        gross_amount, net_amount, method_title, method_detail,
-        status, status_detail, booking_id, document
-      ) VALUES (
-        $1, $2, NULL, CURRENT_DATE,
-        $3, $4, $5,
-        $6, $6, $7, $8,
-        'Payment due', $9, $10, $11::jsonb
-      )`,
-      [
-        professionalProfileId,
-        row.entry_type,
-        row.client_name,
-        row.client_email,
-        row.client_type,
-        gross,
-        row.method_title,
-        row.method_detail,
-        `Reissue of ${prevNumber}`,
-        row.booking_id,
-        JSON.stringify({
-          ...doc,
-          documentNumber: reissueNumber,
-          totalPrice: formatEuro(gross),
-        }),
-      ],
-    );
-    created += 1;
+    const nextLevel = level + 1;
+    const result = await applySettingsBasedReissue(row, paymentTerms, nextLevel);
+    if (result.applied) created += 1;
   }
 
   return created;
+}
+
+/**
+ * Run settings-based automatic reissues across all professionals.
+ * Called by the email reminder job.
+ */
+export async function processAutomaticInvoiceReissues() {
+  const overdue = await query(
+    `SELECT
+       ft.*,
+       COALESCE(pfs.invoice_settings, '{}'::jsonb) AS invoice_settings
+     FROM finance_transactions ft
+     LEFT JOIN professional_finance_settings pfs
+       ON pfs.professional_profile_id = ft.professional_profile_id
+     WHERE ft.status IN ('Payment due', 'Overdue')
+       AND NULLIF(ft.document->>'dueDate', '') IS NOT NULL
+       AND (ft.document->>'dueDate')::date < CURRENT_DATE`,
+  );
+
+  const outcomes = [];
+  for (const row of overdue.rows) {
+    const settings = mergeInvoiceSettings(row.invoice_settings);
+    const doc = row.document ?? {};
+    const level = Number(doc.reissueLevel) || 0;
+    if (level >= 2) continue;
+
+    const nextLevel = level + 1;
+    const result = await applySettingsBasedReissue(row, settings.paymentTerms, nextLevel);
+    outcomes.push(result);
+  }
+
+  return outcomes;
 }

@@ -17,7 +17,14 @@ import {
 import { alpha, useTheme } from "@mui/material/styles";
 import { useRouter } from "next/navigation";
 import type { ProfessionalFixedLocationRatingReviewAnalyticsData } from "../../../app/professionals/fixed-location/analytics/ratingReviewAnalytics.data";
-import { ratingReviewReviewsHref } from "../../../app/professionals/fixed-location/analytics/ratingReviewRoutes";
+import { ratingReviewAnalyticsHref } from "../../../app/professionals/fixed-location/analytics/ratingReviewRoutes";
+import {
+  REVIEWS_CHANGED_EVENT,
+  clientReviewsHref,
+  computeReviewStats,
+  loadReviewsForShop,
+} from "../../../data/clientProfessionalReviews";
+import { useGetBusinessSetupQuery } from "../../../store/services/businessApi";
 import AnalyticsSectionExplanation from "./AnalyticsSectionExplanation";
 import ReviewSummaryByCategoryChart from "./ReviewSummaryByCategoryChart";
 import { BodyText } from "../../ui/typography";
@@ -32,14 +39,45 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({
   const theme = useTheme();
   const m = theme.palette.mollure;
   const router = useRouter();
+  const { data: businessSetupResponse } = useGetBusinessSetupQuery();
+  const shopId = businessSetupResponse?.data?.id
+    ? String(businessSetupResponse.data.id)
+    : "";
 
   const overview = data.reviewManagementOverview;
   const analytics42 = data.ratingReviewAnalytics;
   const analytics43 = data.ratingDistributionByCategory;
   const analytics44 = data.reviewSummaryByCategory;
 
-  function openReviewsPage(category: string) {
-    router.push(ratingReviewReviewsHref(category));
+  const [reviewStats, setReviewStats] = React.useState(() =>
+    computeReviewStats([]),
+  );
+
+  const refreshReviewStats = React.useCallback(() => {
+    setReviewStats(computeReviewStats(loadReviewsForShop(shopId)));
+  }, [shopId]);
+
+  React.useEffect(() => {
+    refreshReviewStats();
+    window.addEventListener(REVIEWS_CHANGED_EVENT, refreshReviewStats);
+    window.addEventListener("storage", refreshReviewStats);
+    return () => {
+      window.removeEventListener(REVIEWS_CHANGED_EVENT, refreshReviewStats);
+      window.removeEventListener("storage", refreshReviewStats);
+    };
+  }, [refreshReviewStats]);
+
+  const overallRating = reviewStats.total > 0 ? reviewStats.average : 0;
+  const totalReviews = reviewStats.total;
+  const ratingOutOf = overview.ratingOutOf;
+
+  function openReviewsPage() {
+    if (!shopId) return;
+    router.push(
+      clientReviewsHref(shopId, undefined, {
+        returnTo: ratingReviewAnalyticsHref,
+      }),
+    );
   }
 
   return (
@@ -69,7 +107,7 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({
           <Box
             component="button"
             type="button"
-            onClick={() => openReviewsPage("Excellent")}
+            onClick={() => openReviewsPage()}
             sx={{
               flex: 1,
               display: "flex",
@@ -107,8 +145,8 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({
                   color: alpha(m.navy, 0.82),
                 }}
               >
-                {overview.overallRating.toFixed(1)}/
-                {overview.ratingOutOf.toFixed(1)}
+                {overallRating.toFixed(1)}/
+                {ratingOutOf.toFixed(1)}
               </BodyText>
             </Stack>
           </Box>
@@ -138,7 +176,7 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({
             <BodyText
               sx={{ fontSize: 18, fontWeight: 900, color: alpha(m.navy, 0.82) }}
             >
-              {overview.totalReviews}
+              {totalReviews}
             </BodyText>
           </Box>
         </Stack>
@@ -277,7 +315,7 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({
                   <BodyText
                     component="button"
                     type="button"
-                    onClick={() => openReviewsPage(r.category)}
+                    onClick={() => openReviewsPage()}
                     sx={{
                       fontSize: 12,
                       fontWeight: 800,

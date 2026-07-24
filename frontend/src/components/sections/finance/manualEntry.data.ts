@@ -161,12 +161,13 @@ export function createManualEntryLine(
 export function createManualEntryLineFromOption(
   kind: ManualEntryLineKind,
   option: ManualEntryCatalogOption,
+  quantity = 1,
 ): ManualEntryLine {
   return {
     id: `${kind}-${option.id}-${Date.now()}`,
     kind,
     name: option.label,
-    quantity: 1,
+    quantity: Math.max(1, quantity),
     unitPrice: option.unitPrice,
   };
 }

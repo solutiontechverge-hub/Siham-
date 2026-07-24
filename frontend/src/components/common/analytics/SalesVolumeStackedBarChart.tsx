@@ -17,11 +17,9 @@ type SalesVolumeStackedBarChartProps = {
 };
 
 const BAR_HEIGHT = 50;
-const ROW_GAP = 14;
 const LABEL_COL_W = 108;
-const GRID_GAP = 6;
+const TOTAL_LABEL_W = 110;
 const TICK_STEP = 1000;
-const TOTAL_LABEL_MIN_W = 76;
 
 function formatSegmentEur(value: number) {
   return `${value.toLocaleString(undefined, {
@@ -31,7 +29,10 @@ function formatSegmentEur(value: number) {
 }
 
 function formatTotalEur(value: number) {
-  return `${value.toLocaleString(undefined, { useGrouping: false, maximumFractionDigits: 0 })}€`;
+  return `${value.toLocaleString(undefined, {
+    useGrouping: false,
+    maximumFractionDigits: 0,
+  })}€`;
 }
 
 function SegmentLabel({
@@ -87,7 +88,7 @@ export default function SalesVolumeStackedBarChart({
 }: SalesVolumeStackedBarChartProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
-  const tickCount = maxEur / TICK_STEP + 1;
+  const tickCount = Math.floor(maxEur / TICK_STEP) + 1;
   const segmentColor = (index: number) => salesVolumeSegmentColor(m, index);
 
   return (
@@ -117,168 +118,150 @@ export default function SalesVolumeStackedBarChart({
         </Box>
       ) : null}
 
-      <Box sx={{ px: 2.25, pt: title ? 1 : 1.75, pb: 0.5 }}>
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: `${LABEL_COL_W}px minmax(0, 1fr)`,
-            columnGap: `${GRID_GAP}px`,
-            rowGap: `${ROW_GAP}px`,
-            alignItems: "center",
-          }}
-        >
-          {bars.map((bar) => {
-            const barWidthPct = (bar.totalSalesEur / maxEur) * 100;
+      <Stack spacing={1.75} sx={{ px: 2.25, pt: title ? 1 : 1.75, pb: 1 }}>
+        {bars.map((bar) => {
+          const barWidthPct = Math.min(
+            100,
+            (bar.totalSalesEur / Math.max(maxEur, 1)) * 100,
+          );
 
-            return (
-              <Box key={bar.category} sx={{ display: "contents" }}>
-                <BodyText
-                  sx={{
-                    fontSize: 12,
-                    fontWeight: 600,
-                    color: alpha(m.navy, 0.72),
-                    textAlign: "right",
-                    pr: 0.25,
-                    lineHeight: 1.2,
-                  }}
-                >
-                  {bar.category}
-                </BodyText>
-
-                <Box
-                  sx={{
-                    display: "grid",
-                    gridTemplateColumns: `minmax(0, 1fr) ${TOTAL_LABEL_MIN_W}px`,
-                    alignItems: "center",
-                    columnGap: 1,
-                    minHeight: BAR_HEIGHT,
-                  }}
-                >
-                  <Box
-                    sx={{
-                      position: "relative",
-                      height: BAR_HEIGHT,
-                      minWidth: 0,
-                    }}
-                  >
-                    <Box
-                      sx={{
-                        position: "absolute",
-                        left: 0,
-                        top: 0,
-                        height: BAR_HEIGHT,
-                        width: `${barWidthPct}%`,
-                        display: "flex",
-                        flexDirection: "row",
-                        minWidth: 0,
-                      }}
-                    >
-                      {bar.segments.map((seg, segIdx) => {
-                        const segPct = (seg.salesEur / bar.totalSalesEur) * 100;
-                        const fill = segmentColor(segIdx);
-                        const showLabel = segPct >= 13;
-
-                        return (
-                          <Box
-                            key={`${bar.category}-${seg.service}`}
-                            sx={{
-                              position: "relative",
-                              width: `${segPct}%`,
-                              minWidth: showLabel ? 48 : 6,
-                              height: "100%",
-                              bgcolor: fill,
-                              flexShrink: 0,
-                              overflow: "hidden",
-                            }}
-                          >
-                            {showLabel ? (
-                              <SegmentLabel
-                                salesEur={seg.salesEur}
-                                sharePct={seg.shareWithinBarPct}
-                                compact={segPct < 22}
-                              />
-                            ) : null}
-                          </Box>
-                        );
-                      })}
-                    </Box>
-                  </Box>
-
-                  <BodyText
-                    sx={{
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: alpha(m.navy, 0.72),
-                      whiteSpace: "nowrap",
-                      textAlign: "left",
-                    }}
-                  >
-                    {`${formatTotalEur(bar.totalSalesEur)} (${bar.totalSharePct}%)`}
-                  </BodyText>
-                </Box>
-              </Box>
-            );
-          })}
-
-          {/* X-axis — same plot column as bars; 0 aligns with bar start */}
-          <Box />
-          <Box sx={{ gridColumn: 2, pt: 0.5, pb: 0.25 }}>
+          return (
             <Box
+              key={bar.category}
               sx={{
                 display: "grid",
-                gridTemplateColumns: `minmax(0, 1fr) ${TOTAL_LABEL_MIN_W}px`,
+                gridTemplateColumns: `${LABEL_COL_W}px minmax(0, 1fr) ${TOTAL_LABEL_W}px`,
                 columnGap: 1,
+                alignItems: "center",
+                width: "100%",
               }}
             >
-              <Box>
-                <Box
-                  sx={{ height: 1, bgcolor: alpha(m.navy, 0.4), width: "100%" }}
-                />
+              <BodyText
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: alpha(m.navy, 0.72),
+                  textAlign: "right",
+                  lineHeight: 1.2,
+                }}
+              >
+                {bar.category}
+              </BodyText>
+
+              <Box
+                sx={{
+                  position: "relative",
+                  height: BAR_HEIGHT,
+                  minWidth: 0,
+                  overflow: "hidden",
+                }}
+              >
                 <Box
                   sx={{
+                    height: "100%",
+                    width: `${barWidthPct}%`,
                     display: "flex",
-                    justifyContent: "space-between",
-                    mt: 0.75,
-                    width: "100%",
+                    overflow: "hidden",
                   }}
                 >
-                  {Array.from({ length: tickCount }).map((_, i) => {
-                    const t = TICK_STEP * i;
+                  {bar.segments.map((seg, segIdx) => {
+                    const segPct =
+                      bar.totalSalesEur > 0
+                        ? (seg.salesEur / bar.totalSalesEur) * 100
+                        : 0;
+                    const showLabel = segPct >= 13;
+
                     return (
-                      <BodyText
-                        key={t}
-                        component="span"
+                      <Box
+                        key={`${bar.category}-${seg.service}`}
                         sx={{
-                          fontSize: 11,
-                          fontWeight: 500,
-                          color: alpha(m.navy, 0.55),
-                          lineHeight: 1,
-                          transform:
-                            i === 0
-                              ? "translateX(0)"
-                              : i === tickCount - 1
-                                ? "translateX(0)"
-                                : undefined,
+                          position: "relative",
+                          width: `${segPct}%`,
+                          minWidth: 0,
+                          height: "100%",
+                          bgcolor: segmentColor(segIdx),
+                          overflow: "hidden",
                         }}
                       >
-                        {t.toLocaleString()}
-                      </BodyText>
+                        {showLabel ? (
+                          <SegmentLabel
+                            salesEur={seg.salesEur}
+                            sharePct={seg.shareWithinBarPct}
+                            compact={segPct < 22}
+                          />
+                        ) : null}
+                      </Box>
                     );
                   })}
                 </Box>
               </Box>
-              <Box />
+
+              <BodyText
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: alpha(m.navy, 0.72),
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {`${formatTotalEur(bar.totalSalesEur)} (${bar.totalSharePct}%)`}
+              </BodyText>
+            </Box>
+          );
+        })}
+
+        {/* X-axis */}
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: `${LABEL_COL_W}px minmax(0, 1fr) ${TOTAL_LABEL_W}px`,
+            columnGap: 1,
+            width: "100%",
+          }}
+        >
+          <Box />
+          <Box sx={{ minWidth: 0 }}>
+            <Box
+              sx={{
+                height: "1px",
+                width: "100%",
+                bgcolor: alpha(m.navy, 0.35),
+              }}
+            />
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                mt: 0.75,
+                width: "100%",
+              }}
+            >
+              {Array.from({ length: tickCount }).map((_, i) => (
+                <BodyText
+                  key={TICK_STEP * i}
+                  component="span"
+                  sx={{
+                    fontSize: 11,
+                    fontWeight: 500,
+                    color: alpha(m.navy, 0.55),
+                    lineHeight: 1,
+                  }}
+                >
+                  {(TICK_STEP * i).toLocaleString()}
+                </BodyText>
+              ))}
             </Box>
           </Box>
+          <Box />
         </Box>
-      </Box>
+      </Stack>
 
       <Box
         sx={{
           px: 2.25,
           pb: 2.25,
           pt: 2,
-          borderTop: `1px solid ${alpha(m.navy, 0.06)}`,
+          borderTop: `1px solid ${alpha(m.navy, 0.08)}`,
         }}
       >
         <Stack
@@ -304,7 +287,7 @@ export default function SalesVolumeStackedBarChart({
               <Stack spacing={0.55}>
                 {group.items.map((item) => (
                   <Stack
-                    key={item.label}
+                    key={`${group.category}-${item.label}-${item.colorIndex}`}
                     direction="row"
                     alignItems="center"
                     spacing={0.75}

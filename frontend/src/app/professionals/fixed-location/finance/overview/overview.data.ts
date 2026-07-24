@@ -3,7 +3,7 @@ import {
 } from "../data/transactions";
 import type { ActionMenuItem } from "./overview.types";
 
-export const INITIAL_VISIBLE = 4;
+export const INITIAL_VISIBLE = 10;
 
 export const ADD_MENU_ITEMS = [
   { id: "newSale", label: "New Sales" },
@@ -48,7 +48,16 @@ export function buildActionMenuItems(
         { id: "deleteSales", label: "Delete Sales", requiresSelection: true },
         exportItem,
       ];
+    case "due":
+      // Overdue / unpaid — no refund until payment is received
+      return [
+        { id: "voidSales", label: "Void Sales", requiresSelection: true },
+        exportItem,
+      ];
+    case "mixed":
+      return [exportItem];
     default:
+      // No selection yet — show common actions (disabled until a row is selected)
       return [
         { id: "refund", label: "Refund", requiresSelection: true },
         { id: "voidSales", label: "Void Sales", requiresSelection: true },

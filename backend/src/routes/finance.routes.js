@@ -11,6 +11,7 @@ import {
   listFinanceTransactions,
   processFinanceInvoiceReissues,
   replaceFinanceTransaction,
+  reissueFinanceInvoiceForBooking,
   updateFinanceInvoiceSettings,
   updateFinanceStripeStatus,
   updateFinanceTransaction,
@@ -57,6 +58,21 @@ router.post(
 );
 
 router.post("/invoices/process-reissues", requireProfessional, processFinanceInvoiceReissues);
+
+router.post(
+  "/invoices/reissue",
+  requireProfessional,
+  body("bookingId").optional({ values: "falsy" }).isUUID(),
+  body("bookingRef").optional({ values: "falsy" }).isString(),
+  body("dueDate").isString().notEmpty(),
+  body("penaltyAmount").optional({ values: "falsy" }).isFloat({ min: 0 }),
+  body("totalPrice").optional({ values: "falsy" }).isFloat({ min: 0 }),
+  body("clientEmail").optional({ values: "falsy" }).isString(),
+  body("clientName").optional({ values: "falsy" }).isString(),
+  body("paymentMethod").optional({ values: "falsy" }).isString(),
+  validateRequest,
+  reissueFinanceInvoiceForBooking,
+);
 
 router.get("/transaction-options/:businessSetupId", getPublicTransactionOptions);
 router.get("/invoice-settings/:businessSetupId", getPublicInvoiceSettings);

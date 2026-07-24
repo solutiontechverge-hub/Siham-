@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { alpha, useTheme } from "@mui/material/styles";
 import {
   getTransactionActionCategory,
+  isRefundableTransactionStatus,
   type TransactionRow,
 } from "../data/transactions";
 import { buildFinanceTransactionQueryParams } from "../financeQueryParams";
@@ -203,10 +204,27 @@ export function useFinanceOverviewPage() {
       });
       return;
     }
+    const notRefundable = selectedRows.filter(
+      (row) => !isRefundableTransactionStatus(row.status),
+    );
+    if (notRefundable.length > 0) {
+      showSnackbar({
+        severity: "warning",
+        message:
+          "Refund is only available for Paid or Prepaid transactions. Overdue or unpaid entries cannot be refunded.",
+      });
+      return;
+    }
     closeAddMenus();
     closeMoreMenus();
     setRefundDrawerOpen(true);
-  }, [closeAddMenus, closeMoreMenus, selectedCount, showSnackbar]);
+  }, [
+    closeAddMenus,
+    closeMoreMenus,
+    selectedCount,
+    selectedRows,
+    showSnackbar,
+  ]);
 
   const confirmRefund = React.useCallback(async () => {
     const ids = selectedRows.map((r) => r.id);

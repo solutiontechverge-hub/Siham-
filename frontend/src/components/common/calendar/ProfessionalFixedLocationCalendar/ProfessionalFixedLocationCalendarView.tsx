@@ -29,9 +29,15 @@ import {
   Tooltip,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import { useRouter, useSearchParams } from "next/navigation";
 import { BodyText } from "../../../ui/typography";
 import { useSnackbar } from "../../AppSnackbar";
 import { getApiErrorMessage } from "../../../../lib/api-error";
+import {
+  FOCUS_BOOKING_DATE_KEY,
+  FOCUS_BOOKING_ID_KEY,
+  FOCUS_BOOKING_REF_KEY,
+} from "../../NotificationBookingSummaryModal";
 import AppPillTabs from "../../AppPillTabs";
 import AppDrawer from "../../AppDrawer";
 import AppDatePicker from "../../AppDatePicker";
@@ -203,6 +209,8 @@ import BookingRequestBadge, {
   resolveBookingRequestBadgeState,
   resolveProfessionalBookingRequestDirection,
 } from "../BookingRequestBadge";
+import PaymentDueIcon from "../../client-booking/PaymentDueIcon";
+import { useBookingPaymentDueMeta } from "../resolveBookingPaymentDueMeta";
 import { resolveBookingResponseIndicators } from "../bookingResponseStatus";
 import {
   resolveCalendarPrepaymentStatus,
@@ -786,6 +794,8 @@ export default function ProfessionalFixedLocationCalendar({
         : null,
     [editingEventId, events],
   );
+
+  const viewingBookingPaymentDue = useBookingPaymentDueMeta(viewingBookingEvent);
 
   const drawerSalesActivityContext = React.useMemo<CalendarEvent | null>(() => {
     if (viewingBookingEvent) return viewingBookingEvent;
@@ -1478,27 +1488,38 @@ export default function ProfessionalFixedLocationCalendar({
     }
   }, [editingEventId, pendingBookingAction, persistEventStatus, showSnackbar]);
 
-  const handleConfirmNoShow = React.useCallback(async () => {
-    setNoShowModalOpen(false);
-    if (!editingEventId) return;
-    try {
-      await persistEventStatus(editingEventId, "No Show");
-      setEvents((prev) =>
-        prev.map((event) =>
-          event.id === editingEventId ? { ...event, status: "No Show" } : event,
-        ),
-      );
-      showSnackbar({
-        severity: "success",
-        message: "Booking marked as no show.",
-      });
-    } catch (error) {
-      showSnackbar({
-        severity: "error",
-        message: getApiErrorMessage(error, "Unable to update booking status."),
-      });
-    }
-  }, [editingEventId, persistEventStatus, showSnackbar]);
+  const handleConfirmNoShow = React.useCallback(
+    async (selectedIds: string[]) => {
+      setNoShowModalOpen(false);
+      if (!editingEventId) return;
+      // Booking-level status only: require at least one person selected.
+      // Partial selection still marks the booking no-show (client booked, did not attend).
+      if (!selectedIds.length) return;
+      try {
+        await persistEventStatus(editingEventId, "No Show");
+        setEvents((prev) =>
+          prev.map((event) =>
+            event.id === editingEventId
+              ? { ...event, status: "No Show" }
+              : event,
+          ),
+        );
+        showSnackbar({
+          severity: "success",
+          message: "Booking marked as no show.",
+        });
+      } catch (error) {
+        showSnackbar({
+          severity: "error",
+          message: getApiErrorMessage(
+            error,
+            "Unable to update booking status.",
+          ),
+        });
+      }
+    },
+    [editingEventId, persistEventStatus, showSnackbar],
+  );
 
   React.useEffect(() => {
     setBlockDraft((prev) => {
@@ -2678,6 +2699,90 @@ export default function ProfessionalFixedLocationCalendar({
     setBookingMoreAnchor(null);
     setSlotDrawerOpen(true);
   }, []);
+
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const focusBookingHandledRef = React.useRef<string | null>(null);
+
+  React.useEffect(() => {
+    const paramRef = searchParams?.get("bookingRef")?.trim() || "";
+    const paramId = searchParams?.get("bookingId")?.trim() || "";
+    const paramDate = searchParams?.get("date")?.trim() || "";
+    const shouldOpen = searchParams?.get("open") === "1";
+
+    let storedRef = "";
+    let storedId = "";
+    let storedDate = "";
+    if (typeof window !== "undefined") {
+      storedRef = window.sessionStorage.getItem(FOCUS_BOOKING_REF_KEY)?.trim() || "";
+      storedId = window.sessionStorage.getItem(FOCUS_BOOKING_ID_KEY)?.trim() || "";
+      storedDate =
+        window.sessionStorage.getItem(FOCUS_BOOKING_DATE_KEY)?.trim() || "";
+    }
+
+    const focusRef = paramRef || storedRef;
+    const focusId = paramId || storedId;
+    const focusDate = paramDate || storedDate;
+
+    if (!focusRef && !focusId) {
+      focusBookingHandledRef.current = null;
+      return;
+    }
+    if (!shouldOpen && !storedRef && !storedId) return;
+
+    // Jump calendar to the booking date first so the event enters the loaded range.
+    if (
+      focusDate &&
+      /^\d{4}-\d{2}-\d{2}$/.test(focusDate) &&
+      focusDate !== activeDateIso
+    ) {
+      setActiveDateIso(focusDate);
+      return;
+    }
+
+    if (!events.length) return;
+
+    const focusKey = `${focusRef}|${focusId}|${focusDate}`;
+    if (focusBookingHandledRef.current === focusKey) return;
+
+    const normalize = (value: string) =>
+      value.trim().replace(/^#/, "").replace(/^bk-?/i, "").toLowerCase();
+
+    const match =
+      events.find((event) => {
+        if (
+          focusId &&
+          (event.id === focusId || String(event.id).includes(focusId))
+        ) {
+          return true;
+        }
+        if (focusRef && event.bookingCode) {
+          return normalize(event.bookingCode) === normalize(focusRef);
+        }
+        return false;
+      }) ?? null;
+
+    if (!match) return;
+
+    focusBookingHandledRef.current = focusKey;
+    openExistingBooking(match);
+
+    if (typeof window !== "undefined") {
+      window.sessionStorage.removeItem(FOCUS_BOOKING_REF_KEY);
+      window.sessionStorage.removeItem(FOCUS_BOOKING_ID_KEY);
+      window.sessionStorage.removeItem(FOCUS_BOOKING_DATE_KEY);
+    }
+
+    if (paramRef || paramId || shouldOpen || paramDate) {
+      router.replace("/professionals/calendar", { scroll: false });
+    }
+  }, [
+    activeDateIso,
+    events,
+    openExistingBooking,
+    router,
+    searchParams,
+  ]);
 
   const handleDiscardBr = React.useCallback(async () => {
     if (!editingEventId) return;
@@ -4467,6 +4572,7 @@ export default function ProfessionalFixedLocationCalendar({
                     {displayedResources.map((res, laneIdx) => {
                       const laneDates =
                         viewMode === "week" ? visibleDates : [activeDateIso];
+                      // Week keeps Mon–Sun headers, but body shows only the selected day.
                       const laneColumns =
                         viewMode === "day"
                           ? [
@@ -4476,11 +4582,13 @@ export default function ProfessionalFixedLocationCalendar({
                                 date: activeDateIso,
                               },
                             ]
-                          : laneDates.map((date) => ({
-                              key: date,
-                              resource: res,
-                              date,
-                            }));
+                          : [
+                              {
+                                key: activeDateIso,
+                                resource: res,
+                                date: activeDateIso,
+                              },
+                            ];
                       return (
                         <Box
                           key={res.id}
@@ -4516,6 +4624,17 @@ export default function ProfessionalFixedLocationCalendar({
                                 return (
                                   <Box
                                     key={`week-day-${date}`}
+                                    role="button"
+                                    tabIndex={0}
+                                    aria-pressed={isActiveDay}
+                                    aria-label={`Select ${formatWeekDayName(date)} ${formatWeekDayDate(date)}`}
+                                    onClick={() => setActiveDateIso(date)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter" || e.key === " ") {
+                                        e.preventDefault();
+                                        setActiveDateIso(date);
+                                      }
+                                    }}
                                     sx={{
                                       minWidth: 110,
                                       px: 1,
@@ -4523,6 +4642,7 @@ export default function ProfessionalFixedLocationCalendar({
                                       alignItems: "center",
                                       justifyContent: "center",
                                       flexDirection: "column",
+                                      cursor: "pointer",
                                       borderLeft:
                                         colIdx > 0
                                           ? `1px solid ${alpha(m.navy, 0.07)}`
@@ -4530,6 +4650,11 @@ export default function ProfessionalFixedLocationCalendar({
                                       bgcolor: isActiveDay
                                         ? alpha(m.teal, 0.035)
                                         : "#fff",
+                                      "&:hover": {
+                                        bgcolor: isActiveDay
+                                          ? alpha(m.teal, 0.05)
+                                          : alpha(m.navy, 0.02),
+                                      },
                                     }}
                                   >
                                     <BodyText
@@ -4584,8 +4709,7 @@ export default function ProfessionalFixedLocationCalendar({
                             sx={{
                               position: "relative",
                               display: "grid",
-                              gridTemplateColumns:
-                                viewMode === "week" ? "repeat(7, 1fr)" : "1fr",
+                              gridTemplateColumns: "1fr",
                               bgcolor: "#fff",
                             }}
                           >
@@ -4594,8 +4718,17 @@ export default function ProfessionalFixedLocationCalendar({
                                 const laneEvents = eventsInRange.filter(
                                   (event) => {
                                     if (event.date !== date) return false;
-                                    // Day view uses a single active lane — show every booking for that date.
+                                    // Day / week body: single selected-day lane.
                                     if (viewMode === "day") return true;
+                                    if (viewMode === "week") {
+                                      if (date !== activeDateIso) return false;
+                                      if (
+                                        !event.resourceId ||
+                                        !knownResourceIds.has(event.resourceId)
+                                      )
+                                        return true;
+                                      return event.resourceId === resource.id;
+                                    }
                                     if (
                                       !event.resourceId ||
                                       !knownResourceIds.has(event.resourceId)
@@ -4608,6 +4741,15 @@ export default function ProfessionalFixedLocationCalendar({
                                   (block) => {
                                     if (block.date !== date) return false;
                                     if (viewMode === "day") return true;
+                                    if (viewMode === "week") {
+                                      if (date !== activeDateIso) return false;
+                                      if (
+                                        !block.resourceId ||
+                                        !knownResourceIds.has(block.resourceId)
+                                      )
+                                        return true;
+                                      return block.resourceId === resource.id;
+                                    }
                                     if (
                                       !block.resourceId ||
                                       !knownResourceIds.has(block.resourceId)
@@ -5334,24 +5476,6 @@ export default function ProfessionalFixedLocationCalendar({
                   </Stack>
                 </Popover>
                 <Box sx={{ flex: 1 }} />
-                {slotBookingScreen === "new-booking" &&
-                editingEventId &&
-                !isCompletedBooking &&
-                !hideClientBookingEditButton ? (
-                  <AppButton
-                    tone="secondary"
-                    onClick={() => setIsEditingExisting(true)}
-                    startIcon={<EditRoundedIcon sx={{ fontSize: 18 }} />}
-                    disabled={isEditingExisting}
-                    sx={{
-                      borderRadius: "10px",
-                      height: 38,
-                      minWidth: 110,
-                    }}
-                  >
-                    Edit
-                  </AppButton>
-                ) : null}
                 {!hideClientBookingFooterActions ? (
                   <AppButton
                     tone="secondary"
@@ -5398,6 +5522,25 @@ export default function ProfessionalFixedLocationCalendar({
                     }}
                   >
                     {slotBookingScreen === "new-booking" ? "Cancel" : "Back"}
+                  </AppButton>
+                ) : null}
+                {slotBookingScreen === "new-booking" &&
+                editingEventId &&
+                !isCompletedBooking &&
+                !hideClientBookingEditButton ? (
+                  <AppButton
+                    tone="secondary"
+                    onClick={() => setIsEditingExisting(true)}
+                    disabled={isEditingExisting}
+                    sx={{
+                      borderRadius: "10px",
+                      height: 38,
+                      minWidth: 110,
+                      gap: 0.5,
+                    }}
+                  >
+                    <EditRoundedIcon sx={{ fontSize: 18 }} />
+                    Edit
                   </AppButton>
                 ) : null}
                 {!hideClientBookingFooterActions &&
@@ -6399,7 +6542,8 @@ export default function ProfessionalFixedLocationCalendar({
                           >
                             Booking Details
                           </BodyText>
-                          {viewingBookingEvent.status === "Confirmed" ? (
+                          {viewingBookingEvent.status === "Confirmed" ||
+                          viewingBookingEvent.status === "In Progress" ? (
                             <>
                               <AppButton
                                 onClick={(e) =>
@@ -6448,20 +6592,24 @@ export default function ProfessionalFixedLocationCalendar({
                                   },
                                 }}
                               >
-                                <MenuItem
-                                  onClick={() =>
-                                    void handleBookingActionSelect("edit")
-                                  }
-                                  sx={{
-                                    fontWeight: 800,
-                                    fontSize: 13.5,
-                                    color: alpha(m.navy, 0.78),
-                                    py: 1.1,
-                                  }}
-                                >
-                                  Edit Booking
-                                </MenuItem>
-                                <Divider sx={{ my: "0 !important" }} />
+                                {viewingBookingEvent.status === "Confirmed" ? (
+                                  <MenuItem
+                                    onClick={() =>
+                                      void handleBookingActionSelect("edit")
+                                    }
+                                    sx={{
+                                      fontWeight: 800,
+                                      fontSize: 13.5,
+                                      color: alpha(m.navy, 0.78),
+                                      py: 1.1,
+                                    }}
+                                  >
+                                    Edit Booking
+                                  </MenuItem>
+                                ) : null}
+                                {viewingBookingEvent.status === "Confirmed" ? (
+                                  <Divider sx={{ my: "0 !important" }} />
+                                ) : null}
                                 <MenuItem
                                   onClick={() =>
                                     void handleBookingActionSelect("cancel")
@@ -6476,22 +6624,26 @@ export default function ProfessionalFixedLocationCalendar({
                                   Cancel Booking
                                 </MenuItem>
                                 <Divider sx={{ my: "0 !important" }} />
-                                <MenuItem
-                                  onClick={() =>
-                                    void handleBookingActionSelect(
-                                      "in_progress",
-                                    )
-                                  }
-                                  sx={{
-                                    fontWeight: 800,
-                                    fontSize: 13.5,
-                                    color: alpha(m.navy, 0.78),
-                                    py: 1.1,
-                                  }}
-                                >
-                                  In Progress
-                                </MenuItem>
-                                <Divider sx={{ my: "0 !important" }} />
+                                {viewingBookingEvent.status === "Confirmed" ? (
+                                  <MenuItem
+                                    onClick={() =>
+                                      void handleBookingActionSelect(
+                                        "in_progress",
+                                      )
+                                    }
+                                    sx={{
+                                      fontWeight: 800,
+                                      fontSize: 13.5,
+                                      color: alpha(m.navy, 0.78),
+                                      py: 1.1,
+                                    }}
+                                  >
+                                    In Progress
+                                  </MenuItem>
+                                ) : null}
+                                {viewingBookingEvent.status === "Confirmed" ? (
+                                  <Divider sx={{ my: "0 !important" }} />
+                                ) : null}
                                 <MenuItem
                                   onClick={() =>
                                     void handleBookingActionSelect("no_show")
@@ -6794,8 +6946,101 @@ export default function ProfessionalFixedLocationCalendar({
                                   </Stack>
                                 );
                               })()}
+                              {viewingBookingPaymentDue ? (
+                                <Tooltip title="Payment due" placement="top">
+                                  <Box
+                                    sx={{
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      width: 26,
+                                      height: 26,
+                                      borderRadius: "8px",
+                                      bgcolor: alpha(m.navy, 0.04),
+                                      border: `1px solid ${alpha(m.navy, 0.08)}`,
+                                    }}
+                                  >
+                                    <PaymentDueIcon size={18} />
+                                  </Box>
+                                </Tooltip>
+                              ) : null}
                             </Box>
                           </Box>
+
+                          {viewingBookingPaymentDue ? (
+                            <Box
+                              sx={{
+                                width: "100%",
+                                borderRadius: "12px",
+                                px: 1.35,
+                                py: 1.05,
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "space-between",
+                                gap: 1,
+                                bgcolor: alpha(m.teal, 0.07),
+                                border: `1px solid ${alpha(m.teal, 0.22)}`,
+                                backgroundImage: `linear-gradient(135deg, ${alpha("#fff", 0.7)} 0%, ${alpha(m.teal, 0.04)} 100%)`,
+                              }}
+                            >
+                              <Stack
+                                direction="row"
+                                alignItems="center"
+                                spacing={0.85}
+                                sx={{ minWidth: 0 }}
+                              >
+                                <Box
+                                  sx={{
+                                    display: "grid",
+                                    placeItems: "center",
+                                    width: 28,
+                                    height: 28,
+                                    borderRadius: "9px",
+                                    bgcolor: alpha(m.teal, 0.12),
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  <PaymentDueIcon size={18} />
+                                </Box>
+                                <Box sx={{ minWidth: 0 }}>
+                                  <BodyText
+                                    sx={{
+                                      fontSize: 12.5,
+                                      fontWeight: 900,
+                                      color: alpha(m.navy, 0.82),
+                                      lineHeight: 1.2,
+                                    }}
+                                  >
+                                    {viewingBookingPaymentDue.reissued
+                                      ? "Reissue Invoice"
+                                      : "Payment Due"}
+                                  </BodyText>
+                                  <BodyText
+                                    sx={{
+                                      mt: 0.2,
+                                      fontSize: 11,
+                                      fontWeight: 700,
+                                      color: alpha(m.navy, 0.5),
+                                      lineHeight: 1.2,
+                                    }}
+                                  >
+                                    Due date
+                                  </BodyText>
+                                </Box>
+                              </Stack>
+                              <BodyText
+                                sx={{
+                                  fontSize: 13,
+                                  fontWeight: 900,
+                                  color: m.teal,
+                                  flexShrink: 0,
+                                  letterSpacing: "0.01em",
+                                }}
+                              >
+                                {viewingBookingPaymentDue.dateLabel}
+                              </BodyText>
+                            </Box>
+                          ) : null}
                         </Stack>
                       </Box>
                     ) : (
@@ -9174,7 +9419,7 @@ export default function ProfessionalFixedLocationCalendar({
         open={noShowModalOpen}
         participants={noShowParticipants}
         onClose={() => setNoShowModalOpen(false)}
-        onConfirm={() => void handleConfirmNoShow()}
+        onConfirm={(selectedIds) => void handleConfirmNoShow(selectedIds)}
       />
       <CalendarCancelBookingModal
         open={cancelModalOpen}

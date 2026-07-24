@@ -661,7 +661,7 @@ export default function CompanySignupPage() {
                         >
                           Accept our{" "}
                           <Link
-                            href="/terms"
+                            href="/terms-and-conditions"
                             style={{
                               color: m.teal,
                               fontWeight: 600,

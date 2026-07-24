@@ -25,7 +25,9 @@ export default function AppSearchField({
 
   return (
     <AppTextField
-      type="search"
+      // Use text (not search) so the browser native clear X doesn't
+      // appear alongside our custom clear adornment.
+      type="text"
       size={size}
       value={value}
       placeholder="Search..."

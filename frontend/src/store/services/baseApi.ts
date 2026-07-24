@@ -2,8 +2,13 @@ import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from "@reduxjs/toolkit/query";
 import { apiBaseUrl } from "../../lib/api";
 import { clearPersistedAuthSession } from "../../lib/auth-storage";
-import type { RootState } from "../index";
 import { clearAuthSession } from "../slices/authSlice";
+
+type AuthAwareState = {
+  auth?: {
+    accessToken?: string | null;
+  };
+};
 
 const isTokenExpired = (token: string) => {
   try {
@@ -24,8 +29,8 @@ const isTokenExpired = (token: string) => {
 const rawBaseQuery = fetchBaseQuery({
   baseUrl: apiBaseUrl,
   prepareHeaders: (headers, { getState }) => {
-    const state = getState() as RootState;
-    const token = state.auth.accessToken;
+    const state = getState() as AuthAwareState;
+    const token = state.auth?.accessToken;
 
     if (token && !isTokenExpired(token)) {
       headers.set("authorization", `Bearer ${token}`);
@@ -58,7 +63,7 @@ const baseQueryWithAuthHandling: BaseQueryFn<string | FetchArgs, unknown, FetchB
 
 export const baseApi = createApi({
   reducerPath: "baseApi",
-  tagTypes: ["Profile", "BusinessSetup", "BusinessSetupsListing", "BusinessCategories", "Calendar", "Bookings", "ProfessionalClients", "FinanceSettings", "FinanceTransactions", "Messaging", "Notifications", "AdminDashboard", "AdminActivityLog"],
+  tagTypes: ["Profile", "BusinessSetup", "BusinessSetupsListing", "BusinessCategories", "Calendar", "Bookings", "ProfessionalClients", "FinanceSettings", "FinanceTransactions", "Messaging", "Notifications", "AdminDashboard", "AdminActivityLog", "Reviews"],
   baseQuery: baseQueryWithAuthHandling,
   /** Keep cached query data longer after the last subscriber unmounts (seconds). */
   keepUnusedDataFor: 600,

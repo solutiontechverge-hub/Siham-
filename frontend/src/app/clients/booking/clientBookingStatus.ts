@@ -52,9 +52,9 @@ export function bookingStatusChipColors(
       };
     case "completed":
       return {
-        bgcolor: "rgba(52, 74, 102, 0.08)",
-        color: "rgba(52, 74, 102, 0.65)",
-        border: "1px solid rgba(52, 74, 102, 0.12)",
+        bgcolor: "#F9FAFB",
+        color: "#667085",
+        border: "1px solid #D0D5DD",
       };
     case "cancelled":
       return {
@@ -64,9 +64,9 @@ export function bookingStatusChipColors(
       };
     case "no_show":
       return {
-        bgcolor: "rgba(156, 39, 176, 0.12)",
-        color: "#7B1FA2",
-        border: "1px solid rgba(156, 39, 176, 0.28)",
+        bgcolor: "#D0D5DD",
+        color: "#667085",
+        border: "1px solid #D0D5DD",
       };
     case "draft":
       return {

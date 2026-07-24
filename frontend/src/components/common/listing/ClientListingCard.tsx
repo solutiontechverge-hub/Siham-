@@ -21,6 +21,7 @@ import { alpha, useTheme } from "@mui/material/styles";
 import Image from "next/image";
 import type { ListingCardData } from "../../../app/clients/listing/listing.data";
 import { resolveBusinessOfferingFlags } from "../../../data/businessPublicProfile.data";
+import { clientReviewsHref } from "../../../data/clientProfessionalReviews";
 import AppCard from "../AppCard";
 
 function toImageSrc(img: ListingCardData["image"]) {
@@ -346,12 +347,30 @@ export default function ClientListingCard({
           </Stack>
 
           <Box
+            component="button"
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              router.push(
+                clientReviewsHref(String(item.id), undefined, {
+                  returnTo: "/clients/listing",
+                }),
+              );
+            }}
             sx={{
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
               gap: 0.5,
+              border: 0,
+              bgcolor: "transparent",
+              cursor: "pointer",
+              p: 0.5,
+              borderRadius: "8px",
+              font: "inherit",
+              "&:hover": { bgcolor: alpha(tokens.teal, 0.06) },
             }}
+            aria-label={`View reviews for ${item.title}`}
           >
             <Box sx={{ display: "flex", alignItems: "center", gap: 0.4 }}>
               {Array.from({ length: 5 }).map((_, i) => (

@@ -193,11 +193,13 @@ export default function SalesEditCheckout({
 
   const addLinesFromCatalog = (
     kind: ManualEntryLineKind,
-    options: ManualEntryCatalogOption[],
+    options: Array<ManualEntryCatalogOption & { quantity?: number }>,
   ) => {
     setLines((prev) => [
       ...prev,
-      ...options.map((option) => createManualEntryLineFromOption(kind, option)),
+      ...options.map((option) =>
+        createManualEntryLineFromOption(kind, option, option.quantity ?? 1),
+      ),
     ]);
   };
   const removeLine = (id: string) =>
@@ -809,6 +811,8 @@ export default function SalesEditCheckout({
         open={productDrawerOpen}
         title="Add product"
         options={productOptions}
+        withQuantity
+        allowAddProduct
         onClose={() => setProductDrawerOpen(false)}
         onSave={(selected) => {
           addLinesFromCatalog("product", selected);
@@ -819,6 +823,9 @@ export default function SalesEditCheckout({
         open={itemDrawerOpen}
         title="Add service"
         options={itemOptions}
+        withQuantity
+        allowAddProduct
+        addProductLabel="Add Item"
         onClose={() => setItemDrawerOpen(false)}
         onSave={(selected) => {
           addLinesFromCatalog("item", selected);

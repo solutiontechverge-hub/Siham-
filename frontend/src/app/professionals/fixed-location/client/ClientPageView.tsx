@@ -537,16 +537,20 @@ export default function ClientPageView() {
                                       label="Blocked"
                                       size="small"
                                       sx={{
-                                        height: 18,
+                                        height: 16,
                                         borderRadius: "999px",
                                         bgcolor: alpha(
                                           theme.palette.error.main,
                                           0.12,
                                         ),
                                         color: theme.palette.error.main,
-                                        fontSize: 10,
-                                        fontWeight: 800,
-                                        px: 0.5,
+                                        fontWeight: 700,
+                                        "& .MuiChip-label": {
+                                          fontSize: 9,
+                                          px: 0.65,
+                                          py: 0,
+                                          lineHeight: 1.2,
+                                        },
                                       }}
                                     />
                                   ) : null}
@@ -555,13 +559,17 @@ export default function ClientPageView() {
                                       label="No show"
                                       size="small"
                                       sx={{
-                                        height: 18,
+                                        height: 16,
                                         borderRadius: "999px",
-                                        bgcolor: alpha("#7B1FA2", 0.12),
-                                        color: "#7B1FA2",
-                                        fontSize: 10,
-                                        fontWeight: 800,
-                                        px: 0.5,
+                                        bgcolor: m.statusNoShowBg,
+                                        color: m.statusNoShowFg,
+                                        fontWeight: 700,
+                                        "& .MuiChip-label": {
+                                          fontSize: 9,
+                                          px: 0.65,
+                                          py: 0,
+                                          lineHeight: 1.2,
+                                        },
                                       }}
                                     />
                                   ) : null}
@@ -623,18 +631,17 @@ export default function ClientPageView() {
                               label={typeLabel}
                               size="small"
                               sx={{
-                                height: 20,
+                                height: 16,
                                 borderRadius: "6px",
-                                fontSize: 10,
-                                fontWeight: 900,
-                                bgcolor:
-                                  typeLabel === "CC"
-                                    ? alpha(m.teal, 0.12)
-                                    : alpha(m.navy, 0.06),
-                                color:
-                                  typeLabel === "CC"
-                                    ? m.teal
-                                    : alpha(m.navy, 0.65),
+                                fontWeight: 700,
+                                bgcolor: alpha(m.teal, 0.12),
+                                color: m.teal,
+                                "& .MuiChip-label": {
+                                  fontSize: 9,
+                                  px: 0.65,
+                                  py: 0,
+                                  lineHeight: 1.2,
+                                },
                               }}
                             />
                           </TableCell>
@@ -1675,9 +1682,10 @@ export default function ClientPageView() {
                     <Stack direction="row" spacing={0.75} alignItems="center">
                       <Typography
                         sx={{
-                          fontWeight: 900,
-                          fontSize: 12.5,
+                          fontWeight: 800,
+                          fontSize: 13.5,
                           color: alpha(m.navy, 0.86),
+                          lineHeight: 1.2,
                         }}
                       >
                         {r.name}
@@ -1686,13 +1694,17 @@ export default function ClientPageView() {
                         label="Mollure"
                         size="small"
                         sx={{
-                          height: 18,
+                          height: 16,
                           borderRadius: "999px",
                           bgcolor: alpha(theme.palette.primary.main, 0.1),
                           color: theme.palette.primary.main,
-                          fontSize: 10,
-                          fontWeight: 800,
-                          px: 0.5,
+                          fontWeight: 700,
+                          "& .MuiChip-label": {
+                            fontSize: 9,
+                            px: 0.65,
+                            py: 0,
+                            lineHeight: 1.2,
+                          },
                         }}
                       />
                     </Stack>

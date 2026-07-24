@@ -746,7 +746,7 @@ export default function ProfessionalSignupPage() {
                         >
                           Accept our{" "}
                           <Link
-                            href="/terms"
+                            href="/terms-and-conditions"
                             style={{
                               color: m.teal,
                               fontWeight: 600,

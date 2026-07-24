@@ -8,7 +8,6 @@ import CancelRoundedIcon from "@mui/icons-material/CancelRounded";
 import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
 import { Box, Divider, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import { useRouter } from "next/navigation";
 import { Typography } from "../../ui/typography";
 import type { ClientNotificationItem } from "../../../data/clientNotifications.data";
 import AppDrawer from "../AppDrawer";
@@ -55,18 +54,15 @@ export default function ClientNotificationsDrawer({
 }: ClientNotificationsDrawerProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
-  const router = useRouter();
+  const hasUnread = items.some((item) => !item.read);
+  const itemsClickable = Boolean(onItemClick);
 
   const handleItemClick = (item: ClientNotificationItem) => {
     onItemClick?.(item);
-    if (item.href) {
-      router.push(item.href);
-      onClose();
-    }
   };
 
   const markAllReadAction =
-    onMarkAllRead && items.some((item) => !item.read) ? (
+    onMarkAllRead && hasUnread ? (
       <AppButton
         size="small"
         onClick={onMarkAllRead}
@@ -104,12 +100,24 @@ export default function ClientNotificationsDrawer({
           items.map((n, idx) => (
             <Box key={n.id}>
               <Box
+                role={itemsClickable ? "button" : undefined}
+                tabIndex={itemsClickable ? 0 : undefined}
+                onKeyDown={
+                  itemsClickable
+                    ? (event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          handleItemClick(n);
+                        }
+                      }
+                    : undefined
+                }
                 sx={{
                   px: 3,
                   py: 2.25,
-                  cursor: n.href ? "pointer" : "default",
+                  cursor: itemsClickable ? "pointer" : "default",
                   bgcolor: n.read ? "transparent" : alpha(m.teal, 0.04),
-                  "&:hover": n.href
+                  "&:hover": itemsClickable
                     ? { bgcolor: alpha(m.teal, 0.06) }
                     : undefined,
                 }}

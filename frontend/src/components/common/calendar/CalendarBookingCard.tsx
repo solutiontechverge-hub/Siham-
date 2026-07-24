@@ -21,6 +21,7 @@ import {
   resolveCalendarPrepaymentStatus,
   toPrepaymentIconVariant,
 } from "./prepaymentStatus";
+import { useBookingPaymentDueMeta } from "./resolveBookingPaymentDueMeta";
 
 export type CalendarBookingCardProps = {
   event: CalendarEvent;
@@ -86,6 +87,7 @@ export default function CalendarBookingCard({
   const prepaymentIconVariant = prepaymentStatus
     ? toPrepaymentIconVariant(prepaymentStatus)
     : undefined;
+  const paymentDueMeta = useBookingPaymentDueMeta(event);
   const isDesiredLocation = event.location === "DL";
   const isFixedLocation = event.location === "FL";
   const hasNote = Boolean(event.details?.internalNote?.trim());
@@ -188,6 +190,17 @@ export default function CalendarBookingCard({
           bold: label === "EBR" || label === "BR",
         }))}
         prepaymentStatus={prepaymentIconVariant}
+        paymentDue={
+          paymentDueMeta
+            ? {
+                label: paymentDueMeta.reissued
+                  ? "Reissue Invoice"
+                  : "Payment Due",
+                dateLabel: paymentDueMeta.dateLabel,
+                showIcon: true,
+              }
+            : null
+        }
         responseIndicators={
           scenarioIndicators.includes("BR")
             ? responseIndicators

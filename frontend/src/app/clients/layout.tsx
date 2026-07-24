@@ -8,6 +8,8 @@ export default function ClientsLayout({
   children: React.ReactNode;
 }) {
   return (
-    <AuthGuard allowedRoles={["individual", "company"]}>{children}</AuthGuard>
+    <AuthGuard allowedRoles={["individual", "company", "professional"]}>
+      {children}
+    </AuthGuard>
   );
 }

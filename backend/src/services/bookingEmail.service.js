@@ -6,23 +6,30 @@ import {
   buildBookingConfirmedEmail,
   buildIncomingErEmail,
   buildNewBookingRequestEmail,
+  buildNotificationCompanionEmail,
   buildPostTreatmentPaymentEmail,
   buildPrepaymentReceivedEmail,
   buildProfessionalActionEmail,
+  buildReviewInviteEmail,
 } from "../helpers/bookingEmailTemplates.js";
 import { buildRespondToRequestReminderEmail } from "../helpers/financeEmailTemplates.js";
 import { formatBookingId, formatStartTime } from "../helpers/bookingEmailTemplates.js";
+import { createReviewInviteForBooking } from "./review.service.js";
+import { getFrontendBaseUrl } from "../helpers/emailLayout.js";
 
 export const BOOKING_EMAIL_TYPES = {
   CONFIRMED: "booking_confirmed",
   INCOMING_ER: "incoming_er",
   CANCELLED: "booking_cancelled",
   POST_TREATMENT_PAYMENT: "post_treatment_payment",
+  REVIEW_INVITE: "review_invite",
   APPOINTMENT_REMINDER: "appointment_reminder",
   PROFESSIONAL_ACTION: "professional_action",
   RESPOND_REQUEST_REMINDER: "respond_request_reminder",
   NEW_BOOKING_REQUEST: "new_booking_request",
   PREPAYMENT_RECEIVED: "prepayment_received",
+  /** Generic companion email for any in-app notification. */
+  NOTIFICATION_COMPANION: "notification_companion",
 };
 
 const EMAIL_BUILDERS = {
@@ -41,6 +48,10 @@ const EMAIL_BUILDERS = {
   [BOOKING_EMAIL_TYPES.POST_TREATMENT_PAYMENT]: {
     subject: "After treatment payment",
     build: buildPostTreatmentPaymentEmail,
+  },
+  [BOOKING_EMAIL_TYPES.REVIEW_INVITE]: {
+    subject: "Write a review for your visit",
+    build: buildReviewInviteEmail,
   },
   [BOOKING_EMAIL_TYPES.APPOINTMENT_REMINDER]: {
     subject: "Appointment reminder",
@@ -191,6 +202,118 @@ export const sendBookingClientEmailOnce = async (bookingId, emailType, extras = 
   }
 };
 
+/**
+ * Companion email for every in-app notification.
+ * Uses richer booking templates when the notification type maps to one.
+ */
+export const sendInAppNotificationEmail = async ({
+  recipientUserId,
+  notificationType,
+  title,
+  message = null,
+  bookingId = null,
+  bookingRef = null,
+  href = null,
+  actorName = null,
+  audience = "client",
+}) => {
+  try {
+    const userResult = await query(`SELECT email FROM users WHERE id = $1 LIMIT 1`, [recipientUserId]);
+    const to = userResult.rows[0]?.email;
+    if (!to) return { sent: false, reason: "recipient_email_not_found" };
+
+    const isProfessional = audience === "professional";
+    const richType = mapNotificationTypeToEmailType(notificationType, isProfessional);
+
+    // Professional-targeted helpers (not in EMAIL_BUILDERS)
+    if (bookingId && richType === BOOKING_EMAIL_TYPES.NEW_BOOKING_REQUEST) {
+      // Always email on BR (re)send — not once-only.
+      return notifyIncomingBookingRequest(bookingId);
+    }
+    if (bookingId && richType === BOOKING_EMAIL_TYPES.PREPAYMENT_RECEIVED) {
+      return notifyPrepaymentReceived(bookingId);
+    }
+    if (bookingId && richType === BOOKING_EMAIL_TYPES.RESPOND_REQUEST_REMINDER) {
+      return notifyRespondToRequestReminder(bookingId);
+    }
+
+    if (bookingId && richType && EMAIL_BUILDERS[richType]) {
+      const result = await sendBookingClientEmail(bookingId, richType, {
+        title,
+        message,
+      });
+      if (result.sent) {
+        await markEmailSent(bookingId, `${richType}:${notificationType}`).catch(() => {});
+        if (
+          richType === BOOKING_EMAIL_TYPES.APPOINTMENT_REMINDER ||
+          richType === BOOKING_EMAIL_TYPES.CONFIRMED ||
+          richType === BOOKING_EMAIL_TYPES.CANCELLED ||
+          richType === BOOKING_EMAIL_TYPES.POST_TREATMENT_PAYMENT ||
+          richType === BOOKING_EMAIL_TYPES.REVIEW_INVITE ||
+          richType === BOOKING_EMAIL_TYPES.INCOMING_ER
+        ) {
+          await markEmailSent(bookingId, richType).catch(() => {});
+        }
+      }
+      return result;
+    }
+
+    const { html, text } = buildNotificationCompanionEmail({
+      title: title || "Mollure update",
+      message:
+        message ||
+        (actorName ? `${actorName} sent you an update.` : "You have a new update on Mollure."),
+      actorName,
+      bookingRef,
+      href: href || (isProfessional ? "/professionals/calendar" : "/clients/booking"),
+      ctaLabel: isProfessional ? "Open calendar" : "View booking",
+      iconType: "info",
+    });
+
+    await sendMail({
+      to,
+      subject: title || "Mollure update",
+      html,
+      text,
+    });
+
+    if (bookingId) {
+      await markEmailSent(
+        bookingId,
+        `${BOOKING_EMAIL_TYPES.NOTIFICATION_COMPANION}:${notificationType}`,
+      ).catch(() => {});
+    }
+
+    return { sent: true, to };
+  } catch (error) {
+    console.error(
+      `[booking-email] Companion email failed for notification ${notificationType}:`,
+      error.message,
+    );
+    return { sent: false, reason: "error", error: error.message };
+  }
+};
+
+function mapNotificationTypeToEmailType(notificationType, isProfessional) {
+  const type = String(notificationType || "");
+  if (type === "client.booking.confirmed") return BOOKING_EMAIL_TYPES.CONFIRMED;
+  if (type === "client.booking.cancelled") return BOOKING_EMAIL_TYPES.CANCELLED;
+  if (type === "client.booking.completed") return BOOKING_EMAIL_TYPES.POST_TREATMENT_PAYMENT;
+  if (type === "client.er.incoming" || type === "client.er.suggested") {
+    return BOOKING_EMAIL_TYPES.INCOMING_ER;
+  }
+  if (type === "client.reminder.appointment") return BOOKING_EMAIL_TYPES.APPOINTMENT_REMINDER;
+  if (type === "client.booking.no_show") return BOOKING_EMAIL_TYPES.PROFESSIONAL_ACTION;
+  if (type === "pro.br.incoming") return BOOKING_EMAIL_TYPES.NEW_BOOKING_REQUEST;
+  if (type === "pro.payment.prepayment_received") return BOOKING_EMAIL_TYPES.PREPAYMENT_RECEIVED;
+  if (type === "pro.reminder.respond_request") return BOOKING_EMAIL_TYPES.RESPOND_REQUEST_REMINDER;
+  if (isProfessional && type.startsWith("pro.")) return null;
+  if (!isProfessional && type.startsWith("client.booking.")) {
+    return BOOKING_EMAIL_TYPES.PROFESSIONAL_ACTION;
+  }
+  return null;
+}
+
 export const notifyBookingConfirmed = (bookingId) =>
   sendBookingClientEmailOnce(bookingId, BOOKING_EMAIL_TYPES.CONFIRMED);
 
@@ -202,6 +325,27 @@ export const notifyBookingCancelled = (bookingId) =>
 
 export const notifyPostTreatmentPayment = (bookingId, extras) =>
   sendBookingClientEmailOnce(bookingId, BOOKING_EMAIL_TYPES.POST_TREATMENT_PAYMENT, extras);
+
+export const notifyReviewInvite = async (bookingId) => {
+  try {
+    const invite = await createReviewInviteForBooking(bookingId);
+    if (!invite?.invite_token) {
+      return { sent: false, reason: "invite_not_created" };
+    }
+    if (invite.submitted_at) {
+      return { sent: false, reason: "already_submitted" };
+    }
+
+    const reviewUrl = `${getFrontendBaseUrl()}/reviews/write?token=${encodeURIComponent(invite.invite_token)}`;
+    return sendBookingClientEmailOnce(bookingId, BOOKING_EMAIL_TYPES.REVIEW_INVITE, {
+      inviteToken: invite.invite_token,
+      reviewUrl,
+    });
+  } catch (error) {
+    console.error(`[booking-email] Failed review invite for booking ${bookingId}:`, error.message);
+    return { sent: false, reason: "error", error: error.message };
+  }
+};
 
 export const notifyAppointmentReminder = (bookingId) =>
   sendBookingClientEmailOnce(bookingId, BOOKING_EMAIL_TYPES.APPOINTMENT_REMINDER);
@@ -333,6 +477,7 @@ export const notifyBookingStatusChange = async (bookingId, previousStatus, nextS
 
   if (nextStatus === "completed") {
     await notifyPostTreatmentPayment(bookingId);
+    await notifyReviewInvite(bookingId);
     return;
   }
 

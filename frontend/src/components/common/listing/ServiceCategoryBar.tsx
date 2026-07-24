@@ -52,6 +52,16 @@ export default function ServiceCategoryBar({
     swiper.slideTo(activeIndex, 280);
   }, [activeIndex]);
 
+  const navButtonSx = {
+    display: { xs: "none", sm: "flex" },
+    flexShrink: 0,
+    bgcolor: "#fff",
+    border: `1px solid ${alpha("#0B1220", 0.12)}`,
+    boxShadow: `0 10px 22px ${alpha("#0B1220", 0.08)}`,
+    "&:hover": { bgcolor: "#fff" },
+    "&.swiper-button-disabled": { opacity: 0.35 },
+  } as const;
+
   return (
     <Box
       sx={{
@@ -62,8 +72,9 @@ export default function ServiceCategoryBar({
           sm: "96px",
           md: `${SERVICE_CATEGORY_SLIDER_CARD_WIDTH}px`,
         },
-        position: "relative",
-        px: { xs: 0, sm: 4.5 },
+        display: "flex",
+        alignItems: "center",
+        gap: { xs: 0, sm: 1 },
         "& .service-category-swiper": {
           width: "100%",
           overflow: "hidden",
@@ -79,44 +90,16 @@ export default function ServiceCategoryBar({
       <IconButton
         aria-label="Scroll categories left"
         ref={prevRef}
-        sx={{
-          display: { xs: "none", sm: "flex" },
-          position: "absolute",
-          left: 0,
-          top: "50%",
-          transform: "translateY(-50%)",
-          zIndex: 2,
-          bgcolor: "#fff",
-          border: `1px solid ${alpha("#0B1220", 0.12)}`,
-          boxShadow: `0 10px 22px ${alpha("#0B1220", 0.08)}`,
-          "&:hover": { bgcolor: "#fff" },
-          "&.swiper-button-disabled": { opacity: 0.35 },
-        }}
+        sx={navButtonSx}
       >
         <ChevronLeftRoundedIcon />
       </IconButton>
 
-      <IconButton
-        aria-label="Scroll categories right"
-        ref={nextRef}
-        sx={{
-          display: { xs: "none", sm: "flex" },
-          position: "absolute",
-          right: 0,
-          top: "50%",
-          transform: "translateY(-50%)",
-          zIndex: 2,
-          bgcolor: "#fff",
-          border: `1px solid ${alpha("#0B1220", 0.12)}`,
-          boxShadow: `0 10px 22px ${alpha("#0B1220", 0.08)}`,
-          "&:hover": { bgcolor: "#fff" },
-          "&.swiper-button-disabled": { opacity: 0.35 },
-        }}
+      <Box
+        role="tablist"
+        aria-label={ariaLabel}
+        sx={{ flex: 1, minWidth: 0 }}
       >
-        <ChevronRightRoundedIcon />
-      </IconButton>
-
-      <Box role="tablist" aria-label={ariaLabel}>
         <Swiper
           className="service-category-swiper"
           modules={[Navigation]}
@@ -157,6 +140,14 @@ export default function ServiceCategoryBar({
           ))}
         </Swiper>
       </Box>
+
+      <IconButton
+        aria-label="Scroll categories right"
+        ref={nextRef}
+        sx={navButtonSx}
+      >
+        <ChevronRightRoundedIcon />
+      </IconButton>
     </Box>
   );
 }

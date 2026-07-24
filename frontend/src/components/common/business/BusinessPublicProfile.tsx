@@ -1054,29 +1054,33 @@ export default function BusinessPublicProfile({
           </Grid>
           <Grid item xs={12} md={7}>
             <Box sx={{ p: 2.5 }}>
-              <Stack direction="row" alignItems="center" spacing={0.5}>
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <StarRoundedIcon
-                    key={i}
-                    sx={{ fontSize: 18, color: m.star }}
-                  />
-                ))}
-                <ButtonBase
-                  onClick={() => {
-                    const firstMember = visibleTeamMembers[0];
-                    router.push(
-                      clientReviewsHref(data.shopId, firstMember?.id),
-                    );
-                  }}
-                  sx={{
-                    ml: 0.5,
-                    borderRadius: "6px",
-                    px: 0.35,
-                    "&:hover": { bgcolor: alpha(m.teal, 0.06) },
-                  }}
-                >
+              <ButtonBase
+                onClick={() => {
+                  const firstMember = visibleTeamMembers[0];
+                  router.push(
+                    clientReviewsHref(data.shopId, firstMember?.id, {
+                      returnTo: `/clients/listing/${encodeURIComponent(data.shopId)}`,
+                    }),
+                  );
+                }}
+                sx={{
+                  borderRadius: "6px",
+                  px: 0.35,
+                  py: 0.25,
+                  "&:hover": { bgcolor: alpha(m.teal, 0.06) },
+                }}
+                aria-label="View reviews and ratings"
+              >
+                <Stack direction="row" alignItems="center" spacing={0.5}>
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <StarRoundedIcon
+                      key={i}
+                      sx={{ fontSize: 18, color: m.star }}
+                    />
+                  ))}
                   <Typography
                     sx={{
+                      ml: 0.5,
                       fontSize: 12.5,
                       fontWeight: 800,
                       color: alpha(m.navy, 0.55),
@@ -1084,8 +1088,8 @@ export default function BusinessPublicProfile({
                   >
                     ({data.reviewsCount} Reviews)
                   </Typography>
-                </ButtonBase>
-              </Stack>
+                </Stack>
+              </ButtonBase>
               <Typography
                 sx={{
                   mt: 1,
@@ -1636,39 +1640,43 @@ export default function BusinessPublicProfile({
                       >
                         {member.name}
                       </Typography>
-                      <Stack
-                        direction="row"
-                        alignItems="center"
-                        spacing={0.25}
-                        sx={{ mt: 0.35 }}
+                      <ButtonBase
+                        onClick={() =>
+                          router.push(
+                            clientReviewsHref(data.shopId, member.id, {
+                              returnTo: `/clients/listing/${encodeURIComponent(data.shopId)}`,
+                            }),
+                          )
+                        }
+                        sx={{
+                          mt: 0.35,
+                          borderRadius: "6px",
+                          px: 0.25,
+                          py: 0.15,
+                          "&:hover": { bgcolor: alpha(m.teal, 0.06) },
+                        }}
+                        aria-label={`View reviews for ${member.name}`}
                       >
-                        {Array.from({ length: 5 }).map((_, i) => (
-                          <StarRoundedIcon
-                            key={i}
-                            sx={{
-                              fontSize: 14,
-                              color:
-                                i < Math.round(member.rating)
-                                  ? m.star
-                                  : alpha(m.navy, 0.15),
-                            }}
-                          />
-                        ))}
-                        <ButtonBase
-                          onClick={() =>
-                            router.push(
-                              clientReviewsHref(data.shopId, member.id),
-                            )
-                          }
-                          sx={{
-                            ml: 0.25,
-                            borderRadius: "6px",
-                            px: 0.25,
-                            "&:hover": { bgcolor: alpha(m.teal, 0.06) },
-                          }}
+                        <Stack
+                          direction="row"
+                          alignItems="center"
+                          spacing={0.25}
                         >
+                          {Array.from({ length: 5 }).map((_, i) => (
+                            <StarRoundedIcon
+                              key={i}
+                              sx={{
+                                fontSize: 14,
+                                color:
+                                  i < Math.round(member.rating)
+                                    ? m.star
+                                    : alpha(m.navy, 0.15),
+                              }}
+                            />
+                          ))}
                           <Typography
                             sx={{
+                              ml: 0.25,
                               fontSize: 10.5,
                               fontWeight: 500,
                               color: alpha(m.navy, 0.5),
@@ -1676,8 +1684,8 @@ export default function BusinessPublicProfile({
                           >
                             ({member.reviewsCount} Reviews)
                           </Typography>
-                        </ButtonBase>
-                      </Stack>
+                        </Stack>
+                      </ButtonBase>
                     </Box>
                   </Stack>
 

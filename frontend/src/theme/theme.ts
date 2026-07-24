@@ -131,6 +131,18 @@ const theme = createTheme({
       /** Calendar blocked-time slot */
       blockedTimeBg: "#FEE4E2",
       blockedTimeFg: "#F04438",
+      /** Soft status chips (finance / payment labels) */
+      statusOrangeBg: "#FFFAEB",
+      statusOrangeFg: "#F79009",
+      statusGreenBg: "#ECFDF3",
+      statusGreenFg: "#039855",
+      statusGreyFg: "#475467",
+      /** No show status chip */
+      statusNoShowBg: "#D0D5DD",
+      statusNoShowFg: "#667085",
+      /** Completed status chip (outlined grey) */
+      statusCompletedBg: "#F9FAFB",
+      statusCompletedBorder: "#D0D5DD",
       /** Sales Volume stacked bar chart — 4-step teal gradient (Figma) */
       salesVolumeStackDark: "#169BA1",
       salesVolumeStackMid: "#21B8BF",

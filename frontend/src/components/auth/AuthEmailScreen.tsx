@@ -51,8 +51,8 @@ export default function AuthEmailScreen({
       />
 
       <Box sx={{ position: "relative", width: "100%", maxWidth, zIndex: 1 }}>
-        <Stack alignItems="center" sx={{ mb: 3 }}>
-          <Image src={Logo} alt="Mollure" width={72} height={72} priority />
+        <Stack alignItems="center" sx={{ mb: 3.5 }}>
+          <Image src={Logo} alt="Mollure" width={200} height={48} priority />
         </Stack>
 
         <Box

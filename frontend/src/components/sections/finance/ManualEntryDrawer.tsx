@@ -232,11 +232,13 @@ export default function ManualEntryDrawer({
 
   const addLinesFromCatalog = (
     kind: ManualEntryLineKind,
-    options: ManualEntryCatalogOption[],
+    options: Array<ManualEntryCatalogOption & { quantity?: number }>,
   ) => {
     setLines((prev) => [
       ...prev,
-      ...options.map((option) => createManualEntryLineFromOption(kind, option)),
+      ...options.map((option) =>
+        createManualEntryLineFromOption(kind, option, option.quantity ?? 1),
+      ),
     ]);
   };
 
@@ -458,9 +460,10 @@ export default function ManualEntryDrawer({
                         >
                           <Typography
                             sx={{
-                              fontSize: 13,
+                              fontSize: 13.5,
                               fontWeight: 800,
                               color: alpha(m.navy, 0.86),
+                              lineHeight: 1.2,
                             }}
                           >
                             {client.name}
@@ -470,11 +473,17 @@ export default function ManualEntryDrawer({
                               label="Mollure"
                               size="small"
                               sx={{
-                                height: 20,
-                                fontSize: 10,
-                                fontWeight: 800,
+                                height: 16,
+                                borderRadius: "999px",
+                                fontWeight: 700,
                                 bgcolor: alpha(m.teal, 0.12),
                                 color: m.teal,
+                                "& .MuiChip-label": {
+                                  fontSize: 9,
+                                  px: 0.65,
+                                  py: 0,
+                                  lineHeight: 1.2,
+                                },
                               }}
                             />
                           ) : null}
@@ -540,9 +549,10 @@ export default function ManualEntryDrawer({
                           >
                             <Typography
                               sx={{
-                                fontSize: 13,
+                                fontSize: 13.5,
                                 fontWeight: 800,
                                 color: alpha(m.navy, 0.86),
+                                lineHeight: 1.2,
                               }}
                             >
                               {row.name}
@@ -551,11 +561,17 @@ export default function ManualEntryDrawer({
                               label="Mollure"
                               size="small"
                               sx={{
-                                height: 20,
-                                fontSize: 10,
-                                fontWeight: 800,
+                                height: 16,
+                                borderRadius: "999px",
+                                fontWeight: 700,
                                 bgcolor: alpha(m.teal, 0.12),
                                 color: m.teal,
+                                "& .MuiChip-label": {
+                                  fontSize: 9,
+                                  px: 0.65,
+                                  py: 0,
+                                  lineHeight: 1.2,
+                                },
                               }}
                             />
                           </Stack>
@@ -926,6 +942,8 @@ export default function ManualEntryDrawer({
         title="Select products"
         options={productOptions}
         emptyLabel="No products configured yet."
+        withQuantity
+        allowAddProduct
         onSave={(selected) => addLinesFromCatalog("product", selected)}
       />
 
@@ -935,6 +953,9 @@ export default function ManualEntryDrawer({
         title="Select items"
         options={itemOptions}
         emptyLabel="No services configured yet."
+        withQuantity
+        allowAddProduct
+        addProductLabel="Add Item"
         onSave={(selected) => addLinesFromCatalog("item", selected)}
       />
 
