@@ -37,16 +37,16 @@ export default function CancelPendingPaymentModal({
         tone="secondary"
         onClick={onClose}
         sx={{
-          height: 34,
+          height: 40,
         }}
       >
         Cancel
       </AppButton>
       <AppButton
-        tone="primary"
+        tone="danger"
         onClick={onConfirm}
         sx={{
-          height: 34,
+          height: 40,
         }}
       >
         {confirmLabel}

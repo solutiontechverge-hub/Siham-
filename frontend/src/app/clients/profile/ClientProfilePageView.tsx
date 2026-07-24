@@ -35,8 +35,8 @@ import {
   REVIEW_NAME_MODES,
   reviewNameOptionLabel,
 } from "../../../lib/reviewNameDisplay";
-import { profilePageData } from "./data-profile";
-import { useClientProfilePage } from "./use-profile";
+import { profilePageData } from "./profile.data";
+import { useClientProfilePage } from "./useClientProfilePage";
 import {
   AppModal,
   ClientPageTabsBar,
@@ -67,7 +67,7 @@ function imgSrc(img: unknown): string {
   return String(img);
 }
 
-export default function ClientProfilePage() {
+export default function ClientProfilePageView() {
   const pathname = usePathname();
   const {
     tokens,

@@ -11,7 +11,7 @@ import {
   type Theme,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import { MollureTextField } from ".";
+import AppSearchField from "./AppSearchField";
 
 export type KeywordTagsInputProps = {
   value: string[];
@@ -129,9 +129,10 @@ export default function KeywordTagsInput({
           Maximum {maxKeywords} keywords added
         </Typography>
       ) : (
-        <MollureTextField
+        <AppSearchField
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
+          onClear={() => setDraft("")}
           onKeyDown={handleKeyDown}
           placeholder={
             value.length ? "Press Enter to add another" : placeholder

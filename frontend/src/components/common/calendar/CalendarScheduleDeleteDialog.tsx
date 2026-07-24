@@ -59,7 +59,7 @@ export default function CalendarScheduleDeleteDialog({
               Cancel
             </AppButton>
             <AppButton
-              tone="primary"
+              tone="danger"
               onClick={() => {
                 onConfirm();
                 onClose();

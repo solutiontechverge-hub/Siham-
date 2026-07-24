@@ -28,6 +28,7 @@ export default function ClientBookingDiscardDialog({
         <>
           <MessagingModalCancelButton onClick={onClose} />
           <MessagingModalPrimaryButton
+            tone="danger"
             label="Discard"
             onClick={() => {
               onConfirm();

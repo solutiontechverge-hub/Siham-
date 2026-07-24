@@ -40,6 +40,7 @@ export default function ClientBookingCancelDialog({
         <>
           <MessagingModalCancelButton onClick={onClose} label="Keep booking" />
           <MessagingModalPrimaryButton
+            tone="danger"
             label="Cancel booking"
             onClick={() => {
               onConfirm(reason.trim());

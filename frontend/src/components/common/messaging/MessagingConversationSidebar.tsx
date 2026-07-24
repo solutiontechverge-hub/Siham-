@@ -175,7 +175,6 @@ export default function MessagingConversationSidebar({
             onClear={() => onSearchChange("")}
             sx={{
               "& .MuiOutlinedInput-root": {
-                borderRadius: "10px",
                 bgcolor: "#fff",
                 fontSize: { xs: 12, sm: 13 },
                 "& fieldset": { borderColor: alpha(m.navy, 0.14) },

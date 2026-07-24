@@ -24,7 +24,7 @@ export default function AdminFilterPanel({
         spacing={1.25}
         flexWrap="wrap"
         useFlexGap
-        alignItems={{ lg: "center" }}
+        alignItems={{ lg: "flex-end" }}
         sx={{ width: "100%", ...sx }}
       >
         {children}

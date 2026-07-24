@@ -35,6 +35,7 @@ export default function ClientBookingDeleteDialog({
         <>
           <MessagingModalCancelButton onClick={onClose} />
           <MessagingModalPrimaryButton
+            tone="danger"
             label="Delete"
             onClick={() => {
               onConfirm();

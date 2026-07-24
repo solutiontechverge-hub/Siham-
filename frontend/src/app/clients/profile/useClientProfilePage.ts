@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useTheme } from "@mui/material/styles";
-import { profilePageData } from "./data-profile";
+import { profilePageData } from "./profile.data";
 import { getPasswordStrength } from "../../../lib/passwordStrength";
 import { getOptionalPhoneValidationErrors } from "../../../lib/phone-validation";
 import {

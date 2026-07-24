@@ -3,12 +3,11 @@
 import AppButton from "../../common/AppButton";
 import * as React from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
-import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import { Box, Checkbox, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDrawer from "../../common/AppDrawer";
 import { FinanceDrawerActionsFooter } from "../../common/FinanceDrawerFooter";
-import MollureFormField from "../../common/MollureFormField";
+import AppSearchField from "../../common/AppSearchField";
 import type { ManualEntryCatalogOption } from "./manualEntry.data";
 import { formatEurAmount } from "./manualEntry.data";
 
@@ -118,22 +117,14 @@ export default function ManualEntryCatalogDrawer({
       }
     >
       <Stack spacing={1.5}>
-        <MollureFormField
+        <AppSearchField
+          fullWidth
           placeholder="Search..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          size="small"
-          fullWidth
-          InputProps={{
-            endAdornment: (
-              <SearchRoundedIcon
-                sx={{ fontSize: 18, color: alpha(m.navy, 0.45) }}
-              />
-            ),
-          }}
+          onClear={() => setQuery("")}
           sx={{
             "& .MuiOutlinedInput-root": {
-              borderRadius: "10px",
               bgcolor: "#fff",
             },
           }}

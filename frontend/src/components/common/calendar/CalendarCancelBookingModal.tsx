@@ -114,7 +114,7 @@ export default function CalendarCancelBookingModal({
             Cancel
           </AppButton>
           <AppButton
-            tone="primary"
+            tone="danger"
             onClick={() => onConfirm({ reasons, details: details.trim() })}
             sx={{
               height: 40,

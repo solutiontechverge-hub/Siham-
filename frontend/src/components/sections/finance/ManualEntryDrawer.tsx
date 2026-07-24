@@ -8,6 +8,7 @@ import { Box, Chip, Paper, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDrawer from "../../common/AppDrawer";
 import { FinanceDrawerActionsFooter } from "../../common/FinanceDrawerFooter";
+import AppSearchField from "../../common/AppSearchField";
 import MollureFormField from "../../common/MollureFormField";
 import { BodyText } from "../../ui/typography";
 import { useGetBusinessSetupQuery } from "../../../store/services/businessApi";
@@ -423,23 +424,16 @@ export default function ManualEntryDrawer({
                       borderTop: `1px solid ${alpha(m.navy, 0.06)}`,
                     }}
                   >
-                    <MollureFormField
+                    <AppSearchField
+                      fullWidth
                       placeholder="Search by name"
                       value={clientQuery}
                       onChange={(e) => setClientQuery(e.target.value)}
-                      size="small"
+                      onClear={() => setClientQuery("")}
                       sx={{
                         "& .MuiOutlinedInput-root": {
                           bgcolor: "#fff",
-                          borderRadius: "10px",
                         },
-                      }}
-                      InputProps={{
-                        endAdornment: (
-                          <SearchRoundedIcon
-                            sx={{ fontSize: 18, color: alpha(m.navy, 0.45) }}
-                          />
-                        ),
                       }}
                     />
                     {listResults.map((client) => (
@@ -509,23 +503,16 @@ export default function ManualEntryDrawer({
                       borderTop: `1px solid ${alpha(m.navy, 0.06)}`,
                     }}
                   >
-                    <MollureFormField
+                    <AppSearchField
+                      fullWidth
                       placeholder="Search by email"
                       value={clientQuery}
                       onChange={(e) => setClientQuery(e.target.value)}
-                      size="small"
+                      onClear={() => setClientQuery("")}
                       sx={{
                         "& .MuiOutlinedInput-root": {
                           bgcolor: "#fff",
-                          borderRadius: "10px",
                         },
-                      }}
-                      InputProps={{
-                        endAdornment: (
-                          <SearchRoundedIcon
-                            sx={{ fontSize: 18, color: alpha(m.navy, 0.45) }}
-                          />
-                        ),
                       }}
                     />
                     {platformResults.map((row) => (

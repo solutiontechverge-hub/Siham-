@@ -110,20 +110,39 @@ export default function AppButton<C extends React.ElementType = "button">({
         },
       };
       break;
-    case "danger":
-      toneVariant = "contained";
+    case "danger": {
+      const outlinedDanger = variant === "outlined";
+      toneVariant = outlinedDanger ? "outlined" : "contained";
       toneDisableElevation = true;
-      toneSx = {
-        fontWeight: 900,
-        bgcolor: danger,
-        color: "#fff",
-        "&:hover": { bgcolor: "#D14C4C", color: "#fff" },
-        "&.Mui-disabled": {
-          bgcolor: alpha(m.navy, 0.12),
-          color: alpha(m.navy, 0.35),
-        },
-      };
+      toneSx = outlinedDanger
+        ? {
+            fontWeight: 800,
+            bgcolor: "#fff",
+            color: danger,
+            borderColor: alpha(danger, 0.55),
+            "&:hover": {
+              bgcolor: alpha(danger, 0.06),
+              borderColor: danger,
+              color: danger,
+            },
+            "&.Mui-disabled": {
+              bgcolor: alpha(m.navy, 0.04),
+              color: alpha(m.navy, 0.35),
+              borderColor: alpha(m.navy, 0.12),
+            },
+          }
+        : {
+            fontWeight: 900,
+            bgcolor: danger,
+            color: "#fff",
+            "&:hover": { bgcolor: "#D14C4C", color: "#fff" },
+            "&.Mui-disabled": {
+              bgcolor: alpha(m.navy, 0.12),
+              color: alpha(m.navy, 0.35),
+            },
+          };
       break;
+    }
     case "ghost":
       toneVariant = "text";
       toneSx = {

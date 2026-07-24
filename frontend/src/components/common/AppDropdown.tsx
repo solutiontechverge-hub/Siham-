@@ -2,15 +2,14 @@
 
 import * as React from "react";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
-import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import {
   Checkbox,
-  InputAdornment,
   ListSubheader,
   MenuItem,
   type TextFieldProps,
 } from "@mui/material";
 import AppTextField from "./AppTextField";
+import AppSearchField from "./AppSearchField";
 
 export type AppDropdownOption = {
   label: string;
@@ -122,22 +121,15 @@ export default function AppDropdown({
           disableSticky
           sx={{ px: 1, py: 0.75, lineHeight: 1, bgcolor: "#fff" }}
         >
-          <AppTextField
-            size="small"
+          <AppSearchField
             autoFocus
             fullWidth
             placeholder={searchPlaceholder}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            onClear={() => setSearch("")}
             onKeyDown={(e) => {
               if (e.key !== "Escape") e.stopPropagation();
-            }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchRoundedIcon sx={{ fontSize: 18, opacity: 0.5 }} />
-                </InputAdornment>
-              ),
             }}
           />
         </ListSubheader>

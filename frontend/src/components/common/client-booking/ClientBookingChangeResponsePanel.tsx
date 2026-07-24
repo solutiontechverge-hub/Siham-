@@ -277,13 +277,12 @@ export default function ClientBookingChangeResponsePanel({
           onClick={onAccept ?? onOk}
           sx={{
             flex: 1,
-            borderRadius: "10px",
-            textTransform: "none",
-            fontWeight: 900,
-            fontSize: 14,
-            py: 1.2,
+            fontSize: 13,
+            py: 1.1,
+            minHeight: 40,
             bgcolor: m.success,
-            "&:hover": { bgcolor: m.successDark },
+            color: "#fff",
+            "&:hover": { bgcolor: m.successDark, color: "#fff" },
           }}
         >
           Accept
@@ -294,9 +293,9 @@ export default function ClientBookingChangeResponsePanel({
           onClick={onSuggestChange}
           sx={{
             flex: 1,
-            fontSize: 14,
-            py: 1.2,
-            bgcolor: alpha(m.navy, 0.03),
+            fontSize: 13,
+            py: 1.1,
+            minHeight: 40,
           }}
         >
           Suggest Change

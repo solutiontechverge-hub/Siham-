@@ -5,13 +5,20 @@ import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import { Stack } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
+import { useTheme } from "@mui/material/styles";
 
 type BookingRequestResponseActionsProps = {
   onAccept: () => void;
   onEdit: () => void;
   onReject: () => void;
 };
+
+const ACTION_SX = {
+  flex: 1,
+  fontSize: 13,
+  py: 1.1,
+  minHeight: 40,
+} as const;
 
 export default function BookingRequestResponseActions({
   onAccept,
@@ -29,38 +36,20 @@ export default function BookingRequestResponseActions({
         startIcon={<CheckRoundedIcon />}
         onClick={onAccept}
         sx={{
-          flex: 1,
-          borderRadius: "10px",
-          textTransform: "none",
-          fontWeight: 900,
-          fontSize: 13,
-          py: 1.1,
+          ...ACTION_SX,
           bgcolor: m.success,
-          "&:hover": { bgcolor: m.successDark },
+          color: "#fff",
+          "&:hover": { bgcolor: m.successDark, color: "#fff" },
         }}
       >
         Accept
       </AppButton>
       <AppButton
+        tone="secondary"
         fullWidth
-        variant="outlined"
         startIcon={<EditRoundedIcon sx={{ fontSize: 18 }} />}
         onClick={onEdit}
-        sx={{
-          flex: 1,
-          borderRadius: "10px",
-          textTransform: "none",
-          fontWeight: 900,
-          fontSize: 13,
-          py: 1.1,
-          borderColor: alpha(m.navy, 0.14),
-          color: alpha(m.navy, 0.68),
-          bgcolor: alpha(m.navy, 0.03),
-          "&:hover": {
-            bgcolor: alpha(m.navy, 0.06),
-            borderColor: alpha(m.navy, 0.2),
-          },
-        }}
+        sx={ACTION_SX}
       >
         Edit
       </AppButton>
@@ -69,11 +58,7 @@ export default function BookingRequestResponseActions({
         fullWidth
         startIcon={<CloseRoundedIcon />}
         onClick={onReject}
-        sx={{
-          flex: 1,
-          py: 1.1,
-          "&:hover": { bgcolor: "#D94545" },
-        }}
+        sx={ACTION_SX}
       >
         Reject
       </AppButton>

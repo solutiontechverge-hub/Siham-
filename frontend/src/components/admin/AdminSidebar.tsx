@@ -18,7 +18,7 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import { Logo } from "../../../images";
+import { LogoOnDark } from "../../../images";
 import { AppButton } from "../common";
 import {
   adminDashboardNavItem,
@@ -151,24 +151,30 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <Stack sx={{ height: "100%", py: 2.5, px: 2 }}>
-      <Stack
-        direction="row"
-        alignItems="center"
-        spacing={1.25}
-        sx={{ px: 1, mb: 3 }}
+      <Box
+        component={Link}
+        href="/admin/dashboard"
+        onClick={onNavigate}
+        sx={{
+          display: "inline-flex",
+          alignItems: "center",
+          px: 0.75,
+          mb: 3,
+          textDecoration: "none",
+          borderRadius: 1.5,
+          transition: "opacity 160ms ease",
+          "&:hover": { opacity: 0.88 },
+        }}
       >
-        <Image src={Logo} alt="Mollure" width={32} height={32} />
-        <Typography
-          sx={{
-            fontWeight: 700,
-            fontSize: 22,
-            letterSpacing: "-0.02em",
-            color: tokens.white,
-          }}
-        >
-          Mollure
-        </Typography>
-      </Stack>
+        <Image
+          src={LogoOnDark}
+          alt="Mollure"
+          width={152}
+          height={36}
+          priority
+          style={{ display: "block", width: "auto", height: 36 }}
+        />
+      </Box>
 
       <Stack spacing={0.5} sx={{ flex: 1, overflowY: "auto" }}>
         <NavLink

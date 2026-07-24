@@ -10,7 +10,7 @@ import {
   MollureMarketingHeader,
 } from "../../../components/common";
 import { marketingShellFooter } from "../../../data/marketingShell.data";
-import { profilePageData } from "../profile/data-profile";
+import { profilePageData } from "../profile/profile.data";
 import { useAppSelector } from "../../../store/hooks";
 import ClientBookingPillTabsBar from "./ClientBookingPillTabsBar";
 import type { BookingListTab } from "./clientBookingRecords";

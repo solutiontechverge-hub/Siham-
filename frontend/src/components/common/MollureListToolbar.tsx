@@ -4,11 +4,10 @@ import AppButton from "./AppButton";
 import * as React from "react";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
-import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import SortRoundedIcon from "@mui/icons-material/SortRounded";
 import { Box, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import MollureFormField from "./MollureFormField";
+import AppSearchField from "./AppSearchField";
 
 type MollureListToolbarProps = {
   searchPlaceholder: string;
@@ -40,22 +39,18 @@ export default function MollureListToolbar({
         alignItems={{ md: "center" }}
       >
         <Box sx={{ flex: 1, maxWidth: { md: 420 } }}>
-          <MollureFormField
+          <AppSearchField
+            fullWidth
+            size="small"
             placeholder={searchPlaceholder}
             value={searchValue}
             onChange={(e) => onSearchChange(e.target.value)}
+            onClear={() => onSearchChange("")}
             sx={{
               "& .MuiOutlinedInput-root": {
+                height: 40,
                 bgcolor: alpha(m.navy, 0.01),
-                borderRadius: "10px",
               },
-            }}
-            InputProps={{
-              endAdornment: (
-                <SearchRoundedIcon
-                  sx={{ fontSize: 18, color: alpha(m.navy, 0.45) }}
-                />
-              ),
             }}
           />
         </Box>
@@ -70,43 +65,31 @@ export default function MollureListToolbar({
         >
           {onFilterClick ? (
             <AppButton
-              variant="outlined"
+              tone="secondary"
               onClick={onFilterClick}
               startIcon={<TuneRoundedIcon sx={{ fontSize: 18 }} />}
               sx={{
-                borderRadius: "6px",
-                textTransform: "none",
-                fontWeight: 700,
+                height: 40,
+                px: 1.5,
                 fontSize: 12.5,
                 borderColor:
                   activeFilterCount > 0
                     ? alpha(m.teal, 0.45)
-                    : alpha(m.navy, 0.14),
-                color: activeFilterCount > 0 ? m.teal : alpha(m.navy, 0.78),
-                bgcolor: activeFilterCount > 0 ? alpha(m.teal, 0.06) : "#fff",
-                height: 34,
-                px: 1.25,
+                    : undefined,
+                color: activeFilterCount > 0 ? m.teal : undefined,
+                bgcolor:
+                  activeFilterCount > 0 ? alpha(m.teal, 0.06) : undefined,
               }}
             >
               Filter{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
             </AppButton>
           ) : null}
           <AppButton
-            variant="outlined"
+            tone="secondary"
             onClick={onSortClick}
             startIcon={<SortRoundedIcon sx={{ fontSize: 18 }} />}
             endIcon={<KeyboardArrowDownRoundedIcon />}
-            sx={{
-              borderRadius: "6px",
-              textTransform: "none",
-              fontWeight: 700,
-              fontSize: 12.5,
-              borderColor: alpha(m.navy, 0.14),
-              color: alpha(m.navy, 0.78),
-              bgcolor: "#fff",
-              height: 34,
-              px: 1.25,
-            }}
+            sx={{ height: 40, px: 1.5, fontSize: 12.5 }}
           >
             Sort By
           </AppButton>
@@ -114,12 +97,7 @@ export default function MollureListToolbar({
             tone="primary"
             onClick={onAddClick}
             endIcon={<KeyboardArrowDownRoundedIcon />}
-            sx={{
-              fontSize: 12.5,
-              height: 34,
-              px: 1.25,
-              color: m.white,
-            }}
+            sx={{ height: 40, px: 1.5, fontSize: 12.5 }}
           >
             Add
           </AppButton>

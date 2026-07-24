@@ -34,7 +34,7 @@ import {
   useClientListingState,
   useListingTokens,
   type ListingSortValue,
-} from "./listing.use";
+} from "./useClientListingPage";
 import { useListingCards } from "./use-listing-cards";
 import { ListingBG } from "../../../../images";
 import { useAppSelector } from "../../../store/hooks";
@@ -51,7 +51,7 @@ function toSrc(img: any) {
   return String(img);
 }
 
-export default function ClientListingPage() {
+export default function ClientListingPageView() {
   const tokens = useListingTokens();
   const searchParams = useSearchParams();
   const searchKey = searchParams.toString();

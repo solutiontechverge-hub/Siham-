@@ -4,13 +4,20 @@ import AppButton from "../AppButton";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import { Stack } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
+import { useTheme } from "@mui/material/styles";
 
 type Props = {
   onAccept: () => void;
   onSuggestChange: () => void;
   onReject: () => void;
 };
+
+const ACTION_SX = {
+  flex: 1,
+  fontSize: 13,
+  py: 1.1,
+  minHeight: 40,
+} as const;
 
 /** Accept / Suggest Change / Reject row shown when an EBR is incoming on the client booking page. */
 export default function ClientEbrResponseActions({
@@ -33,14 +40,10 @@ export default function ClientEbrResponseActions({
         startIcon={<CheckRoundedIcon />}
         onClick={onAccept}
         sx={{
-          flex: 1,
-          borderRadius: "10px",
-          textTransform: "none",
-          fontWeight: 900,
-          fontSize: 14,
-          py: 1.2,
+          ...ACTION_SX,
           bgcolor: m.success,
-          "&:hover": { bgcolor: m.successDark },
+          color: "#fff",
+          "&:hover": { bgcolor: m.successDark, color: "#fff" },
         }}
       >
         Accept
@@ -49,11 +52,7 @@ export default function ClientEbrResponseActions({
         tone="secondary"
         fullWidth
         onClick={onSuggestChange}
-        sx={{
-          flex: 1,
-          fontSize: 14,
-          py: 1.2,
-        }}
+        sx={ACTION_SX}
       >
         Suggest Change
       </AppButton>
@@ -62,12 +61,7 @@ export default function ClientEbrResponseActions({
         fullWidth
         startIcon={<CloseRoundedIcon />}
         onClick={onReject}
-        sx={{
-          flex: 1,
-          fontSize: 14,
-          py: 1.2,
-          "&:hover": { bgcolor: "#D94545" },
-        }}
+        sx={ACTION_SX}
       >
         Reject
       </AppButton>

@@ -62,6 +62,7 @@ export default function ClientEbrActionDialog({
         <>
           <MessagingModalCancelButton onClick={onClose} />
           <MessagingModalPrimaryButton
+            tone={action === "reject" ? "danger" : "primary"}
             label={copy.confirmLabel}
             onClick={() => {
               onConfirm();

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { getPhoneValidationErrors } from "../../../../lib/phone-validation";
-import { mockClientRecords, mockMollureDirectory, type ClientRecord } from "./data/clientList";
+import type { ClientRecord } from "./data/clientList";
 import {
   useCreateProfessionalClientMutation,
   useDeleteProfessionalClientMutation,
@@ -19,6 +19,22 @@ import {
   type ClientListFilterKey,
 } from "./data/clientListFilters";
 import { mapApiProfessionalClientToRecord } from "./mapApiProfessionalClient";
+import {
+  emptyEditCompanyForm,
+  emptyEditIndividualForm,
+  type ClientDetailsMode,
+  type ClientSnackbarState,
+  type EditCompanyFormState,
+  type EditIndividualFormState,
+  type NonMollureClientType,
+} from "./client.types";
+import { splitClientPhone } from "./client.data";
+
+export type {
+  EditCompanyFormState,
+  EditIndividualFormState,
+} from "./client.types";
+export { emptyEditCompanyForm, emptyEditIndividualForm } from "./client.types";
 
 function getApiErrorMessage(error: unknown, fallback: string): string {
   if (
@@ -43,65 +59,6 @@ function parseDobForApi(raw: string): string | undefined {
   }
   return v;
 }
-export type EditCompanyFormState = {
-  legalName: string;
-  coc: string;
-  vat: string;
-  contactFirst: string;
-  contactLast: string;
-  gender: string;
-  countryCode: string;
-  phone: string;
-  street: string;
-  streetNumber: string;
-  postal: string;
-  province: string;
-  municipality: string;
-  email: string;
-  technicalNote: string;
-};
-
-export const emptyEditCompanyForm = (): EditCompanyFormState => ({
-  legalName: "",
-  coc: "",
-  vat: "",
-  contactFirst: "",
-  contactLast: "",
-  gender: "",
-  countryCode: "+44",
-  phone: "",
-  street: "",
-  streetNumber: "",
-  postal: "",
-  province: "",
-  municipality: "",
-  email: "",
-  technicalNote: "",
-});
-
-export type EditIndividualFormState = {
-  firstName: string;
-  lastName: string;
-  gender: string;
-  dob: string;
-  countryCode: string;
-  phone: string;
-  email: string;
-  residentialAddress: string;
-  technicalNote: string;
-};
-
-export const emptyEditIndividualForm = (): EditIndividualFormState => ({
-  firstName: "",
-  lastName: "",
-  gender: "",
-  dob: "",
-  countryCode: "+44",
-  phone: "",
-  email: "",
-  residentialAddress: "",
-  technicalNote: "",
-});
 
 export function useFixedLocationClientPage() {
   const { data: clientsResponse, isLoading: clientsLoading, isError: clientsError } = useGetProfessionalClientsQuery();
@@ -127,7 +84,7 @@ export function useFixedLocationClientPage() {
   const [deleteClientId, setDeleteClientId] = React.useState<string | null>(null);
   const [viewClientId, setViewClientId] = React.useState<string | null>(null);
   const [focusTechnicalNoteOnOpen, setFocusTechnicalNoteOnOpen] = React.useState(false);
-  const [clientDetailsMode, setClientDetailsMode] = React.useState<"view" | "edit">("view");
+  const [clientDetailsMode, setClientDetailsMode] = React.useState<ClientDetailsMode>("view");
   const [editCompanyForm, setEditCompanyForm] = React.useState<EditCompanyFormState>(emptyEditCompanyForm);
   const [editIndividualForm, setEditIndividualForm] = React.useState<EditIndividualFormState>(emptyEditIndividualForm);
   const [addMollureOpen, setAddMollureOpen] = React.useState(false);
@@ -138,7 +95,7 @@ export function useFixedLocationClientPage() {
     { skip: !addMollureOpen },
   );
   const [selectedMollureId, setSelectedMollureId] = React.useState<string | "">("");
-  const [nonMollureClientType, setNonMollureClientType] = React.useState<"" | "Individual Client" | "Company Client">(
+  const [nonMollureClientType, setNonMollureClientType] = React.useState<NonMollureClientType>(
     "",
   );
   const [indFirstName, setIndFirstName] = React.useState("");
@@ -169,11 +126,11 @@ export function useFixedLocationClientPage() {
   const [editPhoneErrors, setEditPhoneErrors] = React.useState<{ countryCode?: string; phone?: string }>({});
   const [nonMollureTechnicalNote, setNonMollureTechnicalNote] = React.useState("");
 
-  const [snackbar, setSnackbar] = React.useState<{
-    open: boolean;
-    message: string;
-    severity: "success" | "info" | "error";
-  }>({ open: false, message: "", severity: "success" });
+  const [snackbar, setSnackbar] = React.useState<ClientSnackbarState>({
+    open: false,
+    message: "",
+    severity: "success",
+  });
 
   const closeSnackbar = React.useCallback((_e?: unknown, reason?: string) => {
     if (reason === "clickaway") return;
@@ -328,19 +285,10 @@ export function useFixedLocationClientPage() {
       });
       return;
     }
-    const dialCodes = ["+971", "+92", "+91", "+49", "+44", "+1", "+81", "+61", "+31"];
-    const splitPhone = (raw: string) => {
-      for (const code of dialCodes) {
-        if (raw.startsWith(code)) {
-          return { countryCode: code, phone: raw.slice(code.length).trim() };
-        }
-      }
-      return { countryCode: "+44", phone: raw };
-    };
     if (viewClient.kind === "company") {
       const c = viewClient;
       const parts = (c.contactPersonName ?? "").trim().split(/\s+/);
-      const { countryCode, phone } = splitPhone(c.phone.trim());
+      const { countryCode, phone } = splitClientPhone(c.phone.trim());
       setEditCompanyForm({
         legalName: c.legalName ?? "",
         coc: c.coc ?? "",
@@ -361,7 +309,7 @@ export function useFixedLocationClientPage() {
     } else {
       const c = viewClient;
       const nameParts = c.name.trim().split(/\s+/);
-      const { countryCode, phone } = splitPhone(c.phone.trim());
+      const { countryCode, phone } = splitClientPhone(c.phone.trim());
       setEditIndividualForm({
         firstName: nameParts[0] ?? "",
         lastName: nameParts.slice(1).join(" ") || "",

@@ -3,12 +3,11 @@ import * as React from "react";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
-import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import { Box, IconButton, Popover, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useSnackbar } from "../../common/AppSnackbar";
 import AppDatePicker from "../../common/AppDatePicker";
-import MollureFormField from "../../common/MollureFormField";
+import AppSearchField from "../../common/AppSearchField";
 import { BodyText } from "../../ui/typography";
 
 export type TransactionsToolbarProps = {
@@ -63,15 +62,9 @@ export default function TransactionsToolbar({
   }, [onFromDateChange, onToDateChange]);
 
   const commonBtnSx = {
-    borderRadius: "6px",
-    textTransform: "none",
-    fontWeight: 700,
+    height: 40,
+    px: 1.5,
     fontSize: 12.5,
-    borderColor: alpha(m.navy, 0.14),
-    color: alpha(m.navy, 0.78),
-    bgcolor: "#fff",
-    height: 34,
-    px: 1.25,
   } as const;
 
   return (
@@ -82,22 +75,18 @@ export default function TransactionsToolbar({
         alignItems={{ lg: "center" }}
       >
         <Box sx={{ flex: 1, maxWidth: { lg: 420 } }}>
-          <MollureFormField
+          <AppSearchField
+            fullWidth
+            size="small"
             placeholder="Search by Booking ID, client name or email"
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
+            onClear={() => onQueryChange("")}
             sx={{
               "& .MuiOutlinedInput-root": {
+                height: 40,
                 bgcolor: alpha(m.navy, 0.01),
-                borderRadius: "10px",
               },
-            }}
-            InputProps={{
-              endAdornment: (
-                <SearchRoundedIcon
-                  sx={{ fontSize: 18, color: alpha(m.navy, 0.45) }}
-                />
-              ),
             }}
           />
         </Box>
@@ -107,18 +96,19 @@ export default function TransactionsToolbar({
           spacing={1}
           flexWrap="wrap"
           useFlexGap
+          alignItems="center"
           justifyContent={{ xs: "flex-start", lg: "flex-end" }}
           sx={{ width: { xs: "100%", lg: "auto" } }}
         >
           <AppButton
-            variant="outlined"
+            tone="secondary"
             onClick={(e) => setFromAnchor(e.currentTarget)}
             sx={commonBtnSx}
           >
             {fromDate ? `From: ${fromDate}` : "from date"}
           </AppButton>
           <AppButton
-            variant="outlined"
+            tone="secondary"
             onClick={(e) => setToAnchor(e.currentTarget)}
             sx={commonBtnSx}
           >
@@ -126,7 +116,7 @@ export default function TransactionsToolbar({
           </AppButton>
           {hasAppliedDateRange ? (
             <AppButton
-              variant="outlined"
+              tone="secondary"
               onClick={handleResetDateRange}
               sx={commonBtnSx}
             >
@@ -134,39 +124,19 @@ export default function TransactionsToolbar({
             </AppButton>
           ) : null}
           <AppButton
-            variant="outlined"
+            tone="secondary"
             startIcon={<TuneRoundedIcon sx={{ fontSize: 18 }} />}
             onClick={onFiltersClick}
-            sx={{
-              borderRadius: "6px",
-              textTransform: "none",
-              fontWeight: 700,
-              fontSize: 12.5,
-              borderColor: alpha(m.navy, 0.14),
-              color: alpha(m.navy, 0.78),
-              bgcolor: "#fff",
-              height: 34,
-              px: 1.25,
-            }}
+            sx={commonBtnSx}
           >
             Filters
           </AppButton>
           <AppButton
-            variant="contained"
-            disableElevation
+            tone="primary"
             disabled={disableAdd}
             onClick={(e) => onAddClick(e.currentTarget)}
             endIcon={<KeyboardArrowDownRoundedIcon />}
-            sx={{
-              borderRadius: "6px",
-              textTransform: "none",
-              fontWeight: 800,
-              fontSize: 12.5,
-              height: 34,
-              px: 1.25,
-              bgcolor: "primary.main",
-              "&:hover": { bgcolor: "mollure.tealDark" },
-            }}
+            sx={commonBtnSx}
           >
             Add
           </AppButton>
@@ -176,10 +146,10 @@ export default function TransactionsToolbar({
             aria-haspopup="menu"
             onClick={(e) => onMoreClick(e.currentTarget)}
             sx={{
-              width: 34,
-              height: 34,
+              width: 40,
+              height: 40,
               flexShrink: 0,
-              borderRadius: "8px",
+              borderRadius: "10px",
               border: `1px solid ${alpha(m.navy, 0.12)}`,
               bgcolor: "#fff",
               color: alpha(m.navy, 0.72),
@@ -228,13 +198,13 @@ export default function TransactionsToolbar({
         />
         <Stack direction="row" spacing={1} sx={{ mt: 1.25 }}>
           <AppButton
+            tone="secondary"
             fullWidth
-            variant="outlined"
             onClick={() => {
               setFromAnchor(null);
               setFromDraft(fromDate ?? "");
             }}
-            sx={{ ...commonBtnSx, height: 36 }}
+            sx={{ height: 40 }}
           >
             Cancel
           </AppButton>
@@ -296,13 +266,13 @@ export default function TransactionsToolbar({
         />
         <Stack direction="row" spacing={1} sx={{ mt: 1.25 }}>
           <AppButton
+            tone="secondary"
             fullWidth
-            variant="outlined"
             onClick={() => {
               setToAnchor(null);
               setToDraft(toDate ?? "");
             }}
-            sx={{ ...commonBtnSx, height: 36 }}
+            sx={{ height: 40 }}
           >
             Cancel
           </AppButton>

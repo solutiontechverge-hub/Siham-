@@ -15,6 +15,7 @@ type AdminFilterDateRangeProps = {
   minWidth?: number | string | Record<string, number | string>;
   /** Removes outer border for use inside segmented filter bars. */
   embedded?: boolean;
+  height?: number;
 };
 
 function formatDisplay(iso: string) {
@@ -37,6 +38,7 @@ export default function AdminFilterDateRange({
   placeholder = "Select date range",
   minWidth = 240,
   embedded = false,
+  height = 40,
 }: AdminFilterDateRangeProps) {
   const tokens = useTheme().palette.mollure;
   const anchorRef = React.useRef<HTMLButtonElement>(null);
@@ -103,9 +105,11 @@ export default function AdminFilterDateRange({
             : `1px solid ${open ? tokens.teal : (tokens.inputBorder ?? tokens.cardBorder)}`,
           bgcolor: embedded ? "transparent" : tokens.white,
           minWidth: embedded ? 0 : minWidth,
-          width: embedded ? "100%" : undefined,
-          height: 40,
+          width: embedded || minWidth === 0 || minWidth === "100%" ? "100%" : undefined,
+          maxWidth: "100%",
+          height,
           justifyContent: "flex-start",
+          boxSizing: "border-box",
           transition: "border-color 160ms ease",
           "&:hover": embedded
             ? { bgcolor: alpha(tokens.teal, 0.04) }

@@ -15,7 +15,14 @@ export default function AdminFilterField({
   const tokens = useTheme().palette.mollure;
 
   return (
-    <Stack spacing={0.5} sx={{ width: "100%", minWidth: 0 }}>
+    <Stack
+      spacing={0.5}
+      sx={{
+        width: { xs: "100%", lg: "auto" },
+        minWidth: 0,
+        flex: { lg: "1 1 0" },
+      }}
+    >
       {label ? (
         <Typography
           sx={{

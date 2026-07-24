@@ -63,7 +63,6 @@ export {
   MollureAuthTextField,
 } from "./MollureAuthFields";
 export { default as ContentCard } from "./ContentCard";
-export { default as FilterPanel } from "./FilterPanel";
 export { default as ImageCard } from "./ImageCard";
 export * from "./ListingFilterBox";
 export { default as ListingFiltersDrawer } from "./ListingFiltersDrawer";

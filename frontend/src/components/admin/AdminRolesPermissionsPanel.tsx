@@ -24,6 +24,7 @@ import { AppButton, AppSearchField, AppTextField } from "../common";
 import AppCard from "../common/AppCard";
 import AdminUnderlineTabs from "./AdminUnderlineTabs";
 import AdminDataTable, { type AdminTableColumn } from "./AdminDataTable";
+import AdminUserRowActions from "./AdminUserRowActions";
 import { ADMIN_CARD_PADDING as pad } from "./adminCardPadding";
 import {
   adminPermissionModules,
@@ -221,11 +222,16 @@ export default function AdminRolesPermissionsPanel({
           label={r.status === "active" ? "Active" : "Disabled"}
           size="small"
           sx={{
+            height: 24,
+            borderRadius: "999px",
             bgcolor:
-              r.status === "active" ? tokens.mintSoft : tokens.sectionSurface,
+              r.status === "active"
+                ? tokens.mintSoft
+                : "rgba(16, 35, 63, 0.08)",
             color: r.status === "active" ? tokens.tealDark : tokens.slate,
             fontWeight: 600,
             fontSize: 11,
+            "& .MuiChip-label": { px: 1.25 },
           }}
         />
       ),
@@ -234,36 +240,12 @@ export default function AdminRolesPermissionsPanel({
       id: "actions",
       label: "Action",
       render: (r) => (
-        <Stack direction="row" spacing={1}>
-          <AppButton
-            size="small"
-            variant="outlined"
-            onClick={() => onEditUser(r)}
-            sx={{ textTransform: "none", fontSize: 12 }}
-          >
-            Edit
-          </AppButton>
-          {r.status === "active" ? (
-            <AppButton
-              size="small"
-              variant="outlined"
-              color="inherit"
-              onClick={() => onDisableUser(r)}
-              sx={{ textTransform: "none", fontSize: 12 }}
-            >
-              Disable
-            </AppButton>
-          ) : (
-            <AppButton
-              tone="danger"
-              size="small"
-              onClick={() => onDeleteUser(r)}
-              sx={{ fontSize: 12 }}
-            >
-              Delete
-            </AppButton>
-          )}
-        </Stack>
+        <AdminUserRowActions
+          user={r}
+          onEdit={onEditUser}
+          onDisable={onDisableUser}
+          onDelete={onDeleteUser}
+        />
       ),
     },
   ];

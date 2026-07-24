@@ -240,14 +240,16 @@ export function AppModalPrimaryButton({
   onClick,
   label,
   disabled,
+  tone = "primary",
 }: {
   onClick: () => void;
   label: string;
   disabled?: boolean;
+  tone?: "primary" | "danger";
 }) {
   return (
     <AppButton
-      tone="primary"
+      tone={tone}
       presetSize="lg"
       onClick={onClick}
       disabled={disabled}

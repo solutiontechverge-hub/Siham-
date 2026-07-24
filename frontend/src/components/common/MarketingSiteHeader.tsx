@@ -1,10 +1,5 @@
-/**
- * @deprecated Import `MollureMarketingHeader` for clarity; this file re-exports the same component for compatibility.
- */
-import MollureMarketingHeader from "./MollureMarketingHeader";
+﻿"use client";
 
-export default MollureMarketingHeader;
-export type {
-  MarketingNavItem,
-  MollureMarketingHeaderProps as MarketingSiteHeaderProps,
-} from "./MollureMarketingHeader";
+export { default } from "./marketing/MarketingSiteHeader";
+export type { MarketingSiteHeaderProps } from "./marketing/MarketingSiteHeader";
+export type { MarketingNavItem } from "./marketing/MollureMarketingHeader";
