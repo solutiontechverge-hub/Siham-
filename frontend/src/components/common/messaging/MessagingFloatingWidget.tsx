@@ -19,8 +19,12 @@ function useMessagingProfile(audience: MessagingAudience) {
   const fallbackDisplayName =
     ((user as { display_name?: string })?.display_name as string | undefined) ||
     `${(user as { first_name?: string })?.first_name ?? ""} ${(user as { last_name?: string })?.last_name ?? ""}`.trim();
-  const [userName, setUserName] = React.useState(fallbackDisplayName || (audience === "client" ? "User" : "Professional"));
-  const [avatarUrl, setAvatarUrl] = React.useState<string | undefined>(undefined);
+  const [userName, setUserName] = React.useState(
+    fallbackDisplayName || (audience === "client" ? "User" : "Professional"),
+  );
+  const [avatarUrl, setAvatarUrl] = React.useState<string | undefined>(
+    undefined,
+  );
 
   React.useEffect(() => {
     if (audience !== "client") return;
@@ -37,9 +41,11 @@ function useMessagingProfile(audience: MessagingAudience) {
       const authedEmail = user?.email?.trim().toLowerCase();
       const persistedEmail = data?.email?.trim().toLowerCase();
       if (authedEmail && persistedEmail && authedEmail === persistedEmail) {
-        if (typeof data.avatar_url === "string" && data.avatar_url) setAvatarUrl(data.avatar_url);
+        if (typeof data.avatar_url === "string" && data.avatar_url)
+          setAvatarUrl(data.avatar_url);
         const persistedName = (data.display_name ?? "").trim();
-        const fullName = `${data.first_name ?? ""} ${data.last_name ?? ""}`.trim();
+        const fullName =
+          `${data.first_name ?? ""} ${data.last_name ?? ""}`.trim();
         const resolved = persistedName || fullName;
         if (resolved) setUserName(resolved);
       }
@@ -60,7 +66,9 @@ export type MessagingFloatingWidgetProps = {
   audience: MessagingAudience;
 };
 
-export default function MessagingFloatingWidget({ audience }: MessagingFloatingWidgetProps) {
+export default function MessagingFloatingWidget({
+  audience,
+}: MessagingFloatingWidgetProps) {
   const m = useTheme().palette.mollure;
   const pathname = usePathname();
   const { open, params, openMessaging, closeMessaging } = useMessagingWidget();
@@ -69,7 +77,8 @@ export default function MessagingFloatingWidget({ audience }: MessagingFloatingW
   const professionalUnread = useProfessionalMessagingUnread();
   const unreadCount = audience === "client" ? clientUnread : professionalUnread;
 
-  const messagingRoutePrefix = audience === "client" ? "/clients/messaging" : "/professionals/messaging";
+  const messagingRoutePrefix =
+    audience === "client" ? "/clients/messaging" : "/professionals/messaging";
   const hideFab = pathname?.startsWith(messagingRoutePrefix);
 
   React.useEffect(() => {
@@ -116,7 +125,14 @@ export default function MessagingFloatingWidget({ audience }: MessagingFloatingW
             isolation: "isolate",
           }}
         >
-          <Box sx={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+          <Box
+            sx={{
+              flex: 1,
+              minHeight: 0,
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
             <MessagingPageView
               audience={audience}
               currentUserName={userName}
@@ -154,9 +170,16 @@ export default function MessagingFloatingWidget({ audience }: MessagingFloatingW
             badgeContent={unreadCount > 9 ? "9+" : unreadCount}
             color="error"
             invisible={unreadCount <= 0}
-            sx={{ "& .MuiBadge-badge": { fontWeight: 900, fontSize: { xs: 9, sm: 10 } } }}
+            sx={{
+              "& .MuiBadge-badge": {
+                fontWeight: 900,
+                fontSize: { xs: 9, sm: 10 },
+              },
+            }}
           >
-            <ChatBubbleRoundedIcon sx={{ fontSize: { xs: 24, sm: 28 }, color: "#fff" }} />
+            <ChatBubbleRoundedIcon
+              sx={{ fontSize: { xs: 24, sm: 28 }, color: "#fff" }}
+            />
           </Badge>
         </Fab>
       ) : null}

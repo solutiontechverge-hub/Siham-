@@ -77,6 +77,36 @@ export const notificationsApi = baseApi.injectEndpoints({
         if (response.error) return { error: response.error };
         return { data: response.data as ApiEnvelope<AppNotificationItem> };
       },
+      async onQueryStarted(id, { dispatch, queryFulfilled }) {
+        const patchList = dispatch(
+          notificationsApi.util.updateQueryData(
+            "getMyNotifications",
+            undefined,
+            (draft) => {
+              const rows = draft.data ?? [];
+              const row = rows.find((item) => item.id === id);
+              if (row) row.read = true;
+            },
+          ),
+        );
+        const patchCount = dispatch(
+          notificationsApi.util.updateQueryData(
+            "getUnreadNotificationCount",
+            undefined,
+            (draft) => {
+              if (draft.data) {
+                draft.data.count = Math.max(0, (draft.data.count ?? 0) - 1);
+              }
+            },
+          ),
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patchList.undo();
+          patchCount.undo();
+        }
+      },
       invalidatesTags: ["Notifications"],
     }),
     markAllNotificationsRead: builder.mutation<ApiEnvelope<null>, void>({
@@ -87,6 +117,34 @@ export const notificationsApi = baseApi.injectEndpoints({
         });
         if (response.error) return { error: response.error };
         return { data: response.data as ApiEnvelope<null> };
+      },
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        const patchList = dispatch(
+          notificationsApi.util.updateQueryData(
+            "getMyNotifications",
+            undefined,
+            (draft) => {
+              for (const row of draft.data ?? []) {
+                row.read = true;
+              }
+            },
+          ),
+        );
+        const patchCount = dispatch(
+          notificationsApi.util.updateQueryData(
+            "getUnreadNotificationCount",
+            undefined,
+            (draft) => {
+              if (draft.data) draft.data.count = 0;
+            },
+          ),
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patchList.undo();
+          patchCount.undo();
+        }
       },
       invalidatesTags: ["Notifications"],
     }),

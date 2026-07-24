@@ -54,6 +54,14 @@ export function emitBookingChanged(booking, action = "updated") {
   }
 }
 
+export function emitReviewChanged(payload = {}) {
+  if (!messagingIo || !payload?.business_setup_id) return;
+  messagingIo.to(`business:${payload.business_setup_id}`).emit("reviews:changed", payload);
+  if (payload.client_user_id) {
+    messagingIo.to(`user:${payload.client_user_id}`).emit("reviews:changed", payload);
+  }
+}
+
 export function emitNotificationChanged(userId) {
   if (!messagingIo || !userId) return;
   messagingIo.to(`user:${userId}`).emit("notifications:changed", { userId });

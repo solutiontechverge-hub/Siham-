@@ -2,6 +2,7 @@ import { query } from "../db/index.js";
 import { syncBookingToFinanceTransaction } from "../services/finance-sync.service.js";
 import { notifyBookingStatusChange } from "../services/bookingEmail.service.js";
 import { emitBookingChanged } from "../messaging/messagingSocket.js";
+import { dispatchBookingUpdatedNotifications } from "../services/bookingNotification.service.js";
 
 const DEFAULT_INTERVAL_MS = Number(process.env.BOOKING_AUTOCOMPLETE_POLL_MS || 60 * 1000);
 
@@ -9,11 +10,13 @@ let intervalHandle = null;
 let running = false;
 
 /**
- * Transition confirmed / in-progress bookings to completed once their service
- * window has passed. Uses end_time when available, otherwise falls back to the
- * booking date (completed once the booking date is before today). Only
- * 'confirmed' and 'in_progress' bookings are touched — cancelled / requested /
- * no_show are left untouched.
+ * Transition in-progress bookings to completed once their service window has
+ * passed. Uses end_time when available, otherwise falls back to the booking
+ * date (completed once the booking date is before today).
+ *
+ * Confirmed bookings are intentionally left alone after the window ends so the
+ * professional can still mark No Show (client booked but never arrived). Only
+ * bookings that were started (in_progress) auto-complete.
  */
 const runAutoCompleteCycle = async () => {
   if (running) return;
@@ -23,7 +26,7 @@ const runAutoCompleteCycle = async () => {
       `WITH targets AS (
          SELECT id, status AS prev_status
          FROM bookings
-         WHERE status IN ('confirmed', 'in_progress')
+         WHERE status = 'in_progress'
            AND (
              (end_time IS NOT NULL AND end_time <= NOW())
              OR (end_time IS NULL AND booking_date < CURRENT_DATE)
@@ -50,6 +53,7 @@ const runAutoCompleteCycle = async () => {
         // best-effort finance sync
       }
       void notifyBookingStatusChange(booking.id, booking.prev_status, "completed");
+      void dispatchBookingUpdatedNotifications(booking, booking.prev_status, booking.prepayment_status);
       emitBookingChanged(booking, "updated");
     }
 

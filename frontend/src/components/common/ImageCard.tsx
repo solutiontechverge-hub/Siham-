@@ -2,12 +2,7 @@
 
 import * as React from "react";
 import Image from "next/image";
-import {
-  Box,
-  CardContent,
-  Stack,
-  type PaperProps,
-} from "@mui/material";
+import { Box, CardContent, Stack, type PaperProps } from "@mui/material";
 import AppCard from "./AppCard";
 import { BodyText, SubHeading } from "../ui/typography";
 
@@ -30,7 +25,9 @@ export default function ImageCard({
   ...props
 }: ImageCardProps) {
   const useUnoptimizedImage =
-    /^https?:\/\//i.test(image) || image.startsWith("data:") || image.startsWith("blob:");
+    /^https?:\/\//i.test(image) ||
+    image.startsWith("data:") ||
+    image.startsWith("blob:");
 
   return (
     <AppCard sx={{ overflow: "hidden" }} {...props}>

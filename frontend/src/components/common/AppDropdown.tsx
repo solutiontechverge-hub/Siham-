@@ -2,8 +2,14 @@
 
 import * as React from "react";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
-import { Checkbox, MenuItem, type TextFieldProps } from "@mui/material";
+import {
+  Checkbox,
+  ListSubheader,
+  MenuItem,
+  type TextFieldProps,
+} from "@mui/material";
 import AppTextField from "./AppTextField";
+import AppSearchField from "./AppSearchField";
 
 export type AppDropdownOption = {
   label: string;
@@ -12,12 +18,18 @@ export type AppDropdownOption = {
   icon?: React.ReactNode;
 };
 
-type AppDropdownProps = Omit<TextFieldProps, "select" | "onChange" | "children" | "value"> & {
+type AppDropdownProps = Omit<
+  TextFieldProps,
+  "select" | "onChange" | "children" | "value"
+> & {
   options: AppDropdownOption[];
   value: string | readonly string[];
   multiple?: boolean;
   /** Close the menu after each selection (useful for multi-select in modals). */
   closeOnSelect?: boolean;
+  /** Show a search field at the top of the menu to filter options by label. */
+  searchable?: boolean;
+  searchPlaceholder?: string;
   renderValue?: (selected: string | readonly string[]) => React.ReactNode;
   onChange: (
     value: string | readonly string[],
@@ -43,18 +55,29 @@ export default function AppDropdown({
   value,
   multiple,
   closeOnSelect = false,
+  searchable = false,
+  searchPlaceholder = "Search...",
   renderValue,
   placeholder,
   ...props
 }: AppDropdownProps) {
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [search, setSearch] = React.useState("");
 
-  const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (
+    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
     onChange(normalizeSelectValue(event.target.value, multiple), event);
     if (closeOnSelect) {
       setMenuOpen(false);
     }
   };
+
+  const query = search.trim().toLowerCase();
+  const visibleOptions =
+    searchable && query
+      ? options.filter((option) => option.label.toLowerCase().includes(query))
+      : options;
 
   return (
     <AppTextField
@@ -65,19 +88,27 @@ export default function AppDropdown({
         IconComponent: ExpandMoreRoundedIcon,
         multiple: Boolean(multiple),
         displayEmpty: true,
-        ...(closeOnSelect
+        onClose: () => {
+          setMenuOpen(false);
+          setSearch("");
+        },
+        ...(closeOnSelect || searchable
           ? {
               open: menuOpen,
               onOpen: () => setMenuOpen(true),
-              onClose: () => setMenuOpen(false),
             }
           : {}),
         renderValue:
           (renderValue as any) ??
           ((selected: any) => {
             const isMulti = Array.isArray(selected);
-            const isEmpty = isMulti ? selected.length === 0 : selected === "" || selected == null;
-            if (isEmpty) return <span style={{ opacity: 0.6 }}>{placeholder ?? "Select"}</span>;
+            const isEmpty = isMulti
+              ? selected.length === 0
+              : selected === "" || selected == null;
+            if (isEmpty)
+              return (
+                <span style={{ opacity: 0.6 }}>{placeholder ?? "Select"}</span>
+              );
             const v = isMulti ? selected[0] : selected;
             const label = options.find((o) => o.value === v)?.label;
             return label ?? String(v);
@@ -85,8 +116,28 @@ export default function AppDropdown({
       }}
       {...props}
     >
-      {options.map((option) => {
-        const selected = Array.isArray(value) ? value.includes(option.value) : value === option.value;
+      {searchable ? (
+        <ListSubheader
+          disableSticky
+          sx={{ px: 1, py: 0.75, lineHeight: 1, bgcolor: "#fff" }}
+        >
+          <AppSearchField
+            autoFocus
+            fullWidth
+            placeholder={searchPlaceholder}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onClear={() => setSearch("")}
+            onKeyDown={(e) => {
+              if (e.key !== "Escape") e.stopPropagation();
+            }}
+          />
+        </ListSubheader>
+      ) : null}
+      {visibleOptions.map((option) => {
+        const selected = Array.isArray(value)
+          ? value.includes(option.value)
+          : value === option.value;
         return (
           <MenuItem
             key={option.value}
@@ -100,7 +151,9 @@ export default function AppDropdown({
               lineHeight: 1.2,
             }}
           >
-            {multiple ? <Checkbox size="small" checked={selected} sx={{ p: 0.5 }} /> : null}
+            {multiple ? (
+              <Checkbox size="small" checked={selected} sx={{ p: 0.5 }} />
+            ) : null}
             {option.icon ? option.icon : null}
             {option.label}
           </MenuItem>

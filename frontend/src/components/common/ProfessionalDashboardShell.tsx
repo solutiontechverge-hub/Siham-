@@ -7,7 +7,8 @@ import FixedLocationPageScaffold from "./FixedLocationPageScaffold";
 import { fixedLocationTopTabs } from "../../app/professionals/fixed-location/fixedLocationTopTabs";
 import FinanceSubTabs from "../../app/professionals/fixed-location/finance/FinanceSubTabs";
 
-type DashboardTabKey = "profile" | "calendar" | "client" | "finance" | "analytics";
+type DashboardTabKey =
+  "profile" | "calendar" | "client" | "finance" | "analytics";
 
 type CachedPanel = {
   node: React.ReactNode;
@@ -44,15 +45,20 @@ export type ProfessionalDashboardShellProps = {
   children: React.ReactNode;
 };
 
-export default function ProfessionalDashboardShell({ children }: ProfessionalDashboardShellProps) {
+export default function ProfessionalDashboardShell({
+  children,
+}: ProfessionalDashboardShellProps) {
   const pathname = usePathname();
   const router = useRouter();
   const activeTab = resolveTabKey(pathname);
-  const panelCacheRef = React.useRef<Partial<Record<DashboardTabKey, CachedPanel>>>({});
+  const panelCacheRef = React.useRef<
+    Partial<Record<DashboardTabKey, CachedPanel>>
+  >({});
 
   const cachedPanel = panelCacheRef.current[activeTab];
   const shouldStorePanel =
-    !cachedPanel || (activeTab === "finance" && cachedPanel.pathname !== pathname);
+    !cachedPanel ||
+    (activeTab === "finance" && cachedPanel.pathname !== pathname);
 
   if (shouldStorePanel) {
     panelCacheRef.current[activeTab] = { node: children, pathname };
@@ -69,7 +75,10 @@ export default function ProfessionalDashboardShell({ children }: ProfessionalDas
   const activeTopTab = resolveActiveTopTab(activeTab);
 
   return (
-    <FixedLocationPageScaffold activeTopTab={activeTopTab} topTabs={fixedLocationTopTabs}>
+    <FixedLocationPageScaffold
+      activeTopTab={activeTopTab}
+      topTabs={fixedLocationTopTabs}
+    >
       {mountedTabs.map((tabKey) => {
         const panel = panelCacheRef.current[tabKey]?.node;
         if (!panel) return null;

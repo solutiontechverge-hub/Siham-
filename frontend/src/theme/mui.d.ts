@@ -29,6 +29,7 @@ declare module "@mui/material/styles" {
     navy: string;
     slate: string;
     surface: string;
+    pageBg: string;
     footer: string;
     footerText: string;
     footerMuted: string;
@@ -79,6 +80,24 @@ declare module "@mui/material/styles" {
     addSoftBgHover: string;
     addSoftFg: string;
     addSoftBorder: string;
+    /** Calendar blocked-time slot fill */
+    blockedTimeBg: string;
+    /** Calendar blocked-time label / accent */
+    blockedTimeFg: string;
+    /** Soft status chip — overdue / pending / due */
+    statusOrangeBg: string;
+    statusOrangeFg: string;
+    /** Soft status chip — paid / prepaid */
+    statusGreenBg: string;
+    statusGreenFg: string;
+    /** Soft status chip — void / refunded text (bg: fxGrayF2F4F7) */
+    statusGreyFg: string;
+    /** Soft status chip — no show */
+    statusNoShowBg: string;
+    statusNoShowFg: string;
+    /** Soft status chip — completed (outlined) */
+    statusCompletedBg: string;
+    statusCompletedBorder: string;
     salesVolumeStackDark: string;
     salesVolumeStackMid: string;
     salesVolumeStackLight: string;

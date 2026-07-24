@@ -7,7 +7,13 @@ import { alpha, useTheme } from "@mui/material/styles";
 
 type Variant = "arrow" | "rejected";
 
-export default function EditRequestIndicatorIcon({ variant, size = 22 }: { variant: Variant; size?: number }) {
+export default function EditRequestIndicatorIcon({
+  variant,
+  size = 22,
+}: {
+  variant: Variant;
+  size?: number;
+}) {
   const m = useTheme().palette.mollure;
 
   if (variant === "rejected") {

@@ -28,7 +28,10 @@ export function MarketingShellLayout({
   contentSx,
   hideFooter,
 }: MarketingShellLayoutProps) {
-  const footerData = audience === "clients" ? marketingShellFooter : professionalsMarketingFooter;
+  const footerData =
+    audience === "clients"
+      ? marketingShellFooter
+      : professionalsMarketingFooter;
   const footer = (
     <MarketingSiteFooter
       columns={footerData.columns.map((col) => ({
@@ -42,7 +45,13 @@ export function MarketingShellLayout({
   if (audience === "clients") {
     const h = clientsShellHeader;
     return (
-      <Box sx={{ bgcolor: "background.default", minHeight: "100vh", ...(contentSx ?? {}) }}>
+      <Box
+        sx={{
+          bgcolor: "background.default",
+          minHeight: "100vh",
+          ...(contentSx ?? {}),
+        }}
+      >
         <MollureMarketingHeader
           navItems={[...h.navItems]}
           localeLabel={h.localeLabel}
@@ -59,7 +68,13 @@ export function MarketingShellLayout({
 
   const h = professionalsMarketingHeader;
   return (
-    <Box sx={{ bgcolor: "background.default", minHeight: "100vh", ...(contentSx ?? {}) }}>
+    <Box
+      sx={{
+        bgcolor: "background.default",
+        minHeight: "100vh",
+        ...(contentSx ?? {}),
+      }}
+    >
       <MollureMarketingHeader
         navItems={[...h.navItems]}
         localeLabel={h.localeLabel}

@@ -3,7 +3,10 @@
 import * as React from "react";
 import { Box, Paper, Radio, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import type { CheckoutPaymentMethodId, CheckoutPaymentOption } from "./checkoutPaymentOptions";
+import type {
+  CheckoutPaymentMethodId,
+  CheckoutPaymentOption,
+} from "./checkoutPaymentOptions";
 
 type Props = {
   options: CheckoutPaymentOption[];
@@ -33,9 +36,27 @@ export default function ClientBookingPaymentMethodSelector({
         overflow: "hidden",
       }}
     >
-      <Box sx={{ px: 1.75, py: 1.15, bgcolor: alpha(m.navy, 0.02), borderBottom: `1px solid ${alpha(m.navy, 0.06)}` }}>
-        <Typography sx={{ fontWeight: 900, fontSize: 12.5, color: alpha(m.navy, 0.78) }}>Payment method</Typography>
-        <Typography sx={{ mt: 0.25, fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.48) }}>
+      <Box
+        sx={{
+          px: 1.75,
+          py: 1.15,
+          bgcolor: alpha(m.navy, 0.02),
+          borderBottom: `1px solid ${alpha(m.navy, 0.06)}`,
+        }}
+      >
+        <Typography
+          sx={{ fontWeight: 900, fontSize: 12.5, color: alpha(m.navy, 0.78) }}
+        >
+          Payment method
+        </Typography>
+        <Typography
+          sx={{
+            mt: 0.25,
+            fontSize: 11,
+            fontWeight: 700,
+            color: alpha(m.navy, 0.48),
+          }}
+        >
           Options offered by this professional after booking
         </Typography>
       </Box>
@@ -69,13 +90,31 @@ export default function ClientBookingPaymentMethodSelector({
                   checked={selected}
                   size="small"
                   tabIndex={-1}
-                  sx={{ p: 0.25, mt: 0.1, color: alpha(m.navy, 0.35), "&.Mui-checked": { color: m.teal } }}
+                  sx={{
+                    p: 0.25,
+                    mt: 0.1,
+                    color: alpha(m.navy, 0.35),
+                    "&.Mui-checked": { color: m.teal },
+                  }}
                 />
                 <Box sx={{ minWidth: 0 }}>
-                  <Typography sx={{ fontWeight: 900, fontSize: 12.5, color: alpha(m.navy, 0.82) }}>
+                  <Typography
+                    sx={{
+                      fontWeight: 900,
+                      fontSize: 12.5,
+                      color: alpha(m.navy, 0.82),
+                    }}
+                  >
                     {option.label}
                   </Typography>
-                  <Typography sx={{ mt: 0.35, fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.5) }}>
+                  <Typography
+                    sx={{
+                      mt: 0.35,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: alpha(m.navy, 0.5),
+                    }}
+                  >
                     {option.description}
                   </Typography>
                 </Box>

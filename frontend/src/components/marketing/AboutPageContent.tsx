@@ -1,10 +1,6 @@
 "use client";
 
-import {
-  AboutFaqAccordion,
-  AboutHero,
-  AboutSplitSection,
-} from "../about";
+import { AboutFaqAccordion, AboutHero, AboutSplitSection } from "../about";
 import { aboutPageData } from "../../app/about/about.data";
 
 export function AboutPageContent() {
@@ -24,7 +20,10 @@ export function AboutPageContent() {
         paragraphs={aboutPageData.split.paragraphs}
       />
 
-      <AboutFaqAccordion title={aboutPageData.faq.title} items={aboutPageData.faq.items} />
+      <AboutFaqAccordion
+        title={aboutPageData.faq.title}
+        items={aboutPageData.faq.items}
+      />
     </>
   );
 }

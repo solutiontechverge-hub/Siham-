@@ -6,7 +6,10 @@ import AppDropdown, { type AppDropdownOption } from "./AppDropdown";
 
 export type AppMultiSelectOption = AppDropdownOption;
 
-type AppMultiSelectProps = Omit<TextFieldProps, "select" | "onChange" | "value"> & {
+type AppMultiSelectProps = Omit<
+  TextFieldProps,
+  "select" | "onChange" | "value"
+> & {
   options: AppMultiSelectOption[];
   value: string[];
   placeholder?: string;
@@ -56,9 +59,18 @@ export default function AppMultiSelect({
         onChange([]);
       }}
       renderValue={(selected) => {
-        const values = Array.isArray(selected) ? selected : selected ? [selected] : [];
+        const values = Array.isArray(selected)
+          ? selected
+          : selected
+            ? [selected]
+            : [];
         if (renderValue) return renderValue(values);
-        return formatMultiSelectValue(values, options, placeholder, maxLabelsShown);
+        return formatMultiSelectValue(
+          values,
+          options,
+          placeholder,
+          maxLabelsShown,
+        );
       }}
       {...props}
     />

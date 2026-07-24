@@ -1,8 +1,9 @@
 "use client";
 
+import AppButton from "../../../../components/common/AppButton";
 import * as React from "react";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
-import { Box, Button, Container, Paper, Stack, Typography } from "@mui/material";
+import { Box, Container, Paper, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useRouter } from "next/navigation";
 
@@ -15,7 +16,7 @@ export default function BookingCompletedPage() {
     <Box
       sx={{
         minHeight: "100vh",
-        bgcolor: "#EAF9FB",
+        bgcolor: "mollure.pageBg",
         py: { xs: 2.5, md: 3.5 },
         display: "flex",
         alignItems: "center",
@@ -53,17 +54,22 @@ export default function BookingCompletedPage() {
               >
                 <CheckRoundedIcon sx={{ fontSize: 34 }} />
               </Box>
-              <Typography sx={{ fontWeight: 900, color: alpha(m.navy, 0.82), fontSize: 16 }}>
+              <Typography
+                sx={{
+                  fontWeight: 900,
+                  color: alpha(m.navy, 0.82),
+                  fontSize: 16,
+                }}
+              >
                 Booking Completed
               </Typography>
-              <Button
-                variant="contained"
-                disableElevation
+              <AppButton
+                tone="primary"
                 onClick={() => router.push("/clients/booking")}
-                sx={{ mt: 0.5, bgcolor: m.teal, "&:hover": { bgcolor: m.tealDark }, borderRadius: "8px", fontWeight: 900, textTransform: "none" }}
+                sx={{ mt: 0.5, borderRadius: "8px" }}
               >
                 View Booking
-              </Button>
+              </AppButton>
             </Stack>
           </Box>
         </Paper>
@@ -71,4 +77,3 @@ export default function BookingCompletedPage() {
     </Box>
   );
 }
-

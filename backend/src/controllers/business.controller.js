@@ -12,11 +12,6 @@ import {
   dispatchBookingEventNotification,
   dispatchBookingUpdatedNotifications,
 } from "../services/bookingNotification.service.js";
-import {
-  notifyBookingStatusChange,
-  notifyIncomingBookingRequest,
-  notifyIncomingEditRequest,
-} from "../services/bookingEmail.service.js";
 import { emitBookingChanged } from "../messaging/messagingSocket.js";
 import { normalizeEntityId } from "../utils/business-setup-parsers.js";
 import { saveBookingAttachments } from "../services/booking-upload.service.js";
@@ -211,6 +206,8 @@ const normalizeServiceCategories = (value) => {
       const durationLabel = String(item.duration_label ?? item.duration ?? "").trim() || null;
       const categoryTitle = String(item.category_title ?? item.categoryTitle ?? "").trim() || null;
       const serviceTitle = String(item.service_title ?? item.serviceTitle ?? "").trim() || null;
+      const parentServiceId =
+        String(item.parent_service_id ?? item.parentServiceId ?? "").trim() || null;
 
       if (!categoryId || !serviceId) {
         return null;
@@ -223,6 +220,8 @@ const normalizeServiceCategories = (value) => {
         service_title: serviceTitle,
         amount: amount ?? 0,
         duration_label: durationLabel,
+        parent_service_id: parentServiceId,
+        is_visible: item.is_visible === false || item.isVisible === false ? false : true,
       };
     })
     .filter(Boolean);
@@ -1116,10 +1115,22 @@ export const createCalendarEntry = async (req, res) => {
       ],
     );
 
+    const entry = result.rows[0];
+    if (entry && normalizedStatus === "requested") {
+      try {
+        await mirrorCalendarRequestToBooking({
+          entry,
+          professionalUserId: req.user.id,
+        });
+      } catch {
+        // Client list mirror is best-effort; calendar entry still succeeds.
+      }
+    }
+
     return res.status(201).json({
       success: true,
       message: "Calendar entry created successfully.",
-      data: result.rows[0],
+      data: entry,
     });
   } catch (error) {
     return res.status(500).json({
@@ -1308,23 +1319,251 @@ export const upsertCalendarSettings = async (req, res) => {
   }
 };
 
-const parseBookingsTabFilter = (tab) => {
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
+
+/** Pull client email from calendar notes meta or an email-shaped client_name. */
+const extractCalendarClientEmail = (clientName, notes) => {
+  const fromName = String(clientName ?? "").trim();
+  if (EMAIL_RE.test(fromName)) return fromName.toLowerCase();
+
+  const raw = String(notes ?? "");
+  const metaPart = raw.includes("---mollure-meta---")
+    ? raw.split("---mollure-meta---").slice(1).join("---mollure-meta---").trim()
+    : "";
+  if (metaPart) {
+    try {
+      const meta = JSON.parse(metaPart);
+      const fromMeta = String(meta?.clientEmail ?? "").trim();
+      if (EMAIL_RE.test(fromMeta)) return fromMeta.toLowerCase();
+    } catch {
+      // ignore malformed meta
+    }
+  }
+  return null;
+};
+
+/**
+ * Resolve which Mollure user should receive a professional-sent calendar BR.
+ * Tries: users.email → professional_clients.email → professional_clients.display_name.
+ */
+const resolveMollureCustomerIdForCalendarEntry = async ({
+  entry,
+  professionalUserId,
+}) => {
+  const email = extractCalendarClientEmail(entry.client_name, entry.notes);
+  const clientName = String(entry.client_name ?? "").trim();
+
+  if (email) {
+    const byUserEmail = await query(
+      `SELECT id FROM users WHERE LOWER(TRIM(email)) = LOWER(TRIM($1)) LIMIT 1`,
+      [email],
+    );
+    if (byUserEmail.rows[0]?.id) return byUserEmail.rows[0].id;
+  }
+
+  const professionalProfile = await getProfessionalProfile(professionalUserId);
+  if (!professionalProfile?.id) return null;
+
+  const byClient = await query(
+    `SELECT mollure_user_id
+     FROM professional_clients
+     WHERE professional_profile_id = $1
+       AND mollure_user_id IS NOT NULL
+       AND (
+         ($2::text IS NOT NULL AND LOWER(TRIM(COALESCE(email, ''))) = LOWER(TRIM($2)))
+         OR ($3::text <> '' AND LOWER(TRIM(COALESCE(display_name, ''))) = LOWER(TRIM($3)))
+       )
+     LIMIT 1`,
+    [professionalProfile.id, email, clientName],
+  );
+  return byClient.rows[0]?.mollure_user_id ?? null;
+};
+
+/**
+ * Mirror a professional-sent calendar BR into `bookings` so it appears on the
+ * client's Past / Ongoing / Upcoming list (incoming BR).
+ */
+const mirrorCalendarRequestToBooking = async ({
+  entry,
+  professionalUserId,
+}) => {
+  if (!entry || String(entry.status).toLowerCase() !== "requested") return null;
+
+  const customerId = await resolveMollureCustomerIdForCalendarEntry({
+    entry,
+    professionalUserId,
+  });
+  if (!customerId) return null;
+
+  const businessSetup = await getBusinessSetupByUserId(professionalUserId);
+  if (!businessSetup?.id) return null;
+
+  const uniqueCode = entry.unique_code || makeCalendarCode("OF123");
+  const existing = await query(
+    `SELECT id FROM bookings WHERE unique_code = $1 LIMIT 1`,
+    [uniqueCode],
+  );
+  if (existing.rows[0]) return existing.rows[0];
+
+  const bookingDate =
+    normalizeBookingDateInput(entry.start_date) ||
+    normalizeBookingDateInput(entry.start_time) ||
+    null;
+  const serviceIds = Array.isArray(entry.service_ids) ? entry.service_ids : [];
+  const serviceId = parseOptionalUuid(serviceIds.find((id) => Boolean(id)) ?? null);
+
+  // Mark as professional-outgoing so the client list can show an incoming BR badge.
+  let notes = entry.notes ?? null;
+  if (notes && String(notes).includes("---mollure-meta---")) {
+    try {
+      const [human, metaRaw] = String(notes).split("---mollure-meta---");
+      const meta = JSON.parse(metaRaw.trim() || "{}");
+      if (!meta.requestDirection) meta.requestDirection = "outgoing";
+      notes = `${human}---mollure-meta---\n${JSON.stringify(meta)}`;
+    } catch {
+      // keep original notes
+    }
+  } else {
+    notes = `${notes ? `${notes}\n` : ""}---mollure-meta---\n${JSON.stringify({
+      requestDirection: "outgoing",
+    })}`;
+  }
+
+  const inserted = await query(
+    `INSERT INTO bookings (
+       booking_date,
+       business_setup_id,
+       customer_id,
+       service_id,
+       team_member_id,
+       start_time,
+       end_time,
+       location_type,
+       notes,
+       status,
+       booking_type,
+       unique_code,
+       total_price
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'requested', 'request', $10, NULL)
+     RETURNING id`,
+    [
+      bookingDate,
+      businessSetup.id,
+      customerId,
+      serviceId,
+      entry.team_member_id ?? null,
+      entry.start_time ?? null,
+      entry.end_time ?? null,
+      entry.location_type ?? "fixed",
+      notes,
+      uniqueCode,
+    ],
+  );
+  return inserted.rows[0] ?? null;
+};
+
+/**
+ * Backfill: professional calendar BRs addressed to this Mollure user that were
+ * never written into `bookings` (so they never showed on Your Bookings).
+ */
+const ensureIncomingCalendarRequestsMirrored = async (customerUserId) => {
+  const userResult = await query(`SELECT email FROM users WHERE id = $1 LIMIT 1`, [
+    customerUserId,
+  ]);
+  const email = String(userResult.rows[0]?.email ?? "")
+    .trim()
+    .toLowerCase();
+
+  const entries = await query(
+    `SELECT
+       ce.*,
+       pp.user_id AS professional_user_id
+     FROM calendar_entries ce
+     INNER JOIN professional_profiles pp ON pp.id = ce.professional_profile_id
+     WHERE ce.status = 'requested'
+       AND NOT EXISTS (
+         SELECT 1 FROM bookings b WHERE b.unique_code = ce.unique_code
+       )
+       AND (
+         ($2::text <> '' AND LOWER(TRIM(ce.client_name)) = $2)
+         OR ($2::text <> '' AND ce.notes ILIKE '%' || $2 || '%')
+         OR EXISTS (
+           SELECT 1
+           FROM professional_clients pc
+           WHERE pc.professional_profile_id = pp.id
+             AND pc.mollure_user_id = $1
+             AND (
+               LOWER(TRIM(COALESCE(pc.display_name, ''))) = LOWER(TRIM(ce.client_name))
+               OR (
+                 NULLIF(TRIM(pc.email), '') IS NOT NULL
+                 AND (
+                   LOWER(TRIM(pc.email)) = LOWER(TRIM(ce.client_name))
+                   OR ce.notes ILIKE '%' || TRIM(pc.email) || '%'
+                 )
+               )
+             )
+         )
+       )
+     LIMIT 50`,
+    [customerUserId, email],
+  );
+
+  for (const entry of entries.rows) {
+    try {
+      await mirrorCalendarRequestToBooking({
+        entry,
+        professionalUserId: entry.professional_user_id,
+      });
+    } catch {
+      // best-effort backfill — list should still return existing bookings
+    }
+  }
+};
+
+/**
+ * Past / Ongoing / Upcoming buckets for client + professional booking lists.
+ * Includes requested (BR), confirmed, and in_progress — not only confirmed.
+ * A booking moves to Past once its end_time has passed (or booking_date is before
+ * today when end_time is missing), matching the client list time rules.
+ */
+const parseBookingsTabFilter = (tab, alias = "b") => {
   const normalized = String(tab ?? "").trim().toLowerCase();
+  const daySql = `COALESCE(${alias}.booking_date, ${alias}.start_time::date)`;
+  const endedSql = `(
+    (${alias}.end_time IS NOT NULL AND ${alias}.end_time <= NOW())
+    OR (${alias}.end_time IS NULL AND ${daySql} < CURRENT_DATE)
+  )`;
+  // Active = still open for Past/Ongoing/Upcoming timing (includes BR `requested`).
+  const activeSql = `${alias}.status NOT IN ('completed', 'cancelled', 'no_show')`;
+
   if (normalized === "past") {
     return `AND (
-      b.status IN ('completed', 'cancelled', 'no_show')
-      OR COALESCE(b.booking_date, b.start_time::date) < CURRENT_DATE
+      ${alias}.status IN ('completed', 'cancelled', 'no_show')
+      OR ${endedSql}
     )`;
   }
   if (normalized === "ongoing") {
-    return `AND b.status NOT IN ('completed', 'cancelled', 'no_show')
-      AND COALESCE(b.booking_date, b.start_time::date) = CURRENT_DATE`;
+    return `AND ${activeSql}
+      AND NOT ${endedSql}
+      AND ${daySql} = CURRENT_DATE`;
   }
   if (normalized === "upcoming") {
-    return `AND b.status NOT IN ('completed', 'cancelled', 'no_show')
-      AND COALESCE(b.booking_date, b.start_time::date) > CURRENT_DATE`;
+    return `AND ${activeSql}
+      AND NOT ${endedSql}
+      AND ${daySql} > CURRENT_DATE`;
   }
   return "";
+};
+
+/** Normalize booking search: strip # / BK- so unique_code matches loosely. */
+const parseBookingsSearchTerm = (raw) => {
+  const trimmed = String(raw ?? "").trim();
+  if (!trimmed) return "";
+  return trimmed
+    .replace(/^#/, "")
+    .replace(/^bk-?/i, "")
+    .trim();
 };
 
 const mapBookingListRow = (booking) => {
@@ -1346,7 +1585,8 @@ export const listBookings = async (req, res) => {
   try {
     const pagination = parseListPagination(req.query);
     const tabFilterSql = parseBookingsTabFilter(req.query.tab);
-    const { clause: limitClause } = sqlLimitOffset(2);
+    const searchTerm = parseBookingsSearchTerm(req.query.q ?? req.query.search);
+    const searchPattern = searchTerm ? `%${searchTerm}%` : null;
 
     let result;
     let total = 0;
@@ -1367,12 +1607,36 @@ export const listBookings = async (req, res) => {
         );
       }
 
+      const baseParams = [businessSetup.id];
+      let searchSql = "";
+      if (searchPattern) {
+        baseParams.push(searchPattern);
+        searchSql = `AND (
+          b.unique_code ILIKE $2
+          OR CAST(b.id AS text) ILIKE $2
+          OR COALESCE(
+            NULLIF(TRIM(ip.display_name), ''),
+            NULLIF(TRIM(CONCAT_WS(' ', ip.first_name, ip.last_name)), ''),
+            u.email,
+            ''
+          ) ILIKE $2
+          OR COALESCE(u.email, '') ILIKE $2
+          OR COALESCE(s.title, '') ILIKE $2
+        )`;
+      }
+
+      const { clause: limitClause } = sqlLimitOffset(baseParams.length + 1);
+
       const countResult = await query(
         `SELECT COUNT(*)::int AS total
          FROM bookings b
+         LEFT JOIN users u ON u.id = b.customer_id
+         LEFT JOIN individual_profiles ip ON ip.user_id = u.id
+         LEFT JOIN subcategories s ON s.id = b.service_id
          WHERE b.business_setup_id = $1
-         ${tabFilterSql}`,
-        [businessSetup.id],
+         ${tabFilterSql}
+         ${searchSql}`,
+        baseParams,
       );
       total = countResult.rows[0]?.total ?? 0;
 
@@ -1401,17 +1665,44 @@ export const listBookings = async (req, res) => {
          LEFT JOIN individual_profiles ip ON ip.user_id = u.id
          WHERE b.business_setup_id = $1
          ${tabFilterSql}
+         ${searchSql}
          ORDER BY COALESCE(b.start_time, b.created_at) DESC
          ${pagination.paginate ? limitClause : ""}`,
-        withPaginationParams([businessSetup.id], pagination),
+        withPaginationParams(baseParams, pagination),
       );
     } else {
+      // Backfill professional-sent BRs so they appear on the client's list.
+      try {
+        await ensureIncomingCalendarRequestsMirrored(req.user.id);
+      } catch {
+        // ignore — listing existing bookings is more important
+      }
+
+      const baseParams = [req.user.id];
+      let searchSql = "";
+      if (searchPattern) {
+        baseParams.push(searchPattern);
+        searchSql = `AND (
+          b.unique_code ILIKE $2
+          OR CAST(b.id AS text) ILIKE $2
+          OR COALESCE(bs.business_name, '') ILIKE $2
+          OR COALESCE(s.title, '') ILIKE $2
+          OR COALESCE(bs.fixed_location_municipality, '') ILIKE $2
+          OR COALESCE(bs.fixed_location_address, '') ILIKE $2
+        )`;
+      }
+
+      const { clause: limitClause } = sqlLimitOffset(baseParams.length + 1);
+
       const countResult = await query(
         `SELECT COUNT(*)::int AS total
          FROM bookings b
+         INNER JOIN business_setups bs ON bs.id = b.business_setup_id
+         LEFT JOIN subcategories s ON s.id = b.service_id
          WHERE b.customer_id = $1
-         ${tabFilterSql}`,
-        [req.user.id],
+         ${tabFilterSql}
+         ${searchSql}`,
+        baseParams,
       );
       total = countResult.rows[0]?.total ?? 0;
 
@@ -1432,9 +1723,10 @@ export const listBookings = async (req, res) => {
          LEFT JOIN business_team_members tm ON tm.id = b.team_member_id
          WHERE b.customer_id = $1
          ${tabFilterSql}
+         ${searchSql}
          ORDER BY COALESCE(b.start_time, b.created_at) DESC
          ${pagination.paginate ? limitClause : ""}`,
-        withPaginationParams([req.user.id], pagination),
+        withPaginationParams(baseParams, pagination),
       );
     }
 
@@ -1566,11 +1858,6 @@ export const createBooking = async (req, res) => {
     }
 
     void dispatchBookingCreatedNotifications(booking);
-    if (booking?.status === "confirmed") {
-      void notifyBookingStatusChange(booking.id, "requested", booking.status);
-    } else if (booking?.status === "requested") {
-      void notifyIncomingBookingRequest(booking.id);
-    }
 
     emitBookingChanged(booking, "created");
 
@@ -1887,12 +2174,6 @@ export const updateMyBooking = async (req, res) => {
           req.body.notify_incoming_er === true || req.body.email_scenario === "incoming_er",
       });
     }
-    if (previousStatus !== booking.status) {
-      void notifyBookingStatusChange(booking.id, previousStatus, booking.status);
-      if (previousStatus === "confirmed" && booking.status === "requested") {
-        void notifyIncomingBookingRequest(booking.id);
-      }
-    }
     emitBookingChanged(booking, "updated");
 
     return res.status(200).json({
@@ -1944,7 +2225,8 @@ export const updateBookingStatus = async (req, res) => {
     // Scope by professional profile (all business setups), not a single rows[0] setup —
     // calendar overview lists bookings across setups; Accept/Reject must match that.
     const existingResult = await query(
-      `SELECT b.status, b.notes, b.total_price, b.booking_date, b.start_time, b.end_time, b.business_setup_id
+      `SELECT b.status, b.notes, b.total_price, b.booking_date, b.start_time, b.end_time,
+              b.business_setup_id, b.customer_id
        FROM bookings b
        INNER JOIN business_setups bs ON bs.id = b.business_setup_id
        WHERE b.id = $1
@@ -1963,6 +2245,16 @@ export const updateBookingStatus = async (req, res) => {
 
     const previousStatus = existingResult.rows[0].status;
     const businessSetupId = existingResult.rows[0].business_setup_id;
+    const customerId = existingResult.rows[0].customer_id;
+
+    // No Show = client booked but did not arrive. Only from active attendance states.
+    if (status === "no_show" && !["confirmed", "in_progress"].includes(previousStatus)) {
+      return res.status(400).json({
+        success: false,
+        message: "Only confirmed or in-progress bookings can be marked as no show.",
+        data: null,
+      });
+    }
     const nextNotes =
       req.body.notes !== undefined && req.body.notes !== null
         ? String(req.body.notes)
@@ -2029,6 +2321,30 @@ export const updateBookingStatus = async (req, res) => {
         });
       } catch {
         // best-effort
+      }
+    }
+
+    // Flag the client record when they booked but did not show up.
+    if (booking.status === "no_show" && customerId) {
+      try {
+        await query(
+          `UPDATE professional_clients pc
+           SET has_no_show = true,
+               updated_at = NOW()
+           WHERE pc.professional_profile_id = $1
+             AND (
+               pc.mollure_user_id = $2
+               OR (
+                 pc.email IS NOT NULL
+                 AND lower(pc.email) = (
+                   SELECT lower(u.email) FROM users u WHERE u.id = $2 LIMIT 1
+                 )
+               )
+             )`,
+          [professionalProfile.id, customerId],
+        );
+      } catch {
+        // best-effort client flag
       }
     }
 

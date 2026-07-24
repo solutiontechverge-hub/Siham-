@@ -1,14 +1,33 @@
 "use client";
 
+import AppButton from "../AppButton";
 import * as React from "react";
 import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
-import { Badge, Box, Button, Divider, IconButton, Menu, MenuItem, Stack, Typography } from "@mui/material";
+import {
+  Badge,
+  Box,
+  Divider,
+  IconButton,
+  Menu,
+  MenuItem,
+  Stack,
+  Typography,
+} from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useSnackbar } from "../AppSnackbar";
-import { getMessagingHref, useClientMessagingUnread, useMessagingWidgetOptional } from "../messaging";
-import type { BookingRequestDirection, ClientBookingStatus } from "../../../app/clients/booking/clientBookingRecords";
-import BookingRequestStatusRow, { type BookingRequestRowMode } from "./BookingRequestStatusRow";
+import {
+  getMessagingHref,
+  useClientMessagingUnread,
+  useMessagingWidgetOptional,
+} from "../messaging";
+import type {
+  BookingRequestDirection,
+  ClientBookingStatus,
+} from "../../../app/clients/booking/clientBookingRecords";
+import BookingRequestStatusRow, {
+  type BookingRequestRowMode,
+} from "./BookingRequestStatusRow";
 import {
   professionalRejectEditRequest,
   professionalSuggestBookingChanges,
@@ -37,7 +56,12 @@ type Props = {
   onDeleteBooking?: () => void;
   onDiscardBookingRequest?: () => void;
   onDispatchBookingNotification?: (
-    event: "edit_request_outgoing" | "booking_date_changed" | "time_changed" | "service_edited" | "unique_item_edited",
+    event:
+      | "edit_request_outgoing"
+      | "booking_date_changed"
+      | "time_changed"
+      | "service_edited"
+      | "unique_item_edited",
   ) => void | Promise<void>;
   messagingHref?: string;
 };
@@ -67,12 +91,15 @@ export default function ClientBookingDetailsHeader({
   const { showSnackbar } = useSnackbar();
   const messagingWidget = useMessagingWidgetOptional();
   const [editAnchor, setEditAnchor] = React.useState<HTMLElement | null>(null);
-  const [activityAnchor, setActivityAnchor] = React.useState<HTMLElement | null>(null);
+  const [activityAnchor, setActivityAnchor] =
+    React.useState<HTMLElement | null>(null);
   const unreadFromProfessional = useClientMessagingUnread(bookingRef);
   const editRequest = useBookingEditRequest(bookingRef);
 
   const chatIcon = (
-    <ChatBubbleOutlineRoundedIcon sx={{ fontSize: 24, color: alpha(m.navy, 0.42) }} />
+    <ChatBubbleOutlineRoundedIcon
+      sx={{ fontSize: 24, color: alpha(m.navy, 0.42) }}
+    />
   );
 
   const handleSendEditRequest = () => {
@@ -82,7 +109,8 @@ export default function ClientBookingDetailsHeader({
     editRequest.refresh();
     showSnackbar({
       severity: "success",
-      message: "Edit request sent to the professional. You can edit after they approve.",
+      message:
+        "Edit request sent to the professional. You can edit after they approve.",
     });
   };
 
@@ -99,7 +127,9 @@ export default function ClientBookingDetailsHeader({
     px: 1.5,
   };
 
-  const displayStatus: ClientBookingStatus = isCancelled ? "cancelled" : bookingStatus;
+  const displayStatus: ClientBookingStatus = isCancelled
+    ? "cancelled"
+    : bookingStatus;
 
   const requestRowMode: BookingRequestRowMode = editRequest.isSuggested
     ? "professional_suggested"
@@ -124,18 +154,14 @@ export default function ClientBookingDetailsHeader({
     (isConfirmed || waitingForPayment);
   const editActionsDisabled = !showEdit;
   const showConfirmedEditMenu =
-    isConfirmed && Boolean(onEditDateTime || onEditBookingDetails || onEditProject);
+    isConfirmed &&
+    Boolean(onEditDateTime || onEditBookingDetails || onEditProject);
 
   const headerActionBtnSx = {
     borderRadius: "8px",
-    textTransform: "none" as const,
-    fontWeight: 900,
     fontSize: 12.5,
     height: 34,
     px: 2,
-    borderColor: alpha(m.navy, 0.14),
-    color: alpha(m.navy, 0.62),
-    bgcolor: "#fff",
   };
 
   return (
@@ -148,22 +174,47 @@ export default function ClientBookingDetailsHeader({
           spacing={1.5}
         >
           <Box sx={{ minWidth: 0 }}>
-            <Typography sx={{ fontWeight: 900, fontSize: 16, lineHeight: 1.25, color: alpha(m.navy, 0.88) }}>
+            <Typography
+              sx={{
+                fontWeight: 900,
+                fontSize: 16,
+                lineHeight: 1.25,
+                color: alpha(m.navy, 0.88),
+              }}
+            >
               Booking Details{" "}
               <Box component="span" sx={{ color: m.teal }}>
                 #{bookingRef}
               </Box>
             </Typography>
             {bookedDateLabel ? (
-              <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mt: 0.65 }}>
-                <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.55) }}>
+              <Stack
+                direction="row"
+                alignItems="center"
+                spacing={0.75}
+                sx={{ mt: 0.65 }}
+              >
+                <Typography
+                  sx={{
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.55),
+                  }}
+                >
                   Booked on{" "}
-                  <Box component="span" sx={{ fontWeight: 900, color: alpha(m.navy, 0.88) }}>
+                  <Box
+                    component="span"
+                    sx={{ fontWeight: 900, color: alpha(m.navy, 0.88) }}
+                  >
                     {bookedDateLabel}
                   </Box>
                   {bookedTimeLabel ? (
-                    <Box component="span" sx={{ fontWeight: 700, color: alpha(m.navy, 0.55) }}>
-                      {" "}({bookedTimeLabel})
+                    <Box
+                      component="span"
+                      sx={{ fontWeight: 700, color: alpha(m.navy, 0.55) }}
+                    >
+                      {" "}
+                      ({bookedTimeLabel})
                     </Box>
                   ) : null}
                 </Typography>
@@ -175,10 +226,19 @@ export default function ClientBookingDetailsHeader({
                 >
                   {unreadFromProfessional > 0 ? (
                     <Badge
-                      badgeContent={unreadFromProfessional > 9 ? "9+" : unreadFromProfessional}
+                      badgeContent={
+                        unreadFromProfessional > 9
+                          ? "9+"
+                          : unreadFromProfessional
+                      }
                       color="error"
                       sx={{
-                        "& .MuiBadge-badge": { fontSize: 10, minWidth: 18, height: 18, fontWeight: 900 },
+                        "& .MuiBadge-badge": {
+                          fontSize: 10,
+                          minWidth: 18,
+                          height: 18,
+                          fontWeight: 900,
+                        },
                       }}
                     >
                       {chatIcon}
@@ -191,54 +251,70 @@ export default function ClientBookingDetailsHeader({
             ) : null}
           </Box>
 
-          <Stack alignItems={{ xs: "flex-start", md: "flex-end" }} spacing={0.85}>
-            <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
+          <Stack
+            alignItems={{ xs: "flex-start", md: "flex-end" }}
+            spacing={0.85}
+          >
+            <Stack
+              direction="row"
+              alignItems="center"
+              spacing={1}
+              flexWrap="wrap"
+            >
               {showEdit ? (
-                <Button
-                  variant="contained"
-                  disableElevation
+                <AppButton
+                  tone="primary"
                   disabled={editActionsDisabled}
-                  endIcon={<KeyboardArrowDownRoundedIcon sx={{ fontSize: 18, color: "#fff" }} />}
+                  endIcon={
+                    <KeyboardArrowDownRoundedIcon
+                      sx={{ fontSize: 18, color: "#fff" }}
+                    />
+                  }
                   onClick={(e) => setEditAnchor(e.currentTarget)}
                   sx={{
                     borderRadius: "8px",
-                    textTransform: "none",
-                    fontWeight: 900,
                     fontSize: 12.5,
                     px: 2,
                     height: 34,
-                    color: "#fff",
-                    bgcolor: m.teal,
-                    "&:hover": { bgcolor: m.tealDark, color: "#fff" },
                   }}
                 >
                   Edit
-                </Button>
+                </AppButton>
               ) : null}
-              <Button
-                variant="outlined"
+              <AppButton
+                tone="secondary"
                 sx={headerActionBtnSx}
                 disabled={isCancelled}
                 onClick={(e) => setActivityAnchor(e.currentTarget)}
               >
                 Activity
-              </Button>
+              </AppButton>
               {isOutgoingBookingRequest && onDiscardBookingRequest ? (
-                <Button variant="outlined" onClick={onDiscardBookingRequest} sx={headerActionBtnSx}>
+                <AppButton
+                  tone="secondary"
+                  onClick={onDiscardBookingRequest}
+                  sx={headerActionBtnSx}
+                >
                   Discard
-                </Button>
+                </AppButton>
               ) : null}
               {isCancelled || isCompleted ? (
-                <Button variant="outlined" onClick={onDeleteBooking} sx={headerActionBtnSx}>
+                <AppButton
+                  tone="secondary"
+                  onClick={onDeleteBooking}
+                  sx={headerActionBtnSx}
+                >
                   Delete
-                </Button>
+                </AppButton>
               ) : null}
             </Stack>
             <BookingRequestStatusRow
               bookingStatus={displayStatus}
               bookingRequestSent={bookingRequestSent}
               editRequestPending={editRequest.isPending}
-              requiresPrepayment={requiresPrepayment && requestRowMode === "default"}
+              requiresPrepayment={
+                requiresPrepayment && requestRowMode === "default"
+              }
               prepaymentPaid={prepaymentPaid}
               paymentDue={paymentDue}
               bookingRequestDirection={bookingRequestDirection}
@@ -262,7 +338,10 @@ export default function ClientBookingDetailsHeader({
             setActivityAnchor(null);
             professionalSuggestBookingChanges(bookingRef);
             editRequest.refresh();
-            showSnackbar({ severity: "info", message: "Professional suggested changes (demo)." });
+            showSnackbar({
+              severity: "info",
+              message: "Professional suggested changes (demo).",
+            });
           }}
           sx={menuItemSx}
         >
@@ -273,7 +352,10 @@ export default function ClientBookingDetailsHeader({
             setActivityAnchor(null);
             professionalRejectEditRequest(bookingRef);
             editRequest.refresh();
-            showSnackbar({ severity: "info", message: "Professional rejected edit request (demo)." });
+            showSnackbar({
+              severity: "info",
+              message: "Professional rejected edit request (demo).",
+            });
           }}
           sx={menuItemSx}
         >
@@ -287,7 +369,9 @@ export default function ClientBookingDetailsHeader({
         onClose={() => setEditAnchor(null)}
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
         transformOrigin={{ vertical: "top", horizontal: "right" }}
-        PaperProps={{ sx: { borderRadius: "10px", minWidth: 200, mt: 0.5, py: 0.5 } }}
+        PaperProps={{
+          sx: { borderRadius: "10px", minWidth: 200, mt: 0.5, py: 0.5 },
+        }}
       >
         {showConfirmedEditMenu ? (
           <>
@@ -302,7 +386,9 @@ export default function ClientBookingDetailsHeader({
                 Date &amp; Time
               </MenuItem>
             ) : null}
-            {onEditDateTime && onEditBookingDetails ? <Divider sx={{ my: 0 }} /> : null}
+            {onEditDateTime && onEditBookingDetails ? (
+              <Divider sx={{ my: 0 }} />
+            ) : null}
             {onEditBookingDetails ? (
               <MenuItem
                 onClick={() => {
@@ -330,11 +416,17 @@ export default function ClientBookingDetailsHeader({
             ) : null}
           </>
         ) : bookingRequestSent ? (
-          <MenuItem disabled sx={{ ...menuItemSx, whiteSpace: "normal", opacity: 1 }}>
+          <MenuItem
+            disabled
+            sx={{ ...menuItemSx, whiteSpace: "normal", opacity: 1 }}
+          >
             Booking request sent — awaiting professional approval
           </MenuItem>
         ) : editRequest.isPending ? (
-          <MenuItem disabled sx={{ ...menuItemSx, whiteSpace: "normal", opacity: 1 }}>
+          <MenuItem
+            disabled
+            sx={{ ...menuItemSx, whiteSpace: "normal", opacity: 1 }}
+          >
             Edit request sent — awaiting professional approval
           </MenuItem>
         ) : onSendBookingRequest ? (

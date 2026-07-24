@@ -47,7 +47,11 @@ export default function MollureSnackbar({
           "& > *": { pointerEvents: "auto" },
         }}
       >
-        <MollureSnackbarAlert message={message} severity={severity} onClose={onClose} />
+        <MollureSnackbarAlert
+          message={message}
+          severity={severity}
+          onClose={onClose}
+        />
       </Box>
     </Portal>
   );

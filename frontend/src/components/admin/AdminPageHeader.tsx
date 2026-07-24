@@ -9,7 +9,11 @@ type AdminPageHeaderProps = {
   actions?: React.ReactNode;
 };
 
-export default function AdminPageHeader({ title, description, actions }: AdminPageHeaderProps) {
+export default function AdminPageHeader({
+  title,
+  description,
+  actions,
+}: AdminPageHeaderProps) {
   const theme = useTheme();
   const tokens = theme.palette.mollure;
 
@@ -24,12 +28,19 @@ export default function AdminPageHeader({ title, description, actions }: AdminPa
       <Stack spacing={0.5}>
         <Typography variant="mainHeading">{title}</Typography>
         {description ? (
-          <Typography variant="description" sx={{ color: tokens.bodyText, maxWidth: 640 }}>
+          <Typography
+            variant="description"
+            sx={{ color: tokens.bodyText, maxWidth: 640 }}
+          >
             {description}
           </Typography>
         ) : null}
       </Stack>
-      {actions ? <Stack direction="row" spacing={1.5} flexWrap="wrap">{actions}</Stack> : null}
+      {actions ? (
+        <Stack direction="row" spacing={1.5} flexWrap="wrap">
+          {actions}
+        </Stack>
+      ) : null}
     </Stack>
   );
 }

@@ -19,7 +19,10 @@ type AdminTimeRangeFilterProps = {
   onChange: (value: AdminTimeRange) => void;
 };
 
-export default function AdminTimeRangeFilter({ value, onChange }: AdminTimeRangeFilterProps) {
+export default function AdminTimeRangeFilter({
+  value,
+  onChange,
+}: AdminTimeRangeFilterProps) {
   const theme = useTheme();
   const tokens = theme.palette.mollure;
 
@@ -44,7 +47,8 @@ export default function AdminTimeRangeFilter({ value, onChange }: AdminTimeRange
               aria-label={t.label}
               onClick={() => onChange(t.id as AdminTimeRange)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") onChange(t.id as AdminTimeRange);
+                if (e.key === "Enter" || e.key === " ")
+                  onChange(t.id as AdminTimeRange);
               }}
               sx={{
                 flex: 1,

@@ -17,7 +17,12 @@ export default function MessagingReadReceipt({ readByPeer }: Props) {
     <Box
       component="span"
       aria-label={readByPeer ? "Seen" : "Sent"}
-      sx={{ display: "inline-flex", alignItems: "center", lineHeight: 0, ml: 0.25 }}
+      sx={{
+        display: "inline-flex",
+        alignItems: "center",
+        lineHeight: 0,
+        ml: 0.25,
+      }}
     >
       {readByPeer ? (
         <DoneAllRoundedIcon sx={{ fontSize: 14, color }} />

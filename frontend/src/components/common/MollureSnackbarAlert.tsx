@@ -3,7 +3,10 @@
 import * as React from "react";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import { Box, IconButton, Typography } from "@mui/material";
-import { getMollureSnackbarColors, type MollureSnackbarSeverity } from "../../theme/mollureSnackbar";
+import {
+  getMollureSnackbarColors,
+  type MollureSnackbarSeverity,
+} from "../../theme/mollureSnackbar";
 
 export type MollureSnackbarAlertProps = {
   message: React.ReactNode;
@@ -11,8 +14,13 @@ export type MollureSnackbarAlertProps = {
   onClose?: () => void;
 };
 
-const MollureSnackbarAlert = React.forwardRef<HTMLDivElement, MollureSnackbarAlertProps>(
-  function MollureSnackbarAlert({ message, severity = "success", onClose }, ref) {
+const MollureSnackbarAlert = React.forwardRef<
+  HTMLDivElement,
+  MollureSnackbarAlertProps
+>(function MollureSnackbarAlert(
+  { message, severity = "success", onClose },
+  ref,
+) {
   const colors = getMollureSnackbarColors(severity);
 
   return (
@@ -63,7 +71,6 @@ const MollureSnackbarAlert = React.forwardRef<HTMLDivElement, MollureSnackbarAle
       ) : null}
     </Box>
   );
-  },
-);
+});
 
 export default MollureSnackbarAlert;

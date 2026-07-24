@@ -11,6 +11,9 @@ export type ClientNotificationItem = {
   timeLabel: string;
   href?: string | null;
   read?: boolean;
+  bookingId?: string | null;
+  bookingRef?: string | null;
+  message?: string | null;
 };
 
 export const clientNotificationsData = {

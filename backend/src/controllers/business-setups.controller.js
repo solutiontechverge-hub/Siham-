@@ -10,6 +10,7 @@ import {
   sqlLimitOffset,
   withPaginationParams,
 } from "../utils/pagination.js";
+import { getReviewAggregatesForSetups } from "../services/review.service.js";
 
 export const listAllBusinessSetups = async (req, res) => {
   try {
@@ -71,11 +72,13 @@ export const listAllBusinessSetups = async (req, res) => {
       teamMembersBySetupId,
       useTeamAssignmentsFallback: true,
     });
+    const reviewAggregates = await getReviewAggregatesForSetups(setupIds);
 
     const data = setupRows.map((row) =>
       transformBusinessSetupForListing(row, {
         teamMembers: teamMembersBySetupId[row.id] ?? [],
         serviceDetails: serviceDetailsBySetupId[row.id] ?? [],
+        ratingStats: reviewAggregates.get(String(row.id)) ?? null,
       }),
     );
 

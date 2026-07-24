@@ -42,6 +42,7 @@ const theme = createTheme({
     primary: {
       main: "#21B8BF",
       dark: "#149CA7",
+      contrastText: "#FFFFFF",
     },
     secondary: {
       main: "#E9F8F9",
@@ -68,6 +69,8 @@ const theme = createTheme({
       navy: "#344A66",
       slate: "#71819A",
       surface: "#F7FBFD",
+      /** Shared page background for client and professional pages */
+      pageBg: "#EAF9FB",
       footer: "#223648",
       footerText: "#D7E3EC",
       footerMuted: "rgba(215,227,236,0.68)",
@@ -125,6 +128,21 @@ const theme = createTheme({
       addSoftBgHover: "#A6E2E5",
       addSoftFg: "#149CA7",
       addSoftBorder: "rgba(20,156,167,0.18)",
+      /** Calendar blocked-time slot */
+      blockedTimeBg: "#FEE4E2",
+      blockedTimeFg: "#F04438",
+      /** Soft status chips (finance / payment labels) */
+      statusOrangeBg: "#FFFAEB",
+      statusOrangeFg: "#F79009",
+      statusGreenBg: "#ECFDF3",
+      statusGreenFg: "#039855",
+      statusGreyFg: "#475467",
+      /** No show status chip */
+      statusNoShowBg: "#D0D5DD",
+      statusNoShowFg: "#667085",
+      /** Completed status chip (outlined grey) */
+      statusCompletedBg: "#F9FAFB",
+      statusCompletedBorder: "#D0D5DD",
       /** Sales Volume stacked bar chart — 4-step teal gradient (Figma) */
       salesVolumeStackDark: "#169BA1",
       salesVolumeStackMid: "#21B8BF",
@@ -206,6 +224,21 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           fontSize: mollureFontSizes.content,
+        },
+        contained: {
+          color: "#FFFFFF",
+          "&:hover": {
+            color: "#FFFFFF",
+          },
+          "& .MuiButton-startIcon, & .MuiButton-endIcon": {
+            color: "inherit",
+          },
+        },
+        containedPrimary: {
+          color: "#FFFFFF",
+          "&:hover": {
+            color: "#FFFFFF",
+          },
         },
       },
     },

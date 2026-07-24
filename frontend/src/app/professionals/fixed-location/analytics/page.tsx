@@ -7,8 +7,9 @@ import { professionalFixedLocationAnalyticsData } from "./analytics.data";
 export default function FixedLocationAnalyticsPage() {
   return (
     <Suspense>
-      <ProfessionalFixedLocationAnalytics data={professionalFixedLocationAnalyticsData} />
+      <ProfessionalFixedLocationAnalytics
+        data={professionalFixedLocationAnalyticsData}
+      />
     </Suspense>
   );
 }
-

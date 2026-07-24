@@ -1,6 +1,9 @@
 "use client";
 
-import { AboutPageContent, MarketingShellLayout } from "../../../components/marketing";
+import {
+  AboutPageContent,
+  MarketingShellLayout,
+} from "../../../components/marketing";
 
 export default function ProfessionalsAboutPage() {
   return (

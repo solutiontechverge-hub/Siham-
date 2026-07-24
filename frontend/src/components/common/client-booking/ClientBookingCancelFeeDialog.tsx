@@ -3,10 +3,10 @@
 import * as React from "react";
 import { Box, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import MessagingModalShell, {
+import AppModal, {
   MessagingModalCancelButton,
   MessagingModalPrimaryButton,
-} from "../messaging/MessagingModalShell";
+} from "../AppModal";
 import type { BusinessPublicProfilePolicySection } from "../../../data/businessPublicProfile.data";
 import type { CancellationFeeSettlement } from "./settleCancellationFee";
 
@@ -45,14 +45,20 @@ export default function ClientBookingCancelFeeDialog({
       : "Confirm cancellation";
 
   return (
-    <MessagingModalShell
+    <AppModal
+      contentSx={{ px: 2.5 }}
+      footerVariant="actions"
       open={open}
       title="Cancellation policy"
       onClose={onClose}
       maxWidth="sm"
       footer={
         <>
-          <MessagingModalCancelButton onClick={onKeepBooking} label="Keep booking" disabled={isProcessing} />
+          <MessagingModalCancelButton
+            onClick={onKeepBooking}
+            label="Keep booking"
+            disabled={isProcessing}
+          />
           <MessagingModalPrimaryButton
             label={isProcessing ? "Processing…" : primaryLabel}
             onClick={onPayNow}
@@ -62,7 +68,14 @@ export default function ClientBookingCancelFeeDialog({
       }
     >
       <Box sx={{ py: 1.5 }}>
-        <Typography sx={{ fontWeight: 800, fontSize: 13.5, color: alpha(m.navy, 0.78), lineHeight: 1.55 }}>
+        <Typography
+          sx={{
+            fontWeight: 800,
+            fontSize: 13.5,
+            color: alpha(m.navy, 0.78),
+            lineHeight: 1.55,
+          }}
+        >
           Review the professional&apos;s cancellation policy before confirming.
         </Typography>
 
@@ -79,34 +92,72 @@ export default function ClientBookingCancelFeeDialog({
                   py: 1.25,
                 }}
               >
-                <Typography sx={{ fontWeight: 900, fontSize: 12.5, color: alpha(m.navy, 0.78), mb: 0.5 }}>
+                <Typography
+                  sx={{
+                    fontWeight: 900,
+                    fontSize: 12.5,
+                    color: alpha(m.navy, 0.78),
+                    mb: 0.5,
+                  }}
+                >
                   {section.title}
                 </Typography>
                 {section.fields?.map((field) => (
                   <Typography
                     key={`${section.title}-${field.label}`}
-                    sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.55), lineHeight: 1.5 }}
+                    sx={{
+                      fontSize: 11.5,
+                      fontWeight: 700,
+                      color: alpha(m.navy, 0.55),
+                      lineHeight: 1.5,
+                    }}
                   >
-                    <Box component="span" sx={{ fontWeight: 900, color: alpha(m.navy, 0.7) }}>
+                    <Box
+                      component="span"
+                      sx={{ fontWeight: 900, color: alpha(m.navy, 0.7) }}
+                    >
                       {field.label}:
                     </Box>{" "}
                     {field.value}
                   </Typography>
                 ))}
                 {section.description ? (
-                  <Typography sx={{ mt: 0.5, fontSize: 11.5, fontWeight: 600, color: alpha(m.navy, 0.55), lineHeight: 1.55 }}>
+                  <Typography
+                    sx={{
+                      mt: 0.5,
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      color: alpha(m.navy, 0.55),
+                      lineHeight: 1.55,
+                    }}
+                  >
                     {section.description}
                   </Typography>
                 ) : null}
               </Box>
             ))
           ) : policyInstruction ? (
-            <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: alpha(m.navy, 0.55), lineHeight: 1.55 }}>
+            <Typography
+              sx={{
+                fontSize: 12.5,
+                fontWeight: 600,
+                color: alpha(m.navy, 0.55),
+                lineHeight: 1.55,
+              }}
+            >
               {policyInstruction}
             </Typography>
           ) : (
-            <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: alpha(m.navy, 0.55), lineHeight: 1.55 }}>
-              A cancellation fee of {settlement.feePercent}% of the booking total may apply.
+            <Typography
+              sx={{
+                fontSize: 12.5,
+                fontWeight: 600,
+                color: alpha(m.navy, 0.55),
+                lineHeight: 1.55,
+              }}
+            >
+              A cancellation fee of {settlement.feePercent}% of the booking
+              total may apply.
             </Typography>
           )}
         </Stack>
@@ -129,27 +180,46 @@ export default function ClientBookingCancelFeeDialog({
               emphasize
             />
             {settlement.prepaidPaid > 0 ? (
-              <Row label="Applied from prepayment" value={`− ${money(settlement.appliedFromPrepaid)}`} />
+              <Row
+                label="Applied from prepayment"
+                value={`− ${money(settlement.appliedFromPrepaid)}`}
+              />
             ) : null}
             {settlement.refundAmount > 0 ? (
-              <Row label="Refund to you" value={money(settlement.refundAmount)} />
+              <Row
+                label="Refund to you"
+                value={money(settlement.refundAmount)}
+              />
             ) : null}
             <Row
-              label={settlement.amountDueNow > 0 ? "Amount to pay now" : "Amount due now"}
+              label={
+                settlement.amountDueNow > 0
+                  ? "Amount to pay now"
+                  : "Amount due now"
+              }
               value={money(settlement.amountDueNow)}
               emphasize
             />
           </Stack>
         </Box>
 
-        <Typography sx={{ mt: 1.5, fontSize: 11.5, fontWeight: 600, color: alpha(m.navy, 0.5), lineHeight: 1.5 }}>
-          Keep booking leaves this booking unchanged. Confirming pays any remaining fee and cancels the booking.
+        <Typography
+          sx={{
+            mt: 1.5,
+            fontSize: 11.5,
+            fontWeight: 600,
+            color: alpha(m.navy, 0.5),
+            lineHeight: 1.5,
+          }}
+        >
+          Keep booking leaves this booking unchanged. Confirming pays any
+          remaining fee and cancels the booking.
           {settlement.refundAmount > 0
             ? ` Any unused prepayment (${money(settlement.refundAmount)}) will be refunded.`
             : ""}
         </Typography>
       </Box>
-    </MessagingModalShell>
+    </AppModal>
   );
 }
 
@@ -164,11 +234,26 @@ function Row({
 }) {
   const m = useTheme().palette.mollure;
   return (
-    <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
-      <Typography sx={{ fontSize: 12, fontWeight: emphasize ? 900 : 700, color: alpha(m.navy, emphasize ? 0.78 : 0.55) }}>
+    <Stack
+      direction="row"
+      justifyContent="space-between"
+      alignItems="center"
+      spacing={1}
+    >
+      <Typography
+        sx={{
+          fontSize: 12,
+          fontWeight: emphasize ? 900 : 700,
+          color: alpha(m.navy, emphasize ? 0.78 : 0.55),
+        }}
+      >
         {label}
       </Typography>
-      <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.82) }}>{value}</Typography>
+      <Typography
+        sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.82) }}
+      >
+        {value}
+      </Typography>
     </Stack>
   );
 }

@@ -1,16 +1,10 @@
 "use client";
 
+import AppButton from "../AppButton";
 import * as React from "react";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import CreditCardRoundedIcon from "@mui/icons-material/CreditCardRounded";
-import {
-  Box,
-  Button,
-  IconButton,
-  Radio,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { Box, IconButton, Radio, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useGetBusinessSetupQuery } from "../../../store/services/businessApi";
 import ManualEntryCatalogDrawer, {
@@ -59,10 +53,15 @@ export default function SalesAddOnCheckout({
 
   const [step, setStep] = React.useState<Step>("items");
   const [lines, setLines] = React.useState<ManualEntryLine[]>([]);
-  const [discount, setDiscount] = React.useState<ManualEntryDiscount | null>(null);
+  const [discount, setDiscount] = React.useState<ManualEntryDiscount | null>(
+    null,
+  );
   const [discountModalOpen, setDiscountModalOpen] = React.useState(false);
-  const [editingLine, setEditingLine] = React.useState<ManualEntryLine | null>(null);
-  const [paymentMethod, setPaymentMethod] = React.useState<ManualEntryPaymentMethod>("offlineDirect");
+  const [editingLine, setEditingLine] = React.useState<ManualEntryLine | null>(
+    null,
+  );
+  const [paymentMethod, setPaymentMethod] =
+    React.useState<ManualEntryPaymentMethod>("offlineDirect");
   const [guestEmail, setGuestEmail] = React.useState(clientEmail ?? "");
   const [productDrawerOpen, setProductDrawerOpen] = React.useState(false);
   const [itemDrawerOpen, setItemDrawerOpen] = React.useState(false);
@@ -89,14 +88,25 @@ export default function SalesAddOnCheckout({
     }
     return settings.services.map((service) => ({
       id: service.id,
-      label: service.service ? `${service.category} - ${service.service}` : service.category,
+      label: service.service
+        ? `${service.category} - ${service.service}`
+        : service.category,
       unitPrice: 0,
     }));
   }, [businessSetup?.service_details, settings.services]);
 
-  const productLines = React.useMemo(() => lines.filter((l) => l.kind === "product"), [lines]);
-  const itemLines = React.useMemo(() => lines.filter((l) => l.kind === "item"), [lines]);
-  const subtotal = React.useMemo(() => lines.reduce((sum, line) => sum + lineTotal(line), 0), [lines]);
+  const productLines = React.useMemo(
+    () => lines.filter((l) => l.kind === "product"),
+    [lines],
+  );
+  const itemLines = React.useMemo(
+    () => lines.filter((l) => l.kind === "item"),
+    [lines],
+  );
+  const subtotal = React.useMemo(
+    () => lines.reduce((sum, line) => sum + lineTotal(line), 0),
+    [lines],
+  );
   const discountAmount = React.useMemo(
     () => calculateManualEntryDiscountAmount(subtotal, discount),
     [discount, subtotal],
@@ -104,11 +114,20 @@ export default function SalesAddOnCheckout({
   const totalPrice = Math.max(0, subtotal - discountAmount);
   const hasItems = lines.length > 0;
 
-  const addLinesFromCatalog = (kind: ManualEntryLineKind, options: ManualEntryCatalogOption[]) => {
-    setLines((prev) => [...prev, ...options.map((option) => createManualEntryLineFromOption(kind, option))]);
+  const addLinesFromCatalog = (
+    kind: ManualEntryLineKind,
+    options: Array<ManualEntryCatalogOption & { quantity?: number }>,
+  ) => {
+    setLines((prev) => [
+      ...prev,
+      ...options.map((option) =>
+        createManualEntryLineFromOption(kind, option, option.quantity ?? 1),
+      ),
+    ]);
   };
 
-  const removeLine = (id: string) => setLines((prev) => prev.filter((l) => l.id !== id));
+  const removeLine = (id: string) =>
+    setLines((prev) => prev.filter((l) => l.id !== id));
   const updateLine = (next: ManualEntryLine) =>
     setLines((prev) => prev.map((l) => (l.id === next.id ? next : l)));
 
@@ -140,7 +159,8 @@ export default function SalesAddOnCheckout({
     });
   };
 
-  const paymentLabel = paymentMethod === "onlineDirect" ? "Online Direct" : "Offline Direct";
+  const paymentLabel =
+    paymentMethod === "onlineDirect" ? "Online Direct" : "Offline Direct";
 
   return (
     <Box sx={{ pt: 0.5 }}>
@@ -153,19 +173,30 @@ export default function SalesAddOnCheckout({
         >
           <ArrowBackRoundedIcon sx={{ fontSize: 20 }} />
         </IconButton>
-        <Typography sx={{ fontSize: 16, fontWeight: 900, color: alpha(m.navy, 0.88) }}>
+        <Typography
+          sx={{ fontSize: 16, fontWeight: 900, color: alpha(m.navy, 0.88) }}
+        >
           Checkout
         </Typography>
       </Stack>
 
       {step === "items" ? (
         <Stack spacing={2}>
-          <Typography sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.86) }}>
+          <Typography
+            sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.86) }}
+          >
             Add services or items
           </Typography>
 
           <Box>
-            <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.55), mb: 0.75 }}>
+            <Typography
+              sx={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.55),
+                mb: 0.75,
+              }}
+            >
               Product
             </Typography>
             <Stack spacing={0.75}>
@@ -177,12 +208,22 @@ export default function SalesAddOnCheckout({
                   onDelete={() => removeLine(line.id)}
                 />
               ))}
-              <ManualEntryCatalogOpenButton label="Product" onClick={() => setProductDrawerOpen(true)} />
+              <ManualEntryCatalogOpenButton
+                label="Product"
+                onClick={() => setProductDrawerOpen(true)}
+              />
             </Stack>
           </Box>
 
           <Box>
-            <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.55), mb: 0.75 }}>
+            <Typography
+              sx={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.55),
+                mb: 0.75,
+              }}
+            >
               Service / Item
             </Typography>
             <Stack spacing={0.75}>
@@ -194,47 +235,70 @@ export default function SalesAddOnCheckout({
                   onDelete={() => removeLine(line.id)}
                 />
               ))}
-              <ManualEntryCatalogOpenButton label="Item" onClick={() => setItemDrawerOpen(true)} />
-              <Button
-                variant="outlined"
+              <ManualEntryCatalogOpenButton
+                label="Item"
+                onClick={() => setItemDrawerOpen(true)}
+              />
+              <AppButton
+                tone="secondary"
                 onClick={() => setUniqueItemOpen(true)}
                 sx={{
-                  borderRadius: "10px",
-                  textTransform: "none",
-                  fontWeight: 800,
                   fontSize: 12.5,
-                  borderColor: alpha(m.navy, 0.14),
                   color: m.teal,
                 }}
               >
                 + Unique item
-              </Button>
+              </AppButton>
             </Stack>
           </Box>
 
           {hasItems ? (
             <Stack spacing={1}>
               <Stack direction="row" justifyContent="space-between">
-                <Typography sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.55) }}>
+                <Typography
+                  sx={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.55),
+                  }}
+                >
                   Subtotal
                 </Typography>
-                <Typography sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.78) }}>
+                <Typography
+                  sx={{
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: alpha(m.navy, 0.78),
+                  }}
+                >
                   {formatEurAmount(subtotal)}
                 </Typography>
               </Stack>
 
               {discount && discount.amount > 0 ? (
                 <Stack direction="row" justifyContent="space-between">
-                  <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.55) }}>
+                  <Typography
+                    sx={{
+                      fontSize: 12.5,
+                      fontWeight: 700,
+                      color: alpha(m.navy, 0.55),
+                    }}
+                  >
                     Discount ({formatManualEntryDiscountLabel(discount)})
                   </Typography>
-                  <Typography sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.78) }}>
+                  <Typography
+                    sx={{
+                      fontSize: 13,
+                      fontWeight: 800,
+                      color: alpha(m.navy, 0.78),
+                    }}
+                  >
                     -{formatEurAmount(discountAmount)}
                   </Typography>
                 </Stack>
               ) : null}
 
-              <Button
+              <AppButton
                 variant="text"
                 onClick={() => setDiscountModalOpen(true)}
                 sx={{
@@ -246,17 +310,38 @@ export default function SalesAddOnCheckout({
                   fontSize: 12.5,
                   color: m.teal,
                   textDecoration: "underline",
-                  "&:hover": { bgcolor: "transparent", textDecoration: "underline" },
+                  "&:hover": {
+                    bgcolor: "transparent",
+                    textDecoration: "underline",
+                  },
                 }}
               >
-                {discount && discount.amount > 0 ? "Edit Discount" : "+ Discount"}
-              </Button>
+                {discount && discount.amount > 0
+                  ? "Edit Discount"
+                  : "+ Discount"}
+              </AppButton>
 
-              <Stack direction="row" justifyContent="space-between" sx={{ pt: 0.25 }}>
-                <Typography sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.55) }}>
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                sx={{ pt: 0.25 }}
+              >
+                <Typography
+                  sx={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.55),
+                  }}
+                >
                   Final Price
                 </Typography>
-                <Typography sx={{ fontSize: 18, fontWeight: 900, color: alpha(m.navy, 0.88) }}>
+                <Typography
+                  sx={{
+                    fontSize: 18,
+                    fontWeight: 900,
+                    color: alpha(m.navy, 0.88),
+                  }}
+                >
                   {formatEurAmount(totalPrice)}
                 </Typography>
               </Stack>
@@ -267,14 +352,25 @@ export default function SalesAddOnCheckout({
 
       {step === "payment" ? (
         <Box>
-          <Typography sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.86), mb: 1.25 }}>
+          <Typography
+            sx={{
+              fontSize: 13,
+              fontWeight: 800,
+              color: alpha(m.navy, 0.86),
+              mb: 1.25,
+            }}
+          >
             Payment Method
           </Typography>
           <Stack spacing={1}>
             {(
               [
                 { id: "onlineDirect", label: "Online Direct", showEmail: true },
-                { id: "offlineDirect", label: "Offline Direct", showEmail: false },
+                {
+                  id: "offlineDirect",
+                  label: "Offline Direct",
+                  showEmail: false,
+                },
               ] as const
             ).map((option) => {
               const selected = paymentMethod === option.id;
@@ -292,13 +388,24 @@ export default function SalesAddOnCheckout({
                   }}
                 >
                   <Stack direction="row" alignItems="center" spacing={1.25}>
-                    <CreditCardRoundedIcon sx={{ fontSize: 20, color: alpha(m.navy, 0.45) }} />
+                    <CreditCardRoundedIcon
+                      sx={{ fontSize: 20, color: alpha(m.navy, 0.45) }}
+                    />
                     <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography sx={{ fontSize: 13.5, fontWeight: 800, color: alpha(m.navy, 0.82) }}>
+                      <Typography
+                        sx={{
+                          fontSize: 13.5,
+                          fontWeight: 800,
+                          color: alpha(m.navy, 0.82),
+                        }}
+                      >
                         {option.label}
                       </Typography>
                       {option.showEmail && selected ? (
-                        <Box sx={{ mt: 1 }} onClick={(e) => e.stopPropagation()}>
+                        <Box
+                          sx={{ mt: 1 }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <MollureFormField
                             placeholder="Email for Guest"
                             value={guestEmail}
@@ -335,14 +442,30 @@ export default function SalesAddOnCheckout({
             py: 1.5,
           }}
         >
-          <Typography sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.86), mb: 1.25 }}>
+          <Typography
+            sx={{
+              fontSize: 14,
+              fontWeight: 900,
+              color: alpha(m.navy, 0.86),
+              mb: 1.25,
+            }}
+          >
             Summary
           </Typography>
-          <Typography sx={{ fontSize: 13.5, fontWeight: 800, color: alpha(m.navy, 0.82) }}>
+          <Typography
+            sx={{ fontSize: 13.5, fontWeight: 800, color: alpha(m.navy, 0.82) }}
+          >
             {clientName}
           </Typography>
-          {(guestEmail || clientEmail) ? (
-            <Typography sx={{ fontSize: 12, fontWeight: 650, color: alpha(m.navy, 0.5), mb: 1.5 }}>
+          {guestEmail || clientEmail ? (
+            <Typography
+              sx={{
+                fontSize: 12,
+                fontWeight: 650,
+                color: alpha(m.navy, 0.5),
+                mb: 1.5,
+              }}
+            >
               {guestEmail || clientEmail}
             </Typography>
           ) : (
@@ -351,75 +474,104 @@ export default function SalesAddOnCheckout({
 
           <Stack spacing={0.85} sx={{ mb: 1.5 }}>
             {lines.map((line) => (
-              <Stack key={line.id} direction="row" justifyContent="space-between" spacing={1.5}>
-                <Typography sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.72) }}>
-                  {line.quantity > 1 ? `${line.name} ×${line.quantity}` : line.name}
+              <Stack
+                key={line.id}
+                direction="row"
+                justifyContent="space-between"
+                spacing={1.5}
+              >
+                <Typography
+                  sx={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.72),
+                  }}
+                >
+                  {line.quantity > 1
+                    ? `${line.name} ×${line.quantity}`
+                    : line.name}
                 </Typography>
-                <Typography sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.82) }}>
+                <Typography
+                  sx={{
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: alpha(m.navy, 0.82),
+                  }}
+                >
                   €{lineTotal(line).toFixed(2)}
                 </Typography>
               </Stack>
             ))}
             {discountAmount > 0 ? (
-              <Stack direction="row" justifyContent="space-between" spacing={1.5}>
-                <Typography sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.62) }}>
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                spacing={1.5}
+              >
+                <Typography
+                  sx={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.62),
+                  }}
+                >
                   Discount
                 </Typography>
-                <Typography sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.72) }}>
+                <Typography
+                  sx={{
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: alpha(m.navy, 0.72),
+                  }}
+                >
                   -€{discountAmount.toFixed(2)}
                 </Typography>
               </Stack>
             ) : null}
           </Stack>
 
-          <Stack direction="row" justifyContent="space-between" alignItems="baseline" sx={{ mb: 1 }}>
-            <Typography sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="baseline"
+            sx={{ mb: 1 }}
+          >
+            <Typography
+              sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.82) }}
+            >
               Total Price
             </Typography>
             <Typography sx={{ fontSize: 22, fontWeight: 900, color: m.teal }}>
               €{totalPrice % 1 === 0 ? totalPrice : totalPrice.toFixed(2)}
             </Typography>
           </Stack>
-          <Typography sx={{ fontSize: 12, fontWeight: 650, color: alpha(m.navy, 0.48) }}>
+          <Typography
+            sx={{ fontSize: 12, fontWeight: 650, color: alpha(m.navy, 0.48) }}
+          >
             {paymentLabel}
           </Typography>
         </Box>
       ) : null}
 
-      <Stack direction="row" justifyContent="flex-end" spacing={1} sx={{ mt: 2.5 }}>
-        <Button
-          variant="outlined"
-          onClick={onCancel}
-          sx={{
-            textTransform: "none",
-            fontWeight: 800,
-            borderRadius: "8px",
-            borderColor: alpha(m.navy, 0.14),
-            color: alpha(m.navy, 0.72),
-            bgcolor: "#fff",
-            height: 36,
-            px: 2.25,
-          }}
-        >
+      <Stack
+        direction="row"
+        justifyContent="flex-end"
+        spacing={1}
+        sx={{ mt: 2.5 }}
+      >
+        <AppButton tone="secondary" onClick={onCancel}>
           Cancel
-        </Button>
-        <Button
-          variant="contained"
-          disableElevation
+        </AppButton>
+        <AppButton
+          tone="primary"
           disabled={step === "items" && !hasItems}
           onClick={handleNext}
           sx={{
-            textTransform: "none",
-            fontWeight: 900,
-            borderRadius: "8px",
-            bgcolor: m.teal,
-            "&:hover": { bgcolor: m.tealDark },
-            height: 36,
             px: 2.5,
           }}
         >
           Next
-        </Button>
+        </AppButton>
       </Stack>
 
       <ManualEntryCatalogDrawer
@@ -428,6 +580,8 @@ export default function SalesAddOnCheckout({
         title="Select products"
         options={productOptions}
         emptyLabel="No products configured yet."
+        withQuantity
+        allowAddProduct
         onSave={(selected) => addLinesFromCatalog("product", selected)}
       />
       <ManualEntryCatalogDrawer
@@ -436,6 +590,9 @@ export default function SalesAddOnCheckout({
         title="Select items"
         options={itemOptions}
         emptyLabel="No services configured yet."
+        withQuantity
+        allowAddProduct
+        addProductLabel="Add Item"
         onSave={(selected) => addLinesFromCatalog("item", selected)}
       />
       <ManualEntryUniqueItemModal

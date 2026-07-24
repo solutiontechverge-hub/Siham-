@@ -18,7 +18,10 @@ export default function AdminShell({ children, title }: AdminShellProps) {
 
   return (
     <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: tokens.surface }}>
-      <AdminSidebar mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
+      <AdminSidebar
+        mobileOpen={mobileOpen}
+        onMobileClose={() => setMobileOpen(false)}
+      />
 
       <Box
         component="main"
@@ -47,7 +50,10 @@ export default function AdminShell({ children, title }: AdminShellProps) {
             <MenuIcon />
           </IconButton>
           {title ? (
-            <Typography variant="subHeading" sx={{ color: tokens.textcolorgrey700 }}>
+            <Typography
+              variant="subHeading"
+              sx={{ color: tokens.textcolorgrey700 }}
+            >
               {title}
             </Typography>
           ) : null}

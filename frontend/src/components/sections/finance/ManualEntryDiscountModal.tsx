@@ -1,11 +1,14 @@
 "use client";
 
+import AppButton from "../../common/AppButton";
 import * as React from "react";
-import { Button, InputAdornment, MenuItem, Stack } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
+import { InputAdornment, MenuItem, Stack } from "@mui/material";
 import MollureFormField from "../../common/MollureFormField";
-import MollureModal from "../../common/MollureModal";
-import type { ManualEntryDiscount, ManualEntryDiscountType } from "./manualEntry.data";
+import AppModal from "../../common/AppModal";
+import type {
+  ManualEntryDiscount,
+  ManualEntryDiscountType,
+} from "./manualEntry.data";
 
 type ManualEntryDiscountModalProps = {
   open: boolean;
@@ -14,7 +17,10 @@ type ManualEntryDiscountModalProps = {
   onApply: (discount: ManualEntryDiscount) => void;
 };
 
-const DISCOUNT_TYPE_OPTIONS: Array<{ value: ManualEntryDiscountType; label: string }> = [
+const DISCOUNT_TYPE_OPTIONS: Array<{
+  value: ManualEntryDiscountType;
+  label: string;
+}> = [
   { value: "fixed", label: "Fixed discount" },
   { value: "percentage", label: "Percentage discount" },
 ];
@@ -25,8 +31,8 @@ export default function ManualEntryDiscountModal({
   onClose,
   onApply,
 }: ManualEntryDiscountModalProps) {
-  const m = useTheme().palette.mollure;
-  const [discountType, setDiscountType] = React.useState<ManualEntryDiscountType>("fixed");
+  const [discountType, setDiscountType] =
+    React.useState<ManualEntryDiscountType>("fixed");
   const [amount, setAmount] = React.useState("0");
 
   React.useEffect(() => {
@@ -36,51 +42,33 @@ export default function ManualEntryDiscountModal({
   }, [initialValue, open]);
 
   const handleApply = () => {
-    const parsed = Math.max(0, Number.parseFloat(amount.replace(",", ".")) || 0);
+    const parsed = Math.max(
+      0,
+      Number.parseFloat(amount.replace(",", ".")) || 0,
+    );
     onApply({ type: discountType, amount: parsed });
     onClose();
   };
 
   return (
-    <MollureModal
+    <AppModal
       open={open}
       onClose={onClose}
       title="Add Discount"
       maxWidth="xs"
       footer={
-        <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ px: 2.5, py: 2 }}>
-          <Button
-            onClick={onClose}
-            variant="outlined"
-            sx={{
-              borderRadius: "8px",
-              textTransform: "none",
-              fontWeight: 800,
-              borderColor: alpha(m.navy, 0.14),
-              color: alpha(m.navy, 0.72),
-              bgcolor: "#fff",
-              height: 36,
-              px: 2.25,
-            }}
-          >
+        <Stack
+          direction="row"
+          spacing={1}
+          justifyContent="flex-end"
+          sx={{ px: 2.5, py: 2 }}
+        >
+          <AppButton tone="secondary" onClick={onClose}>
             Cancel
-          </Button>
-          <Button
-            variant="contained"
-            disableElevation
-            onClick={handleApply}
-            sx={{
-              borderRadius: "8px",
-              textTransform: "none",
-              fontWeight: 900,
-              bgcolor: m.teal,
-              "&:hover": { bgcolor: m.tealDark },
-              height: 36,
-              px: 2.25,
-            }}
-          >
+          </AppButton>
+          <AppButton tone="primary" onClick={handleApply}>
             Apply
-          </Button>
+          </AppButton>
         </Stack>
       }
     >
@@ -89,9 +77,16 @@ export default function ManualEntryDiscountModal({
           label="Discount type"
           select
           value={discountType}
-          onChange={(e) => setDiscountType(e.target.value as ManualEntryDiscountType)}
+          onChange={(e) =>
+            setDiscountType(e.target.value as ManualEntryDiscountType)
+          }
           fullWidth
-          sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" } }}
+          sx={{
+            "& .MuiOutlinedInput-root": {
+              bgcolor: "#fff",
+              borderRadius: "10px",
+            },
+          }}
         >
           {DISCOUNT_TYPE_OPTIONS.map((option) => (
             <MenuItem key={option.value} value={option.value}>
@@ -105,21 +100,32 @@ export default function ManualEntryDiscountModal({
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           fullWidth
-          sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" } }}
+          sx={{
+            "& .MuiOutlinedInput-root": {
+              bgcolor: "#fff",
+              borderRadius: "10px",
+            },
+          }}
           InputProps={
             discountType === "fixed"
               ? {
-                  startAdornment: <InputAdornment position="start">€</InputAdornment>,
-                  endAdornment: <InputAdornment position="end">EUR</InputAdornment>,
+                  startAdornment: (
+                    <InputAdornment position="start">€</InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end">EUR</InputAdornment>
+                  ),
                   inputMode: "decimal",
                 }
               : {
-                  endAdornment: <InputAdornment position="end">%</InputAdornment>,
+                  endAdornment: (
+                    <InputAdornment position="end">%</InputAdornment>
+                  ),
                   inputMode: "decimal",
                 }
           }
         />
       </Stack>
-    </MollureModal>
+    </AppModal>
   );
 }

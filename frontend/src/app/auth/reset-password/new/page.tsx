@@ -1,20 +1,18 @@
 "use client";
 
+import AppButton from "../../../../components/common/AppButton";
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import {
-  Box,
-  Button,
-  Container,
-  Paper,
-  Stack,
-} from "@mui/material";
+import { Box, Container, Paper, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { getApiErrorMessage } from "../../../../lib/api-error";
 import { useResetPasswordMutation } from "../../../../store/services/authApi";
-import { MarketingSiteHeader, MollureLabeledPasswordField } from "../../../../components/common";
+import {
+  MarketingSiteHeader,
+  MollureLabeledPasswordField,
+} from "../../../../components/common";
 import { authLoginHeaderClient } from "../../../../data/marketingShell.data";
 import { BodyText, SubHeading } from "../../../../components/ui/typography";
 import { useSnackbar } from "../../../../components/common/AppSnackbar";
@@ -32,7 +30,8 @@ export default function NewPasswordPage() {
   const cardBorder = m.cardBorder ?? alpha(m.navy, 0.12);
 
   React.useEffect(() => {
-    const savedUserId = window.sessionStorage.getItem("mollure_reset_user_id") || "";
+    const savedUserId =
+      window.sessionStorage.getItem("mollure_reset_user_id") || "";
     setUserId(savedUserId);
   }, []);
 
@@ -40,12 +39,18 @@ export default function NewPasswordPage() {
     event.preventDefault();
 
     if (password !== confirmPassword) {
-      showSnackbar({ severity: "error", message: "Password and confirm password must match." });
+      showSnackbar({
+        severity: "error",
+        message: "Password and confirm password must match.",
+      });
       return;
     }
 
     if (!userId) {
-      showSnackbar({ severity: "error", message: "OTP verification is required before resetting the password." });
+      showSnackbar({
+        severity: "error",
+        message: "OTP verification is required before resetting the password.",
+      });
       return;
     }
 
@@ -57,10 +62,16 @@ export default function NewPasswordPage() {
       }).unwrap();
 
       window.sessionStorage.removeItem("mollure_reset_user_id");
-      showSnackbar({ severity: "success", message: "Password reset successfully." });
+      showSnackbar({
+        severity: "success",
+        message: "Password reset successfully.",
+      });
       router.push("/auth/reset-password/success");
     } catch (error) {
-      showSnackbar({ severity: "error", message: getApiErrorMessage(error, "Unable to reset password.") });
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Unable to reset password."),
+      });
     }
   };
 
@@ -199,7 +210,8 @@ export default function NewPasswordPage() {
                       lineHeight: 1.45,
                     }}
                   >
-                    Your New Password Must Be Different From Your Previously Used Password
+                    Your New Password Must Be Different From Your Previously
+                    Used Password
                   </BodyText>
                 </Box>
 
@@ -218,36 +230,39 @@ export default function NewPasswordPage() {
                       fieldLabel="Confirm Password"
                       placeholder="Enter Password Here"
                       value={confirmPassword}
-                      onChange={(event) => setConfirmPassword(event.target.value)}
+                      onChange={(event) =>
+                        setConfirmPassword(event.target.value)
+                      }
                       required
                       autoComplete="new-password"
                     />
 
-                    <Button
+                    <AppButton
+                      tone="primary"
                       type="submit"
-                      variant="contained"
-                      disableElevation
                       fullWidth
                       disabled={isLoading}
                       sx={{
-                        borderRadius: "10px",
-                        textTransform: "none",
-                        fontWeight: 700,
                         fontSize: "1rem",
                         py: 1.2,
                         minHeight: 44,
-                        bgcolor: m.teal,
                         color: m.white,
-                        "&:hover": { bgcolor: m.tealDark },
                       }}
                     >
                       {isLoading ? "Resetting..." : "Reset Password"}
-                    </Button>
+                    </AppButton>
 
-                    <BodyText textAlign="center" sx={{ color: alpha(m.navy, 0.48), fontSize: "0.8125rem" }}>
+                    <BodyText
+                      textAlign="center"
+                      sx={{ color: alpha(m.navy, 0.48), fontSize: "0.8125rem" }}
+                    >
                       <Link
                         href="/auth/reset-password/verify-otp"
-                        style={{ color: m.teal, textDecoration: "none", fontWeight: 600 }}
+                        style={{
+                          color: m.teal,
+                          textDecoration: "none",
+                          fontWeight: 600,
+                        }}
                       >
                         Back to OTP verification
                       </Link>

@@ -10,7 +10,11 @@ type AdminFilterPanelProps = {
   sx?: SxProps<Theme>;
 };
 
-export default function AdminFilterPanel({ children, horizontal = false, sx }: AdminFilterPanelProps) {
+export default function AdminFilterPanel({
+  children,
+  horizontal = false,
+  sx,
+}: AdminFilterPanelProps) {
   const tokens = useTheme().palette.mollure;
 
   if (horizontal) {
@@ -20,7 +24,7 @@ export default function AdminFilterPanel({ children, horizontal = false, sx }: A
         spacing={1.25}
         flexWrap="wrap"
         useFlexGap
-        alignItems={{ lg: "center" }}
+        alignItems={{ lg: "flex-end" }}
         sx={{ width: "100%", ...sx }}
       >
         {children}
@@ -61,7 +65,12 @@ type AdminFilterPanelRowProps = {
   sx?: SxProps<Theme>;
 };
 
-export function AdminFilterPanelRow({ children, horizontal = false, grow = false, sx }: AdminFilterPanelRowProps) {
+export function AdminFilterPanelRow({
+  children,
+  horizontal = false,
+  grow = false,
+  sx,
+}: AdminFilterPanelRowProps) {
   const tokens = useTheme().palette.mollure;
 
   if (horizontal) {

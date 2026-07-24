@@ -1,5 +1,6 @@
 "use client";
 
+import AppButton from "../AppButton";
 import * as React from "react";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
@@ -8,7 +9,6 @@ import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownR
 import {
   Avatar,
   Box,
-  Button,
   IconButton,
   Menu,
   MenuItem,
@@ -50,9 +50,7 @@ import { BodyText, SubHeading } from "../../ui/typography";
 type ScheduleStatusTab = "active" | "archived";
 
 type DeleteTarget =
-  | { kind: "availability"; id: string }
-  | { kind: "blocked"; id: string }
-  | null;
+  { kind: "availability"; id: string } | { kind: "blocked"; id: string } | null;
 
 type CalendarTeamMemberScheduleProps = {
   resources: readonly CalendarResource[];
@@ -61,7 +59,9 @@ type CalendarTeamMemberScheduleProps = {
   blocked: readonly TeamScheduleBlockedEntry[];
   activeDateIso: string;
   onDateChange: (iso: string) => void;
-  onAvailabilityChange: (next: readonly TeamScheduleAvailabilityEntry[]) => void;
+  onAvailabilityChange: (
+    next: readonly TeamScheduleAvailabilityEntry[],
+  ) => void;
   onBlockedChange: (next: readonly TeamScheduleBlockedEntry[]) => void;
 };
 
@@ -76,7 +76,8 @@ const formatScheduleTime = (time: string) => {
 const formatTimeRange = (range: TeamScheduleTimeRange) =>
   `${formatScheduleTime(range.start)} - ${formatScheduleTime(range.end)}`;
 
-const isDateInRange = (iso: string, from: string, to: string) => iso >= from && iso <= to;
+const isDateInRange = (iso: string, from: string, to: string) =>
+  iso >= from && iso <= to;
 
 function ScheduleStatusTabs({
   value,
@@ -176,7 +177,14 @@ function ScheduleTableSection({
 
   return (
     <Box>
-      <BodyText sx={{ fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.58), mb: 0.85 }}>
+      <BodyText
+        sx={{
+          fontSize: 13,
+          fontWeight: 900,
+          color: alpha(m.navy, 0.58),
+          mb: 0.85,
+        }}
+      >
         {title}
       </BodyText>
       <TableContainer
@@ -203,7 +211,10 @@ function ScheduleTableSection({
               rows
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} sx={{ ...bodyCellSx, color: alpha(m.navy, 0.45) }}>
+                <TableCell
+                  colSpan={columns.length}
+                  sx={{ ...bodyCellSx, color: alpha(m.navy, 0.45) }}
+                >
                   {emptyLabel}
                 </TableCell>
               </TableRow>
@@ -215,7 +226,11 @@ function ScheduleTableSection({
   );
 }
 
-function DateRangeDropdown({ entry }: { entry: TeamScheduleAvailabilityEntry }) {
+function DateRangeDropdown({
+  entry,
+}: {
+  entry: TeamScheduleAvailabilityEntry;
+}) {
   const m = useTheme().palette.mollure;
   const [anchor, setAnchor] = React.useState<HTMLElement | null>(null);
   const bookedDates = entry.bookedDates ?? [];
@@ -223,7 +238,12 @@ function DateRangeDropdown({ entry }: { entry: TeamScheduleAvailabilityEntry }) 
 
   return (
     <>
-      <Stack direction="row" spacing={0.35} alignItems="center" justifyContent="center">
+      <Stack
+        direction="row"
+        spacing={0.35}
+        alignItems="center"
+        justifyContent="center"
+      >
         <span>
           {formatMdyDate(entry.dateFrom)} - {formatMdyDate(entry.dateTo)}
         </span>
@@ -290,19 +310,27 @@ export default function CalendarTeamMemberSchedule({
 }: CalendarTeamMemberScheduleProps) {
   const m = useTheme().palette.mollure;
   const [statusTab, setStatusTab] = React.useState<ScheduleStatusTab>("active");
-  const [datePickerAnchor, setDatePickerAnchor] = React.useState<HTMLElement | null>(null);
+  const [datePickerAnchor, setDatePickerAnchor] =
+    React.useState<HTMLElement | null>(null);
   const [addAnchor, setAddAnchor] = React.useState<HTMLElement | null>(null);
 
-  const [availabilityModalOpen, setAvailabilityModalOpen] = React.useState(false);
-  const [availabilityMode, setAvailabilityMode] = React.useState<"add" | "edit">("add");
-  const [availabilityDraft, setAvailabilityDraft] = React.useState<AvailabilityDraft>(() =>
-    emptyAvailabilityDraft(activeDateIso),
-  );
-  const [editingAvailability, setEditingAvailability] = React.useState<TeamScheduleAvailabilityEntry | null>(null);
+  const [availabilityModalOpen, setAvailabilityModalOpen] =
+    React.useState(false);
+  const [availabilityMode, setAvailabilityMode] = React.useState<
+    "add" | "edit"
+  >("add");
+  const [availabilityDraft, setAvailabilityDraft] =
+    React.useState<AvailabilityDraft>(() =>
+      emptyAvailabilityDraft(activeDateIso),
+    );
+  const [editingAvailability, setEditingAvailability] =
+    React.useState<TeamScheduleAvailabilityEntry | null>(null);
 
   const [blockModalOpen, setBlockModalOpen] = React.useState(false);
   const [blockMode, setBlockMode] = React.useState<"add" | "edit">("add");
-  const [blockDraft, setBlockDraft] = React.useState<BlockTimeDraft & { activity?: string }>({
+  const [blockDraft, setBlockDraft] = React.useState<
+    BlockTimeDraft & { activity?: string }
+  >({
     title: "Custom",
     teamIds: [],
     locations: [...supportedLocations],
@@ -314,7 +342,8 @@ export default function CalendarTeamMemberSchedule({
     endTime: "17:00",
     activity: "",
   });
-  const [editingBlocked, setEditingBlocked] = React.useState<TeamScheduleBlockedEntry | null>(null);
+  const [editingBlocked, setEditingBlocked] =
+    React.useState<TeamScheduleBlockedEntry | null>(null);
 
   const [deleteTarget, setDeleteTarget] = React.useState<DeleteTarget>(null);
 
@@ -374,12 +403,23 @@ export default function CalendarTeamMemberSchedule({
 
   const applyAvailability = () => {
     if (availabilityMode === "add") {
-      if (!availabilityDraft.teamIds.length || !availabilityDraft.locations.length) return;
+      if (
+        !availabilityDraft.teamIds.length ||
+        !availabilityDraft.locations.length
+      )
+        return;
       const created = buildAvailabilityEntriesFromDraft(availabilityDraft);
       onAvailabilityChange([...availability, ...created]);
     } else if (editingAvailability) {
-      const [updated] = buildAvailabilityEntriesFromDraft(availabilityDraft, editingAvailability);
-      onAvailabilityChange(availability.map((entry) => (entry.id === updated.id ? updated : entry)));
+      const [updated] = buildAvailabilityEntriesFromDraft(
+        availabilityDraft,
+        editingAvailability,
+      );
+      onAvailabilityChange(
+        availability.map((entry) =>
+          entry.id === updated.id ? updated : entry,
+        ),
+      );
     }
     setAvailabilityModalOpen(false);
   };
@@ -410,12 +450,23 @@ export default function CalendarTeamMemberSchedule({
   };
 
   const applyBlocked = () => {
-    if (!blockDraft.teamIds.length || !blockDraft.activity?.trim()) return;
-    const nextEntry = buildBlockedEntryFromDraft(blockDraft, editingBlocked ?? undefined);
+    if (!blockDraft.teamIds.length) return;
+    if (
+      blockDraft.title === "Custom" &&
+      !blockDraft.customTitle?.trim() &&
+      !blockDraft.activity?.trim()
+    )
+      return;
+    const nextEntry = buildBlockedEntryFromDraft(
+      blockDraft,
+      editingBlocked ?? undefined,
+    );
     if (blockMode === "add") {
       onBlockedChange([...blocked, nextEntry]);
     } else {
-      onBlockedChange(blocked.map((entry) => (entry.id === nextEntry.id ? nextEntry : entry)));
+      onBlockedChange(
+        blocked.map((entry) => (entry.id === nextEntry.id ? nextEntry : entry)),
+      );
     }
     setBlockModalOpen(false);
   };
@@ -423,7 +474,9 @@ export default function CalendarTeamMemberSchedule({
   const confirmDelete = () => {
     if (!deleteTarget) return;
     if (deleteTarget.kind === "availability") {
-      onAvailabilityChange(availability.filter((entry) => entry.id !== deleteTarget.id));
+      onAvailabilityChange(
+        availability.filter((entry) => entry.id !== deleteTarget.id),
+      );
     } else {
       onBlockedChange(blocked.filter((entry) => entry.id !== deleteTarget.id));
     }
@@ -432,30 +485,48 @@ export default function CalendarTeamMemberSchedule({
 
   const rowActions = (onEdit: () => void, onDelete: () => void) => (
     <Stack direction="row" spacing={0.35} justifyContent="center">
-      <IconButton size="small" onClick={onEdit} sx={{ width: 28, height: 28, borderRadius: "8px" }}>
+      <IconButton
+        size="small"
+        onClick={onEdit}
+        sx={{ width: 28, height: 28, borderRadius: "8px" }}
+      >
         <EditOutlinedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
       </IconButton>
-      <IconButton size="small" onClick={onDelete} sx={{ width: 28, height: 28, borderRadius: "8px" }}>
-        <DeleteOutlineRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
+      <IconButton
+        size="small"
+        onClick={onDelete}
+        sx={{ width: 28, height: 28, borderRadius: "8px" }}
+      >
+        <DeleteOutlineRoundedIcon
+          sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }}
+        />
       </IconButton>
     </Stack>
   );
 
   const membersWithRows = resources.filter((resource) => {
-    const memberAvailability = filteredAvailability.filter((entry) => entry.resourceId === resource.id);
-    const memberBlocked = filteredBlocked.filter((entry) => entry.resourceId === resource.id);
+    const memberAvailability = filteredAvailability.filter(
+      (entry) => entry.resourceId === resource.id,
+    );
+    const memberBlocked = filteredBlocked.filter(
+      (entry) => entry.resourceId === resource.id,
+    );
     return memberAvailability.length > 0 || memberBlocked.length > 0;
   });
 
-  const membersToRender = membersWithRows.length > 0 ? membersWithRows : resources.slice(0, 1);
+  const membersToRender =
+    membersWithRows.length > 0 ? membersWithRows : resources.slice(0, 1);
 
-  const editingAvailabilityName =
-    editingAvailability
-      ? resources.find((resource) => resource.id === editingAvailability.resourceId)?.name
-      : undefined;
+  const editingAvailabilityName = editingAvailability
+    ? resources.find(
+        (resource) => resource.id === editingAvailability.resourceId,
+      )?.name
+    : undefined;
 
-  const editingBlockedName =
-    editingBlocked ? resources.find((resource) => resource.id === editingBlocked.resourceId)?.name : undefined;
+  const editingBlockedName = editingBlocked
+    ? resources.find((resource) => resource.id === editingBlocked.resourceId)
+        ?.name
+    : undefined;
 
   return (
     <>
@@ -479,10 +550,19 @@ export default function CalendarTeamMemberSchedule({
                 py: 1.75,
               }}
             >
-              <SubHeading sx={{ fontSize: 22, fontWeight: 800, color: alpha(m.navy, 0.9), lineHeight: 1.2 }}>
+              <SubHeading
+                sx={{
+                  fontSize: 22,
+                  fontWeight: 800,
+                  color: alpha(m.navy, 0.9),
+                  lineHeight: 1.2,
+                }}
+              >
                 Team Member schedule
               </SubHeading>
-              <BodyText sx={{ mt: 0.5, fontSize: 13, color: alpha(m.navy, 0.52) }}>
+              <BodyText
+                sx={{ mt: 0.5, fontSize: 13, color: alpha(m.navy, 0.52) }}
+              >
                 Set Availability and block a time slot for the team members.
               </BodyText>
             </Box>
@@ -497,7 +577,7 @@ export default function CalendarTeamMemberSchedule({
               useFlexGap
               sx={{ position: "relative" }}
             >
-              <Button
+              <AppButton
                 variant="outlined"
                 startIcon={<CalendarMonthRoundedIcon sx={{ fontSize: 18 }} />}
                 onClick={(e) => setDatePickerAnchor(e.currentTarget)}
@@ -515,27 +595,22 @@ export default function CalendarTeamMemberSchedule({
                 }}
               >
                 {formatLongDateUtc(activeDateIso)}
-              </Button>
+              </AppButton>
 
               {!isArchived ? (
-                <Button
-                  variant="contained"
-                  disableElevation
+                <AppButton
+                  tone="primary"
                   endIcon={<KeyboardArrowDownRoundedIcon />}
                   onClick={(e) => setAddAnchor(e.currentTarget)}
                   sx={{
-                    borderRadius: "6px",
-                    textTransform: "none",
-                    fontWeight: 700,
                     fontSize: 11,
                     height: 28,
                     px: 1.25,
-                    bgcolor: m.teal,
-                    "&:hover": { bgcolor: m.tealDark },
+                    "& .MuiButton-endIcon": { color: "#fff" },
                   }}
                 >
                   Add
-                </Button>
+                </AppButton>
               ) : null}
 
               <Popover
@@ -572,12 +647,21 @@ export default function CalendarTeamMemberSchedule({
 
             <Stack spacing={2.5}>
               {membersToRender.map((resource) => {
-                const memberAvailability = filteredAvailability.filter((entry) => entry.resourceId === resource.id);
-                const memberBlocked = filteredBlocked.filter((entry) => entry.resourceId === resource.id);
+                const memberAvailability = filteredAvailability.filter(
+                  (entry) => entry.resourceId === resource.id,
+                );
+                const memberBlocked = filteredBlocked.filter(
+                  (entry) => entry.resourceId === resource.id,
+                );
 
                 return (
                   <Box key={resource.id}>
-                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      alignItems="center"
+                      sx={{ mb: 1.5 }}
+                    >
                       <Avatar
                         sx={{
                           width: 28,
@@ -590,7 +674,13 @@ export default function CalendarTeamMemberSchedule({
                       >
                         {resource.avatarText}
                       </Avatar>
-                      <BodyText sx={{ fontSize: 14, fontWeight: 800, color: alpha(m.navy, 0.86) }}>
+                      <BodyText
+                        sx={{
+                          fontSize: 14,
+                          fontWeight: 800,
+                          color: alpha(m.navy, 0.86),
+                        }}
+                      >
                         {resource.name}
                       </BodyText>
                     </Stack>
@@ -598,11 +688,19 @@ export default function CalendarTeamMemberSchedule({
                     <Stack spacing={1.75}>
                       <ScheduleTableSection
                         title="Availability"
-                        columns={["Location", "Date - Date", "Day - Day", "Time - Time", "Action"]}
+                        columns={[
+                          "Location",
+                          "Date - Date",
+                          "Day - Day",
+                          "Time - Time",
+                          "Action",
+                        ]}
                         emptyLabel="No availability entries."
                         rows={memberAvailability.map((entry) => (
                           <TableRow key={entry.id}>
-                            <TableCell sx={bodyCellSx}>{entry.location}</TableCell>
+                            <TableCell sx={bodyCellSx}>
+                              {entry.location}
+                            </TableCell>
                             <TableCell sx={bodyCellSx}>
                               <DateRangeDropdown entry={entry} />
                             </TableCell>
@@ -612,14 +710,20 @@ export default function CalendarTeamMemberSchedule({
                             <TableCell sx={bodyCellSx}>
                               <Stack spacing={0.35}>
                                 {entry.times.map((range, timeIndex) => (
-                                  <span key={`${entry.id}-${timeIndex}`}>{formatTimeRange(range)}</span>
+                                  <span key={`${entry.id}-${timeIndex}`}>
+                                    {formatTimeRange(range)}
+                                  </span>
                                 ))}
                               </Stack>
                             </TableCell>
                             <TableCell sx={bodyCellSx}>
                               {rowActions(
                                 () => openEditAvailability(entry),
-                                () => setDeleteTarget({ kind: "availability", id: entry.id }),
+                                () =>
+                                  setDeleteTarget({
+                                    kind: "availability",
+                                    id: entry.id,
+                                  }),
                               )}
                             </TableCell>
                           </TableRow>
@@ -628,13 +732,22 @@ export default function CalendarTeamMemberSchedule({
 
                       <ScheduleTableSection
                         title="Blocked Time"
-                        columns={["Activity", "Date - Date", "Day - Day", "Time - Time", "Action"]}
+                        columns={[
+                          "Title",
+                          "Date - Date",
+                          "Day - Day",
+                          "Time - Time",
+                          "Action",
+                        ]}
                         emptyLabel="No blocked time entries."
                         rows={memberBlocked.map((entry) => (
                           <TableRow key={entry.id}>
-                            <TableCell sx={bodyCellSx}>{entry.activity}</TableCell>
                             <TableCell sx={bodyCellSx}>
-                              {formatMdyDate(entry.dateFrom)} - {formatMdyDate(entry.dateTo)}
+                              {entry.activity}
+                            </TableCell>
+                            <TableCell sx={bodyCellSx}>
+                              {formatMdyDate(entry.dateFrom)} -{" "}
+                              {formatMdyDate(entry.dateTo)}
                             </TableCell>
                             <TableCell sx={bodyCellSx}>
                               {entry.dayFrom} - {entry.dayTo}
@@ -642,14 +755,20 @@ export default function CalendarTeamMemberSchedule({
                             <TableCell sx={bodyCellSx}>
                               <Stack spacing={0.35}>
                                 {entry.times.map((range, timeIndex) => (
-                                  <span key={`${entry.id}-${timeIndex}`}>{formatTimeRange(range)}</span>
+                                  <span key={`${entry.id}-${timeIndex}`}>
+                                    {formatTimeRange(range)}
+                                  </span>
                                 ))}
                               </Stack>
                             </TableCell>
                             <TableCell sx={bodyCellSx}>
                               {rowActions(
                                 () => openEditBlocked(entry),
-                                () => setDeleteTarget({ kind: "blocked", id: entry.id }),
+                                () =>
+                                  setDeleteTarget({
+                                    kind: "blocked",
+                                    id: entry.id,
+                                  }),
                               )}
                             </TableCell>
                           </TableRow>
@@ -670,7 +789,9 @@ export default function CalendarTeamMemberSchedule({
         resources={resources}
         availableLocations={supportedLocations}
         teamLabelById={teamLabelById}
-        title={availabilityMode === "edit" ? "Edit Availability" : "Add Availability"}
+        title={
+          availabilityMode === "edit" ? "Edit Availability" : "Add Availability"
+        }
         onClose={() => setAvailabilityModalOpen(false)}
         onApply={applyAvailability}
         setDraft={setAvailabilityDraft}

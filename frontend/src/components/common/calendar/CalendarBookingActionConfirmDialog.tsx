@@ -3,10 +3,10 @@
 import { Box, Typography } from "@mui/material";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { alpha, useTheme } from "@mui/material/styles";
-import MessagingModalShell, {
+import AppModal, {
   MessagingModalCancelButton,
   MessagingModalPrimaryButton,
-} from "../messaging/MessagingModalShell";
+} from "../AppModal";
 
 export type CalendarBookingAction = "cancel" | "in_progress";
 
@@ -34,18 +34,26 @@ const COPY: Record<
   },
 };
 
-export default function CalendarBookingActionConfirmDialog({ open, action, onClose, onConfirm }: Props) {
+export default function CalendarBookingActionConfirmDialog({
+  open,
+  action,
+  onClose,
+  onConfirm,
+}: Props) {
   const m = useTheme().palette.mollure;
   if (!action) return null;
 
   const copy = COPY[action];
 
   return (
-    <MessagingModalShell
+    <AppModal
+      contentSx={{ px: 2.5 }}
+      footerVariant="actions"
       open={open}
       title={copy.title}
       onClose={onClose}
       maxWidth="sm"
+      headerTone={action === "cancel" ? "danger" : "default"}
       footer={
         <>
           <MessagingModalCancelButton onClick={onClose} />
@@ -61,12 +69,22 @@ export default function CalendarBookingActionConfirmDialog({ open, action, onClo
     >
       <Box sx={{ py: 2.5, textAlign: "center" }}>
         {copy.showWarning ? (
-          <WarningAmberRoundedIcon sx={{ fontSize: 52, color: "#E85D5D", mb: 1.5 }} />
+          <WarningAmberRoundedIcon
+            sx={{ fontSize: 52, color: "#E85D5D", mb: 1.5 }}
+          />
         ) : null}
-        <Typography sx={{ fontWeight: 900, fontSize: 14, color: alpha(m.navy, 0.88), lineHeight: 1.55, px: 1 }}>
+        <Typography
+          sx={{
+            fontWeight: 900,
+            fontSize: 14,
+            color: alpha(m.navy, 0.88),
+            lineHeight: 1.55,
+            px: 1,
+          }}
+        >
           {copy.body}
         </Typography>
       </Box>
-    </MessagingModalShell>
+    </AppModal>
   );
 }

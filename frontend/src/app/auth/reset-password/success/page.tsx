@@ -1,9 +1,10 @@
 "use client";
 
+import AppButton from "../../../../components/common/AppButton";
 import Link from "next/link";
 import Image from "next/image";
 import { alpha, useTheme } from "@mui/material/styles";
-import { Box, Button, Container, Paper, Stack } from "@mui/material";
+import { Box, Container, Paper, Stack } from "@mui/material";
 import { MarketingSiteHeader } from "../../../../components/common";
 import { authLoginHeaderClient } from "../../../../data/marketingShell.data";
 import { BodyText, SubHeading } from "../../../../components/ui/typography";
@@ -148,27 +149,21 @@ export default function PasswordResetSuccessPage() {
                 >
                   Your Password Has Been Successfully Reset
                 </BodyText>
-                <Button
+                <AppButton
+                  tone="primary"
                   component={Link}
                   href="/auth/login"
-                  variant="contained"
-                  disableElevation
                   fullWidth
                   sx={{
                     mt: 0.5,
-                    borderRadius: "10px",
-                    textTransform: "none",
-                    fontWeight: 700,
                     fontSize: "1rem",
                     py: 1.2,
                     minHeight: 44,
-                    bgcolor: m.teal,
                     color: m.white,
-                    "&:hover": { bgcolor: m.tealDark },
                   }}
                 >
                   Login
-                </Button>
+                </AppButton>
               </Stack>
             </Paper>
           </Box>

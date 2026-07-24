@@ -28,7 +28,9 @@ export default function BookingAddUniqueItemScreen({
 
   return (
     <Stack spacing={1.6}>
-      <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 15 }}>
+      <BodyText
+        sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 15 }}
+      >
         Add Unique Item
       </BodyText>
 
@@ -64,7 +66,11 @@ export default function BookingAddUniqueItemScreen({
         placeholder="Unit"
         type="number"
         value={String(draft.unit)}
-        onChange={(e) => onChange({ unit: Math.max(1, Number.parseInt(e.target.value, 10) || 1) })}
+        onChange={(e) =>
+          onChange({
+            unit: Math.max(1, Number.parseInt(e.target.value, 10) || 1),
+          })
+        }
         fullWidth
         disabled={disabled}
         inputProps={{ min: 1 }}
@@ -83,8 +89,15 @@ export default function BookingAddUniqueItemScreen({
                 <IconButton
                   size="small"
                   disabled={disabled || draft.unit <= 1}
-                  onClick={() => onChange({ unit: Math.max(1, draft.unit - 1) })}
-                  sx={{ width: 30, height: 30, borderRadius: 0, color: alpha(m.navy, 0.55) }}
+                  onClick={() =>
+                    onChange({ unit: Math.max(1, draft.unit - 1) })
+                  }
+                  sx={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: 0,
+                    color: alpha(m.navy, 0.55),
+                  }}
                 >
                   <RemoveRoundedIcon sx={{ fontSize: 16 }} />
                 </IconButton>
@@ -92,7 +105,12 @@ export default function BookingAddUniqueItemScreen({
                   size="small"
                   disabled={disabled}
                   onClick={() => onChange({ unit: draft.unit + 1 })}
-                  sx={{ width: 30, height: 30, borderRadius: 0, color: alpha(m.navy, 0.55) }}
+                  sx={{
+                    width: 30,
+                    height: 30,
+                    borderRadius: 0,
+                    color: alpha(m.navy, 0.55),
+                  }}
                 >
                   <AddRoundedIcon sx={{ fontSize: 16 }} />
                 </IconButton>
@@ -110,7 +128,14 @@ export default function BookingAddUniqueItemScreen({
           p: 1.5,
         }}
       >
-        <BodyText sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.76), mb: 1.25 }}>
+        <BodyText
+          sx={{
+            fontSize: 12.5,
+            fontWeight: 900,
+            color: alpha(m.navy, 0.76),
+            mb: 1.25,
+          }}
+        >
           Add Discount (Optional)
         </BodyText>
 
@@ -118,7 +143,12 @@ export default function BookingAddUniqueItemScreen({
           <AppSelect
             label="Discount type"
             value={draft.discountType}
-            onChange={(e) => onChange({ discountType: e.target.value as BookingUniqueItemDraft["discountType"] })}
+            onChange={(e) =>
+              onChange({
+                discountType: e.target
+                  .value as BookingUniqueItemDraft["discountType"],
+              })
+            }
             options={[
               { label: "Fixed discount", value: "fixed" },
               { label: "Percentage discount", value: "percentage" },
@@ -136,12 +166,18 @@ export default function BookingAddUniqueItemScreen({
             InputProps={
               draft.discountType === "fixed"
                 ? {
-                    startAdornment: <InputAdornment position="start">€</InputAdornment>,
-                    endAdornment: <InputAdornment position="end">EUR</InputAdornment>,
+                    startAdornment: (
+                      <InputAdornment position="start">€</InputAdornment>
+                    ),
+                    endAdornment: (
+                      <InputAdornment position="end">EUR</InputAdornment>
+                    ),
                     inputMode: "decimal",
                   }
                 : {
-                    endAdornment: <InputAdornment position="end">%</InputAdornment>,
+                    endAdornment: (
+                      <InputAdornment position="end">%</InputAdornment>
+                    ),
                     inputMode: "decimal",
                   }
             }

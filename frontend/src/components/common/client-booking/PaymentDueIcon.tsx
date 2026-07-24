@@ -19,8 +19,22 @@ export default function PaymentDueIcon({ size = 22 }: { size?: number }) {
         placeItems: "center",
       }}
     >
-      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden>
-        <circle cx="12" cy="12" r="10" stroke={stroke} strokeWidth="0.9" strokeDasharray="2.5 2.5" opacity={0.55} />
+      <svg
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="none"
+        aria-hidden
+      >
+        <circle
+          cx="12"
+          cy="12"
+          r="10"
+          stroke={stroke}
+          strokeWidth="0.9"
+          strokeDasharray="2.5 2.5"
+          opacity={0.55}
+        />
         <circle cx="12" cy="12" r="7.2" stroke={stroke} strokeWidth="1.1" />
         <text
           x="12"
@@ -48,9 +62,21 @@ export default function PaymentDueIcon({ size = 22 }: { size?: number }) {
           placeItems: "center",
         }}
       >
-        <svg width={badgeSize - 3} height={badgeSize - 3} viewBox="0 0 10 10" fill="none" aria-hidden>
+        <svg
+          width={badgeSize - 3}
+          height={badgeSize - 3}
+          viewBox="0 0 10 10"
+          fill="none"
+          aria-hidden
+        >
           <circle cx="5" cy="5" r="3.6" stroke={stroke} strokeWidth="0.9" />
-          <path d="M5 3.2v2l1.3.8" stroke={stroke} strokeWidth="0.9" strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d="M5 3.2v2l1.3.8"
+            stroke={stroke}
+            strokeWidth="0.9"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       </Box>
     </Box>

@@ -28,9 +28,7 @@ export function getTransactionStatusTone(status: TransactionStatus): Transaction
     case "Pending":
     case "Prepayment due":
     case "Payment due":
-      return "warning";
     case "Overdue":
-      return "danger";
     case "Overdue response":
       return "warning";
     case "Refunded":
@@ -679,7 +677,18 @@ export const mockTransactions: TransactionRow[] = [
 ];
 
 /** Derive action menu category from selected transaction statuses. */
-export type TransactionActionCategory = "paid" | "failed" | "pending" | "voided" | "mixed";
+export type TransactionActionCategory =
+  | "paid"
+  | "failed"
+  | "pending"
+  | "voided"
+  | "due"
+  | "mixed";
+
+/** Refund is only allowed after money was received (Paid / Prepaid). */
+export function isRefundableTransactionStatus(status: TransactionStatus): boolean {
+  return status === "Paid" || status === "Prepaid";
+}
 
 export function getTransactionActionCategory(
   rows: readonly TransactionRow[],
@@ -702,10 +711,16 @@ export function getTransactionActionCategory(
         categories.add("pending");
         break;
       case "Voided":
+      case "Refunded":
         categories.add("voided");
         break;
+      case "Overdue":
+      case "Overdue response":
+      case "Payment due":
+        categories.add("due");
+        break;
       default:
-        categories.add("paid");
+        categories.add("due");
         break;
     }
   }

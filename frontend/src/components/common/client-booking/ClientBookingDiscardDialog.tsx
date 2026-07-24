@@ -1,8 +1,9 @@
 "use client";
 
-import { Box, Typography } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
-import MessagingModalShell, { MessagingModalCancelButton, MessagingModalPrimaryButton } from "../messaging/MessagingModalShell";
+import AppModal, {
+  MessagingModalCancelButton,
+  MessagingModalPrimaryButton,
+} from "../AppModal";
 
 type Props = {
   open: boolean;
@@ -10,18 +11,24 @@ type Props = {
   onConfirm: () => void;
 };
 
-export default function ClientBookingDiscardDialog({ open, onClose, onConfirm }: Props) {
-  const m = useTheme().palette.mollure;
-
+export default function ClientBookingDiscardDialog({
+  open,
+  onClose,
+  onConfirm,
+}: Props) {
   return (
-    <MessagingModalShell
+    <AppModal
+      contentSx={{ px: 2.5, py: 1 }}
+      footerVariant="actions"
+      headerTone="danger"
       open={open}
-      title="Discard booking request"
+      title="Are you sure you want to discard your BR? It will be deleted afterward."
       onClose={onClose}
       footer={
         <>
           <MessagingModalCancelButton onClick={onClose} />
           <MessagingModalPrimaryButton
+            tone="danger"
             label="Discard"
             onClick={() => {
               onConfirm();
@@ -31,11 +38,7 @@ export default function ClientBookingDiscardDialog({ open, onClose, onConfirm }:
         </>
       }
     >
-      <Box sx={{ py: 2, textAlign: "center" }}>
-        <Typography sx={{ fontWeight: 900, fontSize: 14, color: alpha(m.navy, 0.85) }}>
-          Are you sure you want to discard your BR? It will be deleted afterward.
-        </Typography>
-      </Box>
-    </MessagingModalShell>
+      {null}
+    </AppModal>
   );
 }

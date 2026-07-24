@@ -2,7 +2,14 @@
 
 import * as React from "react";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
-import { Box, DialogActions, IconButton, Paper, Stack, Typography } from "@mui/material";
+import {
+  Box,
+  DialogActions,
+  IconButton,
+  Paper,
+  Stack,
+  Typography,
+} from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 
 export type MessagingInsetOverlayProps = {
@@ -13,6 +20,8 @@ export type MessagingInsetOverlayProps = {
   footer?: React.ReactNode;
   hideDivider?: boolean;
   maxWidth?: number;
+  /** Soft teal by default; soft red for destructive confirmations. */
+  headerTone?: "default" | "danger";
 };
 
 export default function MessagingInsetOverlay({
@@ -23,8 +32,11 @@ export default function MessagingInsetOverlay({
   footer,
   hideDivider,
   maxWidth = 400,
+  headerTone = "default",
 }: MessagingInsetOverlayProps) {
   const m = useTheme().palette.mollure;
+  const headerBg =
+    headerTone === "danger" ? alpha("#E85D5D", 0.14) : alpha(m.teal, 0.12);
 
   if (!open) return null;
 
@@ -57,26 +69,54 @@ export default function MessagingInsetOverlay({
           border: `1px solid ${alpha(m.navy, 0.1)}`,
         }}
       >
-        <Box sx={{ px: { xs: 2, sm: 2.5 }, pt: { xs: 1.75, sm: 2 }, pb: 1, flexShrink: 0 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between">
-            <Typography sx={{ fontWeight: 900, fontSize: { xs: 15, sm: 16 }, color: alpha(m.navy, 0.88) }}>{title}</Typography>
-            <IconButton
-              size="small"
-              onClick={onClose}
-              aria-label="Close"
-              sx={{
-                bgcolor: alpha(m.navy, 0.06),
-                width: 28,
-                height: 28,
-                "&:hover": { bgcolor: alpha(m.navy, 0.1) },
-              }}
-            >
-              <CloseRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.45) }} />
-            </IconButton>
-          </Stack>
-        </Box>
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          sx={{
+            px: { xs: 2, sm: 2.5 },
+            py: 1.75,
+            flexShrink: 0,
+            bgcolor: headerBg,
+            color: m.navy,
+          }}
+        >
+          <Typography
+            sx={{
+              fontWeight: 800,
+              fontSize: { xs: 15, sm: 16 },
+              color: alpha(m.navy, 0.9),
+            }}
+          >
+            {title}
+          </Typography>
+          <IconButton
+            size="small"
+            onClick={onClose}
+            aria-label="Close"
+            sx={{
+              width: 30,
+              height: 30,
+              borderRadius: "999px",
+              color: alpha(m.navy, 0.55),
+              bgcolor: alpha(m.navy, 0.06),
+              "&:hover": { bgcolor: alpha(m.navy, 0.12) },
+            }}
+          >
+            <CloseRoundedIcon sx={{ fontSize: 18 }} />
+          </IconButton>
+        </Stack>
 
-        <Box sx={{ px: { xs: 2, sm: 2.5 }, pt: 0, pb: footer ? 1 : { xs: 2, sm: 2.5 }, overflowY: "auto", flex: 1, minHeight: 0 }}>
+        <Box
+          sx={{
+            px: { xs: 2, sm: 2.5 },
+            pt: { xs: 1.75, sm: 2 },
+            pb: footer ? 1 : { xs: 2, sm: 2.5 },
+            overflowY: "auto",
+            flex: 1,
+            minHeight: 0,
+          }}
+        >
           {children}
         </Box>
 
@@ -89,7 +129,9 @@ export default function MessagingInsetOverlay({
               justifyContent: "center",
               gap: 1.5,
               flexShrink: 0,
-              borderTop: hideDivider ? "none" : `1px solid ${alpha(m.navy, 0.08)}`,
+              borderTop: hideDivider
+                ? "none"
+                : `1px solid ${alpha(m.navy, 0.08)}`,
             }}
           >
             {footer}

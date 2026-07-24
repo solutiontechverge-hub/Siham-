@@ -1,15 +1,19 @@
 "use client";
 
+import AppButton from "../AppButton";
 import * as React from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
-import { Box, Button, IconButton, Stack } from "@mui/material";
+import { Box, IconButton, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDatePicker from "../AppDatePicker";
 import AppDropdown from "../AppDropdown";
-import AppTextField from "../AppTextField";
-import MollureModal from "../MollureModal";
-import type { CalendarBookingLocation, CalendarResource } from "../../../app/professionals/fixed-location/calendar/calendar.data";
+import AppTimePicker from "../AppTimePicker";
+import AppModal from "../AppModal";
+import type {
+  CalendarBookingLocation,
+  CalendarResource,
+} from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { BlockTimeDraft } from "./calendar.utils";
 import type { ScheduleShift } from "./calendar-settings.types";
 
@@ -59,16 +63,8 @@ export default function CalendarAvailabilityModal({
   const theme = useTheme();
   const m = theme.palette.mollure;
 
-  const toggleLocation = (location: CalendarBookingLocation) => {
-    setDraft((prev) => {
-      const has = prev.locations.includes(location);
-      const next = has ? prev.locations.filter((item) => item !== location) : [...prev.locations, location];
-      return { ...prev, locations: next.length ? next : [...availableLocations] };
-    });
-  };
-
   return (
-    <MollureModal
+    <AppModal
       open={open}
       onClose={onClose}
       title={title}
@@ -77,17 +73,26 @@ export default function CalendarAvailabilityModal({
       footer={
         <Box sx={{ px: 2.5, py: 2 }}>
           <Stack direction="row" justifyContent="flex-end" spacing={1.25}>
-            <Button variant="outlined" onClick={onClose} sx={{ borderRadius: "10px", textTransform: "none", fontWeight: 800, height: 38 }}>
-              Cancel
-            </Button>
-            <Button
-              variant="contained"
-              disableElevation
-              onClick={onApply}
-              sx={{ borderRadius: "10px", textTransform: "none", fontWeight: 800, height: 38, bgcolor: m.teal, "&:hover": { bgcolor: m.tealDark } }}
+            <AppButton
+              tone="secondary"
+              onClick={onClose}
+              sx={{
+                height: 38,
+                minWidth: 110,
+              }}
             >
-              Save
-            </Button>
+              Cancel
+            </AppButton>
+            <AppButton
+              tone="primary"
+              onClick={onApply}
+              sx={{
+                height: 38,
+                minWidth: 110,
+              }}
+            >
+              Apply
+            </AppButton>
           </Stack>
         </Box>
       }
@@ -95,16 +100,19 @@ export default function CalendarAvailabilityModal({
       <Box sx={{ px: 2.5, py: 2 }}>
         <Stack spacing={1.75}>
           <AppDropdown
-            label="Team Member(s)"
+            label="Team Member"
             value={draft.teamIds}
             multiple
+            placeholder="Select Team Member"
             renderValue={(selected) => {
               const ids = selected as readonly string[];
               if (!ids.length) return "Select Team Member";
               if (ids.length === resources.length) return "All";
               return ids.map((id) => teamLabelById.get(id) ?? id).join(", ");
             }}
-            onChange={(val) => setDraft((p) => ({ ...p, teamIds: val as string[] }))}
+            onChange={(val) =>
+              setDraft((p) => ({ ...p, teamIds: val as string[] }))
+            }
             options={resources.map((resource) => ({
               label: teamLabelById.get(resource.id) ?? resource.name,
               value: resource.id,
@@ -112,61 +120,183 @@ export default function CalendarAvailabilityModal({
             fullWidth
           />
 
-          <Stack direction="row" spacing={1}>
-            {availableLocations.map((location) => {
-              const active = draft.locations.includes(location);
-              return (
-                <Button
-                  key={location}
-                  variant={active ? "contained" : "outlined"}
-                  onClick={() => toggleLocation(location)}
-                  sx={{
-                    borderRadius: "8px",
-                    textTransform: "none",
-                    fontWeight: 800,
-                    bgcolor: active ? m.teal : "#fff",
-                    "&:hover": { bgcolor: active ? m.tealDark : alpha(m.teal, 0.04) },
-                  }}
-                >
-                  {location}
-                </Button>
-              );
-            })}
+          <AppDropdown
+            label="Location"
+            value={draft.locations}
+            multiple
+            placeholder="Select Location"
+            renderValue={(selected) => {
+              const locs = selected as readonly string[];
+              if (!locs.length) return "Select Location";
+              if (locs.length === availableLocations.length) return "All";
+              return locs.join(", ");
+            }}
+            onChange={(val) => {
+              const next = val as CalendarBookingLocation[];
+              setDraft((p) => ({
+                ...p,
+                locations: next.length ? next : [...availableLocations],
+              }));
+            }}
+            options={availableLocations.map((location) => ({
+              label: location,
+              value: location,
+            }))}
+            fullWidth
+          />
+
+          <Stack direction="row" spacing={1.25}>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <AppDatePicker
+                label="Date (from)"
+                value={draft.dateFrom}
+                onChange={(val) => setDraft((p) => ({ ...p, dateFrom: val }))}
+                fullWidth
+              />
+            </Box>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <AppDatePicker
+                label="Date (To)"
+                value={draft.dateTo}
+                onChange={(val) => setDraft((p) => ({ ...p, dateTo: val }))}
+                min={draft.dateFrom || undefined}
+                fullWidth
+              />
+            </Box>
           </Stack>
 
           <Stack direction="row" spacing={1.25}>
-            <AppDatePicker label="Date from" value={draft.dateFrom} onChange={(val) => setDraft((p) => ({ ...p, dateFrom: val }))} fullWidth />
-            <AppDatePicker label="Date to" value={draft.dateTo} onChange={(val) => setDraft((p) => ({ ...p, dateTo: val }))} fullWidth />
-          </Stack>
-
-          <Stack direction="row" spacing={1.25}>
-            <AppDropdown label="Day from" value={draft.dayFrom} onChange={(val) => setDraft((p) => ({ ...p, dayFrom: String(val) as AvailabilityDraft["dayFrom"] }))} options={dayOptions} fullWidth />
-            <AppDropdown label="Day to" value={draft.dayTo} onChange={(val) => setDraft((p) => ({ ...p, dayTo: String(val) as AvailabilityDraft["dayTo"] }))} options={dayOptions} fullWidth />
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <AppDropdown
+                label="Day (From)"
+                value={draft.dayFrom}
+                onChange={(val) =>
+                  setDraft((p) => ({
+                    ...p,
+                    dayFrom: String(val) as AvailabilityDraft["dayFrom"],
+                  }))
+                }
+                options={dayOptions}
+                fullWidth
+              />
+            </Box>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <AppDropdown
+                label="Day (To)"
+                value={draft.dayTo}
+                onChange={(val) =>
+                  setDraft((p) => ({
+                    ...p,
+                    dayTo: String(val) as AvailabilityDraft["dayTo"],
+                  }))
+                }
+                options={dayOptions}
+                fullWidth
+              />
+            </Box>
           </Stack>
 
           {draft.shifts.map((shift, index) => (
-            <Stack key={`shift-${index}`} direction="row" spacing={1.25} alignItems="center">
-              <AppTextField label="Start" type="time" value={shift.start} onChange={(e) => setDraft((p) => ({ ...p, shifts: p.shifts.map((item, i) => (i === index ? { ...item, start: e.target.value } : item)) }))} fullWidth InputLabelProps={{ shrink: true }} />
-              <AppTextField label="End" type="time" value={shift.end} onChange={(e) => setDraft((p) => ({ ...p, shifts: p.shifts.map((item, i) => (i === index ? { ...item, end: e.target.value } : item)) }))} fullWidth InputLabelProps={{ shrink: true }} />
-              <IconButton
-                size="small"
-                disabled={draft.shifts.length === 1}
-                onClick={() => setDraft((p) => ({ ...p, shifts: p.shifts.filter((_, i) => i !== index) }))}
-              >
-                <DeleteOutlineRoundedIcon fontSize="small" />
-              </IconButton>
+            <Stack
+              key={`shift-${index}`}
+              direction="row"
+              spacing={1.25}
+              alignItems="flex-end"
+            >
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <AppTimePicker
+                  label="Start Time"
+                  value={shift.start}
+                  onChange={(val) =>
+                    setDraft((p) => ({
+                      ...p,
+                      shifts: p.shifts.map((item, i) =>
+                        i === index ? { ...item, start: val } : item,
+                      ),
+                    }))
+                  }
+                  fullWidth
+                  sx={{ minHeight: 40, py: 0.5 }}
+                />
+              </Box>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <AppTimePicker
+                  label="End Time"
+                  value={shift.end}
+                  onChange={(val) =>
+                    setDraft((p) => ({
+                      ...p,
+                      shifts: p.shifts.map((item, i) =>
+                        i === index ? { ...item, end: val } : item,
+                      ),
+                    }))
+                  }
+                  fullWidth
+                  sx={{ minHeight: 40, py: 0.5 }}
+                />
+              </Box>
+              {draft.shifts.length > 1 ? (
+                <IconButton
+                  size="small"
+                  onClick={() =>
+                    setDraft((p) => ({
+                      ...p,
+                      shifts: p.shifts.filter((_, i) => i !== index),
+                    }))
+                  }
+                  sx={{ mb: 0.5, color: alpha(m.navy, 0.45) }}
+                  aria-label="Remove shift"
+                >
+                  <DeleteOutlineRoundedIcon fontSize="small" />
+                </IconButton>
+              ) : null}
             </Stack>
           ))}
 
-          <Button
-            startIcon={<AddRoundedIcon />}
-            onClick={() => setDraft((p) => ({ ...p, shifts: [...p.shifts, { start: "09:00", end: "17:00" }] }))}
-            sx={{ alignSelf: "flex-start", textTransform: "none", fontWeight: 800, color: m.teal }}
+          <AppButton
+            onClick={() =>
+              setDraft((p) => ({
+                ...p,
+                shifts: [...p.shifts, { start: "09:00", end: "17:00" }],
+              }))
+            }
+            sx={{
+              alignSelf: "flex-start",
+              textTransform: "none",
+              fontWeight: 600,
+              fontSize: 13.5,
+              color: m.slate,
+              px: 0,
+              minWidth: 0,
+              gap: 1,
+              "&:hover": {
+                bgcolor: "transparent",
+                color: alpha(m.navy, 0.78),
+                "& .add-shift-icon": {
+                  bgcolor: m.addSoftBgHover,
+                },
+              },
+            }}
           >
-            Add shift
-          </Button>
+            <Box
+              className="add-shift-icon"
+              sx={{
+                width: 28,
+                height: 28,
+                borderRadius: "999px",
+                bgcolor: m.addSoftBg,
+                color: m.addSoftFg,
+                display: "grid",
+                placeItems: "center",
+                transition: "background-color 0.15s ease",
+              }}
+            >
+              <AddRoundedIcon sx={{ fontSize: 18 }} />
+            </Box>
+            Add Shift
+          </AppButton>
         </Stack>
       </Box>
-    </MollureModal>
+    </AppModal>
   );
 }

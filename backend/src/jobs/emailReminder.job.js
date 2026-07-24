@@ -1,9 +1,12 @@
 import { processInvoiceReminders } from "../services/financeEmail.service.js";
 import {
+  dispatchInvoiceScheduledReminderNotification,
   processPaymentDueReminders,
   processPaymentOverdueNotifications,
   processRespondRequestReminderNotifications,
 } from "../services/bookingNotification.service.js";
+import { processAutomaticInvoiceReissues } from "../services/finance-sync.service.js";
+
 const DEFAULT_INTERVAL_MS = Number(process.env.EMAIL_REMINDER_POLL_MS || 15 * 60 * 1000);
 
 let intervalHandle = null;
@@ -20,14 +23,33 @@ const runReminderCycle = async () => {
       processPaymentDueReminders(),
     ]);
 
+    // After overdue status flips, apply Automatic first/second reissues from settings.
+    const reissueOutcomes = await processAutomaticInvoiceReissues();
+
+    for (const outcome of invoiceOutcomes) {
+      if (!outcome?.sent || !outcome.reminder) continue;
+      try {
+        await dispatchInvoiceScheduledReminderNotification(
+          outcome.transactionId,
+          outcome.reminder,
+        );
+      } catch (error) {
+        console.error(
+          `[email-reminder] In-app reminder failed for ${outcome.transactionId}:`,
+          error.message,
+        );
+      }
+    }
+
     const sentCount =
       respondOutcomes.filter((item) => item.sent).length +
       invoiceOutcomes.filter((item) => item.sent).length +
       overdueCount +
-      dueReminderCount;
+      dueReminderCount +
+      reissueOutcomes.filter((item) => item.applied).length;
 
     if (sentCount > 0) {
-      console.log(`[email-reminder] Sent ${sentCount} reminder email(s).`);
+      console.log(`[email-reminder] Sent ${sentCount} reminder/reissue notification(s).`);
     }
   } catch (error) {
     console.error("[email-reminder] Reminder cycle failed:", error.message);

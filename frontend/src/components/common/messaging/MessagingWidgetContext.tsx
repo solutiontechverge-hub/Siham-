@@ -20,9 +20,14 @@ type MessagingWidgetContextValue = {
   toggleMessaging: () => void;
 };
 
-const MessagingWidgetContext = React.createContext<MessagingWidgetContextValue | null>(null);
+const MessagingWidgetContext =
+  React.createContext<MessagingWidgetContextValue | null>(null);
 
-export function MessagingWidgetProvider({ children }: { children: React.ReactNode }) {
+export function MessagingWidgetProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const [open, setOpen] = React.useState(false);
   const [params, setParams] = React.useState<MessagingOpenParams>({});
 
@@ -44,7 +49,11 @@ export function MessagingWidgetProvider({ children }: { children: React.ReactNod
     [closeMessaging, open, openMessaging, params, toggleMessaging],
   );
 
-  return <MessagingWidgetContext.Provider value={value}>{children}</MessagingWidgetContext.Provider>;
+  return (
+    <MessagingWidgetContext.Provider value={value}>
+      {children}
+    </MessagingWidgetContext.Provider>
+  );
 }
 
 /** @deprecated Use MessagingWidgetProvider */
@@ -53,7 +62,9 @@ export const ClientMessagingWidgetProvider = MessagingWidgetProvider;
 export function useMessagingWidget() {
   const ctx = React.useContext(MessagingWidgetContext);
   if (!ctx) {
-    throw new Error("useMessagingWidget must be used within MessagingWidgetProvider");
+    throw new Error(
+      "useMessagingWidget must be used within MessagingWidgetProvider",
+    );
   }
   return ctx;
 }

@@ -29,35 +29,51 @@ function mergeSx(base: SxProps<Theme>, sx?: SxProps<Theme>): SxProps<Theme> {
   return [...baseArr, ...sxArr] as SxProps<Theme>;
 }
 
-export function MainHeading<C extends React.ElementType = "h1">(props: AppTypographyProps<C>) {
+export function MainHeading<C extends React.ElementType = "h1">(
+  props: AppTypographyProps<C>,
+) {
   return <MuiTypography variant="mainHeading" {...props} />;
 }
 
-export function SubHeading<C extends React.ElementType = "h2">(props: AppTypographyProps<C>) {
+export function SubHeading<C extends React.ElementType = "h2">(
+  props: AppTypographyProps<C>,
+) {
   return <MuiTypography variant="subHeading" {...props} />;
 }
 
-export function Description<C extends React.ElementType = "p">(props: AppTypographyProps<C>) {
+export function Description<C extends React.ElementType = "p">(
+  props: AppTypographyProps<C>,
+) {
   return <MuiTypography variant="description" {...props} />;
 }
 
-export function CardTitle<C extends React.ElementType = "h3">(props: AppTypographyProps<C>) {
+export function CardTitle<C extends React.ElementType = "h3">(
+  props: AppTypographyProps<C>,
+) {
   return <MuiTypography variant="cardTitle" {...props} />;
 }
 
-export function BodyText<C extends React.ElementType = "p">(props: AppTypographyProps<C>) {
+export function BodyText<C extends React.ElementType = "p">(
+  props: AppTypographyProps<C>,
+) {
   return <MuiTypography variant="bodyText" {...props} />;
 }
 
-export function HeaderNavText<C extends React.ElementType = "span">(props: AppTypographyProps<C>) {
+export function HeaderNavText<C extends React.ElementType = "span">(
+  props: AppTypographyProps<C>,
+) {
   return <MuiTypography variant="headerNav" {...props} />;
 }
 
-export function FormLabelText<C extends React.ElementType = "span">(props: AppTypographyProps<C>) {
+export function FormLabelText<C extends React.ElementType = "span">(
+  props: AppTypographyProps<C>,
+) {
   return <MuiTypography variant="formLabel" {...props} />;
 }
 
-export function MarketingHeroTitle<C extends React.ElementType = "h1">(props: AppTypographyProps<C>) {
+export function MarketingHeroTitle<C extends React.ElementType = "h1">(
+  props: AppTypographyProps<C>,
+) {
   const { sx, ...rest } = props;
   return (
     <MuiTypography
@@ -79,7 +95,9 @@ export function MarketingHeroTitle<C extends React.ElementType = "h1">(props: Ap
   );
 }
 
-export function MarketingHeroDescription<C extends React.ElementType = "p">(props: AppTypographyProps<C>) {
+export function MarketingHeroDescription<C extends React.ElementType = "p">(
+  props: AppTypographyProps<C>,
+) {
   const { sx, ...rest } = props;
   return (
     <MuiTypography
@@ -103,7 +121,9 @@ export function MarketingHeroDescription<C extends React.ElementType = "p">(prop
   );
 }
 
-export function MarketingSectionTitle<C extends React.ElementType = "h2">(props: AppTypographyProps<C>) {
+export function MarketingSectionTitle<C extends React.ElementType = "h2">(
+  props: AppTypographyProps<C>,
+) {
   const { sx, ...rest } = props;
   return (
     <MuiTypography
@@ -125,7 +145,9 @@ export function MarketingSectionTitle<C extends React.ElementType = "h2">(props:
   );
 }
 
-export function MarketingSectionSubtitle<C extends React.ElementType = "p">(props: AppTypographyProps<C>) {
+export function MarketingSectionSubtitle<C extends React.ElementType = "p">(
+  props: AppTypographyProps<C>,
+) {
   const { sx, ...rest } = props;
   return (
     <MuiTypography
@@ -149,7 +171,9 @@ export function MarketingSectionSubtitle<C extends React.ElementType = "p">(prop
   );
 }
 
-export function MarketingKpiTitle<C extends React.ElementType = "div">(props: AppTypographyProps<C>) {
+export function MarketingKpiTitle<C extends React.ElementType = "div">(
+  props: AppTypographyProps<C>,
+) {
   const { sx, ...rest } = props;
   return (
     <MuiTypography
@@ -168,7 +192,9 @@ export function MarketingKpiTitle<C extends React.ElementType = "div">(props: Ap
   );
 }
 
-export function MarketingKpiSubtitle<C extends React.ElementType = "div">(props: AppTypographyProps<C>) {
+export function MarketingKpiSubtitle<C extends React.ElementType = "div">(
+  props: AppTypographyProps<C>,
+) {
   const { sx, ...rest } = props;
   return (
     <MuiTypography
@@ -190,11 +216,10 @@ export function MarketingKpiSubtitle<C extends React.ElementType = "div">(props:
  * Escape hatch for legacy pages: use our theme-wired typography without importing MUI directly.
  * Prefer `MainHeading`, `SubHeading`, `Description`, `CardTitle`, `BodyText`.
  */
-export function Typography<C extends React.ElementType = "p">(props: TypographyProps<C>) {
+export function Typography<C extends React.ElementType = "p">(
+  props: TypographyProps<C>,
+) {
   return <MuiTypography {...props} />;
 }
 
-export type {
-  TypographyProps as MuiTypographyProps,
-};
-
+export type { TypographyProps as MuiTypographyProps };

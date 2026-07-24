@@ -56,7 +56,12 @@ type ChartCardProps = {
   children: React.ReactNode;
 };
 
-function ChartCard({ title, description, height = 280, children }: ChartCardProps) {
+function ChartCard({
+  title,
+  description,
+  height = 280,
+  children,
+}: ChartCardProps) {
   return (
     <AdminSectionCard title={title} description={description} compact>
       <Box sx={{ width: "100%", height, pt: 0.5 }}>{children}</Box>
@@ -91,40 +96,65 @@ export function AdminAreaChart({
       {!ready ? (
         <ChartPlaceholder height={chartHeight} />
       ) : (
-      <ResponsiveContainer width="100%" height="100%">
-        <AreaChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-          <defs>
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart
+            data={data}
+            margin={{ top: 8, right: 8, left: -16, bottom: 0 }}
+          >
+            <defs>
+              {series.map((s, i) => {
+                const color =
+                  s.color ?? ADMIN_CHART_SERIES[i % ADMIN_CHART_SERIES.length];
+                return (
+                  <linearGradient
+                    key={s.dataKey}
+                    id={`grad-${s.dataKey}`}
+                    x1="0"
+                    y1="0"
+                    x2="0"
+                    y2="1"
+                  >
+                    <stop offset="0%" stopColor={color} stopOpacity={0.35} />
+                    <stop offset="100%" stopColor={color} stopOpacity={0.02} />
+                  </linearGradient>
+                );
+              })}
+            </defs>
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke={tokens.cardBorder}
+              vertical={false}
+            />
+            <XAxis
+              dataKey={xKey}
+              tick={{ fontSize: 11, fill: tokens.slate }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              tick={{ fontSize: 11, fill: tokens.slate }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <Tooltip contentStyle={tooltipStyle} />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
             {series.map((s, i) => {
-              const color = s.color ?? ADMIN_CHART_SERIES[i % ADMIN_CHART_SERIES.length];
+              const color =
+                s.color ?? ADMIN_CHART_SERIES[i % ADMIN_CHART_SERIES.length];
               return (
-                <linearGradient key={s.dataKey} id={`grad-${s.dataKey}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={color} stopOpacity={0.35} />
-                  <stop offset="100%" stopColor={color} stopOpacity={0.02} />
-                </linearGradient>
+                <Area
+                  key={s.dataKey}
+                  type="monotone"
+                  dataKey={s.dataKey}
+                  name={s.name}
+                  stroke={color}
+                  fill={`url(#grad-${s.dataKey})`}
+                  strokeWidth={2}
+                />
               );
             })}
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke={tokens.cardBorder} vertical={false} />
-          <XAxis dataKey={xKey} tick={{ fontSize: 11, fill: tokens.slate }} axisLine={false} tickLine={false} />
-          <YAxis tick={{ fontSize: 11, fill: tokens.slate }} axisLine={false} tickLine={false} />
-          <Tooltip contentStyle={tooltipStyle} />
-          <Legend wrapperStyle={{ fontSize: 12 }} />
-          {series.map((s, i) => {
-            const color = s.color ?? ADMIN_CHART_SERIES[i % ADMIN_CHART_SERIES.length];
-            return (
-              <Area
-                key={s.dataKey}
-                type="monotone"
-                dataKey={s.dataKey}
-                name={s.name}
-                stroke={color}
-                fill={`url(#grad-${s.dataKey})`}
-                strokeWidth={2}
-              />
-            );
-          })}
-        </AreaChart>
-      </ResponsiveContainer>
+          </AreaChart>
+        </ResponsiveContainer>
       )}
     </ChartCard>
   );
@@ -161,9 +191,21 @@ export function AdminLineChart({
         <ChartPlaceholder height={chartHeight} />
       ) : (
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 8, right: 12, left: -8, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke={tokens.cardBorder} vertical={false} />
-            <XAxis dataKey={xKey} tick={{ fontSize: 11, fill: tokens.slate }} axisLine={false} tickLine={false} />
+          <LineChart
+            data={data}
+            margin={{ top: 8, right: 12, left: -8, bottom: 0 }}
+          >
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke={tokens.cardBorder}
+              vertical={false}
+            />
+            <XAxis
+              dataKey={xKey}
+              tick={{ fontSize: 11, fill: tokens.slate }}
+              axisLine={false}
+              tickLine={false}
+            />
             <YAxis
               tick={{ fontSize: 11, fill: tokens.slate }}
               axisLine={false}
@@ -178,7 +220,10 @@ export function AdminLineChart({
                 type="monotone"
                 dataKey={line.dataKey}
                 name={line.name}
-                stroke={line.color ?? ADMIN_CHART_SERIES[i % ADMIN_CHART_SERIES.length]}
+                stroke={
+                  line.color ??
+                  ADMIN_CHART_SERIES[i % ADMIN_CHART_SERIES.length]
+                }
                 strokeWidth={2.5}
                 strokeDasharray={line.dashed ? "6 4" : undefined}
                 dot={false}
@@ -219,25 +264,49 @@ export function AdminBarChart({
       {!ready ? (
         <ChartPlaceholder height={chartHeight} />
       ) : (
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 8, right: 8, left: -16, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke={tokens.cardBorder} vertical={false} />
-          <XAxis dataKey={xKey} tick={{ fontSize: 11, fill: tokens.slate }} axisLine={false} tickLine={false} />
-          <YAxis tick={{ fontSize: 11, fill: tokens.slate }} axisLine={false} tickLine={false} />
-          <Tooltip contentStyle={tooltipStyle} />
-          <Legend wrapperStyle={{ fontSize: 12 }} />
-          {bars.map((b, i) => (
-            <Bar
-              key={b.dataKey}
-              dataKey={b.dataKey}
-              name={b.name}
-              fill={b.color ?? ADMIN_CHART_SERIES[i % ADMIN_CHART_SERIES.length]}
-              radius={stacked ? (i === bars.length - 1 ? [6, 6, 0, 0] : [0, 0, 0, 0]) : [6, 6, 0, 0]}
-              stackId={stacked ? "stack" : undefined}
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={data}
+            margin={{ top: 8, right: 8, left: -16, bottom: 0 }}
+          >
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke={tokens.cardBorder}
+              vertical={false}
             />
-          ))}
-        </BarChart>
-      </ResponsiveContainer>
+            <XAxis
+              dataKey={xKey}
+              tick={{ fontSize: 11, fill: tokens.slate }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <YAxis
+              tick={{ fontSize: 11, fill: tokens.slate }}
+              axisLine={false}
+              tickLine={false}
+            />
+            <Tooltip contentStyle={tooltipStyle} />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            {bars.map((b, i) => (
+              <Bar
+                key={b.dataKey}
+                dataKey={b.dataKey}
+                name={b.name}
+                fill={
+                  b.color ?? ADMIN_CHART_SERIES[i % ADMIN_CHART_SERIES.length]
+                }
+                radius={
+                  stacked
+                    ? i === bars.length - 1
+                      ? [6, 6, 0, 0]
+                      : [0, 0, 0, 0]
+                    : [6, 6, 0, 0]
+                }
+                stackId={stacked ? "stack" : undefined}
+              />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
       )}
     </ChartCard>
   );
@@ -265,42 +334,49 @@ export function AdminDonutChart({
       {!ready ? (
         <ChartPlaceholder height={chartHeight} />
       ) : (
-      <Box sx={{ position: "relative", width: "100%", height: "100%" }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={data}
-              cx="50%"
-              cy="50%"
-              innerRadius="58%"
-              outerRadius="78%"
-              paddingAngle={2}
-              dataKey="value"
+        <Box sx={{ position: "relative", width: "100%", height: "100%" }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={data}
+                cx="50%"
+                cy="50%"
+                innerRadius="58%"
+                outerRadius="78%"
+                paddingAngle={2}
+                dataKey="value"
+              >
+                {data.map((_, i) => (
+                  <Cell
+                    key={i}
+                    fill={ADMIN_CHART_SERIES[i % ADMIN_CHART_SERIES.length]}
+                  />
+                ))}
+              </Pie>
+              <Tooltip contentStyle={tooltipStyle} />
+              <Legend wrapperStyle={{ fontSize: 12 }} />
+            </PieChart>
+          </ResponsiveContainer>
+          <Box
+            sx={{
+              position: "absolute",
+              top: "42%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              textAlign: "center",
+              pointerEvents: "none",
+            }}
+          >
+            <Typography
+              sx={{ fontSize: 22, fontWeight: 700, color: tokens.navy }}
             >
-              {data.map((_, i) => (
-                <Cell key={i} fill={ADMIN_CHART_SERIES[i % ADMIN_CHART_SERIES.length]} />
-              ))}
-            </Pie>
-            <Tooltip contentStyle={tooltipStyle} />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
-          </PieChart>
-        </ResponsiveContainer>
-        <Box
-          sx={{
-            position: "absolute",
-            top: "42%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            textAlign: "center",
-            pointerEvents: "none",
-          }}
-        >
-          <Typography sx={{ fontSize: 22, fontWeight: 700, color: tokens.navy }}>
-            {total.toLocaleString()}
-          </Typography>
-          <Typography sx={{ fontSize: 11, color: tokens.slate }}>Total</Typography>
+              {total.toLocaleString()}
+            </Typography>
+            <Typography sx={{ fontSize: 11, color: tokens.slate }}>
+              Total
+            </Typography>
+          </Box>
         </Box>
-      </Box>
       )}
     </ChartCard>
   );

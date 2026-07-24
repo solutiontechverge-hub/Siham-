@@ -9,4 +9,7 @@ export {
   useMessagingWidgetOptional as useClientMessagingWidgetOptional,
 } from "./MessagingWidgetContext";
 
-export type { MessagingOpenParams, ClientMessagingOpenParams } from "./MessagingWidgetContext";
+export type {
+  MessagingOpenParams,
+  ClientMessagingOpenParams,
+} from "./MessagingWidgetContext";

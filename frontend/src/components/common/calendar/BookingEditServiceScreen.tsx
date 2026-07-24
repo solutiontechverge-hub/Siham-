@@ -20,7 +20,9 @@ type StaffOption = {
 type BookingEditServiceScreenProps = {
   draft: BookingServiceEditDraft;
   staffOptions: readonly StaffOption[];
-  errors?: Partial<Record<"name" | "durationMins" | "startTime" | "endTime" | "price", string>>;
+  errors?: Partial<
+    Record<"name" | "durationMins" | "startTime" | "endTime" | "price", string>
+  >;
   onChange: (patch: Partial<BookingServiceEditDraft>) => void;
   disabled?: boolean;
 };
@@ -66,7 +68,9 @@ export default function BookingEditServiceScreen({
 
   return (
     <Stack spacing={1.6}>
-      <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 15 }}>
+      <BodyText
+        sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 15 }}
+      >
         Edit Service
       </BodyText>
 
@@ -112,12 +116,22 @@ export default function BookingEditServiceScreen({
         helperText={errors.endTime}
       />
 
-      <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65) }}>Price</BodyText>
+      <BodyText
+        sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.65) }}
+      >
+        Price
+      </BodyText>
       <Stack direction="row" spacing={1}>
         <AppSelect
           placeholder="Price type"
           value={draft.priceType}
-          onChange={(e) => onChange({ priceType: String(e.target.value) as BookingServiceEditDraft["priceType"] })}
+          onChange={(e) =>
+            onChange({
+              priceType: String(
+                e.target.value,
+              ) as BookingServiceEditDraft["priceType"],
+            })
+          }
           options={priceTypeOptions}
           fullWidth
           disabled={disabled}
@@ -144,7 +158,13 @@ export default function BookingEditServiceScreen({
         <AppSelect
           label="Discount type"
           value={draft.discountType}
-          onChange={(e) => onChange({ discountType: String(e.target.value) as BookingServiceEditDraft["discountType"] })}
+          onChange={(e) =>
+            onChange({
+              discountType: String(
+                e.target.value,
+              ) as BookingServiceEditDraft["discountType"],
+            })
+          }
           options={discountTypeOptions}
           fullWidth
           disabled={disabled}
@@ -170,7 +190,10 @@ export default function BookingEditServiceScreen({
         placeholder="Staff member"
         value={draft.staffResourceId}
         onChange={(e) => onChange({ staffResourceId: String(e.target.value) })}
-        options={staffOptions.map((staff) => ({ label: staff.name, value: staff.id }))}
+        options={staffOptions.map((staff) => ({
+          label: staff.name,
+          value: staff.id,
+        }))}
         fullWidth
         disabled={disabled}
       />

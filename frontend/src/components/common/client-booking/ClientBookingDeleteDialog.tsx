@@ -1,8 +1,9 @@
 "use client";
 
-import { Box, Typography } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
-import MessagingModalShell, { MessagingModalCancelButton, MessagingModalPrimaryButton } from "../messaging/MessagingModalShell";
+import AppModal, {
+  MessagingModalCancelButton,
+  MessagingModalPrimaryButton,
+} from "../AppModal";
 
 type Props = {
   open: boolean;
@@ -11,22 +12,30 @@ type Props = {
   variant?: "cancelled" | "completed";
 };
 
-export default function ClientBookingDeleteDialog({ open, onClose, onConfirm, variant = "cancelled" }: Props) {
-  const m = useTheme().palette.mollure;
-  const message =
+export default function ClientBookingDeleteDialog({
+  open,
+  onClose,
+  onConfirm,
+  variant = "cancelled",
+}: Props) {
+  const title =
     variant === "completed"
       ? "Remove this completed booking from your list?"
       : "Remove this cancelled booking from your list?";
 
   return (
-    <MessagingModalShell
+    <AppModal
+      contentSx={{ px: 2.5, py: 1 }}
+      footerVariant="actions"
+      headerTone="danger"
       open={open}
-      title="Delete booking"
+      title={title}
       onClose={onClose}
       footer={
         <>
           <MessagingModalCancelButton onClick={onClose} />
           <MessagingModalPrimaryButton
+            tone="danger"
             label="Delete"
             onClick={() => {
               onConfirm();
@@ -36,9 +45,7 @@ export default function ClientBookingDeleteDialog({ open, onClose, onConfirm, va
         </>
       }
     >
-      <Box sx={{ py: 2, textAlign: "center" }}>
-        <Typography sx={{ fontWeight: 900, fontSize: 14, color: alpha(m.navy, 0.85) }}>{message}</Typography>
-      </Box>
-    </MessagingModalShell>
+      {null}
+    </AppModal>
   );
 }

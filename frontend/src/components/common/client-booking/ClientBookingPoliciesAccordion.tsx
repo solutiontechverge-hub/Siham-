@@ -1,5 +1,6 @@
 "use client";
 
+import AppButton from "../AppButton";
 import * as React from "react";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
@@ -8,7 +9,6 @@ import {
   AccordionDetails,
   AccordionSummary,
   Box,
-  Button,
   Divider,
   Stack,
   Typography,
@@ -33,7 +33,7 @@ export default function ClientBookingPoliciesAccordion({
   if (!sections.length && !showCancelAction) return null;
 
   const cancelButton = showCancelAction ? (
-    <Button
+    <AppButton
       fullWidth
       variant="outlined"
       startIcon={<CloseRoundedIcon sx={{ fontSize: 18 }} />}
@@ -50,11 +50,14 @@ export default function ClientBookingPoliciesAccordion({
         borderColor: alpha(m.navy, 0.12),
         color: alpha(m.navy, 0.55),
         bgcolor: alpha(m.navy, 0.03),
-        "&:hover": { bgcolor: alpha(m.navy, 0.06), borderColor: alpha(m.navy, 0.18) },
+        "&:hover": {
+          bgcolor: alpha(m.navy, 0.06),
+          borderColor: alpha(m.navy, 0.18),
+        },
       }}
     >
       Cancel Booking
-    </Button>
+    </AppButton>
   ) : null;
 
   if (!sections.length) {
@@ -106,7 +109,9 @@ export default function ClientBookingPoliciesAccordion({
           "& .MuiAccordionSummary-content": { my: 1 },
         }}
       >
-        <Typography sx={{ fontWeight: 900, fontSize: 12.5, color: alpha(m.navy, 0.78) }}>
+        <Typography
+          sx={{ fontWeight: 900, fontSize: 12.5, color: alpha(m.navy, 0.78) }}
+        >
           Professional&apos;s Policies
         </Typography>
       </AccordionSummary>
@@ -114,8 +119,19 @@ export default function ClientBookingPoliciesAccordion({
       <AccordionDetails sx={{ px: 2, pb: 2, pt: 0 }}>
         <Stack spacing={1.5}>
           {sections.map((section) => (
-            <Typography key={section.title} sx={{ fontSize: 11.5, fontWeight: 600, color: alpha(m.navy, 0.55), lineHeight: 1.5 }}>
-              <Box component="span" sx={{ fontWeight: 900, color: alpha(m.navy, 0.72) }}>
+            <Typography
+              key={section.title}
+              sx={{
+                fontSize: 11.5,
+                fontWeight: 600,
+                color: alpha(m.navy, 0.55),
+                lineHeight: 1.5,
+              }}
+            >
+              <Box
+                component="span"
+                sx={{ fontWeight: 900, color: alpha(m.navy, 0.72) }}
+              >
                 {section.title}:
               </Box>{" "}
               {section.description}

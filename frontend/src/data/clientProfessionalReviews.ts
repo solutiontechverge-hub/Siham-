@@ -104,77 +104,18 @@ export function loadReviewsForProfessional(shopId: string, memberId: string): Cl
   return sortReviews(all.filter((r) => r.shopId === shopId && r.memberId === memberId));
 }
 
+export function loadReviewsForShop(shopId: string): ClientProfessionalReview[] {
+  if (!shopId) return [];
+  const all = loadAll();
+  return sortReviews(all.filter((r) => r.shopId === shopId));
+}
+
 export function ensureDemoReviewsForProfessional(
-  shopId: string,
-  memberId: string,
-  services: BusinessPublicProfileService[],
+  _shopId: string,
+  _memberId: string,
+  _services: BusinessPublicProfileService[],
 ): ClientProfessionalReview[] {
-  const existing = loadReviewsForProfessional(shopId, memberId);
-  if (existing.length) return existing;
-
-  const seedFlag = `mollure:reviews_seeded:${reviewKey(shopId, memberId)}`;
-  if (typeof window !== "undefined" && window.localStorage.getItem(seedFlag) === "1") {
-    return [];
-  }
-
-  const haircut = services.find((s) => /haircut/i.test(s.name));
-  const blowdry = services.find((s) => /blow/i.test(s.name));
-  const bridal = services.find((s) => /bridal|makeup/i.test(s.name));
-
-  const now = Date.now();
-  const key = reviewKey(shopId, memberId);
-  const seeded: ClientProfessionalReview[] = [
-    {
-      id: `${key}-1`,
-      shopId,
-      memberId,
-      reviewerName: "Sara Johnson",
-      rating: 5,
-      reviewText:
-        "Jessica is an absolute artist! She took the time to listen to what I wanted and gave me the best haircut I've had in years. The salon has such a relaxing atmosphere. I'll definitely be back!",
-      createdAt: new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString(),
-      tags: [
-        { label: "TM 1" },
-        ...(haircut ? [{ label: haircut.name, categoryId: haircut.categoryId, serviceId: haircut.id }] : [{ label: "Haircut" }]),
-        ...(blowdry ? [{ label: blowdry.name, categoryId: blowdry.categoryId, serviceId: blowdry.id }] : [{ label: "Blowdry" }]),
-      ],
-      reply: {
-        authorName: "Micheal",
-        message: "Thank you, Sarah! So glad you loved your hair. We hope to see you again soon for your next event!",
-      },
-    },
-    {
-      id: `${key}-2`,
-      shopId,
-      memberId,
-      reviewerName: "Jamie Lee",
-      rating: 4,
-      reviewText:
-        "Decent experience overall. The stylist was friendly but the finish could use more attention to detail.",
-      createdAt: new Date(now - 12 * 24 * 60 * 60 * 1000).toISOString(),
-      tags: [
-        { label: "TM 1" },
-        ...(haircut ? [{ label: haircut.name, categoryId: haircut.categoryId, serviceId: haircut.id }] : [{ label: "Haircut" }]),
-      ],
-    },
-    {
-      id: `${key}-3`,
-      shopId,
-      memberId,
-      reviewerName: "Nina Patel",
-      rating: 5,
-      reviewText: "Good service and pleasant environment. Booking was easy and the team was professional.",
-      createdAt: new Date(now - 18 * 24 * 60 * 60 * 1000).toISOString(),
-      tags: [
-        { label: "TM 2" },
-        ...(bridal ? [{ label: bridal.name, categoryId: bridal.categoryId, serviceId: bridal.id }] : [{ label: "Bridal Makeup" }]),
-      ],
-    },
-  ];
-
-  saveAll([...seeded, ...loadAll()]);
-  if (typeof window !== "undefined") window.localStorage.setItem(seedFlag, "1");
-  return seeded;
+  return [];
 }
 
 function sortReviews(reviews: ClientProfessionalReview[]) {
@@ -321,8 +262,26 @@ export function formatRelativeReviewTime(iso: string): string {
   return `${months} months ago`;
 }
 
-export function clientReviewsHref(shopId: string, memberId?: string) {
+export function clientReviewsHref(
+  shopId: string,
+  memberId?: string,
+  options?: { returnTo?: string },
+) {
+  const params = new URLSearchParams();
+  if (memberId) params.set("memberId", memberId);
+  if (options?.returnTo) params.set("returnTo", options.returnTo);
+  const query = params.toString();
   const base = `/clients/listing/${encodeURIComponent(shopId)}/reviews`;
-  if (!memberId) return base;
-  return `${base}?memberId=${encodeURIComponent(memberId)}`;
+  return query ? `${base}?${query}` : base;
+}
+
+/** Only allow same-app relative paths (blocks open redirects). */
+export function resolveReviewsBackHref(
+  shopId: string,
+  returnTo?: string | null,
+): string {
+  const fallback = `/clients/listing/${encodeURIComponent(shopId)}`;
+  if (!returnTo) return fallback;
+  if (!returnTo.startsWith("/") || returnTo.startsWith("//")) return fallback;
+  return returnTo;
 }

@@ -2,11 +2,17 @@
 
 import * as React from "react";
 import { Box, Container } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
+import { useTheme } from "@mui/material/styles";
 import { useAppSelector } from "../../../store/hooks";
-import { MarketingSiteFooter, MarketingSiteHeader, MollureMarketingHeader } from "..";
-import { marketingShellFooter, professionalsMarketingFooter } from "../../../data/marketingShell.data";
-import { profilePageData } from "../../../app/clients/profile/data-profile";
+import {
+  MarketingSiteFooter,
+  MarketingSiteHeader,
+  MollureMarketingHeader,
+} from "..";
+import {
+  marketingShellFooter,
+  professionalsMarketingFooter,
+} from "../../../data/marketingShell.data";
 import MessagingPageView from "./MessagingPageView";
 import type { MessagingAudience } from "./messagingRoutes";
 
@@ -15,7 +21,10 @@ export type MessagingPageShellProps = {
   homeHref?: string;
 };
 
-export default function MessagingPageShell({ audience, homeHref }: MessagingPageShellProps) {
+export default function MessagingPageShell({
+  audience,
+  homeHref,
+}: MessagingPageShellProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
   const user = useAppSelector((s) => s.auth.user);
@@ -23,12 +32,15 @@ export default function MessagingPageShell({ audience, homeHref }: MessagingPage
     ((user as { display_name?: string })?.display_name as string | undefined) ||
     `${(user as { first_name?: string })?.first_name ?? ""} ${(user as { last_name?: string })?.last_name ?? ""}`.trim();
   const [userName, setUserName] = React.useState(fallbackDisplayName || "User");
-  const [avatarUrl, setAvatarUrl] = React.useState<string | undefined>(undefined);
+  const [avatarUrl, setAvatarUrl] = React.useState<string | undefined>(
+    undefined,
+  );
 
   const resolvedHome =
-    homeHref ?? (audience === "client" ? "/" : "/professionals/fixed-location/calendar");
+    homeHref ??
+    (audience === "client" ? "/" : "/professionals/fixed-location/calendar");
 
-  const pageBg = audience === "client" ? profilePageData.pageBg : alpha(m.teal, 0.08);
+  const pageBg = m.pageBg;
 
   React.useEffect(() => {
     if (audience !== "client") return;
@@ -45,9 +57,11 @@ export default function MessagingPageShell({ audience, homeHref }: MessagingPage
       const authedEmail = user?.email?.trim().toLowerCase();
       const persistedEmail = data?.email?.trim().toLowerCase();
       if (authedEmail && persistedEmail && authedEmail === persistedEmail) {
-        if (typeof data.avatar_url === "string" && data.avatar_url) setAvatarUrl(data.avatar_url);
+        if (typeof data.avatar_url === "string" && data.avatar_url)
+          setAvatarUrl(data.avatar_url);
         const persistedName = (data.display_name ?? "").trim();
-        const fullName = `${data.first_name ?? ""} ${data.last_name ?? ""}`.trim();
+        const fullName =
+          `${data.first_name ?? ""} ${data.last_name ?? ""}`.trim();
         const resolved = persistedName || fullName;
         if (resolved) setUserName(resolved);
       }
@@ -64,12 +78,18 @@ export default function MessagingPageShell({ audience, homeHref }: MessagingPage
   const footer =
     audience === "client" ? (
       <MarketingSiteFooter
-        columns={marketingShellFooter.columns.map((col) => ({ title: col.title, items: [...col.items] }))}
+        columns={marketingShellFooter.columns.map((col) => ({
+          title: col.title,
+          items: [...col.items],
+        }))}
         copyright={marketingShellFooter.copyright}
       />
     ) : (
       <MarketingSiteFooter
-        columns={professionalsMarketingFooter.columns.map((col) => ({ title: col.title, items: [...col.items] }))}
+        columns={professionalsMarketingFooter.columns.map((col) => ({
+          title: col.title,
+          items: [...col.items],
+        }))}
         copyright={professionalsMarketingFooter.copyright}
         sx={{ mt: 2 }}
       />
@@ -96,8 +116,15 @@ export default function MessagingPageShell({ audience, homeHref }: MessagingPage
         />
       )}
 
-      <Container maxWidth="lg" sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 2, md: 3 } }}>
-        <MessagingPageView audience={audience} currentUserName={userName} currentUserAvatarSrc={avatarUrl} />
+      <Container
+        maxWidth="lg"
+        sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 2, md: 3 } }}
+      >
+        <MessagingPageView
+          audience={audience}
+          currentUserName={userName}
+          currentUserAvatarSrc={avatarUrl}
+        />
       </Container>
 
       {footer}

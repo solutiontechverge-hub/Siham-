@@ -1,9 +1,10 @@
 "use client";
 
+import AppButton from "../AppButton";
 import * as React from "react";
-import { Box, Button, Stack } from "@mui/material";
+import { Box, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import MollureModal from "../MollureModal";
+import AppModal from "../AppModal";
 import { BodyText } from "../../ui/typography";
 
 type CalendarServiceColorEditModalProps = {
@@ -29,7 +30,7 @@ export default function CalendarServiceColorEditModal({
   }, [color, open]);
 
   return (
-    <MollureModal
+    <AppModal
       open={open}
       onClose={onClose}
       title={`${serviceLabel} colour`}
@@ -38,40 +39,37 @@ export default function CalendarServiceColorEditModal({
       footer={
         <Box sx={{ px: 2.5, py: 2 }}>
           <Stack direction="row" justifyContent="flex-end">
-            <Button
-              variant="outlined"
+            <AppButton
+              tone="secondary"
               onClick={onClose}
               sx={{
-                borderRadius: "10px",
-                textTransform: "none",
-                fontWeight: 800,
                 height: 38,
-                borderColor: alpha(m.navy, 0.14),
-                color: alpha(m.navy, 0.72),
                 minWidth: 110,
               }}
             >
               Cancel
-            </Button>
+            </AppButton>
           </Stack>
         </Box>
       }
     >
       <Box sx={{ px: 2.5, py: 2 }}>
-        <BodyText sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 1.25 }}>
+        <BodyText
+          sx={{
+            fontSize: 12.5,
+            fontWeight: 700,
+            color: alpha(m.navy, 0.62),
+            mb: 1.25,
+          }}
+        >
           Choose a background colour for this service on the calendar.
         </BodyText>
-        <Button
+        <AppButton
+          tone="secondary"
           component="label"
-          variant="outlined"
           fullWidth
           sx={{
-            borderRadius: "10px",
-            textTransform: "none",
-            fontWeight: 800,
             height: 42,
-            borderColor: alpha(m.navy, 0.12),
-            color: alpha(m.navy, 0.72),
             justifyContent: "flex-start",
             px: 1.5,
             gap: 1.25,
@@ -96,10 +94,15 @@ export default function CalendarServiceColorEditModal({
               onApply(nextColor);
               e.currentTarget.blur();
             }}
-            style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }}
+            style={{
+              position: "absolute",
+              inset: 0,
+              opacity: 0,
+              cursor: "pointer",
+            }}
           />
-        </Button>
+        </AppButton>
       </Box>
-    </MollureModal>
+    </AppModal>
   );
 }

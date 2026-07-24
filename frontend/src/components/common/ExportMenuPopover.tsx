@@ -1,8 +1,9 @@
 "use client";
 
+import AppButton from "./AppButton";
 import * as React from "react";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
-import { Box, Button, ButtonBase, Divider, Menu, Stack } from "@mui/material";
+import { Box, ButtonBase, Divider, Menu, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../ui/typography";
 
@@ -40,7 +41,9 @@ function ExportCheckbox({ checked }: { checked: boolean }) {
         flexShrink: 0,
       }}
     >
-      {checked ? <CheckRoundedIcon sx={{ fontSize: 21, color: "#fff" }} /> : null}
+      {checked ? (
+        <CheckRoundedIcon sx={{ fontSize: 21, color: "#fff" }} />
+      ) : null}
     </Box>
   );
 }
@@ -93,53 +96,60 @@ export default function ExportMenuPopover({
             textAlign: "left",
           }}
         >
-          <BodyText sx={{ fontSize: 20, fontWeight: 700, color: alpha(m.navy, 0.68) }}>All</BodyText>
+          <BodyText
+            sx={{ fontSize: 20, fontWeight: 700, color: alpha(m.navy, 0.68) }}
+          >
+            All
+          </BodyText>
           <ExportCheckbox checked={allSelected} />
         </ButtonBase>
 
         <Divider sx={{ borderColor: alpha(m.navy, 0.16), m: 0 }} />
 
         {options.map((opt, idx) => (
-        <React.Fragment key={opt.id}>
-          <ButtonBase
-            onClick={() => onToggle(opt)}
-            sx={{
-              width: "100%",
-              py: 1.75,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 2,
-              textAlign: "left",
-            }}
-          >
-            <BodyText sx={{ fontSize: 20, fontWeight: 700, color: alpha(m.navy, 0.68) }}>{opt.label}</BodyText>
-            <ExportCheckbox checked={!allSelected && selectedIds.includes(opt.id)} />
-          </ButtonBase>
-          {idx < options.length - 1 ? <Divider sx={{ borderColor: alpha(m.navy, 0.16), m: 0 }} /> : null}
-        </React.Fragment>
+          <React.Fragment key={opt.id}>
+            <ButtonBase
+              onClick={() => onToggle(opt)}
+              sx={{
+                width: "100%",
+                py: 1.75,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 2,
+                textAlign: "left",
+              }}
+            >
+              <BodyText
+                sx={{
+                  fontSize: 20,
+                  fontWeight: 700,
+                  color: alpha(m.navy, 0.68),
+                }}
+              >
+                {opt.label}
+              </BodyText>
+              <ExportCheckbox
+                checked={!allSelected && selectedIds.includes(opt.id)}
+              />
+            </ButtonBase>
+            {idx < options.length - 1 ? (
+              <Divider sx={{ borderColor: alpha(m.navy, 0.16), m: 0 }} />
+            ) : null}
+          </React.Fragment>
         ))}
 
-        <Button
-          variant="contained"
-          disableElevation
+        <AppButton
+          tone="primary"
           disabled={!selectedCount}
           onClick={onDownloadSelected}
           sx={{
             mt: 1.8,
-            height: 36,
-            borderRadius: "8px",
-            textTransform: "none",
-            fontSize: 13,
-            fontWeight: 800,
-            bgcolor: m.teal,
-            "&:hover": { bgcolor: m.tealDark },
           }}
         >
           Download
-        </Button>
+        </AppButton>
       </Stack>
     </Menu>
   );
 }
-

@@ -2,15 +2,12 @@ import { query } from "../db/index.js";
 import { emitNotificationChanged } from "../messaging/messagingSocket.js";
 import {
   BOOKING_EMAIL_TYPES,
-  notifyAppointmentReminder,
-  notifyBookingConfirmed,
-  notifyBookingStatusChange,
-  notifyIncomingEditRequest,
-  notifyNewBookingRequest,
-  notifyPrepaymentReceived,
-  notifyProfessionalAction,
-  notifyRespondToRequestReminder,
+  sendInAppNotificationEmail,
 } from "./bookingEmail.service.js";
+import {
+  FINANCE_EMAIL_TYPES,
+  sendFinanceClientEmail,
+} from "./financeEmail.service.js";
 
 export const NOTIFICATION_TYPES = {
   PRO_BR_INCOMING: "pro.br.incoming",
@@ -42,6 +39,9 @@ export const NOTIFICATION_TYPES = {
   CLIENT_PAYMENT_DUE_SET: "client.payment.due_set",
   CLIENT_PAYMENT_DUE: "client.payment.due",
   CLIENT_PAYMENT_OVERDUE: "client.payment.overdue",
+  CLIENT_INVOICE_REISSUED: "client.invoice.reissued",
+  CLIENT_INVOICE_REMINDER_1: "client.invoice.reminder_1",
+  CLIENT_INVOICE_REMINDER_2: "client.invoice.reminder_2",
   CLIENT_ER_INCOMING: "client.er.incoming",
   CLIENT_ER_SUGGESTED: "client.er.suggested",
   CLIENT_REMINDER_APPOINTMENT: "client.reminder.appointment",
@@ -185,6 +185,21 @@ const NOTIFICATION_META = {
     statusType: "rejected",
     audience: "client",
   },
+  [NOTIFICATION_TYPES.CLIENT_INVOICE_REISSUED]: {
+    title: "Invoice Reissued",
+    statusType: "updated",
+    audience: "client",
+  },
+  [NOTIFICATION_TYPES.CLIENT_INVOICE_REMINDER_1]: {
+    title: "Invoice Payment Reminder",
+    statusType: "pending",
+    audience: "client",
+  },
+  [NOTIFICATION_TYPES.CLIENT_INVOICE_REMINDER_2]: {
+    title: "Invoice Payment Reminder",
+    statusType: "pending",
+    audience: "client",
+  },
   [NOTIFICATION_TYPES.CLIENT_BOOKING_CONFIRMED]: {
     title: "Booking Confirmed",
     statusType: "accepted",
@@ -239,7 +254,14 @@ const loadBookingNotificationContext = async (bookingId) => {
        b.business_setup_id,
        pp.user_id AS professional_user_id,
        COALESCE(NULLIF(bs.salon_name, ''), NULLIF(bs.business_name, ''), 'Salon') AS salon_name,
-       COALESCE(NULLIF(tm.full_name, ''), 'Professional') AS professional_name,
+       COALESCE(
+         NULLIF(TRIM(pp.legal_name), ''),
+         NULLIF(TRIM(CONCAT(COALESCE(pp.contact_first_name, ''), ' ', COALESCE(pp.contact_last_name, ''))), ''),
+         NULLIF(bs.salon_name, ''),
+         NULLIF(bs.business_name, ''),
+         'Professional'
+       ) AS professional_name,
+       COALESCE(NULLIF(tm.full_name, ''), NULL) AS team_member_name,
        COALESCE(
          NULLIF(TRIM(COALESCE(ip.display_name, ip.first_name || ' ' || ip.last_name)), ''),
          cu.email,
@@ -266,6 +288,7 @@ export const createInAppNotification = async ({
   actorName = null,
   message = null,
   href = null,
+  skipEmail = false,
 }) => {
   const meta = NOTIFICATION_META[notificationType];
   if (!meta || !recipientUserId) return null;
@@ -301,15 +324,33 @@ export const createInAppNotification = async ({
 
   const row = result.rows[0];
   emitNotificationChanged(recipientUserId);
+
+  if (!skipEmail) {
+    void sendInAppNotificationEmail({
+      recipientUserId,
+      notificationType,
+      title: meta.title,
+      message,
+      bookingId,
+      bookingRef,
+      href,
+      actorName,
+      audience: meta.audience,
+    });
+  }
+
   return row;
 };
 
 const clientHref = (uniqueCode) =>
   `/clients/booking/checkout?ref=${encodeURIComponent(String(uniqueCode ?? ""))}`;
 
-const proHref = () => "/professionals/calendar";
-
-async function notifyClientInApp(ctx, notificationType, actorName) {
+const proHref = (uniqueCode) => {
+  const code = String(uniqueCode ?? "").trim();
+  if (!code) return "/professionals/calendar";
+  return `/professionals/calendar?bookingRef=${encodeURIComponent(code)}&open=1`;
+};
+async function notifyClientInApp(ctx, notificationType, actorName, extras = {}) {
   if (!ctx?.customer_id) return;
   await createInAppNotification({
     recipientUserId: ctx.customer_id,
@@ -317,11 +358,13 @@ async function notifyClientInApp(ctx, notificationType, actorName) {
     bookingId: ctx.id,
     bookingRef: ctx.unique_code,
     actorName: actorName ?? ctx.professional_name,
+    message: extras.message ?? null,
     href: clientHref(ctx.unique_code),
+    skipEmail: extras.skipEmail === true,
   });
 }
 
-async function notifyProfessionalInApp(ctx, notificationType, actorName) {
+async function notifyProfessionalInApp(ctx, notificationType, actorName, extras = {}) {
   if (!ctx?.professional_user_id) return;
   await createInAppNotification({
     recipientUserId: ctx.professional_user_id,
@@ -329,9 +372,14 @@ async function notifyProfessionalInApp(ctx, notificationType, actorName) {
     bookingId: ctx.id,
     bookingRef: ctx.unique_code,
     actorName: actorName ?? ctx.client_name,
-    href: proHref(),
+    message: extras.message ?? null,
+    href: proHref(ctx.unique_code),
+    skipEmail: extras.skipEmail === true,
   });
 }
+
+const youCanceledWith = (otherName) =>
+  `You canceled booking with ${otherName || "them"}`;
 
 const resolveInitiatedBy = (initiatedBy, fallback = "professional") => {
   const value = String(initiatedBy ?? fallback).trim().toLowerCase();
@@ -387,7 +435,6 @@ export async function dispatchBookingEventNotification(bookingId, event, options
       break;
     case BOOKING_NOTIFICATION_EVENTS.INCOMING_ER:
       await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_ER_INCOMING, ctx.professional_name);
-      void notifyIncomingEditRequest(bookingId);
       break;
     case BOOKING_NOTIFICATION_EVENTS.PAYMENT_DUE_SET:
       if (ctx.customer_id) {
@@ -414,13 +461,11 @@ export async function dispatchBookingCreatedNotifications(booking) {
 
   if (booking.status === "requested") {
     await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_BR_INCOMING, ctx.client_name);
-    void notifyNewBookingRequest(booking.id);
   }
 
   if (booking.status === "confirmed") {
     await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_BOOKING_CONFIRMED, ctx.professional_name);
     await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_BOOKING_CONFIRMED, ctx.client_name);
-    void notifyBookingConfirmed(booking.id);
   }
 }
 
@@ -437,7 +482,6 @@ export async function dispatchBookingUpdatedNotifications(booking, previousStatu
   if (prepaymentPaid) {
     await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_PREPAYMENT_RECEIVED, ctx.professional_name);
     await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_PREPAYMENT_RECEIVED, ctx.client_name);
-    void notifyPrepaymentReceived(booking.id);
   }
 
   if (statusChanged) {
@@ -454,41 +498,82 @@ export async function dispatchBookingUpdatedNotifications(booking, previousStatu
     if (booking.status === "confirmed") {
       if (previousStatus === "requested") {
         await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_BR_ACCEPTED, ctx.professional_name);
-        await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_BR_ACCEPTED, ctx.client_name);
+        await notifyProfessionalInApp(
+          ctx,
+          NOTIFICATION_TYPES.PRO_BR_ACCEPTED,
+          `You accepted booking request from ${ctx.client_name}`,
+        );
       }
       await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_BOOKING_CONFIRMED, ctx.professional_name);
-      await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_BOOKING_CONFIRMED, ctx.client_name);
-      void notifyBookingStatusChange(booking.id, previousStatus, booking.status);
-      void notifyBookingConfirmed(booking.id);
+      await notifyProfessionalInApp(
+        ctx,
+        NOTIFICATION_TYPES.PRO_BOOKING_CONFIRMED,
+        previousStatus === "requested"
+          ? `You confirmed booking with ${ctx.client_name}`
+          : ctx.client_name,
+      );
       return;
     }
 
     if (booking.status === "cancelled") {
+      const initiatedBy = resolveInitiatedBy(options.initiatedBy);
       if (previousStatus === "requested" && options.notificationEvent !== BOOKING_NOTIFICATION_EVENTS.EBR_DISCARDED) {
+        // Professional rejected a booking request
         await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_BR_REJECTED, ctx.professional_name);
-        await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_BR_REJECTED, ctx.client_name);
+        await notifyProfessionalInApp(
+          ctx,
+          NOTIFICATION_TYPES.PRO_BR_REJECTED,
+          `You rejected booking request from ${ctx.client_name}`,
+        );
       } else if (options.notificationEvent !== BOOKING_NOTIFICATION_EVENTS.EBR_DISCARDED) {
-        await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_BOOKING_CANCELLED, ctx.professional_name);
-        await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_BOOKING_CANCELLED, ctx.client_name);
+        if (initiatedBy === "client") {
+          await notifyClientInApp(
+            ctx,
+            NOTIFICATION_TYPES.CLIENT_BOOKING_CANCELLED,
+            youCanceledWith(ctx.professional_name),
+          );
+          await notifyProfessionalInApp(
+            ctx,
+            NOTIFICATION_TYPES.PRO_BOOKING_CANCELLED,
+            ctx.client_name,
+          );
+        } else {
+          await notifyClientInApp(
+            ctx,
+            NOTIFICATION_TYPES.CLIENT_BOOKING_CANCELLED,
+            ctx.professional_name,
+          );
+          await notifyProfessionalInApp(
+            ctx,
+            NOTIFICATION_TYPES.PRO_BOOKING_CANCELLED,
+            youCanceledWith(ctx.client_name),
+          );
+        }
       }
-      void notifyBookingStatusChange(booking.id, previousStatus, booking.status);
       return;
     }
 
     if (booking.status === "completed") {
       await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_BOOKING_COMPLETED, ctx.professional_name);
       await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_BOOKING_COMPLETED, ctx.client_name);
-      void notifyBookingStatusChange(booking.id, previousStatus, booking.status);
+      try {
+        const { notifyReviewInvite } = await import("./bookingEmail.service.js");
+        await notifyReviewInvite(booking.id);
+      } catch (error) {
+        console.error("[booking-notification] review invite failed:", error.message);
+      }
       return;
     }
 
     if (booking.status === "no_show") {
       await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_BOOKING_NO_SHOW, ctx.professional_name);
-      void notifyProfessionalAction(booking.id);
       return;
     }
 
-    void notifyBookingStatusChange(booking.id, previousStatus, booking.status);
+    if (booking.status === "requested" && previousStatus !== "requested") {
+      await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_BR_INCOMING, ctx.client_name);
+      return;
+    }
   }
 
   if (options.notifyIncomingEr) {
@@ -501,15 +586,13 @@ export async function dispatchBookingUpdatedNotifications(booking, previousStatu
 export async function dispatchAppointmentReminderNotification(bookingId) {
   const ctx = await loadBookingNotificationContext(bookingId);
   if (!ctx?.customer_id) return;
-  await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_REMINDER_APPOINTMENT, ctx.professional_name);
-  return notifyAppointmentReminder(bookingId);
+  return notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_REMINDER_APPOINTMENT, ctx.professional_name);
 }
 
 export async function dispatchRespondRequestReminderNotification(bookingId) {
   const ctx = await loadBookingNotificationContext(bookingId);
   if (!ctx?.professional_user_id) return;
-  await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_REMINDER_RESPOND, ctx.client_name);
-  return notifyRespondToRequestReminder(bookingId);
+  return notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_REMINDER_RESPOND, ctx.client_name);
 }
 
 const REMINDER_WINDOW_MINUTES = Number(process.env.BOOKING_REMINDER_WINDOW_MINUTES || 5);
@@ -625,6 +708,76 @@ export async function dispatchPaymentDueSetNotification(transactionId, dueDateLa
   });
 }
 
+/** Always notify client when invoice is reissued / due date is extended. */
+export async function dispatchInvoiceReissuedNotification(transactionId, dueDateLabel) {
+  const ctx = await loadFinanceNotificationContext(transactionId);
+  if (!ctx?.customer_id || !ctx.booking_uuid) return null;
+
+  // Rich finance email is sent by the reissue controller — skip companion duplicate.
+  return createInAppNotification({
+    recipientUserId: ctx.customer_id,
+    notificationType: NOTIFICATION_TYPES.CLIENT_INVOICE_REISSUED,
+    bookingId: ctx.booking_uuid,
+    bookingRef: ctx.booking_id,
+    actorName: ctx.salon_name,
+    message: dueDateLabel
+      ? `Your invoice was reissued. New due date: ${dueDateLabel}`
+      : "Your invoice was reissued with a new due date.",
+    href: clientHref(ctx.booking_id),
+    skipEmail: true,
+  });
+}
+
+/**
+ * In-app companion for settings-based Reminder 1 / Reminder 2 emails.
+ * @param {"reminder1"|"reminder2"} reminderKey
+ */
+export async function dispatchInvoiceScheduledReminderNotification(
+  transactionId,
+  reminderKey,
+  dueDateLabel,
+) {
+  const ctx = await loadFinanceNotificationContext(transactionId);
+  if (!ctx?.customer_id || !ctx.booking_uuid) return null;
+
+  const notificationType =
+    reminderKey === "reminder2"
+      ? NOTIFICATION_TYPES.CLIENT_INVOICE_REMINDER_2
+      : NOTIFICATION_TYPES.CLIENT_INVOICE_REMINDER_1;
+
+  const doc = ctx.document ?? {};
+  const dueIso = doc.dueDate ? String(doc.dueDate).slice(0, 10) : "";
+  const message = dueDateLabel
+    ? `Payment reminder — due date: ${dueDateLabel}`
+    : dueIso
+      ? `Payment reminder — due date: ${dueIso.split("-").reverse().join("/")}`
+      : "Your invoice payment is coming due soon.";
+
+  // Allow the same reminder slot again after a reissue (new due date).
+  const existing = await query(
+    `SELECT 1
+     FROM in_app_notifications
+     WHERE recipient_user_id = $1
+       AND notification_type = $2
+       AND booking_ref IS NOT DISTINCT FROM $3
+       AND message IS NOT DISTINCT FROM $4
+     LIMIT 1`,
+    [ctx.customer_id, notificationType, ctx.booking_id, message],
+  );
+  if (existing.rowCount > 0) return null;
+
+  return createInAppNotification({
+    recipientUserId: ctx.customer_id,
+    notificationType,
+    bookingId: ctx.booking_uuid,
+    bookingRef: ctx.booking_id,
+    actorName: ctx.salon_name,
+    message,
+    href: clientHref(ctx.booking_id),
+    skipEmail: true,
+  });
+}
+
 export async function processPaymentOverdueNotifications() {
   const overdueResult = await query(
     `UPDATE finance_transactions ft
@@ -655,7 +808,9 @@ export async function processPaymentOverdueNotifications() {
       actorName: ctx.salon_name,
       message: "Your payment is now overdue.",
       href: clientHref(ctx.booking_id),
+      skipEmail: true,
     });
+    void sendFinanceClientEmail(row.id, FINANCE_EMAIL_TYPES.INVOICE_POST_DUE);
   }
 
   return overdueResult.rowCount;
@@ -690,6 +845,10 @@ export async function processPaymentDueReminders() {
       actorName: ctx.salon_name,
       message: "Payment is due today.",
       href: clientHref(ctx.booking_id),
+      skipEmail: true,
+    });
+    void sendFinanceClientEmail(row.id, FINANCE_EMAIL_TYPES.INVOICE_PRE_DUE, {
+      forceKey: "due_today",
     });
     sent += 1;
   }
@@ -730,8 +889,20 @@ export const markNotificationRead = async (userId, notificationId) => {
      RETURNING *`,
     [notificationId, userId],
   );
-  if (result.rows[0]) emitNotificationChanged(userId);
-  return result.rows[0] ?? null;
+  if (result.rows[0]) {
+    emitNotificationChanged(userId);
+    return result.rows[0];
+  }
+
+  const existing = await query(
+    `SELECT *
+     FROM in_app_notifications
+     WHERE id = $1
+       AND recipient_user_id = $2
+     LIMIT 1`,
+    [notificationId, userId],
+  );
+  return existing.rows[0] ?? null;
 };
 
 export const markAllNotificationsRead = async (userId) => {

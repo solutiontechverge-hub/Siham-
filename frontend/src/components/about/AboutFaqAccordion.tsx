@@ -12,7 +12,10 @@ import {
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import { BodyText, CardTitle, SubHeading } from "../ui/typography";
-import { MOLLURE_HEADING_BODY_GAP_PX, MOLLURE_SECTION_GAP_PX } from "../../theme/spacing";
+import {
+  MOLLURE_HEADING_BODY_GAP_PX,
+  MOLLURE_SECTION_GAP_PX,
+} from "../../theme/spacing";
 
 export type AboutFaqItem = {
   id: string;

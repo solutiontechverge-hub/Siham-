@@ -1,5 +1,6 @@
 "use client";
 
+import AppButton from "../../../../components/common/AppButton";
 import * as React from "react";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
@@ -7,7 +8,6 @@ import ShowChartRoundedIcon from "@mui/icons-material/ShowChartRounded";
 import {
   Avatar,
   Box,
-  Button,
   Chip,
   Grid,
   IconButton,
@@ -34,10 +34,25 @@ function InfoFieldCell({ label, value }: InfoField) {
   const m = useTheme().palette.mollure;
   return (
     <Grid item xs={6}>
-      <Typography sx={{ fontSize: 11, fontWeight: 600, color: alpha(m.navy, 0.48), lineHeight: 1.3 }}>
+      <Typography
+        sx={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: alpha(m.navy, 0.48),
+          lineHeight: 1.3,
+        }}
+      >
         {label}
       </Typography>
-      <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.86), mt: 0.4, lineHeight: 1.35 }}>
+      <Typography
+        sx={{
+          fontSize: 12.5,
+          fontWeight: 700,
+          color: alpha(m.navy, 0.86),
+          mt: 0.4,
+          lineHeight: 1.35,
+        }}
+      >
         {value || "—"}
       </Typography>
     </Grid>
@@ -65,7 +80,8 @@ export default function ClientDetailsViewPanel({
   }, [client.id, client.technicalNote]);
 
   const technicalNoteSectionRef = React.useRef<HTMLDivElement | null>(null);
-  const [highlightTechnicalNote, setHighlightTechnicalNote] = React.useState(false);
+  const [highlightTechnicalNote, setHighlightTechnicalNote] =
+    React.useState(false);
 
   const handleSaveTechnicalNote = React.useCallback(() => {
     if (!noteDirty) return;
@@ -76,10 +92,16 @@ export default function ClientDetailsViewPanel({
     if (!focusTechnicalNote) return;
     setHighlightTechnicalNote(true);
     const frame = window.requestAnimationFrame(() => {
-      technicalNoteSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      technicalNoteSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
       onTechnicalNoteFocused?.();
     });
-    const timer = window.setTimeout(() => setHighlightTechnicalNote(false), 2200);
+    const timer = window.setTimeout(
+      () => setHighlightTechnicalNote(false),
+      2200,
+    );
     return () => {
       window.cancelAnimationFrame(frame);
       window.clearTimeout(timer);
@@ -113,11 +135,15 @@ export default function ClientDetailsViewPanel({
     { label: "Email Address", value: client.email },
   ];
 
-  const infoFields = client.kind === "company" ? companyFields : individualFields;
+  const infoFields =
+    client.kind === "company" ? companyFields : individualFields;
 
   const statCards = [
     { label: "Total Sales", value: client.totalSales },
-    { label: "Last Booking", value: client.statsLastBooking ?? client.lastBooking },
+    {
+      label: "Last Booking",
+      value: client.statsLastBooking ?? client.lastBooking,
+    },
     { label: "Bookings Completed", value: String(client.bookingsCompleted) },
     { label: "Average Booking value", value: client.averageBookingValue },
   ];
@@ -146,8 +172,21 @@ export default function ClientDetailsViewPanel({
               .toUpperCase()}
           </Avatar>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
-              <Typography sx={{ fontWeight: 800, fontSize: 14, color: alpha(m.navy, 0.9) }}>
+            <Stack
+              direction="row"
+              spacing={0.75}
+              alignItems="center"
+              flexWrap="wrap"
+              useFlexGap
+            >
+              <Typography
+                sx={{
+                  fontWeight: 800,
+                  fontSize: 15,
+                  color: alpha(m.navy, 0.9),
+                  lineHeight: 1.2,
+                }}
+              >
                 {client.name}
               </Typography>
               {blocked ? (
@@ -155,12 +194,17 @@ export default function ClientDetailsViewPanel({
                   label="Blocked"
                   size="small"
                   sx={{
-                    height: 20,
+                    height: 16,
                     borderRadius: "999px",
                     bgcolor: alpha(theme.palette.error.main, 0.12),
                     color: theme.palette.error.main,
-                    fontSize: 10,
-                    fontWeight: 800,
+                    fontWeight: 700,
+                    "& .MuiChip-label": {
+                      fontSize: 9,
+                      px: 0.65,
+                      py: 0,
+                      lineHeight: 1.2,
+                    },
                   }}
                 />
               ) : null}
@@ -169,12 +213,17 @@ export default function ClientDetailsViewPanel({
                   label="No show"
                   size="small"
                   sx={{
-                    height: 20,
+                    height: 16,
                     borderRadius: "999px",
-                    bgcolor: alpha("#7B1FA2", 0.12),
-                    color: "#7B1FA2",
-                    fontSize: 10,
-                    fontWeight: 800,
+                    bgcolor: m.statusNoShowBg,
+                    color: m.statusNoShowFg,
+                    fontWeight: 700,
+                    "& .MuiChip-label": {
+                      fontSize: 9,
+                      px: 0.65,
+                      py: 0,
+                      lineHeight: 1.2,
+                    },
                   }}
                 />
               ) : null}
@@ -183,12 +232,17 @@ export default function ClientDetailsViewPanel({
                   label="CC"
                   size="small"
                   sx={{
-                    height: 20,
+                    height: 16,
                     borderRadius: "999px",
-                    bgcolor: m.teal,
-                    color: "#fff",
-                    fontSize: 10,
-                    fontWeight: 800,
+                    bgcolor: alpha(m.teal, 0.12),
+                    color: m.teal,
+                    fontWeight: 700,
+                    "& .MuiChip-label": {
+                      fontSize: 9,
+                      px: 0.65,
+                      py: 0,
+                      lineHeight: 1.2,
+                    },
                   }}
                 />
               ) : (
@@ -196,12 +250,17 @@ export default function ClientDetailsViewPanel({
                   label="IC"
                   size="small"
                   sx={{
-                    height: 20,
+                    height: 16,
                     borderRadius: "999px",
-                    bgcolor: alpha(m.navy, 0.08),
-                    color: alpha(m.navy, 0.65),
-                    fontSize: 10,
-                    fontWeight: 800,
+                    bgcolor: alpha(m.teal, 0.12),
+                    color: m.teal,
+                    fontWeight: 700,
+                    "& .MuiChip-label": {
+                      fontSize: 9,
+                      px: 0.65,
+                      py: 0,
+                      lineHeight: 1.2,
+                    },
                   }}
                 />
               )}
@@ -210,12 +269,17 @@ export default function ClientDetailsViewPanel({
                   label="Non-Mollure"
                   size="small"
                   sx={{
-                    height: 20,
+                    height: 16,
                     borderRadius: "999px",
                     bgcolor: alpha(m.teal, 0.14),
                     color: m.teal,
-                    fontSize: 10,
-                    fontWeight: 800,
+                    fontWeight: 700,
+                    "& .MuiChip-label": {
+                      fontSize: 9,
+                      px: 0.65,
+                      py: 0,
+                      lineHeight: 1.2,
+                    },
                   }}
                 />
               ) : (
@@ -223,17 +287,29 @@ export default function ClientDetailsViewPanel({
                   label="Mollure"
                   size="small"
                   sx={{
-                    height: 20,
+                    height: 16,
                     borderRadius: "999px",
                     bgcolor: alpha(m.teal, 0.14),
                     color: m.teal,
-                    fontSize: 10,
-                    fontWeight: 800,
+                    fontWeight: 700,
+                    "& .MuiChip-label": {
+                      fontSize: 9,
+                      px: 0.65,
+                      py: 0,
+                      lineHeight: 1.2,
+                    },
                   }}
                 />
               )}
             </Stack>
-            <Typography sx={{ fontSize: 12, fontWeight: 600, color: alpha(m.navy, 0.52), mt: 0.35 }}>
+            <Typography
+              sx={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: alpha(m.navy, 0.52),
+                mt: 0.35,
+              }}
+            >
               {client.email}
             </Typography>
           </Box>
@@ -260,16 +336,29 @@ export default function ClientDetailsViewPanel({
       <Paper elevation={0} sx={sectionCardSx}>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
           <PersonRoundedIcon sx={{ fontSize: 20, color: m.teal }} />
-          <Typography sx={{ fontWeight: 800, fontSize: 13, color: alpha(m.navy, 0.88) }}>
+          <Typography
+            sx={{ fontWeight: 800, fontSize: 13, color: alpha(m.navy, 0.88) }}
+          >
             Client Information
           </Typography>
         </Stack>
-        <Typography sx={{ fontSize: 11.5, fontWeight: 600, color: alpha(m.navy, 0.48), mb: 1.5 }}>
+        <Typography
+          sx={{
+            fontSize: 11.5,
+            fontWeight: 600,
+            color: alpha(m.navy, 0.48),
+            mb: 1.5,
+          }}
+        >
           Added to the client list on {client.addedOn}
         </Typography>
         <Grid container spacing={2}>
           {infoFields.map((field) => (
-            <InfoFieldCell key={field.label} label={field.label} value={field.value} />
+            <InfoFieldCell
+              key={field.label}
+              label={field.label}
+              value={field.value}
+            />
           ))}
         </Grid>
       </Paper>
@@ -277,7 +366,9 @@ export default function ClientDetailsViewPanel({
       <Paper elevation={0} sx={sectionCardSx}>
         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
           <ShowChartRoundedIcon sx={{ fontSize: 20, color: m.teal }} />
-          <Typography sx={{ fontWeight: 800, fontSize: 13, color: alpha(m.navy, 0.88) }}>
+          <Typography
+            sx={{ fontWeight: 800, fontSize: 13, color: alpha(m.navy, 0.88) }}
+          >
             Platform Statistics
           </Typography>
         </Stack>
@@ -299,10 +390,24 @@ export default function ClientDetailsViewPanel({
                   textAlign: "center",
                 }}
               >
-                <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: alpha(m.navy, 0.5) }}>
+                <Typography
+                  sx={{
+                    fontSize: 10.5,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.5),
+                  }}
+                >
                   {card.label}
                 </Typography>
-                <Typography sx={{ fontSize: 15, fontWeight: 800, color: m.teal, mt: 0.45, lineHeight: 1.2 }}>
+                <Typography
+                  sx={{
+                    fontSize: 15,
+                    fontWeight: 800,
+                    color: m.teal,
+                    mt: 0.45,
+                    lineHeight: 1.2,
+                  }}
+                >
                   {card.value}
                 </Typography>
               </Box>
@@ -340,7 +445,13 @@ export default function ClientDetailsViewPanel({
                     justifyContent="space-between"
                     gap={1}
                   >
-                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: alpha(m.navy, 0.55) }}>
+                    <Typography
+                      sx={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: alpha(m.navy, 0.55),
+                      }}
+                    >
                       {service.name}
                     </Typography>
                     <Typography
@@ -387,7 +498,13 @@ export default function ClientDetailsViewPanel({
                     justifyContent="space-between"
                     gap={1}
                   >
-                    <Typography sx={{ fontSize: 12, fontWeight: 600, color: alpha(m.navy, 0.55) }}>
+                    <Typography
+                      sx={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        color: alpha(m.navy, 0.55),
+                      }}
+                    >
                       {entry.period}
                     </Typography>
                     <Typography
@@ -421,12 +538,20 @@ export default function ClientDetailsViewPanel({
             : undefined
         }
       >
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.75 }}>
-          <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.55) }}>
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          sx={{ mb: 0.75 }}
+        >
+          <Typography
+            sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.55) }}
+          >
             Technical Note (Optional)
           </Typography>
           {noteDirty ? (
-            <Button
+            <AppButton
+              tone="primary"
               size="small"
               onClick={handleSaveTechnicalNote}
               sx={{
@@ -434,16 +559,11 @@ export default function ClientDetailsViewPanel({
                 px: 1.25,
                 py: 0.35,
                 fontSize: 11.5,
-                fontWeight: 800,
-                textTransform: "none",
                 borderRadius: "8px",
-                bgcolor: m.teal,
-                color: "#fff",
-                "&:hover": { bgcolor: alpha(m.teal, 0.88) },
               }}
             >
               Save note
-            </Button>
+            </AppButton>
           ) : null}
         </Stack>
         <MollureFormField

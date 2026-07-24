@@ -1,5 +1,6 @@
 "use client";
 
+import AppButton from "../AppButton";
 import * as React from "react";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
@@ -8,7 +9,6 @@ import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import {
   Avatar,
   Box,
-  Button,
   Checkbox,
   Divider,
   FormControlLabel,
@@ -21,7 +21,12 @@ import { alpha, useTheme } from "@mui/material/styles";
 import AppSearchField from "../AppSearchField";
 import MessagingAvatar from "./MessagingAvatar";
 import MessagingThreadPreviewLine from "./MessagingThreadPreviewLine";
-import { getMessagingBookingHref, getMessagingPeerProfileHref, messagingSearchPlaceholder, type MessagingAudience } from "./messagingRoutes";
+import {
+  getMessagingBookingHref,
+  getMessagingPeerProfileHref,
+  messagingSearchPlaceholder,
+  type MessagingAudience,
+} from "./messagingRoutes";
 import type { MessagingThread } from "./messagingTypes";
 
 type Props = {
@@ -87,27 +92,75 @@ export default function MessagingConversationSidebar({
         minHeight: 0,
       }}
     >
-      <Box sx={{ px: { xs: 1.25, sm: 1.5, md: embedded ? 1.5 : 2 }, pt: { xs: 1, sm: embedded ? 1.25 : 2 }, pb: { xs: 1.25, sm: 1.5 } }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <Stack direction="row" alignItems="center" spacing={1.25} sx={{ minWidth: 0 }}>
+      <Box
+        sx={{
+          px: { xs: 1.25, sm: 1.5, md: embedded ? 1.5 : 2 },
+          pt: { xs: 1, sm: embedded ? 1.25 : 2 },
+          pb: { xs: 1.25, sm: 1.5 },
+        }}
+      >
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+        >
+          <Stack
+            direction="row"
+            alignItems="center"
+            spacing={1.25}
+            sx={{ minWidth: 0 }}
+          >
             <Avatar
               src={currentUserAvatarSrc}
-              sx={{ width: 28, height: 28, fontSize: 12, fontWeight: 900, bgcolor: alpha(m.teal, 0.15), color: m.teal }}
+              sx={{
+                width: 28,
+                height: 28,
+                fontSize: 12,
+                fontWeight: 900,
+                bgcolor: alpha(m.teal, 0.15),
+                color: m.teal,
+              }}
             >
               {currentUserName.slice(0, 1).toUpperCase()}
             </Avatar>
-            <Typography sx={{ fontWeight: 900, fontSize: { xs: 14, sm: embedded ? 15 : 18 }, color: alpha(m.navy, 0.9) }}>Messaging</Typography>
+            <Typography
+              sx={{
+                fontWeight: 900,
+                fontSize: { xs: 14, sm: embedded ? 15 : 18 },
+                color: alpha(m.navy, 0.9),
+              }}
+            >
+              Messaging
+            </Typography>
           </Stack>
           <Stack direction="row" spacing={0.25} sx={{ flexShrink: 0 }}>
-            <IconButton size="small" aria-label="Settings" onClick={onOpenSettings}>
-              <SettingsRoundedIcon sx={{ fontSize: 20, color: alpha(m.navy, 0.45) }} />
+            <IconButton
+              size="small"
+              aria-label="Settings"
+              onClick={onOpenSettings}
+            >
+              <SettingsRoundedIcon
+                sx={{ fontSize: 20, color: alpha(m.navy, 0.45) }}
+              />
             </IconButton>
-            <IconButton size="small" aria-label="Filter" onClick={onOpenFilters}>
-              <TuneRoundedIcon sx={{ fontSize: 20, color: alpha(m.navy, 0.45) }} />
+            <IconButton
+              size="small"
+              aria-label="Filter"
+              onClick={onOpenFilters}
+            >
+              <TuneRoundedIcon
+                sx={{ fontSize: 20, color: alpha(m.navy, 0.45) }}
+              />
             </IconButton>
             {embedded && onClose ? (
-              <IconButton size="small" aria-label="Close messaging" onClick={onClose}>
-                <CloseRoundedIcon sx={{ fontSize: 20, color: alpha(m.navy, 0.45) }} />
+              <IconButton
+                size="small"
+                aria-label="Close messaging"
+                onClick={onClose}
+              >
+                <CloseRoundedIcon
+                  sx={{ fontSize: 20, color: alpha(m.navy, 0.45) }}
+                />
               </IconButton>
             ) : null}
           </Stack>
@@ -122,7 +175,6 @@ export default function MessagingConversationSidebar({
             onClear={() => onSearchChange("")}
             sx={{
               "& .MuiOutlinedInput-root": {
-                borderRadius: "10px",
                 bgcolor: "#fff",
                 fontSize: { xs: 12, sm: 13 },
                 "& fieldset": { borderColor: alpha(m.navy, 0.14) },
@@ -132,8 +184,13 @@ export default function MessagingConversationSidebar({
         </Box>
 
         {showBulkActions ? (
-          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: { xs: 1.25, sm: 1.5 } }}>
-            <Button
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+            sx={{ mt: { xs: 1.25, sm: 1.5 } }}
+          >
+            <AppButton
               variant="outlined"
               size="small"
               onClick={onRequestDelete}
@@ -146,21 +203,37 @@ export default function MessagingConversationSidebar({
                 borderColor: alpha("#D32F2F", 0.45),
                 px: 2,
                 py: 0.55,
-                "&:hover": { borderColor: "#D32F2F", bgcolor: alpha("#D32F2F", 0.04) },
+                "&:hover": {
+                  borderColor: "#D32F2F",
+                  bgcolor: alpha("#D32F2F", 0.04),
+                },
               }}
             >
               Delete
-            </Button>
+            </AppButton>
             <FormControlLabel
               control={
                 <Checkbox
                   size="small"
                   checked={selectAll}
                   onChange={onSelectAll}
-                  sx={{ color: alpha(m.navy, 0.35), "&.Mui-checked": { color: m.teal } }}
+                  sx={{
+                    color: alpha(m.navy, 0.35),
+                    "&.Mui-checked": { color: m.teal },
+                  }}
                 />
               }
-              label={<Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.55) }}>Select All</Typography>}
+              label={
+                <Typography
+                  sx={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.55),
+                  }}
+                >
+                  Select All
+                </Typography>
+              }
             />
           </Stack>
         ) : null}
@@ -170,7 +243,15 @@ export default function MessagingConversationSidebar({
 
       <Box sx={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
         {threads.length === 0 ? (
-          <Typography sx={{ px: 2, py: 3, fontSize: 13, color: alpha(m.navy, 0.45), fontWeight: 600 }}>
+          <Typography
+            sx={{
+              px: 2,
+              py: 3,
+              fontSize: 13,
+              color: alpha(m.navy, 0.45),
+              fontWeight: 600,
+            }}
+          >
             {search.trim()
               ? audience === "professional"
                 ? "No client conversations match your search. Try a client name or booking ID."
@@ -195,19 +276,36 @@ export default function MessagingConversationSidebar({
                   py: { xs: 1.25, sm: 1.6 },
                   cursor: "pointer",
                   bgcolor: active ? alpha(m.navy, 0.04) : "transparent",
-                  borderLeft: active ? `4px solid ${m.teal}` : "4px solid transparent",
+                  borderLeft: active
+                    ? `4px solid ${m.teal}`
+                    : "4px solid transparent",
                   "&:hover": { bgcolor: alpha(m.navy, 0.03) },
                 }}
               >
                 <MessagingAvatar seed={thread.avatarSeed} />
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
-                    <Stack direction="row" alignItems="center" spacing={0.5} sx={{ minWidth: 0, flexWrap: "wrap" }}>
+                  <Stack
+                    direction="row"
+                    alignItems="flex-start"
+                    justifyContent="space-between"
+                    spacing={1}
+                  >
+                    <Stack
+                      direction="row"
+                      alignItems="center"
+                      spacing={0.5}
+                      sx={{ minWidth: 0, flexWrap: "wrap" }}
+                    >
                       <Link
                         href={getMessagingPeerProfileHref(audience, thread)}
                         underline="hover"
                         onClick={(e) => e.stopPropagation()}
-                        sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.88), maxWidth: "100%" }}
+                        sx={{
+                          fontWeight: 900,
+                          fontSize: 13,
+                          color: alpha(m.navy, 0.88),
+                          maxWidth: "100%",
+                        }}
                       >
                         {thread.name}
                       </Link>
@@ -216,18 +314,38 @@ export default function MessagingConversationSidebar({
                           href={getMessagingBookingHref(audience, thread)}
                           underline="hover"
                           onClick={(e) => e.stopPropagation()}
-                          sx={{ fontSize: 10.5, fontWeight: 700, color: alpha(m.navy, 0.45) }}
+                          sx={{
+                            fontSize: 10.5,
+                            fontWeight: 700,
+                            color: alpha(m.navy, 0.45),
+                          }}
                         >
                           {thread.bookingMeta}
                         </Link>
                       ) : (
-                        <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: alpha(m.navy, 0.45) }} noWrap>
+                        <Typography
+                          sx={{
+                            fontSize: 10.5,
+                            fontWeight: 700,
+                            color: alpha(m.navy, 0.45),
+                          }}
+                          noWrap
+                        >
                           Unlinked
                         </Typography>
                       )}
-                      <CheckCircleRoundedIcon sx={{ fontSize: 13, color: "#4CAF50" }} />
+                      <CheckCircleRoundedIcon
+                        sx={{ fontSize: 13, color: "#4CAF50" }}
+                      />
                     </Stack>
-                    <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: alpha(m.navy, 0.42), whiteSpace: "nowrap" }}>
+                    <Typography
+                      sx={{
+                        fontSize: 10.5,
+                        fontWeight: 700,
+                        color: alpha(m.navy, 0.42),
+                        whiteSpace: "nowrap",
+                      }}
+                    >
                       {thread.timeLabel}
                     </Typography>
                   </Stack>
@@ -251,7 +369,7 @@ export default function MessagingConversationSidebar({
         )}
         {hasMore && onLoadMore ? (
           <Box sx={{ px: 2, py: 1.5 }}>
-            <Button
+            <AppButton
               fullWidth
               variant="outlined"
               disabled={loadingMore}
@@ -264,11 +382,14 @@ export default function MessagingConversationSidebar({
                 borderColor: alpha(m.teal, 0.45),
                 color: m.teal,
                 py: 0.85,
-                "&:hover": { borderColor: m.teal, bgcolor: alpha(m.teal, 0.04) },
+                "&:hover": {
+                  borderColor: m.teal,
+                  bgcolor: alpha(m.teal, 0.04),
+                },
               }}
             >
               {loadingMore ? "Loading..." : "Load more"}
-            </Button>
+            </AppButton>
           </Box>
         ) : null}
       </Box>

@@ -1,50 +1,63 @@
 "use client";
 
 import * as React from "react";
-import { Box, Stack, Typography } from "@mui/material";
+import { Box, Checkbox, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import ContentCutRoundedIcon from "@mui/icons-material/ContentCutRounded";
-import BrushRoundedIcon from "@mui/icons-material/BrushRounded";
-import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
-import GestureRoundedIcon from "@mui/icons-material/GestureRounded";
-import FaceRetouchingNaturalOutlinedIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
-import BackHandOutlinedIcon from "@mui/icons-material/BackHandOutlined";
 import SpaOutlinedIcon from "@mui/icons-material/SpaOutlined";
-import WaterDropOutlinedIcon from "@mui/icons-material/WaterDropOutlined";
 import CategoryOutlinedIcon from "@mui/icons-material/CategoryOutlined";
 import type { ServiceCategorySliderIconId } from "../../../data/businessServiceCategorySlider.data";
+import { SERVICE_CATEGORY_ICON_SRC } from "../ServiceCategoryIcon";
 
 export type CalendarServiceOrderCardProps = {
   label: string;
   iconId: ServiceCategorySliderIconId;
   order: number;
+  /** Checked = shown in business setup / client listing. */
+  checked?: boolean;
+  /** Show the visibility checkbox (only while editing). */
+  showCheckbox?: boolean;
+  /** Soft highlight for the category whose services are being viewed. */
+  active?: boolean;
   draggable?: boolean;
   isDragging?: boolean;
+  onCheckedChange?: (checked: boolean) => void;
   onDragStart?: () => void;
   onDragEnd?: () => void;
   onDragOver?: (event: React.DragEvent) => void;
   onDrop?: (event: React.DragEvent) => void;
+  onClick?: () => void;
 };
 
-function CategoryIcon({ iconId, color }: { iconId: ServiceCategorySliderIconId; color: string }) {
+function CategoryIcon({
+  iconId,
+  color,
+}: {
+  iconId: ServiceCategorySliderIconId;
+  color: string;
+}) {
+  const src = SERVICE_CATEGORY_ICON_SRC[iconId];
+  if (src) {
+    return (
+      <Box
+        component="img"
+        src={src}
+        alt=""
+        aria-hidden
+        sx={{
+          height: 24,
+          width: "auto",
+          maxWidth: 40,
+          objectFit: "contain",
+          display: "block",
+        }}
+      />
+    );
+  }
+
   const sx = { fontSize: 24, color };
   switch (iconId) {
-    case "hair":
-      return <ContentCutRoundedIcon sx={sx} />;
-    case "makeup":
-      return <BrushRoundedIcon sx={sx} />;
-    case "lashes":
-      return <VisibilityRoundedIcon sx={sx} />;
-    case "brows":
-      return <GestureRoundedIcon sx={sx} />;
-    case "facial":
-      return <FaceRetouchingNaturalOutlinedIcon sx={sx} />;
-    case "nails":
-      return <BackHandOutlinedIcon sx={sx} />;
     case "body":
       return <SpaOutlinedIcon sx={sx} />;
-    case "waxing":
-      return <WaterDropOutlinedIcon sx={sx} />;
     default:
       return <CategoryOutlinedIcon sx={sx} />;
   }
@@ -54,12 +67,17 @@ export default function CalendarServiceOrderCard({
   label,
   iconId,
   order,
+  checked = true,
+  showCheckbox = false,
+  active = false,
   draggable = false,
   isDragging = false,
+  onCheckedChange,
   onDragStart,
   onDragEnd,
   onDragOver,
   onDrop,
+  onClick,
 }: CalendarServiceOrderCardProps) {
   const m = useTheme().palette.mollure;
   const teal = m.teal;
@@ -67,6 +85,7 @@ export default function CalendarServiceOrderCard({
   return (
     <Box
       draggable={draggable}
+      onClick={onClick}
       onDragStart={(event) => {
         event.dataTransfer.effectAllowed = "move";
         event.dataTransfer.setData("text/plain", label);
@@ -83,18 +102,24 @@ export default function CalendarServiceOrderCard({
       }}
       sx={{
         position: "relative",
-        flex: "0 0 96px",
-        width: 96,
-        minWidth: 96,
+        boxSizing: "border-box",
+        flex: "0 0 108px",
+        width: 108,
+        minWidth: 108,
+        maxWidth: 108,
         borderRadius: "10px",
-        border: `1px solid ${alpha(teal, 0.35)}`,
-        bgcolor: "#fff",
-        px: 0.75,
-        py: 1.25,
+        border: `1px solid ${active ? alpha(teal, 0.55) : alpha(m.navy, 0.12)}`,
+        bgcolor: checked ? "#fff" : alpha(m.navy, 0.03),
+        px: 1,
+        pt: 1.5,
+        pb: 1.1,
         textAlign: "center",
-        cursor: draggable ? "grab" : "default",
-        opacity: isDragging ? 0.55 : 1,
-        transition: "opacity 0.15s ease",
+        overflow: "hidden",
+        cursor:
+          onClick || draggable ? (draggable ? "grab" : "pointer") : "default",
+        opacity: isDragging ? 0.55 : checked ? 1 : 0.55,
+        transition:
+          "opacity 0.15s ease, border-color 0.15s ease, background-color 0.15s ease",
         userSelect: "none",
       }}
     >
@@ -103,33 +128,82 @@ export default function CalendarServiceOrderCard({
           position: "absolute",
           top: 6,
           left: 6,
-          minWidth: 18,
+          zIndex: 1,
+          width: 18,
           height: 18,
-          px: 0.35,
-          borderRadius: "4px",
-          bgcolor: teal,
+          borderRadius: "999px",
+          bgcolor: checked ? teal : alpha(m.navy, 0.35),
           color: "#fff",
-          fontSize: 10,
-          fontWeight: 800,
-          display: "grid",
-          placeItems: "center",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+          p: 0,
         }}
       >
-        {order}
+        <Box
+          component="span"
+          sx={{
+            fontSize: 10,
+            fontWeight: 800,
+            lineHeight: 1,
+            display: "block",
+            transform: "translateY(0.5px)",
+          }}
+        >
+          {order}
+        </Box>
       </Box>
-      <Stack spacing={0.5} alignItems="center" justifyContent="center" sx={{ minHeight: 72 }}>
+
+      {showCheckbox ? (
+        <Checkbox
+          size="small"
+          checked={checked}
+          onClick={(event) => event.stopPropagation()}
+          onChange={(event) => {
+            event.stopPropagation();
+            onCheckedChange?.(event.target.checked);
+          }}
+          inputProps={{
+            "aria-label": checked ? `Hide ${label}` : `Show ${label}`,
+          }}
+          sx={{
+            position: "absolute",
+            top: 2,
+            right: 2,
+            zIndex: 2,
+            p: 0.35,
+            color: alpha(m.navy, 0.35),
+            "&.Mui-checked": { color: teal },
+          }}
+        />
+      ) : null}
+
+      <Stack
+        spacing={0.6}
+        alignItems="center"
+        justifyContent="center"
+        sx={{ width: "100%", minHeight: 78, overflow: "hidden" }}
+      >
         <CategoryIcon iconId={iconId} color={teal} />
         <Typography
+          title={label}
           sx={{
+            width: "100%",
+            maxWidth: "100%",
             fontSize: 11,
             fontWeight: 700,
-            lineHeight: 1.2,
-            color: alpha(m.navy, 0.72),
+            lineHeight: 1.25,
+            color: alpha(m.navy, checked ? 0.72 : 0.45),
             px: 0.25,
             display: "-webkit-box",
             WebkitLineClamp: 2,
             WebkitBoxOrient: "vertical",
             overflow: "hidden",
+            textOverflow: "ellipsis",
+            wordBreak: "break-word",
+            overflowWrap: "anywhere",
+            hyphens: "auto",
           }}
         >
           {label}

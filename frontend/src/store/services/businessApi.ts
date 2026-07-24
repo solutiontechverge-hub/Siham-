@@ -18,6 +18,8 @@ export type BookingsPagination = ListPagination;
 
 export type GetMyBookingsParams = ListPaginationParams & {
   tab?: "past" | "ongoing" | "upcoming";
+  /** Search by booking ID, salon name, service, or address. */
+  q?: string;
 };
 
 export type BusinessSubcategory = {
@@ -41,10 +43,14 @@ export type BusinessServiceDetail = {
   price: string | number;
   /** From service_categories JSONB (computed on read) */
   duration_label?: string | null;
+  /** Service id of the parent service when this entry is a nested subservice. */
+  parent_service_id?: string | null;
   created_at: string;
   service_title: string;
   category_id: string;
   category_title: string;
+  /** When false, hidden from business setup UI and public listing (data kept). */
+  is_visible?: boolean;
 };
 
 export type BusinessTeamMember = {
@@ -110,6 +116,7 @@ export type BusinessSetupListingServiceDetail = {
   serviceTitle: string | null;
   categoryId: string | null;
   categoryTitle: string | null;
+  isVisible?: boolean;
   createdAt: string | null;
 };
 
@@ -207,6 +214,10 @@ export type BusinessSetup = {
     service_id: string;
     amount: number;
     duration_label?: string | null;
+    parent_service_id?: string | null;
+    category_title?: string | null;
+    service_title?: string | null;
+    is_visible?: boolean;
   }>;
   project: string | null;
   book_service_notes: string | null;
@@ -437,6 +448,10 @@ export type UpsertBusinessSetupRequest = {
     service_id: string;
     amount: number;
     duration_label?: string | null;
+    parent_service_id?: string | null;
+    category_title?: string | null;
+    service_title?: string | null;
+    is_visible?: boolean;
   }>;
   project?: string;
   book_service_notes?: string;
@@ -809,6 +824,7 @@ export const businessApi = baseApi.injectEndpoints({
         const response = await fetchWithBQ({
           url: buildListQuery("/api/business/bookings", arg ?? undefined, {
             tab: arg?.tab,
+            q: arg?.q,
           }),
           method: "GET",
         });

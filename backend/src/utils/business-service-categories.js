@@ -47,6 +47,7 @@ const mapCategoryItemToServiceDetail = (item, metaByServiceId, businessSetupId) 
   const durationLabel = String(item?.duration_label ?? "").trim() || null;
   const storedServiceTitle = String(item?.service_title ?? item?.serviceTitle ?? "").trim();
   const storedCategoryTitle = String(item?.category_title ?? item?.categoryTitle ?? "").trim();
+  const parentServiceId = String(item?.parent_service_id ?? item?.parentServiceId ?? "").trim() || null;
   const resolvedServiceId = serviceId ?? rawServiceId;
   const resolvedCategoryId = categoryId ?? (rawCategoryId || null);
 
@@ -60,6 +61,8 @@ const mapCategoryItemToServiceDetail = (item, metaByServiceId, businessSetupId) 
       duration_label: durationLabel,
       service_title: storedServiceTitle || meta.service_title,
       category_title: storedCategoryTitle || meta.category_title,
+      parent_service_id: parentServiceId,
+      is_visible: item?.is_visible === false || item?.isVisible === false ? false : true,
       created_at: null,
     };
   }
@@ -73,6 +76,8 @@ const mapCategoryItemToServiceDetail = (item, metaByServiceId, businessSetupId) 
     duration_label: durationLabel,
     service_title: storedServiceTitle || "Service",
     category_title: storedCategoryTitle || null,
+    parent_service_id: parentServiceId,
+    is_visible: item?.is_visible === false || item?.isVisible === false ? false : true,
     created_at: null,
   };
 };

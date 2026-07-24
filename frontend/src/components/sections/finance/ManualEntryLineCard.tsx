@@ -14,7 +14,11 @@ type ManualEntryLineCardProps = {
   onDelete: () => void;
 };
 
-export default function ManualEntryLineCard({ line, onEdit, onDelete }: ManualEntryLineCardProps) {
+export default function ManualEntryLineCard({
+  line,
+  onEdit,
+  onDelete,
+}: ManualEntryLineCardProps) {
   const m = useTheme().palette.mollure;
   const total = lineTotal(line);
 
@@ -33,19 +37,43 @@ export default function ManualEntryLineCard({ line, onEdit, onDelete }: ManualEn
       }}
     >
       <Box sx={{ minWidth: 0 }}>
-        <Typography sx={{ fontSize: 13.5, fontWeight: 800, color: alpha(m.navy, 0.86) }}>
+        <Typography
+          sx={{ fontSize: 13.5, fontWeight: 800, color: alpha(m.navy, 0.86) }}
+        >
           {line.name}{" "}
-          <Box component="span" sx={{ fontWeight: 600, color: alpha(m.navy, 0.65) }}>
+          <Box
+            component="span"
+            sx={{ fontWeight: 600, color: alpha(m.navy, 0.65) }}
+          >
             {line.quantity}x
           </Box>
         </Typography>
-        <Typography sx={{ fontSize: 12, fontWeight: 600, color: alpha(m.navy, 0.5), mt: 0.35 }}>
+        <Typography
+          sx={{
+            fontSize: 12,
+            fontWeight: 600,
+            color: alpha(m.navy, 0.5),
+            mt: 0.35,
+          }}
+        >
           €{line.unitPrice}
         </Typography>
       </Box>
 
-      <Stack direction="row" alignItems="center" spacing={0.25} sx={{ flexShrink: 0 }}>
-        <Typography sx={{ fontSize: 13.5, fontWeight: 800, color: alpha(m.navy, 0.86), mr: 0.5 }}>
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={0.25}
+        sx={{ flexShrink: 0 }}
+      >
+        <Typography
+          sx={{
+            fontSize: 13.5,
+            fontWeight: 800,
+            color: alpha(m.navy, 0.86),
+            mr: 0.5,
+          }}
+        >
           {formatEurAmount(total)}
         </Typography>
         <IconButton
