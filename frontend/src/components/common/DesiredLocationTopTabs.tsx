@@ -16,7 +16,10 @@ export type DesiredLocationTopTabsProps = {
   activeLabel: string;
 };
 
-export default function DesiredLocationTopTabs({ tabs, activeLabel }: DesiredLocationTopTabsProps) {
+export default function DesiredLocationTopTabs({
+  tabs,
+  activeLabel,
+}: DesiredLocationTopTabsProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
 
@@ -79,7 +82,9 @@ export default function DesiredLocationTopTabs({ tabs, activeLabel }: DesiredLoc
                 letterSpacing: "-0.01em",
                 bgcolor: "#fff",
                 "&:hover": { bgcolor: "#fff" },
-                color: active ? theme.palette.text.primary : alpha(theme.palette.text.secondary, 0.75),
+                color: active
+                  ? theme.palette.text.primary
+                  : alpha(theme.palette.text.secondary, 0.75),
                 fontSize: 16,
                 pt: 1.6,
                 pb: 1.55,
@@ -108,4 +113,3 @@ export default function DesiredLocationTopTabs({ tabs, activeLabel }: DesiredLoc
     </Paper>
   );
 }
-

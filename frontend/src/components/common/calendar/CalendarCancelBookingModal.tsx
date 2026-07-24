@@ -1,7 +1,8 @@
 "use client";
 
+import AppButton from "../AppButton";
 import * as React from "react";
-import { Box, Button, Stack, Typography } from "@mui/material";
+import { Box, Stack, Typography } from "@mui/material";
 import WarningRoundedIcon from "@mui/icons-material/WarningRounded";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppModal from "../AppModal";
@@ -21,7 +22,10 @@ type CalendarCancelBookingModalProps = {
 
 const REASON_OPTIONS = [
   { label: "No availability / Fully booked", value: "no_availability" },
-  { label: "Service not available on selected date/time", value: "service_unavailable" },
+  {
+    label: "Service not available on selected date/time",
+    value: "service_unavailable",
+  },
   { label: "Invalid booking details", value: "invalid_details" },
   { label: "Other reason", value: "other" },
 ];
@@ -43,12 +47,25 @@ export default function CalendarCancelBookingModal({
   }, [open]);
 
   return (
-    <AppModal open={open} onClose={onClose} title="Cancel Booking" maxWidth="sm" fullWidth headerTone="danger">
+    <AppModal
+      open={open}
+      onClose={onClose}
+      title="Cancel Booking"
+      maxWidth="sm"
+      fullWidth
+      headerTone="danger"
+    >
       <Box sx={{ px: 2.5, py: 2.5 }}>
         <Stack alignItems="center" spacing={1.25} sx={{ mb: 2 }}>
           <WarningRoundedIcon sx={{ fontSize: 52, color: "#E85D5D" }} />
           <Typography
-            sx={{ fontWeight: 900, fontSize: 16, color: alpha(m.navy, 0.88), textAlign: "center", lineHeight: 1.4 }}
+            sx={{
+              fontWeight: 900,
+              fontSize: 16,
+              color: alpha(m.navy, 0.88),
+              textAlign: "center",
+              lineHeight: 1.4,
+            }}
           >
             Are you sure you want to Cancel this booking?
           </Typography>
@@ -86,38 +103,26 @@ export default function CalendarCancelBookingModal({
       </Box>
       <Box sx={{ px: 2.5, py: 2 }}>
         <Stack direction="row" justifyContent="center" spacing={1.5}>
-          <Button
-            variant="outlined"
+          <AppButton
+            tone="secondary"
             onClick={onClose}
             sx={{
-              borderRadius: "10px",
-              textTransform: "none",
-              fontWeight: 800,
               height: 40,
-              borderColor: alpha(m.navy, 0.14),
-              color: alpha(m.navy, 0.72),
-              bgcolor: "#fff",
               minWidth: 120,
             }}
           >
             Cancel
-          </Button>
-          <Button
-            variant="contained"
-            disableElevation
+          </AppButton>
+          <AppButton
+            tone="primary"
             onClick={() => onConfirm({ reasons, details: details.trim() })}
             sx={{
-              borderRadius: "10px",
-              textTransform: "none",
-              fontWeight: 800,
               height: 40,
-              bgcolor: m.teal,
-              "&:hover": { bgcolor: m.tealDark },
               minWidth: 120,
             }}
           >
             Yes, Reject
-          </Button>
+          </AppButton>
         </Stack>
       </Box>
     </AppModal>

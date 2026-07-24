@@ -1,5 +1,6 @@
 "use client";
 
+import AppButton from "../../../components/common/AppButton";
 import * as React from "react";
 import SortRoundedIcon from "@mui/icons-material/SortRounded";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
@@ -7,7 +8,6 @@ import SwapVertRoundedIcon from "@mui/icons-material/SwapVertRounded";
 import {
   Alert,
   Box,
-  Button,
   CircularProgress,
   Container,
   Grid,
@@ -30,7 +30,11 @@ import {
 } from "../../../components/common";
 import { listingPageData } from "./listing.data";
 import { parseListingSearchParams } from "./listingSearchParams";
-import { useClientListingState, useListingTokens, type ListingSortValue } from "./listing.use";
+import {
+  useClientListingState,
+  useListingTokens,
+  type ListingSortValue,
+} from "./listing.use";
 import { useListingCards } from "./use-listing-cards";
 import { ListingBG } from "../../../../images";
 import { useAppSelector } from "../../../store/hooks";
@@ -51,7 +55,10 @@ export default function ClientListingPage() {
   const tokens = useListingTokens();
   const searchParams = useSearchParams();
   const searchKey = searchParams.toString();
-  const urlFilters = React.useMemo(() => parseListingSearchParams(searchParams), [searchKey]);
+  const urlFilters = React.useMemo(
+    () => parseListingSearchParams(searchParams),
+    [searchKey],
+  );
   const { filters: filterData, toolbar } = listingPageData;
   const { cards, isLoading, isError, error } = useListingCards();
   const state = useClientListingState(cards, urlFilters, searchKey);
@@ -59,7 +66,9 @@ export default function ClientListingPage() {
   const displayName =
     ((user as any)?.display_name as string | undefined) ||
     `${(user as any)?.first_name ?? ""} ${(user as any)?.last_name ?? ""}`.trim();
-  const [avatarUrl, setAvatarUrl] = React.useState<string | undefined>(undefined);
+  const [avatarUrl, setAvatarUrl] = React.useState<string | undefined>(
+    undefined,
+  );
   const [snackbarOpen, setSnackbarOpen] = React.useState(false);
   const [filtersDrawerOpen, setFiltersDrawerOpen] = React.useState(false);
 
@@ -67,11 +76,15 @@ export default function ClientListingPage() {
     try {
       const raw = window.localStorage.getItem("mollure:client_profile");
       if (!raw) return;
-      const data = JSON.parse(raw) as { avatar_url?: string | null; email?: string };
+      const data = JSON.parse(raw) as {
+        avatar_url?: string | null;
+        email?: string;
+      };
       const authedEmail = user?.email?.trim().toLowerCase();
       const persistedEmail = data?.email?.trim().toLowerCase();
       if (authedEmail && persistedEmail && authedEmail === persistedEmail) {
-        if (typeof data.avatar_url === "string" && data.avatar_url) setAvatarUrl(data.avatar_url);
+        if (typeof data.avatar_url === "string" && data.avatar_url)
+          setAvatarUrl(data.avatar_url);
       }
     } catch {
       // ignore
@@ -124,7 +137,10 @@ export default function ClientListingPage() {
           }}
         />
 
-        <Container maxWidth="lg" sx={{ position: "relative", pt: { xs: 5, md: 7 } }}>
+        <Container
+          maxWidth="lg"
+          sx={{ position: "relative", pt: { xs: 5, md: 7 } }}
+        >
           <Box sx={{ display: "flex", justifyContent: "center" }}>
             <Box sx={{ width: "100%", maxWidth: 820 }}>
               <ListingFilterBox
@@ -143,13 +159,19 @@ export default function ClientListingPage() {
 
       {/* Results */}
       <Container maxWidth="lg" sx={{ py: { xs: 4, md: 5 } }}>
-        <Stack direction="row" alignItems="center" justifyContent="flex-end" spacing={1.25} sx={{ mb: 2 }}>
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="flex-end"
+          spacing={1.25}
+          sx={{ mb: 2 }}
+        >
           {/*
             Toolbar controls must match the compact design:
             same height/shape/typography for Filters + Sort.
           */}
           {/** shared sizing tokens */}
-          <Button
+          <AppButton
             variant="outlined"
             endIcon={<TuneRoundedIcon />}
             onClick={() => setFiltersDrawerOpen(true)}
@@ -165,12 +187,18 @@ export default function ClientListingPage() {
               color: alpha(tokens.navy, 0.85),
               bgcolor: "#fff",
               borderColor: alpha(tokens.navy, 0.18),
-              "&:hover": { bgcolor: "#fff", borderColor: alpha(tokens.navy, 0.28) },
-              "& .MuiButton-endIcon": { ml: 1, color: alpha(tokens.navy, 0.85) },
+              "&:hover": {
+                bgcolor: "#fff",
+                borderColor: alpha(tokens.navy, 0.28),
+              },
+              "& .MuiButton-endIcon": {
+                ml: 1,
+                color: alpha(tokens.navy, 0.85),
+              },
             }}
           >
             {toolbar.filterLabel}
-          </Button>
+          </AppButton>
 
           <MollureTextField
             select
@@ -191,7 +219,10 @@ export default function ClientListingPage() {
                 color: alpha(tokens.navy, 0.85),
                 "& fieldset": { borderColor: alpha(tokens.navy, 0.18) },
                 "&:hover fieldset": { borderColor: alpha(tokens.navy, 0.28) },
-                "&.Mui-focused fieldset": { borderColor: alpha(tokens.navy, 0.28), borderWidth: 1 },
+                "&.Mui-focused fieldset": {
+                  borderColor: alpha(tokens.navy, 0.28),
+                  borderWidth: 1,
+                },
               },
               "& .MuiSelect-select": {
                 fontSize: 13,
@@ -202,7 +233,11 @@ export default function ClientListingPage() {
             }}
             InputProps={{
               startAdornment: null,
-              endAdornment: <SwapVertRoundedIcon sx={{ color: alpha(tokens.navy, 0.8), mr: 0.25 }} />,
+              endAdornment: (
+                <SwapVertRoundedIcon
+                  sx={{ color: alpha(tokens.navy, 0.8), mr: 0.25 }}
+                />
+              ),
             }}
             SelectProps={{
               displayEmpty: true,
@@ -225,12 +260,17 @@ export default function ClientListingPage() {
         ) : isError ? (
           <Alert severity="error" sx={{ borderRadius: 2 }}>
             {typeof error === "object" && error && "data" in error
-              ? String((error as { data?: { message?: string } }).data?.message ?? "Unable to load listings.")
+              ? String(
+                  (error as { data?: { message?: string } }).data?.message ??
+                    "Unable to load listings.",
+                )
               : "Unable to load listings."}
           </Alert>
         ) : state.items.length === 0 ? (
           <Box sx={{ py: 6, textAlign: "center" }}>
-            <Typography sx={{ color: alpha(tokens.navy, 0.65), fontWeight: 600 }}>
+            <Typography
+              sx={{ color: alpha(tokens.navy, 0.65), fontWeight: 600 }}
+            >
               No professionals found. Try adjusting your filters.
             </Typography>
           </Box>
@@ -284,11 +324,13 @@ export default function ClientListingPage() {
       />
 
       <MarketingSiteFooter
-        columns={marketingShellFooter.columns.map((col) => ({ title: col.title, items: [...col.items] }))}
+        columns={marketingShellFooter.columns.map((col) => ({
+          title: col.title,
+          items: [...col.items],
+        }))}
         copyright={marketingShellFooter.copyright}
         sx={{ mt: 2 }}
       />
     </Box>
   );
 }
-

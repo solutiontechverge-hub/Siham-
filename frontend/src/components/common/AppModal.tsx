@@ -4,7 +4,6 @@ import * as React from "react";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import {
   Box,
-  Button,
   Dialog,
   IconButton,
   Stack,
@@ -14,6 +13,7 @@ import {
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText, SubHeading } from "../ui/typography";
+import AppButton from "./AppButton";
 import MessagingInsetOverlay from "./messaging/MessagingInsetOverlay";
 
 type AppModalCloseHandler = DialogProps["onClose"] | (() => void);
@@ -90,12 +90,27 @@ export default function AppModal({
       }}
     >
       <Box sx={{ minWidth: 0, flex: 1, pr: 1 }}>
-        <SubHeading sx={{ fontSize: subtitle ? 18 : 16, color: alpha(m.navy, 0.9), fontWeight: 800 }}>{title}</SubHeading>
+        <SubHeading
+          sx={{
+            fontSize: subtitle ? 18 : 16,
+            color: alpha(m.navy, 0.9),
+            fontWeight: 800,
+          }}
+        >
+          {title}
+        </SubHeading>
         {subtitle ? (
-          <BodyText sx={{ mt: 0.4, color: alpha(m.navy, 0.62), fontSize: 13 }}>{subtitle}</BodyText>
+          <BodyText sx={{ mt: 0.4, color: alpha(m.navy, 0.62), fontSize: 13 }}>
+            {subtitle}
+          </BodyText>
         ) : null}
       </Box>
-      <IconButton size="small" onClick={() => invokeClose(onClose)} aria-label="Close modal" sx={headerIconBtnSx}>
+      <IconButton
+        size="small"
+        onClick={() => invokeClose(onClose)}
+        aria-label="Close modal"
+        sx={headerIconBtnSx}
+      >
         <CloseRoundedIcon sx={{ fontSize: 18 }} />
       </IconButton>
     </Stack>
@@ -108,8 +123,14 @@ export default function AppModal({
           minHeight: contentMinHeight ?? 0,
           overflowY: "auto",
           minWidth: 0,
+          // Keep content clear of the teal/danger header across all modals.
+          pt: 2,
         },
-        ...(Array.isArray(contentSx) ? contentSx : contentSx ? [contentSx] : []),
+        ...(Array.isArray(contentSx)
+          ? contentSx
+          : contentSx
+            ? [contentSx]
+            : []),
       ]}
     >
       {children}
@@ -202,25 +223,16 @@ export function AppModalCancelButton({
   label?: string;
   disabled?: boolean;
 }) {
-  const m = useTheme().palette.mollure;
   return (
-    <Button
-      variant="outlined"
+    <AppButton
+      tone="secondary"
+      presetSize="lg"
       onClick={onClick}
       disabled={disabled}
-      sx={{
-        textTransform: "none",
-        fontWeight: 800,
-        fontSize: 13,
-        minWidth: 100,
-        borderRadius: "10px",
-        borderColor: alpha(m.navy, 0.18),
-        color: alpha(m.navy, 0.65),
-        px: 3,
-      }}
+      sx={{ minWidth: 100, px: 3 }}
     >
       {label}
-    </Button>
+    </AppButton>
   );
 }
 
@@ -233,26 +245,16 @@ export function AppModalPrimaryButton({
   label: string;
   disabled?: boolean;
 }) {
-  const m = useTheme().palette.mollure;
   return (
-    <Button
-      variant="contained"
-      disableElevation
-      disabled={disabled}
+    <AppButton
+      tone="primary"
+      presetSize="lg"
       onClick={onClick}
-      sx={{
-        textTransform: "none",
-        fontWeight: 800,
-        fontSize: 13,
-        minWidth: 100,
-        borderRadius: "10px",
-        bgcolor: m.teal,
-        px: 3,
-        "&:hover": { bgcolor: m.tealDark },
-      }}
+      disabled={disabled}
+      sx={{ minWidth: 100, px: 3 }}
     >
       {label}
-    </Button>
+    </AppButton>
   );
 }
 

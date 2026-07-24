@@ -1,7 +1,8 @@
 "use client";
 
+import AppButton from "../../common/AppButton";
 import * as React from "react";
-import { Button, Stack } from "@mui/material";
+import { Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import MollureFormField from "../../common/MollureFormField";
 import AppModal from "../../common/AppModal";
@@ -51,7 +52,7 @@ export default function TransactionNoteModal({
           sx={{ px: 2.5, py: 2, width: "100%" }}
         >
           {hasExistingNote && onDelete ? (
-            <Button
+            <AppButton
               onClick={() => {
                 onDelete();
                 onClose();
@@ -63,48 +64,28 @@ export default function TransactionNoteModal({
                 color: "#C62828",
                 minWidth: 0,
                 p: 0,
-                "&:hover": { bgcolor: "transparent", textDecoration: "underline" },
+                "&:hover": {
+                  bgcolor: "transparent",
+                  textDecoration: "underline",
+                },
               }}
             >
               Delete Note
-            </Button>
+            </AppButton>
           ) : (
             <span />
           )}
           <Stack direction="row" spacing={1}>
-            <Button
-              onClick={onClose}
-              variant="outlined"
-              sx={{
-                borderRadius: "8px",
-                textTransform: "none",
-                fontWeight: 800,
-                borderColor: alpha(m.navy, 0.14),
-                color: alpha(m.navy, 0.72),
-                bgcolor: "#fff",
-                height: 36,
-                px: 2.25,
-              }}
-            >
+            <AppButton tone="secondary" onClick={onClose}>
               Cancel
-            </Button>
-            <Button
-              variant="contained"
-              disableElevation
+            </AppButton>
+            <AppButton
+              tone="primary"
               onClick={handleSave}
               disabled={!note.trim()}
-              sx={{
-                borderRadius: "8px",
-                textTransform: "none",
-                fontWeight: 900,
-                bgcolor: m.teal,
-                "&:hover": { bgcolor: m.tealDark },
-                height: 36,
-                px: 2.25,
-              }}
             >
               Save
-            </Button>
+            </AppButton>
           </Stack>
         </Stack>
       }
@@ -118,7 +99,12 @@ export default function TransactionNoteModal({
           multiline
           minRows={5}
           fullWidth
-          sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" } }}
+          sx={{
+            "& .MuiOutlinedInput-root": {
+              bgcolor: "#fff",
+              borderRadius: "10px",
+            },
+          }}
         />
       </Stack>
     </AppModal>

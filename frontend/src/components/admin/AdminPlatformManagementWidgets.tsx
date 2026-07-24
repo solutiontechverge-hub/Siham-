@@ -68,8 +68,14 @@ function InfoBox({ children }: { children: React.ReactNode }) {
         border: `1px solid ${alpha(tokens.teal, 0.15)}`,
       }}
     >
-      <InfoOutlinedIcon sx={{ fontSize: 16, color: tokens.teal, mt: 0.15, flexShrink: 0 }} />
-      <Typography sx={{ fontSize: 11.5, color: tokens.bodyText, lineHeight: 1.45 }}>{children}</Typography>
+      <InfoOutlinedIcon
+        sx={{ fontSize: 16, color: tokens.teal, mt: 0.15, flexShrink: 0 }}
+      />
+      <Typography
+        sx={{ fontSize: 11.5, color: tokens.bodyText, lineHeight: 1.45 }}
+      >
+        {children}
+      </Typography>
     </Stack>
   );
 }
@@ -97,9 +103,22 @@ export function RankingWeightSummaryWidget() {
       <Stack spacing={1.75}>
         {rankingFactors.map((factor) => (
           <Box key={factor.id}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-              <Typography sx={{ fontSize: 12, fontWeight: 500, color: tokens.navy }}>{factor.label}</Typography>
-              <Typography sx={{ fontSize: 12, fontWeight: 700, color: tokens.tealDark }}>{factor.weight}%</Typography>
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="center"
+              sx={{ mb: 0.5 }}
+            >
+              <Typography
+                sx={{ fontSize: 12, fontWeight: 500, color: tokens.navy }}
+              >
+                {factor.label}
+              </Typography>
+              <Typography
+                sx={{ fontSize: 12, fontWeight: 700, color: tokens.tealDark }}
+              >
+                {factor.weight}%
+              </Typography>
             </Stack>
             <LinearProgress
               variant="determinate"
@@ -118,8 +137,8 @@ export function RankingWeightSummaryWidget() {
         ))}
       </Stack>
       <InfoBox>
-        Ranking weights determine how professionals are sorted in search results. Higher weights give more influence to
-        that metric.
+        Ranking weights determine how professionals are sorted in search
+        results. Higher weights give more influence to that metric.
       </InfoBox>
     </AdminSectionCard>
   );
@@ -137,7 +156,12 @@ export function FlaggedReviewsWidget() {
     >
       <Stack spacing={1.25}>
         {platformFlaggedReviews.map((review) => (
-          <Stack key={review.id} direction="row" alignItems="center" spacing={1.25}>
+          <Stack
+            key={review.id}
+            direction="row"
+            alignItems="center"
+            spacing={1.25}
+          >
             <Avatar
               sx={{
                 width: 32,
@@ -151,10 +175,15 @@ export function FlaggedReviewsWidget() {
               {review.initials}
             </Avatar>
             <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }} noWrap>
+              <Typography
+                sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}
+                noWrap
+              >
                 {review.professional}
               </Typography>
-              <Typography sx={{ fontSize: 10.5, color: tokens.slate }}>{review.date}</Typography>
+              <Typography sx={{ fontSize: 10.5, color: tokens.slate }}>
+                {review.date}
+              </Typography>
             </Box>
             <Chip
               label="Flagged"
@@ -195,7 +224,12 @@ export function RecentReportsWidget() {
         {platformRecentReports.map((report) => {
           const statusStyle = reportStatusStyles[report.status];
           return (
-            <Stack key={report.id} direction="row" alignItems="center" spacing={1.25}>
+            <Stack
+              key={report.id}
+              direction="row"
+              alignItems="center"
+              spacing={1.25}
+            >
               <Avatar
                 sx={{
                   width: 32,
@@ -209,10 +243,15 @@ export function RecentReportsWidget() {
                 {report.initials}
               </Avatar>
               <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography sx={{ fontSize: 12, fontWeight: 500, color: tokens.navy }} noWrap>
+                <Typography
+                  sx={{ fontSize: 12, fontWeight: 500, color: tokens.navy }}
+                  noWrap
+                >
                   Reported: {report.reported}
                 </Typography>
-                <Typography sx={{ fontSize: 10.5, color: tokens.slate }}>{report.reporter}</Typography>
+                <Typography sx={{ fontSize: 10.5, color: tokens.slate }}>
+                  {report.reporter}
+                </Typography>
               </Box>
               <Chip
                 label={statusStyle.label}
@@ -236,7 +275,11 @@ export function RecentReportsWidget() {
 
 const messageStatusStyles = {
   new: { label: "New", bg: "rgba(76, 175, 80, 0.12)", color: "#2E7D32" },
-  replied: { label: "Replied", bg: "rgba(59, 130, 246, 0.12)", color: "#2563EB" },
+  replied: {
+    label: "Replied",
+    bg: "rgba(59, 130, 246, 0.12)",
+    color: "#2563EB",
+  },
 } as const;
 
 export function RecentContactMessagesWidget() {
@@ -253,7 +296,12 @@ export function RecentContactMessagesWidget() {
         {platformContactMessages.map((message) => {
           const statusStyle = messageStatusStyles[message.status];
           return (
-            <Stack key={message.id} direction="row" alignItems="flex-start" spacing={1.25}>
+            <Stack
+              key={message.id}
+              direction="row"
+              alignItems="flex-start"
+              spacing={1.25}
+            >
               <Box
                 sx={{
                   width: 32,
@@ -269,9 +317,17 @@ export function RecentContactMessagesWidget() {
                 <EmailOutlinedIcon sx={{ fontSize: 16 }} />
               </Box>
               <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}>{message.category}</Typography>
-                <Typography sx={{ fontSize: 11, color: tokens.bodyText }}>{message.sender}</Typography>
-                <Typography sx={{ fontSize: 10.5, color: tokens.slate, mt: 0.25 }}>
+                <Typography
+                  sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}
+                >
+                  {message.category}
+                </Typography>
+                <Typography sx={{ fontSize: 11, color: tokens.bodyText }}>
+                  {message.sender}
+                </Typography>
+                <Typography
+                  sx={{ fontSize: 10.5, color: tokens.slate, mt: 0.25 }}
+                >
                   {message.date} · {message.time}
                 </Typography>
               </Box>
@@ -330,9 +386,15 @@ export function ReviewRatingCategoriesWidget() {
               border: `1px solid ${alpha(cat.color, 0.15)}`,
             }}
           >
-            <Typography sx={{ fontSize: 20, lineHeight: 1 }}>{cat.emoji}</Typography>
+            <Typography sx={{ fontSize: 20, lineHeight: 1 }}>
+              {cat.emoji}
+            </Typography>
             <Box sx={{ flex: 1 }}>
-              <Typography sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}>{cat.label}</Typography>
+              <Typography
+                sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}
+              >
+                {cat.label}
+              </Typography>
               <Typography sx={{ fontSize: 11, color: tokens.bodyText }}>
                 {cat.min.toFixed(1)} – {cat.max.toFixed(1)}
               </Typography>
@@ -341,7 +403,8 @@ export function ReviewRatingCategoriesWidget() {
         ))}
       </Stack>
       <InfoBox>
-        Rating categories define how star ratings are grouped and displayed across the platform.
+        Rating categories define how star ratings are grouped and displayed
+        across the platform.
       </InfoBox>
     </AdminSectionCard>
   );
@@ -378,8 +441,17 @@ export function SeoQuickLinksWidget() {
               },
             }}
           >
-            <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-              <Stack direction="row" spacing={1.25} alignItems="flex-start" sx={{ flex: 1, minWidth: 0 }}>
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="flex-start"
+            >
+              <Stack
+                direction="row"
+                spacing={1.25}
+                alignItems="flex-start"
+                sx={{ flex: 1, minWidth: 0 }}
+              >
                 <Box
                   sx={{
                     width: 36,
@@ -397,15 +469,31 @@ export function SeoQuickLinksWidget() {
                   {link.logoLabel}
                 </Box>
                 <Box sx={{ minWidth: 0 }}>
-                  <Typography sx={{ fontSize: 13, fontWeight: 600, color: tokens.navy, lineHeight: 1.3 }}>
+                  <Typography
+                    sx={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: tokens.navy,
+                      lineHeight: 1.3,
+                    }}
+                  >
                     {link.title}
                   </Typography>
-                  <Typography sx={{ fontSize: 11, color: tokens.bodyText, mt: 0.35, lineHeight: 1.4 }}>
+                  <Typography
+                    sx={{
+                      fontSize: 11,
+                      color: tokens.bodyText,
+                      mt: 0.35,
+                      lineHeight: 1.4,
+                    }}
+                  >
                     {link.description}
                   </Typography>
                 </Box>
               </Stack>
-              <OpenInNewOutlinedIcon sx={{ fontSize: 16, color: tokens.slate, flexShrink: 0, ml: 1 }} />
+              <OpenInNewOutlinedIcon
+                sx={{ fontSize: 16, color: tokens.slate, flexShrink: 0, ml: 1 }}
+              />
             </Stack>
           </Box>
         ))}

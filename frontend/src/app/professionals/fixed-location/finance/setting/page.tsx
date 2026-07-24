@@ -1,5 +1,6 @@
 "use client";
 
+import AppButton from "../../../../../components/common/AppButton";
 import * as React from "react";
 import Image from "next/image";
 import BusinessCenterRoundedIcon from "@mui/icons-material/BusinessCenterRounded";
@@ -15,7 +16,6 @@ import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import {
   Box,
-  Button,
   Checkbox,
   IconButton,
   InputAdornment,
@@ -28,7 +28,11 @@ import {
   TableRow,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import { BodyText, CardTitle, SubHeading } from "../../../../../components/ui/typography";
+import {
+  BodyText,
+  CardTitle,
+  SubHeading,
+} from "../../../../../components/ui/typography";
 import AppCard from "../../../../../components/common/AppCard";
 import MollureFormField from "../../../../../components/common/MollureFormField";
 import AppModal from "../../../../../components/common/AppModal";
@@ -58,7 +62,7 @@ function TabButton({
   const m = theme.palette.mollure;
 
   return (
-    <Button
+    <AppButton
       size="small"
       disableElevation
       onClick={onClick}
@@ -77,7 +81,7 @@ function TabButton({
       }}
     >
       {children}
-    </Button>
+    </AppButton>
   );
 }
 
@@ -96,7 +100,7 @@ function StripeSettings() {
 
   const cardSx = {
     borderRadius: "10px",
-    border: `1px solid ${alpha(m.navy, 0.10)}`,
+    border: `1px solid ${alpha(m.navy, 0.1)}`,
     boxShadow: "0 6px 14px rgba(16, 35, 63, 0.05)",
     bgcolor: "#fff",
     overflow: "hidden",
@@ -124,27 +128,43 @@ function StripeSettings() {
 
   const expectItems = [
     {
-      icon: <BusinessCenterRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.75) }} />,
+      icon: (
+        <BusinessCenterRoundedIcon
+          sx={{ fontSize: 16, color: alpha(m.navy, 0.75) }}
+        />
+      ),
       title: "Business Information",
       desc: "Enter your legal business details, business type, and contact information.",
     },
     {
-      icon: <PersonRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.75) }} />,
+      icon: (
+        <PersonRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.75) }} />
+      ),
       title: "Representative Details",
       desc: "Provide personal information for the account owner or legal representative.",
     },
     {
-      icon: <PublicRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.75) }} />,
+      icon: (
+        <PublicRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.75) }} />
+      ),
       title: "Public Business Information",
       desc: "Set how your business appears on client bank statements and provide customer contact details.",
     },
     {
-      icon: <AccountBalanceRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.75) }} />,
+      icon: (
+        <AccountBalanceRoundedIcon
+          sx={{ fontSize: 16, color: alpha(m.navy, 0.75) }}
+        />
+      ),
       title: "Payout Details",
       desc: "Connect your bank account (IBAN) to receive payouts.",
     },
     {
-      icon: <FactCheckRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.75) }} />,
+      icon: (
+        <FactCheckRoundedIcon
+          sx={{ fontSize: 16, color: alpha(m.navy, 0.75) }}
+        />
+      ),
       title: "Review & Submit",
       desc: "Confirm your information before activating online payments.",
     },
@@ -186,7 +206,8 @@ function StripeSettings() {
           }}
         >
           <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: "#E65100" }}>
-            Onboarding not completed — please proceed with your onboarding process.
+            Onboarding not completed — please proceed with your onboarding
+            process.
           </BodyText>
         </Paper>
       ) : null}
@@ -203,7 +224,8 @@ function StripeSettings() {
           }}
         >
           <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: "#C62828" }}>
-            Public profile has temporarily been deactivated — Status: Not Connected
+            Public profile has temporarily been deactivated — Status: Not
+            Connected
           </BodyText>
         </Paper>
       ) : null}
@@ -219,17 +241,19 @@ function StripeSettings() {
         }}
       >
         <SubHeading sx={{ color: alpha(m.navy, 0.86) }}>Stripe</SubHeading>
-        <BodyText sx={{ mt: 0.35, color: alpha(m.navy, 0.50), fontSize: 12.5 }}>
+        <BodyText sx={{ mt: 0.35, color: alpha(m.navy, 0.5), fontSize: 12.5 }}>
           Stripe Mollure partnership
         </BodyText>
       </Paper>
 
       <Paper elevation={0} sx={cardSx}>
         <Box sx={sectionTitleSx}>
-          <CardTitle sx={{ color: alpha(m.navy, 0.86) }}>Mollure Subscription</CardTitle>
+          <CardTitle sx={{ color: alpha(m.navy, 0.86) }}>
+            Mollure Subscription
+          </CardTitle>
         </Box>
         <Box sx={{ px: 2, py: 1.5 }}>
-          <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.70) }}>
+          <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.7) }}>
             <Box component="span" sx={labelSx}>
               Status:
             </Box>{" "}
@@ -237,43 +261,54 @@ function StripeSettings() {
             <Box
               component="span"
               sx={{
-                color: subscriptionActive ? "success.main" : alpha(m.navy, 0.70),
+                color: subscriptionActive ? "success.main" : alpha(m.navy, 0.7),
                 fontWeight: 800,
               }}
             >
               {subscriptionActive ? "Active" : "Not Active"}
             </Box>
           </BodyText>
-          <BodyText sx={{ mt: 0.6, fontSize: 12.5, color: alpha(m.navy, 0.60) }}>
-            Your 15 EUR/month is billed securely via Stripe Billing. A valid credit card is required
+          <BodyText sx={{ mt: 0.6, fontSize: 12.5, color: alpha(m.navy, 0.6) }}>
+            Your 15 EUR/month is billed securely via Stripe Billing. A valid
+            credit card is required
           </BodyText>
           <Box sx={{ mt: 1.25 }}>
-            <Button
+            <AppButton
               variant="contained"
               disableElevation
               sx={actionBtnSx}
               onClick={() => {
                 if (subscriptionActive) {
                   deactivateSubscription();
-                  showSnackbar({ severity: "info", message: "Mollure subscription deactivated." });
+                  showSnackbar({
+                    severity: "info",
+                    message: "Mollure subscription deactivated.",
+                  });
                   return;
                 }
                 activateSubscription();
-                showSnackbar({ severity: "success", message: "Mollure subscription is now active." });
+                showSnackbar({
+                  severity: "success",
+                  message: "Mollure subscription is now active.",
+                });
               }}
             >
-              {subscriptionActive ? "Deactivate Subscription" : "Activate Subscription"}
-            </Button>
+              {subscriptionActive
+                ? "Deactivate Subscription"
+                : "Activate Subscription"}
+            </AppButton>
           </Box>
         </Box>
       </Paper>
 
       <Paper elevation={0} sx={cardSx}>
         <Box sx={sectionTitleSx}>
-          <CardTitle sx={{ color: alpha(m.navy, 0.86) }}>Accept Online Payment</CardTitle>
+          <CardTitle sx={{ color: alpha(m.navy, 0.86) }}>
+            Accept Online Payment
+          </CardTitle>
         </Box>
         <Box sx={{ px: 2, py: 1.5 }}>
-          <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.70) }}>
+          <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.7) }}>
             <Box component="span" sx={labelSx}>
               Status:
             </Box>{" "}
@@ -281,7 +316,7 @@ function StripeSettings() {
             <Box
               component="span"
               sx={{
-                color: paymentsConnected ? "success.main" : alpha(m.navy, 0.70),
+                color: paymentsConnected ? "success.main" : alpha(m.navy, 0.7),
                 fontWeight: 800,
               }}
             >
@@ -290,7 +325,7 @@ function StripeSettings() {
           </BodyText>
 
           <Box sx={{ mt: 1.1 }}>
-            <Button
+            <AppButton
               variant="contained"
               disableElevation
               sx={actionBtnSx}
@@ -298,33 +333,55 @@ function StripeSettings() {
                 if (!subscriptionActive) {
                   showSnackbar({
                     severity: "warning",
-                    message: "Activate your Mollure subscription before connecting Stripe payments.",
+                    message:
+                      "Activate your Mollure subscription before connecting Stripe payments.",
                   });
                   return;
                 }
                 if (paymentsConnected) {
-                  window.open("https://dashboard.stripe.com/", "_blank", "noopener,noreferrer");
+                  window.open(
+                    "https://dashboard.stripe.com/",
+                    "_blank",
+                    "noopener,noreferrer",
+                  );
                   return;
                 }
                 markPaymentsConnected();
-                showSnackbar({ severity: "success", message: "Stripe account connected." });
+                showSnackbar({
+                  severity: "success",
+                  message: "Stripe account connected.",
+                });
               }}
             >
-              {paymentsConnected ? "Stripe Mollure Dashboard" : subscriptionActive ? "Complete Onboarding" : "Start Onboarding"}
-            </Button>
+              {paymentsConnected
+                ? "Stripe Mollure Dashboard"
+                : subscriptionActive
+                  ? "Complete Onboarding"
+                  : "Start Onboarding"}
+            </AppButton>
           </Box>
 
           {!subscriptionActive ? (
             <Box sx={{ mt: 2 }}>
-              <CardTitle sx={{ color: alpha(m.navy, 0.86) }}>What To Expect</CardTitle>
-              <BodyText sx={{ mt: 0.45, fontSize: 12, color: alpha(m.navy, 0.55) }}>
-                Stripe&apos;s onboarding takes 2–5 minutes and guides you through a standard compliance verification
-                flow. During onboarding, Stripe will request the following information:
+              <CardTitle sx={{ color: alpha(m.navy, 0.86) }}>
+                What To Expect
+              </CardTitle>
+              <BodyText
+                sx={{ mt: 0.45, fontSize: 12, color: alpha(m.navy, 0.55) }}
+              >
+                Stripe&apos;s onboarding takes 2–5 minutes and guides you
+                through a standard compliance verification flow. During
+                onboarding, Stripe will request the following information:
               </BodyText>
 
               <Stack spacing={1.25} sx={{ mt: 1.4 }}>
                 {expectItems.map((it) => (
-                  <Stack key={it.title} direction="row" spacing={1} alignItems="flex-start">
+                  <Stack
+                    key={it.title}
+                    direction="row"
+                    spacing={1}
+                    alignItems="flex-start"
+                  >
                     <Box
                       sx={{
                         mt: 0.25,
@@ -341,8 +398,20 @@ function StripeSettings() {
                       {it.icon}
                     </Box>
                     <Box sx={{ flex: 1 }}>
-                      <BodyText sx={{ fontWeight: 800, color: alpha(m.navy, 0.78) }}>{it.title}</BodyText>
-                      <BodyText sx={{ mt: 0.2, fontSize: 12, color: alpha(m.navy, 0.55) }}>{it.desc}</BodyText>
+                      <BodyText
+                        sx={{ fontWeight: 800, color: alpha(m.navy, 0.78) }}
+                      >
+                        {it.title}
+                      </BodyText>
+                      <BodyText
+                        sx={{
+                          mt: 0.2,
+                          fontSize: 12,
+                          color: alpha(m.navy, 0.55),
+                        }}
+                      >
+                        {it.desc}
+                      </BodyText>
                     </Box>
                   </Stack>
                 ))}
@@ -353,30 +422,54 @@ function StripeSettings() {
               <CardTitle sx={{ color: alpha(m.navy, 0.86) }}>Payout</CardTitle>
               <Stack spacing={0.5} sx={{ mt: 0.75, pl: 1.5 }}>
                 {payoutBullets.map((t) => (
-                  <BodyText key={t} sx={{ fontSize: 12, color: alpha(m.navy, 0.58), display: "list-item" }}>
+                  <BodyText
+                    key={t}
+                    sx={{
+                      fontSize: 12,
+                      color: alpha(m.navy, 0.58),
+                      display: "list-item",
+                    }}
+                  >
                     {t}
                   </BodyText>
                 ))}
               </Stack>
 
-              <CardTitle sx={{ mt: 2, color: alpha(m.navy, 0.86) }}>Managing Your Stripe Account</CardTitle>
-              <BodyText sx={{ mt: 0.45, fontSize: 12, color: alpha(m.navy, 0.55) }}>
-                After onboarding, you can manage key payment information directly in your Stripe dashboard:
+              <CardTitle sx={{ mt: 2, color: alpha(m.navy, 0.86) }}>
+                Managing Your Stripe Account
+              </CardTitle>
+              <BodyText
+                sx={{ mt: 0.45, fontSize: 12, color: alpha(m.navy, 0.55) }}
+              >
+                After onboarding, you can manage key payment information
+                directly in your Stripe dashboard:
               </BodyText>
               <Stack spacing={0.5} sx={{ mt: 0.75, pl: 1.5 }}>
                 {managingBullets.map((t) => (
-                  <BodyText key={t} sx={{ fontSize: 12, color: alpha(m.navy, 0.58), display: "list-item" }}>
+                  <BodyText
+                    key={t}
+                    sx={{
+                      fontSize: 12,
+                      color: alpha(m.navy, 0.58),
+                      display: "list-item",
+                    }}
+                  >
                     {t}
                   </BodyText>
                 ))}
               </Stack>
-              <BodyText sx={{ mt: 1.25, fontSize: 11.5, color: alpha(m.navy, 0.48) }}>
+              <BodyText
+                sx={{ mt: 1.25, fontSize: 11.5, color: alpha(m.navy, 0.48) }}
+              >
                 (Note: Stripe handles KYC, AML, etc.)
               </BodyText>
             </Box>
           ) : (
-            <BodyText sx={{ mt: 1.5, fontSize: 12.5, color: alpha(m.navy, 0.58) }}>
-              Your subscription is active. Complete Stripe onboarding to accept online payments and view payout details.
+            <BodyText
+              sx={{ mt: 1.5, fontSize: 12.5, color: alpha(m.navy, 0.58) }}
+            >
+              Your subscription is active. Complete Stripe onboarding to accept
+              online payments and view payout details.
             </BodyText>
           )}
         </Box>
@@ -400,7 +493,7 @@ function TransactionOptionsSettings() {
 
   const cardSx = {
     borderRadius: "10px",
-    border: `1px solid ${alpha(m.navy, 0.10)}`,
+    border: `1px solid ${alpha(m.navy, 0.1)}`,
     boxShadow: "0 6px 14px rgba(16, 35, 63, 0.05)",
     bgcolor: "#fff",
     overflow: "hidden",
@@ -416,10 +509,19 @@ function TransactionOptionsSettings() {
           borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
         }}
       >
-        <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1.5}>
+        <Stack
+          direction="row"
+          alignItems="flex-start"
+          justifyContent="space-between"
+          spacing={1.5}
+        >
           <Box sx={{ flex: 1 }}>
-            <SubHeading sx={{ color: alpha(m.navy, 0.86) }}>Post-booking payment methods</SubHeading>
-            <BodyText sx={{ mt: 0.35, color: alpha(m.navy, 0.55), fontSize: 12.5 }}>
+            <SubHeading sx={{ color: alpha(m.navy, 0.86) }}>
+              Post-booking payment methods
+            </SubHeading>
+            <BodyText
+              sx={{ mt: 0.35, color: alpha(m.navy, 0.55), fontSize: 12.5 }}
+            >
               Select transaction options featured at checkout for post-booking.
             </BodyText>
           </Box>
@@ -429,7 +531,10 @@ function TransactionOptionsSettings() {
             onClick={() => {
               if (editing) {
                 setOptions(draft);
-                showSnackbar({ severity: "success", message: "Transaction options saved." });
+                showSnackbar({
+                  severity: "success",
+                  message: "Transaction options saved.",
+                });
               }
               setEditing((v) => !v);
             }}
@@ -438,20 +543,30 @@ function TransactionOptionsSettings() {
               width: 28,
               height: 28,
               borderRadius: "8px",
-              border: `1px solid ${alpha(m.navy, 0.10)}`,
+              border: `1px solid ${alpha(m.navy, 0.1)}`,
               bgcolor: alpha(m.navy, 0.02),
               color: alpha(m.navy, 0.55),
               "&:hover": { bgcolor: alpha(m.navy, 0.04) },
             }}
           >
-            {editing ? <CheckRoundedIcon sx={{ fontSize: 16 }} /> : <EditRoundedIcon sx={{ fontSize: 16 }} />}
+            {editing ? (
+              <CheckRoundedIcon sx={{ fontSize: 16 }} />
+            ) : (
+              <EditRoundedIcon sx={{ fontSize: 16 }} />
+            )}
           </IconButton>
         </Stack>
       </Box>
 
       <Box sx={{ px: 2, py: 1.6 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <CardTitle sx={{ color: alpha(m.navy, 0.86) }}>Post-Booking</CardTitle>
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+        >
+          <CardTitle sx={{ color: alpha(m.navy, 0.86) }}>
+            Post-Booking
+          </CardTitle>
         </Stack>
         <BodyText sx={{ mt: 0.4, color: alpha(m.navy, 0.55), fontSize: 12 }}>
           Options available at checkout after a booking is made.
@@ -466,7 +581,8 @@ function TransactionOptionsSettings() {
               },
               {
                 key: "onlineInvoiceDueDate" as const,
-                label: "Online (Invoice with a due date – for BC clients and IC for fee charges)",
+                label:
+                  "Online (Invoice with a due date – for BC clients and IC for fee charges)",
               },
               {
                 key: "offlineImmediate" as const,
@@ -474,22 +590,36 @@ function TransactionOptionsSettings() {
               },
               {
                 key: "offlineInvoiceDueDate" as const,
-                label: "Offline (Invoice with a due date – for BC clients and IC for fee charges)",
+                label:
+                  "Offline (Invoice with a due date – for BC clients and IC for fee charges)",
               },
             ] as const
           ).map((item) => (
-          <Stack key={item.key} direction="row" spacing={1} alignItems="center">
-            <Checkbox
-              checked={draft[item.key]}
-              disabled={!editing}
-              onChange={(e) => setDraft((p) => ({ ...p, [item.key]: e.target.checked }))}
-              size="small"
-              sx={{ p: 0.5 }}
-            />
-            <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, editing ? 0.75 : 0.45), fontWeight: 700 }}>
-              {item.label}
-            </BodyText>
-          </Stack>
+            <Stack
+              key={item.key}
+              direction="row"
+              spacing={1}
+              alignItems="center"
+            >
+              <Checkbox
+                checked={draft[item.key]}
+                disabled={!editing}
+                onChange={(e) =>
+                  setDraft((p) => ({ ...p, [item.key]: e.target.checked }))
+                }
+                size="small"
+                sx={{ p: 0.5 }}
+              />
+              <BodyText
+                sx={{
+                  fontSize: 12.5,
+                  color: alpha(m.navy, editing ? 0.75 : 0.45),
+                  fontWeight: 700,
+                }}
+              >
+                {item.label}
+              </BodyText>
+            </Stack>
           ))}
         </Stack>
       </Box>
@@ -504,19 +634,28 @@ function InvoiceSettings() {
   const { settings, setSettings } = useFinanceInvoiceSettings();
   const { options: txOptions } = useFinanceTransactionOptions();
   const { data: profileResponse } = useGetProfileQuery();
-  const [processReissues, { isLoading: isProcessingReissues }] = useProcessFinanceInvoiceReissuesMutation();
-  const showDueDateSettings = txOptions.onlineInvoiceDueDate || txOptions.offlineInvoiceDueDate;
+  const [processReissues, { isLoading: isProcessingReissues }] =
+    useProcessFinanceInvoiceReissuesMutation();
+  const showDueDateSettings =
+    txOptions.onlineInvoiceDueDate || txOptions.offlineInvoiceDueDate;
   const [paymentsEditing, setPaymentsEditing] = React.useState(false);
   const [addProductOpen, setAddProductOpen] = React.useState(false);
-  const [editingProductId, setEditingProductId] = React.useState<string | null>(null);
+  const [editingProductId, setEditingProductId] = React.useState<string | null>(
+    null,
+  );
   const [addProductDraft, setAddProductDraft] = React.useState({
     productName: "Hair Protein",
     vat: "21%",
     price: "0",
   });
   const [addServiceOpen, setAddServiceOpen] = React.useState(false);
-  const [editingServiceId, setEditingServiceId] = React.useState<string | null>(null);
-  const [addServiceDraft, setAddServiceDraft] = React.useState({ service: "Hair Protein", vat: "20%" });
+  const [editingServiceId, setEditingServiceId] = React.useState<string | null>(
+    null,
+  );
+  const [addServiceDraft, setAddServiceDraft] = React.useState({
+    service: "Hair Protein",
+    vat: "20%",
+  });
 
   const handleProcessReissues = React.useCallback(async () => {
     try {
@@ -530,7 +669,10 @@ function InvoiceSettings() {
             : "No overdue invoices required re-issuing.",
       });
     } catch {
-      showSnackbar({ severity: "error", message: "Could not process invoice re-issues." });
+      showSnackbar({
+        severity: "error",
+        message: "Could not process invoice re-issues.",
+      });
     }
   }, [processReissues, showSnackbar]);
 
@@ -539,7 +681,7 @@ function InvoiceSettings() {
 
   const sectionCardSx = {
     borderRadius: "10px",
-    border: `1px solid ${alpha(m.navy, 0.10)}`,
+    border: `1px solid ${alpha(m.navy, 0.1)}`,
     boxShadow: "0 6px 14px rgba(16, 35, 63, 0.05)",
     bgcolor: "#fff",
     overflow: "hidden",
@@ -573,7 +715,10 @@ function InvoiceSettings() {
       ...prev,
       products: prev.products.filter((product) => product.id !== id),
     }));
-    showSnackbar({ severity: "error", message: "Product deleted successfully." });
+    showSnackbar({
+      severity: "error",
+      message: "Product deleted successfully.",
+    });
   };
 
   const handleDeleteService = (id: string) => {
@@ -581,7 +726,10 @@ function InvoiceSettings() {
       ...prev,
       services: prev.services.filter((service) => service.id !== id),
     }));
-    showSnackbar({ severity: "error", message: "Service deleted successfully." });
+    showSnackbar({
+      severity: "error",
+      message: "Service deleted successfully.",
+    });
   };
 
   const handleAddProductSaveOrUpdate = () => {
@@ -595,16 +743,27 @@ function InvoiceSettings() {
       setSettings((prev) => ({
         ...prev,
         products: prev.products.map((product) =>
-          product.id === editingProductId ? { ...product, name, price, vat } : product,
+          product.id === editingProductId
+            ? { ...product, name, price, vat }
+            : product,
         ),
       }));
-      showSnackbar({ severity: "success", message: "Product updated successfully." });
+      showSnackbar({
+        severity: "success",
+        message: "Product updated successfully.",
+      });
     } else {
       setSettings((prev) => ({
         ...prev,
-        products: [{ id: `p-${Date.now()}`, name, price, vat }, ...prev.products],
+        products: [
+          { id: `p-${Date.now()}`, name, price, vat },
+          ...prev.products,
+        ],
       }));
-      showSnackbar({ severity: "success", message: "Successfully added product." });
+      showSnackbar({
+        severity: "success",
+        message: "Successfully added product.",
+      });
     }
 
     setAddProductOpen(false);
@@ -622,16 +781,27 @@ function InvoiceSettings() {
       setSettings((prev) => ({
         ...prev,
         services: prev.services.map((item) =>
-          item.id === editingServiceId ? { ...item, category, service, vat } : item,
+          item.id === editingServiceId
+            ? { ...item, category, service, vat }
+            : item,
         ),
       }));
-      showSnackbar({ severity: "success", message: "Service updated successfully." });
+      showSnackbar({
+        severity: "success",
+        message: "Service updated successfully.",
+      });
     } else {
       setSettings((prev) => ({
         ...prev,
-        services: [{ id: `s-${Date.now()}`, category, service, vat }, ...prev.services],
+        services: [
+          { id: `s-${Date.now()}`, category, service, vat },
+          ...prev.services,
+        ],
       }));
-      showSnackbar({ severity: "success", message: "Successfully added service." });
+      showSnackbar({
+        severity: "success",
+        message: "Successfully added service.",
+      });
     }
 
     setAddServiceOpen(false);
@@ -731,7 +901,11 @@ function InvoiceSettings() {
 
   const rowActions = (opts: { onEdit: () => void; onDelete: () => void }) => (
     <Stack direction="row" spacing={0.5} justifyContent="center">
-      <IconButton size="small" onClick={opts.onEdit} sx={{ width: 28, height: 28, borderRadius: "8px" }}>
+      <IconButton
+        size="small"
+        onClick={opts.onEdit}
+        sx={{ width: 28, height: 28, borderRadius: "8px" }}
+      >
         <EditOutlinedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
       </IconButton>
       <IconButton
@@ -739,14 +913,16 @@ function InvoiceSettings() {
         onClick={opts.onDelete}
         sx={{ width: 28, height: 28, borderRadius: "8px" }}
       >
-        <DeleteOutlineRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
+        <DeleteOutlineRoundedIcon
+          sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }}
+        />
       </IconButton>
     </Stack>
   );
 
   const formPanelSx = {
     borderRadius: "10px",
-    border: `1px solid ${alpha(m.navy, 0.10)}`,
+    border: `1px solid ${alpha(m.navy, 0.1)}`,
     bgcolor: alpha(m.navy, 0.01),
     p: 2,
   } as const;
@@ -756,7 +932,7 @@ function InvoiceSettings() {
     minWidth: 86,
     fontSize: 12,
     fontWeight: 800,
-    color: alpha(m.navy, 0.70),
+    color: alpha(m.navy, 0.7),
     pt: 1.25,
   } as const;
 
@@ -764,13 +940,22 @@ function InvoiceSettings() {
     <Stack spacing={2}>
       <AppCard sx={{ ...sectionCardSx, borderRadius: "10px" }}>
         <Box sx={headerSx}>
-          <SubHeading sx={{ color: alpha(m.navy, 0.86) }}>Invoice Setting</SubHeading>
+          <SubHeading sx={{ color: alpha(m.navy, 0.86) }}>
+            Invoice Setting
+          </SubHeading>
         </Box>
         <Box sx={{ p: 2 }}>
           <Stack spacing={2}>
             <Box sx={{ ...sectionCardSx, boxShadow: "none" }}>
               <Box sx={headerSx}>
-                <SubHeading sx={{ color: alpha(m.navy, 0.86), fontSize: 24, fontWeight: 500, lineHeight: "36px" }}>
+                <SubHeading
+                  sx={{
+                    color: alpha(m.navy, 0.86),
+                    fontSize: 24,
+                    fontWeight: 500,
+                    lineHeight: "36px",
+                  }}
+                >
                   Invoice Templates
                 </SubHeading>
               </Box>
@@ -790,22 +975,41 @@ function InvoiceSettings() {
                   >
                     <Stack spacing={0.55} alignItems="center">
                       {settings.logoDataUrl ? (
-                        <Box sx={{ position: "relative", width: 52, height: 52 }}>
+                        <Box
+                          sx={{ position: "relative", width: 52, height: 52 }}
+                        >
                           <Image
                             src={settings.logoDataUrl}
                             alt="Invoice logo"
                             fill
                             unoptimized
-                            style={{ objectFit: "contain", borderRadius: "10px" }}
+                            style={{
+                              objectFit: "contain",
+                              borderRadius: "10px",
+                            }}
                           />
                         </Box>
                       ) : (
-                        <UploadFileRoundedIcon sx={{ fontSize: 20, color: alpha(m.navy, 0.55) }} />
+                        <UploadFileRoundedIcon
+                          sx={{ fontSize: 20, color: alpha(m.navy, 0.55) }}
+                        />
                       )}
-                      <BodyText sx={{ fontWeight: 900, fontSize: 12.5, color: alpha(m.navy, 0.72) }}>
-                        {settings.logoDataUrl ? "Change invoice logo" : "Upload logo for invoice"}
+                      <BodyText
+                        sx={{
+                          fontWeight: 900,
+                          fontSize: 12.5,
+                          color: alpha(m.navy, 0.72),
+                        }}
+                      >
+                        {settings.logoDataUrl
+                          ? "Change invoice logo"
+                          : "Upload logo for invoice"}
                       </BodyText>
-                      <BodyText sx={{ fontSize: 10.5, color: alpha(m.navy, 0.52) }}>PNG, JPG, SVG up to 5MB</BodyText>
+                      <BodyText
+                        sx={{ fontSize: 10.5, color: alpha(m.navy, 0.52) }}
+                      >
+                        PNG, JPG, SVG up to 5MB
+                      </BodyText>
                     </Stack>
                   </Box>
                   <input
@@ -818,9 +1022,15 @@ function InvoiceSettings() {
                       if (!file) return;
                       const reader = new FileReader();
                       reader.onload = () => {
-                        const url = typeof reader.result === "string" ? reader.result : null;
+                        const url =
+                          typeof reader.result === "string"
+                            ? reader.result
+                            : null;
                         setSettings((prev) => ({ ...prev, logoDataUrl: url }));
-                        showSnackbar({ severity: "success", message: "Logo uploaded successfully." });
+                        showSnackbar({
+                          severity: "success",
+                          message: "Logo uploaded successfully.",
+                        });
                       };
                       reader.readAsDataURL(file);
                       e.target.value = "";
@@ -831,40 +1041,57 @@ function InvoiceSettings() {
                       ...templateTileSx(),
                       borderStyle: "solid",
                       borderColor:
-                        settings.defaultInvoiceType === "individual" ? alpha(m.teal, 0.5) : alpha(m.navy, 0.12),
-                      bgcolor: settings.defaultInvoiceType === "individual" ? alpha(m.teal, 0.04) : "#fff",
+                        settings.defaultInvoiceType === "individual"
+                          ? alpha(m.teal, 0.5)
+                          : alpha(m.navy, 0.12),
+                      bgcolor:
+                        settings.defaultInvoiceType === "individual"
+                          ? alpha(m.teal, 0.04)
+                          : "#fff",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       cursor: "pointer",
                     }}
                     onClick={() => {
-                      setSettings((prev) => ({ ...prev, defaultInvoiceType: "individual" }));
+                      setSettings((prev) => ({
+                        ...prev,
+                        defaultInvoiceType: "individual",
+                      }));
                       setInvoiceDrawerOpen(true);
                     }}
                   >
-                    <Stack spacing={0.45} alignItems="center" sx={{ textAlign: "center" }}>
+                    <Stack
+                      spacing={0.45}
+                      alignItems="center"
+                      sx={{ textAlign: "center" }}
+                    >
                       <PersonRoundedIcon sx={{ fontSize: 20, color: m.teal }} />
-                      <BodyText sx={{ fontWeight: 900, fontSize: 12.5, color: alpha(m.navy, 0.78) }}>
+                      <BodyText
+                        sx={{
+                          fontWeight: 900,
+                          fontSize: 12.5,
+                          color: alpha(m.navy, 0.78),
+                        }}
+                      >
                         Individual Client
                       </BodyText>
-                      <BodyText sx={{ fontSize: 10.5, color: alpha(m.navy, 0.55) }}>
-                        A simplified template for freelance and personal invoices.
+                      <BodyText
+                        sx={{ fontSize: 10.5, color: alpha(m.navy, 0.55) }}
+                      >
+                        A simplified template for freelance and personal
+                        invoices.
                       </BodyText>
-                      <Button
-                        variant="outlined"
+                      <AppButton
+                        tone="secondary"
                         disableElevation
                         sx={{
                           ...tinyBtnSx,
                           mt: 0.55,
-                          borderColor: alpha(m.navy, 0.16),
-                          color: alpha(m.navy, 0.65),
-                          bgcolor: "#fff",
-                          "&:hover": { borderColor: alpha(m.navy, 0.24), bgcolor: alpha(m.navy, 0.02) },
                         }}
                       >
                         View invoice
-                      </Button>
+                      </AppButton>
                     </Stack>
                   </Box>
                   <Box
@@ -872,40 +1099,56 @@ function InvoiceSettings() {
                       ...templateTileSx(),
                       borderStyle: "solid",
                       borderColor:
-                        settings.defaultInvoiceType === "company" ? alpha(m.teal, 0.5) : alpha(m.navy, 0.12),
-                      bgcolor: settings.defaultInvoiceType === "company" ? alpha(m.teal, 0.04) : "#fff",
+                        settings.defaultInvoiceType === "company"
+                          ? alpha(m.teal, 0.5)
+                          : alpha(m.navy, 0.12),
+                      bgcolor:
+                        settings.defaultInvoiceType === "company"
+                          ? alpha(m.teal, 0.04)
+                          : "#fff",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       cursor: "pointer",
                     }}
                     onClick={() => {
-                      setSettings((prev) => ({ ...prev, defaultInvoiceType: "company" }));
+                      setSettings((prev) => ({
+                        ...prev,
+                        defaultInvoiceType: "company",
+                      }));
                       setInvoiceDrawerOpen(true);
                     }}
                   >
-                    <Stack spacing={0.45} alignItems="center" sx={{ textAlign: "center" }}>
+                    <Stack
+                      spacing={0.45}
+                      alignItems="center"
+                      sx={{ textAlign: "center" }}
+                    >
                       <PersonRoundedIcon sx={{ fontSize: 20, color: m.teal }} />
-                      <BodyText sx={{ fontWeight: 900, fontSize: 12.5, color: alpha(m.navy, 0.78) }}>
+                      <BodyText
+                        sx={{
+                          fontWeight: 900,
+                          fontSize: 12.5,
+                          color: alpha(m.navy, 0.78),
+                        }}
+                      >
                         Company Client
                       </BodyText>
-                      <BodyText sx={{ fontSize: 10.5, color: alpha(m.navy, 0.55) }}>
+                      <BodyText
+                        sx={{ fontSize: 10.5, color: alpha(m.navy, 0.55) }}
+                      >
                         A professional template with company details and VAT.
                       </BodyText>
-                      <Button
-                        variant="outlined"
+                      <AppButton
+                        tone="secondary"
                         disableElevation
                         sx={{
                           ...tinyBtnSx,
                           mt: 0.55,
-                          borderColor: alpha(m.navy, 0.16),
-                          color: alpha(m.navy, 0.65),
-                          bgcolor: "#fff",
-                          "&:hover": { borderColor: alpha(m.navy, 0.24), bgcolor: alpha(m.navy, 0.02) },
                         }}
                       >
                         View invoice
-                      </Button>
+                      </AppButton>
                     </Stack>
                   </Box>
                 </Stack>
@@ -914,8 +1157,19 @@ function InvoiceSettings() {
 
             <Box sx={{ ...sectionCardSx, boxShadow: "none" }}>
               <Box sx={headerSx}>
-                <Stack direction="row" alignItems="center" justifyContent="space-between">
-                  <SubHeading sx={{ color: alpha(m.navy, 0.86), fontSize: 24, fontWeight: 500, lineHeight: "100%" }}>
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                >
+                  <SubHeading
+                    sx={{
+                      color: alpha(m.navy, 0.86),
+                      fontSize: 24,
+                      fontWeight: 500,
+                      lineHeight: "100%",
+                    }}
+                  >
                     Products And Services
                   </SubHeading>
                 </Stack>
@@ -925,7 +1179,7 @@ function InvoiceSettings() {
                   <Box
                     sx={{
                       borderRadius: "10px",
-                      border: `1px solid ${alpha(m.navy, 0.10)}`,
+                      border: `1px solid ${alpha(m.navy, 0.1)}`,
                       overflow: "hidden",
                     }}
                   >
@@ -941,24 +1195,30 @@ function InvoiceSettings() {
                         gap: 1,
                       }}
                     >
-                      <SubHeading sx={{ color: alpha(m.navy, 0.86), fontSize: 24, fontWeight: 500, lineHeight: "100%" }}>
+                      <SubHeading
+                        sx={{
+                          color: alpha(m.navy, 0.86),
+                          fontSize: 24,
+                          fontWeight: 500,
+                          lineHeight: "100%",
+                        }}
+                      >
                         Product List
                       </SubHeading>
-                      <Button
-                        variant="outlined"
+                      <AppButton
+                        tone="secondary"
                         onClick={openAddProduct}
                         sx={{
                           ...tinyBtnSx,
                           height: 34,
                           px: 1.25,
-                          borderRadius: "10px",
-                          borderColor: alpha(m.navy, 0.16),
-                          color: alpha(m.navy, 0.65),
-                          bgcolor: "#fff",
-                          "&:hover": { borderColor: alpha(m.navy, 0.24), bgcolor: alpha(m.navy, 0.02) },
                         }}
                       >
-                        <Stack direction="row" spacing={0.75} alignItems="center">
+                        <Stack
+                          direction="row"
+                          spacing={0.75}
+                          alignItems="center"
+                        >
                           <Box
                             sx={{
                               width: 22,
@@ -973,39 +1233,60 @@ function InvoiceSettings() {
                           >
                             <AddRoundedIcon sx={{ fontSize: 18 }} />
                           </Box>
-                          <BodyText sx={{ fontWeight: 800, fontSize: 12.5, color: "inherit" }}>Product</BodyText>
+                          <BodyText
+                            sx={{
+                              fontWeight: 800,
+                              fontSize: 12.5,
+                              color: "inherit",
+                            }}
+                          >
+                            Product
+                          </BodyText>
                         </Stack>
-                      </Button>
+                      </AppButton>
                     </Box>
                     <Box sx={{ p: 1.25 }}>
                       <Box
                         sx={{
                           borderRadius: "10px",
-                          border: `1px solid ${alpha(m.navy, 0.10)}`,
+                          border: `1px solid ${alpha(m.navy, 0.1)}`,
                           overflow: "hidden",
                         }}
                       >
                         <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell sx={tableHeadCellSx}>Product Name</TableCell>
-                          <TableCell sx={tableHeadCellSx}>Price (Including Vat)</TableCell>
-                          <TableCell sx={tableHeadCellSx}>VAT%</TableCell>
-                          <TableCell sx={tableHeadCellSx}>Action</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {settings.products.map((p) => (
-                          <TableRow key={p.id} hover>
-                            <TableCell sx={tableBodyCellSx}>{p.name}</TableCell>
-                            <TableCell sx={tableBodyCellSx}>{p.price}</TableCell>
-                            <TableCell sx={tableBodyCellSx}>{p.vat}</TableCell>
-                            <TableCell sx={tableBodyCellSx}>
-                              {rowActions({ onEdit: () => openEditProduct(p.id), onDelete: () => handleDeleteProduct(p.id) })}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
+                          <TableHead>
+                            <TableRow>
+                              <TableCell sx={tableHeadCellSx}>
+                                Product Name
+                              </TableCell>
+                              <TableCell sx={tableHeadCellSx}>
+                                Price (Including Vat)
+                              </TableCell>
+                              <TableCell sx={tableHeadCellSx}>VAT%</TableCell>
+                              <TableCell sx={tableHeadCellSx}>Action</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {settings.products.map((p) => (
+                              <TableRow key={p.id} hover>
+                                <TableCell sx={tableBodyCellSx}>
+                                  {p.name}
+                                </TableCell>
+                                <TableCell sx={tableBodyCellSx}>
+                                  {p.price}
+                                </TableCell>
+                                <TableCell sx={tableBodyCellSx}>
+                                  {p.vat}
+                                </TableCell>
+                                <TableCell sx={tableBodyCellSx}>
+                                  {rowActions({
+                                    onEdit: () => openEditProduct(p.id),
+                                    onDelete: () => handleDeleteProduct(p.id),
+                                  })}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
                         </Table>
                       </Box>
                     </Box>
@@ -1014,7 +1295,7 @@ function InvoiceSettings() {
                   <Box
                     sx={{
                       borderRadius: "10px",
-                      border: `1px solid ${alpha(m.navy, 0.10)}`,
+                      border: `1px solid ${alpha(m.navy, 0.1)}`,
                       overflow: "hidden",
                     }}
                   >
@@ -1031,7 +1312,14 @@ function InvoiceSettings() {
                       }}
                     >
                       <Stack direction="row" spacing={1} alignItems="center">
-                        <SubHeading sx={{ color: alpha(m.navy, 0.86), fontSize: 24, fontWeight: 500, lineHeight: "100%" }}>
+                        <SubHeading
+                          sx={{
+                            color: alpha(m.navy, 0.86),
+                            fontSize: 24,
+                            fontWeight: 500,
+                            lineHeight: "100%",
+                          }}
+                        >
                           Service List
                         </SubHeading>
                         <Box
@@ -1050,21 +1338,20 @@ function InvoiceSettings() {
                           i
                         </Box>
                       </Stack>
-                      <Button
-                        variant="outlined"
+                      <AppButton
+                        tone="secondary"
                         onClick={openAddService}
                         sx={{
                           ...tinyBtnSx,
                           height: 34,
                           px: 1.25,
-                          borderRadius: "10px",
-                          borderColor: alpha(m.navy, 0.16),
-                          color: alpha(m.navy, 0.65),
-                          bgcolor: "#fff",
-                          "&:hover": { borderColor: alpha(m.navy, 0.24), bgcolor: alpha(m.navy, 0.02) },
                         }}
                       >
-                        <Stack direction="row" spacing={0.75} alignItems="center">
+                        <Stack
+                          direction="row"
+                          spacing={0.75}
+                          alignItems="center"
+                        >
                           <Box
                             sx={{
                               width: 22,
@@ -1079,39 +1366,62 @@ function InvoiceSettings() {
                           >
                             <AddRoundedIcon sx={{ fontSize: 18 }} />
                           </Box>
-                          <BodyText sx={{ fontWeight: 800, fontSize: 12.5, color: "inherit" }}>Service</BodyText>
+                          <BodyText
+                            sx={{
+                              fontWeight: 800,
+                              fontSize: 12.5,
+                              color: "inherit",
+                            }}
+                          >
+                            Service
+                          </BodyText>
                         </Stack>
-                      </Button>
+                      </AppButton>
                     </Box>
                     <Box sx={{ p: 1.25 }}>
                       <Box
                         sx={{
                           borderRadius: "10px",
-                          border: `1px solid ${alpha(m.navy, 0.10)}`,
+                          border: `1px solid ${alpha(m.navy, 0.1)}`,
                           overflow: "hidden",
                         }}
                       >
                         <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell sx={tableHeadCellSx}>Category</TableCell>
-                          <TableCell sx={tableHeadCellSx}>Service</TableCell>
-                          <TableCell sx={tableHeadCellSx}>VAT% of invoice</TableCell>
-                          <TableCell sx={tableHeadCellSx}>Action</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {settings.services.map((s) => (
-                          <TableRow key={s.id} hover>
-                            <TableCell sx={tableBodyCellSx}>{s.category}</TableCell>
-                            <TableCell sx={tableBodyCellSx}>{s.service}</TableCell>
-                            <TableCell sx={tableBodyCellSx}>{s.vat}</TableCell>
-                            <TableCell sx={tableBodyCellSx}>
-                              {rowActions({ onEdit: () => openEditService(s.id), onDelete: () => handleDeleteService(s.id) })}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
+                          <TableHead>
+                            <TableRow>
+                              <TableCell sx={tableHeadCellSx}>
+                                Category
+                              </TableCell>
+                              <TableCell sx={tableHeadCellSx}>
+                                Service
+                              </TableCell>
+                              <TableCell sx={tableHeadCellSx}>
+                                VAT% of invoice
+                              </TableCell>
+                              <TableCell sx={tableHeadCellSx}>Action</TableCell>
+                            </TableRow>
+                          </TableHead>
+                          <TableBody>
+                            {settings.services.map((s) => (
+                              <TableRow key={s.id} hover>
+                                <TableCell sx={tableBodyCellSx}>
+                                  {s.category}
+                                </TableCell>
+                                <TableCell sx={tableBodyCellSx}>
+                                  {s.service}
+                                </TableCell>
+                                <TableCell sx={tableBodyCellSx}>
+                                  {s.vat}
+                                </TableCell>
+                                <TableCell sx={tableBodyCellSx}>
+                                  {rowActions({
+                                    onEdit: () => openEditService(s.id),
+                                    onDelete: () => handleDeleteService(s.id),
+                                  })}
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
                         </Table>
                       </Box>
                     </Box>
@@ -1120,10 +1430,22 @@ function InvoiceSettings() {
               </Box>
             </Box>
 
-            <Box sx={{ ...sectionCardSx, boxShadow: "none", display: showDueDateSettings ? "block" : "none" }}>
+            <Box
+              sx={{
+                ...sectionCardSx,
+                boxShadow: "none",
+                display: showDueDateSettings ? "block" : "none",
+              }}
+            >
               <Box sx={headerSx}>
-                <Stack direction="row" alignItems="center" justifyContent="space-between">
-                  <CardTitle sx={{ color: alpha(m.navy, 0.86) }}>Payments And Reminders</CardTitle>
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                >
+                  <CardTitle sx={{ color: alpha(m.navy, 0.86) }}>
+                    Payments And Reminders
+                  </CardTitle>
                   <IconButton
                     size="small"
                     onClick={() => setPaymentsEditing((v) => !v)}
@@ -1131,140 +1453,302 @@ function InvoiceSettings() {
                       width: 28,
                       height: 28,
                       borderRadius: "8px",
-                      border: `1px solid ${alpha(m.navy, 0.10)}`,
+                      border: `1px solid ${alpha(m.navy, 0.1)}`,
                       bgcolor: alpha(m.navy, 0.02),
                       color: alpha(m.navy, 0.55),
                       "&:hover": { bgcolor: alpha(m.navy, 0.04) },
                     }}
                   >
-                    {paymentsEditing ? <CheckRoundedIcon sx={{ fontSize: 16 }} /> : <EditRoundedIcon sx={{ fontSize: 16 }} />}
+                    {paymentsEditing ? (
+                      <CheckRoundedIcon sx={{ fontSize: 16 }} />
+                    ) : (
+                      <EditRoundedIcon sx={{ fontSize: 16 }} />
+                    )}
                   </IconButton>
                 </Stack>
               </Box>
               <Box sx={{ p: 2 }}>
                 <Stack spacing={2}>
                   <Box>
-                    <CardTitle sx={{ color: alpha(m.navy, 0.86) }}>Payment Terms</CardTitle>
+                    <CardTitle sx={{ color: alpha(m.navy, 0.86) }}>
+                      Payment Terms
+                    </CardTitle>
                     <Box sx={{ mt: 1.25, ...formPanelSx, bgcolor: "#fff" }}>
-                      <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.78) }}>Original Invoice</BodyText>
+                      <BodyText
+                        sx={{ fontWeight: 900, color: alpha(m.navy, 0.78) }}
+                      >
+                        Original Invoice
+                      </BodyText>
 
                       <Stack spacing={1.25} sx={{ mt: 1.25 }}>
-                        <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} alignItems={{ md: "flex-start" }}>
+                        <Stack
+                          direction={{ xs: "column", md: "row" }}
+                          spacing={1.25}
+                          alignItems={{ md: "flex-start" }}
+                        >
                           <BodyText sx={rowLabelSx}>Due Date:</BodyText>
-                          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ flex: 1 }}>
+                          <Stack
+                            direction={{ xs: "column", sm: "row" }}
+                            spacing={1.25}
+                            sx={{ flex: 1 }}
+                          >
                             <MollureFormField
                               disabled={!paymentsEditing}
                               value={settings.paymentTerms.originalDueValue}
-                              onChange={(e) => updatePaymentTerm("originalDueValue", e.target.value)}
+                              onChange={(e) =>
+                                updatePaymentTerm(
+                                  "originalDueValue",
+                                  e.target.value,
+                                )
+                              }
                             />
                             <MollureFormField
                               disabled={!paymentsEditing}
                               value={settings.paymentTerms.originalDueUnit}
-                              onChange={(e) => updatePaymentTerm("originalDueUnit", e.target.value)}
+                              onChange={(e) =>
+                                updatePaymentTerm(
+                                  "originalDueUnit",
+                                  e.target.value,
+                                )
+                              }
                             />
                           </Stack>
                         </Stack>
 
-                        <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} alignItems={{ md: "flex-start" }}>
+                        <Stack
+                          direction={{ xs: "column", md: "row" }}
+                          spacing={1.25}
+                          alignItems={{ md: "flex-start" }}
+                        >
                           <BodyText sx={rowLabelSx}>Penalty Fee</BodyText>
-                          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ flex: 1 }}>
+                          <Stack
+                            direction={{ xs: "column", sm: "row" }}
+                            spacing={1.25}
+                            sx={{ flex: 1 }}
+                          >
                             <MollureFormField
                               disabled={!paymentsEditing}
                               value={settings.paymentTerms.originalPenaltyValue}
-                              onChange={(e) => updatePaymentTerm("originalPenaltyValue", e.target.value)}
+                              onChange={(e) =>
+                                updatePaymentTerm(
+                                  "originalPenaltyValue",
+                                  e.target.value,
+                                )
+                              }
                             />
                             <MollureFormField
                               disabled={!paymentsEditing}
                               value={settings.paymentTerms.originalPenaltyUnit}
-                              onChange={(e) => updatePaymentTerm("originalPenaltyUnit", e.target.value)}
+                              onChange={(e) =>
+                                updatePaymentTerm(
+                                  "originalPenaltyUnit",
+                                  e.target.value,
+                                )
+                              }
                             />
                           </Stack>
                         </Stack>
                       </Stack>
 
-                      <BodyText sx={{ mt: 2, fontWeight: 900, color: alpha(m.navy, 0.78) }}>First Reissue</BodyText>
+                      <BodyText
+                        sx={{
+                          mt: 2,
+                          fontWeight: 900,
+                          color: alpha(m.navy, 0.78),
+                        }}
+                      >
+                        First Reissue
+                      </BodyText>
                       <Stack spacing={1.25} sx={{ mt: 1.25 }}>
-                        <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} alignItems={{ md: "flex-start" }}>
+                        <Stack
+                          direction={{ xs: "column", md: "row" }}
+                          spacing={1.25}
+                          alignItems={{ md: "flex-start" }}
+                        >
                           <BodyText sx={rowLabelSx}>Trigger:</BodyText>
                           <MollureFormField
                             disabled={!paymentsEditing}
                             value={settings.paymentTerms.firstReissueTrigger}
-                            onChange={(e) => updatePaymentTerm("firstReissueTrigger", e.target.value)}
+                            onChange={(e) =>
+                              updatePaymentTerm(
+                                "firstReissueTrigger",
+                                e.target.value,
+                              )
+                            }
                           />
                         </Stack>
 
-                        <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} alignItems={{ md: "flex-start" }}>
+                        <Stack
+                          direction={{ xs: "column", md: "row" }}
+                          spacing={1.25}
+                          alignItems={{ md: "flex-start" }}
+                        >
                           <BodyText sx={rowLabelSx}>Due Date:</BodyText>
-                          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ flex: 1 }}>
+                          <Stack
+                            direction={{ xs: "column", sm: "row" }}
+                            spacing={1.25}
+                            sx={{ flex: 1 }}
+                          >
                             <MollureFormField
                               disabled={!paymentsEditing}
                               value={settings.paymentTerms.firstReissueDueValue}
-                              onChange={(e) => updatePaymentTerm("firstReissueDueValue", e.target.value)}
+                              onChange={(e) =>
+                                updatePaymentTerm(
+                                  "firstReissueDueValue",
+                                  e.target.value,
+                                )
+                              }
                             />
                             <MollureFormField
                               disabled={!paymentsEditing}
                               value={settings.paymentTerms.firstReissueDueUnit}
-                              onChange={(e) => updatePaymentTerm("firstReissueDueUnit", e.target.value)}
+                              onChange={(e) =>
+                                updatePaymentTerm(
+                                  "firstReissueDueUnit",
+                                  e.target.value,
+                                )
+                              }
                             />
                           </Stack>
                         </Stack>
 
-                        <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} alignItems={{ md: "flex-start" }}>
+                        <Stack
+                          direction={{ xs: "column", md: "row" }}
+                          spacing={1.25}
+                          alignItems={{ md: "flex-start" }}
+                        >
                           <BodyText sx={rowLabelSx}>Penalty Fee</BodyText>
-                          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ flex: 1 }}>
+                          <Stack
+                            direction={{ xs: "column", sm: "row" }}
+                            spacing={1.25}
+                            sx={{ flex: 1 }}
+                          >
                             <MollureFormField
                               disabled={!paymentsEditing}
-                              value={settings.paymentTerms.firstReissuePenaltyValue}
-                              onChange={(e) => updatePaymentTerm("firstReissuePenaltyValue", e.target.value)}
+                              value={
+                                settings.paymentTerms.firstReissuePenaltyValue
+                              }
+                              onChange={(e) =>
+                                updatePaymentTerm(
+                                  "firstReissuePenaltyValue",
+                                  e.target.value,
+                                )
+                              }
                             />
                             <MollureFormField
                               disabled={!paymentsEditing}
-                              value={settings.paymentTerms.firstReissuePenaltyUnit}
-                              onChange={(e) => updatePaymentTerm("firstReissuePenaltyUnit", e.target.value)}
+                              value={
+                                settings.paymentTerms.firstReissuePenaltyUnit
+                              }
+                              onChange={(e) =>
+                                updatePaymentTerm(
+                                  "firstReissuePenaltyUnit",
+                                  e.target.value,
+                                )
+                              }
                             />
                           </Stack>
                         </Stack>
                       </Stack>
 
-                      <BodyText sx={{ mt: 2, fontWeight: 900, color: alpha(m.navy, 0.78) }}>Second Reissue</BodyText>
+                      <BodyText
+                        sx={{
+                          mt: 2,
+                          fontWeight: 900,
+                          color: alpha(m.navy, 0.78),
+                        }}
+                      >
+                        Second Reissue
+                      </BodyText>
                       <Stack spacing={1.25} sx={{ mt: 1.25 }}>
-                        <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} alignItems={{ md: "flex-start" }}>
+                        <Stack
+                          direction={{ xs: "column", md: "row" }}
+                          spacing={1.25}
+                          alignItems={{ md: "flex-start" }}
+                        >
                           <BodyText sx={rowLabelSx}>Trigger:</BodyText>
                           <MollureFormField
                             disabled={!paymentsEditing}
                             value={settings.paymentTerms.secondReissueTrigger}
-                            onChange={(e) => updatePaymentTerm("secondReissueTrigger", e.target.value)}
+                            onChange={(e) =>
+                              updatePaymentTerm(
+                                "secondReissueTrigger",
+                                e.target.value,
+                              )
+                            }
                           />
                         </Stack>
 
-                        <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} alignItems={{ md: "flex-start" }}>
+                        <Stack
+                          direction={{ xs: "column", md: "row" }}
+                          spacing={1.25}
+                          alignItems={{ md: "flex-start" }}
+                        >
                           <BodyText sx={rowLabelSx}>Due Date:</BodyText>
-                          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ flex: 1 }}>
+                          <Stack
+                            direction={{ xs: "column", sm: "row" }}
+                            spacing={1.25}
+                            sx={{ flex: 1 }}
+                          >
                             <MollureFormField
                               disabled={!paymentsEditing}
-                              value={settings.paymentTerms.secondReissueDueValue}
-                              onChange={(e) => updatePaymentTerm("secondReissueDueValue", e.target.value)}
+                              value={
+                                settings.paymentTerms.secondReissueDueValue
+                              }
+                              onChange={(e) =>
+                                updatePaymentTerm(
+                                  "secondReissueDueValue",
+                                  e.target.value,
+                                )
+                              }
                             />
                             <MollureFormField
                               disabled={!paymentsEditing}
                               value={settings.paymentTerms.secondReissueDueUnit}
-                              onChange={(e) => updatePaymentTerm("secondReissueDueUnit", e.target.value)}
+                              onChange={(e) =>
+                                updatePaymentTerm(
+                                  "secondReissueDueUnit",
+                                  e.target.value,
+                                )
+                              }
                             />
                           </Stack>
                         </Stack>
 
-                        <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} alignItems={{ md: "flex-start" }}>
+                        <Stack
+                          direction={{ xs: "column", md: "row" }}
+                          spacing={1.25}
+                          alignItems={{ md: "flex-start" }}
+                        >
                           <BodyText sx={rowLabelSx}>Penalty Fee</BodyText>
-                          <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ flex: 1 }}>
+                          <Stack
+                            direction={{ xs: "column", sm: "row" }}
+                            spacing={1.25}
+                            sx={{ flex: 1 }}
+                          >
                             <MollureFormField
                               disabled={!paymentsEditing}
-                              value={settings.paymentTerms.secondReissuePenaltyValue}
-                              onChange={(e) => updatePaymentTerm("secondReissuePenaltyValue", e.target.value)}
+                              value={
+                                settings.paymentTerms.secondReissuePenaltyValue
+                              }
+                              onChange={(e) =>
+                                updatePaymentTerm(
+                                  "secondReissuePenaltyValue",
+                                  e.target.value,
+                                )
+                              }
                             />
                             <MollureFormField
                               disabled={!paymentsEditing}
-                              value={settings.paymentTerms.secondReissuePenaltyUnit}
-                              onChange={(e) => updatePaymentTerm("secondReissuePenaltyUnit", e.target.value)}
+                              value={
+                                settings.paymentTerms.secondReissuePenaltyUnit
+                              }
+                              onChange={(e) =>
+                                updatePaymentTerm(
+                                  "secondReissuePenaltyUnit",
+                                  e.target.value,
+                                )
+                              }
                             />
                           </Stack>
                         </Stack>
@@ -1273,35 +1757,61 @@ function InvoiceSettings() {
                   </Box>
 
                   <Box>
-                    <CardTitle sx={{ color: alpha(m.navy, 0.86) }}>Invoice Reminders</CardTitle>
+                    <CardTitle sx={{ color: alpha(m.navy, 0.86) }}>
+                      Invoice Reminders
+                    </CardTitle>
                     <Box sx={{ mt: 1.25, ...formPanelSx, bgcolor: "#fff" }}>
-                      <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} sx={{ mt: 0.25 }}>
+                      <Stack
+                        direction={{ xs: "column", md: "row" }}
+                        spacing={1.25}
+                        sx={{ mt: 0.25 }}
+                      >
                         <BodyText sx={rowLabelSx}>Reminder 1</BodyText>
-                        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ flex: 1 }}>
+                        <Stack
+                          direction={{ xs: "column", sm: "row" }}
+                          spacing={1.25}
+                          sx={{ flex: 1 }}
+                        >
                           <MollureFormField
                             disabled={!paymentsEditing}
                             value={settings.reminders.reminder1Value}
-                            onChange={(e) => updateReminder("reminder1Value", e.target.value)}
+                            onChange={(e) =>
+                              updateReminder("reminder1Value", e.target.value)
+                            }
                           />
                           <MollureFormField
                             disabled={!paymentsEditing}
                             value={settings.reminders.reminder1Unit}
-                            onChange={(e) => updateReminder("reminder1Unit", e.target.value)}
+                            onChange={(e) =>
+                              updateReminder("reminder1Unit", e.target.value)
+                            }
                           />
                         </Stack>
                       </Stack>
-                      <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} sx={{ mt: 1.25 }}>
+                      <Stack
+                        direction={{ xs: "column", md: "row" }}
+                        spacing={1.25}
+                        sx={{ mt: 1.25 }}
+                      >
                         <BodyText sx={rowLabelSx}>Reminder 2</BodyText>
-                        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ flex: 1 }}>
+                        <Stack
+                          direction={{ xs: "column", sm: "row" }}
+                          spacing={1.25}
+                          sx={{ flex: 1 }}
+                        >
                           <MollureFormField
                             disabled={!paymentsEditing}
                             value={settings.reminders.reminder2Value}
-                            onChange={(e) => updateReminder("reminder2Value", e.target.value)}
+                            onChange={(e) =>
+                              updateReminder("reminder2Value", e.target.value)
+                            }
                           />
                           <MollureFormField
                             disabled={!paymentsEditing}
                             value={settings.reminders.reminder2Unit}
-                            onChange={(e) => updateReminder("reminder2Unit", e.target.value)}
+                            onChange={(e) =>
+                              updateReminder("reminder2Unit", e.target.value)
+                            }
                           />
                         </Stack>
                       </Stack>
@@ -1310,27 +1820,33 @@ function InvoiceSettings() {
 
                   {showDueDateSettings ? (
                     <Box>
-                      <CardTitle sx={{ color: alpha(m.navy, 0.86) }}>Overdue Invoice Re-issues</CardTitle>
+                      <CardTitle sx={{ color: alpha(m.navy, 0.86) }}>
+                        Overdue Invoice Re-issues
+                      </CardTitle>
                       <Box sx={{ mt: 1.25, ...formPanelSx, bgcolor: "#fff" }}>
-                        <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.58), fontWeight: 700 }}>
-                          Manually process overdue invoices and create re-issued invoices with updated due dates and
-                          penalty fees per your payment terms.
+                        <BodyText
+                          sx={{
+                            fontSize: 12.5,
+                            color: alpha(m.navy, 0.58),
+                            fontWeight: 700,
+                          }}
+                        >
+                          Manually process overdue invoices and create re-issued
+                          invoices with updated due dates and penalty fees per
+                          your payment terms.
                         </BodyText>
-                        <Button
-                          variant="outlined"
+                        <AppButton
+                          tone="secondary"
                           disabled={isProcessingReissues}
                           onClick={() => void handleProcessReissues()}
                           sx={{
                             mt: 1.5,
-                            borderRadius: "10px",
-                            textTransform: "none",
-                            fontWeight: 900,
-                            borderColor: alpha(m.navy, 0.16),
-                            color: alpha(m.navy, 0.72),
                           }}
                         >
-                          {isProcessingReissues ? "Processing…" : "Process overdue re-issues"}
-                        </Button>
+                          {isProcessingReissues
+                            ? "Processing…"
+                            : "Process overdue re-issues"}
+                        </AppButton>
                       </Box>
                     </Box>
                   ) : null}
@@ -1348,56 +1864,59 @@ function InvoiceSettings() {
           setEditingProductId(null);
         }}
         title={editingProductId ? "Edit Product" : "Add Product"}
-        PaperProps={{ sx: { width: { xs: "92vw", sm: 560 }, maxWidth: "92vw" } }}
+        PaperProps={{
+          sx: { width: { xs: "92vw", sm: 560 }, maxWidth: "92vw" },
+        }}
         footer={
-          <Stack direction="row" spacing={1.25} justifyContent="flex-end" sx={{ px: 2.5, py: 1.75 }}>
-            <Button
-              variant="outlined"
+          <Stack
+            direction="row"
+            spacing={1.25}
+            justifyContent="flex-end"
+            sx={{ px: 2.5, py: 1.75 }}
+          >
+            <AppButton
+              tone="secondary"
               onClick={() => setAddProductOpen(false)}
               sx={{
-                borderRadius: "10px",
-                textTransform: "none",
-                fontWeight: 800,
-                height: 36,
                 px: 3,
-                borderColor: alpha(m.navy, 0.16),
-                color: alpha(m.navy, 0.65),
-                bgcolor: "#fff",
-                "&:hover": { borderColor: alpha(m.navy, 0.24), bgcolor: alpha(m.navy, 0.02) },
               }}
             >
               Cancel
-            </Button>
-            <Button
-              variant="contained"
-              disableElevation
+            </AppButton>
+            <AppButton
+              tone="primary"
               onClick={handleAddProductSaveOrUpdate}
               sx={{
-                borderRadius: "10px",
-                textTransform: "none",
-                fontWeight: 900,
-                height: 36,
                 px: 4,
-                bgcolor: m.teal,
-                color: "#fff",
-                "&:hover": { bgcolor: m.tealDark },
               }}
             >
               {editingProductId ? "Update" : "Save"}
-            </Button>
+            </AppButton>
           </Stack>
         }
       >
         <Box sx={{ px: 2.5, py: 2 }}>
           <Stack spacing={1.5}>
             <Box>
-              <BodyText sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.65), mb: 0.5 }}>
+              <BodyText
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 800,
+                  color: alpha(m.navy, 0.65),
+                  mb: 0.5,
+                }}
+              >
                 Product Name
               </BodyText>
               <MollureFormField
                 select
                 value={addProductDraft.productName}
-                onChange={(e) => setAddProductDraft((p) => ({ ...p, productName: String(e.target.value) }))}
+                onChange={(e) =>
+                  setAddProductDraft((p) => ({
+                    ...p,
+                    productName: String(e.target.value),
+                  }))
+                }
                 SelectProps={{ native: true }}
               >
                 {productNameOptions.map((opt) => (
@@ -1409,21 +1928,47 @@ function InvoiceSettings() {
             </Box>
 
             <Box>
-              <BodyText sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.65), mb: 0.5 }}>VAT</BodyText>
+              <BodyText
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 800,
+                  color: alpha(m.navy, 0.65),
+                  mb: 0.5,
+                }}
+              >
+                VAT
+              </BodyText>
               <MollureFormField
                 value={addProductDraft.vat}
-                onChange={(e) => setAddProductDraft((p) => ({ ...p, vat: e.target.value }))}
+                onChange={(e) =>
+                  setAddProductDraft((p) => ({ ...p, vat: e.target.value }))
+                }
               />
             </Box>
 
             <Box>
-              <BodyText sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.65), mb: 0.5 }}>Price</BodyText>
+              <BodyText
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 800,
+                  color: alpha(m.navy, 0.65),
+                  mb: 0.5,
+                }}
+              >
+                Price
+              </BodyText>
               <MollureFormField
                 value={addProductDraft.price}
-                onChange={(e) => setAddProductDraft((p) => ({ ...p, price: e.target.value }))}
+                onChange={(e) =>
+                  setAddProductDraft((p) => ({ ...p, price: e.target.value }))
+                }
                 InputProps={{
-                  startAdornment: <InputAdornment position="start">€</InputAdornment>,
-                  endAdornment: <InputAdornment position="end">EUR</InputAdornment>,
+                  startAdornment: (
+                    <InputAdornment position="start">€</InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end">EUR</InputAdornment>
+                  ),
                 }}
               />
             </Box>
@@ -1438,56 +1983,59 @@ function InvoiceSettings() {
           setEditingServiceId(null);
         }}
         title={editingServiceId ? "Edit Service" : "Add Service"}
-        PaperProps={{ sx: { width: { xs: "92vw", sm: 560 }, maxWidth: "92vw" } }}
+        PaperProps={{
+          sx: { width: { xs: "92vw", sm: 560 }, maxWidth: "92vw" },
+        }}
         footer={
-          <Stack direction="row" spacing={1.25} justifyContent="flex-end" sx={{ px: 2.5, py: 1.75 }}>
-            <Button
-              variant="outlined"
+          <Stack
+            direction="row"
+            spacing={1.25}
+            justifyContent="flex-end"
+            sx={{ px: 2.5, py: 1.75 }}
+          >
+            <AppButton
+              tone="secondary"
               onClick={() => setAddServiceOpen(false)}
               sx={{
-                borderRadius: "10px",
-                textTransform: "none",
-                fontWeight: 800,
-                height: 36,
                 px: 3,
-                borderColor: alpha(m.navy, 0.16),
-                color: alpha(m.navy, 0.65),
-                bgcolor: "#fff",
-                "&:hover": { borderColor: alpha(m.navy, 0.24), bgcolor: alpha(m.navy, 0.02) },
               }}
             >
               Cancel
-            </Button>
-            <Button
-              variant="contained"
-              disableElevation
+            </AppButton>
+            <AppButton
+              tone="primary"
               onClick={handleAddServiceSaveOrUpdate}
               sx={{
-                borderRadius: "10px",
-                textTransform: "none",
-                fontWeight: 900,
-                height: 36,
                 px: 4,
-                bgcolor: m.teal,
-                color: "#fff",
-                "&:hover": { bgcolor: m.tealDark },
               }}
             >
               {editingServiceId ? "Update" : "Save"}
-            </Button>
+            </AppButton>
           </Stack>
         }
       >
         <Box sx={{ px: 2.5, py: 2 }}>
           <Stack spacing={1.5}>
             <Box>
-              <BodyText sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.65), mb: 0.5 }}>
+              <BodyText
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 800,
+                  color: alpha(m.navy, 0.65),
+                  mb: 0.5,
+                }}
+              >
                 Select Service
               </BodyText>
               <MollureFormField
                 select
                 value={addServiceDraft.service}
-                onChange={(e) => setAddServiceDraft((p) => ({ ...p, service: String(e.target.value) }))}
+                onChange={(e) =>
+                  setAddServiceDraft((p) => ({
+                    ...p,
+                    service: String(e.target.value),
+                  }))
+                }
                 SelectProps={{ native: true }}
               >
                 {serviceOptions.map((opt) => (
@@ -1499,10 +2047,21 @@ function InvoiceSettings() {
             </Box>
 
             <Box>
-              <BodyText sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.65), mb: 0.5 }}>VAT</BodyText>
+              <BodyText
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 800,
+                  color: alpha(m.navy, 0.65),
+                  mb: 0.5,
+                }}
+              >
+                VAT
+              </BodyText>
               <MollureFormField
                 value={addServiceDraft.vat}
-                onChange={(e) => setAddServiceDraft((p) => ({ ...p, vat: e.target.value }))}
+                onChange={(e) =>
+                  setAddServiceDraft((p) => ({ ...p, vat: e.target.value }))
+                }
               />
             </Box>
           </Stack>
@@ -1545,13 +2104,22 @@ export default function FinanceSettingPage() {
       >
         <Box sx={{ px: 2.25, pt: 2.1, pb: 1.25 }}>
           <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-            <TabButton active={tab === "stripe"} onClick={() => setTab("stripe")}>
+            <TabButton
+              active={tab === "stripe"}
+              onClick={() => setTab("stripe")}
+            >
               Stripe
             </TabButton>
-            <TabButton active={tab === "transaction"} onClick={() => setTab("transaction")}>
+            <TabButton
+              active={tab === "transaction"}
+              onClick={() => setTab("transaction")}
+            >
               Transaction Options
             </TabButton>
-            <TabButton active={tab === "invoice"} onClick={() => setTab("invoice")}>
+            <TabButton
+              active={tab === "invoice"}
+              onClick={() => setTab("invoice")}
+            >
               Invoice
             </TabButton>
           </Stack>
@@ -1559,12 +2127,8 @@ export default function FinanceSettingPage() {
 
         <Box sx={{ px: 2.25, pb: 2.25 }}>
           {tab === "stripe" ? <StripeSettings /> : null}
-          {tab === "transaction" ? (
-            <TransactionOptionsSettings />
-          ) : null}
-          {tab === "invoice" ? (
-            <InvoiceSettings />
-          ) : null}
+          {tab === "transaction" ? <TransactionOptionsSettings /> : null}
+          {tab === "invoice" ? <InvoiceSettings /> : null}
         </Box>
       </Paper>
     </Box>

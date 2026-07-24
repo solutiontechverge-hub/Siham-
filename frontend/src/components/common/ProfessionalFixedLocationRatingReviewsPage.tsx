@@ -28,11 +28,16 @@ function reviewMatchesTeamMember(
   if (memberName) {
     const name = memberName.trim().toLowerCase();
     if (name && review.memberName?.trim().toLowerCase() === name) return true;
-    if (name && review.tags.some((tag) => tag.label.trim().toLowerCase() === name)) return true;
+    if (
+      name &&
+      review.tags.some((tag) => tag.label.trim().toLowerCase() === name)
+    )
+      return true;
   }
   if (memberIndex != null && memberIndex > 0) {
     const tmLabel = `tm ${memberIndex}`;
-    if (review.tags.some((tag) => tag.label.trim().toLowerCase() === tmLabel)) return true;
+    if (review.tags.some((tag) => tag.label.trim().toLowerCase() === tmLabel))
+      return true;
   }
   return false;
 }
@@ -73,12 +78,22 @@ export default function ProfessionalFixedLocationRatingReviewsPage({
   const memberId = searchParams.get("memberId");
   const memberName = searchParams.get("memberName");
   const memberIndexRaw = searchParams.get("memberIndex");
-  const memberIndex = memberIndexRaw ? Number.parseInt(memberIndexRaw, 10) : null;
-  const hasMemberFilter = Boolean(memberId || memberName || (memberIndex != null && memberIndex > 0));
-  const [replyOverrides, setReplyOverrides] = React.useState<Record<string, ReviewReply | null>>({});
+  const memberIndex = memberIndexRaw
+    ? Number.parseInt(memberIndexRaw, 10)
+    : null;
+  const hasMemberFilter = Boolean(
+    memberId || memberName || (memberIndex != null && memberIndex > 0),
+  );
+  const [replyOverrides, setReplyOverrides] = React.useState<
+    Record<string, ReviewReply | null>
+  >({});
 
   const reviews = React.useMemo(() => {
-    const baseReviews = collectUniqueReviews(data.reviewsByCategory, category, hasMemberFilter);
+    const baseReviews = collectUniqueReviews(
+      data.reviewsByCategory,
+      category,
+      hasMemberFilter,
+    );
     return baseReviews
       .filter((rev) =>
         hasMemberFilter
@@ -92,7 +107,10 @@ export default function ProfessionalFixedLocationRatingReviewsPage({
       )
       .map((rev) => ({
         ...rev,
-        reply: rev.id in replyOverrides ? replyOverrides[rev.id] ?? undefined : rev.reply,
+        reply:
+          rev.id in replyOverrides
+            ? (replyOverrides[rev.id] ?? undefined)
+            : rev.reply,
       }));
   }, [
     category,
@@ -134,7 +152,12 @@ export default function ProfessionalFixedLocationRatingReviewsPage({
         overflow: "hidden",
       }}
     >
-      <Stack direction="row" alignItems="center" spacing={0.75} sx={{ px: 1.25, pt: 1.1, pb: 1.5 }}>
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={0.75}
+        sx={{ px: 1.25, pt: 1.1, pb: 1.5 }}
+      >
         <IconButton
           size="small"
           onClick={() => router.push(ratingReviewAnalyticsHref)}
@@ -149,7 +172,9 @@ export default function ProfessionalFixedLocationRatingReviewsPage({
         >
           <ArrowBackRoundedIcon sx={{ fontSize: 20 }} />
         </IconButton>
-        <SubHeading sx={{ fontSize: 18, lineHeight: 1.15, color: alpha(m.navy, 0.88) }}>
+        <SubHeading
+          sx={{ fontSize: 18, lineHeight: 1.15, color: alpha(m.navy, 0.88) }}
+        >
           Rating and review
         </SubHeading>
       </Stack>
@@ -157,7 +182,14 @@ export default function ProfessionalFixedLocationRatingReviewsPage({
       <Box sx={{ height: 1, bgcolor: alpha(m.navy, 0.06) }} />
 
       <Box sx={{ px: 2.25, py: 2.25 }}>
-        <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88), mb: 1.25 }}>
+        <BodyText
+          sx={{
+            fontSize: 14,
+            fontWeight: 900,
+            color: alpha(m.navy, 0.88),
+            mb: 1.25,
+          }}
+        >
           {headingLabel} ({reviews.length})
         </BodyText>
 
@@ -171,7 +203,13 @@ export default function ProfessionalFixedLocationRatingReviewsPage({
             />
           ))}
           {reviews.length === 0 && (
-            <BodyText sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.45) }}>
+            <BodyText
+              sx={{
+                fontSize: 12.5,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.45),
+              }}
+            >
               {hasMemberFilter
                 ? "No reviews for this team member yet."
                 : "No reviews in this category yet."}

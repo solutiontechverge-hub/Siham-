@@ -1,5 +1,6 @@
 "use client";
 
+import AppButton from "../AppButton";
 import * as React from "react";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
@@ -8,7 +9,6 @@ import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownR
 import {
   Avatar,
   Box,
-  Button,
   IconButton,
   Paper,
   Popover,
@@ -23,7 +23,9 @@ import {
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText, SubHeading } from "../../ui/typography";
 import { AppCalendarPanel } from "../AppDatePicker";
-import CalendarAvailabilityModal, { type AvailabilityDraft } from "./CalendarAvailabilityModal";
+import CalendarAvailabilityModal, {
+  type AvailabilityDraft,
+} from "./CalendarAvailabilityModal";
 import CalendarBlockTimeModal from "./CalendarBlockTimeModal";
 import CalendarScheduleAddMenu from "./CalendarScheduleAddMenu";
 import CalendarScheduleDeleteDialog from "./CalendarScheduleDeleteDialog";
@@ -59,9 +61,7 @@ type CalendarSchedulePanelProps = {
 type ScheduleStatusTab = "active" | "archived";
 
 type DeleteTarget =
-  | { kind: "availability"; id: string }
-  | { kind: "blocked"; id: string }
-  | null;
+  { kind: "availability"; id: string } | { kind: "blocked"; id: string } | null;
 
 const DAY_ABBR: Record<string, string> = {
   Monday: "Mon",
@@ -87,7 +87,8 @@ const formatScheduleTime = (time: string) => {
 const formatTimeRange = (start: string, end: string) =>
   `${formatScheduleTime(start)} – ${formatScheduleTime(end)}`;
 
-const isDateInRange = (iso: string, from: string, to: string) => iso >= from && iso <= to;
+const isDateInRange = (iso: string, from: string, to: string) =>
+  iso >= from && iso <= to;
 
 const defaultAvailabilityDraft = (
   resources: readonly CalendarResource[],
@@ -218,7 +219,14 @@ function ScheduleTableSection({
 
   return (
     <Box>
-      <BodyText sx={{ fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.58), mb: 0.85 }}>
+      <BodyText
+        sx={{
+          fontSize: 13,
+          fontWeight: 900,
+          color: alpha(m.navy, 0.58),
+          mb: 0.85,
+        }}
+      >
         {title}
       </BodyText>
       <TableContainer
@@ -246,7 +254,10 @@ function ScheduleTableSection({
               rows
             ) : (
               <TableRow>
-                <TableCell colSpan={columns.length} sx={{ ...bodyCellSx, color: alpha(m.navy, 0.45) }}>
+                <TableCell
+                  colSpan={columns.length}
+                  sx={{ ...bodyCellSx, color: alpha(m.navy, 0.45) }}
+                >
                   {emptyLabel}
                 </TableCell>
               </TableRow>
@@ -276,18 +287,22 @@ export default function CalendarSchedulePanel({
   const todayIso = React.useMemo(() => toIsoLocalDate(new Date()), []);
 
   const [statusTab, setStatusTab] = React.useState<ScheduleStatusTab>("active");
-  const [datePickerAnchor, setDatePickerAnchor] = React.useState<HTMLElement | null>(null);
+  const [datePickerAnchor, setDatePickerAnchor] =
+    React.useState<HTMLElement | null>(null);
   const [addAnchor, setAddAnchor] = React.useState<HTMLElement | null>(null);
   const [availabilityOpen, setAvailabilityOpen] = React.useState(false);
-  const [availabilityMode, setAvailabilityMode] = React.useState<"add" | "edit">("add");
+  const [availabilityMode, setAvailabilityMode] = React.useState<
+    "add" | "edit"
+  >("add");
   const [editingRowId, setEditingRowId] = React.useState<string | null>(null);
-  const [availabilityDraft, setAvailabilityDraft] = React.useState<AvailabilityDraft>(() =>
-    defaultAvailabilityDraft(resources, availableLocations, activeDateIso),
-  );
+  const [availabilityDraft, setAvailabilityDraft] =
+    React.useState<AvailabilityDraft>(() =>
+      defaultAvailabilityDraft(resources, availableLocations, activeDateIso),
+    );
   const [blockOpen, setBlockOpen] = React.useState(false);
-  const [blockDraft, setBlockDraft] = React.useState<BlockTimeDraft & { activity?: string }>(() =>
-    defaultBlockDraft(resources, availableLocations, activeDateIso),
-  );
+  const [blockDraft, setBlockDraft] = React.useState<
+    BlockTimeDraft & { activity?: string }
+  >(() => defaultBlockDraft(resources, availableLocations, activeDateIso));
   const [deleteTarget, setDeleteTarget] = React.useState<DeleteTarget>(null);
 
   const teamLabelById = React.useMemo(() => {
@@ -303,7 +318,11 @@ export default function CalendarSchedulePanel({
       scheduleRows.filter((row) => {
         if (Boolean(row.archived) !== isArchived) return false;
         if (isArchived) return true;
-        return isDateInRange(activeDateIso, row.dateFrom, row.dateTo || row.dateFrom);
+        return isDateInRange(
+          activeDateIso,
+          row.dateFrom,
+          row.dateTo || row.dateFrom,
+        );
       }),
     [activeDateIso, isArchived, scheduleRows],
   );
@@ -316,14 +335,22 @@ export default function CalendarSchedulePanel({
   const visibleResources = React.useMemo(() => {
     const base =
       selectedResourceIds.length > 0
-        ? resources.filter((resource) => selectedResourceIds.includes(resource.id))
+        ? resources.filter((resource) =>
+            selectedResourceIds.includes(resource.id),
+          )
         : [...resources];
     const withData = base.filter((resource) => {
-      const hasAvailability = filteredRows.some((row) => row.resourceIds.includes(resource.id));
-      const hasBlocked = filteredBlocks.some((block) => block.resourceId === resource.id);
+      const hasAvailability = filteredRows.some((row) =>
+        row.resourceIds.includes(resource.id),
+      );
+      const hasBlocked = filteredBlocks.some(
+        (block) => block.resourceId === resource.id,
+      );
       return hasAvailability || hasBlocked;
     });
-    return (withData.length ? withData : base.slice(0, 1)).sort((a, b) => a.name.localeCompare(b.name));
+    return (withData.length ? withData : base.slice(0, 1)).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
   }, [filteredBlocks, filteredRows, resources, selectedResourceIds]);
 
   const bodyCellSx = {
@@ -341,7 +368,9 @@ export default function CalendarSchedulePanel({
   const openAddAvailability = () => {
     setAvailabilityMode("add");
     setEditingRowId(null);
-    setAvailabilityDraft(defaultAvailabilityDraft(resources, availableLocations, activeDateIso));
+    setAvailabilityDraft(
+      defaultAvailabilityDraft(resources, availableLocations, activeDateIso),
+    );
     setAvailabilityOpen(true);
   };
 
@@ -355,17 +384,25 @@ export default function CalendarSchedulePanel({
       dateTo: row.dateTo || row.dateFrom,
       dayFrom: row.dayFrom,
       dayTo: row.dayTo,
-      shifts: row.shifts.length ? [...row.shifts] : [{ start: "09:00", end: "17:00" }],
+      shifts: row.shifts.length
+        ? [...row.shifts]
+        : [{ start: "09:00", end: "17:00" }],
     });
     setAvailabilityOpen(true);
   };
 
   const applyAvailability = async () => {
-    if (!availabilityDraft.teamIds.length || !availabilityDraft.locations.length) return;
+    if (
+      !availabilityDraft.teamIds.length ||
+      !availabilityDraft.locations.length
+    )
+      return;
     const nextRow: ScheduleAvailabilityRow = {
       id: editingRowId ?? makeScheduleRowId(),
       resourceIds: availabilityDraft.teamIds,
-      locations: availabilityDraft.locations.filter((location) => availableLocations.includes(location)),
+      locations: availabilityDraft.locations.filter((location) =>
+        availableLocations.includes(location),
+      ),
       dateFrom: availabilityDraft.dateFrom,
       dateTo: availabilityDraft.dateTo || availabilityDraft.dateFrom,
       dayFrom: availabilityDraft.dayFrom,
@@ -382,7 +419,9 @@ export default function CalendarSchedulePanel({
   };
 
   const openAddBlocked = () => {
-    setBlockDraft(defaultBlockDraft(resources, availableLocations, activeDateIso));
+    setBlockDraft(
+      defaultBlockDraft(resources, availableLocations, activeDateIso),
+    );
     setBlockOpen(true);
   };
 
@@ -395,7 +434,9 @@ export default function CalendarSchedulePanel({
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     if (deleteTarget.kind === "availability") {
-      await onSaveScheduleRows(scheduleRows.filter((row) => row.id !== deleteTarget.id));
+      await onSaveScheduleRows(
+        scheduleRows.filter((row) => row.id !== deleteTarget.id),
+      );
     } else if (onDeleteBlockedEntry) {
       const rawId = deleteTarget.id.replace(/^blk-/, "");
       await onDeleteBlockedEntry(rawId);
@@ -406,12 +447,22 @@ export default function CalendarSchedulePanel({
   const rowActions = (onEdit: (() => void) | null, onDelete: () => void) => (
     <Stack direction="row" spacing={0.35} justifyContent="center">
       {onEdit ? (
-        <IconButton size="small" onClick={onEdit} sx={{ width: 28, height: 28, borderRadius: "8px" }}>
+        <IconButton
+          size="small"
+          onClick={onEdit}
+          sx={{ width: 28, height: 28, borderRadius: "8px" }}
+        >
           <EditOutlinedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
         </IconButton>
       ) : null}
-      <IconButton size="small" onClick={onDelete} sx={{ width: 28, height: 28, borderRadius: "8px" }}>
-        <DeleteOutlineRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
+      <IconButton
+        size="small"
+        onClick={onDelete}
+        sx={{ width: 28, height: 28, borderRadius: "8px" }}
+      >
+        <DeleteOutlineRoundedIcon
+          sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }}
+        />
       </IconButton>
     </Stack>
   );
@@ -438,10 +489,19 @@ export default function CalendarSchedulePanel({
                 py: 1.75,
               }}
             >
-              <SubHeading sx={{ fontSize: 22, fontWeight: 800, color: alpha(m.navy, 0.9), lineHeight: 1.2 }}>
+              <SubHeading
+                sx={{
+                  fontSize: 22,
+                  fontWeight: 800,
+                  color: alpha(m.navy, 0.9),
+                  lineHeight: 1.2,
+                }}
+              >
                 Team Member schedule
               </SubHeading>
-              <BodyText sx={{ mt: 0.5, fontSize: 13, color: alpha(m.navy, 0.52) }}>
+              <BodyText
+                sx={{ mt: 0.5, fontSize: 13, color: alpha(m.navy, 0.52) }}
+              >
                 Set Availability and block a time slot for the team members.
               </BodyText>
             </Box>
@@ -456,7 +516,7 @@ export default function CalendarSchedulePanel({
               useFlexGap
               spacing={1}
             >
-              <Button
+              <AppButton
                 variant="outlined"
                 startIcon={<CalendarMonthRoundedIcon sx={{ fontSize: 18 }} />}
                 onClick={(e) => setDatePickerAnchor(e.currentTarget)}
@@ -474,30 +534,23 @@ export default function CalendarSchedulePanel({
                 }}
               >
                 {formatLongDateUtc(activeDateIso)}
-              </Button>
+              </AppButton>
 
               {!isArchived ? (
-                <Button
-                  variant="contained"
-                  disableElevation
+                <AppButton
+                  tone="primary"
                   disabled={isSaving}
                   endIcon={<KeyboardArrowDownRoundedIcon />}
                   onClick={(e) => setAddAnchor(e.currentTarget)}
                   sx={{
-                    borderRadius: "6px",
-                    textTransform: "none",
-                    fontWeight: 700,
                     fontSize: 11,
                     height: 28,
                     px: 1.25,
-                    bgcolor: m.teal,
-                    color: "#fff",
-                    "&:hover": { bgcolor: m.tealDark, color: "#fff" },
                     "& .MuiButton-endIcon": { color: "#fff" },
                   }}
                 >
                   Add
-                </Button>
+                </AppButton>
               ) : null}
 
               <Popover
@@ -535,12 +588,21 @@ export default function CalendarSchedulePanel({
 
             <Stack spacing={2.5}>
               {visibleResources.map((resource) => {
-                const memberRows = filteredRows.filter((row) => row.resourceIds.includes(resource.id));
-                const memberBlocks = filteredBlocks.filter((block) => block.resourceId === resource.id);
+                const memberRows = filteredRows.filter((row) =>
+                  row.resourceIds.includes(resource.id),
+                );
+                const memberBlocks = filteredBlocks.filter(
+                  (block) => block.resourceId === resource.id,
+                );
 
                 return (
                   <Box key={resource.id}>
-                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      alignItems="center"
+                      sx={{ mb: 1.5 }}
+                    >
                       <Avatar
                         sx={{
                           width: 28,
@@ -553,7 +615,13 @@ export default function CalendarSchedulePanel({
                       >
                         {resource.avatarText}
                       </Avatar>
-                      <BodyText sx={{ fontSize: 14, fontWeight: 800, color: alpha(m.navy, 0.86) }}>
+                      <BodyText
+                        sx={{
+                          fontSize: 14,
+                          fontWeight: 800,
+                          color: alpha(m.navy, 0.86),
+                        }}
+                      >
                         {resource.name}
                       </BodyText>
                     </Stack>
@@ -561,52 +629,76 @@ export default function CalendarSchedulePanel({
                     <Stack spacing={1.75}>
                       <ScheduleTableSection
                         title="Availability"
-                        columns={["Location", "Date - Date", "Day - Day", "Time - Time", "Action"]}
+                        columns={[
+                          "Location",
+                          "Date - Date",
+                          "Day - Day",
+                          "Time - Time",
+                          "Action",
+                        ]}
                         emptyLabel="No availability entries."
                         rows={memberRows.flatMap((row) =>
-                          (row.locations.length ? row.locations : (["FL"] as CalendarBookingLocation[])).map(
-                            (location) => (
-                              <TableRow key={`${row.id}-${location}`}>
-                                <TableCell sx={bodyCellSx}>{location}</TableCell>
-                                <TableCell sx={bodyCellSx}>
-                                  {formatMdyDate(row.dateFrom)} – {formatMdyDate(row.dateTo || row.dateFrom)}
-                                </TableCell>
-                                <TableCell sx={bodyCellSx}>
-                                  {formatDayRange(row.dayFrom, row.dayTo)}
-                                </TableCell>
-                                <TableCell sx={bodyCellSx}>
-                                  <Stack spacing={0.35} alignItems="center">
-                                    {row.shifts.map((shift, index) => (
-                                      <span key={`${row.id}-${index}`}>
-                                        {formatTimeRange(shift.start, shift.end)}
-                                      </span>
-                                    ))}
-                                  </Stack>
-                                </TableCell>
-                                <TableCell sx={bodyCellSx}>
-                                  {isArchived
-                                    ? "—"
-                                    : rowActions(
-                                        () => openEditAvailability(row),
-                                        () => setDeleteTarget({ kind: "availability", id: row.id }),
-                                      )}
-                                </TableCell>
-                              </TableRow>
-                            ),
-                          ),
+                          (row.locations.length
+                            ? row.locations
+                            : (["FL"] as CalendarBookingLocation[])
+                          ).map((location) => (
+                            <TableRow key={`${row.id}-${location}`}>
+                              <TableCell sx={bodyCellSx}>{location}</TableCell>
+                              <TableCell sx={bodyCellSx}>
+                                {formatMdyDate(row.dateFrom)} –{" "}
+                                {formatMdyDate(row.dateTo || row.dateFrom)}
+                              </TableCell>
+                              <TableCell sx={bodyCellSx}>
+                                {formatDayRange(row.dayFrom, row.dayTo)}
+                              </TableCell>
+                              <TableCell sx={bodyCellSx}>
+                                <Stack spacing={0.35} alignItems="center">
+                                  {row.shifts.map((shift, index) => (
+                                    <span key={`${row.id}-${index}`}>
+                                      {formatTimeRange(shift.start, shift.end)}
+                                    </span>
+                                  ))}
+                                </Stack>
+                              </TableCell>
+                              <TableCell sx={bodyCellSx}>
+                                {isArchived
+                                  ? "—"
+                                  : rowActions(
+                                      () => openEditAvailability(row),
+                                      () =>
+                                        setDeleteTarget({
+                                          kind: "availability",
+                                          id: row.id,
+                                        }),
+                                    )}
+                              </TableCell>
+                            </TableRow>
+                          )),
                         )}
                       />
 
                       <ScheduleTableSection
                         title="Blocked Time"
-                        columns={["Title", "Date - Date", "Day - Day", "Time - Time", "Action"]}
+                        columns={[
+                          "Title",
+                          "Date - Date",
+                          "Day - Day",
+                          "Time - Time",
+                          "Action",
+                        ]}
                         emptyLabel="No blocked time entries."
                         rows={memberBlocks.map((block) => (
                           <TableRow key={block.id}>
-                            <TableCell sx={bodyCellSx}>{block.title || "Blocked"}</TableCell>
-                            <TableCell sx={bodyCellSx}>{formatMdyDate(block.date)}</TableCell>
                             <TableCell sx={bodyCellSx}>
-                              {new Date(`${block.date}T00:00:00`).toLocaleDateString("en-US", {
+                              {block.title || "Blocked"}
+                            </TableCell>
+                            <TableCell sx={bodyCellSx}>
+                              {formatMdyDate(block.date)}
+                            </TableCell>
+                            <TableCell sx={bodyCellSx}>
+                              {new Date(
+                                `${block.date}T00:00:00`,
+                              ).toLocaleDateString("en-US", {
                                 weekday: "short",
                               })}
                             </TableCell>
@@ -614,10 +706,15 @@ export default function CalendarSchedulePanel({
                               {formatTimeRange(block.start, block.end)}
                             </TableCell>
                             <TableCell sx={bodyCellSx}>
-                              {isArchived || !onDeleteBlockedEntry || !block.id.startsWith("blk-")
+                              {isArchived ||
+                              !onDeleteBlockedEntry ||
+                              !block.id.startsWith("blk-")
                                 ? "—"
                                 : rowActions(null, () =>
-                                    setDeleteTarget({ kind: "blocked", id: block.id }),
+                                    setDeleteTarget({
+                                      kind: "blocked",
+                                      id: block.id,
+                                    }),
                                   )}
                             </TableCell>
                           </TableRow>
@@ -643,7 +740,9 @@ export default function CalendarSchedulePanel({
         resources={resources}
         setDraft={setAvailabilityDraft}
         teamLabelById={teamLabelById}
-        title={availabilityMode === "edit" ? "Edit Availability" : "Add Availability"}
+        title={
+          availabilityMode === "edit" ? "Edit Availability" : "Add Availability"
+        }
       />
 
       <CalendarBlockTimeModal

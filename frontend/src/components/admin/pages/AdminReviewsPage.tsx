@@ -40,7 +40,10 @@ import AdminFilterDateRange from "../AdminFilterDateRange";
 import AdminFilterPanel, { AdminFilterPanelRow } from "../AdminFilterPanel";
 import AdminSectionCard from "../AdminSectionCard";
 import AdminUnderlineTabs from "../AdminUnderlineTabs";
-import AdminDataTable, { AdminSummaryGrid, type AdminTableColumn } from "../AdminDataTable";
+import AdminDataTable, {
+  AdminSummaryGrid,
+  type AdminTableColumn,
+} from "../AdminDataTable";
 import { AdminDashboardFooter } from "../AdminDashboardHeader";
 import { ADMIN_CARD_PADDING as pad } from "../adminCardPadding";
 import {
@@ -66,7 +69,11 @@ type AdminReviewsPageProps = {
 
 function formatDisplayDate(iso: string) {
   const d = new Date(`${iso}T00:00:00`);
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 function StarRating({ value }: { value: number }) {
@@ -84,20 +91,33 @@ function StarRating({ value }: { value: number }) {
           />
         ))}
       </Stack>
-      <Typography sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}>{value.toFixed(1)}</Typography>
+      <Typography sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}>
+        {value.toFixed(1)}
+      </Typography>
     </Stack>
   );
 }
 
-function HighlightedReviewText({ text, keywords }: { text: string; keywords: string[] }) {
+function HighlightedReviewText({
+  text,
+  keywords,
+}: {
+  text: string;
+  keywords: string[];
+}) {
   const tokens = useTheme().palette.mollure;
-  const pattern = new RegExp(`\\b(${keywords.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})\\b`, "gi");
+  const pattern = new RegExp(
+    `\\b(${keywords.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})\\b`,
+    "gi",
+  );
   const parts = text.split(pattern);
 
   return (
     <Typography sx={{ fontSize: 12, color: tokens.bodyText, lineHeight: 1.5 }}>
       {parts.map((part, i) => {
-        const isMatch = keywords.some((k) => k.toLowerCase() === part.toLowerCase());
+        const isMatch = keywords.some(
+          (k) => k.toLowerCase() === part.toLowerCase(),
+        );
         if (!isMatch) return <span key={i}>{part}</span>;
         return (
           <Box
@@ -140,7 +160,9 @@ function ReviewsSidebar({
   onNewKeywordChange: (v: string) => void;
   onAddKeyword: () => void;
   ranges: typeof ratingCategoryDefaults;
-  onRangesChange: React.Dispatch<React.SetStateAction<typeof ratingCategoryDefaults>>;
+  onRangesChange: React.Dispatch<
+    React.SetStateAction<typeof ratingCategoryDefaults>
+  >;
   onTabChange: (tab: ReviewTabId) => void;
 }) {
   const tokens = useTheme().palette.mollure;
@@ -157,11 +179,20 @@ function ReviewsSidebar({
             fullWidth
             size="small"
           />
-          <AppButton variant="contained" onClick={onAddKeyword} sx={{ textTransform: "none", whiteSpace: "nowrap" }}>
+          <AppButton
+            variant="contained"
+            onClick={onAddKeyword}
+            sx={{ textTransform: "none", whiteSpace: "nowrap" }}
+          >
             Add
           </AppButton>
         </Stack>
-        <KeywordTagsInput value={keywords} onChange={onKeywordsChange} maxKeywords={50} placeholder="" />
+        <KeywordTagsInput
+          value={keywords}
+          onChange={onKeywordsChange}
+          maxKeywords={50}
+          placeholder=""
+        />
         <Typography
           component="button"
           type="button"
@@ -201,11 +232,18 @@ function ReviewsSidebar({
                 border: `1px solid ${alpha(cat.color, 0.15)}`,
               }}
             >
-              <Typography sx={{ fontSize: 18, lineHeight: 1 }}>{cat.emoji}</Typography>
+              <Typography sx={{ fontSize: 18, lineHeight: 1 }}>
+                {cat.emoji}
+              </Typography>
               <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}>{cat.label}</Typography>
+                <Typography
+                  sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}
+                >
+                  {cat.label}
+                </Typography>
                 <Typography sx={{ fontSize: 11, color: tokens.bodyText }}>
-                  {ranges[cat.id].min.toFixed(1)} – {ranges[cat.id].max.toFixed(1)}
+                  {ranges[cat.id].min.toFixed(1)} –{" "}
+                  {ranges[cat.id].max.toFixed(1)}
                 </Typography>
               </Box>
               <IconButton
@@ -224,9 +262,12 @@ function ReviewsSidebar({
   );
 }
 
-export default function AdminReviewsPage({ embedded = false }: AdminReviewsPageProps) {
+export default function AdminReviewsPage({
+  embedded = false,
+}: AdminReviewsPageProps) {
   const tokens = useTheme().palette.mollure;
-  const [activeTab, setActiveTab] = React.useState<ReviewTabId>("flagged-reviews");
+  const [activeTab, setActiveTab] =
+    React.useState<ReviewTabId>("flagged-reviews");
   const [reviews, setReviews] = React.useState(mockFlaggedReviewRows);
   const [keywords, setKeywords] = React.useState(mockFlaggedKeywordsList);
   const [newKeyword, setNewKeyword] = React.useState("");
@@ -238,8 +279,10 @@ export default function AdminReviewsPage({ embedded = false }: AdminReviewsPageP
   const [dateTo, setDateTo] = React.useState("");
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(PAGE_SIZE_OPTIONS[0]);
-  const [exportMenuAnchor, setExportMenuAnchor] = React.useState<null | HTMLElement>(null);
-  const [deleteTarget, setDeleteTarget] = React.useState<FlaggedReviewRow | null>(null);
+  const [exportMenuAnchor, setExportMenuAnchor] =
+    React.useState<null | HTMLElement>(null);
+  const [deleteTarget, setDeleteTarget] =
+    React.useState<FlaggedReviewRow | null>(null);
 
   const addKeyword = () => {
     const kw = newKeyword.trim().toLowerCase();
@@ -250,8 +293,13 @@ export default function AdminReviewsPage({ embedded = false }: AdminReviewsPageP
 
   const filteredReviews = React.useMemo(() => {
     return reviews.filter((row) => {
-      if (professionalFilter !== "all" && row.professional !== professionalFilter) return false;
-      if (ratingFilter !== "all" && row.rating !== Number(ratingFilter)) return false;
+      if (
+        professionalFilter !== "all" &&
+        row.professional !== professionalFilter
+      )
+        return false;
+      if (ratingFilter !== "all" && row.rating !== Number(ratingFilter))
+        return false;
       if (dateFrom && row.date < dateFrom) return false;
       if (dateTo && row.date > dateTo) return false;
       if (search.trim()) {
@@ -267,7 +315,10 @@ export default function AdminReviewsPage({ embedded = false }: AdminReviewsPageP
   }, [reviews, professionalFilter, ratingFilter, dateFrom, dateTo, search]);
 
   const totalPages = Math.max(1, Math.ceil(filteredReviews.length / pageSize));
-  const pagedReviews = filteredReviews.slice((page - 1) * pageSize, page * pageSize);
+  const pagedReviews = filteredReviews.slice(
+    (page - 1) * pageSize,
+    page * pageSize,
+  );
 
   React.useEffect(() => {
     setPage(1);
@@ -318,8 +369,14 @@ export default function AdminReviewsPage({ embedded = false }: AdminReviewsPageP
             {r.professionalInitials}
           </Avatar>
           <Box>
-            <Typography sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}>{r.professional}</Typography>
-            <Typography sx={{ fontSize: 10.5, color: tokens.slate }}>{r.professionalCategory}</Typography>
+            <Typography
+              sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}
+            >
+              {r.professional}
+            </Typography>
+            <Typography sx={{ fontSize: 10.5, color: tokens.slate }}>
+              {r.professionalCategory}
+            </Typography>
           </Box>
         </Stack>
       ),
@@ -343,8 +400,14 @@ export default function AdminReviewsPage({ embedded = false }: AdminReviewsPageP
             {r.clientInitials}
           </Avatar>
           <Box>
-            <Typography sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}>{r.client}</Typography>
-            <Typography sx={{ fontSize: 10.5, color: tokens.slate }}>{r.clientType}</Typography>
+            <Typography
+              sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}
+            >
+              {r.client}
+            </Typography>
+            <Typography sx={{ fontSize: 10.5, color: tokens.slate }}>
+              {r.clientType}
+            </Typography>
           </Box>
         </Stack>
       ),
@@ -359,7 +422,9 @@ export default function AdminReviewsPage({ embedded = false }: AdminReviewsPageP
       id: "review",
       label: "Review",
       minWidth: 240,
-      render: (r) => <HighlightedReviewText text={r.text} keywords={keywords} />,
+      render: (r) => (
+        <HighlightedReviewText text={r.text} keywords={keywords} />
+      ),
     },
     {
       id: "date",
@@ -367,8 +432,12 @@ export default function AdminReviewsPage({ embedded = false }: AdminReviewsPageP
       minWidth: 120,
       render: (r) => (
         <Box>
-          <Typography sx={{ fontSize: 12, color: tokens.navy }}>{formatDisplayDate(r.date)}</Typography>
-          <Typography sx={{ fontSize: 10.5, color: tokens.slate }}>{r.time}</Typography>
+          <Typography sx={{ fontSize: 12, color: tokens.navy }}>
+            {formatDisplayDate(r.date)}
+          </Typography>
+          <Typography sx={{ fontSize: 10.5, color: tokens.slate }}>
+            {r.time}
+          </Typography>
         </Box>
       ),
     },
@@ -378,10 +447,18 @@ export default function AdminReviewsPage({ embedded = false }: AdminReviewsPageP
       align: "center",
       render: (r) => (
         <Stack direction="row" spacing={0.25} justifyContent="center">
-          <IconButton size="small" aria-label="View review" sx={{ color: tokens.slate }}>
+          <IconButton
+            size="small"
+            aria-label="View review"
+            sx={{ color: tokens.slate }}
+          >
             <VisibilityOutlinedIcon sx={{ fontSize: 18 }} />
           </IconButton>
-          <IconButton size="small" aria-label="Hide review" sx={{ color: tokens.slate }}>
+          <IconButton
+            size="small"
+            aria-label="Hide review"
+            sx={{ color: tokens.slate }}
+          >
             <VisibilityOffOutlinedIcon sx={{ fontSize: 18 }} />
           </IconButton>
           <IconButton
@@ -439,7 +516,12 @@ export default function AdminReviewsPage({ embedded = false }: AdminReviewsPageP
       <Grid container spacing={1.5} sx={{ mt: 2 }}>
         <Grid size={{ xs: 12, xl: 8 }}>
           <AdminSectionCard noPadding compact>
-            <Box sx={{ p: pad.bodyCompact, borderBottom: `1px solid ${tokens.cardBorder}` }}>
+            <Box
+              sx={{
+                p: pad.bodyCompact,
+                borderBottom: `1px solid ${tokens.cardBorder}`,
+              }}
+            >
               <AdminFilterPanel horizontal>
                 <AdminFilterPanelRow horizontal grow>
                   <AppSearchField
@@ -453,7 +535,9 @@ export default function AdminReviewsPage({ embedded = false }: AdminReviewsPageP
                 <AdminFilterPanelRow horizontal>
                   <AppSelect
                     value={professionalFilter}
-                    onChange={(e) => setProfessionalFilter(e.target.value as string)}
+                    onChange={(e) =>
+                      setProfessionalFilter(e.target.value as string)
+                    }
                     options={PROFESSIONAL_FILTER_OPTIONS}
                     size="small"
                     fullWidth
@@ -486,7 +570,12 @@ export default function AdminReviewsPage({ embedded = false }: AdminReviewsPageP
                     variant="outlined"
                     startIcon={<RefreshOutlinedIcon />}
                     onClick={resetFilters}
-                    sx={{ textTransform: "none", fontWeight: 600, whiteSpace: "nowrap", height: 40 }}
+                    sx={{
+                      textTransform: "none",
+                      fontWeight: 600,
+                      whiteSpace: "nowrap",
+                      height: 40,
+                    }}
                   >
                     Reset Filters
                   </AppButton>
@@ -496,7 +585,12 @@ export default function AdminReviewsPage({ embedded = false }: AdminReviewsPageP
                     variant="outlined"
                     startIcon={<FileDownloadOutlinedIcon />}
                     onClick={(e) => setExportMenuAnchor(e.currentTarget)}
-                    sx={{ textTransform: "none", fontWeight: 600, whiteSpace: "nowrap", height: 40 }}
+                    sx={{
+                      textTransform: "none",
+                      fontWeight: 600,
+                      whiteSpace: "nowrap",
+                      height: 40,
+                    }}
                   >
                     Export
                   </AppButton>
@@ -508,16 +602,30 @@ export default function AdminReviewsPage({ embedded = false }: AdminReviewsPageP
                     transformOrigin={{ vertical: "top", horizontal: "right" }}
                     slotProps={{
                       paper: {
-                        sx: { borderRadius: 2, minWidth: 180, border: `1px solid ${tokens.cardBorder}` },
+                        sx: {
+                          borderRadius: 2,
+                          minWidth: 180,
+                          border: `1px solid ${tokens.cardBorder}`,
+                        },
                       },
                     }}
                   >
-                    <MenuItem onClick={handleExportPdf} sx={{ fontSize: 13, gap: 1.25 }}>
-                      <PictureAsPdfOutlinedIcon sx={{ fontSize: 18, color: "#D92D20" }} />
+                    <MenuItem
+                      onClick={handleExportPdf}
+                      sx={{ fontSize: 13, gap: 1.25 }}
+                    >
+                      <PictureAsPdfOutlinedIcon
+                        sx={{ fontSize: 18, color: "#D92D20" }}
+                      />
                       Download PDF
                     </MenuItem>
-                    <MenuItem onClick={handleExportExcel} sx={{ fontSize: 13, gap: 1.25 }}>
-                      <TableChartOutlinedIcon sx={{ fontSize: 18, color: "#2E7D32" }} />
+                    <MenuItem
+                      onClick={handleExportExcel}
+                      sx={{ fontSize: 13, gap: 1.25 }}
+                    >
+                      <TableChartOutlinedIcon
+                        sx={{ fontSize: 18, color: "#2E7D32" }}
+                      />
                       Download Excel
                     </MenuItem>
                   </Menu>
@@ -525,19 +633,44 @@ export default function AdminReviewsPage({ embedded = false }: AdminReviewsPageP
               </AdminFilterPanel>
             </Box>
 
-            <AdminDataTable columns={reviewColumns} rows={pagedReviews} getRowId={(r) => r.id} dense />
+            <AdminDataTable
+              columns={reviewColumns}
+              rows={pagedReviews}
+              getRowId={(r) => r.id}
+              dense
+            />
 
-            <Box sx={{ p: pad.bodyCompact, borderTop: `1px solid ${tokens.cardBorder}` }}>
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ sm: "center" }} justifyContent="space-between">
+            <Box
+              sx={{
+                p: pad.bodyCompact,
+                borderTop: `1px solid ${tokens.cardBorder}`,
+              }}
+            >
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={2}
+                alignItems={{ sm: "center" }}
+                justifyContent="space-between"
+              >
                 <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>
-                  Showing {filteredReviews.length === 0 ? 0 : (page - 1) * pageSize + 1} to{" "}
-                  {Math.min(page * pageSize, filteredReviews.length)} of {filteredReviews.length} results
+                  Showing{" "}
+                  {filteredReviews.length === 0 ? 0 : (page - 1) * pageSize + 1}{" "}
+                  to {Math.min(page * pageSize, filteredReviews.length)} of{" "}
+                  {filteredReviews.length} results
                 </Typography>
-                <Stack direction="row" spacing={2} alignItems="center" flexWrap="nowrap">
+                <Stack
+                  direction="row"
+                  spacing={2}
+                  alignItems="center"
+                  flexWrap="nowrap"
+                >
                   <AppSelect
                     value={String(pageSize)}
                     onChange={(e) => setPageSize(Number(e.target.value))}
-                    options={PAGE_SIZE_OPTIONS.map((n) => ({ value: String(n), label: `${n} / page` }))}
+                    options={PAGE_SIZE_OPTIONS.map((n) => ({
+                      value: String(n),
+                      label: `${n} / page`,
+                    }))}
                     size="small"
                     sx={{ minWidth: 110 }}
                   />
@@ -583,11 +716,20 @@ export default function AdminReviewsPage({ embedded = false }: AdminReviewsPageP
           fullWidth
           size="small"
         />
-        <AppButton variant="contained" onClick={addKeyword} sx={{ textTransform: "none" }}>
+        <AppButton
+          variant="contained"
+          onClick={addKeyword}
+          sx={{ textTransform: "none" }}
+        >
           Add
         </AppButton>
       </Stack>
-      <KeywordTagsInput value={keywords} onChange={setKeywords} maxKeywords={50} placeholder="Manage flagged keywords" />
+      <KeywordTagsInput
+        value={keywords}
+        onChange={setKeywords}
+        maxKeywords={50}
+        placeholder="Manage flagged keywords"
+      />
     </AdminSectionCard>
   );
 
@@ -608,7 +750,16 @@ export default function AdminReviewsPage({ embedded = false }: AdminReviewsPageP
             }}
           >
             <Typography sx={{ fontSize: 22 }}>{cat.emoji}</Typography>
-            <Typography sx={{ fontSize: 13, fontWeight: 600, color: tokens.navy, minWidth: 80 }}>{cat.label}</Typography>
+            <Typography
+              sx={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: tokens.navy,
+                minWidth: 80,
+              }}
+            >
+              {cat.label}
+            </Typography>
             <AppTextField
               label="Min"
               type="number"
@@ -617,7 +768,10 @@ export default function AdminReviewsPage({ embedded = false }: AdminReviewsPageP
               onChange={(e) =>
                 setRanges((prev) => ({
                   ...prev,
-                  [cat.id]: { ...prev[cat.id], min: parseFloat(e.target.value) || 0 },
+                  [cat.id]: {
+                    ...prev[cat.id],
+                    min: parseFloat(e.target.value) || 0,
+                  },
                 }))
               }
               sx={{ width: 90 }}
@@ -631,14 +785,20 @@ export default function AdminReviewsPage({ embedded = false }: AdminReviewsPageP
               onChange={(e) =>
                 setRanges((prev) => ({
                   ...prev,
-                  [cat.id]: { ...prev[cat.id], max: parseFloat(e.target.value) || 0 },
+                  [cat.id]: {
+                    ...prev[cat.id],
+                    max: parseFloat(e.target.value) || 0,
+                  },
                 }))
               }
               sx={{ width: 90 }}
             />
           </Stack>
         ))}
-        <AppButton variant="contained" sx={{ alignSelf: "flex-start", textTransform: "none" }}>
+        <AppButton
+          variant="contained"
+          sx={{ alignSelf: "flex-start", textTransform: "none" }}
+        >
           Save ranges
         </AppButton>
       </Stack>
@@ -655,16 +815,30 @@ export default function AdminReviewsPage({ embedded = false }: AdminReviewsPageP
     <>
       {!embedded ? (
         <>
-          <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1.5 }}>
+          <Stack
+            direction="row"
+            alignItems="center"
+            spacing={0.75}
+            sx={{ mb: 1.5 }}
+          >
             <Typography
               component={Link}
               href="/admin/dashboard"
-              sx={{ fontSize: 12, color: tokens.bodyText, textDecoration: "none", "&:hover": { color: tokens.teal } }}
+              sx={{
+                fontSize: 12,
+                color: tokens.bodyText,
+                textDecoration: "none",
+                "&:hover": { color: tokens.teal },
+              }}
             >
               Home
             </Typography>
-            <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>/</Typography>
-            <Typography sx={{ fontSize: 12, color: tokens.navy, fontWeight: 500 }}>
+            <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>
+              /
+            </Typography>
+            <Typography
+              sx={{ fontSize: 12, color: tokens.navy, fontWeight: 500 }}
+            >
               Rating & Review Management
             </Typography>
           </Stack>
@@ -672,18 +846,28 @@ export default function AdminReviewsPage({ embedded = false }: AdminReviewsPageP
           <Box sx={{ mb: 2 }}>
             <Typography
               variant="mainHeading"
-              sx={{ fontSize: { xs: 24, md: 28 }, color: tokens.textcolorgrey700, mb: 0.5 }}
+              sx={{
+                fontSize: { xs: 24, md: 28 },
+                color: tokens.textcolorgrey700,
+                mb: 0.5,
+              }}
             >
               Rating & Review Management
             </Typography>
-            <Typography sx={{ fontSize: 14, color: tokens.bodyText, maxWidth: 640 }}>
+            <Typography
+              sx={{ fontSize: 14, color: tokens.bodyText, maxWidth: 640 }}
+            >
               Manage flagged keywords, review moderation and rating categories.
             </Typography>
           </Box>
         </>
       ) : null}
 
-      <AdminUnderlineTabs tabs={REVIEW_TABS} value={activeTab} onChange={(id) => setActiveTab(id as ReviewTabId)} />
+      <AdminUnderlineTabs
+        tabs={REVIEW_TABS}
+        value={activeTab}
+        onChange={(id) => setActiveTab(id as ReviewTabId)}
+      />
 
       <Box role="tabpanel">{tabPanels[activeTab]}</Box>
 
@@ -697,11 +881,16 @@ export default function AdminReviewsPage({ embedded = false }: AdminReviewsPageP
         fullWidth
         headerTone="danger"
         footer={
-          <Stack direction="row" spacing={1.5} justifyContent="flex-end" sx={{ px: 2.5, py: 2 }}>
-            <AppButton variant="outlined" onClick={() => setDeleteTarget(null)} sx={{ textTransform: "none" }}>
+          <Stack
+            direction="row"
+            spacing={1.5}
+            justifyContent="flex-end"
+            sx={{ px: 2.5, py: 2 }}
+          >
+            <AppButton tone="secondary" onClick={() => setDeleteTarget(null)}>
               Cancel
             </AppButton>
-            <AppButton variant="contained" color="error" onClick={confirmDelete} sx={{ textTransform: "none" }}>
+            <AppButton tone="danger" onClick={confirmDelete}>
               Delete
             </AppButton>
           </Stack>
@@ -709,15 +898,22 @@ export default function AdminReviewsPage({ embedded = false }: AdminReviewsPageP
       >
         <Stack spacing={1.5} sx={{ px: 2.5, py: 2 }}>
           <Stack direction="row" spacing={1.25} alignItems="flex-start">
-            <WarningAmberRoundedIcon sx={{ color: "#DC6803", fontSize: 22, mt: 0.25 }} />
+            <WarningAmberRoundedIcon
+              sx={{ color: "#DC6803", fontSize: 22, mt: 0.25 }}
+            />
             <Box>
-              <Typography sx={{ fontSize: 14, fontWeight: 600, color: tokens.navy }}>
+              <Typography
+                sx={{ fontSize: 14, fontWeight: 600, color: tokens.navy }}
+              >
                 Are you sure you want to delete this review?
               </Typography>
               {deleteTarget ? (
-                <Typography sx={{ fontSize: 13, color: tokens.bodyText, mt: 0.75 }}>
+                <Typography
+                  sx={{ fontSize: 13, color: tokens.bodyText, mt: 0.75 }}
+                >
                   Review by <strong>{deleteTarget.client}</strong> for{" "}
-                  <strong>{deleteTarget.professional}</strong> will be permanently removed.
+                  <strong>{deleteTarget.professional}</strong> will be
+                  permanently removed.
                 </Typography>
               ) : null}
             </Box>

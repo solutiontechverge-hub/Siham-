@@ -139,22 +139,32 @@ const initialState: DesiredLocationFormState = {
 };
 
 export function useDesiredLocationForm() {
-  const [values, setValues] = React.useState<DesiredLocationFormState>(initialState);
+  const [values, setValues] =
+    React.useState<DesiredLocationFormState>(initialState);
 
   const setField = React.useCallback(
-    <K extends keyof DesiredLocationFormState>(key: K, value: DesiredLocationFormState[K]) => {
+    <K extends keyof DesiredLocationFormState>(
+      key: K,
+      value: DesiredLocationFormState[K],
+    ) => {
       setValues((prev) => ({ ...prev, [key]: value }));
     },
     [],
   );
 
   const setAmenity = React.useCallback((id: string, checked: boolean) => {
-    setValues((prev) => ({ ...prev, amenities: { ...prev.amenities, [id]: checked } }));
+    setValues((prev) => ({
+      ...prev,
+      amenities: { ...prev.amenities, [id]: checked },
+    }));
   }, []);
 
   const setServiceFor = React.useCallback(
     (id: "men" | "women" | "kids", checked: boolean) => {
-      setValues((prev) => ({ ...prev, serviceFor: { ...prev.serviceFor, [id]: checked } }));
+      setValues((prev) => ({
+        ...prev,
+        serviceFor: { ...prev.serviceFor, [id]: checked },
+      }));
     },
     [],
   );
@@ -175,7 +185,10 @@ export function useDesiredLocationForm() {
   }, [values.keywordDraft, values.keywords]);
 
   const removeKeyword = React.useCallback((k: string) => {
-    setValues((prev) => ({ ...prev, keywords: prev.keywords.filter((x) => x !== k) }));
+    setValues((prev) => ({
+      ...prev,
+      keywords: prev.keywords.filter((x) => x !== k),
+    }));
   }, []);
 
   const reset = React.useCallback(() => setValues(initialState), []);
@@ -190,4 +203,3 @@ export function useDesiredLocationForm() {
     reset,
   };
 }
-

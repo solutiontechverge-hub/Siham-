@@ -26,7 +26,10 @@ export type AnalyticsSectionExplanationProps = {
   content: AnalyticsExplanationContent;
 };
 
-export default function AnalyticsSectionExplanation({ label, content }: AnalyticsSectionExplanationProps) {
+export default function AnalyticsSectionExplanation({
+  label,
+  content,
+}: AnalyticsSectionExplanationProps) {
   const m = useTheme().palette.mollure;
   const [open, setOpen] = React.useState(false);
 
@@ -54,7 +57,9 @@ export default function AnalyticsSectionExplanation({ label, content }: Analytic
           },
         }}
       >
-        <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: m.teal }}>{label}</BodyText>
+        <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: m.teal }}>
+          {label}
+        </BodyText>
         <KeyboardArrowDownRoundedIcon
           sx={{
             fontSize: 20,
@@ -81,13 +86,23 @@ export default function AnalyticsSectionExplanation({ label, content }: Analytic
             {content.blocks.map((block, blockIndex) => (
               <Box key={`${block.title}-${blockIndex}`}>
                 {block.title ? (
-                  <BodyText sx={{ fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.85), mb: 1 }}>
+                  <BodyText
+                    sx={{
+                      fontSize: 13,
+                      fontWeight: 900,
+                      color: alpha(m.navy, 0.85),
+                      mb: 1,
+                    }}
+                  >
                     {block.title}
                   </BodyText>
                 ) : null}
 
                 {block.paragraphs?.length ? (
-                  <Stack spacing={0.75} sx={{ mb: block.items?.length ? 1.25 : 0 }}>
+                  <Stack
+                    spacing={0.75}
+                    sx={{ mb: block.items?.length ? 1.25 : 0 }}
+                  >
                     {block.paragraphs.map((paragraph) => (
                       <BodyText
                         key={paragraph}
@@ -108,7 +123,14 @@ export default function AnalyticsSectionExplanation({ label, content }: Analytic
                   <Stack spacing={1.25}>
                     {block.items.map((item) => (
                       <Box key={item.title}>
-                        <BodyText sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.72), mb: 0.35 }}>
+                        <BodyText
+                          sx={{
+                            fontSize: 12.5,
+                            fontWeight: 800,
+                            color: alpha(m.navy, 0.72),
+                            mb: 0.35,
+                          }}
+                        >
                           {item.title}
                         </BodyText>
                         <BodyText

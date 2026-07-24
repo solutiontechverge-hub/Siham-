@@ -35,11 +35,21 @@ export default function AdminSeoPage() {
 
   return (
     <>
-      <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1.5 }}>
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={0.75}
+        sx={{ mb: 1.5 }}
+      >
         <Typography
           component={Link}
           href="/admin/dashboard"
-          sx={{ fontSize: 12, color: tokens.bodyText, textDecoration: "none", "&:hover": { color: tokens.teal } }}
+          sx={{
+            fontSize: 12,
+            color: tokens.bodyText,
+            textDecoration: "none",
+            "&:hover": { color: tokens.teal },
+          }}
         >
           Home
         </Typography>
@@ -52,11 +62,17 @@ export default function AdminSeoPage() {
       <Box sx={{ mb: 3 }}>
         <Typography
           variant="mainHeading"
-          sx={{ fontSize: { xs: 24, md: 28 }, color: tokens.textcolorgrey700, mb: 0.5 }}
+          sx={{
+            fontSize: { xs: 24, md: 28 },
+            color: tokens.textcolorgrey700,
+            mb: 0.5,
+          }}
         >
           SEO
         </Typography>
-        <Typography sx={{ fontSize: 14, color: tokens.bodyText, maxWidth: 640 }}>
+        <Typography
+          sx={{ fontSize: 14, color: tokens.bodyText, maxWidth: 640 }}
+        >
           Quick access to Google Search Console and Google Analytics.
         </Typography>
       </Box>
@@ -71,7 +87,12 @@ export default function AdminSeoPage() {
                 alignItems={{ xs: "flex-start", sm: "center" }}
                 justifyContent="space-between"
               >
-                <Stack direction="row" spacing={1.5} alignItems="center" sx={{ flex: 1, minWidth: 0 }}>
+                <Stack
+                  direction="row"
+                  spacing={1.5}
+                  alignItems="center"
+                  sx={{ flex: 1, minWidth: 0 }}
+                >
                   <Box
                     sx={{
                       width: 44,
@@ -89,10 +110,19 @@ export default function AdminSeoPage() {
                     {link.logoLabel}
                   </Box>
                   <Box sx={{ minWidth: 0 }}>
-                    <Typography sx={{ fontSize: 15, fontWeight: 600, color: tokens.navy, lineHeight: 1.3 }}>
+                    <Typography
+                      sx={{
+                        fontSize: 15,
+                        fontWeight: 600,
+                        color: tokens.navy,
+                        lineHeight: 1.3,
+                      }}
+                    >
                       {link.label}
                     </Typography>
-                    <Typography sx={{ fontSize: 12, color: tokens.bodyText, mt: 0.35 }}>
+                    <Typography
+                      sx={{ fontSize: 12, color: tokens.bodyText, mt: 0.35 }}
+                    >
                       {link.description}
                     </Typography>
                   </Box>

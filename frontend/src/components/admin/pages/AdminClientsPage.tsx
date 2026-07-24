@@ -30,12 +30,22 @@ import DeleteOutlineOutlinedIcon from "@mui/icons-material/DeleteOutlineOutlined
 import NoteAddOutlinedIcon from "@mui/icons-material/NoteAddOutlined";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { alpha, useTheme } from "@mui/material/styles";
-import { AppButton, AppMultiSelect, AppPagination, AppSearchField, AppSelect, AppTextField } from "../../common";
+import {
+  AppButton,
+  AppMultiSelect,
+  AppPagination,
+  AppSearchField,
+  AppSelect,
+  AppTextField,
+} from "../../common";
 import AppModal from "../../common/AppModal";
 import AdminFilterDateRange from "../AdminFilterDateRange";
 import AdminPageHeader from "../AdminPageHeader";
 import AdminSectionCard from "../AdminSectionCard";
-import AdminDataTable, { AdminSummaryGrid, type AdminTableColumn } from "../AdminDataTable";
+import AdminDataTable, {
+  AdminSummaryGrid,
+  type AdminTableColumn,
+} from "../AdminDataTable";
 import {
   clientManagementSummary,
   mockClients,
@@ -85,7 +95,11 @@ type ClientRowActionsProps = {
 
 function formatDisplayDate(iso: string) {
   const d = new Date(`${iso}T00:00:00`);
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 function getInitials(name: string) {
@@ -126,11 +140,24 @@ function ClientTypeCell({ type }: { type: MockClient["type"] }) {
   );
 }
 
-function FilterField({ label, children }: { label: string; children: React.ReactNode }) {
+function FilterField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   const tokens = useTheme().palette.mollure;
   return (
     <Stack spacing={0.5} sx={{ minWidth: 0 }}>
-      <Typography sx={{ fontSize: 11, fontWeight: 600, color: tokens.slate, lineHeight: 1.2 }}>
+      <Typography
+        sx={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: tokens.slate,
+          lineHeight: 1.2,
+        }}
+      >
         {label}
       </Typography>
       {children}
@@ -138,11 +165,25 @@ function FilterField({ label, children }: { label: string; children: React.React
   );
 }
 
-function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
+function DetailRow({
+  label,
+  value,
+}: {
+  label: string;
+  value: React.ReactNode;
+}) {
   const tokens = useTheme().palette.mollure;
   return (
     <Stack spacing={0.35}>
-      <Typography sx={{ fontSize: 11, fontWeight: 600, color: tokens.slate, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+      <Typography
+        sx={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: tokens.slate,
+          textTransform: "uppercase",
+          letterSpacing: "0.04em",
+        }}
+      >
         {label}
       </Typography>
       <Typography sx={{ fontSize: 14, color: tokens.navy }}>{value}</Typography>
@@ -150,7 +191,13 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   );
 }
 
-function ClientRowActions({ client, onView, onToggleStatus, onDelete, onNote }: ClientRowActionsProps) {
+function ClientRowActions({
+  client,
+  onView,
+  onToggleStatus,
+  onDelete,
+  onNote,
+}: ClientRowActionsProps) {
   const theme = useTheme();
   const tokens = theme.palette.mollure;
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
@@ -199,7 +246,10 @@ function ClientRowActions({ client, onView, onToggleStatus, onDelete, onNote }: 
           <MenuItem
             sx={{
               ...menuItemSx,
-              color: client.accountStatus === "disabled" ? tokens.tealDark : tokens.requestAccent,
+              color:
+                client.accountStatus === "disabled"
+                  ? tokens.tealDark
+                  : tokens.requestAccent,
             }}
             onClick={() => {
               setAnchorEl(null);
@@ -207,7 +257,9 @@ function ClientRowActions({ client, onView, onToggleStatus, onDelete, onNote }: 
             }}
           >
             <BlockOutlinedIcon sx={{ fontSize: 18 }} />
-            {client.accountStatus === "disabled" ? "Enable Client" : "Disable Client"}
+            {client.accountStatus === "disabled"
+              ? "Enable Client"
+              : "Disable Client"}
           </MenuItem>
         ) : null}
         {client.accountStatus !== "deleted" ? (
@@ -253,9 +305,12 @@ export default function AdminClientsPage() {
   const [usePagination, setUsePagination] = React.useState(false);
   const [page, setPage] = React.useState(1);
   const [exportNotice, setExportNotice] = React.useState<string | null>(null);
-  const [exportMenuAnchor, setExportMenuAnchor] = React.useState<null | HTMLElement>(null);
+  const [exportMenuAnchor, setExportMenuAnchor] =
+    React.useState<null | HTMLElement>(null);
   const [modal, setModal] = React.useState<ClientModal>(null);
-  const [activeClient, setActiveClient] = React.useState<MockClient | null>(null);
+  const [activeClient, setActiveClient] = React.useState<MockClient | null>(
+    null,
+  );
   const [draftNote, setDraftNote] = React.useState("");
   const [mounted, setMounted] = React.useState(false);
   const exportMenuOpen = Boolean(exportMenuAnchor);
@@ -279,22 +334,48 @@ export default function AdminClientsPage() {
           c.name.toLowerCase().includes(q) ||
           c.email.toLowerCase().includes(q) ||
           c.phone.includes(q);
-        const matchesType = typeFilter.length === 0 || typeFilter.includes(c.type);
-        const matchesStatus = statusFilter === "all" || c.accountStatus === statusFilter;
+        const matchesType =
+          typeFilter.length === 0 || typeFilter.includes(c.type);
+        const matchesStatus =
+          statusFilter === "all" || c.accountStatus === statusFilter;
         const matchesFrom = !regDateFrom || c.registrationDate >= regDateFrom;
         const matchesTo = !regDateTo || c.registrationDate <= regDateTo;
-        return matchesSearch && matchesType && matchesStatus && matchesFrom && matchesTo;
+        return (
+          matchesSearch &&
+          matchesType &&
+          matchesStatus &&
+          matchesFrom &&
+          matchesTo
+        );
       })
       .sort((a, b) => {
-        const field = sortBy.startsWith("reg") ? "registrationDate" : "lastBookingDate";
+        const field = sortBy.startsWith("reg")
+          ? "registrationDate"
+          : "lastBookingDate";
         const cmp = a[field].localeCompare(b[field]);
         return sortBy.endsWith("_desc") ? -cmp : cmp;
       });
-  }, [clients, search, typeFilter, statusFilter, regDateFrom, regDateTo, sortBy]);
+  }, [
+    clients,
+    search,
+    typeFilter,
+    statusFilter,
+    regDateFrom,
+    regDateTo,
+    sortBy,
+  ]);
 
   React.useEffect(() => {
     resetListView();
-  }, [search, typeFilter, statusFilter, regDateFrom, regDateTo, sortBy, resetListView]);
+  }, [
+    search,
+    typeFilter,
+    statusFilter,
+    regDateFrom,
+    regDateTo,
+    sortBy,
+    resetListView,
+  ]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
 
@@ -310,10 +391,14 @@ export default function AdminClientsPage() {
     if (page > pageCount) setPage(pageCount);
   }, [page, pageCount]);
 
-  const showLoadMore = !usePagination && visibleCount === INITIAL_VISIBLE && filtered.length > INITIAL_VISIBLE;
+  const showLoadMore =
+    !usePagination &&
+    visibleCount === INITIAL_VISIBLE &&
+    filtered.length > INITIAL_VISIBLE;
   const showPagination = usePagination && filtered.length > PAGE_SIZE;
 
-  const showingFrom = filtered.length === 0 ? 0 : usePagination ? (page - 1) * PAGE_SIZE + 1 : 1;
+  const showingFrom =
+    filtered.length === 0 ? 0 : usePagination ? (page - 1) * PAGE_SIZE + 1 : 1;
   const showingTo = usePagination
     ? Math.min(page * PAGE_SIZE, filtered.length)
     : Math.min(visibleCount, filtered.length);
@@ -331,7 +416,9 @@ export default function AdminClientsPage() {
   };
 
   const updateClient = (id: string, patch: Partial<MockClient>) => {
-    setClients((prev) => prev.map((c) => (c.id === id ? { ...c, ...patch } : c)));
+    setClients((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+    );
     setActiveClient((prev) => (prev?.id === id ? { ...prev, ...patch } : prev));
   };
 
@@ -345,7 +432,8 @@ export default function AdminClientsPage() {
 
   const handleApplyStatus = () => {
     if (!activeClient || activeClient.accountStatus === "deleted") return;
-    const nextStatus = activeClient.accountStatus === "active" ? "disabled" : "active";
+    const nextStatus =
+      activeClient.accountStatus === "active" ? "disabled" : "active";
     updateClient(activeClient.id, { accountStatus: nextStatus });
     closeModal();
   };
@@ -366,7 +454,8 @@ export default function AdminClientsPage() {
     closeModal();
   };
 
-  const clientHasNote = (client: MockClient) => Boolean(client.note?.trim() || client.hasNotes);
+  const clientHasNote = (client: MockClient) =>
+    Boolean(client.note?.trim() || client.hasNotes);
 
   const toggleSelect = (id: string) => {
     setSelected((prev) => {
@@ -405,7 +494,7 @@ export default function AdminClientsPage() {
     setExportNotice(
       ok
         ? `Exported ${filtered.length} client${filtered.length === 1 ? "" : "s"} to Excel.`
-        : "No clients to export for the current filters."
+        : "No clients to export for the current filters.",
     );
     setExportMenuAnchor(null);
   };
@@ -415,7 +504,7 @@ export default function AdminClientsPage() {
     setExportNotice(
       ok
         ? `Exported ${filtered.length} client${filtered.length === 1 ? "" : "s"} to PDF.`
-        : "No clients to export for the current filters."
+        : "No clients to export for the current filters.",
     );
     setExportMenuAnchor(null);
   };
@@ -428,11 +517,13 @@ export default function AdminClientsPage() {
 
   const allPageSelected =
     displayed.length > 0 && displayed.every((r) => selected.has(r.id));
-  const somePageSelected = displayed.some((r) => selected.has(r.id)) && !allPageSelected;
+  const somePageSelected =
+    displayed.some((r) => selected.has(r.id)) && !allPageSelected;
 
   const isDisabling = activeClient?.accountStatus === "active";
 
-  const { totalIC, totalCC, totalClients, totalBookings } = clientManagementSummary;
+  const { totalIC, totalCC, totalClients, totalBookings } =
+    clientManagementSummary;
   const icPct = ((totalIC / totalClients) * 100).toFixed(1);
   const ccPct = ((totalCC / totalClients) * 100).toFixed(1);
 
@@ -449,7 +540,11 @@ export default function AdminClientsPage() {
       ),
       minWidth: 44,
       render: (r) => (
-        <Checkbox size="small" checked={selected.has(r.id)} onChange={() => toggleSelect(r.id)} />
+        <Checkbox
+          size="small"
+          checked={selected.has(r.id)}
+          onChange={() => toggleSelect(r.id)}
+        />
       ),
     },
     {
@@ -458,10 +553,14 @@ export default function AdminClientsPage() {
       minWidth: 130,
       render: (r) => (
         <Stack spacing={0.25}>
-          <Typography sx={{ fontSize: 13, fontWeight: 500, color: tokens.navy }}>
+          <Typography
+            sx={{ fontSize: 13, fontWeight: 500, color: tokens.navy }}
+          >
             {formatDisplayDate(r.registrationDate)}
           </Typography>
-          <Typography sx={{ fontSize: 11, color: tokens.bodyText }}>{r.registrationTime}</Typography>
+          <Typography sx={{ fontSize: 11, color: tokens.bodyText }}>
+            {r.registrationTime}
+          </Typography>
         </Stack>
       ),
     },
@@ -476,7 +575,8 @@ export default function AdminClientsPage() {
             sx={{
               width: 36,
               height: 36,
-              bgcolor: r.type === "IC" ? alpha(tokens.teal, 0.14) : CC_PURPLE_SOFT,
+              bgcolor:
+                r.type === "IC" ? alpha(tokens.teal, 0.14) : CC_PURPLE_SOFT,
               color: r.type === "IC" ? tokens.tealDark : CC_PURPLE,
               fontSize: 13,
               fontWeight: 700,
@@ -485,9 +585,17 @@ export default function AdminClientsPage() {
             {getInitials(r.name)}
           </Avatar>
           <Stack spacing={0.25} sx={{ minWidth: 0 }}>
-            <Typography sx={{ fontSize: 13, fontWeight: 600, color: tokens.navy }}>{r.name}</Typography>
-            <Typography sx={{ fontSize: 11, color: tokens.bodyText }}>{r.email}</Typography>
-            <Typography sx={{ fontSize: 11, color: tokens.bodyText }}>{r.phone}</Typography>
+            <Typography
+              sx={{ fontSize: 13, fontWeight: 600, color: tokens.navy }}
+            >
+              {r.name}
+            </Typography>
+            <Typography sx={{ fontSize: 11, color: tokens.bodyText }}>
+              {r.email}
+            </Typography>
+            <Typography sx={{ fontSize: 11, color: tokens.bodyText }}>
+              {r.phone}
+            </Typography>
           </Stack>
         </Stack>
       ),
@@ -504,10 +612,14 @@ export default function AdminClientsPage() {
       minWidth: 150,
       render: (r) => (
         <Stack spacing={0.25}>
-          <Typography sx={{ fontSize: 13, fontWeight: 500, color: tokens.navy }}>
+          <Typography
+            sx={{ fontSize: 13, fontWeight: 500, color: tokens.navy }}
+          >
             {formatDisplayDate(r.lastBookingDate)}
           </Typography>
-          <Typography sx={{ fontSize: 11, color: tokens.bodyText }}>{r.lastBookingTime}</Typography>
+          <Typography sx={{ fontSize: 11, color: tokens.bodyText }}>
+            {r.lastBookingTime}
+          </Typography>
         </Stack>
       ),
     },
@@ -545,7 +657,9 @@ export default function AdminClientsPage() {
             aria-label="View notes"
             onClick={() => openClientModal(r, "note")}
           >
-            <ChatBubbleOutlineOutlinedIcon sx={{ fontSize: 18, color: tokens.teal }} />
+            <ChatBubbleOutlineOutlinedIcon
+              sx={{ fontSize: 18, color: tokens.teal }}
+            />
           </IconButton>
         ) : (
           <Box sx={{ width: 34, height: 34 }} />
@@ -569,16 +683,28 @@ export default function AdminClientsPage() {
 
   return (
     <>
-      <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1.5 }}>
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={0.75}
+        sx={{ mb: 1.5 }}
+      >
         <Typography
           component={Link}
           href="/admin/dashboard"
-          sx={{ fontSize: 12, color: tokens.bodyText, textDecoration: "none", "&:hover": { color: tokens.teal } }}
+          sx={{
+            fontSize: 12,
+            color: tokens.bodyText,
+            textDecoration: "none",
+            "&:hover": { color: tokens.teal },
+          }}
         >
           Home
         </Typography>
         <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>/</Typography>
-        <Typography sx={{ fontSize: 12, color: tokens.navy, fontWeight: 500 }}>Client Management</Typography>
+        <Typography sx={{ fontSize: 12, color: tokens.navy, fontWeight: 500 }}>
+          Client Management
+        </Typography>
       </Stack>
 
       <AdminPageHeader
@@ -692,7 +818,9 @@ export default function AdminClientsPage() {
               <AppButton
                 variant="outlined"
                 startIcon={<FileDownloadOutlinedIcon />}
-                endIcon={<KeyboardArrowDownOutlinedIcon sx={{ fontSize: 18 }} />}
+                endIcon={
+                  <KeyboardArrowDownOutlinedIcon sx={{ fontSize: 18 }} />
+                }
                 onClick={(e) => setExportMenuAnchor(e.currentTarget)}
                 disabled={filtered.length === 0}
                 sx={{ textTransform: "none", whiteSpace: "nowrap" }}
@@ -717,12 +845,22 @@ export default function AdminClientsPage() {
                   },
                 }}
               >
-                <MenuItem onClick={handleExportPdf} sx={{ fontSize: 13, gap: 1.25 }}>
-                  <PictureAsPdfOutlinedIcon sx={{ fontSize: 18, color: tokens.slate }} />
+                <MenuItem
+                  onClick={handleExportPdf}
+                  sx={{ fontSize: 13, gap: 1.25 }}
+                >
+                  <PictureAsPdfOutlinedIcon
+                    sx={{ fontSize: 18, color: tokens.slate }}
+                  />
                   Export as PDF
                 </MenuItem>
-                <MenuItem onClick={handleExportExcel} sx={{ fontSize: 13, gap: 1.25 }}>
-                  <TableChartOutlinedIcon sx={{ fontSize: 18, color: tokens.slate }} />
+                <MenuItem
+                  onClick={handleExportExcel}
+                  sx={{ fontSize: 13, gap: 1.25 }}
+                >
+                  <TableChartOutlinedIcon
+                    sx={{ fontSize: 18, color: tokens.slate }}
+                  />
                   Export as Excel
                 </MenuItem>
               </Menu>
@@ -730,7 +868,9 @@ export default function AdminClientsPage() {
           </Stack>
 
           {exportNotice ? (
-            <Typography sx={{ fontSize: 12, color: tokens.tealDark, fontWeight: 500 }}>
+            <Typography
+              sx={{ fontSize: 12, color: tokens.tealDark, fontWeight: 500 }}
+            >
               {exportNotice}
             </Typography>
           ) : null}
@@ -749,7 +889,9 @@ export default function AdminClientsPage() {
             borderBottom: `1px solid ${tokens.cardBorder}`,
           }}
         >
-          <Typography sx={{ fontSize: 13, fontWeight: 600, color: tokens.navy }}>
+          <Typography
+            sx={{ fontSize: 13, fontWeight: 600, color: tokens.navy }}
+          >
             Total Clients:{" "}
             <Box component="span" sx={{ fontWeight: 700 }}>
               {filtered.length.toLocaleString()}
@@ -780,11 +922,26 @@ export default function AdminClientsPage() {
           </Stack>
         </Stack>
 
-        <AdminDataTable columns={columns} rows={displayed} getRowId={(r) => r.id} />
+        <AdminDataTable
+          columns={columns}
+          rows={displayed}
+          getRowId={(r) => r.id}
+        />
 
         {showLoadMore ? (
-          <Box sx={{ px: pad.tableCellX, py: 2, borderTop: `1px solid ${tokens.cardBorder}`, textAlign: "center" }}>
-            <AppButton variant="outlined" onClick={handleLoadMore} sx={{ textTransform: "none", minWidth: 140 }}>
+          <Box
+            sx={{
+              px: pad.tableCellX,
+              py: 2,
+              borderTop: `1px solid ${tokens.cardBorder}`,
+              textAlign: "center",
+            }}
+          >
+            <AppButton
+              variant="outlined"
+              onClick={handleLoadMore}
+              sx={{ textTransform: "none", minWidth: 140 }}
+            >
               Load more
             </AppButton>
           </Box>
@@ -802,15 +959,21 @@ export default function AdminClientsPage() {
           }}
         >
           <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>
-            Showing {showingFrom.toLocaleString()} to {showingTo.toLocaleString()} of{" "}
-            {filtered.length.toLocaleString()} results
+            Showing {showingFrom.toLocaleString()} to{" "}
+            {showingTo.toLocaleString()} of {filtered.length.toLocaleString()}{" "}
+            results
           </Typography>
           {showPagination ? (
             <AppPagination
               page={page}
               count={pageCount}
               onChange={(_, p) => setPage(p)}
-              sx={{ "& .MuiPagination-ul": { flexWrap: "nowrap", justifyContent: { xs: "center", md: "flex-end" } } }}
+              sx={{
+                "& .MuiPagination-ul": {
+                  flexWrap: "nowrap",
+                  justifyContent: { xs: "center", md: "flex-end" },
+                },
+              }}
             />
           ) : null}
         </Stack>
@@ -887,7 +1050,11 @@ export default function AdminClientsPage() {
             footer={
               <Box sx={{ px: 2.5, py: 2 }}>
                 <Stack direction="row" justifyContent="flex-end">
-                  <AppButton variant="outlined" onClick={closeModal} sx={{ textTransform: "none" }}>
+                  <AppButton
+                    variant="outlined"
+                    onClick={closeModal}
+                    sx={{ textTransform: "none" }}
+                  >
                     Close
                   </AppButton>
                 </Stack>
@@ -901,15 +1068,25 @@ export default function AdminClientsPage() {
                     sx={{
                       width: 48,
                       height: 48,
-                      bgcolor: activeClient.type === "IC" ? alpha(tokens.teal, 0.14) : CC_PURPLE_SOFT,
-                      color: activeClient.type === "IC" ? tokens.tealDark : CC_PURPLE,
+                      bgcolor:
+                        activeClient.type === "IC"
+                          ? alpha(tokens.teal, 0.14)
+                          : CC_PURPLE_SOFT,
+                      color:
+                        activeClient.type === "IC"
+                          ? tokens.tealDark
+                          : CC_PURPLE,
                       fontWeight: 700,
                     }}
                   >
                     {getInitials(activeClient.name)}
                   </Avatar>
                   <Box>
-                    <Typography sx={{ fontSize: 16, fontWeight: 600, color: tokens.navy }}>{activeClient.name}</Typography>
+                    <Typography
+                      sx={{ fontSize: 16, fontWeight: 600, color: tokens.navy }}
+                    >
+                      {activeClient.name}
+                    </Typography>
                     <ClientTypeCell type={activeClient.type} />
                   </Box>
                 </Stack>
@@ -923,13 +1100,25 @@ export default function AdminClientsPage() {
                   label="Last completed booking"
                   value={`${formatDisplayDate(activeClient.lastBookingDate)}, ${activeClient.lastBookingTime}`}
                 />
-                <DetailRow label="Account status" value={STATUS_STYLES[activeClient.accountStatus].label} />
+                <DetailRow
+                  label="Account status"
+                  value={STATUS_STYLES[activeClient.accountStatus].label}
+                />
                 {activeClient.contactPerson ? (
-                  <DetailRow label="Contact person" value={activeClient.contactPerson} />
+                  <DetailRow
+                    label="Contact person"
+                    value={activeClient.contactPerson}
+                  />
                 ) : null}
-                {activeClient.birthdate ? <DetailRow label="Birthdate" value={activeClient.birthdate} /> : null}
-                {activeClient.gender ? <DetailRow label="Gender" value={activeClient.gender} /> : null}
-                {activeClient.note?.trim() ? <DetailRow label="Note" value={activeClient.note} /> : null}
+                {activeClient.birthdate ? (
+                  <DetailRow label="Birthdate" value={activeClient.birthdate} />
+                ) : null}
+                {activeClient.gender ? (
+                  <DetailRow label="Gender" value={activeClient.gender} />
+                ) : null}
+                {activeClient.note?.trim() ? (
+                  <DetailRow label="Note" value={activeClient.note} />
+                ) : null}
               </Stack>
             ) : null}
           </AppModal>
@@ -944,10 +1133,18 @@ export default function AdminClientsPage() {
             footer={
               <Box sx={{ px: 2.5, py: 2 }}>
                 <Stack direction="row" justifyContent="center" spacing={1.25}>
-                  <AppButton variant="outlined" onClick={closeModal} sx={{ textTransform: "none", minWidth: 120 }}>
+                  <AppButton
+                    variant="outlined"
+                    onClick={closeModal}
+                    sx={{ textTransform: "none", minWidth: 120 }}
+                  >
                     Cancel
                   </AppButton>
-                  <AppButton variant="contained" onClick={handleApplyStatus} sx={{ textTransform: "none", minWidth: 120 }}>
+                  <AppButton
+                    variant="contained"
+                    onClick={handleApplyStatus}
+                    sx={{ textTransform: "none", minWidth: 120 }}
+                  >
                     Apply
                   </AppButton>
                 </Stack>
@@ -955,8 +1152,17 @@ export default function AdminClientsPage() {
             }
           >
             <Box sx={{ py: 3, px: 2.5, textAlign: "center" }}>
-              <WarningAmberRoundedIcon sx={{ fontSize: 56, color: "#E85D5D", mb: 1.75 }} />
-              <Typography sx={{ fontWeight: 700, fontSize: 14, color: alpha(tokens.navy, 0.88), lineHeight: 1.55 }}>
+              <WarningAmberRoundedIcon
+                sx={{ fontSize: 56, color: "#E85D5D", mb: 1.75 }}
+              />
+              <Typography
+                sx={{
+                  fontWeight: 700,
+                  fontSize: 14,
+                  color: alpha(tokens.navy, 0.88),
+                  lineHeight: 1.55,
+                }}
+              >
                 {isDisabling
                   ? `Are you sure you want to disable ${activeClient?.name}? They will no longer be able to book services.`
                   : `Are you sure you want to re-enable ${activeClient?.name}? They will regain access to booking.`}
@@ -974,14 +1180,17 @@ export default function AdminClientsPage() {
             footer={
               <Box sx={{ px: 2.5, py: 2 }}>
                 <Stack direction="row" justifyContent="center" spacing={1.25}>
-                  <AppButton variant="outlined" onClick={closeModal} sx={{ textTransform: "none", minWidth: 120 }}>
+                  <AppButton
+                    tone="secondary"
+                    onClick={closeModal}
+                    sx={{ minWidth: 120 }}
+                  >
                     Cancel
                   </AppButton>
                   <AppButton
-                    variant="contained"
-                    color="error"
+                    tone="danger"
                     onClick={handleApplyDelete}
-                    sx={{ textTransform: "none", minWidth: 120 }}
+                    sx={{ minWidth: 120 }}
                   >
                     Apply
                   </AppButton>
@@ -990,9 +1199,19 @@ export default function AdminClientsPage() {
             }
           >
             <Box sx={{ py: 3, px: 2.5, textAlign: "center" }}>
-              <WarningAmberRoundedIcon sx={{ fontSize: 56, color: "#E85D5D", mb: 1.75 }} />
-              <Typography sx={{ fontWeight: 700, fontSize: 14, color: alpha(tokens.navy, 0.88), lineHeight: 1.55 }}>
-                Are you sure you want to delete {activeClient?.name}? This will mark the account as deleted.
+              <WarningAmberRoundedIcon
+                sx={{ fontSize: 56, color: "#E85D5D", mb: 1.75 }}
+              />
+              <Typography
+                sx={{
+                  fontWeight: 700,
+                  fontSize: 14,
+                  color: alpha(tokens.navy, 0.88),
+                  lineHeight: 1.55,
+                }}
+              >
+                Are you sure you want to delete {activeClient?.name}? This will
+                mark the account as deleted.
               </Typography>
             </Box>
           </AppModal>
@@ -1006,10 +1225,18 @@ export default function AdminClientsPage() {
             footer={
               <Box sx={{ px: 2.5, py: 2 }}>
                 <Stack direction="row" justifyContent="flex-end" spacing={1.25}>
-                  <AppButton variant="outlined" onClick={closeModal} sx={{ textTransform: "none" }}>
+                  <AppButton
+                    variant="outlined"
+                    onClick={closeModal}
+                    sx={{ textTransform: "none" }}
+                  >
                     Cancel
                   </AppButton>
-                  <AppButton variant="contained" onClick={handleSaveNote} sx={{ textTransform: "none" }}>
+                  <AppButton
+                    variant="contained"
+                    onClick={handleSaveNote}
+                    sx={{ textTransform: "none" }}
+                  >
                     Save note
                   </AppButton>
                 </Stack>

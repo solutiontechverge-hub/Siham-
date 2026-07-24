@@ -62,36 +62,85 @@ function ActivityCard({
           "&:hover": clickable ? { bgcolor: alpha(m.navy, 0.02) } : undefined,
         }}
       >
-        <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
+        <Stack
+          direction="row"
+          alignItems="flex-start"
+          justifyContent="space-between"
+          spacing={1}
+        >
           <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.48), mb: 0.25 }}>
+            <Typography
+              sx={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.48),
+                mb: 0.25,
+              }}
+            >
               {item.actorLabel}
             </Typography>
-            <Typography sx={{ fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.88), lineHeight: 1.3 }}>
+            <Typography
+              sx={{
+                fontSize: 13,
+                fontWeight: 900,
+                color: alpha(m.navy, 0.88),
+                lineHeight: 1.3,
+              }}
+            >
               {item.title}
             </Typography>
             {item.subtitle ? (
-              <Typography sx={{ mt: 0.35, fontSize: 11.5, fontWeight: 600, color: alpha(m.navy, 0.52) }}>
+              <Typography
+                sx={{
+                  mt: 0.35,
+                  fontSize: 11.5,
+                  fontWeight: 600,
+                  color: alpha(m.navy, 0.52),
+                }}
+              >
                 {item.subtitle}
               </Typography>
             ) : null}
-            <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.85 }}>
+            <Stack
+              direction="row"
+              spacing={1.5}
+              alignItems="center"
+              sx={{ mt: 0.85 }}
+            >
               <Stack direction="row" spacing={0.45} alignItems="center">
-                <CalendarMonthRoundedIcon sx={{ fontSize: 13, color: alpha(m.navy, 0.38) }} />
-                <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: alpha(m.navy, 0.48) }}>
+                <CalendarMonthRoundedIcon
+                  sx={{ fontSize: 13, color: alpha(m.navy, 0.38) }}
+                />
+                <Typography
+                  sx={{
+                    fontSize: 10.5,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.48),
+                  }}
+                >
                   {item.dateLabel}
                 </Typography>
               </Stack>
               <Stack direction="row" spacing={0.45} alignItems="center">
-                <AccessTimeRoundedIcon sx={{ fontSize: 13, color: alpha(m.navy, 0.38) }} />
-                <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: alpha(m.navy, 0.48) }}>
+                <AccessTimeRoundedIcon
+                  sx={{ fontSize: 13, color: alpha(m.navy, 0.38) }}
+                />
+                <Typography
+                  sx={{
+                    fontSize: 10.5,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.48),
+                  }}
+                >
                   {item.timeLabel}
                 </Typography>
               </Stack>
             </Stack>
           </Box>
           {clickable ? (
-            <ChevronRightRoundedIcon sx={{ fontSize: 22, color: alpha(m.navy, 0.35), mt: 0.5 }} />
+            <ChevronRightRoundedIcon
+              sx={{ fontSize: 22, color: alpha(m.navy, 0.35), mt: 0.5 }}
+            />
           ) : null}
         </Stack>
       </Box>
@@ -146,7 +195,14 @@ function CancellationActivityDetails({ item }: { item: BookingActivityItem }) {
   return (
     <Stack spacing={1.75}>
       <Box>
-        <Typography sx={{ fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.88), mb: 1 }}>
+        <Typography
+          sx={{
+            fontSize: 13,
+            fontWeight: 900,
+            color: alpha(m.navy, 0.88),
+            mb: 1,
+          }}
+        >
           Booking Details
         </Typography>
         <Box
@@ -158,31 +214,63 @@ function CancellationActivityDetails({ item }: { item: BookingActivityItem }) {
             py: 1.5,
           }}
         >
-          <Typography sx={{ fontSize: 13.5, fontWeight: 800, color: m.teal, mb: 1 }}>
+          <Typography
+            sx={{ fontSize: 13.5, fontWeight: 800, color: m.teal, mb: 1 }}
+          >
             Booking Cancelled
           </Typography>
-          <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1.25 }}>
+          <Stack
+            direction="row"
+            spacing={1.5}
+            alignItems="center"
+            sx={{ mb: 1.25 }}
+          >
             <Stack direction="row" spacing={0.45} alignItems="center">
-              <CalendarMonthRoundedIcon sx={{ fontSize: 15, color: alpha(m.navy, 0.4) }} />
-              <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.55) }}>
+              <CalendarMonthRoundedIcon
+                sx={{ fontSize: 15, color: alpha(m.navy, 0.4) }}
+              />
+              <Typography
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: alpha(m.navy, 0.55),
+                }}
+              >
                 {item.dateLabel}
               </Typography>
             </Stack>
             <Stack direction="row" spacing={0.45} alignItems="center">
-              <AccessTimeRoundedIcon sx={{ fontSize: 15, color: alpha(m.navy, 0.4) }} />
-              <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.55) }}>
+              <AccessTimeRoundedIcon
+                sx={{ fontSize: 15, color: alpha(m.navy, 0.4) }}
+              />
+              <Typography
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: alpha(m.navy, 0.55),
+                }}
+              >
                 {item.timeLabel}
               </Typography>
             </Stack>
           </Stack>
-          <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.62) }}>
+          <Typography
+            sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.62) }}
+          >
             {item.professionalName || "Professional"}
           </Typography>
         </Box>
       </Box>
 
       <Box>
-        <Typography sx={{ fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.88), mb: 1 }}>
+        <Typography
+          sx={{
+            fontSize: 13,
+            fontWeight: 900,
+            color: alpha(m.navy, 0.88),
+            mb: 1,
+          }}
+        >
           Reason
         </Typography>
         <Box
@@ -204,7 +292,14 @@ function CancellationActivityDetails({ item }: { item: BookingActivityItem }) {
               minHeight: 48,
             }}
           >
-            <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.72), lineHeight: 1.5 }}>
+            <Typography
+              sx={{
+                fontSize: 12.5,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.72),
+                lineHeight: 1.5,
+              }}
+            >
               {item.cancellationReason}
             </Typography>
           </Box>
@@ -237,13 +332,31 @@ function EbrActivityDetails({
             py: 1.5,
           }}
         >
-          <Typography sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.78), mb: 1 }}>
+          <Typography
+            sx={{
+              fontSize: 12,
+              fontWeight: 900,
+              color: alpha(m.navy, 0.78),
+              mb: 1,
+            }}
+          >
             Details
           </Typography>
           <Stack spacing={1}>
             {item.detailLines!.map((line) => (
-              <Stack key={line.label} direction="row" justifyContent="space-between" spacing={2}>
-                <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.5) }}>
+              <Stack
+                key={line.label}
+                direction="row"
+                justifyContent="space-between"
+                spacing={2}
+              >
+                <Typography
+                  sx={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.5),
+                  }}
+                >
                   {line.label}
                 </Typography>
                 <Typography
@@ -263,7 +376,9 @@ function EbrActivityDetails({
         </Box>
       ) : null}
 
-      <Typography sx={{ fontSize: 11.5, color: alpha(m.navy, 0.45), lineHeight: 1.45 }}>
+      <Typography
+        sx={{ fontSize: 11.5, color: alpha(m.navy, 0.45), lineHeight: 1.45 }}
+      >
         Read-only details. No actions are available on this screen.
       </Typography>
     </Stack>
@@ -287,7 +402,9 @@ export default function BookingActivityOverview({
 
   const detailItems = React.useMemo(() => {
     if (!selectedDetail) return [];
-    const sameBooking = items.filter((item) => item.bookingId === selectedDetail.bookingId);
+    const sameBooking = items.filter(
+      (item) => item.bookingId === selectedDetail.bookingId,
+    );
     return sameBooking.length ? sameBooking : [selectedDetail];
   }, [items, selectedDetail]);
 
@@ -296,17 +413,29 @@ export default function BookingActivityOverview({
   }
 
   if (selectedDetail) {
-    return <EbrActivityDetails item={selectedDetail} relatedItems={detailItems} />;
+    return (
+      <EbrActivityDetails item={selectedDetail} relatedItems={detailItems} />
+    );
   }
 
   return (
     <Stack spacing={1.5}>
-      <Typography sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}>{title}</Typography>
+      <Typography
+        sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}
+      >
+        {title}
+      </Typography>
 
       {!items.length ? (
-        <Typography sx={{ fontSize: 12.5, color: alpha(m.navy, 0.55), py: 2 }}>{emptyMessage}</Typography>
+        <Typography sx={{ fontSize: 12.5, color: alpha(m.navy, 0.55), py: 2 }}>
+          {emptyMessage}
+        </Typography>
       ) : (
-        <TimelineList items={items} allowArrows onOpen={(item) => onSelectedDetailChange?.(item)} />
+        <TimelineList
+          items={items}
+          allowArrows
+          onOpen={(item) => onSelectedDetailChange?.(item)}
+        />
       )}
     </Stack>
   );

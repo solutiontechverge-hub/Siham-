@@ -10,14 +10,18 @@ type Props = {
   snapshot?: CalendarBookingClientSnapshot | null;
 };
 
-export default function BookingDrawerClientSnapshotSection({ snapshot }: Props) {
+export default function BookingDrawerClientSnapshotSection({
+  snapshot,
+}: Props) {
   const m = useTheme().palette.mollure;
   if (!snapshot) return null;
 
   const people = snapshot.people ?? [];
   const services = snapshot.services ?? [];
   const project = snapshot.projectDetails;
-  const hasProject = Boolean(project?.description?.trim()) || (project?.uploads?.length ?? 0) > 0;
+  const hasProject =
+    Boolean(project?.description?.trim()) ||
+    (project?.uploads?.length ?? 0) > 0;
 
   const teamNameById = React.useMemo(() => {
     const map = new Map<string, string>();
@@ -34,9 +38,24 @@ export default function BookingDrawerClientSnapshotSection({ snapshot }: Props) 
     <Stack spacing={1.75} sx={{ mt: 1.5 }}>
       {hasProject ? (
         <Box>
-          <Stack direction="row" alignItems="baseline" spacing={1} sx={{ mb: 1 }}>
-            <Typography sx={{ fontWeight: 900, fontSize: 12.5, color: alpha(m.navy, 0.78) }}>Project</Typography>
-            <Typography sx={{ fontWeight: 800, fontSize: 11, color: m.teal }}>Detail</Typography>
+          <Stack
+            direction="row"
+            alignItems="baseline"
+            spacing={1}
+            sx={{ mb: 1 }}
+          >
+            <Typography
+              sx={{
+                fontWeight: 900,
+                fontSize: 12.5,
+                color: alpha(m.navy, 0.78),
+              }}
+            >
+              Project
+            </Typography>
+            <Typography sx={{ fontWeight: 800, fontSize: 11, color: m.teal }}>
+              Detail
+            </Typography>
           </Stack>
           {project?.description?.trim() ? (
             <Box
@@ -49,14 +68,28 @@ export default function BookingDrawerClientSnapshotSection({ snapshot }: Props) 
                 mb: (project.uploads?.length ?? 0) > 0 ? 1 : 0,
               }}
             >
-              <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.62), whiteSpace: "pre-wrap" }}>
+              <Typography
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: alpha(m.navy, 0.62),
+                  whiteSpace: "pre-wrap",
+                }}
+              >
                 {project.description}
               </Typography>
             </Box>
           ) : null}
           {(project?.uploads?.length ?? 0) > 0 ? (
             <Box>
-              <Typography sx={{ fontWeight: 900, fontSize: 11.5, color: alpha(m.navy, 0.68), mb: 0.75 }}>
+              <Typography
+                sx={{
+                  fontWeight: 900,
+                  fontSize: 11.5,
+                  color: alpha(m.navy, 0.68),
+                  mb: 0.75,
+                }}
+              >
                 Uploaded
               </Typography>
               <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap">
@@ -112,12 +145,22 @@ export default function BookingDrawerClientSnapshotSection({ snapshot }: Props) 
               : "Guest";
 
         const hasPlanning =
-          isPlanning && Boolean(person.planningActivity?.trim() || person.planningDuration?.trim());
+          isPlanning &&
+          Boolean(
+            person.planningActivity?.trim() || person.planningDuration?.trim(),
+          );
         if (!personServices.length && !hasPlanning) return null;
 
         return (
           <Box key={person.id}>
-            <Typography sx={{ fontWeight: 900, fontSize: 12.5, color: alpha(m.navy, 0.72), mb: 0.85 }}>
+            <Typography
+              sx={{
+                fontWeight: 900,
+                fontSize: 12.5,
+                color: alpha(m.navy, 0.72),
+                mb: 0.85,
+              }}
+            >
               {title}
             </Typography>
             {hasPlanning ? (
@@ -132,12 +175,25 @@ export default function BookingDrawerClientSnapshotSection({ snapshot }: Props) 
                 }}
               >
                 {person.planningActivity?.trim() ? (
-                  <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
+                  <Typography
+                    sx={{
+                      fontSize: 12.5,
+                      fontWeight: 900,
+                      color: alpha(m.navy, 0.82),
+                    }}
+                  >
                     {person.planningActivity}
                   </Typography>
                 ) : null}
                 {person.planningDuration?.trim() ? (
-                  <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.48), mt: 0.25 }}>
+                  <Typography
+                    sx={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: alpha(m.navy, 0.48),
+                      mt: 0.25,
+                    }}
+                  >
                     {person.planningDuration}
                   </Typography>
                 ) : null}
@@ -159,19 +215,44 @@ export default function BookingDrawerClientSnapshotSection({ snapshot }: Props) 
                       py: 1,
                     }}
                   >
-                    <Stack direction="row" justifyContent="space-between" spacing={1}>
+                    <Stack
+                      direction="row"
+                      justifyContent="space-between"
+                      spacing={1}
+                    >
                       <Box sx={{ minWidth: 0 }}>
-                        <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
+                        <Typography
+                          sx={{
+                            fontSize: 12.5,
+                            fontWeight: 900,
+                            color: alpha(m.navy, 0.82),
+                          }}
+                        >
                           {service.name}
                         </Typography>
-                        <ServiceSummaryMetaLine durationLabel={`${service.durationMins} Mins`} />
+                        <ServiceSummaryMetaLine
+                          durationLabel={`${service.durationMins} Mins`}
+                        />
                         {staff ? (
-                          <Typography sx={{ fontSize: 10.5, fontWeight: 800, color: alpha(m.navy, 0.48), mt: 0.35 }}>
+                          <Typography
+                            sx={{
+                              fontSize: 10.5,
+                              fontWeight: 800,
+                              color: alpha(m.navy, 0.48),
+                              mt: 0.35,
+                            }}
+                          >
                             By {staff}
                           </Typography>
                         ) : null}
                       </Box>
-                      <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
+                      <Typography
+                        sx={{
+                          fontSize: 12.5,
+                          fontWeight: 900,
+                          color: alpha(m.navy, 0.82),
+                        }}
+                      >
                         €{service.price}
                       </Typography>
                     </Stack>

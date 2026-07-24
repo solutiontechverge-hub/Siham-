@@ -41,9 +41,14 @@ import { useBookingRealtimeSync } from "../../../../hooks/useBookingRealtimeSync
 import { applyServiceOrderToServiceCategories } from "../../../../components/common/calendar/serviceOrder.utils";
 import type { ServiceOrderSettings } from "../../../../components/common/calendar/calendar-settings.types";
 
-const DEFAULT_TIME_GRID = { startHour: 8, endHour: 22, stepMinutes: 15 } as const;
+const DEFAULT_TIME_GRID = {
+  startHour: 8,
+  endHour: 22,
+  stepMinutes: 15,
+} as const;
 
-const timeFromApi = (value?: string | null) => wallClockTimeFromDateTime(value) ?? "08:00";
+const timeFromApi = (value?: string | null) =>
+  wallClockTimeFromDateTime(value) ?? "08:00";
 
 const dateFromApi = (value?: string | null) =>
   wallClockDateFromDateTime(value) ?? new Date().toISOString().slice(0, 10);
@@ -60,7 +65,9 @@ const parseServiceDurationMins = (label?: string | null) => {
   return fallback ? Number(fallback[1]) : 30;
 };
 
-const mapSetupServicesToCatalog = (services: readonly BusinessServiceDetail[] | undefined): BookingCatalogService[] =>
+const mapSetupServicesToCatalog = (
+  services: readonly BusinessServiceDetail[] | undefined,
+): BookingCatalogService[] =>
   (services ?? []).map((service) => ({
     id: String(service.service_id || service.id),
     name: service.service_title,
@@ -81,7 +88,8 @@ function buildUpsertPayloadFromSetup(
     business_media: setup.business_media,
     salon_name: setup.salon_name ?? undefined,
     fixed_location_address: setup.fixed_location_address ?? undefined,
-    fixed_location_street_number: setup.fixed_location_street_number ?? undefined,
+    fixed_location_street_number:
+      setup.fixed_location_street_number ?? undefined,
     fixed_location_postal_code: setup.fixed_location_postal_code ?? undefined,
     fixed_location_province: setup.fixed_location_province ?? undefined,
     fixed_location_municipality: setup.fixed_location_municipality ?? undefined,
@@ -93,26 +101,39 @@ function buildUpsertPayloadFromSetup(
     additional_notes: setup.additional_notes ?? undefined,
     price_range: setup.price_range ?? undefined,
     prepayment_percentage:
-      setup.prepayment_percentage != null ? Number(setup.prepayment_percentage) : null,
+      setup.prepayment_percentage != null
+        ? Number(setup.prepayment_percentage)
+        : null,
     prepayment_instruction: setup.prepayment_instruction ?? undefined,
     kilometer_allowance:
-      setup.kilometer_allowance != null ? Number(setup.kilometer_allowance) : null,
-    kilometer_allowance_instruction: setup.kilometer_allowance_instruction ?? undefined,
+      setup.kilometer_allowance != null
+        ? Number(setup.kilometer_allowance)
+        : null,
+    kilometer_allowance_instruction:
+      setup.kilometer_allowance_instruction ?? undefined,
     response_time_hours: setup.response_time_hours,
     response_time_minutes: setup.response_time_minutes,
     policy_custom_instruction: setup.policy_custom_instruction ?? undefined,
     appointment_before_hours: setup.appointment_before_hours,
     appointment_before_minutes: setup.appointment_before_minutes,
     late_reschedule_fee_percentage:
-      setup.late_reschedule_fee_percentage != null ? Number(setup.late_reschedule_fee_percentage) : null,
-    late_reschedule_policy_instruction: setup.late_reschedule_policy_instruction ?? undefined,
+      setup.late_reschedule_fee_percentage != null
+        ? Number(setup.late_reschedule_fee_percentage)
+        : null,
+    late_reschedule_policy_instruction:
+      setup.late_reschedule_policy_instruction ?? undefined,
     cancellation_before_hours: setup.cancellation_before_hours,
     cancellation_before_minutes: setup.cancellation_before_minutes,
     late_cancellation_fee_percentage:
-      setup.late_cancellation_fee_percentage != null ? Number(setup.late_cancellation_fee_percentage) : null,
-    cancellation_policy_instruction: setup.cancellation_policy_instruction ?? undefined,
+      setup.late_cancellation_fee_percentage != null
+        ? Number(setup.late_cancellation_fee_percentage)
+        : null,
+    cancellation_policy_instruction:
+      setup.cancellation_policy_instruction ?? undefined,
     no_show_fee_percentage:
-      setup.no_show_fee_percentage != null ? Number(setup.no_show_fee_percentage) : null,
+      setup.no_show_fee_percentage != null
+        ? Number(setup.no_show_fee_percentage)
+        : null,
     no_show_fee_instruction: setup.no_show_fee_instruction ?? undefined,
     desired_location_area: setup.desired_location_area ?? undefined,
     desired_location_province: setup.desired_location_province ?? undefined,
@@ -126,27 +147,40 @@ export default function FixedLocationCalendarPage() {
   const { data: setupData } = useGetBusinessSetupQuery();
   const businessSetupId = setupData?.data?.id ?? "";
   useBookingRealtimeSync({ businessSetupId: businessSetupId || undefined });
-  const [overviewQuery, setOverviewQuery] = React.useState<CalendarOverviewQuery>(() =>
-    getCalendarQueryDateRange(toIsoLocalDate(new Date()), "day"),
-  );
-  const handleOverviewDateRangeChange = React.useCallback((range: CalendarOverviewQuery) => {
-    setOverviewQuery((prev) =>
-      prev.startDate === range.startDate && prev.endDate === range.endDate ? prev : range,
+  const [overviewQuery, setOverviewQuery] =
+    React.useState<CalendarOverviewQuery>(() =>
+      getCalendarQueryDateRange(toIsoLocalDate(new Date()), "day"),
     );
-  }, []);
-  const { data: calendarOverviewData } = useGetCalendarOverviewQuery(overviewQuery, {
-    refetchOnMountOrArgChange: true,
-    refetchOnFocus: true,
-    refetchOnReconnect: true,
-  });
+  const handleOverviewDateRangeChange = React.useCallback(
+    (range: CalendarOverviewQuery) => {
+      setOverviewQuery((prev) =>
+        prev.startDate === range.startDate && prev.endDate === range.endDate
+          ? prev
+          : range,
+      );
+    },
+    [],
+  );
+  const { data: calendarOverviewData } = useGetCalendarOverviewQuery(
+    overviewQuery,
+    {
+      refetchOnMountOrArgChange: true,
+      refetchOnFocus: true,
+      refetchOnReconnect: true,
+    },
+  );
   const { data: professionalClientsData } = useGetProfessionalClientsQuery();
   const { data: mollureDirectoryData } = useGetMollureClientDirectoryQuery();
-  const [createCalendarEntry, { isLoading: isCreatingCalendarEntry }] = useCreateCalendarEntryMutation();
-  const [deleteCalendarEntry, { isLoading: isDeletingCalendarEntry }] = useDeleteCalendarEntryMutation();
-  const [upsertCalendarSettings, { isLoading: isSavingCalendarSettings }] = useUpsertCalendarSettingsMutation();
+  const [createCalendarEntry, { isLoading: isCreatingCalendarEntry }] =
+    useCreateCalendarEntryMutation();
+  const [deleteCalendarEntry, { isLoading: isDeletingCalendarEntry }] =
+    useDeleteCalendarEntryMutation();
+  const [upsertCalendarSettings, { isLoading: isSavingCalendarSettings }] =
+    useUpsertCalendarSettingsMutation();
   const [upsertBusinessSetup] = useUpsertBusinessSetupMutation();
   const [updateBookingStatus] = useUpdateBookingStatusMutation();
-  const [dispatchBookingNotification] = useDispatchBookingNotificationMutation();
+  const [dispatchBookingNotification] =
+    useDispatchBookingNotificationMutation();
   const [updateCalendarEntryStatus] = useUpdateCalendarEntryStatusMutation();
   const { showSnackbar } = useSnackbar();
 
@@ -183,7 +217,9 @@ export default function FixedLocationCalendarPage() {
       .map((entry) => ({
         id: `blk-${entry.id}`,
         resourceId: String(entry.team_member_id ?? resources[0]?.id ?? ""),
-        date: dateFromApi(entry.date || entry.blocked_time_start || entry.start_date),
+        date: dateFromApi(
+          entry.date || entry.blocked_time_start || entry.start_date,
+        ),
         start: entry.start || timeFromApi(entry.blocked_time_start),
         end: entry.end || timeFromApi(entry.blocked_time_end),
         title: entry.title,
@@ -191,7 +227,10 @@ export default function FixedLocationCalendarPage() {
       }));
 
     const calendarLocations = Array.from(
-      new Set<CalendarBookingLocation>([...supportedLocations, ...apiEvents.map((event) => event.location)]),
+      new Set<CalendarBookingLocation>([
+        ...supportedLocations,
+        ...apiEvents.map((event) => event.location),
+      ]),
     );
 
     return {
@@ -211,7 +250,11 @@ export default function FixedLocationCalendarPage() {
   }, [calendarOverviewData, setupData]);
 
   const calendarSettings = React.useMemo(
-    () => parseCalendarSettings(calendarOverviewData?.data?.settings?.availability, calendarOverviewData?.data?.settings?.design),
+    () =>
+      parseCalendarSettings(
+        calendarOverviewData?.data?.settings?.availability,
+        calendarOverviewData?.data?.settings?.design,
+      ),
     [calendarOverviewData],
   );
 
@@ -220,12 +263,19 @@ export default function FixedLocationCalendarPage() {
     [setupData],
   );
 
-  const serviceOptions = React.useMemo(() => serviceCatalog.map((service) => service.name), [serviceCatalog]);
+  const serviceOptions = React.useMemo(
+    () => serviceCatalog.map((service) => service.name),
+    [serviceCatalog],
+  );
 
   const serviceOrderDefaults = React.useMemo(() => {
     const setup = setupData?.data;
     const categories = Array.from(
-      new Set(setup?.service_details?.map((service) => service.category_title).filter(Boolean) ?? []),
+      new Set(
+        setup?.service_details
+          ?.map((service) => service.category_title)
+          .filter(Boolean) ?? [],
+      ),
     );
     if (!categories.length) {
       return { categories: [], servicesByCategory: {} };
@@ -269,13 +319,21 @@ export default function FixedLocationCalendarPage() {
       serviceOrderDefaults={serviceOrderDefaults}
       clientOptions={clientOptions}
       platformClientOptions={platformClientOptions}
-      fixedLocationAddress={setupData?.data?.fixed_location_address || setupData?.data?.salon_name || undefined}
+      fixedLocationAddress={
+        setupData?.data?.fixed_location_address ||
+        setupData?.data?.salon_name ||
+        undefined
+      }
       lateRescheduleFeePercentDefault={
         setupData?.data?.late_reschedule_fee_percentage != null
           ? String(setupData.data.late_reschedule_fee_percentage)
           : undefined
       }
-      isSaving={isCreatingCalendarEntry || isSavingCalendarSettings || isDeletingCalendarEntry}
+      isSaving={
+        isCreatingCalendarEntry ||
+        isSavingCalendarSettings ||
+        isDeletingCalendarEntry
+      }
       onCreateCalendarEntry={async (payload) => {
         const response = await createCalendarEntry(payload).unwrap();
         return response.data;
@@ -283,11 +341,17 @@ export default function FixedLocationCalendarPage() {
       onDeleteCalendarEntry={async (id) => {
         try {
           await deleteCalendarEntry(id).unwrap();
-          showSnackbar({ severity: "success", message: "Calendar entry deleted." });
+          showSnackbar({
+            severity: "success",
+            message: "Calendar entry deleted.",
+          });
         } catch (error) {
           showSnackbar({
             severity: "error",
-            message: getApiErrorMessage(error, "Unable to delete calendar entry."),
+            message: getApiErrorMessage(
+              error,
+              "Unable to delete calendar entry.",
+            ),
           });
           throw error;
         }
@@ -298,7 +362,10 @@ export default function FixedLocationCalendarPage() {
         } catch (error) {
           showSnackbar({
             severity: "error",
-            message: getApiErrorMessage(error, "Unable to save calendar settings."),
+            message: getApiErrorMessage(
+              error,
+              "Unable to save calendar settings.",
+            ),
           });
           throw error;
         }
@@ -313,7 +380,8 @@ export default function FixedLocationCalendarPage() {
           );
           return {
             ...entry,
-            category_title: entry.category_title || detail?.category_title || null,
+            category_title:
+              entry.category_title || detail?.category_title || null,
             service_title: entry.service_title || detail?.service_title || null,
           };
         });
@@ -334,13 +402,21 @@ export default function FixedLocationCalendarPage() {
 
         if (!source.length) return;
 
-        const nextCategories = applyServiceOrderToServiceCategories(source, serviceOrder);
+        const nextCategories = applyServiceOrderToServiceCategories(
+          source,
+          serviceOrder,
+        );
         try {
-          await upsertBusinessSetup(buildUpsertPayloadFromSetup(setup, nextCategories)).unwrap();
+          await upsertBusinessSetup(
+            buildUpsertPayloadFromSetup(setup, nextCategories),
+          ).unwrap();
         } catch (error) {
           showSnackbar({
             severity: "error",
-            message: getApiErrorMessage(error, "Service order saved, but business setup sync failed."),
+            message: getApiErrorMessage(
+              error,
+              "Service order saved, but business setup sync failed.",
+            ),
           });
           throw error;
         }

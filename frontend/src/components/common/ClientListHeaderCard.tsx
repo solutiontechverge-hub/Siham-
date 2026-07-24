@@ -10,7 +10,10 @@ type ClientListHeaderCardProps = {
   subtitle?: string;
 };
 
-export default function ClientListHeaderCard({ title, subtitle }: ClientListHeaderCardProps) {
+export default function ClientListHeaderCard({
+  title,
+  subtitle,
+}: ClientListHeaderCardProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
 
@@ -53,4 +56,3 @@ export default function ClientListHeaderCard({ title, subtitle }: ClientListHead
     </Paper>
   );
 }
-

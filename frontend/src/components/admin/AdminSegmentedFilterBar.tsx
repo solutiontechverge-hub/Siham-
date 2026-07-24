@@ -2,7 +2,13 @@
 
 import * as React from "react";
 import RefreshOutlinedIcon from "@mui/icons-material/RefreshOutlined";
-import { Box, Stack, Typography, type SxProps, type Theme } from "@mui/material";
+import {
+  Box,
+  Stack,
+  Typography,
+  type SxProps,
+  type Theme,
+} from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 
 export const ADMIN_FLUSHED_FIELD_SX: SxProps<Theme> = {
@@ -63,8 +69,19 @@ export default function AdminSegmentedFilterBar({
           }}
         >
           {segments.map((segment) => (
-            <Box key={segment.id} sx={{ flex: segment.flex ?? 1, minWidth: segment.minWidth ?? 0 }}>
-              <Typography sx={{ fontSize: 11, fontWeight: 600, color: tokens.slate, lineHeight: 1.2, whiteSpace: "nowrap" }}>
+            <Box
+              key={segment.id}
+              sx={{ flex: segment.flex ?? 1, minWidth: segment.minWidth ?? 0 }}
+            >
+              <Typography
+                sx={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: tokens.slate,
+                  lineHeight: 1.2,
+                  whiteSpace: "nowrap",
+                }}
+              >
                 {segment.label}
               </Typography>
             </Box>
@@ -89,8 +106,14 @@ export default function AdminSegmentedFilterBar({
                 minWidth: segment.minWidth ?? 0,
                 display: "flex",
                 flexDirection: "column",
-                borderTop: { xs: index > 0 ? `1px solid ${tokens.cardBorder}` : "none", lg: "none" },
-                borderLeft: { xs: "none", lg: index > 0 ? `1px solid ${tokens.cardBorder}` : "none" },
+                borderTop: {
+                  xs: index > 0 ? `1px solid ${tokens.cardBorder}` : "none",
+                  lg: "none",
+                },
+                borderLeft: {
+                  xs: "none",
+                  lg: index > 0 ? `1px solid ${tokens.cardBorder}` : "none",
+                },
               }}
             >
               <Box
@@ -103,11 +126,21 @@ export default function AdminSegmentedFilterBar({
                   borderBottom: `1px solid ${tokens.cardBorder}`,
                 }}
               >
-                <Typography sx={{ fontSize: 11, fontWeight: 600, color: tokens.slate }}>
+                <Typography
+                  sx={{ fontSize: 11, fontWeight: 600, color: tokens.slate }}
+                >
                   {segment.label}
                 </Typography>
               </Box>
-              <Box sx={{ flex: 1, minWidth: 0, display: "flex", alignItems: "stretch", height: 40 }}>
+              <Box
+                sx={{
+                  flex: 1,
+                  minWidth: 0,
+                  display: "flex",
+                  alignItems: "stretch",
+                  height: 40,
+                }}
+              >
                 {segment.content}
               </Box>
             </Box>

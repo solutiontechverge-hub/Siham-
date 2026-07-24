@@ -1,8 +1,20 @@
 "use client";
 
+import AppButton from "./AppButton";
 import * as React from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Box, Button, ButtonBase, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from "@mui/material";
+import {
+  Box,
+  ButtonBase,
+  Paper,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+} from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../ui/typography";
 import {
@@ -117,11 +129,22 @@ function AnalyticsSubTabs({
   );
 }
 
-function BookingOriginAndTypeTable({ rows }: { rows: readonly BookingOriginRow[] }) {
+function BookingOriginAndTypeTable({
+  rows,
+}: {
+  rows: readonly BookingOriginRow[];
+}) {
   const theme = useTheme();
   const m = theme.palette.mollure;
 
-  const headers = ["Origin", "FL Count", "DL Count", "Project Count", "Total", "Share (%)"] as const;
+  const headers = [
+    "Origin",
+    "FL Count",
+    "DL Count",
+    "Project Count",
+    "Total",
+    "Share (%)",
+  ] as const;
 
   return (
     <TableContainer
@@ -144,7 +167,14 @@ function BookingOriginAndTypeTable({ rows }: { rows: readonly BookingOriginRow[]
                   borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
                 }}
               >
-                <BodyText component="span" sx={{ fontSize: 11.5, fontWeight: 800, color: alpha(m.navy, 0.62) }}>
+                <BodyText
+                  component="span"
+                  sx={{
+                    fontSize: 11.5,
+                    fontWeight: 800,
+                    color: alpha(m.navy, 0.62),
+                  }}
+                >
                   {h}
                 </BodyText>
               </TableCell>
@@ -165,7 +195,13 @@ function BookingOriginAndTypeTable({ rows }: { rows: readonly BookingOriginRow[]
             } as const;
 
             return (
-              <TableRow key={r.origin} hover sx={{ "& td": { borderBottom: `1px solid ${alpha(m.navy, 0.06)}` } }}>
+              <TableRow
+                key={r.origin}
+                hover
+                sx={{
+                  "& td": { borderBottom: `1px solid ${alpha(m.navy, 0.06)}` },
+                }}
+              >
                 <TableCell sx={cellSx}>
                   <BodyText component="span" sx={textSx}>
                     {r.origin}
@@ -205,7 +241,11 @@ function BookingOriginAndTypeTable({ rows }: { rows: readonly BookingOriginRow[]
   );
 }
 
-function BookingStatusSummaryTable({ rows }: { rows: readonly BookingStatusSummaryRow[] }) {
+function BookingStatusSummaryTable({
+  rows,
+}: {
+  rows: readonly BookingStatusSummaryRow[];
+}) {
   const theme = useTheme();
   const m = theme.palette.mollure;
 
@@ -232,7 +272,14 @@ function BookingStatusSummaryTable({ rows }: { rows: readonly BookingStatusSumma
                   borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
                 }}
               >
-                <BodyText component="span" sx={{ fontSize: 11.5, fontWeight: 800, color: alpha(m.navy, 0.62) }}>
+                <BodyText
+                  component="span"
+                  sx={{
+                    fontSize: 11.5,
+                    fontWeight: 800,
+                    color: alpha(m.navy, 0.62),
+                  }}
+                >
                   {h}
                 </BodyText>
               </TableCell>
@@ -253,7 +300,13 @@ function BookingStatusSummaryTable({ rows }: { rows: readonly BookingStatusSumma
             } as const;
 
             return (
-              <TableRow key={r.status} hover sx={{ "& td": { borderBottom: `1px solid ${alpha(m.navy, 0.06)}` } }}>
+              <TableRow
+                key={r.status}
+                hover
+                sx={{
+                  "& td": { borderBottom: `1px solid ${alpha(m.navy, 0.06)}` },
+                }}
+              >
                 <TableCell sx={cellSx}>
                   <BodyText component="span" sx={textSx}>
                     {r.status}
@@ -278,7 +331,11 @@ function BookingStatusSummaryTable({ rows }: { rows: readonly BookingStatusSumma
   );
 }
 
-function AttendanceNoShowAnalyticsTable({ rows }: { rows: readonly AttendanceNoShowRow[] }) {
+function AttendanceNoShowAnalyticsTable({
+  rows,
+}: {
+  rows: readonly AttendanceNoShowRow[];
+}) {
   const theme = useTheme();
   const m = theme.palette.mollure;
 
@@ -305,7 +362,14 @@ function AttendanceNoShowAnalyticsTable({ rows }: { rows: readonly AttendanceNoS
                   borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
                 }}
               >
-                <BodyText component="span" sx={{ fontSize: 11.5, fontWeight: 800, color: alpha(m.navy, 0.62) }}>
+                <BodyText
+                  component="span"
+                  sx={{
+                    fontSize: 11.5,
+                    fontWeight: 800,
+                    color: alpha(m.navy, 0.62),
+                  }}
+                >
                   {h}
                 </BodyText>
               </TableCell>
@@ -327,7 +391,13 @@ function AttendanceNoShowAnalyticsTable({ rows }: { rows: readonly AttendanceNoS
             } as const;
 
             return (
-              <TableRow key={r.bookingType} hover sx={{ "& td": { borderBottom: `1px solid ${alpha(m.navy, 0.06)}` } }}>
+              <TableRow
+                key={r.bookingType}
+                hover
+                sx={{
+                  "& td": { borderBottom: `1px solid ${alpha(m.navy, 0.06)}` },
+                }}
+              >
                 <TableCell sx={cellSx}>
                   <BodyText component="span" sx={textSx}>
                     {r.bookingType}
@@ -352,7 +422,11 @@ function AttendanceNoShowAnalyticsTable({ rows }: { rows: readonly AttendanceNoS
   );
 }
 
-function BookingByServiceCategoryTable({ rows }: { rows: readonly BookingByServiceCategoryRow[] }) {
+function BookingByServiceCategoryTable({
+  rows,
+}: {
+  rows: readonly BookingByServiceCategoryRow[];
+}) {
   const theme = useTheme();
   const m = theme.palette.mollure;
 
@@ -379,7 +453,14 @@ function BookingByServiceCategoryTable({ rows }: { rows: readonly BookingByServi
                   borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
                 }}
               >
-                <BodyText component="span" sx={{ fontSize: 11.5, fontWeight: 800, color: alpha(m.navy, 0.62) }}>
+                <BodyText
+                  component="span"
+                  sx={{
+                    fontSize: 11.5,
+                    fontWeight: 800,
+                    color: alpha(m.navy, 0.62),
+                  }}
+                >
                   {h}
                 </BodyText>
               </TableCell>
@@ -401,7 +482,13 @@ function BookingByServiceCategoryTable({ rows }: { rows: readonly BookingByServi
             } as const;
 
             return (
-              <TableRow key={r.category} hover sx={{ "& td": { borderBottom: `1px solid ${alpha(m.navy, 0.06)}` } }}>
+              <TableRow
+                key={r.category}
+                hover
+                sx={{
+                  "& td": { borderBottom: `1px solid ${alpha(m.navy, 0.06)}` },
+                }}
+              >
                 <TableCell sx={cellSx}>
                   <BodyText component="span" sx={textSx}>
                     {r.category}
@@ -426,15 +513,20 @@ function BookingByServiceCategoryTable({ rows }: { rows: readonly BookingByServi
   );
 }
 
-export default function ProfessionalFixedLocationAnalytics({ data }: ProfessionalFixedLocationAnalyticsProps) {
+export default function ProfessionalFixedLocationAnalytics({
+  data,
+}: ProfessionalFixedLocationAnalyticsProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
   const { showSnackbar } = useSnackbar();
 
   const [fromDate, setFromDate] = React.useState("");
   const [toDate, setToDate] = React.useState("");
-  const [exportAnchor, setExportAnchor] = React.useState<HTMLElement | null>(null);
-  const [exportSelection, setExportSelection] = React.useState<ProfessionalAnalyticsExportSelection>("all");
+  const [exportAnchor, setExportAnchor] = React.useState<HTMLElement | null>(
+    null,
+  );
+  const [exportSelection, setExportSelection] =
+    React.useState<ProfessionalAnalyticsExportSelection>("all");
   const exportMenuOpen = Boolean(exportAnchor);
 
   const router = useRouter();
@@ -447,15 +539,20 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
       ? (tabFromUrl as ProfessionalAnalyticsSubTab)
       : data.initialSubTab;
 
-  const [activeSubTab, setActiveSubTab] = React.useState<ProfessionalAnalyticsSubTab>(resolvedSubTab);
+  const [activeSubTab, setActiveSubTab] =
+    React.useState<ProfessionalAnalyticsSubTab>(resolvedSubTab);
 
   React.useEffect(() => {
     setActiveSubTab(resolvedSubTab);
   }, [resolvedSubTab]);
 
-  const todayIso = React.useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const todayIso = React.useMemo(
+    () => new Date().toISOString().slice(0, 10),
+    [],
+  );
 
-  const isBookingAndOperational = activeSubTab === "Booking and Operational Analytics";
+  const isBookingAndOperational =
+    activeSubTab === "Booking and Operational Analytics";
   const isSalesVolume = activeSubTab === "Sales Volume Analytics";
   const isPerformance = activeSubTab === "Performance Analytics";
   const isRatingReview = activeSubTab === "Rating and Review Analytics";
@@ -466,38 +563,57 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
 
   const exportExcel = React.useCallback(
     (scope: ProfessionalAnalyticsExportSelection) => {
-      const validation = validateAnalyticsExportDates(fromDate, toDate, todayIso);
+      const validation = validateAnalyticsExportDates(
+        fromDate,
+        toDate,
+        todayIso,
+      );
       if (!validation.ok) {
         showSnackbar({ severity: "warning", message: validation.message });
         return;
       }
 
       if (Array.isArray(scope) && scope.length === 0) {
-        showSnackbar({ severity: "warning", message: "Please select at least one analytics page to export." });
+        showSnackbar({
+          severity: "warning",
+          message: "Please select at least one analytics page to export.",
+        });
         return;
       }
 
       try {
         exportProfessionalAnalyticsToExcel({ data, scope, fromDate, toDate });
-        const label = scope === "all" ? "all analytics" : Array.isArray(scope) ? `${scope.length} analytics pages` : scope;
+        const label =
+          scope === "all"
+            ? "all analytics"
+            : Array.isArray(scope)
+              ? `${scope.length} analytics pages`
+              : scope;
         showSnackbar({
           severity: "success",
           message: `Downloaded ${label} as Excel.`,
         });
       } catch {
-        showSnackbar({ severity: "error", message: "Export failed. Please try again." });
+        showSnackbar({
+          severity: "error",
+          message: "Export failed. Please try again.",
+        });
       }
     },
     [data, fromDate, showSnackbar, toDate, todayIso],
   );
 
   const exportOptions = React.useMemo(
-    () => [
-      { id: "Booking and Operational Analytics", label: "Booking and Operational" },
-      { id: "Sales Volume Analytics", label: "Sales Volume" },
-      { id: "Performance Analytics", label: "Performance" },
-      { id: "Rating and Review Analytics", label: "Rating and Review" },
-    ] as const,
+    () =>
+      [
+        {
+          id: "Booking and Operational Analytics",
+          label: "Booking and Operational",
+        },
+        { id: "Sales Volume Analytics", label: "Sales Volume" },
+        { id: "Performance Analytics", label: "Performance" },
+        { id: "Rating and Review Analytics", label: "Rating and Review" },
+      ] as const,
     [],
   );
 
@@ -521,7 +637,9 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
       }
       const currentScopes = Array.isArray(current) ? current : [current];
       return currentScopes.includes(scope)
-        ? currentScopes.filter((item: ProfessionalAnalyticsSubTab) => item !== scope)
+        ? currentScopes.filter(
+            (item: ProfessionalAnalyticsSubTab) => item !== scope,
+          )
         : [...currentScopes, scope];
     });
   }
@@ -542,7 +660,11 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
         overflow: "hidden",
       }}
     >
-      <MollureCardHeader title={data.header.title} subtitle={data.header.subtitle} tone="tinted" />
+      <MollureCardHeader
+        title={data.header.title}
+        subtitle={data.header.subtitle}
+        tone="tinted"
+      />
       <Box sx={{ height: 1, bgcolor: alpha(m.navy, 0.06) }} />
 
       {/* Filters row */}
@@ -558,9 +680,24 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
             py: 0.75,
           }}
         >
-          <Stack direction="row" spacing={1.25} alignItems="center" flexWrap="wrap" useFlexGap>
+          <Stack
+            direction="row"
+            spacing={1.25}
+            alignItems="center"
+            flexWrap="wrap"
+            useFlexGap
+          >
             <Stack direction="row" alignItems="center" spacing={0.75}>
-              <BodyText sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.65), whiteSpace: "nowrap" }}>Date From</BodyText>
+              <BodyText
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 800,
+                  color: alpha(m.navy, 0.65),
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Date From
+              </BodyText>
               <AppDatePicker
                 value={fromDate}
                 onChange={(iso) => setFromDate(iso)}
@@ -570,7 +707,16 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
             </Stack>
 
             <Stack direction="row" alignItems="center" spacing={0.75}>
-              <BodyText sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.65), whiteSpace: "nowrap" }}>Date To</BodyText>
+              <BodyText
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 800,
+                  color: alpha(m.navy, 0.65),
+                  whiteSpace: "nowrap",
+                }}
+              >
+                Date To
+              </BodyText>
               <AppDatePicker
                 value={toDate}
                 onChange={(iso) => setToDate(iso)}
@@ -582,25 +728,18 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
 
             <Box sx={{ flex: 1 }} />
 
-            <Button
-              variant="contained"
-              disableElevation
+            <AppButton
+              tone="primary"
               onClick={(e) => setExportAnchor(e.currentTarget)}
               sx={{
                 height: 28,
-                borderRadius: "6px",
-                textTransform: "none",
-                fontWeight: 800,
                 fontSize: 12,
-                bgcolor: m.teal,
-                color: "#fff",
-                "&:hover": { bgcolor: m.tealDark },
                 px: 2,
                 minWidth: 84,
               }}
             >
               Export
-            </Button>
+            </AppButton>
 
             <ExportMenuPopover
               anchorEl={exportAnchor}
@@ -631,7 +770,9 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
       {isBookingAndOperational ? (
         <>
           <Box sx={{ px: 2.25, py: 1.6 }}>
-            <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}>
+            <BodyText
+              sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}
+            >
               {section11.title}
             </BodyText>
           </Box>
@@ -648,7 +789,14 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
           </Box>
 
           <Box sx={{ px: 2.25, pb: 2.25 }}>
-            <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88), mb: 1.6 }}>
+            <BodyText
+              sx={{
+                fontSize: 14,
+                fontWeight: 900,
+                color: alpha(m.navy, 0.88),
+                mb: 1.6,
+              }}
+            >
               {section12.title}
             </BodyText>
 
@@ -663,7 +811,14 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
           </Box>
 
           <Box sx={{ px: 2.25, pb: 2.25 }}>
-            <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88), mb: 1.6 }}>
+            <BodyText
+              sx={{
+                fontSize: 14,
+                fontWeight: 900,
+                color: alpha(m.navy, 0.88),
+                mb: 1.6,
+              }}
+            >
               {section13.title}
             </BodyText>
 
@@ -678,7 +833,14 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
           </Box>
 
           <Box sx={{ px: 2.25, pb: 2.25 }}>
-            <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88), mb: 1.6 }}>
+            <BodyText
+              sx={{
+                fontSize: 14,
+                fontWeight: 900,
+                color: alpha(m.navy, 0.88),
+                mb: 1.6,
+              }}
+            >
               {section16.title}
             </BodyText>
 
@@ -693,16 +855,32 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
           </Box>
         </>
       ) : isSalesVolume ? (
-        <ProfessionalFixedLocationSalesVolumeAnalytics data={data.salesVolume} />
+        <ProfessionalFixedLocationSalesVolumeAnalytics
+          data={data.salesVolume}
+        />
       ) : isPerformance ? (
-        <ProfessionalFixedLocationPerformanceAnalytics data={data.performance} />
+        <ProfessionalFixedLocationPerformanceAnalytics
+          data={data.performance}
+        />
       ) : isRatingReview ? (
-        <ProfessionalFixedLocationRatingReviewAnalytics data={data.ratingReview} />
+        <ProfessionalFixedLocationRatingReviewAnalytics
+          data={data.ratingReview}
+        />
       ) : (
         <Box sx={{ px: 2.25, py: 5 }}>
-          <BodyText sx={{ fontSize: 14, fontWeight: 800, color: alpha(m.navy, 0.65), textAlign: "center" }}>
+          <BodyText
+            sx={{
+              fontSize: 14,
+              fontWeight: 800,
+              color: alpha(m.navy, 0.65),
+              textAlign: "center",
+            }}
+          >
             No data is wired for{" "}
-            <BodyText component="span" sx={{ fontWeight: 900, color: alpha(m.navy, 0.8) }}>
+            <BodyText
+              component="span"
+              sx={{ fontWeight: 900, color: alpha(m.navy, 0.8) }}
+            >
               {activeSubTab}
             </BodyText>{" "}
             yet.
@@ -712,4 +890,3 @@ export default function ProfessionalFixedLocationAnalytics({ data }: Professiona
     </Paper>
   );
 }
-

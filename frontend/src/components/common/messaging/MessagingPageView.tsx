@@ -4,11 +4,17 @@ import * as React from "react";
 import { Box, Paper, useMediaQuery } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import MessagingBlockDialog from "./MessagingBlockDialog";
-import MessagingChatActionsMenu, { type MessagingChatAction } from "./MessagingChatActionsMenu";
+import MessagingChatActionsMenu, {
+  type MessagingChatAction,
+} from "./MessagingChatActionsMenu";
 import MessagingChatPanel from "./MessagingChatPanel";
 import MessagingConversationSidebar from "./MessagingConversationSidebar";
-import MessagingDeleteChatDialog, { type MessagingDeleteScope } from "./MessagingDeleteChatDialog";
-import MessagingDeleteMessageDialog, { type MessagingMessageDeleteScope } from "./MessagingDeleteMessageDialog";
+import MessagingDeleteChatDialog, {
+  type MessagingDeleteScope,
+} from "./MessagingDeleteChatDialog";
+import MessagingDeleteMessageDialog, {
+  type MessagingMessageDeleteScope,
+} from "./MessagingDeleteMessageDialog";
 import MessagingFiltersDrawer from "./MessagingFiltersDrawer";
 import MessagingLinkBookingDialog from "./MessagingLinkBookingDialog";
 import { getReportModalTitle } from "./messagingPeerLabels";
@@ -42,21 +48,27 @@ export default function MessagingPageView({
 }: MessagingPageViewProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
-  const isCompactEmbedded = embedded && useMediaQuery(theme.breakpoints.down("md"));
+  const isCompactEmbedded =
+    embedded && useMediaQuery(theme.breakpoints.down("md"));
   const { showSnackbar } = useSnackbar();
   const inbox = useMessagingInbox(audience, navigation, currentUserName);
   const [mobileChatOpen, setMobileChatOpen] = React.useState(false);
   const [settingsOpen, setSettingsOpen] = React.useState(false);
   const [filtersOpen, setFiltersOpen] = React.useState(false);
-  const [actionsAnchor, setActionsAnchor] = React.useState<HTMLElement | null>(null);
+  const [actionsAnchor, setActionsAnchor] = React.useState<HTMLElement | null>(
+    null,
+  );
   const [linkBookingOpen, setLinkBookingOpen] = React.useState(false);
   const [reportOpen, setReportOpen] = React.useState(false);
   const [blockOpen, setBlockOpen] = React.useState(false);
   const [deleteOpen, setDeleteOpen] = React.useState(false);
-  const [deleteMode, setDeleteMode] = React.useState<DeleteDialogMode>("single");
-  const [deletePresetScope, setDeletePresetScope] = React.useState<MessagingDeleteScope>("me");
+  const [deleteMode, setDeleteMode] =
+    React.useState<DeleteDialogMode>("single");
+  const [deletePresetScope, setDeletePresetScope] =
+    React.useState<MessagingDeleteScope>("me");
   const [deleteMessageOpen, setDeleteMessageOpen] = React.useState(false);
-  const [messageToDelete, setMessageToDelete] = React.useState<MessagingChatMessage | null>(null);
+  const [messageToDelete, setMessageToDelete] =
+    React.useState<MessagingChatMessage | null>(null);
 
   React.useEffect(() => {
     if (!isCompactEmbedded) setMobileChatOpen(false);
@@ -64,10 +76,18 @@ export default function MessagingPageView({
 
   React.useEffect(() => {
     if (!isCompactEmbedded) return;
-    if ((navigation?.bookingRef || navigation?.threadId) && inbox.activeThread) {
+    if (
+      (navigation?.bookingRef || navigation?.threadId) &&
+      inbox.activeThread
+    ) {
       setMobileChatOpen(true);
     }
-  }, [inbox.activeThread, isCompactEmbedded, navigation?.bookingRef, navigation?.threadId]);
+  }, [
+    inbox.activeThread,
+    isCompactEmbedded,
+    navigation?.bookingRef,
+    navigation?.threadId,
+  ]);
 
   const handleSelectThread = React.useCallback(
     (threadId: string) => {
@@ -118,7 +138,17 @@ export default function MessagingPageView({
   }
 
   return (
-    <Box sx={{ position: "relative", pb: embedded ? 0 : 10, height: embedded ? "100%" : undefined, display: embedded ? "flex" : "block", flexDirection: "column", minHeight: 0, isolation: embedded ? "isolate" : undefined }}>
+    <Box
+      sx={{
+        position: "relative",
+        pb: embedded ? 0 : 10,
+        height: embedded ? "100%" : undefined,
+        display: embedded ? "flex" : "block",
+        flexDirection: "column",
+        minHeight: 0,
+        isolation: embedded ? "isolate" : undefined,
+      }}
+    >
       <Paper
         elevation={0}
         sx={{
@@ -135,60 +165,65 @@ export default function MessagingPageView({
         }}
       >
         {showSidebar ? (
-        <MessagingConversationSidebar
-          audience={audience}
-          currentUserName={currentUserName}
-          currentUserAvatarSrc={currentUserAvatarSrc}
-          embedded={embedded}
-          search={inbox.search}
-          onSearchChange={inbox.setSearch}
-          threads={inbox.visibleThreads}
-          activeThreadId={inbox.activeThread?.id ?? ""}
-          onSelectThread={handleSelectThread}
-          selectedIds={inbox.selectedIds}
-          selectAll={inbox.selectAll}
-          onToggleSelect={inbox.toggleThreadSelection}
-          onSelectAll={inbox.handleSelectAll}
-          onRequestDelete={() => {
-            if (inbox.selectedIds.size === 0) {
-              showSnackbar({ severity: "warning", message: "Select at least one conversation to delete." });
-              return;
-            }
-            setDeleteMode("bulk");
-            setDeleteOpen(true);
-          }}
-          onOpenSettings={() => setSettingsOpen(true)}
-          onOpenFilters={() => setFiltersOpen(true)}
-          onClose={embedded ? onClose : undefined}
-          hasMore={inbox.hasMoreThreads}
-          loadingMore={inbox.loadingMore}
-          onLoadMore={() => void inbox.loadMoreThreads()}
-          showBulkActions={audience !== "client"}
-        />
+          <MessagingConversationSidebar
+            audience={audience}
+            currentUserName={currentUserName}
+            currentUserAvatarSrc={currentUserAvatarSrc}
+            embedded={embedded}
+            search={inbox.search}
+            onSearchChange={inbox.setSearch}
+            threads={inbox.visibleThreads}
+            activeThreadId={inbox.activeThread?.id ?? ""}
+            onSelectThread={handleSelectThread}
+            selectedIds={inbox.selectedIds}
+            selectAll={inbox.selectAll}
+            onToggleSelect={inbox.toggleThreadSelection}
+            onSelectAll={inbox.handleSelectAll}
+            onRequestDelete={() => {
+              if (inbox.selectedIds.size === 0) {
+                showSnackbar({
+                  severity: "warning",
+                  message: "Select at least one conversation to delete.",
+                });
+                return;
+              }
+              setDeleteMode("bulk");
+              setDeleteOpen(true);
+            }}
+            onOpenSettings={() => setSettingsOpen(true)}
+            onOpenFilters={() => setFiltersOpen(true)}
+            onClose={embedded ? onClose : undefined}
+            hasMore={inbox.hasMoreThreads}
+            loadingMore={inbox.loadingMore}
+            onLoadMore={() => void inbox.loadMoreThreads()}
+            showBulkActions={audience !== "client"}
+          />
         ) : null}
 
         {showChatPanel ? (
-        <MessagingChatPanel
-          audience={audience}
-          currentUserName={currentUserName}
-          thread={inbox.activeThread}
-          messageGroups={inbox.messageGroups}
-          onSend={inbox.sendMessage}
-          onOpenActions={setActionsAnchor}
-          onDeleteMessage={(message) => {
-            setMessageToDelete(message);
-            setDeleteMessageOpen(true);
-          }}
-          onClose={embedded ? onClose : undefined}
-          onBack={isCompactEmbedded && mobileChatOpen ? handleMobileBack : undefined}
-          composerDisabled={audience === "professional" && !inbox.canReply}
-          composerDisabledHint={
-            audience === "professional" && !inbox.canReply
-              ? "Reply when the client messages first, or when a requested, confirmed, or completed booking exists."
-              : undefined
-          }
-          peerReadAt={inbox.peerReadAt}
-        />
+          <MessagingChatPanel
+            audience={audience}
+            currentUserName={currentUserName}
+            thread={inbox.activeThread}
+            messageGroups={inbox.messageGroups}
+            onSend={inbox.sendMessage}
+            onOpenActions={setActionsAnchor}
+            onDeleteMessage={(message) => {
+              setMessageToDelete(message);
+              setDeleteMessageOpen(true);
+            }}
+            onClose={embedded ? onClose : undefined}
+            onBack={
+              isCompactEmbedded && mobileChatOpen ? handleMobileBack : undefined
+            }
+            composerDisabled={audience === "professional" && !inbox.canReply}
+            composerDisabledHint={
+              audience === "professional" && !inbox.canReply
+                ? "Reply when the client messages first, or when a requested, confirmed, or completed booking exists."
+                : undefined
+            }
+            peerReadAt={inbox.peerReadAt}
+          />
         ) : null}
       </Paper>
 
@@ -279,7 +314,9 @@ export default function MessagingPageView({
         audience={audience}
         onClose={() => setBlockOpen(false)}
         embedded={embedded}
-        onConfirm={() => inbox.activeThread && inbox.blockThread(inbox.activeThread.id)}
+        onConfirm={() =>
+          inbox.activeThread && inbox.blockThread(inbox.activeThread.id)
+        }
       />
     </Box>
   );

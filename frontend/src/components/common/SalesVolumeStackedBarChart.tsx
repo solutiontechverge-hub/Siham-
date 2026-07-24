@@ -63,10 +63,16 @@ function SegmentLabel({
         textShadow: "0 1px 3px rgba(0, 60, 70, 0.55)",
       }}
     >
-      <Box component="span" sx={{ fontSize: amountSize, fontWeight: 700, whiteSpace: "nowrap" }}>
+      <Box
+        component="span"
+        sx={{ fontSize: amountSize, fontWeight: 700, whiteSpace: "nowrap" }}
+      >
         {formatSegmentEur(salesEur)}
       </Box>
-      <Box component="span" sx={{ fontSize: pctSize, fontWeight: 600, whiteSpace: "nowrap" }}>
+      <Box
+        component="span"
+        sx={{ fontSize: pctSize, fontWeight: 600, whiteSpace: "nowrap" }}
+      >
         ({sharePct}%)
       </Box>
     </Box>
@@ -98,7 +104,14 @@ export default function SalesVolumeStackedBarChart({
     >
       {title ? (
         <Box sx={{ px: 2.25, pt: 2, pb: 1 }}>
-          <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.85), textAlign: "center" }}>
+          <BodyText
+            sx={{
+              fontSize: 14,
+              fontWeight: 900,
+              color: alpha(m.navy, 0.85),
+              textAlign: "center",
+            }}
+          >
             {title}
           </BodyText>
         </Box>
@@ -218,7 +231,9 @@ export default function SalesVolumeStackedBarChart({
               }}
             >
               <Box>
-                <Box sx={{ height: 1, bgcolor: alpha(m.navy, 0.4), width: "100%" }} />
+                <Box
+                  sx={{ height: 1, bgcolor: alpha(m.navy, 0.4), width: "100%" }}
+                />
                 <Box
                   sx={{
                     display: "flex",
@@ -239,7 +254,11 @@ export default function SalesVolumeStackedBarChart({
                           color: alpha(m.navy, 0.55),
                           lineHeight: 1,
                           transform:
-                            i === 0 ? "translateX(0)" : i === tickCount - 1 ? "translateX(0)" : undefined,
+                            i === 0
+                              ? "translateX(0)"
+                              : i === tickCount - 1
+                                ? "translateX(0)"
+                                : undefined,
                         }}
                       >
                         {t.toLocaleString()}
@@ -272,12 +291,24 @@ export default function SalesVolumeStackedBarChart({
         >
           {legend.map((group) => (
             <Box key={group.category} sx={{ flex: "1 1 0", minWidth: 120 }}>
-              <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.78), mb: 0.85 }}>
+              <BodyText
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 900,
+                  color: alpha(m.navy, 0.78),
+                  mb: 0.85,
+                }}
+              >
                 {group.category}
               </BodyText>
               <Stack spacing={0.55}>
                 {group.items.map((item) => (
-                  <Stack key={item.label} direction="row" alignItems="center" spacing={0.75}>
+                  <Stack
+                    key={item.label}
+                    direction="row"
+                    alignItems="center"
+                    spacing={0.75}
+                  >
                     <Box
                       sx={{
                         width: 11,
@@ -287,7 +318,14 @@ export default function SalesVolumeStackedBarChart({
                         flexShrink: 0,
                       }}
                     />
-                    <BodyText sx={{ fontSize: 11, fontWeight: 600, color: alpha(m.navy, 0.62), lineHeight: 1.3 }}>
+                    <BodyText
+                      sx={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: alpha(m.navy, 0.62),
+                        lineHeight: 1.3,
+                      }}
+                    >
                       {item.label}
                     </BodyText>
                   </Stack>

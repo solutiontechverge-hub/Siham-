@@ -6,7 +6,10 @@ import { Box, Container, Stack } from "@mui/material";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import { AboutUsImage } from "../../../images";
 import { BodyText, SubHeading } from "../ui/typography";
-import { MOLLURE_HEADING_BODY_GAP_PX, MOLLURE_SECTION_GAP_PX } from "../../theme/spacing";
+import {
+  MOLLURE_HEADING_BODY_GAP_PX,
+  MOLLURE_SECTION_GAP_PX,
+} from "../../theme/spacing";
 
 type AboutSplitSectionProps = {
   imageSrc: string;
@@ -31,7 +34,7 @@ export default function AboutSplitSection({
       aria-labelledby="about-split-heading"
       sx={{ py: `${MOLLURE_SECTION_GAP_PX}px` }}
     >
-      <Container maxWidth="lg" sx={{ px: { xs: 2, sm: 3 } }} >
+      <Container maxWidth="lg" sx={{ px: { xs: 2, sm: 3 } }}>
         <Box
           sx={{
             display: "grid",
@@ -82,7 +85,13 @@ export default function AboutSplitSection({
                 boxSizing: "border-box",
               }}
             >
-              <Stack direction="row" alignItems="center" justifyContent="flex-end" spacing={1} sx={{ width: "100%" }}>
+              <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="flex-end"
+                spacing={1}
+                sx={{ width: "100%" }}
+              >
                 <SubHeading
                   id="about-split-heading"
                   sx={{
@@ -103,7 +112,10 @@ export default function AboutSplitSection({
                 />
               </Stack>
 
-              <Stack spacing={`${MOLLURE_HEADING_BODY_GAP_PX}px`} sx={{ flex: 1 }}>
+              <Stack
+                spacing={`${MOLLURE_HEADING_BODY_GAP_PX}px`}
+                sx={{ flex: 1 }}
+              >
                 {paragraphs.map((p) => (
                   <BodyText
                     key={p.slice(0, 40)}

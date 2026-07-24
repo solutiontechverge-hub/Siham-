@@ -45,7 +45,7 @@ export default function ContentCard({
               bgcolor: theme.palette.primary.main,
               boxShadow: `4px 0 18px ${alpha(
                 theme.palette.primary.main,
-                0.25
+                0.25,
               )}`,
             })}
           />
@@ -77,7 +77,16 @@ export default function ContentCard({
             </BodyText>
           )}
 
-          {children ? <Box sx={{ mt: title || description ? `${MOLLURE_HEADING_BODY_GAP_PX}px` : 0 }}>{children}</Box> : null}
+          {children ? (
+            <Box
+              sx={{
+                mt:
+                  title || description ? `${MOLLURE_HEADING_BODY_GAP_PX}px` : 0,
+              }}
+            >
+              {children}
+            </Box>
+          ) : null}
           {actions}
         </Stack>
       </Box>

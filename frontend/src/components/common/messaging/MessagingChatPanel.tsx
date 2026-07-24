@@ -12,7 +12,11 @@ import MessagingMessageBubble from "./MessagingMessageBubble";
 import MessagingComposer from "./MessagingComposer";
 import { isMessageOwn } from "./messagingPreview";
 import type { MessagingAudience } from "./messagingRoutes";
-import type { MessagingChatMessage, MessagingThread, MessagingAttachment } from "./messagingTypes";
+import type {
+  MessagingChatMessage,
+  MessagingThread,
+  MessagingAttachment,
+} from "./messagingTypes";
 
 type MessageGroup = {
   dateLabel: string;
@@ -59,8 +63,23 @@ export default function MessagingChatPanel({
 
   if (!thread) {
     return (
-      <Box sx={{ flex: 1, display: "grid", placeItems: "center", p: { xs: 2, sm: 3 }, minWidth: 0 }}>
-        <Typography sx={{ fontSize: { xs: 13, sm: 14 }, fontWeight: 700, color: alpha(m.navy, 0.45), textAlign: "center" }}>
+      <Box
+        sx={{
+          flex: 1,
+          display: "grid",
+          placeItems: "center",
+          p: { xs: 2, sm: 3 },
+          minWidth: 0,
+        }}
+      >
+        <Typography
+          sx={{
+            fontSize: { xs: 13, sm: 14 },
+            fontWeight: 700,
+            color: alpha(m.navy, 0.45),
+            textAlign: "center",
+          }}
+        >
           Select a conversation to start messaging
         </Typography>
       </Box>
@@ -68,19 +87,63 @@ export default function MessagingChatPanel({
   }
 
   return (
-    <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, minHeight: 0, bgcolor: "#fff" }}>
-      <Box sx={{ px: { xs: 1.5, sm: 2, md: 2.5 }, py: { xs: 1.25, sm: 1.75 }, borderBottom: `1px solid ${alpha(m.navy, 0.08)}` }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
-          <Stack direction="row" alignItems="center" spacing={{ xs: 1, sm: 1.25 }} sx={{ minWidth: 0, flex: 1 }}>
+    <Box
+      sx={{
+        flex: 1,
+        display: "flex",
+        flexDirection: "column",
+        minWidth: 0,
+        minHeight: 0,
+        bgcolor: "#fff",
+      }}
+    >
+      <Box
+        sx={{
+          px: { xs: 1.5, sm: 2, md: 2.5 },
+          py: { xs: 1.25, sm: 1.75 },
+          borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
+        }}
+      >
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          spacing={1}
+        >
+          <Stack
+            direction="row"
+            alignItems="center"
+            spacing={{ xs: 1, sm: 1.25 }}
+            sx={{ minWidth: 0, flex: 1 }}
+          >
             {onBack ? (
-              <IconButton size="small" aria-label="Back to conversations" onClick={onBack} sx={{ flexShrink: 0, ml: -0.5 }}>
-                <ArrowBackRoundedIcon sx={{ fontSize: 20, color: alpha(m.navy, 0.55) }} />
+              <IconButton
+                size="small"
+                aria-label="Back to conversations"
+                onClick={onBack}
+                sx={{ flexShrink: 0, ml: -0.5 }}
+              >
+                <ArrowBackRoundedIcon
+                  sx={{ fontSize: 20, color: alpha(m.navy, 0.55) }}
+                />
               </IconButton>
             ) : null}
             <MessagingAvatar seed={thread.avatarSeed} size={40} />
             <Box sx={{ minWidth: 0 }}>
-              <Stack direction="row" alignItems="center" spacing={0.6} flexWrap="wrap">
-                <Typography sx={{ fontWeight: 900, fontSize: { xs: 13, sm: 14 }, color: alpha(m.navy, 0.9) }} noWrap>
+              <Stack
+                direction="row"
+                alignItems="center"
+                spacing={0.6}
+                flexWrap="wrap"
+              >
+                <Typography
+                  sx={{
+                    fontWeight: 900,
+                    fontSize: { xs: 13, sm: 14 },
+                    color: alpha(m.navy, 0.9),
+                  }}
+                  noWrap
+                >
                   {thread.name}
                 </Typography>
                 <Typography
@@ -94,14 +157,43 @@ export default function MessagingChatPanel({
                 >
                   {thread.bookingMeta}
                 </Typography>
-                <CheckCircleRoundedIcon sx={{ fontSize: 14, color: "#4CAF50", flexShrink: 0 }} />
+                <CheckCircleRoundedIcon
+                  sx={{ fontSize: 14, color: "#4CAF50", flexShrink: 0 }}
+                />
               </Stack>
               {thread.online || thread.presenceStatus === "online" ? (
-                <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#4CAF50", mt: 0.2 }}>Online</Typography>
+                <Typography
+                  sx={{
+                    fontSize: 11,
+                    fontWeight: 800,
+                    color: "#4CAF50",
+                    mt: 0.2,
+                  }}
+                >
+                  Online
+                </Typography>
               ) : thread.presenceStatus === "busy" ? (
-                <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#FF9800", mt: 0.2 }}>Busy</Typography>
+                <Typography
+                  sx={{
+                    fontSize: 11,
+                    fontWeight: 800,
+                    color: "#FF9800",
+                    mt: 0.2,
+                  }}
+                >
+                  Busy
+                </Typography>
               ) : thread.presenceStatus === "offline" ? (
-                <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#F44336", mt: 0.2 }}>Offline</Typography>
+                <Typography
+                  sx={{
+                    fontSize: 11,
+                    fontWeight: 800,
+                    color: "#F44336",
+                    mt: 0.2,
+                  }}
+                >
+                  Offline
+                </Typography>
               ) : (
                 <Typography
                   sx={{
@@ -118,30 +210,70 @@ export default function MessagingChatPanel({
               )}
             </Box>
           </Stack>
-          <Stack direction="row" alignItems="center" spacing={0.25} sx={{ flexShrink: 0 }}>
-            <IconButton size="small" aria-label="More options" onClick={(e) => onOpenActions(e.currentTarget)}>
+          <Stack
+            direction="row"
+            alignItems="center"
+            spacing={0.25}
+            sx={{ flexShrink: 0 }}
+          >
+            <IconButton
+              size="small"
+              aria-label="More options"
+              onClick={(e) => onOpenActions(e.currentTarget)}
+            >
               <MoreHorizRoundedIcon sx={{ color: alpha(m.navy, 0.45) }} />
             </IconButton>
             {onClose ? (
-              <IconButton size="small" aria-label="Close messaging" onClick={onClose} sx={{ display: { xs: "none", md: "inline-flex" } }}>
-                <CloseRoundedIcon sx={{ fontSize: 20, color: alpha(m.navy, 0.45) }} />
+              <IconButton
+                size="small"
+                aria-label="Close messaging"
+                onClick={onClose}
+                sx={{ display: { xs: "none", md: "inline-flex" } }}
+              >
+                <CloseRoundedIcon
+                  sx={{ fontSize: 20, color: alpha(m.navy, 0.45) }}
+                />
               </IconButton>
             ) : null}
           </Stack>
         </Stack>
       </Box>
 
-      <Box ref={scrollRef} sx={{ flex: 1, overflowY: "auto", px: { xs: 1.5, sm: 2, md: 2.5 }, py: { xs: 1.5, sm: 2 }, minHeight: 0 }}>
+      <Box
+        ref={scrollRef}
+        sx={{
+          flex: 1,
+          overflowY: "auto",
+          px: { xs: 1.5, sm: 2, md: 2.5 },
+          py: { xs: 1.5, sm: 2 },
+          minHeight: 0,
+        }}
+      >
         {messageGroups.map((group) => (
           <Box key={group.dateKey} sx={{ mb: 2.5 }}>
-            <Typography align="center" sx={{ fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.42), mb: 2 }}>
+            <Typography
+              align="center"
+              sx={{
+                fontSize: 11,
+                fontWeight: 800,
+                color: alpha(m.navy, 0.42),
+                mb: 2,
+              }}
+            >
               {group.dateLabel}
             </Typography>
             <Stack spacing={2} sx={{ width: "100%" }}>
               {group.messages.map((msg) => {
                 const own = isMessageOwn(msg, audience);
                 return (
-                  <Box key={msg.id} sx={{ width: "100%", display: "flex", justifyContent: own ? "flex-end" : "flex-start" }}>
+                  <Box
+                    key={msg.id}
+                    sx={{
+                      width: "100%",
+                      display: "flex",
+                      justifyContent: own ? "flex-end" : "flex-start",
+                    }}
+                  >
                     <MessagingMessageBubble
                       message={msg}
                       isOwn={own}
@@ -159,7 +291,11 @@ export default function MessagingChatPanel({
         ))}
       </Box>
 
-      <MessagingComposer onSend={onSend} disabled={composerDisabled} disabledHint={composerDisabledHint} />
+      <MessagingComposer
+        onSend={onSend}
+        disabled={composerDisabled}
+        disabledHint={composerDisabledHint}
+      />
     </Box>
   );
 }

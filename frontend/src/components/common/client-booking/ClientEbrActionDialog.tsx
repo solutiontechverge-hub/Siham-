@@ -3,7 +3,10 @@
 import { Box, Typography } from "@mui/material";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { alpha, useTheme } from "@mui/material/styles";
-import AppModal, { MessagingModalCancelButton, MessagingModalPrimaryButton } from "../AppModal";
+import AppModal, {
+  MessagingModalCancelButton,
+  MessagingModalPrimaryButton,
+} from "../AppModal";
 
 export type ClientEbrActionKind = "accept" | "suggest" | "reject";
 
@@ -36,7 +39,12 @@ const COPY: Record<
   },
 };
 
-export default function ClientEbrActionDialog({ open, action, onClose, onConfirm }: Props) {
+export default function ClientEbrActionDialog({
+  open,
+  action,
+  onClose,
+  onConfirm,
+}: Props) {
   const m = useTheme().palette.mollure;
   if (!action) return null;
 
@@ -65,9 +73,19 @@ export default function ClientEbrActionDialog({ open, action, onClose, onConfirm
     >
       <Box sx={{ py: 2.5, textAlign: "center" }}>
         {copy.showWarning ? (
-          <WarningAmberRoundedIcon sx={{ fontSize: 52, color: "#E85D5D", mb: 1.5 }} />
+          <WarningAmberRoundedIcon
+            sx={{ fontSize: 52, color: "#E85D5D", mb: 1.5 }}
+          />
         ) : null}
-        <Typography sx={{ fontWeight: 900, fontSize: 14, color: alpha(m.navy, 0.88), lineHeight: 1.55, px: 1 }}>
+        <Typography
+          sx={{
+            fontWeight: 900,
+            fontSize: 14,
+            color: alpha(m.navy, 0.88),
+            lineHeight: 1.55,
+            px: 1,
+          }}
+        >
           {copy.body}
         </Typography>
       </Box>

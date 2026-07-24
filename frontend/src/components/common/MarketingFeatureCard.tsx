@@ -10,10 +10,7 @@ import SyncAltRoundedIcon from "@mui/icons-material/SyncAltRounded";
 import { BodyText, CardTitle } from "../ui/typography";
 
 export type MarketingFeatureCardIconKey =
-  | "locations"
-  | "business"
-  | "chat"
-  | "flow";
+  "locations" | "business" | "chat" | "flow";
 
 export type MarketingFeatureCardProps = {
   iconKey: MarketingFeatureCardIconKey;
@@ -51,7 +48,7 @@ export default function MarketingFeatureCard({
         height: "100%",
         borderRadius: "12px",
         bgcolor: "rgba(255,255,255,0.96)",
-        border: `1px solid ${alpha(m.navy, 0.10)}`,
+        border: `1px solid ${alpha(m.navy, 0.1)}`,
         boxShadow: "0 14px 26px rgba(16, 35, 63, 0.12)",
         overflow: "hidden",
         position: "relative",
@@ -73,7 +70,7 @@ export default function MarketingFeatureCard({
               width: 38,
               height: 38,
               borderRadius: "50%",
-              bgcolor: alpha(m.teal, 0.10),
+              bgcolor: alpha(m.teal, 0.1),
               color: m.teal,
               display: "grid",
               placeItems: "center",
@@ -108,4 +105,3 @@ export default function MarketingFeatureCard({
     </Card>
   );
 }
-

@@ -1,7 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { Box, CircularProgress, Grid2 as Grid, Typography } from "@mui/material";
+import {
+  Box,
+  CircularProgress,
+  Grid2 as Grid,
+  Typography,
+} from "@mui/material";
 import BusinessOutlinedIcon from "@mui/icons-material/BusinessOutlined";
 import PeopleOutlinedIcon from "@mui/icons-material/PeopleOutlined";
 import PersonOutlineOutlinedIcon from "@mui/icons-material/PersonOutlineOutlined";
@@ -12,7 +17,9 @@ import type { SvgIconComponent } from "@mui/icons-material";
 import { useTheme } from "@mui/material/styles";
 import AdminKpiCard from "../AdminKpiCard";
 import { AdminLineChart, ADMIN_CHART_COLORS } from "../AdminCharts";
-import AdminDashboardHeader, { AdminDashboardFooter } from "../AdminDashboardHeader";
+import AdminDashboardHeader, {
+  AdminDashboardFooter,
+} from "../AdminDashboardHeader";
 import {
   ActivityLogWidget,
   QuickLinksWidget,
@@ -45,9 +52,10 @@ export default function AdminDashboardPage() {
     [range],
   );
 
-  const { data, isLoading, isFetching, isError, error } = useGetAdminDashboardQuery(queryArgs, {
-    refetchOnMountOrArgChange: true,
-  });
+  const { data, isLoading, isFetching, isError, error } =
+    useGetAdminDashboardQuery(queryArgs, {
+      refetchOnMountOrArgChange: true,
+    });
 
   const dashboard = data?.data;
   const trendLabel = getTrendLabel(range.preset);
@@ -74,9 +82,16 @@ export default function AdminDashboardPage() {
 
       {dashboard ? (
         <>
-          <Grid container spacing={1.5} sx={{ mb: 1.5, opacity: isFetching ? 0.72 : 1 }}>
+          <Grid
+            container
+            spacing={1.5}
+            sx={{ mb: 1.5, opacity: isFetching ? 0.72 : 1 }}
+          >
             {dashboard.kpis.map((kpi) => (
-              <Grid key={kpi.key || kpi.label} size={{ xs: 12, sm: 6, md: 4, xl: 2 }}>
+              <Grid
+                key={kpi.key || kpi.label}
+                size={{ xs: 12, sm: 6, md: 4, xl: 2 }}
+              >
                 <AdminKpiCard
                   label={kpi.label}
                   value={kpi.value}
@@ -89,7 +104,11 @@ export default function AdminDashboardPage() {
             ))}
           </Grid>
 
-          <Grid container spacing={1.5} sx={{ mb: 1.5, opacity: isFetching ? 0.72 : 1 }}>
+          <Grid
+            container
+            spacing={1.5}
+            sx={{ mb: 1.5, opacity: isFetching ? 0.72 : 1 }}
+          >
             <Grid size={{ xs: 12, lg: 5 }}>
               <AdminLineChart
                 title="Bookings Overview"
@@ -97,7 +116,11 @@ export default function AdminDashboardPage() {
                 data={dashboard.bookingsChart}
                 xKey="date"
                 lines={[
-                  { dataKey: "online", name: "Online Bookings", color: ADMIN_CHART_COLORS.primary },
+                  {
+                    dataKey: "online",
+                    name: "Online Bookings",
+                    color: ADMIN_CHART_COLORS.primary,
+                  },
                   {
                     dataKey: "offline",
                     name: "Offline Bookings",
@@ -110,7 +133,9 @@ export default function AdminDashboardPage() {
             </Grid>
             <Grid size={{ xs: 12, md: 6, lg: 3.5 }}>
               <Box sx={{ height: "100%" }}>
-                <TopProfessionalsWidget professionals={dashboard.topProfessionals} />
+                <TopProfessionalsWidget
+                  professionals={dashboard.topProfessionals}
+                />
               </Box>
             </Grid>
             <Grid size={{ xs: 12, md: 6, lg: 3.5 }}>
@@ -120,7 +145,12 @@ export default function AdminDashboardPage() {
             </Grid>
           </Grid>
 
-          <Grid container spacing={1.5} alignItems="stretch" sx={{ opacity: isFetching ? 0.72 : 1 }}>
+          <Grid
+            container
+            spacing={1.5}
+            alignItems="stretch"
+            sx={{ opacity: isFetching ? 0.72 : 1 }}
+          >
             <Grid size={{ xs: 12, lg: 6 }}>
               <SummaryOverviewWidget rows={dashboard.summaryOverview} />
             </Grid>

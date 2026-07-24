@@ -42,7 +42,10 @@ export default function CalendarBookingTicketStack({
 }: CalendarBookingTicketStackProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
-  const { slotHeight: defaultSlotHeight } = React.useMemo(() => computeSameTimeRowLayout(rowPx), [rowPx]);
+  const { slotHeight: defaultSlotHeight } = React.useMemo(
+    () => computeSameTimeRowLayout(rowPx),
+    [rowPx],
+  );
   const cardHeight = slotHeight ?? defaultSlotHeight;
   const isDense = events.length > 1;
 
@@ -83,7 +86,12 @@ export default function CalendarBookingTicketStack({
       <Stack
         direction="row"
         spacing={`${COLUMN_GAP}px`}
-        sx={{ width: "100%", height: "100%", minWidth: 0, alignItems: "stretch" }}
+        sx={{
+          width: "100%",
+          height: "100%",
+          minWidth: 0,
+          alignItems: "stretch",
+        }}
       >
         {events.map((event) => (
           <Box key={event.id} sx={{ flex: 1, minWidth: 0, height: "100%" }}>

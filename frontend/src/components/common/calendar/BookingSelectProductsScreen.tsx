@@ -45,7 +45,7 @@ function ProductRow({
     <Box
       sx={{
         width: "100%",
-        border: `1px solid ${alpha(m.navy, 0.10)}`,
+        border: `1px solid ${alpha(m.navy, 0.1)}`,
         borderRadius: "10px",
         px: 1.25,
         py: 1.1,
@@ -70,10 +70,25 @@ function ProductRow({
           cursor: disabled ? "not-allowed" : "pointer",
         }}
       >
-        <BodyText sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.82), lineHeight: 1.25 }}>
+        <BodyText
+          sx={{
+            fontSize: 12.5,
+            fontWeight: 900,
+            color: alpha(m.navy, 0.82),
+            lineHeight: 1.25,
+          }}
+        >
           {qty > 1 ? `${product.name} x${qty}` : product.name}
         </BodyText>
-        <BodyText sx={{ mt: 0.35, fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.48), lineHeight: 1.2 }}>
+        <BodyText
+          sx={{
+            mt: 0.35,
+            fontSize: 11.5,
+            fontWeight: 700,
+            color: alpha(m.navy, 0.48),
+            lineHeight: 1.2,
+          }}
+        >
           {formatProductUnitPrice(product.price)}
         </BodyText>
       </Box>
@@ -92,7 +107,12 @@ function ProductRow({
           size="small"
           disabled={disabled || !checked || qty <= 1}
           onClick={() => onQuantityChange(product.id, -1)}
-          sx={{ width: 30, height: 30, borderRadius: 0, color: alpha(m.navy, 0.55) }}
+          sx={{
+            width: 30,
+            height: 30,
+            borderRadius: 0,
+            color: alpha(m.navy, 0.55),
+          }}
         >
           <RemoveRoundedIcon sx={{ fontSize: 16 }} />
         </IconButton>
@@ -113,7 +133,12 @@ function ProductRow({
           size="small"
           disabled={disabled || !checked}
           onClick={() => onQuantityChange(product.id, 1)}
-          sx={{ width: 30, height: 30, borderRadius: 0, color: alpha(m.navy, 0.55) }}
+          sx={{
+            width: 30,
+            height: 30,
+            borderRadius: 0,
+            color: alpha(m.navy, 0.55),
+          }}
         >
           <AddRoundedIcon sx={{ fontSize: 16 }} />
         </IconButton>
@@ -150,7 +175,9 @@ export default function BookingSelectProductsScreen({
 
   return (
     <Stack spacing={1.5}>
-      <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 15 }}>
+      <BodyText
+        sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 15 }}
+      >
         Select Product
       </BodyText>
 

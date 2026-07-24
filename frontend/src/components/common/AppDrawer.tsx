@@ -3,7 +3,15 @@
 import * as React from "react";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
-import { Box, Drawer, IconButton, Stack, type DrawerProps, type SxProps, type Theme } from "@mui/material";
+import {
+  Box,
+  Drawer,
+  IconButton,
+  Stack,
+  type DrawerProps,
+  type SxProps,
+  type Theme,
+} from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText, SubHeading } from "../ui/typography";
 
@@ -59,10 +67,15 @@ export default function AppDrawer({
   const m = theme.palette.mollure;
   const useMuted = contentVariant === "muted";
   const paperSx = PaperProps?.sx;
-  const headerBg = headerTone === "danger" ? alpha("#E85D5D", 0.14) : alpha(m.teal, 0.12);
+  const headerBg =
+    headerTone === "danger" ? alpha("#E85D5D", 0.14) : alpha(m.teal, 0.12);
 
   const mergedContentSx = (
-    useMuted ? (contentSx ? [mutedContentSx(m.navy), contentSx] : mutedContentSx(m.navy)) : contentSx
+    useMuted
+      ? contentSx
+        ? [mutedContentSx(m.navy), contentSx]
+        : mutedContentSx(m.navy)
+      : contentSx
   ) as SxProps<Theme> | undefined;
 
   const headerIconBtnSx = {
@@ -115,16 +128,38 @@ export default function AppDrawer({
             color: m.navy,
           }}
         >
-          <Stack direction="row" alignItems={subtitle ? "flex-start" : "center"} spacing={1} sx={{ minWidth: 0, flex: 1, pr: 1 }}>
+          <Stack
+            direction="row"
+            alignItems={subtitle ? "flex-start" : "center"}
+            spacing={1}
+            sx={{ minWidth: 0, flex: 1, pr: 1 }}
+          >
             {onBack ? (
-              <IconButton size="small" onClick={onBack} aria-label="Back" sx={{ ...headerIconBtnSx, mt: subtitle ? 0.15 : 0 }}>
+              <IconButton
+                size="small"
+                onClick={onBack}
+                aria-label="Back"
+                sx={{ ...headerIconBtnSx, mt: subtitle ? 0.15 : 0 }}
+              >
                 <ArrowBackRoundedIcon sx={{ fontSize: 18 }} />
               </IconButton>
             ) : null}
             <Box sx={{ minWidth: 0 }}>
-              <SubHeading sx={{ fontSize: subtitle ? 18 : 16, color: alpha(m.navy, 0.9), fontWeight: 800 }}>{title}</SubHeading>
+              <SubHeading
+                sx={{
+                  fontSize: subtitle ? 18 : 16,
+                  color: alpha(m.navy, 0.9),
+                  fontWeight: 800,
+                }}
+              >
+                {title}
+              </SubHeading>
               {subtitle ? (
-                <BodyText sx={{ mt: 0.4, color: alpha(m.navy, 0.62), fontSize: 13 }}>{subtitle}</BodyText>
+                <BodyText
+                  sx={{ mt: 0.4, color: alpha(m.navy, 0.62), fontSize: 13 }}
+                >
+                  {subtitle}
+                </BodyText>
               ) : null}
             </Box>
           </Stack>
@@ -142,7 +177,12 @@ export default function AppDrawer({
             }}
           >
             {headerActions}
-            <IconButton size="small" onClick={() => onClose?.({}, "backdropClick")} aria-label="Close drawer" sx={headerIconBtnSx}>
+            <IconButton
+              size="small"
+              onClick={() => onClose?.({}, "backdropClick")}
+              aria-label="Close drawer"
+              sx={headerIconBtnSx}
+            >
               <CloseRoundedIcon sx={{ fontSize: 18 }} />
             </IconButton>
           </Stack>
@@ -151,7 +191,11 @@ export default function AppDrawer({
         <Box
           sx={[
             { flex: 1, overflowY: "auto", overflowX: "hidden" },
-            ...(Array.isArray(mergedContentSx) ? mergedContentSx : mergedContentSx ? [mergedContentSx] : []),
+            ...(Array.isArray(mergedContentSx)
+              ? mergedContentSx
+              : mergedContentSx
+                ? [mergedContentSx]
+                : []),
           ]}
         >
           {children}

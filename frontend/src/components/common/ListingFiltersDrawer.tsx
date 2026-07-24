@@ -1,7 +1,8 @@
 "use client";
 
+import AppButton from "./AppButton";
 import * as React from "react";
-import { Box, Button, Stack } from "@mui/material";
+import { Box, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDrawer from "./AppDrawer";
 import MessagingFilterCheckboxList from "./messaging/MessagingFilterCheckboxList";
@@ -24,7 +25,14 @@ type Props = {
   onCancel: () => void;
 };
 
-export default function ListingFiltersDrawer({ open, onClose, filters, onChange, onApply, onCancel }: Props) {
+export default function ListingFiltersDrawer({
+  open,
+  onClose,
+  filters,
+  onChange,
+  onApply,
+  onCancel,
+}: Props) {
   const m = useTheme().palette.mollure;
   const [draft, setDraft] = React.useState<ListingDrawerFilters>(filters);
 
@@ -57,7 +65,7 @@ export default function ListingFiltersDrawer({ open, onClose, filters, onChange,
   const footer = (
     <Box sx={{ px: 2.5, py: 2 }}>
       <Stack direction="row" spacing={1.25}>
-        <Button
+        <AppButton
           fullWidth
           variant="outlined"
           onClick={() => {
@@ -67,29 +75,28 @@ export default function ListingFiltersDrawer({ open, onClose, filters, onChange,
           sx={outlinedActionSx}
         >
           Cancel
-        </Button>
-        <Button fullWidth variant="outlined" onClick={resetToDefaults} sx={outlinedActionSx}>
-          Reset
-        </Button>
-        <Button
+        </AppButton>
+        <AppButton
           fullWidth
-          variant="contained"
-          disableElevation
+          variant="outlined"
+          onClick={resetToDefaults}
+          sx={outlinedActionSx}
+        >
+          Reset
+        </AppButton>
+        <AppButton
+          tone="primary"
+          fullWidth
           onClick={() => {
             onChange(draft);
             onApply(draft);
           }}
           sx={{
-            textTransform: "none",
-            fontWeight: 700,
-            borderRadius: "10px",
             height: 44,
-            bgcolor: m.teal,
-            "&:hover": { bgcolor: m.tealDark },
           }}
         >
           Apply
-        </Button>
+        </AppButton>
       </Stack>
     </Box>
   );
@@ -124,7 +131,10 @@ export default function ListingFiltersDrawer({ open, onClose, filters, onChange,
           onToggle={(key, value) =>
             setDraft((prev) => ({
               ...prev,
-              priceTiers: { ...prev.priceTiers, [key as ListingPriceTier]: value },
+              priceTiers: {
+                ...prev.priceTiers,
+                [key as ListingPriceTier]: value,
+              },
             }))
           }
         />

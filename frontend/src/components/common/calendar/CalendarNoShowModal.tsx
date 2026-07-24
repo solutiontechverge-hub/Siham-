@@ -1,7 +1,8 @@
 "use client";
 
+import AppButton from "../AppButton";
 import * as React from "react";
-import { Box, Button, Checkbox, Stack, Typography } from "@mui/material";
+import { Box, Checkbox, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppModal from "../AppModal";
 
@@ -36,10 +37,13 @@ export default function CalendarNoShowModal({
     }
   }, [open, participants]);
 
-  const allSelected = participants.length > 0 && selected.size === participants.length;
+  const allSelected =
+    participants.length > 0 && selected.size === participants.length;
 
   const toggleAll = () => {
-    setSelected(allSelected ? new Set() : new Set(participants.map((p) => p.id)));
+    setSelected(
+      allSelected ? new Set() : new Set(participants.map((p) => p.id)),
+    );
   };
 
   const toggleOne = (id: string) => {
@@ -57,9 +61,21 @@ export default function CalendarNoShowModal({
     "&.Mui-checked": { color: m.teal },
   } as const;
 
-  const rows: Array<{ id: string; name: string; checked: boolean; onToggle: () => void }> = [
+  const rows: Array<{
+    id: string;
+    name: string;
+    checked: boolean;
+    onToggle: () => void;
+  }> = [
     ...(hasAllOption
-      ? [{ id: ALL_ID, name: "All Participant", checked: allSelected, onToggle: toggleAll }]
+      ? [
+          {
+            id: ALL_ID,
+            name: "All Participant",
+            checked: allSelected,
+            onToggle: toggleAll,
+          },
+        ]
       : []),
     ...participants.map((p) => ({
       id: p.id,
@@ -70,7 +86,14 @@ export default function CalendarNoShowModal({
   ];
 
   return (
-    <AppModal open={open} onClose={onClose} title="No Show" maxWidth="sm" fullWidth headerTone="danger">
+    <AppModal
+      open={open}
+      onClose={onClose}
+      title="No Show"
+      maxWidth="sm"
+      fullWidth
+      headerTone="danger"
+    >
       <Box sx={{ px: 2.5, py: 2 }}>
         <Box
           sx={{
@@ -80,7 +103,14 @@ export default function CalendarNoShowModal({
             p: 1.5,
           }}
         >
-          <Typography sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.6), mb: 1.25 }}>
+          <Typography
+            sx={{
+              fontSize: 13,
+              fontWeight: 800,
+              color: alpha(m.navy, 0.6),
+              mb: 1.25,
+            }}
+          >
             Mark The Entire Booking As No Show Or Select Individual Persons
           </Typography>
           <Stack spacing={1}>
@@ -102,10 +132,20 @@ export default function CalendarNoShowModal({
                   "&:hover": { borderColor: alpha(m.teal, 0.4) },
                 }}
               >
-                <Typography sx={{ fontSize: 13.5, fontWeight: 800, color: alpha(m.navy, 0.75) }}>
+                <Typography
+                  sx={{
+                    fontSize: 13.5,
+                    fontWeight: 800,
+                    color: alpha(m.navy, 0.75),
+                  }}
+                >
                   {row.name}
                 </Typography>
-                <Checkbox checked={row.checked} onChange={row.onToggle} sx={checkboxSx} />
+                <Checkbox
+                  checked={row.checked}
+                  onChange={row.onToggle}
+                  sx={checkboxSx}
+                />
               </Stack>
             ))}
           </Stack>
@@ -113,39 +153,27 @@ export default function CalendarNoShowModal({
       </Box>
       <Box sx={{ px: 2.5, py: 2 }}>
         <Stack direction="row" justifyContent="center" spacing={1.5}>
-          <Button
-            variant="outlined"
+          <AppButton
+            tone="secondary"
             onClick={onClose}
             sx={{
-              borderRadius: "10px",
-              textTransform: "none",
-              fontWeight: 800,
               height: 40,
-              borderColor: alpha(m.navy, 0.14),
-              color: alpha(m.navy, 0.72),
-              bgcolor: "#fff",
               minWidth: 120,
             }}
           >
             Cancel
-          </Button>
-          <Button
-            variant="contained"
-            disableElevation
+          </AppButton>
+          <AppButton
+            tone="primary"
             disabled={selected.size === 0}
             onClick={() => onConfirm([...selected])}
             sx={{
-              borderRadius: "10px",
-              textTransform: "none",
-              fontWeight: 800,
               height: 40,
-              bgcolor: m.teal,
-              "&:hover": { bgcolor: m.tealDark },
               minWidth: 120,
             }}
           >
             Save
-          </Button>
+          </AppButton>
         </Stack>
       </Box>
     </AppModal>

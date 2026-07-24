@@ -1,8 +1,16 @@
 "use client";
 
+import AppButton from "./AppButton";
 import * as React from "react";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
-import { Box, Button, IconButton, InputAdornment, MenuItem, Stack, Typography } from "@mui/material";
+import {
+  Box,
+  IconButton,
+  InputAdornment,
+  MenuItem,
+  Stack,
+  Typography,
+} from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDatePicker from "./AppDatePicker";
 import MollureFormField from "./MollureFormField";
@@ -56,7 +64,9 @@ export default function BusinessServiceFormModal({
       ? businessServiceModalCopy.subserviceInfoLabel
       : businessServiceModalCopy.serviceInfoLabel;
 
-  const fieldInputSx = { "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" } } as const;
+  const fieldInputSx = {
+    "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" },
+  } as const;
 
   const twoColumnRowSx = {
     display: "flex",
@@ -69,43 +79,32 @@ export default function BusinessServiceFormModal({
   const twoColumnCellSx = { flex: 1, minWidth: 0, width: "100%" } as const;
 
   const footer = (
-    <Stack direction="row" spacing={1.25} justifyContent="flex-end" sx={{ px: 2.5, py: 1.75 }}>
-      <Button
-        variant="outlined"
+    <Stack
+      direction="row"
+      spacing={1.25}
+      justifyContent="flex-end"
+      sx={{ px: 2.5, py: 1.75 }}
+    >
+      <AppButton
+        tone="secondary"
         onClick={onClose}
         disabled={disabled}
         sx={{
-          borderRadius: "10px",
-          textTransform: "none",
-          fontWeight: 800,
-          height: 36,
           px: 3,
-          borderColor: alpha(m.navy, 0.16),
-          color: alpha(m.navy, 0.65),
-          bgcolor: "#fff",
-          "&:hover": { borderColor: alpha(m.navy, 0.24), bgcolor: alpha(m.navy, 0.02) },
         }}
       >
         {businessServiceModalCopy.cancelLabel}
-      </Button>
-      <Button
-        variant="contained"
-        disableElevation
+      </AppButton>
+      <AppButton
+        tone="primary"
         onClick={onSubmit}
         disabled={disabled || !canSubmit}
         sx={{
-          borderRadius: "10px",
-          textTransform: "none",
-          fontWeight: 900,
-          height: 36,
           px: 4,
-          bgcolor: m.teal,
-          color: "#fff",
-          "&:hover": { bgcolor: m.tealDark },
         }}
       >
         {submitLabel}
-      </Button>
+      </AppButton>
     </Stack>
   );
 
@@ -126,7 +125,13 @@ export default function BusinessServiceFormModal({
       <Box sx={{ px: 2.5, py: 2, width: "100%", boxSizing: "border-box" }}>
         <Stack spacing={2} sx={{ width: "100%", alignItems: "stretch" }}>
           {mode === "subservice" && !readOnly ? (
-            <Typography sx={{ fontSize: 12.5, color: alpha(m.navy, 0.62), lineHeight: 1.45 }}>
+            <Typography
+              sx={{
+                fontSize: 12.5,
+                color: alpha(m.navy, 0.62),
+                lineHeight: 1.45,
+              }}
+            >
               {businessServiceModalCopy.customServiceHint}
             </Typography>
           ) : null}
@@ -154,22 +159,41 @@ export default function BusinessServiceFormModal({
 
           <Box sx={twoColumnRowSx}>
             <Box sx={twoColumnCellSx}>
-              <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.72), mb: 0.75 }}>
+              <Typography
+                sx={{
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  color: alpha(m.navy, 0.72),
+                  mb: 0.75,
+                }}
+              >
                 {businessServiceModalCopy.durationFromLabel}
               </Typography>
               <Box sx={{ display: "flex", gap: 1 }}>
                 <MollureFormField
                   label={businessServiceModalCopy.durationHoursLabel}
-                  placeholder={businessServiceModalCopy.durationHoursPlaceholder}
+                  placeholder={
+                    businessServiceModalCopy.durationHoursPlaceholder
+                  }
                   value={draft.durationFromHours}
-                  onChange={(e) => onChange({ durationFromHours: sanitizeDurationHours(e.target.value) })}
+                  onChange={(e) =>
+                    onChange({
+                      durationFromHours: sanitizeDurationHours(e.target.value),
+                    })
+                  }
                   disabled={fieldsDisabled}
                   fullWidth
                   sx={fieldInputSx}
                   InputProps={{
                     endAdornment: (
                       <InputAdornment position="end">
-                        <Typography sx={{ fontSize: 11, fontWeight: 600, color: alpha(m.navy, 0.5) }}>
+                        <Typography
+                          sx={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: alpha(m.navy, 0.5),
+                          }}
+                        >
                           {businessServiceModalCopy.durationHoursSuffix}
                         </Typography>
                       </InputAdornment>
@@ -179,16 +203,30 @@ export default function BusinessServiceFormModal({
                 />
                 <MollureFormField
                   label={businessServiceModalCopy.durationMinutesLabel}
-                  placeholder={businessServiceModalCopy.durationMinutesPlaceholder}
+                  placeholder={
+                    businessServiceModalCopy.durationMinutesPlaceholder
+                  }
                   value={draft.durationFromMinutes}
-                  onChange={(e) => onChange({ durationFromMinutes: sanitizeDurationMinutes(e.target.value) })}
+                  onChange={(e) =>
+                    onChange({
+                      durationFromMinutes: sanitizeDurationMinutes(
+                        e.target.value,
+                      ),
+                    })
+                  }
                   disabled={fieldsDisabled}
                   fullWidth
                   sx={fieldInputSx}
                   InputProps={{
                     endAdornment: (
                       <InputAdornment position="end">
-                        <Typography sx={{ fontSize: 11, fontWeight: 600, color: alpha(m.navy, 0.5) }}>
+                        <Typography
+                          sx={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: alpha(m.navy, 0.5),
+                          }}
+                        >
                           {businessServiceModalCopy.durationMinutesSuffix}
                         </Typography>
                       </InputAdornment>
@@ -199,22 +237,41 @@ export default function BusinessServiceFormModal({
               </Box>
             </Box>
             <Box sx={twoColumnCellSx}>
-              <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.72), mb: 0.75 }}>
+              <Typography
+                sx={{
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  color: alpha(m.navy, 0.72),
+                  mb: 0.75,
+                }}
+              >
                 {businessServiceModalCopy.durationToLabel}
               </Typography>
               <Box sx={{ display: "flex", gap: 1 }}>
                 <MollureFormField
                   label={businessServiceModalCopy.durationHoursLabel}
-                  placeholder={businessServiceModalCopy.durationHoursPlaceholder}
+                  placeholder={
+                    businessServiceModalCopy.durationHoursPlaceholder
+                  }
                   value={draft.durationToHours}
-                  onChange={(e) => onChange({ durationToHours: sanitizeDurationHours(e.target.value) })}
+                  onChange={(e) =>
+                    onChange({
+                      durationToHours: sanitizeDurationHours(e.target.value),
+                    })
+                  }
                   disabled={fieldsDisabled}
                   fullWidth
                   sx={fieldInputSx}
                   InputProps={{
                     endAdornment: (
                       <InputAdornment position="end">
-                        <Typography sx={{ fontSize: 11, fontWeight: 600, color: alpha(m.navy, 0.5) }}>
+                        <Typography
+                          sx={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: alpha(m.navy, 0.5),
+                          }}
+                        >
                           {businessServiceModalCopy.durationHoursSuffix}
                         </Typography>
                       </InputAdornment>
@@ -224,16 +281,30 @@ export default function BusinessServiceFormModal({
                 />
                 <MollureFormField
                   label={businessServiceModalCopy.durationMinutesLabel}
-                  placeholder={businessServiceModalCopy.durationMinutesPlaceholder}
+                  placeholder={
+                    businessServiceModalCopy.durationMinutesPlaceholder
+                  }
                   value={draft.durationToMinutes}
-                  onChange={(e) => onChange({ durationToMinutes: sanitizeDurationMinutes(e.target.value) })}
+                  onChange={(e) =>
+                    onChange({
+                      durationToMinutes: sanitizeDurationMinutes(
+                        e.target.value,
+                      ),
+                    })
+                  }
                   disabled={fieldsDisabled}
                   fullWidth
                   sx={fieldInputSx}
                   InputProps={{
                     endAdornment: (
                       <InputAdornment position="end">
-                        <Typography sx={{ fontSize: 11, fontWeight: 600, color: alpha(m.navy, 0.5) }}>
+                        <Typography
+                          sx={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: alpha(m.navy, 0.5),
+                          }}
+                        >
                           {businessServiceModalCopy.durationMinutesSuffix}
                         </Typography>
                       </InputAdornment>
@@ -251,7 +322,12 @@ export default function BusinessServiceFormModal({
                 select
                 label={businessServiceModalCopy.priceTypeLabel}
                 value={draft.priceType}
-                onChange={(e) => onChange({ priceType: e.target.value as BusinessServiceFormDraft["priceType"] })}
+                onChange={(e) =>
+                  onChange({
+                    priceType: e.target
+                      .value as BusinessServiceFormDraft["priceType"],
+                  })
+                }
                 disabled={fieldsDisabled}
                 fullWidth
                 sx={fieldInputSx}
@@ -268,19 +344,37 @@ export default function BusinessServiceFormModal({
                 label={businessServiceModalCopy.priceLabel}
                 placeholder="0"
                 value={draft.priceAmount}
-                onChange={(e) => onChange({ priceAmount: e.target.value.replace(/[^\d.,]/g, "") })}
+                onChange={(e) =>
+                  onChange({
+                    priceAmount: e.target.value.replace(/[^\d.,]/g, ""),
+                  })
+                }
                 disabled={fieldsDisabled}
                 fullWidth
                 sx={fieldInputSx}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <Typography sx={{ fontSize: 14, fontWeight: 600, color: alpha(m.navy, 0.55) }}>€</Typography>
+                      <Typography
+                        sx={{
+                          fontSize: 14,
+                          fontWeight: 600,
+                          color: alpha(m.navy, 0.55),
+                        }}
+                      >
+                        €
+                      </Typography>
                     </InputAdornment>
                   ),
                   endAdornment: (
                     <InputAdornment position="end">
-                      <Typography sx={{ fontSize: 11, fontWeight: 600, color: alpha(m.navy, 0.5) }}>
+                      <Typography
+                        sx={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          color: alpha(m.navy, 0.5),
+                        }}
+                      >
                         {businessServiceModalCopy.currencyCode}
                       </Typography>
                     </InputAdornment>
@@ -300,7 +394,14 @@ export default function BusinessServiceFormModal({
               boxSizing: "border-box",
             }}
           >
-            <Typography sx={{ fontWeight: 700, fontSize: 14, color: alpha(m.navy, 0.88), mb: 1.75 }}>
+            <Typography
+              sx={{
+                fontWeight: 700,
+                fontSize: 14,
+                color: alpha(m.navy, 0.88),
+                mb: 1.75,
+              }}
+            >
               {businessServiceModalCopy.offerDiscountTitle}
             </Typography>
             <Stack spacing={1.5} sx={{ width: "100%", alignItems: "stretch" }}>
@@ -311,7 +412,10 @@ export default function BusinessServiceFormModal({
                     label={businessServiceModalCopy.discountTypeLabel}
                     value={draft.discountType}
                     onChange={(e) =>
-                      onChange({ discountType: e.target.value as BusinessServiceFormDraft["discountType"] })
+                      onChange({
+                        discountType: e.target
+                          .value as BusinessServiceFormDraft["discountType"],
+                      })
                     }
                     disabled={fieldsDisabled}
                     fullWidth
@@ -331,13 +435,24 @@ export default function BusinessServiceFormModal({
                     value={draft.discountAmount}
                     onChange={(e) => {
                       const raw = e.target.value;
-                      if (normalizeBusinessServiceDiscountType(draft.discountType) === "percent") {
+                      if (
+                        normalizeBusinessServiceDiscountType(
+                          draft.discountType,
+                        ) === "percent"
+                      ) {
                         const v = raw.replace(/[^\d.]/g, "");
                         const dot = v.indexOf(".");
                         if (dot === -1) onChange({ discountAmount: v });
-                        else onChange({ discountAmount: v.slice(0, dot + 1) + v.slice(dot + 1).replace(/\./g, "") });
+                        else
+                          onChange({
+                            discountAmount:
+                              v.slice(0, dot + 1) +
+                              v.slice(dot + 1).replace(/\./g, ""),
+                          });
                       } else {
-                        onChange({ discountAmount: raw.replace(/[^\d.,]/g, "") });
+                        onChange({
+                          discountAmount: raw.replace(/[^\d.,]/g, ""),
+                        });
                       }
                     }}
                     disabled={fieldsDisabled}
@@ -348,19 +463,41 @@ export default function BusinessServiceFormModal({
                         ? {
                             endAdornment: (
                               <InputAdornment position="end">
-                                <Typography sx={{ fontSize: 11, fontWeight: 600, color: alpha(m.navy, 0.5) }}>%</Typography>
+                                <Typography
+                                  sx={{
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                    color: alpha(m.navy, 0.5),
+                                  }}
+                                >
+                                  %
+                                </Typography>
                               </InputAdornment>
                             ),
                           }
                         : {
                             startAdornment: (
                               <InputAdornment position="start">
-                                <Typography sx={{ fontSize: 14, fontWeight: 600, color: alpha(m.navy, 0.55) }}>€</Typography>
+                                <Typography
+                                  sx={{
+                                    fontSize: 14,
+                                    fontWeight: 600,
+                                    color: alpha(m.navy, 0.55),
+                                  }}
+                                >
+                                  €
+                                </Typography>
                               </InputAdornment>
                             ),
                             endAdornment: (
                               <InputAdornment position="end">
-                                <Typography sx={{ fontSize: 11, fontWeight: 600, color: alpha(m.navy, 0.5) }}>
+                                <Typography
+                                  sx={{
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                    color: alpha(m.navy, 0.5),
+                                  }}
+                                >
                                   {businessServiceModalCopy.currencyCode}
                                 </Typography>
                               </InputAdornment>
@@ -395,7 +532,9 @@ export default function BusinessServiceFormModal({
               <MollureFormField
                 label={businessServiceModalCopy.discountDescriptionLabel}
                 value={draft.discountDescription}
-                onChange={(e) => onChange({ discountDescription: e.target.value })}
+                onChange={(e) =>
+                  onChange({ discountDescription: e.target.value })
+                }
                 disabled={fieldsDisabled}
                 fullWidth
                 sx={fieldInputSx}

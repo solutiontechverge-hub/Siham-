@@ -44,14 +44,50 @@ export default function ClientBookingInfoBar({
     >
       <Grid container spacing={0}>
         <Grid item xs={12} md={4} sx={colSx}>
-          <Typography sx={{ fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.5), mb: 0.75 }}>Professional</Typography>
-          <Typography sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.85), lineHeight: 1.2 }}>{professionalName}</Typography>
-          <Typography sx={{ fontSize: 11.5, fontWeight: 600, color: alpha(m.navy, 0.48), mt: 0.2 }}>{professionalRole}</Typography>
+          <Typography
+            sx={{
+              fontSize: 11,
+              fontWeight: 800,
+              color: alpha(m.navy, 0.5),
+              mb: 0.75,
+            }}
+          >
+            Professional
+          </Typography>
+          <Typography
+            sx={{
+              fontWeight: 900,
+              fontSize: 13,
+              color: alpha(m.navy, 0.85),
+              lineHeight: 1.2,
+            }}
+          >
+            {professionalName}
+          </Typography>
+          <Typography
+            sx={{
+              fontSize: 11.5,
+              fontWeight: 600,
+              color: alpha(m.navy, 0.48),
+              mt: 0.2,
+            }}
+          >
+            {professionalRole}
+          </Typography>
         </Grid>
 
         <Grid item xs={12} md={4} sx={colSx}>
-          <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.75 }}>
-            <Typography sx={{ fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.5) }}>Location</Typography>
+          <Stack
+            direction="row"
+            alignItems="center"
+            spacing={0.75}
+            sx={{ mb: 0.75 }}
+          >
+            <Typography
+              sx={{ fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.5) }}
+            >
+              Location
+            </Typography>
             <Chip
               label={locationBadge}
               size="small"
@@ -66,16 +102,51 @@ export default function ClientBookingInfoBar({
             />
           </Stack>
           <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.6 }}>
-            <LocationOnOutlinedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.45), mt: 0.15, flexShrink: 0 }} />
-            <Typography sx={{ fontWeight: 700, fontSize: 11.5, color: alpha(m.navy, 0.62), lineHeight: 1.4 }}>{address}</Typography>
+            <LocationOnOutlinedIcon
+              sx={{
+                fontSize: 16,
+                color: alpha(m.navy, 0.45),
+                mt: 0.15,
+                flexShrink: 0,
+              }}
+            />
+            <Typography
+              sx={{
+                fontWeight: 700,
+                fontSize: 11.5,
+                color: alpha(m.navy, 0.62),
+                lineHeight: 1.4,
+              }}
+            >
+              {address}
+            </Typography>
           </Box>
         </Grid>
 
         <Grid item xs={12} md={4} sx={colSx}>
-          <Typography sx={{ fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.5), mb: 0.75 }}>Contact number</Typography>
+          <Typography
+            sx={{
+              fontSize: 11,
+              fontWeight: 800,
+              color: alpha(m.navy, 0.5),
+              mb: 0.75,
+            }}
+          >
+            Contact number
+          </Typography>
           <Box sx={{ display: "flex", alignItems: "center", gap: 0.6 }}>
-            <PhoneOutlinedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.45) }} />
-            <Typography sx={{ fontWeight: 700, fontSize: 12.5, color: alpha(m.navy, 0.62) }}>{phone || "—"}</Typography>
+            <PhoneOutlinedIcon
+              sx={{ fontSize: 16, color: alpha(m.navy, 0.45) }}
+            />
+            <Typography
+              sx={{
+                fontWeight: 700,
+                fontSize: 12.5,
+                color: alpha(m.navy, 0.62),
+              }}
+            >
+              {phone || "—"}
+            </Typography>
           </Box>
         </Grid>
       </Grid>

@@ -1,9 +1,10 @@
+import AppButton from "../../common/AppButton";
 import * as React from "react";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
-import { Box, Button, IconButton, Popover, Stack } from "@mui/material";
+import { Box, IconButton, Popover, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useSnackbar } from "../../common/AppSnackbar";
 import AppDatePicker from "../../common/AppDatePicker";
@@ -75,7 +76,11 @@ export default function TransactionsToolbar({
 
   return (
     <Box sx={{ px: 2.25, py: 1.5 }}>
-      <Stack direction={{ xs: "column", lg: "row" }} spacing={1.5} alignItems={{ lg: "center" }}>
+      <Stack
+        direction={{ xs: "column", lg: "row" }}
+        spacing={1.5}
+        alignItems={{ lg: "center" }}
+      >
         <Box sx={{ flex: 1, maxWidth: { lg: 420 } }}>
           <MollureFormField
             placeholder="Search by Booking ID, client name or email"
@@ -88,7 +93,11 @@ export default function TransactionsToolbar({
               },
             }}
             InputProps={{
-              endAdornment: <SearchRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.45) }} />,
+              endAdornment: (
+                <SearchRoundedIcon
+                  sx={{ fontSize: 18, color: alpha(m.navy, 0.45) }}
+                />
+              ),
             }}
           />
         </Box>
@@ -101,26 +110,30 @@ export default function TransactionsToolbar({
           justifyContent={{ xs: "flex-start", lg: "flex-end" }}
           sx={{ width: { xs: "100%", lg: "auto" } }}
         >
-          <Button
+          <AppButton
             variant="outlined"
             onClick={(e) => setFromAnchor(e.currentTarget)}
             sx={commonBtnSx}
           >
             {fromDate ? `From: ${fromDate}` : "from date"}
-          </Button>
-          <Button
+          </AppButton>
+          <AppButton
             variant="outlined"
             onClick={(e) => setToAnchor(e.currentTarget)}
             sx={commonBtnSx}
           >
             {toDate ? `To: ${toDate}` : "to date"}
-          </Button>
+          </AppButton>
           {hasAppliedDateRange ? (
-            <Button variant="outlined" onClick={handleResetDateRange} sx={commonBtnSx}>
+            <AppButton
+              variant="outlined"
+              onClick={handleResetDateRange}
+              sx={commonBtnSx}
+            >
               Reset
-            </Button>
+            </AppButton>
           ) : null}
-          <Button
+          <AppButton
             variant="outlined"
             startIcon={<TuneRoundedIcon sx={{ fontSize: 18 }} />}
             onClick={onFiltersClick}
@@ -137,8 +150,8 @@ export default function TransactionsToolbar({
             }}
           >
             Filters
-          </Button>
-          <Button
+          </AppButton>
+          <AppButton
             variant="contained"
             disableElevation
             disabled={disableAdd}
@@ -156,7 +169,7 @@ export default function TransactionsToolbar({
             }}
           >
             Add
-          </Button>
+          </AppButton>
           <IconButton
             size="small"
             aria-label="More actions"
@@ -190,14 +203,21 @@ export default function TransactionsToolbar({
           sx: {
             mt: 1,
             borderRadius: "12px",
-            border: `1px solid ${alpha(m.navy, 0.10)}`,
+            border: `1px solid ${alpha(m.navy, 0.1)}`,
             boxShadow: "0 18px 44px rgba(16, 24, 40, 0.14)",
             p: 1.25,
             width: 280,
           },
         }}
       >
-        <BodyText sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.75), mb: 1 }}>
+        <BodyText
+          sx={{
+            fontSize: 12,
+            fontWeight: 800,
+            color: alpha(m.navy, 0.75),
+            mb: 1,
+          }}
+        >
           From date
         </BodyText>
         <AppDatePicker
@@ -207,7 +227,7 @@ export default function TransactionsToolbar({
           fullWidth
         />
         <Stack direction="row" spacing={1} sx={{ mt: 1.25 }}>
-          <Button
+          <AppButton
             fullWidth
             variant="outlined"
             onClick={() => {
@@ -217,30 +237,24 @@ export default function TransactionsToolbar({
             sx={{ ...commonBtnSx, height: 36 }}
           >
             Cancel
-          </Button>
-          <Button
+          </AppButton>
+          <AppButton
+            tone="primary"
             fullWidth
-            variant="contained"
-            disableElevation
             onClick={() => {
               if (!fromDraft) {
-                showSnackbar({ severity: "warning", message: "Please select a From date." });
+                showSnackbar({
+                  severity: "warning",
+                  message: "Please select a From date.",
+                });
                 return;
               }
               onFromDateChange?.(fromDraft || null);
               setFromAnchor(null);
             }}
-            sx={{
-              height: 36,
-              borderRadius: "8px",
-              textTransform: "none",
-              fontWeight: 800,
-              bgcolor: m.teal,
-              "&:hover": { bgcolor: m.tealDark },
-            }}
           >
             Apply
-          </Button>
+          </AppButton>
         </Stack>
       </Popover>
 
@@ -256,14 +270,21 @@ export default function TransactionsToolbar({
           sx: {
             mt: 1,
             borderRadius: "12px",
-            border: `1px solid ${alpha(m.navy, 0.10)}`,
+            border: `1px solid ${alpha(m.navy, 0.1)}`,
             boxShadow: "0 18px 44px rgba(16, 24, 40, 0.14)",
             p: 1.25,
             width: 280,
           },
         }}
       >
-        <BodyText sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.75), mb: 1 }}>
+        <BodyText
+          sx={{
+            fontSize: 12,
+            fontWeight: 800,
+            color: alpha(m.navy, 0.75),
+            mb: 1,
+          }}
+        >
           To date
         </BodyText>
         <AppDatePicker
@@ -274,7 +295,7 @@ export default function TransactionsToolbar({
           fullWidth
         />
         <Stack direction="row" spacing={1} sx={{ mt: 1.25 }}>
-          <Button
+          <AppButton
             fullWidth
             variant="outlined"
             onClick={() => {
@@ -284,33 +305,26 @@ export default function TransactionsToolbar({
             sx={{ ...commonBtnSx, height: 36 }}
           >
             Cancel
-          </Button>
-          <Button
+          </AppButton>
+          <AppButton
+            tone="primary"
             fullWidth
-            variant="contained"
-            disableElevation
             onClick={() => {
               if (!toDraft) {
-                showSnackbar({ severity: "warning", message: "Please select a To date." });
+                showSnackbar({
+                  severity: "warning",
+                  message: "Please select a To date.",
+                });
                 return;
               }
               onToDateChange?.(toDraft || null);
               setToAnchor(null);
             }}
-            sx={{
-              height: 36,
-              borderRadius: "8px",
-              textTransform: "none",
-              fontWeight: 800,
-              bgcolor: m.teal,
-              "&:hover": { bgcolor: m.tealDark },
-            }}
           >
             Apply
-          </Button>
+          </AppButton>
         </Stack>
       </Popover>
     </Box>
   );
 }
-

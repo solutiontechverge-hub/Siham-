@@ -1,7 +1,17 @@
 "use client";
 
 import * as React from "react";
-import { Box, ButtonBase, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from "@mui/material";
+import {
+  Box,
+  ButtonBase,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+} from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../ui/typography";
 import type { ProfessionalFixedLocationSalesVolumeAnalyticsData } from "../../app/professionals/fixed-location/analytics/salesVolumeAnalytics.data";
@@ -15,7 +25,10 @@ export type ProfessionalFixedLocationSalesVolumeAnalyticsProps = {
 
 function formatAmountEur(amount: number) {
   const abs = Math.abs(amount);
-  const formatted = abs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const formatted = abs.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
   return amount < 0 ? `-${formatted}` : formatted;
 }
 
@@ -26,11 +39,16 @@ function formatPct(pct: number) {
 }
 
 function formatValueEur(value: number) {
-  return value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return value.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 function formatCurrencyEur(value: number) {
-  const formatted = value.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  const formatted = value.toLocaleString(undefined, {
+    maximumFractionDigits: 0,
+  });
   return `€${formatted}`;
 }
 
@@ -72,8 +90,17 @@ function HorizontalBarChart({
   const axisColor = alpha(m.navy, 0.3);
 
   const barGap = 16;
-  const barH = pageData.length ? Math.max(22, Math.min(44, (innerH - barGap * (pageData.length - 1)) / pageData.length)) : 30;
-  const usedH = pageData.length * barH + Math.max(0, pageData.length - 1) * barGap;
+  const barH = pageData.length
+    ? Math.max(
+        22,
+        Math.min(
+          44,
+          (innerH - barGap * (pageData.length - 1)) / pageData.length,
+        ),
+      )
+    : 30;
+  const usedH =
+    pageData.length * barH + Math.max(0, pageData.length - 1) * barGap;
   const y0 = margin.top + (innerH - usedH) / 2;
 
   return (
@@ -90,7 +117,16 @@ function HorizontalBarChart({
     >
       {title && (
         <Box sx={{ px: 2.25, pt: 2.1, pb: 1.1 }}>
-          <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.85), textAlign: "center" }}>{title}</BodyText>
+          <BodyText
+            sx={{
+              fontSize: 14,
+              fontWeight: 900,
+              color: alpha(m.navy, 0.85),
+              textAlign: "center",
+            }}
+          >
+            {title}
+          </BodyText>
         </Box>
       )}
 
@@ -104,98 +140,129 @@ function HorizontalBarChart({
             role="img"
             aria-label={title || xLabel}
           >
-              {/* grid + x-axis ticks */}
-              {Array.from({ length: ticks }).map((_, i) => {
-                const t = (max / (ticks - 1)) * i;
-                const x = margin.left + (innerW * i) / (ticks - 1);
-                return (
-                  <g key={i}>
-                    <line x1={x} y1={margin.top} x2={x} y2={margin.top + innerH} stroke={gridColor} strokeWidth={1} />
-                    <text
-                      x={x}
-                      y={margin.top + innerH + 18}
-                      textAnchor="middle"
-                      fontSize={11}
-                      fontFamily="inherit"
-                      fill={alpha(m.navy, 0.55)}
-                    >
-                      {Math.round(t).toLocaleString()}
-                    </text>
-                  </g>
-                );
-              })}
+            {/* grid + x-axis ticks */}
+            {Array.from({ length: ticks }).map((_, i) => {
+              const t = (max / (ticks - 1)) * i;
+              const x = margin.left + (innerW * i) / (ticks - 1);
+              return (
+                <g key={i}>
+                  <line
+                    x1={x}
+                    y1={margin.top}
+                    x2={x}
+                    y2={margin.top + innerH}
+                    stroke={gridColor}
+                    strokeWidth={1}
+                  />
+                  <text
+                    x={x}
+                    y={margin.top + innerH + 18}
+                    textAnchor="middle"
+                    fontSize={11}
+                    fontFamily="inherit"
+                    fill={alpha(m.navy, 0.55)}
+                  >
+                    {Math.round(t).toLocaleString()}
+                  </text>
+                </g>
+              );
+            })}
 
-              {/* y labels + bars + right value labels */}
-              {pageData.map((d, idx) => {
-                const y = y0 + idx * (barH + barGap);
-                const barW = (d.value / max) * innerW;
-                const valueLabel = d.sharePct !== undefined
+            {/* y labels + bars + right value labels */}
+            {pageData.map((d, idx) => {
+              const y = y0 + idx * (barH + barGap);
+              const barW = (d.value / max) * innerW;
+              const valueLabel =
+                d.sharePct !== undefined
                   ? `${d.value.toLocaleString()}€ (${d.sharePct}%)`
                   : `${d.value.toLocaleString()}€`;
-                return (
-                  <g key={d.label}>
-                    {/* left label */}
-                    <text
-                      x={margin.left - 12}
-                      y={y + barH / 2 + 4}
-                      textAnchor="end"
-                      fontSize={12}
-                      fontFamily="inherit"
-                      fill={alpha(m.navy, 0.7)}
-                    >
-                      {d.label}
-                    </text>
-                    {/* bar */}
-                    <rect
-                      x={margin.left}
-                      y={y}
-                      width={Math.max(0, barW)}
-                      height={barH}
-                      fill={m.teal}
-                      rx={4}
-                    />
-                    {/* right value label */}
-                    <text
-                      x={margin.left + barW + 10}
-                      y={y + barH / 2 + 4}
-                      textAnchor="start"
-                      fontSize={11.5}
-                      fontFamily="inherit"
-                      fontWeight="700"
-                      fill={alpha(m.navy, 0.68)}
-                    >
-                      {valueLabel}
-                    </text>
-                  </g>
-                );
-              })}
+              return (
+                <g key={d.label}>
+                  {/* left label */}
+                  <text
+                    x={margin.left - 12}
+                    y={y + barH / 2 + 4}
+                    textAnchor="end"
+                    fontSize={12}
+                    fontFamily="inherit"
+                    fill={alpha(m.navy, 0.7)}
+                  >
+                    {d.label}
+                  </text>
+                  {/* bar */}
+                  <rect
+                    x={margin.left}
+                    y={y}
+                    width={Math.max(0, barW)}
+                    height={barH}
+                    fill={m.teal}
+                    rx={4}
+                  />
+                  {/* right value label */}
+                  <text
+                    x={margin.left + barW + 10}
+                    y={y + barH / 2 + 4}
+                    textAnchor="start"
+                    fontSize={11.5}
+                    fontFamily="inherit"
+                    fontWeight="700"
+                    fill={alpha(m.navy, 0.68)}
+                  >
+                    {valueLabel}
+                  </text>
+                </g>
+              );
+            })}
 
-              {/* x axis line */}
-              <line x1={margin.left} y1={margin.top + innerH} x2={margin.left + innerW} y2={margin.top + innerH} stroke={axisColor} strokeWidth={1} />
+            {/* x axis line */}
+            <line
+              x1={margin.left}
+              y1={margin.top + innerH}
+              x2={margin.left + innerW}
+              y2={margin.top + innerH}
+              stroke={axisColor}
+              strokeWidth={1}
+            />
 
-              {/* x label */}
-              <text
-                x={margin.left + innerW / 2}
-                y={h - 8}
-                textAnchor="middle"
-                fontSize={12}
-                fontFamily="inherit"
-                fill={alpha(m.navy, 0.65)}
-              >
-                {xLabel}
-              </text>
+            {/* x label */}
+            <text
+              x={margin.left + innerW / 2}
+              y={h - 8}
+              textAnchor="middle"
+              fontSize={12}
+              fontFamily="inherit"
+              fill={alpha(m.navy, 0.65)}
+            >
+              {xLabel}
+            </text>
           </svg>
         </Box>
 
-        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", pt: 1.3 }}>
-          <BodyText sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.45) }}>
-            {data.length === 0 ? "0–0 of 0" : `${startIdx + 1}–${Math.min(startIdx + pageData.length, data.length)} of ${data.length}`}
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            pt: 1.3,
+          }}
+        >
+          <BodyText
+            sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.45) }}
+          >
+            {data.length === 0
+              ? "0–0 of 0"
+              : `${startIdx + 1}–${Math.min(startIdx + pageData.length, data.length)} of ${data.length}`}
           </BodyText>
 
           <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
             <ButtonBase
               onClick={() => setPage((p) => Math.max(1, p - 1))}
-              sx={{ px: 0.9, py: 0.5, borderRadius: "6px", color: alpha(m.navy, 0.55) }}
+              sx={{
+                px: 0.9,
+                py: 0.5,
+                borderRadius: "6px",
+                color: alpha(m.navy, 0.55),
+              }}
               aria-label="Previous page"
             >
               ‹
@@ -216,7 +283,14 @@ function HorizontalBarChart({
                     border: `1px solid ${active ? alpha(m.teal, 0.25) : alpha(m.navy, 0.12)}`,
                   }}
                 >
-                  <BodyText component="span" sx={{ fontSize: 11, fontWeight: 900, color: active ? "#fff" : alpha(m.navy, 0.55) }}>
+                  <BodyText
+                    component="span"
+                    sx={{
+                      fontSize: 11,
+                      fontWeight: 900,
+                      color: active ? "#fff" : alpha(m.navy, 0.55),
+                    }}
+                  >
                     {p}
                   </BodyText>
                 </ButtonBase>
@@ -225,7 +299,12 @@ function HorizontalBarChart({
 
             <ButtonBase
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              sx={{ px: 0.9, py: 0.5, borderRadius: "6px", color: alpha(m.navy, 0.55) }}
+              sx={{
+                px: 0.9,
+                py: 0.5,
+                borderRadius: "6px",
+                color: alpha(m.navy, 0.55),
+              }}
               aria-label="Next page"
             >
               ›
@@ -237,7 +316,9 @@ function HorizontalBarChart({
   );
 }
 
-export default function ProfessionalFixedLocationSalesVolumeAnalytics({ data }: ProfessionalFixedLocationSalesVolumeAnalyticsProps) {
+export default function ProfessionalFixedLocationSalesVolumeAnalytics({
+  data,
+}: ProfessionalFixedLocationSalesVolumeAnalyticsProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
 
@@ -246,13 +327,21 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({ data }: 
   const section23 = data.refundsAndAdjustments;
   const section25 = data.netSalesOverview;
 
-  const headers23 = ["Adjustment Type", "Amount (€)", "Share of Gross Sales"] as const;
+  const headers23 = [
+    "Adjustment Type",
+    "Amount (€)",
+    "Share of Gross Sales",
+  ] as const;
   const headers25 = ["Metric", "Amount (€)"] as const;
 
   return (
     <Box sx={{ px: 2.25, pb: 2.5 }}>
       <Box sx={{ pt: 2.25, pb: 1.4 }}>
-        <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}>{section21.title}</BodyText>
+        <BodyText
+          sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}
+        >
+          {section21.title}
+        </BodyText>
       </Box>
 
       <SalesByCategoriesServicesTable rows={section21.rows} />
@@ -273,7 +362,11 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({ data }: 
 
       {/* 2.2 Product Sales */}
       <Box sx={{ pt: 2.7, pb: 1.4 }}>
-        <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}>{section22.title}</BodyText>
+        <BodyText
+          sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}
+        >
+          {section22.title}
+        </BodyText>
       </Box>
 
       <TableContainer
@@ -289,13 +382,28 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({ data }: 
         <Table size="small">
           <TableHead>
             <TableRow sx={{ bgcolor: alpha("#9BA3B5", 0.14) }}>
-              {(["Products", "Count", "Sales (€)", "Share (%)"] as const).map((h) => (
-                <TableCell key={h} sx={{ py: 1.2, borderBottom: `1px solid ${alpha(m.navy, 0.08)}` }}>
-                  <BodyText component="span" sx={{ fontSize: 11.5, fontWeight: 800, color: alpha(m.navy, 0.62) }}>
-                    {h}
-                  </BodyText>
-                </TableCell>
-              ))}
+              {(["Products", "Count", "Sales (€)", "Share (%)"] as const).map(
+                (h) => (
+                  <TableCell
+                    key={h}
+                    sx={{
+                      py: 1.2,
+                      borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
+                    }}
+                  >
+                    <BodyText
+                      component="span"
+                      sx={{
+                        fontSize: 11.5,
+                        fontWeight: 800,
+                        color: alpha(m.navy, 0.62),
+                      }}
+                    >
+                      {h}
+                    </BodyText>
+                  </TableCell>
+                ),
+              )}
             </TableRow>
           </TableHead>
           <TableBody>
@@ -309,23 +417,71 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({ data }: 
                     "&:last-child td": { borderBottom: 0 },
                   }}
                 >
-                  <TableCell sx={{ borderBottom: `1px solid ${alpha(m.navy, 0.06)}`, py: 1 }}>
-                    <BodyText component="span" sx={{ fontSize: 12, fontWeight: isTotal ? 900 : 700, color: alpha(m.navy, isTotal ? 0.82 : 0.68) }}>
+                  <TableCell
+                    sx={{
+                      borderBottom: `1px solid ${alpha(m.navy, 0.06)}`,
+                      py: 1,
+                    }}
+                  >
+                    <BodyText
+                      component="span"
+                      sx={{
+                        fontSize: 12,
+                        fontWeight: isTotal ? 900 : 700,
+                        color: alpha(m.navy, isTotal ? 0.82 : 0.68),
+                      }}
+                    >
                       {r.product}
                     </BodyText>
                   </TableCell>
-                  <TableCell sx={{ borderBottom: `1px solid ${alpha(m.navy, 0.06)}`, py: 1 }}>
-                    <BodyText component="span" sx={{ fontSize: 12, fontWeight: isTotal ? 900 : 700, color: alpha(m.navy, isTotal ? 0.82 : 0.68) }}>
+                  <TableCell
+                    sx={{
+                      borderBottom: `1px solid ${alpha(m.navy, 0.06)}`,
+                      py: 1,
+                    }}
+                  >
+                    <BodyText
+                      component="span"
+                      sx={{
+                        fontSize: 12,
+                        fontWeight: isTotal ? 900 : 700,
+                        color: alpha(m.navy, isTotal ? 0.82 : 0.68),
+                      }}
+                    >
                       {r.count}
                     </BodyText>
                   </TableCell>
-                  <TableCell sx={{ borderBottom: `1px solid ${alpha(m.navy, 0.06)}`, py: 1 }}>
-                    <BodyText component="span" sx={{ fontSize: 12, fontWeight: isTotal ? 900 : 700, color: alpha(m.navy, isTotal ? 0.82 : 0.68) }}>
+                  <TableCell
+                    sx={{
+                      borderBottom: `1px solid ${alpha(m.navy, 0.06)}`,
+                      py: 1,
+                    }}
+                  >
+                    <BodyText
+                      component="span"
+                      sx={{
+                        fontSize: 12,
+                        fontWeight: isTotal ? 900 : 700,
+                        color: alpha(m.navy, isTotal ? 0.82 : 0.68),
+                      }}
+                    >
                       {`€${r.salesEur.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
                     </BodyText>
                   </TableCell>
-                  <TableCell sx={{ borderBottom: `1px solid ${alpha(m.navy, 0.06)}`, py: 1 }}>
-                    <BodyText component="span" sx={{ fontSize: 12, fontWeight: isTotal ? 900 : 700, color: alpha(m.navy, isTotal ? 0.82 : 0.68) }}>
+                  <TableCell
+                    sx={{
+                      borderBottom: `1px solid ${alpha(m.navy, 0.06)}`,
+                      py: 1,
+                    }}
+                  >
+                    <BodyText
+                      component="span"
+                      sx={{
+                        fontSize: 12,
+                        fontWeight: isTotal ? 900 : 700,
+                        color: alpha(m.navy, isTotal ? 0.82 : 0.68),
+                      }}
+                    >
                       {`${r.sharePct.toFixed(1)}%`}
                     </BodyText>
                   </TableCell>
@@ -341,7 +497,11 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({ data }: 
         title=""
         data={section22.rows
           .filter((r) => !r.isTotal)
-          .map((r) => ({ label: r.product, value: r.salesEur, sharePct: r.sharePct }))}
+          .map((r) => ({
+            label: r.product,
+            value: r.salesEur,
+            sharePct: r.sharePct,
+          }))}
         xLabel="Sales€"
       />
 
@@ -353,7 +513,11 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({ data }: 
       ) : null}
 
       <Box sx={{ pt: 2.7, pb: 1.4 }}>
-        <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}>{section23.title}</BodyText>
+        <BodyText
+          sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}
+        >
+          {section23.title}
+        </BodyText>
       </Box>
 
       <TableContainer
@@ -370,8 +534,21 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({ data }: 
           <TableHead>
             <TableRow sx={{ bgcolor: alpha(m.navy, 0.03) }}>
               {headers23.map((h) => (
-                <TableCell key={h} sx={{ py: 1.15, borderBottom: `1px solid ${alpha(m.navy, 0.08)}` }}>
-                  <BodyText component="span" sx={{ fontSize: 11.5, fontWeight: 800, color: alpha(m.navy, 0.62) }}>
+                <TableCell
+                  key={h}
+                  sx={{
+                    py: 1.15,
+                    borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
+                  }}
+                >
+                  <BodyText
+                    component="span"
+                    sx={{
+                      fontSize: 11.5,
+                      fontWeight: 800,
+                      color: alpha(m.navy, 0.62),
+                    }}
+                  >
                     {h}
                   </BodyText>
                 </TableCell>
@@ -381,9 +558,22 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({ data }: 
 
           <TableBody>
             {section23.rows.map((r) => (
-              <TableRow key={r.adjustmentType} hover sx={{ "& td": { borderBottom: `1px solid ${alpha(m.navy, 0.06)}` } }}>
+              <TableRow
+                key={r.adjustmentType}
+                hover
+                sx={{
+                  "& td": { borderBottom: `1px solid ${alpha(m.navy, 0.06)}` },
+                }}
+              >
                 <TableCell sx={{ py: 1.1 }}>
-                  <BodyText component="span" sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.65) }}>
+                  <BodyText
+                    component="span"
+                    sx={{
+                      fontSize: 12.5,
+                      fontWeight: 700,
+                      color: alpha(m.navy, 0.65),
+                    }}
+                  >
                     {r.adjustmentType}
                   </BodyText>
                 </TableCell>
@@ -394,7 +584,10 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({ data }: 
                     sx={{
                       fontSize: 12.5,
                       fontWeight: 700,
-                      color: r.amountEur < 0 ? alpha(theme.palette.error.main, 0.9) : alpha(m.navy, 0.65),
+                      color:
+                        r.amountEur < 0
+                          ? alpha(theme.palette.error.main, 0.9)
+                          : alpha(m.navy, 0.65),
                       fontVariantNumeric: "tabular-nums",
                     }}
                   >
@@ -408,7 +601,10 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({ data }: 
                     sx={{
                       fontSize: 12.5,
                       fontWeight: 700,
-                      color: r.shareOfGrossSalesPct < 0 ? alpha(theme.palette.error.main, 0.9) : alpha(m.navy, 0.65),
+                      color:
+                        r.shareOfGrossSalesPct < 0
+                          ? alpha(theme.palette.error.main, 0.9)
+                          : alpha(m.navy, 0.65),
                       fontVariantNumeric: "tabular-nums",
                     }}
                   >
@@ -429,7 +625,11 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({ data }: 
       ) : null}
 
       <Box sx={{ pt: 2.7, pb: 1.4 }}>
-        <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}>{section25.title}</BodyText>
+        <BodyText
+          sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}
+        >
+          {section25.title}
+        </BodyText>
       </Box>
 
       <TableContainer
@@ -446,8 +646,21 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({ data }: 
           <TableHead>
             <TableRow sx={{ bgcolor: alpha(m.navy, 0.03) }}>
               {headers25.map((h) => (
-                <TableCell key={h} sx={{ py: 1.15, borderBottom: `1px solid ${alpha(m.navy, 0.08)}` }}>
-                  <BodyText component="span" sx={{ fontSize: 11.5, fontWeight: 800, color: alpha(m.navy, 0.62) }}>
+                <TableCell
+                  key={h}
+                  sx={{
+                    py: 1.15,
+                    borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
+                  }}
+                >
+                  <BodyText
+                    component="span"
+                    sx={{
+                      fontSize: 11.5,
+                      fontWeight: 800,
+                      color: alpha(m.navy, 0.62),
+                    }}
+                  >
                     {h}
                   </BodyText>
                 </TableCell>
@@ -467,12 +680,21 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({ data }: 
                   hover
                   sx={{
                     bgcolor: isHighlight ? alpha(m.teal, 0.04) : "transparent",
-                    "& td": { borderBottom: `1px solid ${alpha(m.navy, 0.06)}` },
+                    "& td": {
+                      borderBottom: `1px solid ${alpha(m.navy, 0.06)}`,
+                    },
                     "&:last-child td": { borderBottom: 0 },
                   }}
                 >
                   <TableCell sx={{ py: 1.1 }}>
-                    <BodyText component="span" sx={{ fontSize: 12.5, fontWeight: isHighlight ? 900 : 700, color: alpha(m.navy, isHighlight ? 0.82 : 0.65) }}>
+                    <BodyText
+                      component="span"
+                      sx={{
+                        fontSize: 12.5,
+                        fontWeight: isHighlight ? 900 : 700,
+                        color: alpha(m.navy, isHighlight ? 0.82 : 0.65),
+                      }}
+                    >
                       {r.metric}
                     </BodyText>
                   </TableCell>
@@ -483,7 +705,9 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({ data }: 
                       sx={{
                         fontSize: 12.5,
                         fontWeight: isHighlight ? 900 : 700,
-                        color: isNegative ? "#D32F2F" : alpha(m.navy, isHighlight ? 0.82 : 0.65),
+                        color: isNegative
+                          ? "#D32F2F"
+                          : alpha(m.navy, isHighlight ? 0.82 : 0.65),
                         fontVariantNumeric: "tabular-nums",
                       }}
                     >
@@ -503,8 +727,6 @@ export default function ProfessionalFixedLocationSalesVolumeAnalytics({ data }: 
           content={section25.explanationContent}
         />
       ) : null}
-
     </Box>
   );
 }
-

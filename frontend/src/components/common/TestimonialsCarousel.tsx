@@ -56,7 +56,11 @@ export default function TestimonialsCarousel({
         speed={550}
         autoplay={
           canLoop
-            ? { delay: 3000, disableOnInteraction: false, pauseOnMouseEnter: true }
+            ? {
+                delay: 3000,
+                disableOnInteraction: false,
+                pauseOnMouseEnter: true,
+              }
             : false
         }
         pagination={{ clickable: true }}
@@ -106,17 +110,40 @@ export default function TestimonialsCarousel({
                         alt={testimonial.name}
                         width={52}
                         height={52}
-                        style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
                       />
                     </Box>
                     <Box sx={{ minWidth: 0 }}>
-                      <Typography sx={{ fontWeight: 800, color: tokens.navy, fontSize: 14, lineHeight: 1.2 }}>
+                      <Typography
+                        sx={{
+                          fontWeight: 800,
+                          color: tokens.navy,
+                          fontSize: 14,
+                          lineHeight: 1.2,
+                        }}
+                      >
                         {testimonial.name}
                       </Typography>
-                      <Typography sx={{ fontSize: 12, color: tokens.bodyText, lineHeight: 1.25 }}>
+                      <Typography
+                        sx={{
+                          fontSize: 12,
+                          color: tokens.bodyText,
+                          lineHeight: 1.25,
+                        }}
+                      >
                         {testimonial.role}
                       </Typography>
-                      <Typography sx={{ fontSize: 12, color: tokens.slate, lineHeight: 1.25 }}>
+                      <Typography
+                        sx={{
+                          fontSize: 12,
+                          color: tokens.slate,
+                          lineHeight: 1.25,
+                        }}
+                      >
                         {agencyLabel}
                       </Typography>
                     </Box>
@@ -142,13 +169,18 @@ export default function TestimonialsCarousel({
                       }}
                     >
                       {Array.from({ length: 5 }).map((_, i) => (
-                        <StarRoundedIcon key={i} sx={{ fontSize: 16, color: tokens.star }} />
+                        <StarRoundedIcon
+                          key={i}
+                          sx={{ fontSize: 16, color: tokens.star }}
+                        />
                       ))}
                     </Stack>
                   </Box>
                 </Box>
                 <Box sx={{ px: 2.5, pt: 3.75, pb: 2.5, textAlign: "center" }}>
-                  <Typography sx={{ fontSize: 13, color: tokens.slate, lineHeight: 1.7 }}>
+                  <Typography
+                    sx={{ fontSize: 13, color: tokens.slate, lineHeight: 1.7 }}
+                  >
                     {testimonial.text}
                   </Typography>
                 </Box>

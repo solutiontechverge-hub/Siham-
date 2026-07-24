@@ -1,10 +1,10 @@
 "use client";
 
+import AppButton from "../../../components/common/AppButton";
 import * as React from "react";
 import {
   Alert,
   Box,
-  Button,
   Container,
   Grid,
   PaginationItem,
@@ -31,14 +31,25 @@ import { marketingShellFooter } from "../../../data/marketingShell.data";
 
 export default function ClientFavouritesPage() {
   const pathname = usePathname();
-  const { tokens, items, favorites, toggleFavorite, page, setPage, totalPages, totalCount, rangeLabel } =
-    useClientFavouritesPage();
+  const {
+    tokens,
+    items,
+    favorites,
+    toggleFavorite,
+    page,
+    setPage,
+    totalPages,
+    totalCount,
+    rangeLabel,
+  } = useClientFavouritesPage();
   const user = useAppSelector((s) => s.auth.user);
   const fallbackDisplayName =
     ((user as any)?.display_name as string | undefined) ||
     `${(user as any)?.first_name ?? ""} ${(user as any)?.last_name ?? ""}`.trim();
   const [userName, setUserName] = React.useState<string>(fallbackDisplayName);
-  const [avatarUrl, setAvatarUrl] = React.useState<string | undefined>(undefined);
+  const [avatarUrl, setAvatarUrl] = React.useState<string | undefined>(
+    undefined,
+  );
   const [snackbarOpen, setSnackbarOpen] = React.useState(false);
 
   React.useEffect(() => {
@@ -55,9 +66,11 @@ export default function ClientFavouritesPage() {
       const authedEmail = user?.email?.trim().toLowerCase();
       const persistedEmail = data?.email?.trim().toLowerCase();
       if (authedEmail && persistedEmail && authedEmail === persistedEmail) {
-        if (typeof data.avatar_url === "string" && data.avatar_url) setAvatarUrl(data.avatar_url);
+        if (typeof data.avatar_url === "string" && data.avatar_url)
+          setAvatarUrl(data.avatar_url);
         const persistedName = (data.display_name ?? "").trim();
-        const fullName = `${data.first_name ?? ""} ${data.last_name ?? ""}`.trim();
+        const fullName =
+          `${data.first_name ?? ""} ${data.last_name ?? ""}`.trim();
         const resolved = persistedName || fullName;
         if (resolved) setUserName(resolved);
       }
@@ -103,13 +116,17 @@ export default function ClientFavouritesPage() {
               boxShadow: "0 16px 40px rgba(40, 92, 112, 0.08)",
             }}
           >
-            <Typography sx={{ fontWeight: 800, color: tokens.navy, fontSize: 18 }}>
+            <Typography
+              sx={{ fontWeight: 800, color: tokens.navy, fontSize: 18 }}
+            >
               {favouritesPageData.emptyState.title}
             </Typography>
-            <Typography sx={{ mt: 1, color: tokens.slate, fontSize: 14, lineHeight: 1.6 }}>
+            <Typography
+              sx={{ mt: 1, color: tokens.slate, fontSize: 14, lineHeight: 1.6 }}
+            >
               {favouritesPageData.emptyState.subtitle}
             </Typography>
-            <Button
+            <AppButton
               component={Link}
               href={favouritesPageData.emptyState.ctaHref}
               variant="contained"
@@ -127,7 +144,7 @@ export default function ClientFavouritesPage() {
               }}
             >
               {favouritesPageData.emptyState.ctaLabel}
-            </Button>
+            </AppButton>
           </AppCard>
         ) : (
           <>
@@ -169,7 +186,10 @@ export default function ClientFavouritesPage() {
       </Container>
 
       <MarketingSiteFooter
-        columns={marketingShellFooter.columns.map((col) => ({ title: col.title, items: [...col.items] }))}
+        columns={marketingShellFooter.columns.map((col) => ({
+          title: col.title,
+          items: [...col.items],
+        }))}
         copyright={marketingShellFooter.copyright}
         sx={{ mt: 2 }}
       />

@@ -8,7 +8,15 @@ import ChevronRightOutlinedIcon from "@mui/icons-material/ChevronRightOutlined";
 import ExpandLessOutlinedIcon from "@mui/icons-material/ExpandLessOutlined";
 import ExpandMoreOutlinedIcon from "@mui/icons-material/ExpandMoreOutlined";
 import HeadsetMicOutlinedIcon from "@mui/icons-material/HeadsetMicOutlined";
-import { Box, Chip, Collapse, Drawer, IconButton, Stack, Typography } from "@mui/material";
+import {
+  Box,
+  Chip,
+  Collapse,
+  Drawer,
+  IconButton,
+  Stack,
+  Typography,
+} from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { Logo } from "../../../images";
 import { AppButton } from "../common";
@@ -27,7 +35,10 @@ type AdminSidebarProps = {
 };
 
 function isNavItemActive(pathname: string, href: string) {
-  return pathname === href || (href !== "/admin/dashboard" && pathname.startsWith(href));
+  return (
+    pathname === href ||
+    (href !== "/admin/dashboard" && pathname.startsWith(href))
+  );
 }
 
 function sectionContainsActive(pathname: string, section: AdminNavSection) {
@@ -64,12 +75,18 @@ function NavLink({
         bgcolor: active ? alpha(tokens.teal, 0.28) : "transparent",
         transition: "background-color 160ms ease",
         "&:hover": {
-          bgcolor: active ? alpha(tokens.teal, 0.32) : alpha(tokens.white, 0.06),
+          bgcolor: active
+            ? alpha(tokens.teal, 0.32)
+            : alpha(tokens.white, 0.06),
         },
       }}
     >
-      <Icon sx={{ fontSize: 20, color: active ? tokens.teal : tokens.footerMuted }} />
-      <Typography sx={{ fontSize: 13.5, fontWeight: active ? 600 : 500, flex: 1 }}>
+      <Icon
+        sx={{ fontSize: 20, color: active ? tokens.teal : tokens.footerMuted }}
+      />
+      <Typography
+        sx={{ fontSize: 13.5, fontWeight: active ? 600 : 500, flex: 1 }}
+      >
         {item.label}
       </Typography>
       {item.badge ? (
@@ -88,7 +105,9 @@ function NavLink({
         />
       ) : null}
       {item.showTrailingArrow ? (
-        <ChevronRightOutlinedIcon sx={{ fontSize: 18, color: tokens.footerMuted }} />
+        <ChevronRightOutlinedIcon
+          sx={{ fontSize: 18, color: tokens.footerMuted }}
+        />
       ) : null}
     </Box>
   );
@@ -100,7 +119,9 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const tokens = theme.palette.mollure;
   const dashboardActive = isNavItemActive(pathname, adminDashboardNavItem.href);
 
-  const [collapsedSections, setCollapsedSections] = React.useState<Record<string, boolean>>(() =>
+  const [collapsedSections, setCollapsedSections] = React.useState<
+    Record<string, boolean>
+  >(() =>
     Object.fromEntries(
       adminNavSections.map((section) => [
         section.id,
@@ -130,7 +151,12 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <Stack sx={{ height: "100%", py: 2.5, px: 2 }}>
-      <Stack direction="row" alignItems="center" spacing={1.25} sx={{ px: 1, mb: 3 }}>
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={1.25}
+        sx={{ px: 1, mb: 3 }}
+      >
         <Image src={Logo} alt="Mollure" width={32} height={32} />
         <Typography
           sx={{
@@ -145,7 +171,11 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
       </Stack>
 
       <Stack spacing={0.5} sx={{ flex: 1, overflowY: "auto" }}>
-        <NavLink item={adminDashboardNavItem} active={dashboardActive} onNavigate={onNavigate} />
+        <NavLink
+          item={adminDashboardNavItem}
+          active={dashboardActive}
+          onNavigate={onNavigate}
+        />
 
         {adminNavSections.map((section) => {
           const collapsed = Boolean(collapsedSections[section.id]);
@@ -173,7 +203,11 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                   <IconButton
                     size="small"
                     onClick={() => toggleSection(section.id)}
-                    aria-label={collapsed ? `Expand ${section.label}` : `Collapse ${section.label}`}
+                    aria-label={
+                      collapsed
+                        ? `Expand ${section.label}`
+                        : `Collapse ${section.label}`
+                    }
                     sx={{ color: tokens.footerMuted, p: 0.25 }}
                   >
                     {collapsed ? (
@@ -212,13 +246,20 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         }}
       >
         <Stack direction="row" spacing={1.25} alignItems="flex-start">
-          <HeadsetMicOutlinedIcon sx={{ fontSize: 20, color: tokens.teal, mt: 0.25 }} />
+          <HeadsetMicOutlinedIcon
+            sx={{ fontSize: 20, color: tokens.teal, mt: 0.25 }}
+          />
           <Stack spacing={1}>
-            <Typography sx={{ fontSize: 13.5, fontWeight: 600, color: tokens.white }}>
+            <Typography
+              sx={{ fontSize: 13.5, fontWeight: 600, color: tokens.white }}
+            >
               Need Help?
             </Typography>
-            <Typography sx={{ fontSize: 12, lineHeight: 1.5, color: tokens.footerMuted }}>
-              If you have any questions or need support, feel free to contact us.
+            <Typography
+              sx={{ fontSize: 12, lineHeight: 1.5, color: tokens.footerMuted }}
+            >
+              If you have any questions or need support, feel free to contact
+              us.
             </Typography>
             <AppButton
               variant="outlined"
@@ -246,7 +287,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-export default function AdminSidebar({ mobileOpen = false, onMobileClose }: AdminSidebarProps) {
+export default function AdminSidebar({
+  mobileOpen = false,
+  onMobileClose,
+}: AdminSidebarProps) {
   const theme = useTheme();
   const tokens = theme.palette.mollure;
 
@@ -263,7 +307,10 @@ export default function AdminSidebar({ mobileOpen = false, onMobileClose }: Admi
 
   return (
     <>
-      <Drawer variant="permanent" sx={{ display: { xs: "none", md: "block" }, ...drawerSx }}>
+      <Drawer
+        variant="permanent"
+        sx={{ display: { xs: "none", md: "block" }, ...drawerSx }}
+      >
         <SidebarContent />
       </Drawer>
       <Drawer

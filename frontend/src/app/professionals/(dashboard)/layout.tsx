@@ -4,7 +4,11 @@ import { ProfessionalMarketingHeader } from "../../../components/common";
 import AuthGuard from "../../../components/common/auth/AuthGuard";
 import ProfessionalDashboardShell from "../../../components/common/ProfessionalDashboardShell";
 
-export default function ProfessionalsDashboardLayout({ children }: { children: React.ReactNode }) {
+export default function ProfessionalsDashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <AuthGuard allowedRoles={["professional"]}>
       <ProfessionalMarketingHeader

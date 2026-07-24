@@ -2,7 +2,13 @@
 
 import * as React from "react";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
-import { Box, MenuItem, Stack, Typography, type TextFieldProps } from "@mui/material";
+import {
+  Box,
+  MenuItem,
+  Stack,
+  Typography,
+  type TextFieldProps,
+} from "@mui/material";
 import AppTextField from "./AppTextField";
 import {
   COUNTRY_DIAL_CODES,
@@ -13,19 +19,47 @@ import {
   resolveCountrySelectValue,
 } from "../../data/countryDialCodes";
 
-export type AppCountryCodeSelectProps = Omit<TextFieldProps, "select" | "onChange" | "value"> & {
+export type AppCountryCodeSelectProps = Omit<
+  TextFieldProps,
+  "select" | "onChange" | "value"
+> & {
   value: string;
   onChange: (dialCode: string) => void;
   placeholder?: string;
 };
 
-function CountryCodeMenuItem({ iso, dialCode, name }: { iso: string; dialCode: string; name: string }) {
+function CountryCodeMenuItem({
+  iso,
+  dialCode,
+  name,
+}: {
+  iso: string;
+  dialCode: string;
+  name: string;
+}) {
   return (
-    <Stack direction="row" spacing={1} alignItems="center" sx={{ width: "100%", minWidth: 0 }}>
-      <Box component="span" sx={{ fontSize: 18, lineHeight: 1, width: 22, textAlign: "center", flexShrink: 0 }}>
+    <Stack
+      direction="row"
+      spacing={1}
+      alignItems="center"
+      sx={{ width: "100%", minWidth: 0 }}
+    >
+      <Box
+        component="span"
+        sx={{
+          fontSize: 18,
+          lineHeight: 1,
+          width: 22,
+          textAlign: "center",
+          flexShrink: 0,
+        }}
+      >
         {countryFlagEmoji(iso)}
       </Box>
-      <Typography component="span" sx={{ fontWeight: 700, fontSize: 14, flexShrink: 0 }}>
+      <Typography
+        component="span"
+        sx={{ fontWeight: 700, fontSize: 14, flexShrink: 0 }}
+      >
         {dialCode}
       </Typography>
       <Typography
@@ -69,7 +103,9 @@ export default function AppCountryCodeSelect({
     <AppTextField
       select
       value={selectValue}
-      onChange={(event) => onChange(dialCodeFromSelectValue(String(event.target.value)))}
+      onChange={(event) =>
+        onChange(dialCodeFromSelectValue(String(event.target.value)))
+      }
       SelectProps={{
         IconComponent: ExpandMoreRoundedIcon,
         displayEmpty: true,
@@ -87,8 +123,15 @@ export default function AppCountryCodeSelect({
         <em>{placeholder}</em>
       </MenuItem>
       {COUNTRY_DIAL_CODES.map((entry) => (
-        <MenuItem key={countryDialOptionValue(entry)} value={countryDialOptionValue(entry)}>
-          <CountryCodeMenuItem iso={entry.iso} dialCode={entry.dialCode} name={entry.name} />
+        <MenuItem
+          key={countryDialOptionValue(entry)}
+          value={countryDialOptionValue(entry)}
+        >
+          <CountryCodeMenuItem
+            iso={entry.iso}
+            dialCode={entry.dialCode}
+            name={entry.name}
+          />
         </MenuItem>
       ))}
     </AppTextField>

@@ -1,7 +1,8 @@
 "use client";
 
+import AppButton from "../AppButton";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
-import { Box, Button, Stack, Typography } from "@mui/material";
+import { Box, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppModal from "../AppModal";
 
@@ -28,46 +29,26 @@ export default function SalesCancelModal({
       maxWidth="xs"
       headerTone="danger"
       footer={
-        <Stack direction="row" spacing={1.25} justifyContent="flex-end" sx={{ px: 2.5, py: 2 }}>
-          <Button
-            onClick={onClose}
-            variant="outlined"
-            disabled={confirming}
-            sx={{
-              borderRadius: "8px",
-              textTransform: "none",
-              fontWeight: 800,
-              borderColor: alpha(m.navy, 0.14),
-              color: alpha(m.navy, 0.72),
-              bgcolor: "#fff",
-              height: 36,
-              px: 2.25,
-            }}
-          >
+        <Stack
+          direction="row"
+          spacing={1.25}
+          justifyContent="flex-end"
+          sx={{ px: 2.5, py: 2 }}
+        >
+          <AppButton tone="secondary" onClick={onClose} disabled={confirming}>
             Cancel
-          </Button>
-          <Button
-            variant="contained"
-            disableElevation
-            disabled={confirming}
-            onClick={onConfirm}
-            sx={{
-              borderRadius: "8px",
-              textTransform: "none",
-              fontWeight: 900,
-              bgcolor: m.teal,
-              color: "#fff",
-              "&:hover": { bgcolor: m.tealDark },
-              height: 36,
-              px: 2.25,
-            }}
-          >
+          </AppButton>
+          <AppButton tone="primary" disabled={confirming} onClick={onConfirm}>
             Confirm
-          </Button>
+          </AppButton>
         </Stack>
       }
     >
-      <Stack alignItems="center" spacing={1.5} sx={{ px: 1, py: 1.5, textAlign: "center" }}>
+      <Stack
+        alignItems="center"
+        spacing={1.5}
+        sx={{ px: 1, py: 1.5, textAlign: "center" }}
+      >
         <Box
           sx={{
             width: 56,
@@ -80,9 +61,16 @@ export default function SalesCancelModal({
         >
           <WarningAmberRoundedIcon sx={{ fontSize: 30, color: "#F04438" }} />
         </Box>
-        <Typography sx={{ fontSize: 13.5, fontWeight: 800, color: alpha(m.navy, 0.82), lineHeight: 1.45 }}>
-          This pending sales record will be removed and the payment link will be deactivated. The client
-          will no longer be able to complete the payment
+        <Typography
+          sx={{
+            fontSize: 13.5,
+            fontWeight: 800,
+            color: alpha(m.navy, 0.82),
+            lineHeight: 1.45,
+          }}
+        >
+          This pending sales record will be removed and the payment link will be
+          deactivated. The client will no longer be able to complete the payment
         </Typography>
       </Stack>
     </AppModal>

@@ -3,7 +3,11 @@
 import * as React from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Box, CircularProgress, Container, Typography } from "@mui/material";
-import { BusinessPublicProfile, MarketingSiteFooter, MollureMarketingHeader } from "../../../../components/common";
+import {
+  BusinessPublicProfile,
+  MarketingSiteFooter,
+  MollureMarketingHeader,
+} from "../../../../components/common";
 import { resolveBusinessOfferingFlags } from "../../../../data/businessPublicProfile.data";
 import {
   savePublicProfileBookingSelection,
@@ -24,7 +28,9 @@ export default function ClientBusinessProfilePage() {
     ((user as { display_name?: string })?.display_name as string | undefined) ||
     `${(user as { first_name?: string })?.first_name ?? ""} ${(user as { last_name?: string })?.last_name ?? ""}`.trim();
 
-  const [locationMode, setLocationMode] = React.useState<"fixed" | "desired">("fixed");
+  const [locationMode, setLocationMode] = React.useState<"fixed" | "desired">(
+    "fixed",
+  );
 
   React.useEffect(() => {
     if (!profile) return;
@@ -34,7 +40,10 @@ export default function ClientBusinessProfilePage() {
     try {
       const raw = window.sessionStorage.getItem("mollure:selected_shop");
       if (raw) {
-        const parsed = JSON.parse(raw) as { shopId?: string; locationMode?: "fixed" | "desired" };
+        const parsed = JSON.parse(raw) as {
+          shopId?: string;
+          locationMode?: "fixed" | "desired";
+        };
         if (parsed.shopId === profile.shopId && parsed.locationMode) {
           modeFromListing = parsed.locationMode;
         }
@@ -79,7 +88,8 @@ export default function ClientBusinessProfilePage() {
     (mode: "fixed" | "desired") => {
       if (!profile) return;
       const offering = resolveBusinessOfferingFlags(profile.businessOffering);
-      if (!offering.supportsFixedLocation || !offering.supportsDesiredLocation) return;
+      if (!offering.supportsFixedLocation || !offering.supportsDesiredLocation)
+        return;
       setLocationMode(mode);
       persistSelectedShop(mode);
     },
@@ -123,7 +133,11 @@ export default function ClientBusinessProfilePage() {
       <Box sx={{ minHeight: "100vh", bgcolor: "mollure.pageBg", py: 4 }}>
         <Container maxWidth="lg">
           <Box sx={{ textAlign: "center", py: 8 }}>
-            <Typography>{isError ? "Unable to load business profile." : "Business not found."}</Typography>
+            <Typography>
+              {isError
+                ? "Unable to load business profile."
+                : "Business not found."}
+            </Typography>
           </Box>
         </Container>
       </Box>
@@ -150,7 +164,10 @@ export default function ClientBusinessProfilePage() {
       </Container>
 
       <MarketingSiteFooter
-        columns={marketingShellFooter.columns.map((col) => ({ title: col.title, items: [...col.items] }))}
+        columns={marketingShellFooter.columns.map((col) => ({
+          title: col.title,
+          items: [...col.items],
+        }))}
         copyright={marketingShellFooter.copyright}
         sx={{ mt: 2 }}
       />

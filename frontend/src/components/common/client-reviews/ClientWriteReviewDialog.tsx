@@ -2,9 +2,12 @@
 
 import * as React from "react";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
-import { Box, Button, Stack, Typography } from "@mui/material";
+import { Box, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import AppModal, { MessagingModalCancelButton, MessagingModalPrimaryButton } from "../AppModal";
+import AppModal, {
+  MessagingModalCancelButton,
+  MessagingModalPrimaryButton,
+} from "../AppModal";
 import AppTextField from "../AppTextField";
 
 type Props = {
@@ -13,7 +16,11 @@ type Props = {
   onSubmit: (rating: number, reviewText: string) => void;
 };
 
-export default function ClientWriteReviewDialog({ open, onClose, onSubmit }: Props) {
+export default function ClientWriteReviewDialog({
+  open,
+  onClose,
+  onSubmit,
+}: Props) {
   const m = useTheme().palette.mollure;
   const [rating, setRating] = React.useState(5);
   const [reviewText, setReviewText] = React.useState("");
@@ -41,16 +48,33 @@ export default function ClientWriteReviewDialog({ open, onClose, onSubmit }: Pro
       footer={
         <>
           <MessagingModalCancelButton onClick={onClose} />
-          <MessagingModalPrimaryButton label="Submit review" onClick={handleSubmit} disabled={!reviewText.trim()} />
+          <MessagingModalPrimaryButton
+            label="Submit review"
+            onClick={handleSubmit}
+            disabled={!reviewText.trim()}
+          />
         </>
       }
     >
       <Stack spacing={2} sx={{ py: 1 }}>
         <Box>
-          <Typography sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.62), mb: 0.75 }}>Your rating</Typography>
+          <Typography
+            sx={{
+              fontSize: 12,
+              fontWeight: 800,
+              color: alpha(m.navy, 0.62),
+              mb: 0.75,
+            }}
+          >
+            Your rating
+          </Typography>
           <Stack direction="row" spacing={0.35}>
             {Array.from({ length: 5 }).map((_, i) => (
-              <ButtonBaseStar key={i} filled={i < rating} onClick={() => setRating(i + 1)} />
+              <ButtonBaseStar
+                key={i}
+                filled={i < rating}
+                onClick={() => setRating(i + 1)}
+              />
             ))}
           </Stack>
         </Box>
@@ -68,7 +92,13 @@ export default function ClientWriteReviewDialog({ open, onClose, onSubmit }: Pro
   );
 }
 
-function ButtonBaseStar({ filled, onClick }: { filled: boolean; onClick: () => void }) {
+function ButtonBaseStar({
+  filled,
+  onClick,
+}: {
+  filled: boolean;
+  onClick: () => void;
+}) {
   const m = useTheme().palette.mollure;
   return (
     <Box
@@ -83,7 +113,9 @@ function ButtonBaseStar({ filled, onClick }: { filled: boolean; onClick: () => v
         lineHeight: 0,
       }}
     >
-      <StarRoundedIcon sx={{ fontSize: 28, color: filled ? m.star : alpha(m.navy, 0.15) }} />
+      <StarRoundedIcon
+        sx={{ fontSize: 28, color: filled ? m.star : alpha(m.navy, 0.15) }}
+      />
     </Box>
   );
 }

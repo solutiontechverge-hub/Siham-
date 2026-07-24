@@ -14,7 +14,9 @@ export type ContactUsFormValues = {
   attachments: File[];
 };
 
-export type ContactUsFieldErrors = Partial<Record<keyof ContactUsFormValues, string>>;
+export type ContactUsFieldErrors = Partial<
+  Record<keyof ContactUsFormValues, string>
+>;
 
 const initialValues: ContactUsFormValues = {
   persona: "Client",
@@ -48,7 +50,8 @@ function validate(values: ContactUsFormValues): ContactUsFieldErrors {
     errors.message = "Message should be at least 10 characters.";
   }
 
-  if (!values.consent) errors.consent = "Please accept the privacy policy consent to continue.";
+  if (!values.consent)
+    errors.consent = "Please accept the privacy policy consent to continue.";
 
   return errors;
 }
@@ -56,10 +59,11 @@ function validate(values: ContactUsFormValues): ContactUsFieldErrors {
 export function useContactUsForm() {
   const isSignedIn = useAppSelector((s) => Boolean(s.auth.accessToken));
   const [submitContactMessage] = useSubmitContactMessageMutation();
-  const [values, setValues] = React.useState<ContactUsFormValues>(initialValues);
-  const [touched, setTouched] = React.useState<Partial<Record<keyof ContactUsFormValues, boolean>>>(
-    {},
-  );
+  const [values, setValues] =
+    React.useState<ContactUsFormValues>(initialValues);
+  const [touched, setTouched] = React.useState<
+    Partial<Record<keyof ContactUsFormValues, boolean>>
+  >({});
   const [errors, setErrors] = React.useState<ContactUsFieldErrors>({});
   const [showSignInGate, setShowSignInGate] = React.useState(false);
   const [submitState, setSubmitState] = React.useState<
@@ -67,7 +71,10 @@ export function useContactUsForm() {
   >("idle");
 
   const setField = React.useCallback(
-    <K extends keyof ContactUsFormValues>(key: K, value: ContactUsFormValues[K]) => {
+    <K extends keyof ContactUsFormValues>(
+      key: K,
+      value: ContactUsFormValues[K],
+    ) => {
       setValues((prev) => ({ ...prev, [key]: value }));
     },
     [],
@@ -83,7 +90,10 @@ export function useContactUsForm() {
 
   const addFiles = React.useCallback((files: FileList | null) => {
     if (!files?.length) return;
-    setValues((prev) => ({ ...prev, attachments: [...prev.attachments, ...Array.from(files)] }));
+    setValues((prev) => ({
+      ...prev,
+      attachments: [...prev.attachments, ...Array.from(files)],
+    }));
   }, []);
 
   const removeFile = React.useCallback((idx: number) => {
@@ -145,4 +155,3 @@ export function useContactUsForm() {
     setSubmitState,
   };
 }
-

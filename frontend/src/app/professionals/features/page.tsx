@@ -6,4 +6,3 @@ import { professionalFeaturesPageData } from "../professionalFeatures.data";
 export default function ProfessionalFeaturesPage() {
   return <ProfessionalFeatures data={professionalFeaturesPageData} />;
 }
-

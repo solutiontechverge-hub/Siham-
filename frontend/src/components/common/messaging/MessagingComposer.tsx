@@ -6,14 +6,29 @@ import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 import InsertDriveFileRoundedIcon from "@mui/icons-material/InsertDriveFileRounded";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
-import { Box, IconButton, Menu, MenuItem, ListItemIcon, ListItemText, Stack, TextField, Typography } from "@mui/material";
+import {
+  Box,
+  IconButton,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import { filesToMessagingAttachments, isImageAttachment, revokeAttachmentUrls } from "./messagingFileUtils";
+import {
+  filesToMessagingAttachments,
+  isImageAttachment,
+  revokeAttachmentUrls,
+} from "./messagingFileUtils";
 import type { MessagingAttachment } from "./messagingTypes";
 
 type AttachKind = "picture" | "document";
 
-const PICTURE_ACCEPT = "image/jpeg,image/jpg,image/png,image/webp,image/gif,image/heic,image/heif";
+const PICTURE_ACCEPT =
+  "image/jpeg,image/jpg,image/png,image/webp,image/gif,image/heic,image/heif";
 const DOCUMENT_ACCEPT =
   ".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain";
 
@@ -23,15 +38,22 @@ type Props = {
   disabledHint?: string;
 };
 
-export default function MessagingComposer({ onSend, disabled = false, disabledHint }: Props) {
+export default function MessagingComposer({
+  onSend,
+  disabled = false,
+  disabledHint,
+}: Props) {
   const m = useTheme().palette.mollure;
   const instanceId = React.useId();
   const pictureInputRef = React.useRef<HTMLInputElement>(null);
   const documentInputRef = React.useRef<HTMLInputElement>(null);
   const [draft, setDraft] = React.useState("");
-  const [pendingAttachments, setPendingAttachments] = React.useState<MessagingAttachment[]>([]);
+  const [pendingAttachments, setPendingAttachments] = React.useState<
+    MessagingAttachment[]
+  >([]);
   const [attachError, setAttachError] = React.useState<string | null>(null);
-  const [attachMenuAnchor, setAttachMenuAnchor] = React.useState<HTMLElement | null>(null);
+  const [attachMenuAnchor, setAttachMenuAnchor] =
+    React.useState<HTMLElement | null>(null);
 
   const handleSend = () => {
     if (disabled) return;
@@ -73,7 +95,8 @@ export default function MessagingComposer({ onSend, disabled = false, disabledHi
   const openFilePicker = (kind: AttachKind) => {
     setAttachMenuAnchor(null);
     if (disabled) return;
-    const input = kind === "picture" ? pictureInputRef.current : documentInputRef.current;
+    const input =
+      kind === "picture" ? pictureInputRef.current : documentInputRef.current;
     input?.click();
   };
 
@@ -86,9 +109,23 @@ export default function MessagingComposer({ onSend, disabled = false, disabledHi
   };
 
   return (
-    <Box sx={{ px: { xs: 1.5, sm: 2, md: 2.5 }, py: { xs: 1.5, sm: 2 }, borderTop: `1px solid ${alpha(m.navy, 0.08)}` }}>
+    <Box
+      sx={{
+        px: { xs: 1.5, sm: 2, md: 2.5 },
+        py: { xs: 1.5, sm: 2 },
+        borderTop: `1px solid ${alpha(m.navy, 0.08)}`,
+      }}
+    >
       {disabled && disabledHint ? (
-        <Typography sx={{ mb: 1.25, fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.52), lineHeight: 1.45 }}>
+        <Typography
+          sx={{
+            mb: 1.25,
+            fontSize: 12,
+            fontWeight: 700,
+            color: alpha(m.navy, 0.52),
+            lineHeight: 1.45,
+          }}
+        >
           {disabledHint}
         </Typography>
       ) : null}
@@ -131,9 +168,13 @@ export default function MessagingComposer({ onSend, disabled = false, disabledHi
                 }}
               >
                 {isImage ? (
-                  <ImageRoundedIcon sx={{ fontSize: 18, color: m.teal, flexShrink: 0 }} />
+                  <ImageRoundedIcon
+                    sx={{ fontSize: 18, color: m.teal, flexShrink: 0 }}
+                  />
                 ) : (
-                  <InsertDriveFileRoundedIcon sx={{ fontSize: 18, color: m.teal, flexShrink: 0 }} />
+                  <InsertDriveFileRoundedIcon
+                    sx={{ fontSize: 18, color: m.teal, flexShrink: 0 }}
+                  />
                 )}
                 <Typography
                   sx={{
@@ -165,7 +206,11 @@ export default function MessagingComposer({ onSend, disabled = false, disabledHi
       ) : null}
 
       {attachError ? (
-        <Typography sx={{ mb: 1, fontSize: 11.5, fontWeight: 600, color: "#D32F2F" }}>{attachError}</Typography>
+        <Typography
+          sx={{ mb: 1, fontSize: 11.5, fontWeight: 600, color: "#D32F2F" }}
+        >
+          {attachError}
+        </Typography>
       ) : null}
 
       <Stack direction="row" alignItems="flex-end" spacing={1}>
@@ -183,7 +228,13 @@ export default function MessagingComposer({ onSend, disabled = false, disabledHi
             opacity: disabled ? 0.45 : 1,
           }}
         >
-          <AttachFileRoundedIcon sx={{ fontSize: 22, color: alpha(m.navy, 0.45), transform: "rotate(45deg)" }} />
+          <AttachFileRoundedIcon
+            sx={{
+              fontSize: 22,
+              color: alpha(m.navy, 0.45),
+              transform: "rotate(45deg)",
+            }}
+          />
         </IconButton>
 
         <Menu
@@ -192,19 +243,29 @@ export default function MessagingComposer({ onSend, disabled = false, disabledHi
           onClose={() => setAttachMenuAnchor(null)}
           anchorOrigin={{ vertical: "top", horizontal: "left" }}
           transformOrigin={{ vertical: "bottom", horizontal: "left" }}
-          slotProps={{ paper: { sx: { minWidth: 180, borderRadius: "12px", mt: -1 } } }}
+          slotProps={{
+            paper: { sx: { minWidth: 180, borderRadius: "12px", mt: -1 } },
+          }}
         >
           <MenuItem onClick={() => openFilePicker("picture")} sx={{ py: 1.1 }}>
             <ListItemIcon sx={{ minWidth: 36 }}>
               <ImageRoundedIcon sx={{ fontSize: 20, color: m.teal }} />
             </ListItemIcon>
-            <ListItemText primary="Picture" primaryTypographyProps={{ fontSize: 13, fontWeight: 700 }} />
+            <ListItemText
+              primary="Picture"
+              primaryTypographyProps={{ fontSize: 13, fontWeight: 700 }}
+            />
           </MenuItem>
           <MenuItem onClick={() => openFilePicker("document")} sx={{ py: 1.1 }}>
             <ListItemIcon sx={{ minWidth: 36 }}>
-              <InsertDriveFileRoundedIcon sx={{ fontSize: 20, color: m.teal }} />
+              <InsertDriveFileRoundedIcon
+                sx={{ fontSize: 20, color: m.teal }}
+              />
             </ListItemIcon>
-            <ListItemText primary="Document" primaryTypographyProps={{ fontSize: 13, fontWeight: 700 }} />
+            <ListItemText
+              primary="Document"
+              primaryTypographyProps={{ fontSize: 13, fontWeight: 700 }}
+            />
           </MenuItem>
         </Menu>
 
@@ -213,7 +274,9 @@ export default function MessagingComposer({ onSend, disabled = false, disabledHi
           multiline
           minRows={1}
           maxRows={4}
-          placeholder={disabled ? "Waiting for client message..." : "Type Message"}
+          placeholder={
+            disabled ? "Waiting for client message..." : "Type Message"
+          }
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -223,7 +286,10 @@ export default function MessagingComposer({ onSend, disabled = false, disabledHi
               borderRadius: "12px",
               fontSize: { xs: 12.5, sm: 13 },
               bgcolor: "#fff",
-              "& fieldset": { borderColor: alpha(m.teal, 0.55), borderWidth: 1.5 },
+              "& fieldset": {
+                borderColor: alpha(m.teal, 0.55),
+                borderWidth: 1.5,
+              },
               "&:hover fieldset": { borderColor: m.teal },
               "&.Mui-focused fieldset": { borderColor: m.teal },
             },

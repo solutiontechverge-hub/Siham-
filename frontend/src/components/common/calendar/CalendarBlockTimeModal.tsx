@@ -1,14 +1,18 @@
 "use client";
 
+import AppButton from "../AppButton";
 import * as React from "react";
-import { Box, Button, Stack } from "@mui/material";
+import { Box, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDatePicker from "../AppDatePicker";
 import AppDropdown from "../AppDropdown";
 import AppTextField from "../AppTextField";
 import AppTimePicker from "../AppTimePicker";
 import AppModal from "../AppModal";
-import type { CalendarBookingLocation, CalendarResource } from "../../../app/professionals/fixed-location/calendar/calendar.data";
+import type {
+  CalendarBookingLocation,
+  CalendarResource,
+} from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { BlockTimeDraft } from "./calendar.utils";
 
 type CalendarBlockTimeModalProps = {
@@ -20,7 +24,9 @@ type CalendarBlockTimeModalProps = {
   onClose: () => void;
   open: boolean;
   resources: readonly CalendarResource[];
-  setDraft: React.Dispatch<React.SetStateAction<BlockTimeDraft & { activity?: string }>>;
+  setDraft: React.Dispatch<
+    React.SetStateAction<BlockTimeDraft & { activity?: string }>
+  >;
   teamLabelById?: ReadonlyMap<string, string>;
   editingTeamMemberName?: string;
 };
@@ -59,10 +65,16 @@ export default function CalendarBlockTimeModal({
   const m = theme.palette.mollure;
   const isEdit = mode === "edit";
   const isSchedule = variant === "schedule";
-  const modalTitle = isSchedule ? (isEdit ? "Edit Block Time" : "Add Block Time") : "Add Block Time";
+  const modalTitle = isSchedule
+    ? isEdit
+      ? "Edit Block Time"
+      : "Add Block Time"
+    : "Add Block Time";
 
   const teamMemberNameById = React.useCallback(
-    (resourceId: string) => resources.find((resource) => resource.id === resourceId)?.name ?? resourceId,
+    (resourceId: string) =>
+      resources.find((resource) => resource.id === resourceId)?.name ??
+      resourceId,
     [resources],
   );
 
@@ -76,39 +88,26 @@ export default function CalendarBlockTimeModal({
       footer={
         <Box sx={{ px: 2.5, py: 2 }}>
           <Stack direction="row" justifyContent="flex-end" spacing={1.25}>
-            <Button
-              variant="outlined"
+            <AppButton
+              tone="secondary"
               onClick={onClose}
               sx={{
-                borderRadius: "10px",
-                textTransform: "none",
-                fontWeight: 800,
                 height: 38,
-                borderColor: alpha(m.navy, 0.14),
-                color: alpha(m.navy, 0.72),
-                bgcolor: "#fff",
                 minWidth: 110,
               }}
             >
               Cancel
-            </Button>
-            <Button
-              variant="contained"
-              disableElevation
+            </AppButton>
+            <AppButton
+              tone="primary"
               onClick={onApply}
               sx={{
-                borderRadius: "10px",
-                textTransform: "none",
-                fontWeight: 800,
                 height: 38,
-                bgcolor: m.teal,
-                color: "#fff",
-                "&:hover": { bgcolor: m.tealDark, color: "#fff" },
                 minWidth: 110,
               }}
             >
               Apply
-            </Button>
+            </AppButton>
           </Stack>
         </Box>
       }
@@ -123,7 +122,9 @@ export default function CalendarBlockTimeModal({
               setDraft((p) => ({
                 ...p,
                 title: String(val) as BlockTimeDraft["title"],
-                ...(String(val) !== "Custom" ? { customTitle: "", activity: String(val) } : { activity: p.customTitle ?? "" }),
+                ...(String(val) !== "Custom"
+                  ? { customTitle: "", activity: String(val) }
+                  : { activity: p.customTitle ?? "" }),
               }))
             }
             options={titleOptions}
@@ -146,7 +147,12 @@ export default function CalendarBlockTimeModal({
           ) : null}
 
           {isEdit && isSchedule ? (
-            <AppTextField label="Team Member" value={editingTeamMemberName ?? ""} fullWidth disabled />
+            <AppTextField
+              label="Team Member"
+              value={editingTeamMemberName ?? ""}
+              fullWidth
+              disabled
+            />
           ) : (
             <AppDropdown
               label="Team Member"
@@ -157,9 +163,13 @@ export default function CalendarBlockTimeModal({
                 const ids = selected as readonly string[];
                 if (!ids.length) return "Select Team Member";
                 if (ids.length === resources.length) return "All";
-                return ids.map((id) => teamLabelById.get(id) ?? teamMemberNameById(id)).join(", ");
+                return ids
+                  .map((id) => teamLabelById.get(id) ?? teamMemberNameById(id))
+                  .join(", ");
               }}
-              onChange={(val) => setDraft((p) => ({ ...p, teamIds: val as string[] }))}
+              onChange={(val) =>
+                setDraft((p) => ({ ...p, teamIds: val as string[] }))
+              }
               options={resources.map((r) => ({
                 value: r.id,
                 label: teamLabelById.get(r.id) ?? r.name,
@@ -186,7 +196,10 @@ export default function CalendarBlockTimeModal({
                 locations: next.length ? next : [...availableLocations],
               }));
             }}
-            options={availableLocations.map((location) => ({ label: location, value: location }))}
+            options={availableLocations.map((location) => ({
+              label: location,
+              value: location,
+            }))}
             fullWidth
           />
 
@@ -216,7 +229,10 @@ export default function CalendarBlockTimeModal({
                 label="Day (From)"
                 value={draft.dayFrom}
                 onChange={(val) =>
-                  setDraft((p) => ({ ...p, dayFrom: String(val) as BlockTimeDraft["dayFrom"] }))
+                  setDraft((p) => ({
+                    ...p,
+                    dayFrom: String(val) as BlockTimeDraft["dayFrom"],
+                  }))
                 }
                 options={dayOptions}
                 fullWidth
@@ -227,7 +243,10 @@ export default function CalendarBlockTimeModal({
                 label="Day (To)"
                 value={draft.dayTo}
                 onChange={(val) =>
-                  setDraft((p) => ({ ...p, dayTo: String(val) as BlockTimeDraft["dayTo"] }))
+                  setDraft((p) => ({
+                    ...p,
+                    dayTo: String(val) as BlockTimeDraft["dayTo"],
+                  }))
                 }
                 options={dayOptions}
                 fullWidth

@@ -33,7 +33,9 @@ export type RefundSalesDrawerProps = {
 
 type RefundTab = "item" | "amount";
 
-const fieldSx = { "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" } } as const;
+const fieldSx = {
+  "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" },
+} as const;
 
 function RefundItemRow({
   item,
@@ -62,8 +64,21 @@ function RefundItemRow({
       }}
     >
       <Box>
-        <Typography sx={{ fontSize: 13.5, fontWeight: 800, color: alpha(m.navy, 0.86) }}>{item.name}</Typography>
-        <Typography sx={{ fontSize: 12, fontWeight: 600, color: alpha(m.navy, 0.5), mt: 0.25 }}>{item.meta}</Typography>
+        <Typography
+          sx={{ fontSize: 13.5, fontWeight: 800, color: alpha(m.navy, 0.86) }}
+        >
+          {item.name}
+        </Typography>
+        <Typography
+          sx={{
+            fontSize: 12,
+            fontWeight: 600,
+            color: alpha(m.navy, 0.5),
+            mt: 0.25,
+          }}
+        >
+          {item.meta}
+        </Typography>
       </Box>
       <Checkbox
         checked={checked}
@@ -79,7 +94,12 @@ function RefundItemRow({
   );
 }
 
-export default function RefundSalesDrawer({ open, onClose, transactions, onSave }: RefundSalesDrawerProps) {
+export default function RefundSalesDrawer({
+  open,
+  onClose,
+  transactions,
+  onSave,
+}: RefundSalesDrawerProps) {
   const m = useTheme().palette.mollure;
   const [tab, setTab] = React.useState<RefundTab>("item");
   const [items, setItems] = React.useState<RefundSalesItem[]>([]);
@@ -105,7 +125,8 @@ export default function RefundSalesDrawer({ open, onClose, transactions, onSave 
     setOpenSelectId(null);
   }, [open, transactions]);
 
-  const allItemsSelected = items.length > 0 && selectedItemIds.length === items.length;
+  const allItemsSelected =
+    items.length > 0 && selectedItemIds.length === items.length;
   const someItemsSelected = selectedItemIds.length > 0 && !allItemsSelected;
   const showWriteReason = amountReason === "write-reason";
 
@@ -114,7 +135,9 @@ export default function RefundSalesDrawer({ open, onClose, transactions, onSave 
   };
 
   const toggleItem = (id: string) => {
-    setSelectedItemIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+    setSelectedItemIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
   };
 
   return (
@@ -155,7 +178,13 @@ export default function RefundSalesDrawer({ open, onClose, transactions, onSave 
                 cursor: "pointer",
               }}
             >
-              <Typography sx={{ fontSize: 13.5, fontWeight: 800, color: alpha(m.navy, 0.86) }}>
+              <Typography
+                sx={{
+                  fontSize: 13.5,
+                  fontWeight: 800,
+                  color: alpha(m.navy, 0.86),
+                }}
+              >
                 Select All Item
               </Typography>
               <Checkbox
@@ -209,18 +238,39 @@ export default function RefundSalesDrawer({ open, onClose, transactions, onSave 
             />
 
             <Box>
-              <BodyText sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.55), mb: 0.75 }}>Price</BodyText>
+              <BodyText
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: alpha(m.navy, 0.55),
+                  mb: 0.75,
+                }}
+              >
+                Price
+              </BodyText>
               <MollureFormField
                 value={refundAmount}
-                onChange={(e) => setRefundAmount(e.target.value.replace(/[^\d.]/g, ""))}
+                onChange={(e) =>
+                  setRefundAmount(e.target.value.replace(/[^\d.]/g, ""))
+                }
                 placeholder="0"
                 fullWidth
                 sx={fieldSx}
                 InputProps={{
-                  startAdornment: <InputAdornment position="start">€</InputAdornment>,
+                  startAdornment: (
+                    <InputAdornment position="start">€</InputAdornment>
+                  ),
                   endAdornment: (
                     <InputAdornment position="end">
-                      <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.45) }}>EUR</Typography>
+                      <Typography
+                        sx={{
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: alpha(m.navy, 0.45),
+                        }}
+                      >
+                        EUR
+                      </Typography>
                     </InputAdornment>
                   ),
                 }}
@@ -241,16 +291,16 @@ export default function RefundSalesDrawer({ open, onClose, transactions, onSave 
               highlightBorderWhenValue
             />
             {showWriteReason ? (
-                <MollureFormField
-                  multiline
-                  minRows={3}
-                  placeholder="Write your reason"
-                  value={customReason}
-                  onChange={(e) => setCustomReason(e.target.value)}
-                  fullWidth
-                  sx={{ ...fieldSx, mt: 1 }}
-                />
-              ) : null}
+              <MollureFormField
+                multiline
+                minRows={3}
+                placeholder="Write your reason"
+                value={customReason}
+                onChange={(e) => setCustomReason(e.target.value)}
+                fullWidth
+                sx={{ ...fieldSx, mt: 1 }}
+              />
+            ) : null}
           </Stack>
         )}
       </Stack>

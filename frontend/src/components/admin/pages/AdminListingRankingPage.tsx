@@ -31,22 +31,50 @@ import {
 } from "../adminMockData";
 import { ADMIN_CARD_PADDING as pad } from "../adminCardPadding";
 
-const FACTOR_ICONS: Record<string, { icon: SvgIconComponent; bg: string; color: string }> = {
-  onlineBooking: { icon: EventAvailableOutlinedIcon, bg: "rgba(76, 175, 80, 0.12)", color: "#2E7D32" },
-  onlineTransaction: { icon: PaymentsOutlinedIcon, bg: "rgba(127, 86, 217, 0.12)", color: "#6941C6" },
-  avgRating: { icon: StarOutlineOutlinedIcon, bg: "rgba(255, 181, 71, 0.16)", color: "#DC6803" },
-  totalReviews: { icon: RateReviewOutlinedIcon, bg: "rgba(33, 184, 191, 0.12)", color: "#149CA7" },
-  activity: { icon: ScheduleOutlinedIcon, bg: "rgba(59, 130, 246, 0.12)", color: "#2563EB" },
+const FACTOR_ICONS: Record<
+  string,
+  { icon: SvgIconComponent; bg: string; color: string }
+> = {
+  onlineBooking: {
+    icon: EventAvailableOutlinedIcon,
+    bg: "rgba(76, 175, 80, 0.12)",
+    color: "#2E7D32",
+  },
+  onlineTransaction: {
+    icon: PaymentsOutlinedIcon,
+    bg: "rgba(127, 86, 217, 0.12)",
+    color: "#6941C6",
+  },
+  avgRating: {
+    icon: StarOutlineOutlinedIcon,
+    bg: "rgba(255, 181, 71, 0.16)",
+    color: "#DC6803",
+  },
+  totalReviews: {
+    icon: RateReviewOutlinedIcon,
+    bg: "rgba(33, 184, 191, 0.12)",
+    color: "#149CA7",
+  },
+  activity: {
+    icon: ScheduleOutlinedIcon,
+    bg: "rgba(59, 130, 246, 0.12)",
+    color: "#2563EB",
+  },
 };
 
-const IMPACT_STYLES: Record<RankingImpact, { bg: string; fg: string; label: string }> = {
+const IMPACT_STYLES: Record<
+  RankingImpact,
+  { bg: string; fg: string; label: string }
+> = {
   high: { bg: "rgba(76, 175, 80, 0.12)", fg: "#2E7D32", label: "High" },
   medium: { bg: "rgba(220, 104, 3, 0.14)", fg: "#DC6803", label: "Medium" },
   low: { bg: "rgba(59, 130, 246, 0.12)", fg: "#2563EB", label: "Low" },
 };
 
 /** Live app weights — read-only; only display order can be changed. */
-const LIVE_FACTORS_BY_ID = Object.fromEntries(liveRankingFactors.map((f) => [f.id, f]));
+const LIVE_FACTORS_BY_ID = Object.fromEntries(
+  liveRankingFactors.map((f) => [f.id, f]),
+);
 
 function reorderIds(ids: string[], from: number, to: number) {
   const next = [...ids];
@@ -59,9 +87,13 @@ type AdminListingRankingPageProps = {
   embedded?: boolean;
 };
 
-export default function AdminListingRankingPage({ embedded = false }: AdminListingRankingPageProps) {
+export default function AdminListingRankingPage({
+  embedded = false,
+}: AdminListingRankingPageProps) {
   const tokens = useTheme().palette.mollure;
-  const [orderedIds, setOrderedIds] = React.useState(liveRankingFactors.map((f) => f.id));
+  const [orderedIds, setOrderedIds] = React.useState(
+    liveRankingFactors.map((f) => f.id),
+  );
   const [draggingId, setDraggingId] = React.useState<string | null>(null);
 
   const factors = orderedIds
@@ -86,16 +118,30 @@ export default function AdminListingRankingPage({ embedded = false }: AdminListi
     <>
       {!embedded ? (
         <>
-          <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1.5 }}>
+          <Stack
+            direction="row"
+            alignItems="center"
+            spacing={0.75}
+            sx={{ mb: 1.5 }}
+          >
             <Typography
               component={Link}
               href="/admin/dashboard"
-              sx={{ fontSize: 12, color: tokens.bodyText, textDecoration: "none", "&:hover": { color: tokens.teal } }}
+              sx={{
+                fontSize: 12,
+                color: tokens.bodyText,
+                textDecoration: "none",
+                "&:hover": { color: tokens.teal },
+              }}
             >
               Home
             </Typography>
-            <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>/</Typography>
-            <Typography sx={{ fontSize: 12, color: tokens.navy, fontWeight: 500 }}>
+            <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>
+              /
+            </Typography>
+            <Typography
+              sx={{ fontSize: 12, color: tokens.navy, fontWeight: 500 }}
+            >
               Listing & Ranking Management
             </Typography>
           </Stack>
@@ -103,12 +149,19 @@ export default function AdminListingRankingPage({ embedded = false }: AdminListi
           <Box sx={{ mb: 3 }}>
             <Typography
               variant="mainHeading"
-              sx={{ fontSize: { xs: 24, md: 28 }, color: tokens.textcolorgrey700, mb: 0.5 }}
+              sx={{
+                fontSize: { xs: 24, md: 28 },
+                color: tokens.textcolorgrey700,
+                mb: 0.5,
+              }}
             >
               Listing & Ranking Management
             </Typography>
-            <Typography sx={{ fontSize: 14, color: tokens.bodyText, maxWidth: 640 }}>
-              Ranking weights are set by the platform. Drag rows to adjust factor priority order.
+            <Typography
+              sx={{ fontSize: 14, color: tokens.bodyText, maxWidth: 640 }}
+            >
+              Ranking weights are set by the platform. Drag rows to adjust
+              factor priority order.
             </Typography>
           </Box>
         </>
@@ -135,22 +188,24 @@ export default function AdminListingRankingPage({ embedded = false }: AdminListi
           <Table>
             <TableHead>
               <TableRow sx={{ bgcolor: tokens.mintSoft }}>
-                {["#", "Factor", "Description", "Weight (%)", "Impact", ""].map((col, i) => (
-                  <TableCell
-                    key={col || "drag"}
-                    sx={{
-                      fontWeight: 600,
-                      fontSize: 12,
-                      color: tokens.slate,
-                      py: 1.5,
-                      px: pad.tableCellX,
-                      borderColor: tokens.cardBorder,
-                      width: i === 0 ? 44 : i === 5 ? 48 : undefined,
-                    }}
-                  >
-                    {col}
-                  </TableCell>
-                ))}
+                {["#", "Factor", "Description", "Weight (%)", "Impact", ""].map(
+                  (col, i) => (
+                    <TableCell
+                      key={col || "drag"}
+                      sx={{
+                        fontWeight: 600,
+                        fontSize: 12,
+                        color: tokens.slate,
+                        py: 1.5,
+                        px: pad.tableCellX,
+                        borderColor: tokens.cardBorder,
+                        width: i === 0 ? 44 : i === 5 ? 48 : undefined,
+                      }}
+                    >
+                      {col}
+                    </TableCell>
+                  ),
+                )}
               </TableRow>
             </TableHead>
             <TableBody>
@@ -168,16 +223,29 @@ export default function AdminListingRankingPage({ embedded = false }: AdminListi
                     onDrop={() => handleDrop(index)}
                     sx={{
                       opacity: isDragging ? 0.55 : 1,
-                      bgcolor: isDragging ? alpha(tokens.teal, 0.04) : undefined,
+                      bgcolor: isDragging
+                        ? alpha(tokens.teal, 0.04)
+                        : undefined,
                       "&:last-child td": { borderBottom: 0 },
                     }}
                   >
                     <TableCell
-                      sx={{ px: pad.tableCellX, borderColor: tokens.cardBorder, color: tokens.slate, fontSize: 13 }}
+                      sx={{
+                        px: pad.tableCellX,
+                        borderColor: tokens.cardBorder,
+                        color: tokens.slate,
+                        fontSize: 13,
+                      }}
                     >
                       {index + 1}
                     </TableCell>
-                    <TableCell sx={{ px: pad.tableCellX, borderColor: tokens.cardBorder, minWidth: 180 }}>
+                    <TableCell
+                      sx={{
+                        px: pad.tableCellX,
+                        borderColor: tokens.cardBorder,
+                        minWidth: 180,
+                      }}
+                    >
                       <Stack direction="row" spacing={1.25} alignItems="center">
                         <Box
                           sx={{
@@ -193,17 +261,41 @@ export default function AdminListingRankingPage({ embedded = false }: AdminListi
                         >
                           <Icon sx={{ fontSize: 18 }} />
                         </Box>
-                        <Typography sx={{ fontSize: 13, fontWeight: 600, color: tokens.navy }}>
+                        <Typography
+                          sx={{
+                            fontSize: 13,
+                            fontWeight: 600,
+                            color: tokens.navy,
+                          }}
+                        >
                           {factor.label}
                         </Typography>
                       </Stack>
                     </TableCell>
-                    <TableCell sx={{ px: pad.tableCellX, borderColor: tokens.cardBorder, minWidth: 200 }}>
-                      <Typography sx={{ fontSize: 12, color: tokens.bodyText, lineHeight: 1.45 }}>
+                    <TableCell
+                      sx={{
+                        px: pad.tableCellX,
+                        borderColor: tokens.cardBorder,
+                        minWidth: 200,
+                      }}
+                    >
+                      <Typography
+                        sx={{
+                          fontSize: 12,
+                          color: tokens.bodyText,
+                          lineHeight: 1.45,
+                        }}
+                      >
                         {factor.description}
                       </Typography>
                     </TableCell>
-                    <TableCell sx={{ px: pad.tableCellX, borderColor: tokens.cardBorder, minWidth: 200 }}>
+                    <TableCell
+                      sx={{
+                        px: pad.tableCellX,
+                        borderColor: tokens.cardBorder,
+                        minWidth: 200,
+                      }}
+                    >
                       <Stack direction="row" spacing={1.5} alignItems="center">
                         <Slider
                           value={factor.weight}
@@ -245,13 +337,24 @@ export default function AdminListingRankingPage({ embedded = false }: AdminListi
                             textAlign: "center",
                           }}
                         >
-                          <Typography sx={{ fontSize: 13, fontWeight: 500, color: tokens.slate }}>
+                          <Typography
+                            sx={{
+                              fontSize: 13,
+                              fontWeight: 500,
+                              color: tokens.slate,
+                            }}
+                          >
                             {factor.weight}%
                           </Typography>
                         </Box>
                       </Stack>
                     </TableCell>
-                    <TableCell sx={{ px: pad.tableCellX, borderColor: tokens.cardBorder }}>
+                    <TableCell
+                      sx={{
+                        px: pad.tableCellX,
+                        borderColor: tokens.cardBorder,
+                      }}
+                    >
                       <Chip
                         label={impact.label}
                         size="small"
@@ -264,7 +367,9 @@ export default function AdminListingRankingPage({ embedded = false }: AdminListi
                         }}
                       />
                     </TableCell>
-                    <TableCell sx={{ px: 1, borderColor: tokens.cardBorder, width: 48 }}>
+                    <TableCell
+                      sx={{ px: 1, borderColor: tokens.cardBorder, width: 48 }}
+                    >
                       <Box
                         draggable
                         aria-label={`Drag to reorder ${factor.label}`}

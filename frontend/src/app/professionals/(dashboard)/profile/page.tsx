@@ -4,7 +4,10 @@ import ProfessionalFixedLocationSetup from "../../../../components/common/Profes
 import { useSnackbar } from "../../../../components/common/AppSnackbar";
 import { getApiErrorMessage } from "../../../../lib/api-error";
 import { fixedLocationPageData } from "../../fixed-location/fixedLocation.data";
-import { useGetProfileQuery, useUpdateProfileMutation } from "../../../../store/services/profileApi";
+import {
+  useGetProfileQuery,
+  useUpdateProfileMutation,
+} from "../../../../store/services/profileApi";
 import {
   useGetBusinessCategoriesQuery,
   useGetBusinessSetupQuery,
@@ -16,9 +19,12 @@ export default function ProfessionalsProfilePage() {
   const { data } = useGetProfileQuery();
   const { data: businessCategoriesData } = useGetBusinessCategoriesQuery();
   const { data: businessSetupData } = useGetBusinessSetupQuery();
-  const [updateProfile, { isLoading: isProfileSaving }] = useUpdateProfileMutation();
-  const [upsertBusinessSetup, { isLoading: isBusinessSetupSaving }] = useUpsertBusinessSetupMutation();
-  const [uploadBusinessMedia, { isLoading: isBusinessMediaUploading }] = useUploadBusinessMediaMutation();
+  const [updateProfile, { isLoading: isProfileSaving }] =
+    useUpdateProfileMutation();
+  const [upsertBusinessSetup, { isLoading: isBusinessSetupSaving }] =
+    useUpsertBusinessSetupMutation();
+  const [uploadBusinessMedia, { isLoading: isBusinessMediaUploading }] =
+    useUploadBusinessMediaMutation();
   const { showSnackbar } = useSnackbar();
 
   return (
@@ -52,13 +58,17 @@ export default function ProfessionalsProfilePage() {
           const result = await updateProfile(payload).unwrap();
           showSnackbar({
             severity: "success",
-            message: result.message || "Professional profile updated successfully.",
+            message:
+              result.message || "Professional profile updated successfully.",
           });
           return result.data;
         } catch (error) {
           showSnackbar({
             severity: "error",
-            message: getApiErrorMessage(error, "Unable to update professional profile."),
+            message: getApiErrorMessage(
+              error,
+              "Unable to update professional profile.",
+            ),
           });
           throw error;
         }
@@ -69,7 +79,10 @@ export default function ProfessionalsProfilePage() {
         } catch (error) {
           showSnackbar({
             severity: "error",
-            message: getApiErrorMessage(error, "Unable to update business setup."),
+            message: getApiErrorMessage(
+              error,
+              "Unable to update business setup.",
+            ),
           });
           throw error;
         }

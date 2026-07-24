@@ -24,7 +24,9 @@ export default function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
     // If we ever had an access token and it becomes null (logout),
     // do not treat persisted tokens as a valid session.
     const isLoggedOut = wasAuthenticatedRef.current && !accessToken;
-    setHasSession(Boolean(accessToken || (!isLoggedOut && persisted?.accessToken)));
+    setHasSession(
+      Boolean(accessToken || (!isLoggedOut && persisted?.accessToken)),
+    );
     setIsReady(true);
   }, [accessToken]);
 
@@ -40,7 +42,11 @@ export default function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
       wasAuthenticatedRef.current = true;
     }
 
-    if (allowedRoles?.length && user?.user_type && !allowedRoles.includes(user.user_type)) {
+    if (
+      allowedRoles?.length &&
+      user?.user_type &&
+      !allowedRoles.includes(user.user_type)
+    ) {
       router.replace(getDefaultRouteForUser(user.user_type));
     }
   }, [accessToken, allowedRoles, hasSession, isReady, router, user?.user_type]);
@@ -49,7 +55,11 @@ export default function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
     return null;
   }
 
-  if (allowedRoles?.length && user?.user_type && !allowedRoles.includes(user.user_type)) {
+  if (
+    allowedRoles?.length &&
+    user?.user_type &&
+    !allowedRoles.includes(user.user_type)
+  ) {
     return null;
   }
 

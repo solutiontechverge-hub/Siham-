@@ -2,7 +2,14 @@
 
 import * as React from "react";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
-import { Box, IconButton, Stack, Typography, type SxProps, type Theme } from "@mui/material";
+import {
+  Box,
+  IconButton,
+  Stack,
+  Typography,
+  type SxProps,
+  type Theme,
+} from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { MollureTextField } from ".";
 
@@ -54,7 +61,13 @@ export default function KeywordTagsInput({
   return (
     <Box>
       {value.length ? (
-        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mb: atMax ? 0 : 1.25 }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          useFlexGap
+          flexWrap="wrap"
+          sx={{ mb: atMax ? 0 : 1.25 }}
+        >
           {value.map((keyword) => (
             <Box
               key={keyword}
@@ -91,7 +104,10 @@ export default function KeywordTagsInput({
                   width: 26,
                   height: 26,
                   color: tokens.teal,
-                  "&:hover": { bgcolor: alpha(tokens.teal, 0.12), color: tokens.tealDark },
+                  "&:hover": {
+                    bgcolor: alpha(tokens.teal, 0.12),
+                    color: tokens.tealDark,
+                  },
                 }}
               >
                 <CloseRoundedIcon sx={{ fontSize: 16 }} />
@@ -102,7 +118,14 @@ export default function KeywordTagsInput({
       ) : null}
 
       {atMax ? (
-        <Typography sx={{ fontSize: 12, fontWeight: 600, color: alpha(tokens.navy, 0.5), pt: 0.25 }}>
+        <Typography
+          sx={{
+            fontSize: 12,
+            fontWeight: 600,
+            color: alpha(tokens.navy, 0.5),
+            pt: 0.25,
+          }}
+        >
           Maximum {maxKeywords} keywords added
         </Typography>
       ) : (
@@ -110,7 +133,9 @@ export default function KeywordTagsInput({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={value.length ? "Press Enter to add another" : placeholder}
+          placeholder={
+            value.length ? "Press Enter to add another" : placeholder
+          }
           sx={sx}
         />
       )}

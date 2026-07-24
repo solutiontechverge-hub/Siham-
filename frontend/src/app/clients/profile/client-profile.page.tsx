@@ -1,5 +1,6 @@
 "use client";
 
+import AppButton from "../../../components/common/AppButton";
 import * as React from "react";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
@@ -12,7 +13,6 @@ import {
   Alert,
   Avatar,
   Box,
-  Button,
   Checkbox,
   CircularProgress,
   Container,
@@ -31,10 +31,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo, Profile as AvatarPlaceholder } from "../../../../images";
 import { PROFILE_IMAGE_FILE_ACCEPT } from "../../../lib/profileImageUpload";
-import { REVIEW_NAME_MODES, reviewNameOptionLabel } from "../../../lib/reviewNameDisplay";
+import {
+  REVIEW_NAME_MODES,
+  reviewNameOptionLabel,
+} from "../../../lib/reviewNameDisplay";
 import { profilePageData } from "./data-profile";
 import { useClientProfilePage } from "./use-profile";
-import { AppModal, ClientPageTabsBar, clientTopTabsActiveLabel, MollureMarketingHeader } from "../../../components/common";
+import {
+  AppModal,
+  ClientPageTabsBar,
+  clientTopTabsActiveLabel,
+  MollureMarketingHeader,
+} from "../../../components/common";
 import { MarketingSiteFooter } from "../../../components/common";
 import { marketingShellFooter } from "../../../data/marketingShell.data";
 import {
@@ -53,7 +61,8 @@ function imgSrc(img: unknown): string {
     const o = img as Record<string, unknown>;
     if (typeof o.src === "string") return o.src;
     if (typeof o.default === "string") return o.default;
-    if (typeof o.default === "object" && o.default !== null) return imgSrc(o.default);
+    if (typeof o.default === "object" && o.default !== null)
+      return imgSrc(o.default);
   }
   return String(img);
 }
@@ -104,7 +113,14 @@ export default function ClientProfilePage() {
 
   if (isLoading || !form) {
     return (
-      <Box sx={{ minHeight: "100vh", bgcolor: pageBg, display: "grid", placeItems: "center" }}>
+      <Box
+        sx={{
+          minHeight: "100vh",
+          bgcolor: pageBg,
+          display: "grid",
+          placeItems: "center",
+        }}
+      >
         <CircularProgress sx={{ color: tokens.teal }} />
       </Box>
     );
@@ -115,11 +131,16 @@ export default function ClientProfilePage() {
       <Box sx={{ minHeight: "100vh", bgcolor: pageBg, py: 8 }}>
         <Container maxWidth="sm">
           <Alert severity="error" sx={{ mb: 2 }}>
-            Could not load profile. Ensure <code>GET /api/user/profile</code> is reachable and the auth token is valid.
+            Could not load profile. Ensure <code>GET /api/user/profile</code> is
+            reachable and the auth token is valid.
           </Alert>
-          <Button variant="contained" onClick={() => refetch()} sx={{ bgcolor: tokens.teal }}>
+          <AppButton
+            variant="contained"
+            onClick={() => refetch()}
+            sx={{ bgcolor: tokens.teal }}
+          >
             Retry
-          </Button>
+          </AppButton>
         </Container>
       </Box>
     );
@@ -162,7 +183,14 @@ export default function ClientProfilePage() {
               sx={{ width: 54, height: 54, bgcolor: tokens.avatarBg }}
             />
             <Box sx={{ minWidth: 0 }}>
-              <Typography sx={{ fontWeight: 900, color: tokens.navy, fontSize: 18, lineHeight: 1.2 }}>
+              <Typography
+                sx={{
+                  fontWeight: 900,
+                  color: tokens.navy,
+                  fontSize: 18,
+                  lineHeight: 1.2,
+                }}
+              >
                 {displayName}
               </Typography>
               <Typography sx={{ color: tokens.slate, fontSize: 13, mt: 0.25 }}>
@@ -171,7 +199,7 @@ export default function ClientProfilePage() {
             </Box>
           </Stack>
 
-          <Button
+          <AppButton
             variant="outlined"
             fullWidth
             startIcon={<PersonOutlineRoundedIcon />}
@@ -183,13 +211,16 @@ export default function ClientProfilePage() {
               color: tokens.navy,
               borderColor: tokens.border,
               py: 1.1,
-              "&:hover": { borderColor: tokens.inputBorderHover, bgcolor: "rgba(52, 74, 102, 0.03)" },
+              "&:hover": {
+                borderColor: tokens.inputBorderHover,
+                bgcolor: "rgba(52, 74, 102, 0.03)",
+              },
             }}
           >
             {profilePageData.popovers.profileMenu.managePrivacyLabel}
-          </Button>
+          </AppButton>
 
-          <Button
+          <AppButton
             variant="outlined"
             fullWidth
             startIcon={<DeleteOutlineRoundedIcon />}
@@ -200,13 +231,16 @@ export default function ClientProfilePage() {
               color: tokens.navy,
               borderColor: tokens.border,
               py: 1.1,
-              "&:hover": { borderColor: tokens.inputBorderHover, bgcolor: "rgba(52, 74, 102, 0.03)" },
+              "&:hover": {
+                borderColor: tokens.inputBorderHover,
+                bgcolor: "rgba(52, 74, 102, 0.03)",
+              },
             }}
           >
             {profilePageData.popovers.profileMenu.deleteAccountLabel}
-          </Button>
+          </AppButton>
 
-          <Button
+          <AppButton
             variant="contained"
             fullWidth
             onClick={handleLogout}
@@ -220,7 +254,7 @@ export default function ClientProfilePage() {
             }}
           >
             {profilePageData.popovers.profileMenu.logoutLabel}
-          </Button>
+          </AppButton>
         </Stack>
       </Popover>
 
@@ -233,8 +267,13 @@ export default function ClientProfilePage() {
         subtitle={profilePageData.popovers.manageSharing.description}
         contentSx={{ px: { xs: 3, sm: 4 }, pt: 2, pb: 1 }}
         footer={
-          <Stack direction="row" justifyContent="flex-end" spacing={2} sx={{ px: { xs: 3, sm: 4 }, py: 2.5 }}>
-            <Button
+          <Stack
+            direction="row"
+            justifyContent="flex-end"
+            spacing={2}
+            sx={{ px: { xs: 3, sm: 4 }, py: 2.5 }}
+          >
+            <AppButton
               onClick={closeManageSharing}
               variant="outlined"
               sx={{
@@ -244,12 +283,15 @@ export default function ClientProfilePage() {
                 fontWeight: 800,
                 color: tokens.navy,
                 borderColor: tokens.border,
-                "&:hover": { borderColor: tokens.inputBorderHover, bgcolor: "rgba(52, 74, 102, 0.03)" },
+                "&:hover": {
+                  borderColor: tokens.inputBorderHover,
+                  bgcolor: "rgba(52, 74, 102, 0.03)",
+                },
               }}
             >
               {profilePageData.popovers.manageSharing.cancelLabel}
-            </Button>
-            <Button
+            </AppButton>
+            <AppButton
               onClick={closeManageSharing}
               variant="contained"
               disableElevation
@@ -263,62 +305,64 @@ export default function ClientProfilePage() {
               }}
             >
               {profilePageData.popovers.manageSharing.doneLabel}
-            </Button>
+            </AppButton>
           </Stack>
         }
       >
-          <Paper
-            elevation={0}
-            sx={{
-              borderRadius: 3,
-              border: `1px solid ${tokens.border}`,
-              p: 2,
-              bgcolor: "#fff",
-            }}
-          >
-            <Stack direction="row" spacing={1.5} alignItems="center">
-              <Avatar
-                src={avatarUrl || imgSrc(AvatarPlaceholder)}
-                sx={{ width: 44, height: 44, bgcolor: tokens.avatarBg }}
-              />
-              <Typography sx={{ fontWeight: 900, color: tokens.navy, fontSize: 16 }}>
-                {displayName}
-              </Typography>
-            </Stack>
+        <Paper
+          elevation={0}
+          sx={{
+            borderRadius: 3,
+            border: `1px solid ${tokens.border}`,
+            p: 2,
+            bgcolor: "#fff",
+          }}
+        >
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Avatar
+              src={avatarUrl || imgSrc(AvatarPlaceholder)}
+              sx={{ width: 44, height: 44, bgcolor: tokens.avatarBg }}
+            />
+            <Typography
+              sx={{ fontWeight: 900, color: tokens.navy, fontSize: 16 }}
+            >
+              {displayName}
+            </Typography>
+          </Stack>
 
-            <Box sx={{ mt: 2 }}>
-              <Stack spacing={1.5}>
-                {profilePageData.popovers.manageSharing.fields.map((field) => (
-                  <Box
-                    key={field.key}
+          <Box sx={{ mt: 2 }}>
+            <Stack spacing={1.5}>
+              {profilePageData.popovers.manageSharing.fields.map((field) => (
+                <Box
+                  key={field.key}
+                  sx={{
+                    borderRadius: 2.5,
+                    border: `1px solid ${tokens.border}`,
+                    bgcolor: "rgba(52, 74, 102, 0.03)",
+                    px: 2,
+                    py: 1.35,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <Typography sx={{ color: tokens.slate, fontWeight: 700 }}>
+                    {field.label}
+                  </Typography>
+                  <Checkbox
+                    checked={Boolean(sharingVisibility[field.key])}
+                    onChange={() => toggleSharingField(field.key)}
                     sx={{
-                      borderRadius: 2.5,
-                      border: `1px solid ${tokens.border}`,
-                      bgcolor: "rgba(52, 74, 102, 0.03)",
-                      px: 2,
-                      py: 1.35,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
+                      p: 0,
+                      color: tokens.teal,
+                      "&.Mui-checked": { color: tokens.teal },
                     }}
-                  >
-                    <Typography sx={{ color: tokens.slate, fontWeight: 700 }}>
-                      {field.label}
-                    </Typography>
-                    <Checkbox
-                      checked={Boolean(sharingVisibility[field.key])}
-                      onChange={() => toggleSharingField(field.key)}
-                      sx={{
-                        p: 0,
-                        color: tokens.teal,
-                        "&.Mui-checked": { color: tokens.teal },
-                      }}
-                    />
-                  </Box>
-                ))}
-              </Stack>
-            </Box>
-          </Paper>
+                  />
+                </Box>
+              ))}
+            </Stack>
+          </Box>
+        </Paper>
       </AppModal>
 
       <Container maxWidth="md" sx={{ py: { xs: 3, md: 4 } }}>
@@ -344,7 +388,9 @@ export default function ClientProfilePage() {
               bgcolor: "#fff",
             }}
           >
-            <Typography sx={{ fontWeight: 800, fontSize: 18, color: tokens.navy }}>
+            <Typography
+              sx={{ fontWeight: 800, fontSize: 18, color: tokens.navy }}
+            >
               {profilePageData.card.title}
             </Typography>
             <IconButton
@@ -356,7 +402,10 @@ export default function ClientProfilePage() {
                 border: `1px solid ${tokens.border}`,
                 bgcolor: "#fff",
                 color: tokens.slate,
-                "&:hover": { bgcolor: "rgba(52, 74, 102, 0.03)", color: tokens.teal },
+                "&:hover": {
+                  bgcolor: "rgba(52, 74, 102, 0.03)",
+                  color: tokens.teal,
+                },
               }}
               aria-label="Edit profile"
             >
@@ -364,8 +413,15 @@ export default function ClientProfilePage() {
             </IconButton>
           </Box>
 
-          <Box sx={{ px: { xs: 2.5, sm: 3.5 }, pt: 3, pb: { xs: 2.5, sm: 3.5 } }}>
-            <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 3 }}>
+          <Box
+            sx={{ px: { xs: 2.5, sm: 3.5 }, pt: 3, pb: { xs: 2.5, sm: 3.5 } }}
+          >
+            <Stack
+              direction="row"
+              spacing={2}
+              alignItems="center"
+              sx={{ mb: 3 }}
+            >
               <Box
                 component={isEditing ? "label" : "div"}
                 sx={{
@@ -375,7 +431,12 @@ export default function ClientProfilePage() {
                 }}
               >
                 {isEditing ? (
-                  <input type="file" accept={PROFILE_IMAGE_FILE_ACCEPT} hidden onChange={handleAvatarPick} />
+                  <input
+                    type="file"
+                    accept={PROFILE_IMAGE_FILE_ACCEPT}
+                    hidden
+                    onChange={handleAvatarPick}
+                  />
                 ) : null}
                 <Avatar
                   src={avatarUrl || imgSrc(AvatarPlaceholder)}
@@ -387,330 +448,378 @@ export default function ClientProfilePage() {
                   }}
                 />
               </Box>
-              <Typography sx={{ fontWeight: 700, color: tokens.navy, fontSize: 16 }}>
+              <Typography
+                sx={{ fontWeight: 700, color: tokens.navy, fontSize: 16 }}
+              >
                 {profilePageData.card.profilePictureLabel}
               </Typography>
             </Stack>
 
             <Box component="form" onSubmit={handleSubmit}>
-            {errorMessage ? <Alert severity="error" sx={{ mb: 2 }}>{errorMessage}</Alert> : null}
-            <MollureSnackbar
-              open={Boolean(successMessage)}
-              message={successMessage || "Profile Edited"}
-              severity="success"
-              autoHideDuration={3000}
-              onClose={clearMessages}
-            />
+              {errorMessage ? (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  {errorMessage}
+                </Alert>
+              ) : null}
+              <MollureSnackbar
+                open={Boolean(successMessage)}
+                message={successMessage || "Profile Edited"}
+                severity="success"
+                autoHideDuration={3000}
+                onClose={clearMessages}
+              />
 
-            <Typography sx={{ fontWeight: 800, color: tokens.navy, mb: 1 }}>
-              {isCompanyProfile ? "Company Information" : profilePageData.sections.personal}
-            </Typography>
-            <Divider sx={{ mb: 2.5, borderColor: tokens.border }} />
-
-            {!isCompanyProfile ? (
-              <Grid container spacing={2.25}>
-                <Grid item xs={12} sm={6}>
-                  <MollureLabeledField
-                    name="firstName"
-                    fieldLabel={profilePageData.fields.firstName.label}
-                    placeholder={profilePageData.fields.firstName.placeholder}
-                    value={form.firstName}
-                    onChange={handleChange}
-                    disabled={fieldsDisabled}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <MollureLabeledField
-                    name="lastName"
-                    fieldLabel={profilePageData.fields.lastName.label}
-                    placeholder={profilePageData.fields.lastName.placeholder}
-                    value={form.lastName}
-                    onChange={handleChange}
-                    disabled={fieldsDisabled}
-                  />
-                </Grid>
-                <Grid item xs={12}>
-                  <MollureLabeledField
-                    select
-                    fieldLabel={profilePageData.fields.reviewName.label}
-                    value={form.reviewNameMode}
-                    onChange={(e) => setReviewNameMode(e.target.value as typeof form.reviewNameMode)}
-                    disabled={fieldsDisabled}
-                  >
-                    {REVIEW_NAME_MODES.map((mode) => (
-                      <MenuItem key={mode} value={mode}>
-                        {reviewNameOptionLabel(mode, form.firstName, form.lastName)}
-                      </MenuItem>
-                    ))}
-                  </MollureLabeledField>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Stack spacing={0.75}>
-                    <Typography sx={{ fontSize: 12, fontWeight: 700, color: "text.secondary" }}>
-                      {profilePageData.fields.birthDate.label}
-                    </Typography>
-                    <AppDatePicker
-                      name="birthDate"
-                      value={form.birthDate}
-                      onChange={(iso) => handleChange({ target: { name: "birthDate", value: iso } } as React.ChangeEvent<HTMLInputElement>)}
-                      disabled={fieldsDisabled}
-                      max={(() => {
-                        const d = new Date();
-                        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-                      })()}
-                      fullWidth
-                    />
-                  </Stack>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <MollureLabeledField
-                    select
-                    fieldLabel={profilePageData.fields.gender.label}
-                    name="gender"
-                    value={form.gender}
-                    onChange={handleChange}
-                    disabled={fieldsDisabled}
-                  >
-                    <MenuItem value="">
-                      <em>Select</em>
-                    </MenuItem>
-                    {profilePageData.genderOptions.map((opt) => (
-                      <MenuItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </MenuItem>
-                    ))}
-                  </MollureLabeledField>
-                </Grid>
-              </Grid>
-            ) : (
-              <Grid container spacing={2.25}>
-                <Grid item xs={12}>
-                  <MollureLabeledField
-                    name="legalName"
-                    fieldLabel="Legal Name"
-                    placeholder="Enter legal name"
-                    value={form.legalName}
-                    onChange={handleChange}
-                    disabled={fieldsDisabled}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <MollureLabeledField
-                    name="cccNumber"
-                    fieldLabel="COC Number"
-                    placeholder="Enter COC number"
-                    value={form.cccNumber}
-                    onChange={handleChange}
-                    disabled={fieldsDisabled}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <MollureLabeledField
-                    name="vatNumber"
-                    fieldLabel="VAT Number"
-                    placeholder="Enter VAT number"
-                    value={form.vatNumber}
-                    onChange={handleChange}
-                    disabled={fieldsDisabled}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={8}>
-                  <MollureLabeledField
-                    name="street"
-                    fieldLabel="Street"
-                    placeholder="Enter street"
-                    value={form.street}
-                    onChange={handleChange}
-                    disabled={fieldsDisabled}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <MollureLabeledField
-                    name="streetNumber"
-                    fieldLabel="Street Number"
-                    placeholder="Enter number"
-                    value={form.streetNumber}
-                    onChange={handleChange}
-                    disabled={fieldsDisabled}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <MollureLabeledField
-                    name="postalCode"
-                    fieldLabel="Postal Code"
-                    placeholder="Enter postal code"
-                    value={form.postalCode}
-                    onChange={handleChange}
-                    disabled={fieldsDisabled}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <MollureLabeledField
-                    name="province"
-                    fieldLabel="Province"
-                    placeholder="Enter province"
-                    value={form.province}
-                    onChange={handleChange}
-                    disabled={fieldsDisabled}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <MollureLabeledField
-                    name="municipality"
-                    fieldLabel="Municipality"
-                    placeholder="Enter municipality"
-                    value={form.municipality}
-                    onChange={handleChange}
-                    disabled={fieldsDisabled}
-                  />
-                </Grid>
-              </Grid>
-            )}
-
-            <Typography sx={{ fontWeight: 800, color: tokens.navy, mb: 1, mt: 3.5 }}>
-              {isCompanyProfile ? "Contact Person" : profilePageData.sections.contact}
-            </Typography>
-            <Divider sx={{ mb: 2.5, borderColor: tokens.border }} />
-
-            <Grid container spacing={2.25}>
-              {!isCompanyProfile ? (
-                <>
-                  <Grid item xs={12}>
-                    <AppCountryPhoneFields
-                      countryCode={form.countryCode || ""}
-                      phone={form.phone}
-                      onCountryCodeChange={(dialCode) =>
-                        handleChange({
-                          target: { name: "countryCode", value: dialCode },
-                        } as React.ChangeEvent<HTMLInputElement>)
-                      }
-                      onPhoneChange={(phone) =>
-                        handleChange({
-                          target: { name: "phone", value: phone },
-                        } as React.ChangeEvent<HTMLInputElement>)
-                      }
-                      label={profilePageData.fields.phone.label}
-                      phonePlaceholder={profilePageData.fields.phone.placeholder}
-                      disabled={fieldsDisabled}
-                      required={false}
-                    />
-                  </Grid>
-                </>
-              ) : (
-                <>
-                  <Grid item xs={12} sm={6}>
-                    <MollureLabeledField
-                      name="contactFirstName"
-                      fieldLabel="First Name"
-                      placeholder="Enter first name"
-                      value={form.contactFirstName}
-                      onChange={handleChange}
-                      disabled={fieldsDisabled}
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <MollureLabeledField
-                      name="contactLastName"
-                      fieldLabel="Last Name"
-                      placeholder="Enter last name"
-                      value={form.contactLastName}
-                      onChange={handleChange}
-                      disabled={fieldsDisabled}
-                    />
-                  </Grid>
-                  <Grid item xs={12}>
-                    <MollureLabeledField
-                      name="phone"
-                      fieldLabel="Phone"
-                      placeholder="Enter phone number"
-                      value={form.phone}
-                      onChange={handleChange}
-                      disabled={fieldsDisabled}
-                    />
-                  </Grid>
-                </>
-              )}
-              <Grid item xs={12}>
-                <MollureLabeledField
-                  name="email"
-                  type="email"
-                  fieldLabel={profilePageData.fields.email.label}
-                  placeholder={profilePageData.fields.email.placeholder}
-                  value={form.email}
-                  disabled
-                  sx={{
-                    "& .MuiOutlinedInput-root": { bgcolor: "rgba(52, 74, 102, 0.03)" },
-                  }}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <MollureLabeledPasswordField
-                  name="password"
-                  fieldLabel={profilePageData.fields.password.label}
-                  placeholder={profilePageData.fields.password.placeholder}
-                  value={form.password}
-                  onChange={handleChange}
-                  disabled={fieldsDisabled}
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <MollureLabeledPasswordField
-                  name="confirmPassword"
-                  fieldLabel={profilePageData.fields.repeatPassword.label}
-                  placeholder={profilePageData.fields.repeatPassword.placeholder}
-                  value={form.confirmPassword}
-                  onChange={handleChange}
-                  disabled={fieldsDisabled}
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <PasswordStrengthBar password={form.password} />
-              </Grid>
-            </Grid>
-
-            <Box sx={{ mt: 2 }}>
-              <Typography
-                component={Link}
-                href={profilePageData.links.terms.href}
-                sx={{ color: tokens.teal, fontWeight: 700, fontSize: 14, textDecoration: "none" }}
-              >
-                {profilePageData.links.terms.label}
+              <Typography sx={{ fontWeight: 800, color: tokens.navy, mb: 1 }}>
+                {isCompanyProfile
+                  ? "Company Information"
+                  : profilePageData.sections.personal}
               </Typography>
-            </Box>
+              <Divider sx={{ mb: 2.5, borderColor: tokens.border }} />
 
-            {isEditing ? (
-              <Button
-                type="submit"
-                fullWidth
-                disabled={isSaving || !hasProfileChanges}
-                variant="contained"
-                disableElevation
-                sx={{
-                  mt: 3,
-                  py: 1.35,
-                  borderRadius: "12px",
-                  textTransform: "none",
-                  fontWeight: 600,
-                  fontSize: 16,
-                  color: "#fff",
-                  bgcolor: tokens.teal,
-                  "&:hover": { bgcolor: tokens.tealDark },
-                  "&.Mui-disabled": {
-                    bgcolor: alpha(tokens.teal, 0.35),
-                    color: alpha("#fff", 0.9),
-                  },
-                }}
+              {!isCompanyProfile ? (
+                <Grid container spacing={2.25}>
+                  <Grid item xs={12} sm={6}>
+                    <MollureLabeledField
+                      name="firstName"
+                      fieldLabel={profilePageData.fields.firstName.label}
+                      placeholder={profilePageData.fields.firstName.placeholder}
+                      value={form.firstName}
+                      onChange={handleChange}
+                      disabled={fieldsDisabled}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <MollureLabeledField
+                      name="lastName"
+                      fieldLabel={profilePageData.fields.lastName.label}
+                      placeholder={profilePageData.fields.lastName.placeholder}
+                      value={form.lastName}
+                      onChange={handleChange}
+                      disabled={fieldsDisabled}
+                    />
+                  </Grid>
+                  <Grid item xs={12}>
+                    <MollureLabeledField
+                      select
+                      fieldLabel={profilePageData.fields.reviewName.label}
+                      value={form.reviewNameMode}
+                      onChange={(e) =>
+                        setReviewNameMode(
+                          e.target.value as typeof form.reviewNameMode,
+                        )
+                      }
+                      disabled={fieldsDisabled}
+                    >
+                      {REVIEW_NAME_MODES.map((mode) => (
+                        <MenuItem key={mode} value={mode}>
+                          {reviewNameOptionLabel(
+                            mode,
+                            form.firstName,
+                            form.lastName,
+                          )}
+                        </MenuItem>
+                      ))}
+                    </MollureLabeledField>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <Stack spacing={0.75}>
+                      <Typography
+                        sx={{
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: "text.secondary",
+                        }}
+                      >
+                        {profilePageData.fields.birthDate.label}
+                      </Typography>
+                      <AppDatePicker
+                        name="birthDate"
+                        value={form.birthDate}
+                        onChange={(iso) =>
+                          handleChange({
+                            target: { name: "birthDate", value: iso },
+                          } as React.ChangeEvent<HTMLInputElement>)
+                        }
+                        disabled={fieldsDisabled}
+                        max={(() => {
+                          const d = new Date();
+                          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+                        })()}
+                        fullWidth
+                      />
+                    </Stack>
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <MollureLabeledField
+                      select
+                      fieldLabel={profilePageData.fields.gender.label}
+                      name="gender"
+                      value={form.gender}
+                      onChange={handleChange}
+                      disabled={fieldsDisabled}
+                    >
+                      <MenuItem value="">
+                        <em>Select</em>
+                      </MenuItem>
+                      {profilePageData.genderOptions.map((opt) => (
+                        <MenuItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </MenuItem>
+                      ))}
+                    </MollureLabeledField>
+                  </Grid>
+                </Grid>
+              ) : (
+                <Grid container spacing={2.25}>
+                  <Grid item xs={12}>
+                    <MollureLabeledField
+                      name="legalName"
+                      fieldLabel="Legal Name"
+                      placeholder="Enter legal name"
+                      value={form.legalName}
+                      onChange={handleChange}
+                      disabled={fieldsDisabled}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <MollureLabeledField
+                      name="cccNumber"
+                      fieldLabel="COC Number"
+                      placeholder="Enter COC number"
+                      value={form.cccNumber}
+                      onChange={handleChange}
+                      disabled={fieldsDisabled}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <MollureLabeledField
+                      name="vatNumber"
+                      fieldLabel="VAT Number"
+                      placeholder="Enter VAT number"
+                      value={form.vatNumber}
+                      onChange={handleChange}
+                      disabled={fieldsDisabled}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={8}>
+                    <MollureLabeledField
+                      name="street"
+                      fieldLabel="Street"
+                      placeholder="Enter street"
+                      value={form.street}
+                      onChange={handleChange}
+                      disabled={fieldsDisabled}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <MollureLabeledField
+                      name="streetNumber"
+                      fieldLabel="Street Number"
+                      placeholder="Enter number"
+                      value={form.streetNumber}
+                      onChange={handleChange}
+                      disabled={fieldsDisabled}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <MollureLabeledField
+                      name="postalCode"
+                      fieldLabel="Postal Code"
+                      placeholder="Enter postal code"
+                      value={form.postalCode}
+                      onChange={handleChange}
+                      disabled={fieldsDisabled}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <MollureLabeledField
+                      name="province"
+                      fieldLabel="Province"
+                      placeholder="Enter province"
+                      value={form.province}
+                      onChange={handleChange}
+                      disabled={fieldsDisabled}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={4}>
+                    <MollureLabeledField
+                      name="municipality"
+                      fieldLabel="Municipality"
+                      placeholder="Enter municipality"
+                      value={form.municipality}
+                      onChange={handleChange}
+                      disabled={fieldsDisabled}
+                    />
+                  </Grid>
+                </Grid>
+              )}
+
+              <Typography
+                sx={{ fontWeight: 800, color: tokens.navy, mb: 1, mt: 3.5 }}
               >
-                {isSaving ? <CircularProgress size={22} color="inherit" /> : profilePageData.actions.update}
-              </Button>
-            ) : null}
+                {isCompanyProfile
+                  ? "Contact Person"
+                  : profilePageData.sections.contact}
+              </Typography>
+              <Divider sx={{ mb: 2.5, borderColor: tokens.border }} />
+
+              <Grid container spacing={2.25}>
+                {!isCompanyProfile ? (
+                  <>
+                    <Grid item xs={12}>
+                      <AppCountryPhoneFields
+                        countryCode={form.countryCode || ""}
+                        phone={form.phone}
+                        onCountryCodeChange={(dialCode) =>
+                          handleChange({
+                            target: { name: "countryCode", value: dialCode },
+                          } as React.ChangeEvent<HTMLInputElement>)
+                        }
+                        onPhoneChange={(phone) =>
+                          handleChange({
+                            target: { name: "phone", value: phone },
+                          } as React.ChangeEvent<HTMLInputElement>)
+                        }
+                        label={profilePageData.fields.phone.label}
+                        phonePlaceholder={
+                          profilePageData.fields.phone.placeholder
+                        }
+                        disabled={fieldsDisabled}
+                        required={false}
+                      />
+                    </Grid>
+                  </>
+                ) : (
+                  <>
+                    <Grid item xs={12} sm={6}>
+                      <MollureLabeledField
+                        name="contactFirstName"
+                        fieldLabel="First Name"
+                        placeholder="Enter first name"
+                        value={form.contactFirstName}
+                        onChange={handleChange}
+                        disabled={fieldsDisabled}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <MollureLabeledField
+                        name="contactLastName"
+                        fieldLabel="Last Name"
+                        placeholder="Enter last name"
+                        value={form.contactLastName}
+                        onChange={handleChange}
+                        disabled={fieldsDisabled}
+                      />
+                    </Grid>
+                    <Grid item xs={12}>
+                      <MollureLabeledField
+                        name="phone"
+                        fieldLabel="Phone"
+                        placeholder="Enter phone number"
+                        value={form.phone}
+                        onChange={handleChange}
+                        disabled={fieldsDisabled}
+                      />
+                    </Grid>
+                  </>
+                )}
+                <Grid item xs={12}>
+                  <MollureLabeledField
+                    name="email"
+                    type="email"
+                    fieldLabel={profilePageData.fields.email.label}
+                    placeholder={profilePageData.fields.email.placeholder}
+                    value={form.email}
+                    disabled
+                    sx={{
+                      "& .MuiOutlinedInput-root": {
+                        bgcolor: "rgba(52, 74, 102, 0.03)",
+                      },
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <MollureLabeledPasswordField
+                    name="password"
+                    fieldLabel={profilePageData.fields.password.label}
+                    placeholder={profilePageData.fields.password.placeholder}
+                    value={form.password}
+                    onChange={handleChange}
+                    disabled={fieldsDisabled}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <MollureLabeledPasswordField
+                    name="confirmPassword"
+                    fieldLabel={profilePageData.fields.repeatPassword.label}
+                    placeholder={
+                      profilePageData.fields.repeatPassword.placeholder
+                    }
+                    value={form.confirmPassword}
+                    onChange={handleChange}
+                    disabled={fieldsDisabled}
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <PasswordStrengthBar password={form.password} />
+                </Grid>
+              </Grid>
+
+              <Box sx={{ mt: 2 }}>
+                <Typography
+                  component={Link}
+                  href={profilePageData.links.terms.href}
+                  sx={{
+                    color: tokens.teal,
+                    fontWeight: 700,
+                    fontSize: 14,
+                    textDecoration: "none",
+                  }}
+                >
+                  {profilePageData.links.terms.label}
+                </Typography>
+              </Box>
+
+              {isEditing ? (
+                <AppButton
+                  type="submit"
+                  fullWidth
+                  disabled={isSaving || !hasProfileChanges}
+                  variant="contained"
+                  disableElevation
+                  sx={{
+                    mt: 3,
+                    py: 1.35,
+                    borderRadius: "12px",
+                    textTransform: "none",
+                    fontWeight: 600,
+                    fontSize: 16,
+                    color: "#fff",
+                    bgcolor: tokens.teal,
+                    "&:hover": { bgcolor: tokens.tealDark },
+                    "&.Mui-disabled": {
+                      bgcolor: alpha(tokens.teal, 0.35),
+                      color: alpha("#fff", 0.9),
+                    },
+                  }}
+                >
+                  {isSaving ? (
+                    <CircularProgress size={22} color="inherit" />
+                  ) : (
+                    profilePageData.actions.update
+                  )}
+                </AppButton>
+              ) : null}
             </Box>
           </Box>
         </Paper>
       </Container>
 
       <MarketingSiteFooter
-        columns={marketingShellFooter.columns.map((col) => ({ title: col.title, items: [...col.items] }))}
+        columns={marketingShellFooter.columns.map((col) => ({
+          title: col.title,
+          items: [...col.items],
+        }))}
         copyright={marketingShellFooter.copyright}
         sx={{ mt: 2 }}
       />

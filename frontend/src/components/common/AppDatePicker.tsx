@@ -7,7 +7,12 @@ import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import KeyboardDoubleArrowLeftRoundedIcon from "@mui/icons-material/KeyboardDoubleArrowLeftRounded";
 import KeyboardDoubleArrowRightRoundedIcon from "@mui/icons-material/KeyboardDoubleArrowRightRounded";
 import { Box, ButtonBase, IconButton, Popover } from "@mui/material";
-import { alpha, useTheme, type SxProps, type Theme } from "@mui/material/styles";
+import {
+  alpha,
+  useTheme,
+  type SxProps,
+  type Theme,
+} from "@mui/material/styles";
 import { BodyText } from "../ui/typography";
 
 export type AppDatePickerProps = {
@@ -37,7 +42,20 @@ export type AppCalendarPanelProps = {
 type PanelView = "days" | "months" | "years";
 
 const DAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"] as const;
-const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
+const MONTH_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
 const YEARS_PER_PAGE = 12;
 
 export function normalizeDateToIso(raw: string): string {
@@ -87,11 +105,21 @@ function isIsoOutOfRange(iso: string, min?: string, max?: string): boolean {
   return false;
 }
 
-export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compact = false, daySx }: AppCalendarPanelProps) {
+export function AppCalendarPanel({
+  value,
+  onChange,
+  min,
+  max,
+  onDaySelect,
+  compact = false,
+  daySx,
+}: AppCalendarPanelProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
 
-  const [displayMonth, setDisplayMonth] = React.useState<Date>(() => monthFromValue(value));
+  const [displayMonth, setDisplayMonth] = React.useState<Date>(() =>
+    monthFromValue(value),
+  );
   const [panelView, setPanelView] = React.useState<PanelView>("days");
   const [yearPageStart, setYearPageStart] = React.useState(() => {
     const y = monthFromValue(value).getFullYear();
@@ -102,7 +130,9 @@ export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compa
     if (value) {
       const next = monthFromValue(value);
       setDisplayMonth(next);
-      setYearPageStart(Math.floor(next.getFullYear() / YEARS_PER_PAGE) * YEARS_PER_PAGE);
+      setYearPageStart(
+        Math.floor(next.getFullYear() / YEARS_PER_PAGE) * YEARS_PER_PAGE,
+      );
     }
   }, [value]);
 
@@ -131,7 +161,11 @@ export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compa
   const canGoPrevMonth = (() => {
     if (!min) return true;
     const prev = new Date(year, month - 1, 1);
-    const endDay = new Date(prev.getFullYear(), prev.getMonth() + 1, 0).getDate();
+    const endDay = new Date(
+      prev.getFullYear(),
+      prev.getMonth() + 1,
+      0,
+    ).getDate();
     const endIso = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}-${String(endDay).padStart(2, "0")}`;
     return endIso >= min;
   })();
@@ -161,7 +195,10 @@ export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compa
   for (let i = 0; i < firstDay; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
-  const yearOptions = Array.from({ length: YEARS_PER_PAGE }, (_, i) => yearPageStart + i);
+  const yearOptions = Array.from(
+    { length: YEARS_PER_PAGE },
+    (_, i) => yearPageStart + i,
+  );
   const yearPageEnd = yearPageStart + YEARS_PER_PAGE - 1;
   const dayCellH = compact ? 30 : 36;
   const monthCellH = compact ? 34 : 40;
@@ -189,16 +226,31 @@ export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compa
           gap: 0.5,
         }}
       >
-        <CalendarMonthRoundedIcon sx={{ fontSize: 18, color: m.teal, flexShrink: 0 }} />
+        <CalendarMonthRoundedIcon
+          sx={{ fontSize: 18, color: m.teal, flexShrink: 0 }}
+        />
 
         {panelView === "days" && (
           <>
-            <Box sx={{ flex: 1, display: "flex", alignItems: "center", gap: 0.35, minWidth: 0 }}>
+            <Box
+              sx={{
+                flex: 1,
+                display: "flex",
+                alignItems: "center",
+                gap: 0.35,
+                minWidth: 0,
+              }}
+            >
               <BodyText
                 component="button"
                 type="button"
                 onClick={() => setPanelView("months")}
-                sx={{ ...headerBtnSx, fontSize: compact ? 13 : 14, fontWeight: 900, color: alpha(m.navy, 0.82) }}
+                sx={{
+                  ...headerBtnSx,
+                  fontSize: compact ? 13 : 14,
+                  fontWeight: 900,
+                  color: alpha(m.navy, 0.82),
+                }}
               >
                 {monthName}
               </BodyText>
@@ -206,10 +258,17 @@ export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compa
                 component="button"
                 type="button"
                 onClick={() => {
-                  setYearPageStart(Math.floor(year / YEARS_PER_PAGE) * YEARS_PER_PAGE);
+                  setYearPageStart(
+                    Math.floor(year / YEARS_PER_PAGE) * YEARS_PER_PAGE,
+                  );
                   setPanelView("years");
                 }}
-                sx={{ ...headerBtnSx, fontSize: compact ? 13 : 14, fontWeight: 900, color: alpha(m.navy, 0.82) }}
+                sx={{
+                  ...headerBtnSx,
+                  fontSize: compact ? 13 : 14,
+                  fontWeight: 900,
+                  color: alpha(m.navy, 0.82),
+                }}
               >
                 {year}
               </BodyText>
@@ -219,9 +278,16 @@ export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compa
               disabled={!canGoPrevMonth}
               onClick={() => {
                 if (!canGoPrevMonth) return;
-                setDisplayMonth((p) => new Date(p.getFullYear(), p.getMonth() - 1, 1));
+                setDisplayMonth(
+                  (p) => new Date(p.getFullYear(), p.getMonth() - 1, 1),
+                );
               }}
-              sx={{ width: 28, height: 28, borderRadius: "8px", color: alpha(m.navy, 0.6) }}
+              sx={{
+                width: 28,
+                height: 28,
+                borderRadius: "8px",
+                color: alpha(m.navy, 0.6),
+              }}
             >
               <ChevronLeftRoundedIcon sx={{ fontSize: 18 }} />
             </IconButton>
@@ -230,9 +296,16 @@ export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compa
               disabled={!canGoNextMonth}
               onClick={() => {
                 if (!canGoNextMonth) return;
-                setDisplayMonth((p) => new Date(p.getFullYear(), p.getMonth() + 1, 1));
+                setDisplayMonth(
+                  (p) => new Date(p.getFullYear(), p.getMonth() + 1, 1),
+                );
               }}
-              sx={{ width: 28, height: 28, borderRadius: "8px", color: alpha(m.navy, 0.6) }}
+              sx={{
+                width: 28,
+                height: 28,
+                borderRadius: "8px",
+                color: alpha(m.navy, 0.6),
+              }}
             >
               <ChevronRightRoundedIcon sx={{ fontSize: 18 }} />
             </IconButton>
@@ -241,12 +314,27 @@ export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compa
 
         {panelView === "months" && (
           <>
-            <BodyText sx={{ flex: 1, fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.82) }}>Select month</BodyText>
+            <BodyText
+              sx={{
+                flex: 1,
+                fontSize: 14,
+                fontWeight: 900,
+                color: alpha(m.navy, 0.82),
+              }}
+            >
+              Select month
+            </BodyText>
             <BodyText
               component="button"
               type="button"
               onClick={() => setPanelView("days")}
-              sx={{ ...headerBtnSx, fontSize: 12, fontWeight: 800, color: m.teal, textDecoration: "underline" }}
+              sx={{
+                ...headerBtnSx,
+                fontSize: 12,
+                fontWeight: 800,
+                color: m.teal,
+                textDecoration: "underline",
+              }}
             >
               Back
             </BodyText>
@@ -255,20 +343,37 @@ export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compa
 
         {panelView === "years" && (
           <>
-            <BodyText sx={{ flex: 1, fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
+            <BodyText
+              sx={{
+                flex: 1,
+                fontSize: 14,
+                fontWeight: 900,
+                color: alpha(m.navy, 0.82),
+              }}
+            >
               {yearPageStart} – {yearPageEnd}
             </BodyText>
             <IconButton
               size="small"
               onClick={() => setYearPageStart((p) => p - YEARS_PER_PAGE)}
-              sx={{ width: 28, height: 28, borderRadius: "8px", color: alpha(m.navy, 0.6) }}
+              sx={{
+                width: 28,
+                height: 28,
+                borderRadius: "8px",
+                color: alpha(m.navy, 0.6),
+              }}
             >
               <KeyboardDoubleArrowLeftRoundedIcon sx={{ fontSize: 18 }} />
             </IconButton>
             <IconButton
               size="small"
               onClick={() => setYearPageStart((p) => p + YEARS_PER_PAGE)}
-              sx={{ width: 28, height: 28, borderRadius: "8px", color: alpha(m.navy, 0.6) }}
+              sx={{
+                width: 28,
+                height: 28,
+                borderRadius: "8px",
+                color: alpha(m.navy, 0.6),
+              }}
             >
               <KeyboardDoubleArrowRightRoundedIcon sx={{ fontSize: 18 }} />
             </IconButton>
@@ -279,20 +384,39 @@ export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compa
       <Box sx={{ px: 1.5, pt: 1.25, pb: 1.5 }}>
         {panelView === "days" && (
           <>
-            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", mb: 0.5 }}>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "repeat(7, 1fr)",
+                mb: 0.5,
+              }}
+            >
               {DAY_LABELS.map((d, i) => (
                 <BodyText
                   key={`${d}-${i}`}
-                  sx={{ fontSize: compact ? 10.5 : 11.5, fontWeight: 900, color: alpha(m.navy, 0.45), textAlign: "center", py: 0.5 }}
+                  sx={{
+                    fontSize: compact ? 10.5 : 11.5,
+                    fontWeight: 900,
+                    color: alpha(m.navy, 0.45),
+                    textAlign: "center",
+                    py: 0.5,
+                  }}
                 >
                   {d}
                 </BodyText>
               ))}
             </Box>
 
-            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 0.25 }}>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "repeat(7, 1fr)",
+                gap: 0.25,
+              }}
+            >
               {cells.map((day, idx) => {
-                if (day === null) return <Box key={`pad-${idx}`} sx={{ height: dayCellH }} />;
+                if (day === null)
+                  return <Box key={`pad-${idx}`} sx={{ height: dayCellH }} />;
                 const iso = isoOf(day);
                 const selected = iso === value;
                 const off = isDayDisabled(day);
@@ -324,10 +448,19 @@ export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compa
                               ? m.teal
                               : alpha(m.navy, 0.72),
                       bgcolor: selected ? m.teal : "transparent",
-                      border: isToday && !selected ? `1.5px solid ${alpha(m.teal, 0.4)}` : "none",
+                      border:
+                        isToday && !selected
+                          ? `1.5px solid ${alpha(m.teal, 0.4)}`
+                          : "none",
                       cursor: off ? "not-allowed" : "pointer",
                       "&.Mui-disabled": { pointerEvents: "none", opacity: 1 },
-                      "&:hover": { bgcolor: off ? "transparent" : selected ? m.tealDark : alpha(m.teal, 0.09) },
+                      "&:hover": {
+                        bgcolor: off
+                          ? "transparent"
+                          : selected
+                            ? m.tealDark
+                            : alpha(m.teal, 0.09),
+                      },
                       ...extraDaySx,
                     }}
                   >
@@ -340,7 +473,13 @@ export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compa
         )}
 
         {panelView === "months" && (
-          <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 0.75 }}>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3, 1fr)",
+              gap: 0.75,
+            }}
+          >
             {MONTH_LABELS.map((label, idx) => {
               const selected = idx === month;
               const off = isMonthDisabled(idx);
@@ -358,11 +497,21 @@ export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compa
                     borderRadius: "9px",
                     fontSize: 12.5,
                     fontWeight: selected ? 900 : 700,
-                    color: off ? alpha(m.navy, 0.22) : selected ? "#fff" : alpha(m.navy, 0.72),
+                    color: off
+                      ? alpha(m.navy, 0.22)
+                      : selected
+                        ? "#fff"
+                        : alpha(m.navy, 0.72),
                     bgcolor: selected ? m.teal : "transparent",
                     border: `1px solid ${selected ? alpha(m.teal, 0.2) : alpha(m.navy, 0.08)}`,
                     "&.Mui-disabled": { pointerEvents: "none", opacity: 1 },
-                    "&:hover": { bgcolor: off ? "transparent" : selected ? m.tealDark : alpha(m.teal, 0.09) },
+                    "&:hover": {
+                      bgcolor: off
+                        ? "transparent"
+                        : selected
+                          ? m.tealDark
+                          : alpha(m.teal, 0.09),
+                    },
                   }}
                 >
                   {label}
@@ -374,7 +523,13 @@ export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compa
 
         {panelView === "years" && (
           <>
-            <Box sx={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 0.75 }}>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, 1fr)",
+                gap: 0.75,
+              }}
+            >
               {yearOptions.map((yearValue) => {
                 const selected = yearValue === year;
                 const off = isYearDisabled(yearValue);
@@ -392,11 +547,21 @@ export function AppCalendarPanel({ value, onChange, min, max, onDaySelect, compa
                       borderRadius: "9px",
                       fontSize: 12.5,
                       fontWeight: selected ? 900 : 700,
-                      color: off ? alpha(m.navy, 0.22) : selected ? "#fff" : alpha(m.navy, 0.72),
+                      color: off
+                        ? alpha(m.navy, 0.22)
+                        : selected
+                          ? "#fff"
+                          : alpha(m.navy, 0.72),
                       bgcolor: selected ? m.teal : "transparent",
                       border: `1px solid ${selected ? alpha(m.teal, 0.2) : alpha(m.navy, 0.08)}`,
                       "&.Mui-disabled": { pointerEvents: "none", opacity: 1 },
-                      "&:hover": { bgcolor: off ? "transparent" : selected ? m.tealDark : alpha(m.teal, 0.09) },
+                      "&:hover": {
+                        bgcolor: off
+                          ? "transparent"
+                          : selected
+                            ? m.tealDark
+                            : alpha(m.teal, 0.09),
+                      },
                     }}
                   >
                     {yearValue}
@@ -494,7 +659,10 @@ export default function AppDatePicker({
           cursor: disabled ? "not-allowed" : "pointer",
           transition: "border-color 0.15s",
           "&:hover": { borderColor: disabled ? alpha(m.navy, 0.18) : m.teal },
-          "&:focus-visible": { outline: `2px solid ${m.teal}`, outlineOffset: 2 },
+          "&:focus-visible": {
+            outline: `2px solid ${m.teal}`,
+            outlineOffset: 2,
+          },
           ...sx,
         }}
       >
@@ -511,7 +679,14 @@ export default function AppDatePicker({
         >
           {value ? formatDisplay(value) : placeholder}
         </BodyText>
-        <CalendarMonthRoundedIcon sx={{ fontSize: 18, color: open ? m.teal : alpha(m.navy, 0.4), ml: 1, flexShrink: 0 }} />
+        <CalendarMonthRoundedIcon
+          sx={{
+            fontSize: 18,
+            color: open ? m.teal : alpha(m.navy, 0.4),
+            ml: 1,
+            flexShrink: 0,
+          }}
+        />
       </ButtonBase>
 
       <Popover
@@ -532,7 +707,13 @@ export default function AppDatePicker({
           },
         }}
       >
-        <AppCalendarPanel value={value} onChange={handleChange} min={min} max={max} onDaySelect={closePicker} />
+        <AppCalendarPanel
+          value={value}
+          onChange={handleChange}
+          min={min}
+          max={max}
+          onDaySelect={closePicker}
+        />
       </Popover>
     </Box>
   );

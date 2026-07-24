@@ -97,7 +97,9 @@ export function FilterField({
         placeholder={placeholder}
         size="small"
         InputProps={{
-          endAdornment: <ArrowDropDownRoundedIcon sx={{ color: tokens.placeholder }} />,
+          endAdornment: (
+            <ArrowDropDownRoundedIcon sx={{ color: tokens.placeholder }} />
+          ),
         }}
         sx={{
           "& .MuiOutlinedInput-root": {

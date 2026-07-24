@@ -31,7 +31,10 @@ type AdminDateRangeSelectorProps = {
   onChange: (value: AdminDashboardRangeValue) => void;
 };
 
-export default function AdminDateRangeSelector({ value, onChange }: AdminDateRangeSelectorProps) {
+export default function AdminDateRangeSelector({
+  value,
+  onChange,
+}: AdminDateRangeSelectorProps) {
   const theme = useTheme();
   const tokens = theme.palette.mollure;
   const anchorRef = React.useRef<HTMLButtonElement>(null);
@@ -79,7 +82,8 @@ export default function AdminDateRangeSelector({ value, onChange }: AdminDateRan
   const handleApplyCustom = () => {
     if (!draftStart) return;
     const end = draftEnd || draftStart;
-    const [start, finish] = draftStart <= end ? [draftStart, end] : [end, draftStart];
+    const [start, finish] =
+      draftStart <= end ? [draftStart, end] : [end, draftStart];
     onChange({ preset: "custom", customStart: start, customEnd: finish });
     setCalendarOpen(false);
   };
@@ -106,9 +110,23 @@ export default function AdminDateRangeSelector({ value, onChange }: AdminDateRan
           transition: "border-color 160ms ease",
         }}
       >
-        <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
-          <CalendarTodayOutlinedIcon sx={{ fontSize: 18, color: tokens.teal, flexShrink: 0 }} />
-          <Typography sx={{ fontSize: 13, fontWeight: 600, color: tokens.navy, whiteSpace: "nowrap" }}>
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={1}
+          sx={{ minWidth: 0 }}
+        >
+          <CalendarTodayOutlinedIcon
+            sx={{ fontSize: 18, color: tokens.teal, flexShrink: 0 }}
+          />
+          <Typography
+            sx={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: tokens.navy,
+              whiteSpace: "nowrap",
+            }}
+          >
             {getRangeLabel(value)}
           </Typography>
         </Stack>
@@ -119,7 +137,12 @@ export default function AdminDateRangeSelector({ value, onChange }: AdminDateRan
         )}
       </ButtonBase>
 
-      <Popper open={menuOpen} anchorEl={anchorRef.current} placement="bottom-start" sx={{ zIndex: 1300 }}>
+      <Popper
+        open={menuOpen}
+        anchorEl={anchorRef.current}
+        placement="bottom-start"
+        sx={{ zIndex: 1300 }}
+      >
         <ClickAwayListener onClickAway={() => setMenuOpen(false)}>
           <Paper
             elevation={4}
@@ -179,7 +202,9 @@ export default function AdminDateRangeSelector({ value, onChange }: AdminDateRan
         }}
       >
         <Box sx={{ p: 2, width: { xs: 310, sm: 340 } }}>
-          <Typography sx={{ fontSize: 14, fontWeight: 600, color: tokens.navy, mb: 0.5 }}>
+          <Typography
+            sx={{ fontSize: 14, fontWeight: 600, color: tokens.navy, mb: 0.5 }}
+          >
             Custom date range
           </Typography>
           <Typography sx={{ fontSize: 12, color: tokens.bodyText, mb: 1.5 }}>
@@ -206,13 +231,22 @@ export default function AdminDateRangeSelector({ value, onChange }: AdminDateRan
                 };
               }
               if (inRange) {
-                return { bgcolor: alpha(tokens.teal, 0.14), color: tokens.tealDark, fontWeight: 600 };
+                return {
+                  bgcolor: alpha(tokens.teal, 0.14),
+                  color: tokens.tealDark,
+                  fontWeight: 600,
+                };
               }
               return undefined;
             }}
           />
 
-          <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ mt: 2 }}>
+          <Stack
+            direction="row"
+            spacing={1}
+            justifyContent="flex-end"
+            sx={{ mt: 2 }}
+          >
             <AppButton
               variant="outlined"
               size="small"

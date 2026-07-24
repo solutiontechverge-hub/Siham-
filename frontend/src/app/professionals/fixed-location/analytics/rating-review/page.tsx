@@ -10,7 +10,10 @@ export default function FixedLocationRatingReviewPage() {
   const { ratingReview } = professionalFixedLocationAnalyticsData;
 
   return (
-    <FixedLocationPageScaffold activeTopTab="Analytics" topTabs={fixedLocationTopTabs}>
+    <FixedLocationPageScaffold
+      activeTopTab="Analytics"
+      topTabs={fixedLocationTopTabs}
+    >
       <Suspense>
         <ProfessionalFixedLocationRatingReviewsPage data={ratingReview} />
       </Suspense>

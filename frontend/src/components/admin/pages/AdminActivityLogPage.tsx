@@ -49,7 +49,10 @@ import AppModal from "../../common/AppModal";
 import AdminFilterDateRange from "../AdminFilterDateRange";
 import AdminFilterPanel, { AdminFilterPanelRow } from "../AdminFilterPanel";
 import AdminSectionCard from "../AdminSectionCard";
-import AdminDataTable, { AdminSummaryGrid, type AdminTableColumn } from "../AdminDataTable";
+import AdminDataTable, {
+  AdminSummaryGrid,
+  type AdminTableColumn,
+} from "../AdminDataTable";
 import { AdminDashboardFooter } from "../AdminDashboardHeader";
 import AdminActivityLogWidgets from "../AdminActivityLogWidgets";
 import { ADMIN_CARD_PADDING as pad } from "../adminCardPadding";
@@ -83,7 +86,11 @@ const MODULE_ICONS: Record<ActivityLogModule, React.ElementType> = {
 
 function formatDisplayDate(iso: string) {
   const d = new Date(`${iso}T00:00:00`);
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 function formatDateTime(date: string, time: string) {
@@ -100,12 +107,17 @@ function formatDateTime(date: string, time: string) {
 
 function formatTime12h(time: string) {
   const d = new Date(`2000-01-01T${time}:00`);
-  return d.toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit", hour12: true });
+  return d.toLocaleTimeString("en-GB", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
 }
 
 function formatDateRangeLabel(from: string, to: string) {
   if (!from && !to) return null;
-  if (from && to) return `Showing results for ${formatDisplayDate(from)} - ${formatDisplayDate(to)}`;
+  if (from && to)
+    return `Showing results for ${formatDisplayDate(from)} - ${formatDisplayDate(to)}`;
   if (from) return `Showing results from ${formatDisplayDate(from)}`;
   return `Showing results until ${formatDisplayDate(to)}`;
 }
@@ -127,7 +139,10 @@ function UserCell({ user }: { user: ActivityLogRow["user"] }) {
         {user.initials}
       </Avatar>
       <Box sx={{ minWidth: 0 }}>
-        <Typography sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }} noWrap>
+        <Typography
+          sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}
+          noWrap
+        >
           {user.name}
         </Typography>
         <Typography sx={{ fontSize: 10.5, color: tokens.slate }} noWrap>
@@ -155,7 +170,13 @@ function ActionBadge({ action }: { action: ActivityLogRow["action"] }) {
   );
 }
 
-function ModuleCell({ module, label }: { module: ActivityLogModule; label: string }) {
+function ModuleCell({
+  module,
+  label,
+}: {
+  module: ActivityLogModule;
+  label: string;
+}) {
   const tokens = useTheme().palette.mollure;
   const Icon = MODULE_ICONS[module];
   return (
@@ -174,7 +195,9 @@ function ModuleCell({ module, label }: { module: ActivityLogModule; label: strin
       >
         <Icon sx={{ fontSize: 15 }} />
       </Box>
-      <Typography sx={{ fontSize: 12, fontWeight: 500, color: tokens.navy }}>{label}</Typography>
+      <Typography sx={{ fontSize: 12, fontWeight: 500, color: tokens.navy }}>
+        {label}
+      </Typography>
     </Stack>
   );
 }
@@ -186,13 +209,33 @@ function ActivityDetailContent({ entry }: { entry: ActivityLogRow }) {
     <Stack spacing={2} sx={{ px: 2.5, py: 2 }}>
       <Stack direction="row" alignItems="center" spacing={1}>
         <InfoOutlinedIcon sx={{ fontSize: 18, color: tokens.teal }} />
-        <Typography sx={{ fontSize: 15, fontWeight: 600, color: tokens.navy }}>Activity Details</Typography>
+        <Typography sx={{ fontSize: 15, fontWeight: 600, color: tokens.navy }}>
+          Activity Details
+        </Typography>
       </Stack>
 
-      <Typography sx={{ fontSize: 12, color: tokens.slate, fontWeight: 500 }}>Log ID #{entry.id}</Typography>
+      <Typography sx={{ fontSize: 12, color: tokens.slate, fontWeight: 500 }}>
+        Log ID #{entry.id}
+      </Typography>
 
-      <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: tokens.surface, border: `1px solid ${tokens.cardBorder}` }}>
-        <Typography sx={{ fontSize: 11, fontWeight: 600, color: tokens.slate, mb: 1, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+      <Box
+        sx={{
+          p: 1.5,
+          borderRadius: 2,
+          bgcolor: tokens.surface,
+          border: `1px solid ${tokens.cardBorder}`,
+        }}
+      >
+        <Typography
+          sx={{
+            fontSize: 11,
+            fontWeight: 600,
+            color: tokens.slate,
+            mb: 1,
+            textTransform: "uppercase",
+            letterSpacing: "0.04em",
+          }}
+        >
           User
         </Typography>
         <UserCell user={entry.user} />
@@ -200,13 +243,31 @@ function ActivityDetailContent({ entry }: { entry: ActivityLogRow }) {
 
       <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
         <Box>
-          <Typography sx={{ fontSize: 11, fontWeight: 600, color: tokens.slate, mb: 0.75, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+          <Typography
+            sx={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: tokens.slate,
+              mb: 0.75,
+              textTransform: "uppercase",
+              letterSpacing: "0.04em",
+            }}
+          >
             Action
           </Typography>
           <ActionBadge action={entry.action} />
         </Box>
         <Box>
-          <Typography sx={{ fontSize: 11, fontWeight: 600, color: tokens.slate, mb: 0.75, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+          <Typography
+            sx={{
+              fontSize: 11,
+              fontWeight: 600,
+              color: tokens.slate,
+              mb: 0.75,
+              textTransform: "uppercase",
+              letterSpacing: "0.04em",
+            }}
+          >
             Module
           </Typography>
           <ModuleCell module={entry.module} label={entry.moduleLabel} />
@@ -214,25 +275,57 @@ function ActivityDetailContent({ entry }: { entry: ActivityLogRow }) {
       </Stack>
 
       <Box>
-        <Typography sx={{ fontSize: 11, fontWeight: 600, color: tokens.slate, mb: 0.75, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+        <Typography
+          sx={{
+            fontSize: 11,
+            fontWeight: 600,
+            color: tokens.slate,
+            mb: 0.75,
+            textTransform: "uppercase",
+            letterSpacing: "0.04em",
+          }}
+        >
           Details
         </Typography>
-        <Typography sx={{ fontSize: 13, color: tokens.bodyText, lineHeight: 1.55 }}>{entry.details}</Typography>
+        <Typography
+          sx={{ fontSize: 13, color: tokens.bodyText, lineHeight: 1.55 }}
+        >
+          {entry.details}
+        </Typography>
       </Box>
 
       <Stack direction="row" alignItems="center" spacing={1}>
         <CalendarTodayOutlinedIcon sx={{ fontSize: 16, color: tokens.slate }} />
         <Box>
-          <Typography sx={{ fontSize: 11, fontWeight: 600, color: tokens.slate }}>Date & Time</Typography>
-          <Typography sx={{ fontSize: 12, color: tokens.navy }}>{formatDateTime(entry.date, entry.time)}</Typography>
+          <Typography
+            sx={{ fontSize: 11, fontWeight: 600, color: tokens.slate }}
+          >
+            Date & Time
+          </Typography>
+          <Typography sx={{ fontSize: 12, color: tokens.navy }}>
+            {formatDateTime(entry.date, entry.time)}
+          </Typography>
         </Box>
       </Stack>
 
       <Box>
-        <Typography sx={{ fontSize: 11, fontWeight: 600, color: tokens.slate, mb: 0.5, textTransform: "uppercase", letterSpacing: "0.04em" }}>
+        <Typography
+          sx={{
+            fontSize: 11,
+            fontWeight: 600,
+            color: tokens.slate,
+            mb: 0.5,
+            textTransform: "uppercase",
+            letterSpacing: "0.04em",
+          }}
+        >
           IP Address
         </Typography>
-        <Typography sx={{ fontSize: 12, color: tokens.navy, fontFamily: "monospace" }}>{entry.ipAddress}</Typography>
+        <Typography
+          sx={{ fontSize: 12, color: tokens.navy, fontFamily: "monospace" }}
+        >
+          {entry.ipAddress}
+        </Typography>
       </Box>
     </Stack>
   );
@@ -313,9 +406,14 @@ export default function AdminActivityLogPage() {
   const [dateTo, setDateTo] = React.useState("");
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(PAGE_SIZE_OPTIONS[0]);
-  const [exportMenuAnchor, setExportMenuAnchor] = React.useState<null | HTMLElement>(null);
-  const [deleteTarget, setDeleteTarget] = React.useState<ActivityLogRow | null>(null);
-  const [hiddenIds, setHiddenIds] = React.useState<Set<string>>(() => new Set());
+  const [exportMenuAnchor, setExportMenuAnchor] =
+    React.useState<null | HTMLElement>(null);
+  const [deleteTarget, setDeleteTarget] = React.useState<ActivityLogRow | null>(
+    null,
+  );
+  const [hiddenIds, setHiddenIds] = React.useState<Set<string>>(
+    () => new Set(),
+  );
 
   const queryArgs = React.useMemo(
     () => ({
@@ -331,9 +429,10 @@ export default function AdminActivityLogPage() {
     [search, actionFilter, moduleFilter, userFilter, dateFrom, dateTo],
   );
 
-  const { data, isLoading, isFetching, isError, refetch } = useGetAdminActivityLogQuery(queryArgs, {
-    refetchOnMountOrArgChange: true,
-  });
+  const { data, isLoading, isFetching, isError, refetch } =
+    useGetAdminActivityLogQuery(queryArgs, {
+      refetchOnMountOrArgChange: true,
+    });
 
   const logs = React.useMemo<ActivityLogRow[]>(() => {
     const items = data?.data?.items ?? [];
@@ -344,16 +443,25 @@ export default function AdminActivityLogPage() {
         date: item.date,
         time: item.time,
         user: item.user,
-        action: (item.action in ACTION_STYLES ? item.action : "system") as ActivityLogAction,
+        action: (item.action in ACTION_STYLES
+          ? item.action
+          : "system") as ActivityLogAction,
         actionLabel: item.actionLabel || item.action,
-        module: (item.module in MODULE_ICONS ? item.module : "system") as ActivityLogModule,
+        module: (item.module in MODULE_ICONS
+          ? item.module
+          : "system") as ActivityLogModule,
         moduleLabel: item.moduleLabel || item.module,
         details: item.details,
         ipAddress: item.ipAddress || "—",
       }));
   }, [data?.data?.items, hiddenIds]);
 
-  const summary = data?.data?.summary ?? { total: 0, today: 0, thisWeek: 0, thisMonth: 0 };
+  const summary = data?.data?.summary ?? {
+    total: 0,
+    today: 0,
+    thisWeek: 0,
+    thisMonth: 0,
+  };
 
   const filteredLogs = logs;
   const totalPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
@@ -363,7 +471,15 @@ export default function AdminActivityLogPage() {
 
   React.useEffect(() => {
     setPage(1);
-  }, [userFilter, actionFilter, moduleFilter, dateFrom, dateTo, search, pageSize]);
+  }, [
+    userFilter,
+    actionFilter,
+    moduleFilter,
+    dateFrom,
+    dateTo,
+    search,
+    pageSize,
+  ]);
 
   React.useEffect(() => {
     if (drawerLogId && !logs.some((l) => l.id === drawerLogId)) {
@@ -443,8 +559,12 @@ export default function AdminActivityLogPage() {
       minWidth: 160,
       render: (r) => (
         <Box>
-          <Typography sx={{ fontSize: 12, color: tokens.navy }}>{formatDisplayDate(r.date)}</Typography>
-          <Typography sx={{ fontSize: 10.5, color: tokens.slate }}>{formatTime12h(r.time)}</Typography>
+          <Typography sx={{ fontSize: 12, color: tokens.navy }}>
+            {formatDisplayDate(r.date)}
+          </Typography>
+          <Typography sx={{ fontSize: 10.5, color: tokens.slate }}>
+            {formatTime12h(r.time)}
+          </Typography>
         </Box>
       ),
     },
@@ -470,7 +590,10 @@ export default function AdminActivityLogPage() {
       label: "Details",
       minWidth: 220,
       render: (r) => (
-        <Typography sx={{ fontSize: 12, color: tokens.bodyText, lineHeight: 1.45 }} noWrap>
+        <Typography
+          sx={{ fontSize: 12, color: tokens.bodyText, lineHeight: 1.45 }}
+          noWrap
+        >
           {r.details}
         </Typography>
       ),
@@ -479,7 +602,11 @@ export default function AdminActivityLogPage() {
       id: "ip",
       label: "IP Address",
       render: (r) => (
-        <Typography sx={{ fontSize: 12, color: tokens.navy, fontFamily: "monospace" }}>{r.ipAddress}</Typography>
+        <Typography
+          sx={{ fontSize: 12, color: tokens.navy, fontFamily: "monospace" }}
+        >
+          {r.ipAddress}
+        </Typography>
       ),
     },
     {
@@ -497,11 +624,21 @@ export default function AdminActivityLogPage() {
 
   return (
     <>
-      <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1.5 }}>
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={0.75}
+        sx={{ mb: 1.5 }}
+      >
         <Typography
           component={Link}
           href="/admin/dashboard"
-          sx={{ fontSize: 12, color: tokens.bodyText, textDecoration: "none", "&:hover": { color: tokens.teal } }}
+          sx={{
+            fontSize: 12,
+            color: tokens.bodyText,
+            textDecoration: "none",
+            "&:hover": { color: tokens.teal },
+          }}
         >
           Home
         </Typography>
@@ -521,12 +658,19 @@ export default function AdminActivityLogPage() {
         <Box>
           <Typography
             variant="mainHeading"
-            sx={{ fontSize: { xs: 24, md: 28 }, color: tokens.textcolorgrey700, mb: 0.5 }}
+            sx={{
+              fontSize: { xs: 24, md: 28 },
+              color: tokens.textcolorgrey700,
+              mb: 0.5,
+            }}
           >
             Activity Log
           </Typography>
-          <Typography sx={{ fontSize: 14, color: tokens.bodyText, maxWidth: 640 }}>
-            Track and monitor all activities and actions performed across the platform.
+          <Typography
+            sx={{ fontSize: 14, color: tokens.bodyText, maxWidth: 640 }}
+          >
+            Track and monitor all activities and actions performed across the
+            platform.
           </Typography>
         </Box>
         <AppButton
@@ -545,7 +689,11 @@ export default function AdminActivityLogPage() {
           transformOrigin={{ vertical: "top", horizontal: "right" }}
           slotProps={{
             paper: {
-              sx: { borderRadius: 2, minWidth: 180, border: `1px solid ${tokens.cardBorder}` },
+              sx: {
+                borderRadius: 2,
+                minWidth: 180,
+                border: `1px solid ${tokens.cardBorder}`,
+              },
             },
           }}
         >
@@ -553,7 +701,10 @@ export default function AdminActivityLogPage() {
             <PictureAsPdfOutlinedIcon sx={{ fontSize: 18, color: "#D92D20" }} />
             Download PDF
           </MenuItem>
-          <MenuItem onClick={handleExportExcel} sx={{ fontSize: 13, gap: 1.25 }}>
+          <MenuItem
+            onClick={handleExportExcel}
+            sx={{ fontSize: 13, gap: 1.25 }}
+          >
             <TableChartOutlinedIcon sx={{ fontSize: 18, color: "#2E7D32" }} />
             Download Excel
           </MenuItem>
@@ -571,9 +722,23 @@ export default function AdminActivityLogPage() {
           <AdminSummaryGrid items={summaryItems} embedded />
         </Box>
         {dateRangeLabel ? (
-          <Stack direction="row" alignItems="center" spacing={0.75} sx={{ flexShrink: 0, pb: { md: 0.5 } }}>
-            <CalendarTodayOutlinedIcon sx={{ fontSize: 16, color: tokens.slate }} />
-            <Typography sx={{ fontSize: 12, color: tokens.bodyText, fontWeight: 500, whiteSpace: "nowrap" }}>
+          <Stack
+            direction="row"
+            alignItems="center"
+            spacing={0.75}
+            sx={{ flexShrink: 0, pb: { md: 0.5 } }}
+          >
+            <CalendarTodayOutlinedIcon
+              sx={{ fontSize: 16, color: tokens.slate }}
+            />
+            <Typography
+              sx={{
+                fontSize: 12,
+                color: tokens.bodyText,
+                fontWeight: 500,
+                whiteSpace: "nowrap",
+              }}
+            >
               {dateRangeLabel}
             </Typography>
           </Stack>
@@ -583,7 +748,12 @@ export default function AdminActivityLogPage() {
       <Grid container spacing={1.5} sx={{ mt: 2 }}>
         <Grid size={{ xs: 12, xl: 8 }}>
           <AdminSectionCard noPadding compact>
-            <Box sx={{ p: pad.bodyCompact, borderBottom: `1px solid ${tokens.cardBorder}` }}>
+            <Box
+              sx={{
+                p: pad.bodyCompact,
+                borderBottom: `1px solid ${tokens.cardBorder}`,
+              }}
+            >
               <AdminFilterPanel horizontal>
                 <AdminFilterPanelRow horizontal grow>
                   <AppSearchField
@@ -637,7 +807,12 @@ export default function AdminActivityLogPage() {
                     variant="outlined"
                     startIcon={<RefreshOutlinedIcon />}
                     onClick={resetFilters}
-                    sx={{ textTransform: "none", fontWeight: 600, whiteSpace: "nowrap", height: 40 }}
+                    sx={{
+                      textTransform: "none",
+                      fontWeight: 600,
+                      whiteSpace: "nowrap",
+                      height: 40,
+                    }}
                   >
                     Reset
                   </AppButton>
@@ -674,25 +849,55 @@ export default function AdminActivityLogPage() {
               </Box>
             ) : (
               <Box sx={{ opacity: isFetching ? 0.72 : 1 }}>
-                <AdminDataTable columns={columns} rows={pagedLogs} getRowId={(r) => r.id} dense />
+                <AdminDataTable
+                  columns={columns}
+                  rows={pagedLogs}
+                  getRowId={(r) => r.id}
+                  dense
+                />
               </Box>
             )}
 
-            <Box sx={{ p: pad.bodyCompact, borderTop: `1px solid ${tokens.cardBorder}` }}>
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ sm: "center" }} justifyContent="space-between">
+            <Box
+              sx={{
+                p: pad.bodyCompact,
+                borderTop: `1px solid ${tokens.cardBorder}`,
+              }}
+            >
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={2}
+                alignItems={{ sm: "center" }}
+                justifyContent="space-between"
+              >
                 <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>
-                  Showing {filteredLogs.length === 0 ? 0 : (page - 1) * pageSize + 1} to{" "}
-                  {Math.min(page * pageSize, filteredLogs.length)} of {filteredLogs.length} results
+                  Showing{" "}
+                  {filteredLogs.length === 0 ? 0 : (page - 1) * pageSize + 1} to{" "}
+                  {Math.min(page * pageSize, filteredLogs.length)} of{" "}
+                  {filteredLogs.length} results
                 </Typography>
-                <Stack direction="row" spacing={2} alignItems="center" flexWrap="nowrap">
+                <Stack
+                  direction="row"
+                  spacing={2}
+                  alignItems="center"
+                  flexWrap="nowrap"
+                >
                   <AppSelect
                     value={String(pageSize)}
                     onChange={(e) => setPageSize(Number(e.target.value))}
-                    options={PAGE_SIZE_OPTIONS.map((n) => ({ value: String(n), label: `${n} / page` }))}
+                    options={PAGE_SIZE_OPTIONS.map((n) => ({
+                      value: String(n),
+                      label: `${n} / page`,
+                    }))}
                     size="small"
                     sx={{ minWidth: 110 }}
                   />
-                  <AppPagination count={totalPages} page={page} onChange={(_, p) => setPage(p)} size="small" />
+                  <AppPagination
+                    count={totalPages}
+                    page={page}
+                    onChange={(_, p) => setPage(p)}
+                    size="small"
+                  />
                 </Stack>
               </Stack>
             </Box>
@@ -723,11 +928,16 @@ export default function AdminActivityLogPage() {
         fullWidth
         headerTone="danger"
         footer={
-          <Stack direction="row" spacing={1.5} justifyContent="flex-end" sx={{ px: 2.5, py: 2 }}>
-            <AppButton variant="outlined" onClick={() => setDeleteTarget(null)} sx={{ textTransform: "none" }}>
+          <Stack
+            direction="row"
+            spacing={1.5}
+            justifyContent="flex-end"
+            sx={{ px: 2.5, py: 2 }}
+          >
+            <AppButton tone="secondary" onClick={() => setDeleteTarget(null)}>
               Cancel
             </AppButton>
-            <AppButton variant="contained" color="error" onClick={confirmDelete} sx={{ textTransform: "none" }}>
+            <AppButton tone="danger" onClick={confirmDelete}>
               Delete
             </AppButton>
           </Stack>
@@ -735,15 +945,23 @@ export default function AdminActivityLogPage() {
       >
         <Stack spacing={1.5} sx={{ px: 2.5, py: 2 }}>
           <Stack direction="row" spacing={1.25} alignItems="flex-start">
-            <WarningAmberRoundedIcon sx={{ color: "#DC6803", fontSize: 22, mt: 0.25 }} />
+            <WarningAmberRoundedIcon
+              sx={{ color: "#DC6803", fontSize: 22, mt: 0.25 }}
+            />
             <Box>
-              <Typography sx={{ fontSize: 14, fontWeight: 600, color: tokens.navy }}>
+              <Typography
+                sx={{ fontSize: 14, fontWeight: 600, color: tokens.navy }}
+              >
                 Are you sure you want to delete this activity log entry?
               </Typography>
               {deleteTarget ? (
-                <Typography sx={{ fontSize: 13, color: tokens.bodyText, mt: 0.75 }}>
-                  <strong>{deleteTarget.actionLabel}</strong> by <strong>{deleteTarget.user.name}</strong> on{" "}
-                  {formatDisplayDate(deleteTarget.date)} will be permanently removed.
+                <Typography
+                  sx={{ fontSize: 13, color: tokens.bodyText, mt: 0.75 }}
+                >
+                  <strong>{deleteTarget.actionLabel}</strong> by{" "}
+                  <strong>{deleteTarget.user.name}</strong> on{" "}
+                  {formatDisplayDate(deleteTarget.date)} will be permanently
+                  removed.
                 </Typography>
               ) : null}
             </Box>

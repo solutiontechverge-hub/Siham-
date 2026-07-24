@@ -29,7 +29,7 @@ export default function MarketingResultCard({
         height: "100%",
         borderRadius: "12px",
         bgcolor: "#fff",
-        border: `1px solid ${alpha(m.navy, 0.10)}`,
+        border: `1px solid ${alpha(m.navy, 0.1)}`,
         boxShadow: "0 14px 26px rgba(16, 35, 63, 0.10)",
       }}
     >
@@ -39,7 +39,7 @@ export default function MarketingResultCard({
             width: 36,
             height: 36,
             borderRadius: "50%",
-            bgcolor: alpha(m.teal, 0.10),
+            bgcolor: alpha(m.teal, 0.1),
             color: m.teal,
             display: "grid",
             placeItems: "center",
@@ -70,4 +70,3 @@ export default function MarketingResultCard({
     </Card>
   );
 }
-

@@ -6,13 +6,7 @@ import FitnessCenterOutlinedIcon from "@mui/icons-material/FitnessCenterOutlined
 import FaceRetouchingNaturalOutlinedIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
 import SpaOutlinedIcon from "@mui/icons-material/SpaOutlined";
 import StorefrontOutlinedIcon from "@mui/icons-material/StorefrontOutlined";
-import {
-  Avatar,
-  Box,
-  LinearProgress,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { Avatar, Box, LinearProgress, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import type { SvgIconComponent } from "@mui/icons-material";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
@@ -34,7 +28,10 @@ const CATEGORY_ICONS: Record<ProfessionalCategory, SvgIconComponent> = {
   Barber: StorefrontOutlinedIcon,
 };
 
-const CATEGORY_COLORS: Record<ProfessionalCategory, { bg: string; fg: string }> = {
+const CATEGORY_COLORS: Record<
+  ProfessionalCategory,
+  { bg: string; fg: string }
+> = {
   "Hair & Beauty": { bg: "rgba(33, 184, 191, 0.12)", fg: "#149CA7" },
   "Wellness & Spa": { bg: "rgba(127, 86, 217, 0.12)", fg: "#6941C6" },
   "Fitness & Training": { bg: "rgba(2, 132, 199, 0.12)", fg: "#0284C7" },
@@ -44,7 +41,11 @@ const CATEGORY_COLORS: Record<ProfessionalCategory, { bg: string; fg: string }> 
 
 function formatDisplayDate(iso: string) {
   const d = new Date(`${iso}T00:00:00`);
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 function getInitials(name: string) {
@@ -55,17 +56,34 @@ function getInitials(name: string) {
     .join("");
 }
 
-function SummaryRow({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
+function SummaryRow({
+  label,
+  value,
+  sub,
+}: {
+  label: string;
+  value: string | number;
+  sub?: string;
+}) {
   const tokens = useTheme().palette.mollure;
   return (
-    <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
-      <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>{label}</Typography>
+    <Stack
+      direction="row"
+      justifyContent="space-between"
+      alignItems="center"
+      spacing={1}
+    >
+      <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>
+        {label}
+      </Typography>
       <Stack alignItems="flex-end" spacing={0.15}>
         <Typography sx={{ fontSize: 13, fontWeight: 700, color: tokens.navy }}>
           {typeof value === "number" ? value.toLocaleString() : value}
         </Typography>
         {sub ? (
-          <Typography sx={{ fontSize: 10.5, color: tokens.slate }}>{sub}</Typography>
+          <Typography sx={{ fontSize: 10.5, color: tokens.slate }}>
+            {sub}
+          </Typography>
         ) : null}
       </Stack>
     </Stack>
@@ -74,7 +92,8 @@ function SummaryRow({ label, value, sub }: { label: string; value: string | numb
 
 export function ProfessionalSummaryWidget() {
   const tokens = useTheme().palette.mollure;
-  const { total, verified, pending, rejected, inactive } = professionalManagementSummary;
+  const { total, verified, pending, rejected, inactive } =
+    professionalManagementSummary;
   const pct = (n: number) => `${((n / total) * 100).toFixed(1)}% of total`;
 
   return (
@@ -82,7 +101,11 @@ export function ProfessionalSummaryWidget() {
       <Stack spacing={1.5}>
         <SummaryRow label="Total Professionals" value={total} />
         <SummaryRow label="Verified" value={verified} sub={pct(verified)} />
-        <SummaryRow label="Pending Verification" value={pending} sub={pct(pending)} />
+        <SummaryRow
+          label="Pending Verification"
+          value={pending}
+          sub={pct(pending)}
+        />
         <SummaryRow label="Rejected" value={rejected} sub={pct(rejected)} />
         <SummaryRow label="Inactive" value={inactive} sub={pct(inactive)} />
       </Stack>
@@ -95,8 +118,11 @@ export function ProfessionalSummaryWidget() {
           border: `1px solid ${alpha(tokens.teal, 0.12)}`,
         }}
       >
-        <Typography sx={{ fontSize: 11, color: tokens.bodyText, lineHeight: 1.45 }}>
-          Platform-wide professional metrics. Filter the table to drill into specific segments.
+        <Typography
+          sx={{ fontSize: 11, color: tokens.bodyText, lineHeight: 1.45 }}
+        >
+          Platform-wide professional metrics. Filter the table to drill into
+          specific segments.
         </Typography>
       </Box>
     </AdminSectionCard>
@@ -107,7 +133,10 @@ export function VerificationOverviewWidget() {
   const theme = useTheme();
   const tokens = theme.palette.mollure;
   const [ready, setReady] = React.useState(false);
-  const total = professionalVerificationOverview.reduce((sum, d) => sum + d.value, 0);
+  const total = professionalVerificationOverview.reduce(
+    (sum, d) => sum + d.value,
+    0,
+  );
 
   React.useEffect(() => setReady(true), []);
 
@@ -128,11 +157,18 @@ export function VerificationOverviewWidget() {
                   dataKey="value"
                 >
                   {professionalVerificationOverview.map((_, i) => (
-                    <Cell key={i} fill={ADMIN_CHART_SERIES[i % ADMIN_CHART_SERIES.length]} />
+                    <Cell
+                      key={i}
+                      fill={ADMIN_CHART_SERIES[i % ADMIN_CHART_SERIES.length]}
+                    />
                   ))}
                 </Pie>
                 <Tooltip
-                  contentStyle={{ borderRadius: 10, border: `1px solid ${tokens.cardBorder}`, fontSize: 12 }}
+                  contentStyle={{
+                    borderRadius: 10,
+                    border: `1px solid ${tokens.cardBorder}`,
+                    fontSize: 12,
+                  }}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -146,19 +182,35 @@ export function VerificationOverviewWidget() {
                 pointerEvents: "none",
               }}
             >
-              <Typography sx={{ fontSize: 18, fontWeight: 700, color: tokens.navy }}>
+              <Typography
+                sx={{ fontSize: 18, fontWeight: 700, color: tokens.navy }}
+              >
                 {total.toLocaleString()}
               </Typography>
-              <Typography sx={{ fontSize: 10, color: tokens.slate }}>Total</Typography>
+              <Typography sx={{ fontSize: 10, color: tokens.slate }}>
+                Total
+              </Typography>
             </Box>
           </>
         ) : (
-          <Box sx={{ width: "100%", height: "100%", borderRadius: 2, bgcolor: tokens.surface }} />
+          <Box
+            sx={{
+              width: "100%",
+              height: "100%",
+              borderRadius: 2,
+              bgcolor: tokens.surface,
+            }}
+          />
         )}
       </Box>
       <Stack spacing={1} sx={{ mt: 1.5 }}>
         {professionalVerificationOverview.map((item, i) => (
-          <Stack key={item.name} direction="row" alignItems="center" spacing={1}>
+          <Stack
+            key={item.name}
+            direction="row"
+            alignItems="center"
+            spacing={1}
+          >
             <Box
               sx={{
                 width: 8,
@@ -168,8 +220,14 @@ export function VerificationOverviewWidget() {
                 flexShrink: 0,
               }}
             />
-            <Typography sx={{ fontSize: 11.5, color: tokens.bodyText, flex: 1 }}>{item.name}</Typography>
-            <Typography sx={{ fontSize: 11.5, fontWeight: 600, color: tokens.navy }}>
+            <Typography
+              sx={{ fontSize: 11.5, color: tokens.bodyText, flex: 1 }}
+            >
+              {item.name}
+            </Typography>
+            <Typography
+              sx={{ fontSize: 11.5, fontWeight: 600, color: tokens.navy }}
+            >
               {((item.value / total) * 100).toFixed(1)}%
             </Typography>
           </Stack>
@@ -191,7 +249,12 @@ export function TopCategoriesWidget() {
           const colors = CATEGORY_COLORS[cat.name];
           return (
             <Box key={cat.name}>
-              <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.75 }}>
+              <Stack
+                direction="row"
+                alignItems="center"
+                spacing={1}
+                sx={{ mb: 0.75 }}
+              >
                 <Box
                   sx={{
                     width: 28,
@@ -206,10 +269,19 @@ export function TopCategoriesWidget() {
                 >
                   <Icon sx={{ fontSize: 16 }} />
                 </Box>
-                <Typography sx={{ fontSize: 12, fontWeight: 500, color: tokens.navy, flex: 1 }}>
+                <Typography
+                  sx={{
+                    fontSize: 12,
+                    fontWeight: 500,
+                    color: tokens.navy,
+                    flex: 1,
+                  }}
+                >
                   {cat.name}
                 </Typography>
-                <Typography sx={{ fontSize: 12, fontWeight: 700, color: tokens.navy }}>
+                <Typography
+                  sx={{ fontSize: 12, fontWeight: 700, color: tokens.navy }}
+                >
                   {cat.count.toLocaleString()}
                 </Typography>
               </Stack>
@@ -246,7 +318,12 @@ export function RecentlyJoinedWidget() {
         {recent.map((pro) => {
           const colors = CATEGORY_COLORS[pro.primaryCategory];
           return (
-            <Stack key={pro.id} direction="row" spacing={1.25} alignItems="center">
+            <Stack
+              key={pro.id}
+              direction="row"
+              spacing={1.25}
+              alignItems="center"
+            >
               <Avatar
                 sx={{
                   width: 36,
@@ -260,7 +337,10 @@ export function RecentlyJoinedWidget() {
                 {getInitials(pro.brandName)}
               </Avatar>
               <Box sx={{ minWidth: 0, flex: 1 }}>
-                <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: tokens.navy }} noWrap>
+                <Typography
+                  sx={{ fontSize: 12.5, fontWeight: 600, color: tokens.navy }}
+                  noWrap
+                >
                   {pro.brandName}
                 </Typography>
                 <Typography sx={{ fontSize: 11, color: tokens.bodyText }}>

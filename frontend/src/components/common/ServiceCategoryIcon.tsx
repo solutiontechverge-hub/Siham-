@@ -7,7 +7,9 @@ import type { ServiceCategorySliderIconId } from "../../data/businessServiceCate
 import { resolveServiceCategorySliderIconId } from "../../data/businessServiceCategorySlider.data";
 
 /** Brand SVG assets for service category icons (embedded bitmaps, not tintable). */
-export const SERVICE_CATEGORY_ICON_SRC: Partial<Record<ServiceCategorySliderIconId, string>> = {
+export const SERVICE_CATEGORY_ICON_SRC: Partial<
+  Record<ServiceCategorySliderIconId, string>
+> = {
   hair: "/icons/service-categories/hair.svg",
   makeup: "/icons/service-categories/makeup.svg",
   lashes: "/icons/service-categories/lashes.svg",
@@ -31,7 +33,8 @@ export default function ServiceCategoryIcon({
   fontSize = 20,
   color = "primary.main",
 }: ServiceCategoryIconProps) {
-  const resolved = iconId ?? (label ? resolveServiceCategorySliderIconId(label) : "generic");
+  const resolved =
+    iconId ?? (label ? resolveServiceCategorySliderIconId(label) : "generic");
 
   const src = SERVICE_CATEGORY_ICON_SRC[resolved];
   if (src) {

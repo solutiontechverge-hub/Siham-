@@ -2,12 +2,22 @@
 
 import * as React from "react";
 import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
-import { Box, IconButton, Menu, MenuItem, Stack, Typography } from "@mui/material";
+import {
+  Box,
+  IconButton,
+  Menu,
+  MenuItem,
+  Stack,
+  Typography,
+} from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import MessagingAvatar from "./MessagingAvatar";
 import MessagingReadReceipt from "./MessagingReadReceipt";
 import { isMessageReadByPeer } from "./messagingReadReceiptHelpers";
-import { isImageAttachment, resolveMessagingAttachmentUrl } from "./messagingFileUtils";
+import {
+  isImageAttachment,
+  resolveMessagingAttachmentUrl,
+} from "./messagingFileUtils";
 import { resolveMessageSenderDisplayName } from "./messagingPreview";
 import type { MessagingAudience } from "./messagingRoutes";
 import type { MessagingChatMessage } from "./messagingTypes";
@@ -33,7 +43,11 @@ export default function MessagingMessageBubble({
 }: Props) {
   const m = useTheme().palette.mollure;
   const own = isOwn;
-  const displayName = resolveMessageSenderDisplayName(message, { audience, currentUserName, peerName });
+  const displayName = resolveMessageSenderDisplayName(message, {
+    audience,
+    currentUserName,
+    peerName,
+  });
   const readByPeer = own ? isMessageReadByPeer(message, peerReadAt) : false;
   const isDeleted = message.deletedForEveryone;
   const [menuAnchor, setMenuAnchor] = React.useState<HTMLElement | null>(null);
@@ -45,10 +59,24 @@ export default function MessagingMessageBubble({
       alignItems="flex-start"
       sx={{ alignSelf: own ? "flex-end" : "flex-start", maxWidth: "85%" }}
     >
-      {!own ? <MessagingAvatar seed={message.senderAvatarSeed} label={displayName} size={34} /> : null}
+      {!own ? (
+        <MessagingAvatar
+          seed={message.senderAvatarSeed}
+          label={displayName}
+          size={34}
+        />
+      ) : null}
       <Box sx={{ minWidth: 0, textAlign: own ? "right" : "left" }}>
-        <Stack direction={own ? "row-reverse" : "row"} alignItems="center" spacing={0.5}>
-          <Stack direction={own ? "row-reverse" : "row"} alignItems="baseline" spacing={0.75}>
+        <Stack
+          direction={own ? "row-reverse" : "row"}
+          alignItems="center"
+          spacing={0.5}
+        >
+          <Stack
+            direction={own ? "row-reverse" : "row"}
+            alignItems="baseline"
+            spacing={0.75}
+          >
             <Typography
               sx={{
                 fontWeight: 900,
@@ -67,10 +95,18 @@ export default function MessagingMessageBubble({
             >
               {displayName}
             </Typography>
-            <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: alpha(m.navy, 0.4) }}>
+            <Typography
+              sx={{
+                fontSize: 10.5,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.4),
+              }}
+            >
               {message.timeLabel}
             </Typography>
-            {own && !isDeleted ? <MessagingReadReceipt readByPeer={readByPeer} /> : null}
+            {own && !isDeleted ? (
+              <MessagingReadReceipt readByPeer={readByPeer} />
+            ) : null}
           </Stack>
           {!isDeleted && onRequestDelete ? (
             <IconButton
@@ -113,7 +149,8 @@ export default function MessagingMessageBubble({
         {!isDeleted &&
           message.attachments?.map((att) => {
             const attachmentUrl = resolveMessagingAttachmentUrl(att.url);
-            const canPreview = Boolean(attachmentUrl) && isImageAttachment(att.mimeType);
+            const canPreview =
+              Boolean(attachmentUrl) && isImageAttachment(att.mimeType);
             return (
               <Box
                 key={att.id}
@@ -131,16 +168,44 @@ export default function MessagingMessageBubble({
                       component="img"
                       src={attachmentUrl}
                       alt={att.name}
-                      sx={{ maxWidth: 220, maxHeight: 160, borderRadius: "6px", display: "block" }}
+                      sx={{
+                        maxWidth: 220,
+                        maxHeight: 160,
+                        borderRadius: "6px",
+                        display: "block",
+                      }}
                     />
-                    <Typography sx={{ mt: 0.5, fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.55) }}>{att.name}</Typography>
+                    <Typography
+                      sx={{
+                        mt: 0.5,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: alpha(m.navy, 0.55),
+                      }}
+                    >
+                      {att.name}
+                    </Typography>
                   </>
                 ) : attachmentUrl ? (
-                  <Typography component="a" href={attachmentUrl} target="_blank" rel="noopener noreferrer" sx={{ fontSize: 12, fontWeight: 700 }}>
+                  <Typography
+                    component="a"
+                    href={attachmentUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    sx={{ fontSize: 12, fontWeight: 700 }}
+                  >
                     {att.name}
                   </Typography>
                 ) : (
-                  <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.55) }}>{att.name}</Typography>
+                  <Typography
+                    sx={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: alpha(m.navy, 0.55),
+                    }}
+                  >
+                    {att.name}
+                  </Typography>
                 )}
               </Box>
             );
@@ -151,8 +216,14 @@ export default function MessagingMessageBubble({
         anchorEl={menuAnchor}
         open={Boolean(menuAnchor)}
         onClose={() => setMenuAnchor(null)}
-        anchorOrigin={{ vertical: "bottom", horizontal: own ? "left" : "right" }}
-        transformOrigin={{ vertical: "top", horizontal: own ? "left" : "right" }}
+        anchorOrigin={{
+          vertical: "bottom",
+          horizontal: own ? "left" : "right",
+        }}
+        transformOrigin={{
+          vertical: "top",
+          horizontal: own ? "left" : "right",
+        }}
       >
         <MenuItem
           onClick={() => {

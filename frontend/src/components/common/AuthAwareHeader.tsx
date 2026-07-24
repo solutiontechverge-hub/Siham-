@@ -1,15 +1,9 @@
 "use client";
 
+import AppButton from "./AppButton";
 import * as React from "react";
 import Link from "next/link";
-import {
-  Avatar,
-  Box,
-  Button,
-  Container,
-  Divider,
-  Stack,
-} from "@mui/material";
+import { Avatar, Box, Container, Divider, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText, CardTitle } from "../ui/typography";
 import { useAppSelector } from "../../store/hooks";
@@ -41,7 +35,9 @@ export default function AuthAwareHeader({
 
   const accessToken = useAppSelector((state) => state.auth.accessToken);
   const user = useAppSelector((state) => state.auth.user);
-  const [persisted, setPersisted] = React.useState<ReturnType<typeof getPersistedAuthSession> | null>(null);
+  const [persisted, setPersisted] = React.useState<ReturnType<
+    typeof getPersistedAuthSession
+  > | null>(null);
 
   React.useEffect(() => {
     setPersisted(getPersistedAuthSession());
@@ -51,9 +47,13 @@ export default function AuthAwareHeader({
   const userLabel = user?.email ?? persisted?.user?.email ?? "User";
 
   return (
-    <Box sx={{ bgcolor: alpha(m.teal, 0.10) }}>
+    <Box sx={{ bgcolor: alpha(m.teal, 0.1) }}>
       <Container maxWidth="lg" sx={{ py: 1.25 }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between">
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+        >
           <CardTitle sx={{ color: m.navy, letterSpacing: "-0.02em" }}>
             Mollure
           </CardTitle>
@@ -68,7 +68,9 @@ export default function AuthAwareHeader({
                 border: `1px solid ${alpha(m.navy, 0.08)}`,
               }}
             >
-              <BodyText sx={{ fontSize: 12, color: alpha(m.navy, 0.7) }}>EN</BodyText>
+              <BodyText sx={{ fontSize: 12, color: alpha(m.navy, 0.7) }}>
+                EN
+              </BodyText>
             </Box>
 
             {isAuthed ? (
@@ -85,7 +87,7 @@ export default function AuthAwareHeader({
                 {getInitials(userLabel)}
               </Avatar>
             ) : (
-              <Button
+              <AppButton
                 component={Link}
                 href={signupHref}
                 variant="contained"
@@ -100,7 +102,7 @@ export default function AuthAwareHeader({
                 }}
               >
                 {signupLabel}
-              </Button>
+              </AppButton>
             )}
           </Stack>
         </Stack>
@@ -109,4 +111,3 @@ export default function AuthAwareHeader({
     </Box>
   );
 }
-

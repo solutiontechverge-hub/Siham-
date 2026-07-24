@@ -6,7 +6,11 @@ import { alpha, useTheme } from "@mui/material/styles";
 import AppModal from "../AppModal";
 import MessagingFilterCheckboxList from "./MessagingFilterCheckboxList";
 import { MESSAGE_RETENTION_DAYS } from "./messagingRetention";
-import type { BookingStatusFilter, MessagingPresenceStatus, MessagingSettingsFilters } from "./messagingTypes";
+import type {
+  BookingStatusFilter,
+  MessagingPresenceStatus,
+  MessagingSettingsFilters,
+} from "./messagingTypes";
 
 const AUTO_DELETE_OPTIONS: { key: BookingStatusFilter; label: string }[] = [
   { key: "completed", label: "Completed bookings" },
@@ -16,7 +20,11 @@ const AUTO_DELETE_OPTIONS: { key: BookingStatusFilter; label: string }[] = [
   { key: "unlinked", label: "Unlinked" },
 ];
 
-const PRESENCE_OPTIONS: { key: MessagingPresenceStatus; label: string; color: string }[] = [
+const PRESENCE_OPTIONS: {
+  key: MessagingPresenceStatus;
+  label: string;
+  color: string;
+}[] = [
   { key: "online", label: "Online (automatic)", color: "#4CAF50" },
   { key: "busy", label: "Busy", color: "#FF9800" },
   { key: "offline", label: "Offline", color: "#F44336" },
@@ -47,7 +55,15 @@ function SettingsContent({
 
   return (
     <>
-      <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.55), mb: 1, mt: 0.5 }}>
+      <Typography
+        sx={{
+          fontSize: 12.5,
+          fontWeight: 800,
+          color: alpha(m.navy, 0.55),
+          mb: 1,
+          mt: 0.5,
+        }}
+      >
         Status
       </Typography>
       <Stack spacing={0.75} sx={{ mb: 2.5 }}>
@@ -74,8 +90,21 @@ function SettingsContent({
               }}
             >
               <Stack direction="row" alignItems="center" spacing={1}>
-                <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: option.color }} />
-                <Typography sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.72) }}>
+                <Box
+                  sx={{
+                    width: 10,
+                    height: 10,
+                    borderRadius: "50%",
+                    bgcolor: option.color,
+                  }}
+                />
+                <Typography
+                  sx={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.72),
+                  }}
+                >
                   {option.label}
                 </Typography>
               </Stack>
@@ -84,17 +113,36 @@ function SettingsContent({
         })}
       </Stack>
 
-      <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.55), mb: 1, mt: 0.75 }}>
+      <Typography
+        sx={{
+          fontSize: 12.5,
+          fontWeight: 800,
+          color: alpha(m.navy, 0.55),
+          mb: 1,
+          mt: 0.75,
+        }}
+      >
         Auto delete messages of
       </Typography>
       <MessagingFilterCheckboxList
         options={AUTO_DELETE_OPTIONS}
         checked={filters as Record<string, boolean>}
-        onToggle={(key, value) => onChange({ ...filters, [key as BookingStatusFilter]: value })}
+        onToggle={(key, value) =>
+          onChange({ ...filters, [key as BookingStatusFilter]: value })
+        }
       />
 
-      <Typography sx={{ mt: 2.5, fontSize: 11.5, fontWeight: 600, color: alpha(m.navy, 0.45), lineHeight: 1.5 }}>
-        Messages are kept for {MESSAGE_RETENTION_DAYS} days. Older messages are automatically deleted for everyone.
+      <Typography
+        sx={{
+          mt: 2.5,
+          fontSize: 11.5,
+          fontWeight: 600,
+          color: alpha(m.navy, 0.45),
+          lineHeight: 1.5,
+        }}
+      >
+        Messages are kept for {MESSAGE_RETENTION_DAYS} days. Older messages are
+        automatically deleted for everyone.
       </Typography>
     </>
   );

@@ -21,7 +21,10 @@ type AdminDashboardHeaderProps = {
   onRangeChange: (range: AdminDashboardRangeValue) => void;
 };
 
-export default function AdminDashboardHeader({ range, onRangeChange }: AdminDashboardHeaderProps) {
+export default function AdminDashboardHeader({
+  range,
+  onRangeChange,
+}: AdminDashboardHeaderProps) {
   const theme = useTheme();
   const tokens = theme.palette.mollure;
   const [search, setSearch] = React.useState("");
@@ -34,8 +37,15 @@ export default function AdminDashboardHeader({ range, onRangeChange }: AdminDash
       spacing={2}
       sx={{ mb: 2 }}
     >
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ sm: "center" }}>
-        <Typography variant="mainHeading" sx={{ fontSize: { xs: 26, md: 30 }, whiteSpace: "nowrap" }}>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={2}
+        alignItems={{ sm: "center" }}
+      >
+        <Typography
+          variant="mainHeading"
+          sx={{ fontSize: { xs: 26, md: 30 }, whiteSpace: "nowrap" }}
+        >
           Dashboard
         </Typography>
         <Box sx={{ minWidth: { xs: "100%", sm: 220 } }}>
@@ -43,13 +53,21 @@ export default function AdminDashboardHeader({ range, onRangeChange }: AdminDash
         </Box>
       </Stack>
 
-      <Stack direction="row" spacing={1.5} alignItems="center" justifyContent="flex-end">
+      <Stack
+        direction="row"
+        spacing={1.5}
+        alignItems="center"
+        justifyContent="flex-end"
+      >
         <AppSearchField
           placeholder="Search anything..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           size="small"
-          sx={{ width: { xs: "100%", sm: 260 }, display: { xs: "none", md: "block" } }}
+          sx={{
+            width: { xs: "100%", sm: 260 },
+            display: { xs: "none", md: "block" },
+          }}
         />
         <IconButton
           sx={{
@@ -88,10 +106,19 @@ export default function AdminDashboardHeader({ range, onRangeChange }: AdminDash
             AU
           </Avatar>
           <Box sx={{ display: { xs: "none", sm: "block" } }}>
-            <Typography sx={{ fontSize: 13, fontWeight: 600, color: tokens.navy, lineHeight: 1.2 }}>
+            <Typography
+              sx={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: tokens.navy,
+                lineHeight: 1.2,
+              }}
+            >
               Admin User
             </Typography>
-            <Typography sx={{ fontSize: 11, color: tokens.slate }}>Super Admin</Typography>
+            <Typography sx={{ fontSize: 11, color: tokens.slate }}>
+              Super Admin
+            </Typography>
           </Box>
         </Stack>
       </Stack>
@@ -118,7 +145,13 @@ export function AdminDashboardFooter() {
   );
 }
 
-export function AdminSectionLink({ href, label }: { href: string; label: string }) {
+export function AdminSectionLink({
+  href,
+  label,
+}: {
+  href: string;
+  label: string;
+}) {
   const tokens = useTheme().palette.mollure;
 
   return (

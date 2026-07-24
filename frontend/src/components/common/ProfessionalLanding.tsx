@@ -1,10 +1,10 @@
 "use client";
 
+import AppButton from "./AppButton";
 import * as React from "react";
 import Image from "next/image";
 import {
   Box,
-  Button,
   Card,
   CardContent,
   Chip,
@@ -15,9 +15,12 @@ import {
   Stack,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
-import { MOLLURE_HEADING_BODY_GAP_PX, MOLLURE_SECTION_GAP_PX } from "../../theme/spacing";
+import {
+  MOLLURE_HEADING_BODY_GAP_PX,
+  MOLLURE_SECTION_GAP_PX,
+} from "../../theme/spacing";
 import MarketingSectionHeading from "./MarketingSectionHeading";
 import MarketingSiteFooter from "./MarketingSiteFooter";
 import MollureMarketingHeader from "./MollureMarketingHeader";
@@ -165,13 +168,11 @@ export default function ProfessionalLanding({
                     px: 0.95,
                   }}
                 />
-                <MarketingHeroTitle>
-                  {hero.title}
-                </MarketingHeroTitle>
+                <MarketingHeroTitle>{hero.title}</MarketingHeroTitle>
                 <MarketingHeroDescription>
                   {hero.description}
                 </MarketingHeroDescription>
-                <Button
+                <AppButton
                   variant="contained"
                   disableElevation
                   sx={{
@@ -189,7 +190,7 @@ export default function ProfessionalLanding({
                   }}
                 >
                   {hero.primaryAction}
-                </Button>
+                </AppButton>
               </Stack>
             </Grid>
 
@@ -293,12 +294,8 @@ export default function ProfessionalLanding({
                       },
                     }}
                   >
-                    <MarketingKpiTitle>
-                      {c.title}
-                    </MarketingKpiTitle>
-                    <MarketingKpiSubtitle>
-                      {c.subtitle}
-                    </MarketingKpiSubtitle>
+                    <MarketingKpiTitle>{c.title}</MarketingKpiTitle>
+                    <MarketingKpiSubtitle>{c.subtitle}</MarketingKpiSubtitle>
                   </Box>
                 </Grid>
               ))}
@@ -324,11 +321,14 @@ export default function ProfessionalLanding({
       </Container>
 
       {/* Results */}
-      <Box sx={{ bgcolor: "background.default", py: `${MOLLURE_SECTION_GAP_PX}px` }}>
+      <Box
+        sx={{
+          bgcolor: "background.default",
+          py: `${MOLLURE_SECTION_GAP_PX}px`,
+        }}
+      >
         <Container maxWidth="lg">
-          <MarketingSectionTitle>
-            {results.title}
-          </MarketingSectionTitle>
+          <MarketingSectionTitle>{results.title}</MarketingSectionTitle>
           <MarketingSectionSubtitle>
             {results.subtitle}
           </MarketingSectionSubtitle>
@@ -363,7 +363,12 @@ export default function ProfessionalLanding({
       </Box>
 
       {/* Pricing */}
-      <Box sx={{ bgcolor: "background.default", py: `${MOLLURE_SECTION_GAP_PX}px` }}>
+      <Box
+        sx={{
+          bgcolor: "background.default",
+          py: `${MOLLURE_SECTION_GAP_PX}px`,
+        }}
+      >
         <Container maxWidth="lg">
           <MarketingSectionTitle
             sx={{
@@ -538,7 +543,7 @@ export default function ProfessionalLanding({
                           ))}
                         </Stack>
 
-                        <Button
+                        <AppButton
                           variant="contained"
                           disableElevation
                           sx={{
@@ -554,7 +559,7 @@ export default function ProfessionalLanding({
                           }}
                         >
                           {pricing.cardCta}
-                        </Button>
+                        </AppButton>
                       </Stack>
                     </CardContent>
                   </Card>
@@ -644,7 +649,7 @@ export default function ProfessionalLanding({
             >
               {cta.subtitle}
             </Typography>
-            <Button
+            <AppButton
               variant="contained"
               disableElevation
               sx={{
@@ -658,8 +663,7 @@ export default function ProfessionalLanding({
               }}
             >
               {cta.action}
-            </Button>
-
+            </AppButton>
 
             <Typography
               sx={{

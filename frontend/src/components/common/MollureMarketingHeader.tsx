@@ -1,5 +1,6 @@
 "use client";
 
+import AppButton from "./AppButton";
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
@@ -7,7 +8,16 @@ import { usePathname } from "next/navigation";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import LanguageRoundedIcon from "@mui/icons-material/LanguageRounded";
 import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneRounded";
-import { Avatar, Badge, Box, Button, Container, Divider, IconButton, Stack, Typography } from "@mui/material";
+import {
+  Avatar,
+  Badge,
+  Box,
+  Container,
+  Divider,
+  IconButton,
+  Stack,
+  Typography,
+} from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { Logo } from "../../../images";
 import { HeaderNavText } from "../ui/typography";
@@ -128,23 +138,36 @@ export default function MollureMarketingHeader({
   const m = theme.palette.mollure;
   const accessToken = useAppSelector((state) => state.auth.accessToken);
   const user = useAppSelector((state) => state.auth.user);
-  const [persisted, setPersisted] = React.useState<ReturnType<typeof getPersistedAuthSession> | null>(null);
+  const [persisted, setPersisted] = React.useState<ReturnType<
+    typeof getPersistedAuthSession
+  > | null>(null);
   const pathname = usePathname() ?? "";
   const pathForActive = activePath ?? pathname;
-  const isProfessionalsRoute = pathForActive === "/professionals" || pathForActive.startsWith("/professionals/");
+  const isProfessionalsRoute =
+    pathForActive === "/professionals" ||
+    pathForActive.startsWith("/professionals/");
   const resolvedLoginLabel = primaryActionLabel ?? loginLabel ?? "login";
   const resolvedLoginHref = primaryActionHref ?? loginHref ?? "/auth/login";
   const derivedAuthed = Boolean(accessToken || persisted?.accessToken);
   const isAuthed = isAuthedProp ?? derivedAuthed;
-  const userLabel = userLabelProp ?? user?.email ?? persisted?.user?.email ?? "user@example.com";
+  const userLabel =
+    userLabelProp ??
+    user?.email ??
+    persisted?.user?.email ??
+    "user@example.com";
   const resolvedUserName = toDisplayName(userName, userLabel);
   const userType = user?.user_type ?? persisted?.user?.user_type ?? null;
-  const isProfessionalContext = userType === "professional" || isProfessionalsRoute;
+  const isProfessionalContext =
+    userType === "professional" || isProfessionalsRoute;
   const resolvedHomeHref =
     homeHref === "/" && isProfessionalContext ? "/professionals" : homeHref;
   const showNotifications = Boolean(isAuthed);
-  const { data: notificationsData } = useGetMyNotificationsQuery(undefined, { skip: !showNotifications });
-  const { data: unreadData } = useGetUnreadNotificationCountQuery(undefined, { skip: !showNotifications });
+  const { data: notificationsData } = useGetMyNotificationsQuery(undefined, {
+    skip: !showNotifications,
+  });
+  const { data: unreadData } = useGetUnreadNotificationCountQuery(undefined, {
+    skip: !showNotifications,
+  });
   const [markNotificationRead] = useMarkNotificationReadMutation();
   const [markAllNotificationsRead] = useMarkAllNotificationsReadMutation();
   const notificationItems = React.useMemo(
@@ -153,7 +176,9 @@ export default function MollureMarketingHeader({
   );
   const unreadCount = unreadData?.data?.count ?? 0;
   const [mounted, setMounted] = React.useState(false);
-  const [profileAnchor, setProfileAnchor] = React.useState<HTMLElement | null>(null);
+  const [profileAnchor, setProfileAnchor] = React.useState<HTMLElement | null>(
+    null,
+  );
   const openProfileMenu = (anchor: HTMLElement) => setProfileAnchor(anchor);
   const closeProfileMenu = () => setProfileAnchor(null);
   const [notificationsOpen, setNotificationsOpen] = React.useState(false);
@@ -179,23 +204,7 @@ export default function MollureMarketingHeader({
 
   const pillOutlineSx = {
     ...pillBaseSx,
-    bgcolor: "#fff",
-    borderColor: alpha(m.navy, 0.22),
-    color: alpha(m.navy, 0.86),
     fontWeight: 500,
-    "&:hover": {
-      borderColor: alpha(m.navy, 0.32),
-      bgcolor: alpha(m.navy, 0.03),
-    },
-  };
-
-  const pillPrimarySx = {
-    ...pillBaseSx,
-    bgcolor: m.teal,
-    color: "#fff",
-    fontWeight: 500,
-    boxShadow: "none",
-    "&:hover": { bgcolor: m.tealDark, boxShadow: "none" },
   };
 
   const audienceSwitchSx = {
@@ -216,7 +225,9 @@ export default function MollureMarketingHeader({
           top: 0,
           zIndex: 10,
           bgcolor: "#fff",
-          borderBottom: bottomBorder ? `1px solid ${alpha(m.teal, 0.45)}` : "none",
+          borderBottom: bottomBorder
+            ? `1px solid ${alpha(m.teal, 0.45)}`
+            : "none",
         }}
       >
         <Container
@@ -250,9 +261,20 @@ export default function MollureMarketingHeader({
               <Box
                 component={Link}
                 href={resolvedHomeHref}
-                sx={{ display: "inline-flex", alignItems: "center", flexShrink: 0, minWidth: 0 }}
+                sx={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  flexShrink: 0,
+                  minWidth: 0,
+                }}
               >
-                <Image src={Logo} alt="Mollure" width={160} height={38} priority />
+                <Image
+                  src={Logo}
+                  alt="Mollure"
+                  width={160}
+                  height={38}
+                  priority
+                />
               </Box>
             </Box>
 
@@ -279,7 +301,9 @@ export default function MollureMarketingHeader({
                       sx={{
                         lineHeight: 1.25,
                         fontWeight: active ? 600 : 500,
-                        color: active ? alpha(m.navy, 0.92) : alpha(m.navy, 0.58),
+                        color: active
+                          ? alpha(m.navy, 0.92)
+                          : alpha(m.navy, 0.58),
                         textDecoration: "none",
                         whiteSpace: "nowrap",
                         "&:hover": { color: m.navy },
@@ -323,10 +347,18 @@ export default function MollureMarketingHeader({
                   minWidth: 0,
                 }}
               >
-                <Button
-                  variant="outlined"
-                  startIcon={<LanguageRoundedIcon sx={{ fontSize: 20, color: alpha(m.navy, 0.9) }} />}
-                  endIcon={<ExpandMoreRoundedIcon sx={{ fontSize: 20, color: alpha(m.navy, 0.55) }} />}
+                <AppButton
+                  tone="secondary"
+                  startIcon={
+                    <LanguageRoundedIcon
+                      sx={{ fontSize: 20, color: alpha(m.navy, 0.9) }}
+                    />
+                  }
+                  endIcon={
+                    <ExpandMoreRoundedIcon
+                      sx={{ fontSize: 20, color: alpha(m.navy, 0.55) }}
+                    />
+                  }
                   sx={{
                     ...pillOutlineSx,
                     minWidth: { xs: 84, sm: 84, md: 92 },
@@ -337,7 +369,7 @@ export default function MollureMarketingHeader({
                   }}
                 >
                   {localeLabel}
-                </Button>
+                </AppButton>
 
                 {isAuthed ? (
                   <>
@@ -353,10 +385,21 @@ export default function MollureMarketingHeader({
                         }}
                       >
                         <Badge
-                          badgeContent={unreadCount > 0 ? (unreadCount > 9 ? "9+" : unreadCount) : 0}
+                          badgeContent={
+                            unreadCount > 0
+                              ? unreadCount > 9
+                                ? "9+"
+                                : unreadCount
+                              : 0
+                          }
                           color="error"
                           sx={{
-                            "& .MuiBadge-badge": { fontSize: 10, minWidth: 18, height: 18, fontWeight: 900 },
+                            "& .MuiBadge-badge": {
+                              fontSize: 10,
+                              minWidth: 18,
+                              height: 18,
+                              fontWeight: 900,
+                            },
                           }}
                         >
                           <NotificationsNoneRoundedIcon sx={{ fontSize: 22 }} />
@@ -384,7 +427,11 @@ export default function MollureMarketingHeader({
                           fontSize: 13,
                         }}
                       >
-                        {userAvatarSrc ? null : mounted ? getInitials(userLabel) : "U"}
+                        {userAvatarSrc
+                          ? null
+                          : mounted
+                            ? getInitials(userLabel)
+                            : "U"}
                       </Avatar>
                       <Typography
                         sx={{
@@ -401,30 +448,33 @@ export default function MollureMarketingHeader({
                       >
                         {mounted ? resolvedUserName : ""}
                       </Typography>
-                      <ExpandMoreRoundedIcon sx={{ fontSize: 22, color: alpha(m.navy, 0.55) }} />
+                      <ExpandMoreRoundedIcon
+                        sx={{ fontSize: 22, color: alpha(m.navy, 0.55) }}
+                      />
                     </Stack>
                   </>
                 ) : (
-                  <Button
+                  <AppButton
                     component={Link}
                     href={resolvedLoginHref}
-                    variant="contained"
-                    disableElevation
+                    tone="primary"
                     sx={{
-                      ...pillPrimarySx,
+                      ...pillBaseSx,
+                      fontWeight: 500,
+                      boxShadow: "none",
                       minWidth: { xs: 92, sm: 100, md: 108 },
                     }}
                   >
                     {resolvedLoginLabel}
-                  </Button>
+                  </AppButton>
                 )}
 
                 {!isAuthed && professionalLinkLabel ? (
                   professionalHref ? (
-                    <Button
+                    <AppButton
                       component={Link}
                       href={professionalHref}
-                      variant="outlined"
+                      tone="secondary"
                       sx={{
                         ...audienceSwitchSx,
                         display: "inline-flex",
@@ -434,7 +484,7 @@ export default function MollureMarketingHeader({
                       }}
                     >
                       {professionalLinkLabel}
-                    </Button>
+                    </AppButton>
                   ) : (
                     <Typography
                       sx={{

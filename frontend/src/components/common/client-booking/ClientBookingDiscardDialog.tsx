@@ -1,6 +1,9 @@
 "use client";
 
-import AppModal, { MessagingModalCancelButton, MessagingModalPrimaryButton } from "../AppModal";
+import AppModal, {
+  MessagingModalCancelButton,
+  MessagingModalPrimaryButton,
+} from "../AppModal";
 
 type Props = {
   open: boolean;
@@ -8,7 +11,11 @@ type Props = {
   onConfirm: () => void;
 };
 
-export default function ClientBookingDiscardDialog({ open, onClose, onConfirm }: Props) {
+export default function ClientBookingDiscardDialog({
+  open,
+  onClose,
+  onConfirm,
+}: Props) {
   return (
     <AppModal
       contentSx={{ px: 2.5, py: 1 }}

@@ -3,7 +3,10 @@
 import { Box, Container } from "@mui/material";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { AppPillTabs } from "../../../components/common";
-import { CLIENT_BOOKING_PILL_TABS, parseBookingListTab } from "./bookingPillTabs";
+import {
+  CLIENT_BOOKING_PILL_TABS,
+  parseBookingListTab,
+} from "./bookingPillTabs";
 import type { BookingListTab } from "./clientBookingRecords";
 
 type Props = {
@@ -26,13 +29,20 @@ export default function ClientBookingPillTabsBar({ active }: Props) {
     }
     params.delete("view");
     const query = params.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    router.replace(query ? `${pathname}?${query}` : pathname, {
+      scroll: false,
+    });
   };
 
   return (
     <Container maxWidth="lg" sx={{ px: { xs: 2, sm: 3, md: 4 }, pb: 0, pt: 1 }}>
       <Box>
-        <AppPillTabs tabs={CLIENT_BOOKING_PILL_TABS} active={active} onChange={handleChange} alignStart />
+        <AppPillTabs
+          tabs={CLIENT_BOOKING_PILL_TABS}
+          active={active}
+          onChange={handleChange}
+          alignStart
+        />
       </Box>
     </Container>
   );

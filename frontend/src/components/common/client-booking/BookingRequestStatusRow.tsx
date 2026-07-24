@@ -3,15 +3,22 @@
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import { Box, Chip, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import type { BookingRequestDirection, ClientBookingStatus } from "../../../app/clients/booking/clientBookingRecords";
-import { bookingStatusChipColors, bookingStatusLabel } from "../../../app/clients/booking/clientBookingStatus";
+import type {
+  BookingRequestDirection,
+  ClientBookingStatus,
+} from "../../../app/clients/booking/clientBookingRecords";
+import {
+  bookingStatusChipColors,
+  bookingStatusLabel,
+} from "../../../app/clients/booking/clientBookingStatus";
 import BookingRequestBadge from "../calendar/BookingRequestBadge";
 import BookingRequestReceivedIcon from "../calendar/BookingRequestReceivedIcon";
 import EditRequestIndicatorIcon from "./EditRequestIndicatorIcon";
 import PrepaymentPayNowIcon from "./PrepaymentPayNowIcon";
 import PaymentDueIcon from "./PaymentDueIcon";
 
-export type BookingRequestRowMode = "default" | "professional_suggested" | "professional_rejected";
+export type BookingRequestRowMode =
+  "default" | "professional_suggested" | "professional_rejected";
 
 type Props = {
   bookingStatus: ClientBookingStatus;
@@ -38,12 +45,16 @@ export default function BookingRequestStatusRow({
 }: Props) {
   const m = useTheme().palette.mollure;
   const isEbrIncoming = rowMode === "professional_suggested";
-  const isEbrRejected = rowMode === "professional_rejected" && bookingStatus === "cancelled";
+  const isEbrRejected =
+    rowMode === "professional_rejected" && bookingStatus === "cancelled";
   const showErPill = rowMode === "professional_rejected" && !isEbrRejected;
   const isDraft = bookingStatus === "draft";
   const isCompleted = bookingStatus === "completed";
   const waitingForPrepayment =
-    requiresPrepayment && !prepaymentPaid && !isCompleted && bookingStatus !== "cancelled";
+    requiresPrepayment &&
+    !prepaymentPaid &&
+    !isCompleted &&
+    bookingStatus !== "cancelled";
   const showPaymentIcon = waitingForPrepayment || paymentDue;
 
   const showBrPill =
@@ -55,11 +66,15 @@ export default function BookingRequestStatusRow({
     rowMode === "default" &&
     (isDraft
       ? bookingRequestSent || editRequestPending
-      : bookingRequestSent || bookingStatus === "requested" || editRequestPending);
+      : bookingRequestSent ||
+        bookingStatus === "requested" ||
+        editRequestPending);
   const brAccepted = bookingStatus === "confirmed";
   const brRejected = bookingStatus === "cancelled" || isEbrRejected;
 
-  const resolvedStatusForChip: ClientBookingStatus = isEbrIncoming ? "requested" : bookingStatus;
+  const resolvedStatusForChip: ClientBookingStatus = isEbrIncoming
+    ? "requested"
+    : bookingStatus;
   const chipColors = isEbrRejected
     ? {
         bgcolor: "rgba(229, 115, 115, 0.22)",
@@ -67,8 +82,11 @@ export default function BookingRequestStatusRow({
         border: "1px solid rgba(229, 115, 115, 0.35)",
       }
     : bookingStatusChipColors(resolvedStatusForChip, { paymentDue });
-  const chipLabel = isEbrRejected ? "Invalid" : bookingStatusLabel(resolvedStatusForChip, { paymentDue });
-  const isConfirmedChip = !isEbrRejected && !paymentDue && resolvedStatusForChip === "confirmed";
+  const chipLabel = isEbrRejected
+    ? "Invalid"
+    : bookingStatusLabel(resolvedStatusForChip, { paymentDue });
+  const isConfirmedChip =
+    !isEbrRejected && !paymentDue && resolvedStatusForChip === "confirmed";
 
   return (
     <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
@@ -89,10 +107,24 @@ export default function BookingRequestStatusRow({
           title="Edited booking request incoming"
           aria-label="EBR Incoming"
         >
-          <Typography sx={{ fontWeight: 900, fontSize: 11, color: "#fff", lineHeight: 1, letterSpacing: "0.01em" }}>
+          <Typography
+            sx={{
+              fontWeight: 900,
+              fontSize: 11,
+              color: "#fff",
+              lineHeight: 1,
+              letterSpacing: "0.01em",
+            }}
+          >
             EBR Incoming
           </Typography>
-          <Box sx={{ display: "grid", placeItems: "center", "& svg path": { stroke: "#fff" } }}>
+          <Box
+            sx={{
+              display: "grid",
+              placeItems: "center",
+              "& svg path": { stroke: "#fff" },
+            }}
+          >
             <BookingRequestReceivedIcon size={11} />
           </Box>
         </Box>
@@ -102,7 +134,12 @@ export default function BookingRequestStatusRow({
         size="small"
         icon={
           isConfirmedChip ? (
-            <CheckCircleRoundedIcon sx={{ fontSize: "15px !important", color: `${chipColors.color} !important` }} />
+            <CheckCircleRoundedIcon
+              sx={{
+                fontSize: "15px !important",
+                color: `${chipColors.color} !important`,
+              }}
+            />
           ) : undefined
         }
         sx={{
@@ -129,7 +166,14 @@ export default function BookingRequestStatusRow({
             border: `1px solid ${alpha(m.navy, 0.08)}`,
           }}
         >
-          <Typography sx={{ fontWeight: 900, fontSize: 12.5, color: alpha(m.navy, 0.55), letterSpacing: "0.02em" }}>
+          <Typography
+            sx={{
+              fontWeight: 900,
+              fontSize: 12.5,
+              color: alpha(m.navy, 0.55),
+              letterSpacing: "0.02em",
+            }}
+          >
             ER
           </Typography>
           <EditRequestIndicatorIcon variant="rejected" />
@@ -149,7 +193,11 @@ export default function BookingRequestStatusRow({
           title={paymentDue ? "Payment due" : "Waiting for payment"}
           aria-label={paymentDue ? "Payment due" : "Waiting for payment"}
         >
-          {paymentDue ? <PaymentDueIcon size={22} /> : <PrepaymentPayNowIcon size={22} />}
+          {paymentDue ? (
+            <PaymentDueIcon size={22} />
+          ) : (
+            <PrepaymentPayNowIcon size={22} />
+          )}
         </Box>
       ) : null}
       {showBrPill ? (

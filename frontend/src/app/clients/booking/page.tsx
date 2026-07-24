@@ -1,11 +1,11 @@
 "use client";
 
+import AppButton from "../../../components/common/AppButton";
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   Box,
-  Button,
   ButtonBase,
   Checkbox,
   Chip,
@@ -37,8 +37,17 @@ import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
 import ModeEditOutlineRoundedIcon from "@mui/icons-material/ModeEditOutlineRounded";
-import { AppDropdown, ClientPageTabsBar, clientTopTabsActiveLabel, MarketingSiteFooter, MollureMarketingHeader } from "../../../components/common";
-import AppModal, { MessagingModalCancelButton, MessagingModalPrimaryButton } from "../../../components/common/AppModal";
+import {
+  AppDropdown,
+  ClientPageTabsBar,
+  clientTopTabsActiveLabel,
+  MarketingSiteFooter,
+  MollureMarketingHeader,
+} from "../../../components/common";
+import AppModal, {
+  MessagingModalCancelButton,
+  MessagingModalPrimaryButton,
+} from "../../../components/common/AppModal";
 import { ServiceSummaryMetaLine } from "../../../components/common/ServiceSummaryMetaLine";
 import {
   CLIENT_BOOKING_MIN_LEAD_ERROR,
@@ -63,7 +72,10 @@ import { resolveCreateCheckoutPath } from "./resolveCreateBookingStatus";
 import { submitClientBookingRequest } from "./submitClientBookingRequest";
 import { useSnackbar } from "../../../components/common/AppSnackbar";
 import { getApiErrorMessage } from "../../../lib/api-error";
-import { getServicesForLocationMode, getTeamForLocationMode } from "../../../data/businessPublicProfile.data";
+import {
+  getServicesForLocationMode,
+  getTeamForLocationMode,
+} from "../../../data/businessPublicProfile.data";
 import { useBusinessPublicProfile } from "../../../hooks/useBusinessPublicProfile";
 import { extractUuidFromSyntheticId } from "./clientBookingApi.mapper";
 import { enrichClientBookingRecord } from "./clientBookingDraftCache";
@@ -77,12 +89,17 @@ import {
   type ProfessionalProfile,
   type ProfileResponse,
 } from "../../../store/services/profileApi";
-import { useCreateBookingMutation, useUploadBookingAttachmentsMutation } from "../../../store/services/businessApi";
+import {
+  useCreateBookingMutation,
+  useUploadBookingAttachmentsMutation,
+} from "../../../store/services/businessApi";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function resolveNameFromProfileResponse(profile: ProfileResponse | null | undefined): string {
+function resolveNameFromProfileResponse(
+  profile: ProfileResponse | null | undefined,
+): string {
   if (!profile) return "";
   if (profile.user_type === "company") {
     const companyProfile = profile.profile as CompanyProfile | null;
@@ -108,13 +125,22 @@ function resolveNameFromProfileResponse(profile: ProfileResponse | null | undefi
   );
 }
 
-function resolveRequesterDisplayName(user: unknown, profileResponse?: ProfileResponse | null): string {
+function resolveRequesterDisplayName(
+  user: unknown,
+  profileResponse?: ProfileResponse | null,
+): string {
   const fromApi = resolveNameFromProfileResponse(profileResponse);
   if (fromApi) return fromApi;
 
-  const u = user as { display_name?: string; first_name?: string; last_name?: string; email?: string } | null;
+  const u = user as {
+    display_name?: string;
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+  } | null;
   const fromAuthUser =
-    u?.display_name?.trim() || `${u?.first_name ?? ""} ${u?.last_name ?? ""}`.trim();
+    u?.display_name?.trim() ||
+    `${u?.first_name ?? ""} ${u?.last_name ?? ""}`.trim();
   if (fromAuthUser) return fromAuthUser;
 
   return "Guest";
@@ -126,7 +152,10 @@ function isServiceTeamAssigned(service: { teamMemberId: string | null }) {
 
 const FIXED_LOCATION_MAX_GUESTS = 1;
 
-function isAdditionalGuest(p: { isRequester: boolean; participantType?: "model" | "planning" | "guest" }) {
+function isAdditionalGuest(p: {
+  isRequester: boolean;
+  participantType?: "model" | "planning" | "guest";
+}) {
   return !p.isRequester && p.participantType === "guest";
 }
 
@@ -136,7 +165,8 @@ function ClientBookingCreateView() {
   const fromProfile = searchParams?.get("from") === "profile";
   const profileHydrationToken = searchParams?.get("t") ?? "";
   const isEbrSuggest = searchParams?.get("ebrSuggest") === "1";
-  const ebrFocus = searchParams?.get("ebrFocus") as "datetime" | "services" | "project" | null;
+  const ebrFocus = searchParams?.get("ebrFocus") as
+    "datetime" | "services" | "project" | null;
   const isConfirmedEbrEdit =
     isEbrSuggest && getActiveBookingSession()?.status === "confirmed";
   const { showSnackbar } = useSnackbar();
@@ -157,7 +187,8 @@ function ClientBookingCreateView() {
     locationMode?: "fixed" | "desired";
   } | null>(null);
 
-  const { profile: businessProfile, setups: businessSetups } = useBusinessPublicProfile(shop?.shopId);
+  const { profile: businessProfile, setups: businessSetups } =
+    useBusinessPublicProfile(shop?.shopId);
   const bookingSetup = React.useMemo(
     () => businessSetups.find((row) => row.id === shop?.shopId) ?? null,
     [businessSetups, shop?.shopId],
@@ -172,7 +203,10 @@ function ClientBookingCreateView() {
     return next;
   };
   const today0 = React.useMemo(() => startOfDay(new Date()), []);
-  const isPastDay = React.useCallback((d: Date) => startOfDay(d).getTime() < today0.getTime(), [today0]);
+  const isPastDay = React.useCallback(
+    (d: Date) => startOfDay(d).getTime() < today0.getTime(),
+    [today0],
+  );
 
   const toISO = (d: Date) => {
     const y = d.getFullYear();
@@ -198,11 +232,18 @@ function ClientBookingCreateView() {
     next.setHours(0, 0, 0, 0);
     return next;
   };
-  const fmtDow = (d: Date) => d.toLocaleDateString("en-US", { weekday: "short" });
+  const fmtDow = (d: Date) =>
+    d.toLocaleDateString("en-US", { weekday: "short" });
 
-  const [selectedDate, setSelectedDate] = React.useState<Date>(() => new Date());
-  const [monthPickerAnchor, setMonthPickerAnchor] = React.useState<HTMLElement | null>(null);
-  const weekStart = React.useMemo(() => startOfWeekMon(selectedDate), [selectedDate]);
+  const [selectedDate, setSelectedDate] = React.useState<Date>(
+    () => new Date(),
+  );
+  const [monthPickerAnchor, setMonthPickerAnchor] =
+    React.useState<HTMLElement | null>(null);
+  const weekStart = React.useMemo(
+    () => startOfWeekMon(selectedDate),
+    [selectedDate],
+  );
   const weekDays = React.useMemo(
     () =>
       Array.from({ length: 7 }, (_, i) => {
@@ -212,7 +253,11 @@ function ClientBookingCreateView() {
     [weekStart],
   );
   const monthLabel = React.useMemo(
-    () => selectedDate.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+    () =>
+      selectedDate.toLocaleDateString("en-US", {
+        month: "long",
+        year: "numeric",
+      }),
     [selectedDate],
   );
   const monthPickerYear = selectedDate.getFullYear();
@@ -249,7 +294,10 @@ function ClientBookingCreateView() {
     return () => window.clearInterval(id);
   }, [isSelectedToday]);
 
-  const nowMinutes = React.useMemo(() => getNowMinutesFromMidnight(new Date(nowTick)), [nowTick, selectedDate]);
+  const nowMinutes = React.useMemo(
+    () => getNowMinutesFromMidnight(new Date(nowTick)),
+    [nowTick, selectedDate],
+  );
   const minBookableMinutes = nowMinutes + CLIENT_BOOKING_MIN_LEAD_MINUTES;
 
   const times = allDayTimes;
@@ -260,7 +308,8 @@ function ClientBookingCreateView() {
   }, [isSelectedToday, minBookableMinutes, times]);
 
   const isTimeUnavailable = React.useCallback(
-    (t: string) => isSelectedToday && parseTimeLabelToMinutes(t) <= minBookableMinutes,
+    (t: string) =>
+      isSelectedToday && parseTimeLabelToMinutes(t) <= minBookableMinutes,
     [isSelectedToday, minBookableMinutes],
   );
 
@@ -268,7 +317,10 @@ function ClientBookingCreateView() {
   const scrollTimeSlots = React.useCallback((direction: "left" | "right") => {
     const el = timeScrollRef.current;
     if (!el) return;
-    el.scrollBy({ left: direction === "left" ? -180 : 180, behavior: "smooth" });
+    el.scrollBy({
+      left: direction === "left" ? -180 : 180,
+      behavior: "smooth",
+    });
   }, []);
 
   type BookingPerson = {
@@ -283,16 +335,26 @@ function ClientBookingCreateView() {
   const [people, setPeople] = React.useState<BookingPerson[]>(() => [
     { id: "p-requester", name: "Guest", isRequester: true },
   ]);
-  const [draggingPersonId, setDraggingPersonId] = React.useState<string | null>(null);
+  const [draggingPersonId, setDraggingPersonId] = React.useState<string | null>(
+    null,
+  );
 
   React.useEffect(() => {
     setPeople((prev) =>
-      prev.map((p) => (p.isRequester ? { ...p, name: requesterDisplayName } : p)),
+      prev.map((p) =>
+        p.isRequester ? { ...p, name: requesterDisplayName } : p,
+      ),
     );
   }, [requesterDisplayName]);
 
-  type ShopTeamMember = { id: string; name: string; locationModes: Array<"fixed" | "desired"> };
-  const [shopTeamMembers, setShopTeamMembers] = React.useState<ShopTeamMember[]>([]);
+  type ShopTeamMember = {
+    id: string;
+    name: string;
+    locationModes: Array<"fixed" | "desired">;
+  };
+  const [shopTeamMembers, setShopTeamMembers] = React.useState<
+    ShopTeamMember[]
+  >([]);
 
   type CatalogService = {
     id: string;
@@ -316,12 +378,15 @@ function ClientBookingCreateView() {
     teamMemberId: string | null;
   };
 
-  const getPreferredServiceTab = React.useCallback((items: Service[]): "assigned" | "unassigned" => {
-    const hasUnassigned = items.some((s) => !s.guestId);
-    const hasAssigned = items.some((s) => Boolean(s.guestId));
-    if (hasUnassigned && !hasAssigned) return "unassigned";
-    return "assigned";
-  }, []);
+  const getPreferredServiceTab = React.useCallback(
+    (items: Service[]): "assigned" | "unassigned" => {
+      const hasUnassigned = items.some((s) => !s.guestId);
+      const hasAssigned = items.some((s) => Boolean(s.guestId));
+      if (hasUnassigned && !hasAssigned) return "unassigned";
+      return "assigned";
+    },
+    [],
+  );
 
   const [services, setServices] = React.useState<Service[]>([]);
   const [profileHydrated, setProfileHydrated] = React.useState(false);
@@ -330,21 +395,33 @@ function ClientBookingCreateView() {
   const [selectedTime, setSelectedTime] = React.useState(() => {
     const mins = getNowMinutesFromMidnight() + CLIENT_BOOKING_MIN_LEAD_MINUTES;
     const future = allDayTimes.filter((t) => parseTimeLabelToMinutes(t) > mins);
-    return (future[0] ?? allDayTimes[0]) ?? "";
+    return future[0] ?? allDayTimes[0] ?? "";
   });
-  const [timeValidationError, setTimeValidationError] = React.useState<string | null>(null);
+  const [timeValidationError, setTimeValidationError] = React.useState<
+    string | null
+  >(null);
   const selectedTimeTooSoon = React.useMemo(
-    () => isSelectedToday && isSameDayBookingTooSoon(selectedTime, new Date(nowTick)),
+    () =>
+      isSelectedToday &&
+      isSameDayBookingTooSoon(selectedTime, new Date(nowTick)),
     [isSelectedToday, nowTick, selectedTime],
   );
   const [combineServices, setCombineServices] = React.useState(true);
-  const [selectedPersonId, setSelectedPersonId] = React.useState<string>("p-requester");
-  const [selectedTeamMemberId, setSelectedTeamMemberId] = React.useState<string>("");
-  const [serviceTab, setServiceTab] = React.useState<"assigned" | "unassigned">("assigned");
-  const [selectedServiceIds, setSelectedServiceIds] = React.useState<Record<string, boolean>>({});
+  const [selectedPersonId, setSelectedPersonId] =
+    React.useState<string>("p-requester");
+  const [selectedTeamMemberId, setSelectedTeamMemberId] =
+    React.useState<string>("");
+  const [serviceTab, setServiceTab] = React.useState<"assigned" | "unassigned">(
+    "assigned",
+  );
+  const [selectedServiceIds, setSelectedServiceIds] = React.useState<
+    Record<string, boolean>
+  >({});
 
   const [addServiceDialogOpen, setAddServiceDialogOpen] = React.useState(false);
-  const [addServiceCatalogIds, setAddServiceCatalogIds] = React.useState<Record<string, boolean>>({});
+  const [addServiceCatalogIds, setAddServiceCatalogIds] = React.useState<
+    Record<string, boolean>
+  >({});
   const [addServiceGuestId, setAddServiceGuestId] = React.useState("");
   /** Fixed location: confirm before removing a service card. */
   const [servicePendingRemove, setServicePendingRemove] = React.useState<{
@@ -357,8 +434,11 @@ function ClientBookingCreateView() {
   const [projectUploads, setProjectUploads] = React.useState<
     Array<{ id: string; name: string; previewUrl: string; file: File }>
   >([]);
-  const [participantMenuAnchor, setParticipantMenuAnchor] = React.useState<HTMLElement | null>(null);
-  const [planningPersonId, setPlanningPersonId] = React.useState<string | null>(null);
+  const [participantMenuAnchor, setParticipantMenuAnchor] =
+    React.useState<HTMLElement | null>(null);
+  const [planningPersonId, setPlanningPersonId] = React.useState<string | null>(
+    null,
+  );
   const [planningActivity, setPlanningActivity] = React.useState("");
   const [planningDuration, setPlanningDuration] = React.useState("");
   const projectFileInputRef = React.useRef<HTMLInputElement>(null);
@@ -367,17 +447,24 @@ function ClientBookingCreateView() {
   const isDesiredLocation = locationMode === "desired";
   const getParticipantLabel = React.useCallback(
     (person: BookingPerson) => {
-      if (person.participantType === "planning" || person.name === "Planning") return "Planning";
-      if (person.participantType === "guest" || person.name === "Guest") return "Guest";
+      if (person.participantType === "planning" || person.name === "Planning")
+        return "Planning";
+      if (person.participantType === "guest" || person.name === "Guest")
+        return "Guest";
       return isDesiredLocation ? "Model" : "Guest";
     },
     [isDesiredLocation],
   );
 
-  const catalogByTeamMemberId = React.useMemo<Record<string, CatalogService[]>>(() => {
+  const catalogByTeamMemberId = React.useMemo<
+    Record<string, CatalogService[]>
+  >(() => {
     if (!shop?.shopId || !profileHydrated || !businessProfile) return {};
 
-    const locationCatalog = getServicesForLocationMode(businessProfile, locationMode);
+    const locationCatalog = getServicesForLocationMode(
+      businessProfile,
+      locationMode,
+    );
     const fallbackItems: CatalogService[] = locationCatalog.map((s) => ({
       id: s.id,
       name: s.name,
@@ -385,7 +472,9 @@ function ClientBookingCreateView() {
       price: s.priceValue,
     }));
     const byId = new Map(locationCatalog.map((s) => [s.id, s]));
-    const byName = new Map(locationCatalog.map((s) => [s.name.trim().toLowerCase(), s]));
+    const byName = new Map(
+      locationCatalog.map((s) => [s.name.trim().toLowerCase(), s]),
+    );
     const profileTeam = getTeamForLocationMode(businessProfile, locationMode);
 
     const map: Record<string, CatalogService[]> = {};
@@ -402,7 +491,12 @@ function ClientBookingCreateView() {
       for (const slot of slots) {
         for (const opt of slot.options) {
           const matched =
-            byId.get(opt.value) ?? byName.get(String(opt.label ?? "").trim().toLowerCase());
+            byId.get(opt.value) ??
+            byName.get(
+              String(opt.label ?? "")
+                .trim()
+                .toLowerCase(),
+            );
           const id = matched?.id ?? opt.value;
           if (!id || seen.has(id)) continue;
           seen.add(id);
@@ -417,10 +511,17 @@ function ClientBookingCreateView() {
       map[tm.id] = items.length > 0 ? items : fallbackItems;
     }
     return map;
-  }, [businessProfile, locationMode, profileHydrated, shop?.shopId, shopTeamMembers]);
+  }, [
+    businessProfile,
+    locationMode,
+    profileHydrated,
+    shop?.shopId,
+    shopTeamMembers,
+  ]);
 
   const isPlanningPerson = React.useCallback(
-    (p: BookingPerson) => p.participantType === "planning" || p.name === "Planning",
+    (p: BookingPerson) =>
+      p.participantType === "planning" || p.name === "Planning",
     [],
   );
 
@@ -429,21 +530,28 @@ function ClientBookingCreateView() {
     [people, selectedPersonId],
   );
 
-  const isPlanningCardSelected = Boolean(selectedPerson && isPlanningPerson(selectedPerson));
+  const isPlanningCardSelected = Boolean(
+    selectedPerson && isPlanningPerson(selectedPerson),
+  );
 
   const filteredTeamMembers = React.useMemo(
-    () => shopTeamMembers.filter((tm) => tm.locationModes.includes(locationMode)),
+    () =>
+      shopTeamMembers.filter((tm) => tm.locationModes.includes(locationMode)),
     [locationMode, shopTeamMembers],
   );
 
-  const additionalGuests = React.useMemo(() => people.filter(isAdditionalGuest), [people]);
+  const additionalGuests = React.useMemo(
+    () => people.filter(isAdditionalGuest),
+    [people],
+  );
   const canAddFixedLocationGuest =
     !isDesiredLocation && additionalGuests.length < FIXED_LOCATION_MAX_GUESTS;
   const serviceAssignees = React.useMemo(() => {
     // Jane / Model / Guest can all receive services; Planning cannot.
     return people.filter((p) => !isPlanningPerson(p));
   }, [isPlanningPerson, people]);
-  const canAddService = serviceAssignees.length > 0 && Boolean(selectedTeamMemberId);
+  const canAddService =
+    serviceAssignees.length > 0 && Boolean(selectedTeamMemberId);
 
   const serviceCountLabel = React.useCallback(
     (personId: string) => {
@@ -469,13 +577,24 @@ function ClientBookingCreateView() {
     const { duration } = planningCardDetails(person);
     if (!duration) return null;
     return (
-      <Typography sx={{ fontWeight: 700, fontSize: 11, color: alpha(m.navy, 0.48), lineHeight: 1.2, mt: 0.2 }}>
+      <Typography
+        sx={{
+          fontWeight: 700,
+          fontSize: 11,
+          color: alpha(m.navy, 0.48),
+          lineHeight: 1.2,
+          mt: 0.2,
+        }}
+      >
         {duration}
       </Typography>
     );
   };
 
-  const selectedServicesCount = React.useMemo(() => Object.values(selectedServiceIds).filter(Boolean).length, [selectedServiceIds]);
+  const selectedServicesCount = React.useMemo(
+    () => Object.values(selectedServiceIds).filter(Boolean).length,
+    [selectedServiceIds],
+  );
   const allServicesAssigned = React.useMemo(
     () =>
       services.length > 0 &&
@@ -485,14 +604,22 @@ function ClientBookingCreateView() {
 
   /** Services already given to the selected person (Jane / Model / Guest). */
   const assigned = React.useMemo(
-    () => services.filter((s) => Boolean(s.guestId) && s.guestId === selectedPersonId),
+    () =>
+      services.filter(
+        (s) => Boolean(s.guestId) && s.guestId === selectedPersonId,
+      ),
     [selectedPersonId, services],
   );
   /** Pending rows without a person — catalog never lives here. */
-  const unassigned = React.useMemo(() => services.filter((s) => !s.guestId), [services]);
+  const unassigned = React.useMemo(
+    () => services.filter((s) => !s.guestId),
+    [services],
+  );
 
   const isModelOrGuestSelected = Boolean(
-    selectedPerson && !selectedPerson.isRequester && !isPlanningPerson(selectedPerson),
+    selectedPerson &&
+    !selectedPerson.isRequester &&
+    !isPlanningPerson(selectedPerson),
   );
 
   React.useEffect(() => {
@@ -504,7 +631,11 @@ function ClientBookingCreateView() {
     }
     if (unassigned.length > 0 && serviceTab === "assigned") {
       setServiceTab("unassigned");
-    } else if (unassigned.length === 0 && assigned.length > 0 && serviceTab === "unassigned") {
+    } else if (
+      unassigned.length === 0 &&
+      assigned.length > 0 &&
+      serviceTab === "unassigned"
+    ) {
       setServiceTab("assigned");
     }
   }, [
@@ -520,17 +651,29 @@ function ClientBookingCreateView() {
     () => unassigned.filter((s) => selectedServiceIds[s.id]),
     [unassigned, selectedServiceIds],
   );
-  const canDirectAssign = Boolean(selectedTeamMemberId) && selectedUnassignedServices.length > 0;
+  const canDirectAssign =
+    Boolean(selectedTeamMemberId) && selectedUnassignedServices.length > 0;
   const visible = serviceTab === "assigned" ? assigned : unassigned;
   const hasUnassigned = unassigned.length > 0;
 
-  const allVisibleSelected = visible.length > 0 && visible.every((s) => selectedServiceIds[s.id]);
-  const someVisibleSelected = visible.some((s) => selectedServiceIds[s.id]) && !allVisibleSelected;
+  const allVisibleSelected =
+    visible.length > 0 && visible.every((s) => selectedServiceIds[s.id]);
+  const someVisibleSelected =
+    visible.some((s) => selectedServiceIds[s.id]) && !allVisibleSelected;
 
-  const total = React.useMemo(() => services.reduce((sum, s) => sum + s.price, 0), [services]);
+  const total = React.useMemo(
+    () => services.reduce((sum, s) => sum + s.price, 0),
+    [services],
+  );
 
-  const bookingStartMinutes = React.useMemo(() => parseTimeLabelToMinutes(selectedTime), [selectedTime]);
-  const bookingDurationMinutes = React.useMemo(() => services.reduce((sum, s) => sum + s.durationMins, 0), [services]);
+  const bookingStartMinutes = React.useMemo(
+    () => parseTimeLabelToMinutes(selectedTime),
+    [selectedTime],
+  );
+  const bookingDurationMinutes = React.useMemo(
+    () => services.reduce((sum, s) => sum + s.durationMins, 0),
+    [services],
+  );
   const bookingEndMinutes = bookingStartMinutes + bookingDurationMinutes;
 
   const summaryGroups = React.useMemo(() => {
@@ -558,7 +701,13 @@ function ClientBookingCreateView() {
 
   const teamMemberChipLabelForItems = React.useCallback(
     (items: Service[]) => {
-      const ids = [...new Set(items.map((s) => s.teamMemberId).filter((id): id is string => Boolean(id)))];
+      const ids = [
+        ...new Set(
+          items
+            .map((s) => s.teamMemberId)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      ];
       if (ids.length === 0) return undefined;
       // One shared professional — single chip. Multiple different TMs — per-service labels instead.
       if (ids.length !== 1) return undefined;
@@ -596,7 +745,9 @@ function ClientBookingCreateView() {
               duration: p.planningDuration?.trim() ?? "",
             }
           : undefined;
-      const hasPlanning = Boolean(planningItem?.activity || planningItem?.duration);
+      const hasPlanning = Boolean(
+        planningItem?.activity || planningItem?.duration,
+      );
       if (!items.length && !hasPlanning) continue;
       const teamMemberLabel = teamMemberChipLabelForItems(items);
       sections.push({
@@ -635,8 +786,14 @@ function ClientBookingCreateView() {
   React.useEffect(() => {
     const el = timeScrollRef.current;
     if (!el || !selectedTime) return;
-    const activeBtn = el.querySelector<HTMLElement>(`[data-time-slot="${selectedTime}"]`);
-    activeBtn?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+    const activeBtn = el.querySelector<HTMLElement>(
+      `[data-time-slot="${selectedTime}"]`,
+    );
+    activeBtn?.scrollIntoView({
+      inline: "center",
+      block: "nearest",
+      behavior: "smooth",
+    });
   }, [selectedTime, selectedDate]);
 
   React.useEffect(() => {
@@ -654,10 +811,12 @@ function ClientBookingCreateView() {
         : null;
 
       if (fromProfile && profileSelection?.shopId) {
-        const addressSource = parsed?.shopId === profileSelection.shopId ? parsed : null;
+        const addressSource =
+          parsed?.shopId === profileSelection.shopId ? parsed : null;
         setShop({
           shopId: profileSelection.shopId,
-          shopName: profileSelection.shopName ?? addressSource?.shopName ?? "Salon",
+          shopName:
+            profileSelection.shopName ?? addressSource?.shopName ?? "Salon",
           municipalityLabel: addressSource?.municipalityLabel,
           addressLabel: addressSource?.addressLabel,
           locationMode: profileSelection.locationMode,
@@ -695,27 +854,37 @@ function ClientBookingCreateView() {
   }, [fromProfile, isEbrSuggest, profileHydrationToken]);
 
   const applyProfileSelection = React.useCallback(
-    (profileSelection: NonNullable<ReturnType<typeof loadPublicProfileBookingSelection>>) => {
+    (
+      profileSelection: NonNullable<
+        ReturnType<typeof loadPublicProfileBookingSelection>
+      >,
+    ) => {
       if (profileSelection.teamMembers.length > 0) {
         setShopTeamMembers(profileSelection.teamMembers);
       }
 
       const profileServices = profileSelection.services.map((row) => ({
         id: row.id,
-        catalogServiceId: row.catalogServiceId ?? extractUuidFromSyntheticId(row.id),
+        catalogServiceId:
+          row.catalogServiceId ?? extractUuidFromSyntheticId(row.id),
         name: row.name,
         durationMins: row.durationMins,
         price: row.price,
         // Desired: leave person + professional open so Model can pick services via Assign.
-        guestId: profileSelection.locationMode === "desired" ? null : "p-requester",
-        teamMemberId: profileSelection.locationMode === "desired" ? null : row.teamMemberId,
+        guestId:
+          profileSelection.locationMode === "desired" ? null : "p-requester",
+        teamMemberId:
+          profileSelection.locationMode === "desired" ? null : row.teamMemberId,
       }));
 
       setServices(profileServices);
       setServiceTab(getPreferredServiceTab(profileServices));
       setSelectedServiceIds({});
 
-      if (profileSelection.locationMode === "desired" && profileSelection.projectEnabled) {
+      if (
+        profileSelection.locationMode === "desired" &&
+        profileSelection.projectEnabled
+      ) {
         setProjectDescription(profileSelection.projectInstructions);
       }
 
@@ -743,7 +912,9 @@ function ClientBookingCreateView() {
     const profileSelection = loadPublicProfileBookingSelection();
 
     const applyProfileIfNeeded = (
-      selection: NonNullable<ReturnType<typeof loadPublicProfileBookingSelection>>,
+      selection: NonNullable<
+        ReturnType<typeof loadPublicProfileBookingSelection>
+      >,
     ) => {
       const signature = `${profileHydrationToken}:${selection.savedAt ?? ""}:${selection.services
         .map((row) => `${row.id}:${row.teamMemberId ?? ""}`)
@@ -759,7 +930,9 @@ function ClientBookingCreateView() {
     if (isEbrSuggest) {
       if (!shop?.shopId) return;
       const existingRaw = getActiveBookingSession();
-      const existing = existingRaw ? enrichClientBookingRecord(existingRaw) : null;
+      const existing = existingRaw
+        ? enrichClientBookingRecord(existingRaw)
+        : null;
       if (!existing?.draft?.services?.length) {
         // Session not ready yet — never fall through to blank catalog.
         return;
@@ -768,11 +941,14 @@ function ClientBookingCreateView() {
         return;
       }
 
-      const locationMode = existing.shop?.locationMode ?? shop.locationMode ?? "fixed";
+      const locationMode =
+        existing.shop?.locationMode ?? shop.locationMode ?? "fixed";
       const signature = `ebrSuggest:${existing.bookingRef}:${existing.draft.people
         ?.map((p) => `${p.id}:${p.participantType ?? ""}`)
         .join(",")}:${existing.draft.services
-        .map((row) => `${row.id}:${row.guestId ?? ""}:${row.teamMemberId ?? ""}`)
+        .map(
+          (row) => `${row.id}:${row.guestId ?? ""}:${row.teamMemberId ?? ""}`,
+        )
         .join("|")}:${existing.draft.projectDetails?.description ?? ""}`;
       if (hydrationSignatureRef.current === signature) return;
       hydrationSignatureRef.current = signature;
@@ -795,28 +971,29 @@ function ClientBookingCreateView() {
       setServices(draftServices);
       ebrSuggestBaselineRef.current = draftServices.map((s) => ({ ...s }));
 
-      const draftPeople =
-        existing.draft.people?.length
-          ? existing.draft.people.map((p) => ({
-              id: p.id,
-              name: p.name,
-              isRequester: Boolean(p.isRequester),
-              participantType: p.participantType,
-              planningActivity: p.planningActivity,
-              planningDuration: p.planningDuration,
-              planningIsLocked: p.planningIsLocked,
-            }))
-          : [
-              {
-                id: "p-requester",
-                name: requesterDisplayName,
-                isRequester: true as const,
-              },
-            ];
+      const draftPeople = existing.draft.people?.length
+        ? existing.draft.people.map((p) => ({
+            id: p.id,
+            name: p.name,
+            isRequester: Boolean(p.isRequester),
+            participantType: p.participantType,
+            planningActivity: p.planningActivity,
+            planningDuration: p.planningDuration,
+            planningIsLocked: p.planningIsLocked,
+          }))
+        : [
+            {
+              id: "p-requester",
+              name: requesterDisplayName,
+              isRequester: true as const,
+            },
+          ];
       setPeople(draftPeople);
 
       const personWithServices =
-        draftPeople.find((p) => draftServices.some((s) => s.guestId === p.id)) ??
+        draftPeople.find((p) =>
+          draftServices.some((s) => s.guestId === p.id),
+        ) ??
         draftPeople.find((p) => p.isRequester) ??
         draftPeople[0];
       if (personWithServices?.id) setSelectedPersonId(personWithServices.id);
@@ -834,7 +1011,10 @@ function ClientBookingCreateView() {
           return fromDraft.length ? fromDraft : prev;
         });
       } else if (businessProfile) {
-        const apiTeam = getTeamForLocationMode(businessProfile, locationMode).map((tm) => ({
+        const apiTeam = getTeamForLocationMode(
+          businessProfile,
+          locationMode,
+        ).map((tm) => ({
           id: tm.id,
           name: tm.name,
           locationModes: tm.locationModes,
@@ -846,7 +1026,8 @@ function ClientBookingCreateView() {
         const parsed = new Date(`${existing.draft.selectedDateISO}T00:00:00`);
         if (!Number.isNaN(parsed.getTime())) setSelectedDate(parsed);
       }
-      if (existing.draft.selectedTime) setSelectedTime(existing.draft.selectedTime);
+      if (existing.draft.selectedTime)
+        setSelectedTime(existing.draft.selectedTime);
       setCombineServices(Boolean(existing.draft.combineServices));
       if (existing.draft.projectDetails) {
         setProjectDescription(existing.draft.projectDetails.description ?? "");
@@ -875,7 +1056,10 @@ function ClientBookingCreateView() {
 
     if (!shop?.shopId) return;
 
-    if (profileSelection?.shopId === shop.shopId && profileSelection.services.length > 0) {
+    if (
+      profileSelection?.shopId === shop.shopId &&
+      profileSelection.services.length > 0
+    ) {
       applyProfileIfNeeded(profileSelection);
       return;
     }
@@ -889,7 +1073,10 @@ function ClientBookingCreateView() {
     hydrationSignatureRef.current = defaultSignature;
 
     const apiTeam = businessProfile
-      ? getTeamForLocationMode(businessProfile, shop.locationMode ?? "fixed").map((tm) => ({
+      ? getTeamForLocationMode(
+          businessProfile,
+          shop.locationMode ?? "fixed",
+        ).map((tm) => ({
           id: tm.id,
           name: tm.name,
           locationModes: tm.locationModes,
@@ -907,7 +1094,7 @@ function ClientBookingCreateView() {
       durationMins: s.durationMins,
       price: s.priceValue,
       guestId: (mode === "desired" ? null : "p-requester") as string | null,
-      teamMemberId: mode === "desired" ? null : apiTeam[0]?.id ?? null,
+      teamMemberId: mode === "desired" ? null : (apiTeam[0]?.id ?? null),
     }));
 
     setServices(catalogServices.slice(0, 3));
@@ -934,12 +1121,15 @@ function ClientBookingCreateView() {
   }, [people, selectedPersonId]);
 
   React.useEffect(() => {
-    if (filteredTeamMembers.some((tm) => tm.id === selectedTeamMemberId)) return;
+    if (filteredTeamMembers.some((tm) => tm.id === selectedTeamMemberId))
+      return;
     const fallbackId = filteredTeamMembers[0]?.id ?? "";
     setSelectedTeamMemberId(fallbackId);
     // Desired: keep every service on the single active professional.
     if (isDesiredLocation && fallbackId) {
-      setServices((prev) => prev.map((s) => ({ ...s, teamMemberId: fallbackId })));
+      setServices((prev) =>
+        prev.map((s) => ({ ...s, teamMemberId: fallbackId })),
+      );
     }
   }, [filteredTeamMembers, isDesiredLocation, selectedTeamMemberId]);
 
@@ -956,11 +1146,19 @@ function ClientBookingCreateView() {
     });
   }, []);
 
-  const syncPlanningDraftToPerson = (personId: string, activity: string, duration: string) => {
+  const syncPlanningDraftToPerson = (
+    personId: string,
+    activity: string,
+    duration: string,
+  ) => {
     setPeople((prev) =>
       prev.map((p) =>
         p.id === personId
-          ? { ...p, planningActivity: activity.trim(), planningDuration: duration.trim() }
+          ? {
+              ...p,
+              planningActivity: activity.trim(),
+              planningDuration: duration.trim(),
+            }
           : p,
       ),
     );
@@ -968,7 +1166,11 @@ function ClientBookingCreateView() {
 
   const selectPlanningCard = (person: BookingPerson) => {
     if (planningPersonId && planningPersonId !== person.id) {
-      syncPlanningDraftToPerson(planningPersonId, planningActivity, planningDuration);
+      syncPlanningDraftToPerson(
+        planningPersonId,
+        planningActivity,
+        planningDuration,
+      );
     }
     setPlanningPersonId(person.id);
     setPlanningActivity(person.planningActivity ?? "");
@@ -978,12 +1180,19 @@ function ClientBookingCreateView() {
   };
 
   const selectNonPlanningPerson = (personId: string) => {
-    if (planningPersonId) syncPlanningDraftToPerson(planningPersonId, planningActivity, planningDuration);
+    if (planningPersonId)
+      syncPlanningDraftToPerson(
+        planningPersonId,
+        planningActivity,
+        planningDuration,
+      );
     setPlanningPersonId(null);
     setSelectedPersonId(personId);
     setSelectedServiceIds({});
     const person = people.find((p) => p.id === personId);
-    const isModelOrGuest = Boolean(person && !person.isRequester && !isPlanningPerson(person));
+    const isModelOrGuest = Boolean(
+      person && !person.isRequester && !isPlanningPerson(person),
+    );
     if (isModelOrGuest) {
       setServiceTab("assigned");
       return;
@@ -998,7 +1207,11 @@ function ClientBookingCreateView() {
     const isModel = cardName === "Model";
     const isGuest = cardName === "Guest";
 
-    if (!isDesiredLocation && isGuest && additionalGuests.length >= FIXED_LOCATION_MAX_GUESTS) {
+    if (
+      !isDesiredLocation &&
+      isGuest &&
+      additionalGuests.length >= FIXED_LOCATION_MAX_GUESTS
+    ) {
       return;
     }
 
@@ -1020,16 +1233,24 @@ function ClientBookingCreateView() {
 
   const savePlanning = () => {
     if (!planningPersonId) return;
-    syncPlanningDraftToPerson(planningPersonId, planningActivity, planningDuration);
+    syncPlanningDraftToPerson(
+      planningPersonId,
+      planningActivity,
+      planningDuration,
+    );
     setPeople((prev) =>
-      prev.map((p) => (p.id === planningPersonId ? { ...p, planningIsLocked: true } : p)),
+      prev.map((p) =>
+        p.id === planningPersonId ? { ...p, planningIsLocked: true } : p,
+      ),
     );
   };
 
   const startPlanningEdit = () => {
     if (!planningPersonId) return;
     setPeople((prev) =>
-      prev.map((p) => (p.id === planningPersonId ? { ...p, planningIsLocked: false } : p)),
+      prev.map((p) =>
+        p.id === planningPersonId ? { ...p, planningIsLocked: false } : p,
+      ),
     );
   };
 
@@ -1054,7 +1275,8 @@ function ClientBookingCreateView() {
   const deleteProjectUpload = (uploadId: string) => {
     setProjectUploads((prev) => {
       const target = prev.find((u) => u.id === uploadId);
-      if (target?.previewUrl.startsWith("blob:")) URL.revokeObjectURL(target.previewUrl);
+      if (target?.previewUrl.startsWith("blob:"))
+        URL.revokeObjectURL(target.previewUrl);
       return prev.filter((u) => u.id !== uploadId);
     });
   };
@@ -1071,12 +1293,16 @@ function ClientBookingCreateView() {
       setPlanningDuration("");
     }
     if (selectedPersonId === guestId) {
-      setSelectedPersonId(people.find((p) => p.isRequester)?.id ?? people[0]?.id ?? "");
+      setSelectedPersonId(
+        people.find((p) => p.isRequester)?.id ?? people[0]?.id ?? "",
+      );
     }
   };
 
   const updateGuestName = (guestId: string, name: string) => {
-    setPeople((prev) => prev.map((p) => (p.id === guestId ? { ...p, name } : p)));
+    setPeople((prev) =>
+      prev.map((p) => (p.id === guestId ? { ...p, name } : p)),
+    );
   };
 
   const assignSelectedDirect = () => {
@@ -1101,7 +1327,10 @@ function ClientBookingCreateView() {
     }
     setAddServiceCatalogIds({});
     const preferredAssignee =
-      serviceAssignees.find((p) => p.id === selectedPersonId)?.id ?? serviceAssignees[0]?.id ?? people[0]?.id ?? "";
+      serviceAssignees.find((p) => p.id === selectedPersonId)?.id ??
+      serviceAssignees[0]?.id ??
+      people[0]?.id ??
+      "";
     setAddServiceGuestId(preferredAssignee);
     setAddServiceDialogOpen(true);
   };
@@ -1111,15 +1340,20 @@ function ClientBookingCreateView() {
     const selectedIds = Object.entries(addServiceCatalogIds)
       .filter(([, checked]) => checked)
       .map(([id]) => id);
-    if (!selectedIds.length || !addServiceGuestId || !selectedTeamMemberId) return;
+    if (!selectedIds.length || !addServiceGuestId || !selectedTeamMemberId)
+      return;
 
     const stamped: Service[] = [];
     for (const catalogId of selectedIds) {
       const picked = catalog.find((c) => c.id === catalogId);
       if (!picked) continue;
       stamped.push({
-        id: UUID_RE.test(picked.id) ? `${picked.id}-${Date.now()}-${stamped.length}` : `svc-${Date.now()}-${stamped.length}`,
-        catalogServiceId: UUID_RE.test(picked.id) ? picked.id : extractUuidFromSyntheticId(picked.id),
+        id: UUID_RE.test(picked.id)
+          ? `${picked.id}-${Date.now()}-${stamped.length}`
+          : `svc-${Date.now()}-${stamped.length}`,
+        catalogServiceId: UUID_RE.test(picked.id)
+          ? picked.id
+          : extractUuidFromSyntheticId(picked.id),
         name: picked.name,
         durationMins: picked.durationMins,
         price: picked.price,
@@ -1147,7 +1381,9 @@ function ClientBookingCreateView() {
 
   const updateServiceTeamMember = (serviceId: string, teamMemberId: string) => {
     if (!teamMemberId) return;
-    setServices((prev) => prev.map((s) => (s.id === serviceId ? { ...s, teamMemberId } : s)));
+    setServices((prev) =>
+      prev.map((s) => (s.id === serviceId ? { ...s, teamMemberId } : s)),
+    );
   };
 
   const confirmRemoveService = () => {
@@ -1161,11 +1397,20 @@ function ClientBookingCreateView() {
   };
 
   const onContinue = async () => {
-    if (!shop?.shopId || services.length === 0 || !allServicesAssigned || isContinuing) return;
+    if (
+      !shop?.shopId ||
+      services.length === 0 ||
+      !allServicesAssigned ||
+      isContinuing
+    )
+      return;
 
     if (isSelectedToday && isSameDayBookingTooSoon(selectedTime)) {
       setTimeValidationError(CLIENT_BOOKING_MIN_LEAD_ERROR);
-      showSnackbar({ severity: "error", message: CLIENT_BOOKING_MIN_LEAD_ERROR });
+      showSnackbar({
+        severity: "error",
+        message: CLIENT_BOOKING_MIN_LEAD_ERROR,
+      });
       return;
     }
     setTimeValidationError(null);
@@ -1183,14 +1428,19 @@ function ClientBookingCreateView() {
           )
         : people;
 
-    const requesterId = peopleForDraft.find((p) => p.isRequester)?.id ?? peopleForDraft[0]?.id ?? "p-requester";
+    const requesterId =
+      peopleForDraft.find((p) => p.isRequester)?.id ??
+      peopleForDraft[0]?.id ??
+      "p-requester";
     const servicesForDraft = services.map((s) => ({
       ...s,
       catalogServiceId: s.catalogServiceId ?? extractUuidFromSyntheticId(s.id),
       guestId: s.guestId ?? requesterId,
       // Desired location: every service must use the single selected professional.
       teamMemberId:
-        isDesiredLocation && selectedTeamMemberId ? selectedTeamMemberId : s.teamMemberId,
+        isDesiredLocation && selectedTeamMemberId
+          ? selectedTeamMemberId
+          : s.teamMemberId,
     }));
 
     const payload = {
@@ -1215,7 +1465,9 @@ function ClientBookingCreateView() {
         : {}),
     };
 
-    const prepaymentPercent = parsePrepaymentPercent(businessProfile?.prepaymentLabel);
+    const prepaymentPercent = parsePrepaymentPercent(
+      businessProfile?.prepaymentLabel,
+    );
     const requiresPrepayment = !isDesiredLocation && prepaymentPercent > 0;
 
     // EBR suggest-edit: update existing booking draft and return to details (no new booking).
@@ -1224,11 +1476,15 @@ function ClientBookingCreateView() {
       try {
         const existing = getActiveBookingSession();
         if (!existing?.bookingRef) {
-          showSnackbar({ severity: "error", message: "Booking not found for suggested changes." });
+          showSnackbar({
+            severity: "error",
+            message: "Booking not found for suggested changes.",
+          });
           return;
         }
 
-        const baseline = ebrSuggestBaselineRef.current ?? existing.draft?.services ?? [];
+        const baseline =
+          ebrSuggestBaselineRef.current ?? existing.draft?.services ?? [];
         const baselineById = new Map(baseline.map((s) => [s.id, s]));
         const editedServiceIds: string[] = [];
         for (const service of servicesForDraft) {
@@ -1238,7 +1494,8 @@ function ClientBookingCreateView() {
             original.name !== service.name ||
             original.price !== service.price ||
             original.durationMins !== service.durationMins ||
-            (original.teamMemberId ?? null) !== (service.teamMemberId ?? null) ||
+            (original.teamMemberId ?? null) !==
+              (service.teamMemberId ?? null) ||
             (original.guestId ?? null) !== (service.guestId ?? null)
           ) {
             editedServiceIds.push(service.id);
@@ -1254,7 +1511,9 @@ function ClientBookingCreateView() {
           ...existing,
           draft: payload,
           requiresPrepayment: existing.requiresPrepayment ?? requiresPrepayment,
-          prepaymentPercent: existing.prepaymentPercent ?? (requiresPrepayment ? prepaymentPercent : 0),
+          prepaymentPercent:
+            existing.prepaymentPercent ??
+            (requiresPrepayment ? prepaymentPercent : 0),
         });
         if (typeof window !== "undefined") {
           window.sessionStorage.setItem("mollure:ebr_suggest_return", "1");
@@ -1266,7 +1525,9 @@ function ClientBookingCreateView() {
         const listTab = parseBookingListTab(searchParams?.get("tab"));
         const checkoutPath = resolveCreateCheckoutPath({
           locationMode,
-          requiresPrepayment: Boolean(existing.requiresPrepayment ?? requiresPrepayment),
+          requiresPrepayment: Boolean(
+            existing.requiresPrepayment ?? requiresPrepayment,
+          ),
         });
         router.push(`${checkoutPath}?tab=${listTab}`);
       } finally {
@@ -1292,7 +1553,9 @@ function ClientBookingCreateView() {
         kind?: "image" | "document";
       }> = projectUploads.map((u) => ({ id: u.id, name: u.name }));
       if (isDesiredLocation && projectUploads.length > 0) {
-        const uploaded = await uploadBookingAttachments(projectUploads.map((u) => u.file)).unwrap();
+        const uploaded = await uploadBookingAttachments(
+          projectUploads.map((u) => u.file),
+        ).unwrap();
         const attachments = uploaded.data?.attachments ?? [];
         projectDetailsUploads = attachments.map((att) => ({
           id: att.id,
@@ -1350,12 +1613,18 @@ function ClientBookingCreateView() {
       showSnackbar({ severity: "success", message: "Booking request created" });
 
       const listTab = parseBookingListTab(searchParams?.get("tab"));
-      const checkoutPath = resolveCreateCheckoutPath({ locationMode, requiresPrepayment });
+      const checkoutPath = resolveCreateCheckoutPath({
+        locationMode,
+        requiresPrepayment,
+      });
       router.push(`${checkoutPath}?tab=${listTab}`);
     } catch (error) {
       showSnackbar({
         severity: "error",
-        message: getApiErrorMessage(error, "Unable to create booking. Please try again."),
+        message: getApiErrorMessage(
+          error,
+          "Unable to create booking. Please try again.",
+        ),
       });
     } finally {
       setIsContinuing(false);
@@ -1377,7 +1646,9 @@ function ClientBookingCreateView() {
           ? "booking-services-section"
           : "booking-calendar-section";
     const timer = window.setTimeout(() => {
-      document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      document
+        .getElementById(id)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 120);
     return () => window.clearTimeout(timer);
   }, [ebrFocus, isEbrSuggest, profileHydrated]);
@@ -1413,8 +1684,15 @@ function ClientBookingCreateView() {
         bgcolor: "#fff",
       }}
     >
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.5, minHeight: 32 }}>
-        <Typography sx={{ fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.62) }}>
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        sx={{ mb: 0.5, minHeight: 32 }}
+      >
+        <Typography
+          sx={{ fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.62) }}
+        >
           Activity
         </Typography>
         {planningFormIsLocked ? (
@@ -1430,7 +1708,10 @@ function ClientBookingCreateView() {
               border: `1px solid ${alpha(m.navy, 0.12)}`,
               bgcolor: alpha(m.navy, 0.03),
               color: alpha(m.navy, 0.55),
-              "&:hover": { bgcolor: alpha(m.navy, 0.06), color: alpha(m.navy, 0.72) },
+              "&:hover": {
+                bgcolor: alpha(m.navy, 0.06),
+                color: alpha(m.navy, 0.72),
+              },
             }}
           >
             <ModeEditOutlineRoundedIcon sx={{ fontSize: 18 }} />
@@ -1444,10 +1725,20 @@ function ClientBookingCreateView() {
         fullWidth
         size="small"
         InputProps={{ readOnly: planningFormIsLocked }}
-        sx={{ mb: 2, ...(planningFormIsLocked ? planningLockedFieldSx : planningFieldSx) }}
+        sx={{
+          mb: 2,
+          ...(planningFormIsLocked ? planningLockedFieldSx : planningFieldSx),
+        }}
       />
 
-      <Typography sx={{ fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.62), mb: 0.5 }}>
+      <Typography
+        sx={{
+          fontSize: 11,
+          fontWeight: 800,
+          color: alpha(m.navy, 0.62),
+          mb: 0.5,
+        }}
+      >
         Duration
       </Typography>
       <TextField
@@ -1457,34 +1748,38 @@ function ClientBookingCreateView() {
         fullWidth
         size="small"
         InputProps={{ readOnly: planningFormIsLocked }}
-        sx={{ mb: planningFormIsLocked ? 0 : 2, ...(planningFormIsLocked ? planningLockedFieldSx : planningFieldSx) }}
+        sx={{
+          mb: planningFormIsLocked ? 0 : 2,
+          ...(planningFormIsLocked ? planningLockedFieldSx : planningFieldSx),
+        }}
       />
 
       {!planningFormIsLocked ? (
-        <Button
+        <AppButton
+          tone="primary"
           fullWidth
-          variant="contained"
-          disableElevation
           onClick={savePlanning}
           sx={{
-            borderRadius: "10px",
-            textTransform: "none",
-            fontWeight: 900,
             height: 42,
-            bgcolor: m.teal,
-            "&:hover": { bgcolor: m.tealDark },
           }}
         >
           Save
-        </Button>
+        </AppButton>
       ) : null}
     </Box>
   );
 
   const renderServicesDetails = () => (
     <Box sx={{ p: 1.5 }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-        <Typography sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.78) }}>
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        sx={{ mb: 1 }}
+      >
+        <Typography
+          sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.78) }}
+        >
           Services Details
         </Typography>
 
@@ -1537,7 +1832,8 @@ function ClientBookingCreateView() {
       </Stack>
 
       {/* Desired: one shared professional for all. Fixed assigned: per-service dropdown on each card. */}
-      {filteredTeamMembers.length > 0 && (isDesiredLocation || serviceTab === "unassigned") ? (
+      {filteredTeamMembers.length > 0 &&
+      (isDesiredLocation || serviceTab === "unassigned") ? (
         <Box sx={{ mb: 1.25 }} onClick={(e) => e.stopPropagation()}>
           <AppDropdown
             value={selectedTeamMemberId}
@@ -1552,7 +1848,12 @@ function ClientBookingCreateView() {
             InputProps={{
               startAdornment: (
                 <PersonOutlineRoundedIcon
-                  sx={{ fontSize: 18, color: alpha(m.navy, 0.45), ml: 0.5, mr: 0.25 }}
+                  sx={{
+                    fontSize: 18,
+                    color: alpha(m.navy, 0.45),
+                    ml: 0.5,
+                    mr: 0.25,
+                  }}
                 />
               ),
             }}
@@ -1570,7 +1871,12 @@ function ClientBookingCreateView() {
       ) : null}
 
       {hasUnassigned && serviceTab === "unassigned" ? (
-        <Stack direction="row" alignItems="center" justifyContent="flex-end" sx={{ mb: 1 }}>
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="flex-end"
+          sx={{ mb: 1 }}
+        >
           <FormControlLabel
             control={
               <Checkbox
@@ -1583,11 +1889,20 @@ function ClientBookingCreateView() {
                   for (const s of visible) next[s.id] = checked;
                   setSelectedServiceIds(next);
                 }}
-                sx={{ "&.Mui-checked": { color: m.teal }, color: alpha(m.navy, 0.35) }}
+                sx={{
+                  "&.Mui-checked": { color: m.teal },
+                  color: alpha(m.navy, 0.35),
+                }}
               />
             }
             label={
-              <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: alpha(m.navy, 0.62) }}>
+              <Typography
+                sx={{
+                  fontSize: 11.5,
+                  fontWeight: 800,
+                  color: alpha(m.navy, 0.62),
+                }}
+              >
                 Select All
               </Typography>
             }
@@ -1599,7 +1914,9 @@ function ClientBookingCreateView() {
       <Stack spacing={1}>
         {visible.map((s) => {
           const showFixedAssignedCard =
-            !isDesiredLocation && serviceTab === "assigned" && Boolean(s.guestId);
+            !isDesiredLocation &&
+            serviceTab === "assigned" &&
+            Boolean(s.guestId);
 
           if (showFixedAssignedCard) {
             return (
@@ -1627,14 +1944,24 @@ function ClientBookingCreateView() {
                       {s.name}
                     </Typography>
                     <Typography
-                      sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.48), mt: 0.35 }}
+                      sx={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: alpha(m.navy, 0.48),
+                        mt: 0.35,
+                      }}
                     >
                       {s.durationMins} Mins
                     </Typography>
-                    <Box sx={{ mt: "20px", maxWidth: 220 }} onClick={(e) => e.stopPropagation()}>
+                    <Box
+                      sx={{ mt: "20px", maxWidth: 220 }}
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <AppDropdown
                         value={s.teamMemberId ?? ""}
-                        onChange={(val) => updateServiceTeamMember(s.id, String(val ?? ""))}
+                        onChange={(val) =>
+                          updateServiceTeamMember(s.id, String(val ?? ""))
+                        }
                         options={filteredTeamMembers.map((tm) => ({
                           value: tm.id,
                           label: tm.name,
@@ -1645,7 +1972,12 @@ function ClientBookingCreateView() {
                         InputProps={{
                           startAdornment: (
                             <PersonOutlineRoundedIcon
-                              sx={{ fontSize: 18, color: alpha(m.navy, 0.45), ml: 0.5, mr: 0.25 }}
+                              sx={{
+                                fontSize: 18,
+                                color: alpha(m.navy, 0.45),
+                                ml: 0.5,
+                                mr: 0.25,
+                              }}
                             />
                           ),
                         }}
@@ -1663,10 +1995,23 @@ function ClientBookingCreateView() {
                     </Box>
                   </Box>
 
-                  <Stack alignItems="flex-end" spacing={0.35} sx={{ flexShrink: 0, pt: 0.1 }}>
-                    <Stack direction="row" alignItems="flex-start" spacing={0.75}>
+                  <Stack
+                    alignItems="flex-end"
+                    spacing={0.35}
+                    sx={{ flexShrink: 0, pt: 0.1 }}
+                  >
+                    <Stack
+                      direction="row"
+                      alignItems="flex-start"
+                      spacing={0.75}
+                    >
                       <Box sx={{ textAlign: "right" }}>
-                        <Stack direction="row" alignItems="baseline" spacing={0.75} justifyContent="flex-end">
+                        <Stack
+                          direction="row"
+                          alignItems="baseline"
+                          spacing={0.75}
+                          justifyContent="flex-end"
+                        >
                           {typeof s.originalPrice === "number" ? (
                             <Typography
                               sx={{
@@ -1691,7 +2036,14 @@ function ClientBookingCreateView() {
                           </Typography>
                         </Stack>
                         {typeof s.discountPct === "number" ? (
-                          <Typography sx={{ fontSize: 11, fontWeight: 800, color: m.teal, mt: 0.35 }}>
+                          <Typography
+                            sx={{
+                              fontSize: 11,
+                              fontWeight: 800,
+                              color: m.teal,
+                              mt: 0.35,
+                            }}
+                          >
                             {s.discountPct}% Discount
                           </Typography>
                         ) : null}
@@ -1707,7 +2059,10 @@ function ClientBookingCreateView() {
                           height: 26,
                           borderRadius: "999px",
                           color: alpha(m.navy, 0.4),
-                          "&:hover": { bgcolor: alpha(m.navy, 0.06), color: alpha(m.navy, 0.65) },
+                          "&:hover": {
+                            bgcolor: alpha(m.navy, 0.06),
+                            color: alpha(m.navy, 0.65),
+                          },
                         }}
                         aria-label={`Remove ${s.name}`}
                       >
@@ -1726,12 +2081,13 @@ function ClientBookingCreateView() {
               elevation={0}
               sx={{
                 borderRadius: "10px",
-                border: `1px solid ${alpha(m.navy, 0.10)}`,
+                border: `1px solid ${alpha(m.navy, 0.1)}`,
                 px: 1.25,
                 py: 1.1,
                 bgcolor: "#fff",
                 cursor: "default",
-                transition: "border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease",
+                transition:
+                  "border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease",
                 "&:hover": {
                   borderColor: alpha(m.teal, 0.35),
                   boxShadow: "0 6px 18px rgba(16, 35, 63, 0.06)",
@@ -1740,7 +2096,12 @@ function ClientBookingCreateView() {
             >
               <Stack direction="row" alignItems="flex-start" spacing={1.25}>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    justifyContent="space-between"
+                    spacing={1}
+                  >
                     <Typography
                       sx={{
                         fontSize: 12.5,
@@ -1765,11 +2126,24 @@ function ClientBookingCreateView() {
                       {s.price} €
                     </Typography>
                   </Stack>
-                  <Typography sx={{ fontSize: 10.5, fontWeight: 700, color: alpha(m.navy, 0.45), mt: 0.25 }}>
+                  <Typography
+                    sx={{
+                      fontSize: 10.5,
+                      fontWeight: 700,
+                      color: alpha(m.navy, 0.45),
+                      mt: 0.25,
+                    }}
+                  >
                     {s.durationMins} Mins
                   </Typography>
-                  {typeof s.originalPrice === "number" || typeof s.discountPct === "number" ? (
-                    <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mt: 0.35 }}>
+                  {typeof s.originalPrice === "number" ||
+                  typeof s.discountPct === "number" ? (
+                    <Stack
+                      direction="row"
+                      alignItems="center"
+                      spacing={0.75}
+                      sx={{ mt: 0.35 }}
+                    >
                       {typeof s.originalPrice === "number" ? (
                         <Typography
                           sx={{
@@ -1783,7 +2157,13 @@ function ClientBookingCreateView() {
                         </Typography>
                       ) : null}
                       {typeof s.discountPct === "number" ? (
-                        <Typography sx={{ fontSize: 10.5, fontWeight: 800, color: m.teal }}>
+                        <Typography
+                          sx={{
+                            fontSize: 10.5,
+                            fontWeight: 800,
+                            color: m.teal,
+                          }}
+                        >
                           {s.discountPct}% Discount
                         </Typography>
                       ) : null}
@@ -1797,8 +2177,13 @@ function ClientBookingCreateView() {
                       size="small"
                       checked={Boolean(selectedServiceIds[s.id])}
                       onClick={(e) => e.stopPropagation()}
-                      onChange={(e) => toggleServiceSelection(s.id, e.target.checked)}
-                      sx={{ "&.Mui-checked": { color: m.teal }, color: alpha(m.navy, 0.35) }}
+                      onChange={(e) =>
+                        toggleServiceSelection(s.id, e.target.checked)
+                      }
+                      sx={{
+                        "&.Mui-checked": { color: m.teal },
+                        color: alpha(m.navy, 0.35),
+                      }}
                     />
                   ) : null}
                   <IconButton
@@ -1829,7 +2214,14 @@ function ClientBookingCreateView() {
         })}
 
         {visible.length === 0 ? (
-          <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.45), py: 1 }}>
+          <Typography
+            sx={{
+              fontSize: 11.5,
+              fontWeight: 700,
+              color: alpha(m.navy, 0.45),
+              py: 1,
+            }}
+          >
             {serviceTab === "unassigned"
               ? "No unassigned services."
               : isModelOrGuestSelected
@@ -1841,22 +2233,16 @@ function ClientBookingCreateView() {
 
       {serviceTab === "unassigned" && canDirectAssign ? (
         <Box sx={{ mt: 1.25 }}>
-          <Button
+          <AppButton
+            tone="primary"
             fullWidth
-            variant="contained"
-            disableElevation
             onClick={assignSelectedDirect}
             sx={{
-              borderRadius: "10px",
-              textTransform: "none",
-              fontWeight: 900,
               height: 40,
-              bgcolor: m.teal,
-              "&:hover": { bgcolor: m.tealDark },
             }}
           >
             Assign
-          </Button>
+          </AppButton>
         </Box>
       ) : null}
 
@@ -1888,7 +2274,9 @@ function ClientBookingCreateView() {
         >
           <AddRoundedIcon sx={{ fontSize: 14 }} />
         </Box>
-        <Typography sx={{ fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.48) }}>
+        <Typography
+          sx={{ fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.48) }}
+        >
           Service to assignment list
         </Typography>
       </ButtonBase>
@@ -1897,14 +2285,27 @@ function ClientBookingCreateView() {
 
   if (fromProfile && !profileHydrated) {
     return (
-      <Box sx={{ minHeight: 320, display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <Box
+        sx={{
+          minHeight: 320,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
         <CircularProgress />
       </Box>
     );
   }
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "mollure.pageBg", py: { xs: 2, md: 3.5 } }}>
+    <Box
+      sx={{
+        minHeight: "100vh",
+        bgcolor: "mollure.pageBg",
+        py: { xs: 2, md: 3.5 },
+      }}
+    >
       <Container maxWidth="lg">
         <AppModal
           open={addServiceDialogOpen}
@@ -1913,169 +2314,222 @@ function ClientBookingCreateView() {
           maxWidth="sm"
           contentSx={{ px: 2.5, pt: 0.5, pb: 1 }}
           footer={
-            <Stack direction="row" spacing={1.5} justifyContent="flex-end" sx={{ px: 2.5, py: 2 }}>
-              <Button
+            <Stack
+              direction="row"
+              spacing={1.5}
+              justifyContent="flex-end"
+              sx={{ px: 2.5, py: 2 }}
+            >
+              <AppButton
+                tone="secondary"
                 onClick={() => setAddServiceDialogOpen(false)}
-                variant="outlined"
-                sx={{
-                  borderRadius: "10px",
-                  textTransform: "none",
-                  fontWeight: 900,
-                  borderColor: alpha(m.navy, 0.12),
-                  color: alpha(m.navy, 0.72),
-                }}
               >
                 Cancel
-              </Button>
-              <Button
+              </AppButton>
+              <AppButton
+                tone="primary"
                 onClick={confirmAddService}
-                variant="contained"
-                disableElevation
                 disabled={
-                  !Object.values(addServiceCatalogIds).some(Boolean) || !addServiceGuestId || !selectedTeamMemberId
+                  !Object.values(addServiceCatalogIds).some(Boolean) ||
+                  !addServiceGuestId ||
+                  !selectedTeamMemberId
                 }
-                sx={{
-                  borderRadius: "10px",
-                  textTransform: "none",
-                  fontWeight: 900,
-                  bgcolor: m.teal,
-                  "&:hover": { bgcolor: m.tealDark },
-                }}
               >
                 Add service
-              </Button>
+              </AppButton>
             </Stack>
           }
         >
-            <Typography sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.72), mb: 0.75 }}>
-              Professional
-            </Typography>
-            <AppDropdown
-              value={selectedTeamMemberId}
-              onChange={(val) => {
-                const nextId = String(val ?? "");
-                // Desired: one TM for the whole booking. Fixed: only for this add action.
-                if (isDesiredLocation) applySharedTeamMember(nextId);
-                else setSelectedTeamMemberId(nextId);
-                setAddServiceCatalogIds({});
-              }}
-              options={filteredTeamMembers.map((tm) => ({
-                value: tm.id,
-                label: tm.name,
-              }))}
-              placeholder="Select team member"
-              size="small"
-              fullWidth
-              InputProps={{
-                startAdornment: (
-                  <PersonOutlineRoundedIcon
-                    sx={{ fontSize: 18, color: alpha(m.navy, 0.45), ml: 0.5, mr: 0.25 }}
-                  />
-                ),
-              }}
-              sx={{
-                mb: 1.5,
-                "& .MuiOutlinedInput-root": {
-                  borderRadius: "10px",
-                  bgcolor: alpha(m.navy, 0.015),
-                  fontSize: 12,
-                  fontWeight: 700,
-                },
-              }}
-            />
-
-            <Typography sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.72), mb: 0.75 }}>
-              Services
-            </Typography>
-            <Stack spacing={0.5} sx={{ mb: 1.5 }}>
-              {(catalogByTeamMemberId[selectedTeamMemberId] ?? []).map((item) => (
-                <FormControlLabel
-                  key={item.id}
-                  control={
-                    <Checkbox
-                      size="small"
-                      checked={Boolean(addServiceCatalogIds[item.id])}
-                      onChange={(e) =>
-                        setAddServiceCatalogIds((prev) => ({
-                          ...prev,
-                          [item.id]: e.target.checked,
-                        }))
-                      }
-                      sx={{ "&.Mui-checked": { color: m.teal }, color: alpha(m.navy, 0.35) }}
-                    />
-                  }
-                  label={
-                    <Stack direction="row" justifyContent="space-between" sx={{ width: "100%", pr: 1 }}>
-                      <Box>
-                        <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78) }}>
-                          {item.name}
-                        </Typography>
-                        <Typography sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.48) }}>
-                          {item.durationMins} Mins
-                        </Typography>
-                      </Box>
-                      <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78) }}>
-                        {item.price} €
-                      </Typography>
-                    </Stack>
-                  }
+          <Typography
+            sx={{
+              fontSize: 12,
+              fontWeight: 900,
+              color: alpha(m.navy, 0.72),
+              mb: 0.75,
+            }}
+          >
+            Professional
+          </Typography>
+          <AppDropdown
+            value={selectedTeamMemberId}
+            onChange={(val) => {
+              const nextId = String(val ?? "");
+              // Desired: one TM for the whole booking. Fixed: only for this add action.
+              if (isDesiredLocation) applySharedTeamMember(nextId);
+              else setSelectedTeamMemberId(nextId);
+              setAddServiceCatalogIds({});
+            }}
+            options={filteredTeamMembers.map((tm) => ({
+              value: tm.id,
+              label: tm.name,
+            }))}
+            placeholder="Select team member"
+            size="small"
+            fullWidth
+            InputProps={{
+              startAdornment: (
+                <PersonOutlineRoundedIcon
                   sx={{
-                    m: 0,
-                    px: 0.75,
-                    py: 0.5,
-                    borderRadius: "10px",
-                    border: `1px solid ${alpha(m.navy, 0.08)}`,
-                    bgcolor: alpha(m.navy, 0.015),
-                    alignItems: "flex-start",
-                    width: "100%",
-                    "& .MuiFormControlLabel-label": { flex: 1, minWidth: 0 },
+                    fontSize: 18,
+                    color: alpha(m.navy, 0.45),
+                    ml: 0.5,
+                    mr: 0.25,
                   }}
                 />
-              ))}
-            </Stack>
+              ),
+            }}
+            sx={{
+              mb: 1.5,
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "10px",
+                bgcolor: alpha(m.navy, 0.015),
+                fontSize: 12,
+                fontWeight: 700,
+              },
+            }}
+          />
 
-            <Typography sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.72), mb: 0.75 }}>
-              Assign to
-            </Typography>
-            <AppDropdown
-              value={addServiceGuestId}
-              onChange={(val) => setAddServiceGuestId(String(val))}
-              options={serviceAssignees.map((p) => ({
-                value: p.id,
-                label: p.isRequester
-                  ? `${p.name} (Requester)`
-                  : `${p.name} (${getParticipantLabel(p)})`,
-              }))}
-              placeholder="Select person"
-              size="small"
-              fullWidth
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  borderRadius: "12px",
+          <Typography
+            sx={{
+              fontSize: 12,
+              fontWeight: 900,
+              color: alpha(m.navy, 0.72),
+              mb: 0.75,
+            }}
+          >
+            Services
+          </Typography>
+          <Stack spacing={0.5} sx={{ mb: 1.5 }}>
+            {(catalogByTeamMemberId[selectedTeamMemberId] ?? []).map((item) => (
+              <FormControlLabel
+                key={item.id}
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={Boolean(addServiceCatalogIds[item.id])}
+                    onChange={(e) =>
+                      setAddServiceCatalogIds((prev) => ({
+                        ...prev,
+                        [item.id]: e.target.checked,
+                      }))
+                    }
+                    sx={{
+                      "&.Mui-checked": { color: m.teal },
+                      color: alpha(m.navy, 0.35),
+                    }}
+                  />
+                }
+                label={
+                  <Stack
+                    direction="row"
+                    justifyContent="space-between"
+                    sx={{ width: "100%", pr: 1 }}
+                  >
+                    <Box>
+                      <Typography
+                        sx={{
+                          fontSize: 12.5,
+                          fontWeight: 900,
+                          color: alpha(m.navy, 0.78),
+                        }}
+                      >
+                        {item.name}
+                      </Typography>
+                      <Typography
+                        sx={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: alpha(m.navy, 0.48),
+                        }}
+                      >
+                        {item.durationMins} Mins
+                      </Typography>
+                    </Box>
+                    <Typography
+                      sx={{
+                        fontSize: 12.5,
+                        fontWeight: 900,
+                        color: alpha(m.navy, 0.78),
+                      }}
+                    >
+                      {item.price} €
+                    </Typography>
+                  </Stack>
+                }
+                sx={{
+                  m: 0,
+                  px: 0.75,
+                  py: 0.5,
+                  borderRadius: "10px",
+                  border: `1px solid ${alpha(m.navy, 0.08)}`,
                   bgcolor: alpha(m.navy, 0.015),
-                },
-              }}
-            />
+                  alignItems: "flex-start",
+                  width: "100%",
+                  "& .MuiFormControlLabel-label": { flex: 1, minWidth: 0 },
+                }}
+              />
+            ))}
+          </Stack>
+
+          <Typography
+            sx={{
+              fontSize: 12,
+              fontWeight: 900,
+              color: alpha(m.navy, 0.72),
+              mb: 0.75,
+            }}
+          >
+            Assign to
+          </Typography>
+          <AppDropdown
+            value={addServiceGuestId}
+            onChange={(val) => setAddServiceGuestId(String(val))}
+            options={serviceAssignees.map((p) => ({
+              value: p.id,
+              label: p.isRequester
+                ? `${p.name} (Requester)`
+                : `${p.name} (${getParticipantLabel(p)})`,
+            }))}
+            placeholder="Select person"
+            size="small"
+            fullWidth
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                borderRadius: "12px",
+                bgcolor: alpha(m.navy, 0.015),
+              },
+            }}
+          />
         </AppModal>
 
         <AppModal
-      contentSx={{ px: 2.5 }}
-      footerVariant="actions"
+          contentSx={{ px: 2.5 }}
+          footerVariant="actions"
           open={Boolean(servicePendingRemove)}
           title="Remove service"
           onClose={() => setServicePendingRemove(null)}
           headerTone="danger"
           footer={
             <>
-              <MessagingModalCancelButton onClick={() => setServicePendingRemove(null)} />
-              <MessagingModalPrimaryButton label="Confirm" onClick={confirmRemoveService} />
+              <MessagingModalCancelButton
+                onClick={() => setServicePendingRemove(null)}
+              />
+              <MessagingModalPrimaryButton
+                label="Confirm"
+                onClick={confirmRemoveService}
+              />
             </>
           }
         >
           <Box sx={{ py: 2, textAlign: "center" }}>
-            <Typography sx={{ fontWeight: 900, fontSize: 14, color: alpha(m.navy, 0.85) }}>
+            <Typography
+              sx={{ fontWeight: 900, fontSize: 14, color: alpha(m.navy, 0.85) }}
+            >
               Do you want to remove this service
-              {servicePendingRemove?.name ? ` (${servicePendingRemove.name})` : ""}?
+              {servicePendingRemove?.name
+                ? ` (${servicePendingRemove.name})`
+                : ""}
+              ?
             </Typography>
           </Box>
         </AppModal>
@@ -2091,7 +2545,9 @@ function ClientBookingCreateView() {
           }}
         >
           <Box sx={{ px: { xs: 2, md: 2.5 }, py: 1.75 }}>
-            <Typography sx={{ fontWeight: 900, color: alpha(m.navy, 0.86), fontSize: 14 }}>
+            <Typography
+              sx={{ fontWeight: 900, color: alpha(m.navy, 0.86), fontSize: 14 }}
+            >
               Booking Details
             </Typography>
           </Box>
@@ -2112,7 +2568,13 @@ function ClientBookingCreateView() {
                 >
                   {/* Month + day strip */}
                   <Box id="booking-calendar-section" sx={{ p: 1.5 }}>
-                    <Stack direction="row" alignItems="center" spacing={1} justifyContent="center" sx={{ mb: 1.25 }}>
+                    <Stack
+                      direction="row"
+                      alignItems="center"
+                      spacing={1}
+                      justifyContent="center"
+                      sx={{ mb: 1.25 }}
+                    >
                       <IconButton
                         size="small"
                         onClick={() =>
@@ -2121,19 +2583,21 @@ function ClientBookingCreateView() {
                             return isPastDay(next) ? today0 : next;
                           })
                         }
-                        disabled={
-                          (() => {
-                            const prevMonth = addMonths(selectedDate, -1);
-                            return isPastDay(prevMonth);
-                          })()
-                        }
+                        disabled={(() => {
+                          const prevMonth = addMonths(selectedDate, -1);
+                          return isPastDay(prevMonth);
+                        })()}
                         sx={{
                           width: 24,
                           height: 24,
                           border: `1px solid ${alpha(m.teal, 0.45)}`,
                           color: m.teal,
                           ...(isPastDay(addMonths(selectedDate, -1))
-                            ? { opacity: 0.45, borderColor: alpha(m.navy, 0.10), color: alpha(m.navy, 0.35) }
+                            ? {
+                                opacity: 0.45,
+                                borderColor: alpha(m.navy, 0.1),
+                                color: alpha(m.navy, 0.35),
+                              }
                             : null),
                         }}
                       >
@@ -2151,10 +2615,18 @@ function ClientBookingCreateView() {
                           "&:hover": { bgcolor: alpha(m.navy, 0.03) },
                         }}
                       >
-                        <Typography sx={{ fontWeight: 900, color: alpha(m.navy, 0.78), fontSize: 13 }}>
+                        <Typography
+                          sx={{
+                            fontWeight: 900,
+                            color: alpha(m.navy, 0.78),
+                            fontSize: 13,
+                          }}
+                        >
                           {monthLabel}
                         </Typography>
-                        <KeyboardArrowDownRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.5) }} />
+                        <KeyboardArrowDownRoundedIcon
+                          sx={{ fontSize: 18, color: alpha(m.navy, 0.5) }}
+                        />
                       </ButtonBase>
                       <IconButton
                         size="small"
@@ -2191,17 +2663,25 @@ function ClientBookingCreateView() {
                           onClick={(e) => e.stopPropagation()}
                           sx={{
                             position: "absolute",
-                            left: monthPickerAnchor.getBoundingClientRect().left,
-                            top: monthPickerAnchor.getBoundingClientRect().bottom + 6,
+                            left: monthPickerAnchor.getBoundingClientRect()
+                              .left,
+                            top:
+                              monthPickerAnchor.getBoundingClientRect().bottom +
+                              6,
                             width: 260,
                             borderRadius: "12px",
-                            border: `1px solid ${alpha(m.navy, 0.10)}`,
+                            border: `1px solid ${alpha(m.navy, 0.1)}`,
                             bgcolor: "#fff",
                             boxShadow: "0 18px 44px rgba(16,35,63,0.18)",
                             p: 1.25,
                           }}
                         >
-                          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+                          <Stack
+                            direction="row"
+                            alignItems="center"
+                            justifyContent="space-between"
+                            sx={{ mb: 1 }}
+                          >
                             <IconButton
                               size="small"
                               onClick={() => {
@@ -2218,29 +2698,44 @@ function ClientBookingCreateView() {
                               }}
                               disabled={(() => {
                                 const probe = new Date(selectedDate);
-                                probe.setFullYear(monthPickerYear - 1, monthPickerMonth, 1);
+                                probe.setFullYear(
+                                  monthPickerYear - 1,
+                                  monthPickerMonth,
+                                  1,
+                                );
                                 return isPastDay(probe);
                               })()}
                               sx={{
                                 width: 30,
                                 height: 30,
                                 borderRadius: "10px",
-                                border: `1px solid ${alpha(m.navy, 0.10)}`,
+                                border: `1px solid ${alpha(m.navy, 0.1)}`,
                               }}
                             >
                               <ChevronLeftRoundedIcon sx={{ fontSize: 18 }} />
                             </IconButton>
-                            <Typography sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.8) }}>
+                            <Typography
+                              sx={{
+                                fontWeight: 900,
+                                fontSize: 13,
+                                color: alpha(m.navy, 0.8),
+                              }}
+                            >
                               {monthPickerYear}
                             </Typography>
                             <IconButton
                               size="small"
-                              onClick={() => setMonthYear(monthPickerYear + 1, monthPickerMonth)}
+                              onClick={() =>
+                                setMonthYear(
+                                  monthPickerYear + 1,
+                                  monthPickerMonth,
+                                )
+                              }
                               sx={{
                                 width: 30,
                                 height: 30,
                                 borderRadius: "10px",
-                                border: `1px solid ${alpha(m.navy, 0.10)}`,
+                                border: `1px solid ${alpha(m.navy, 0.1)}`,
                               }}
                             >
                               <ChevronRightRoundedIcon sx={{ fontSize: 18 }} />
@@ -2249,17 +2744,21 @@ function ClientBookingCreateView() {
 
                           <Grid container spacing={1}>
                             {Array.from({ length: 12 }, (_, i) => {
-                              const label = new Date(monthPickerYear, i, 1).toLocaleDateString("en-US", { month: "short" });
+                              const label = new Date(
+                                monthPickerYear,
+                                i,
+                                1,
+                              ).toLocaleDateString("en-US", { month: "short" });
                               const active = i === monthPickerMonth;
                               const probe = new Date(selectedDate);
                               probe.setFullYear(monthPickerYear, i, 1);
                               const disabled = isPastDay(probe);
                               return (
                                 <Grid item xs={4} key={i}>
-                                  <Button
+                                  <AppButton
+                                    tone="primary"
                                     fullWidth
                                     variant={active ? "contained" : "outlined"}
-                                    disableElevation
                                     disabled={disabled}
                                     onClick={() => {
                                       if (disabled) return;
@@ -2267,19 +2766,19 @@ function ClientBookingCreateView() {
                                       setMonthPickerAnchor(null);
                                     }}
                                     sx={{
-                                      borderRadius: "10px",
-                                      textTransform: "none",
-                                      fontWeight: 900,
                                       fontSize: 11.5,
                                       height: 34,
-                                      ...(active
-                                        ? { bgcolor: m.teal, "&:hover": { bgcolor: m.tealDark } }
-                                        : { borderColor: alpha(m.navy, 0.10), color: alpha(m.navy, 0.68) }),
+                                      ...(!active
+                                        ? {
+                                            borderColor: alpha(m.navy, 0.1),
+                                            color: alpha(m.navy, 0.68),
+                                          }
+                                        : {}),
                                       ...(disabled ? { opacity: 0.45 } : null),
                                     }}
                                   >
                                     {label}
-                                  </Button>
+                                  </AppButton>
                                 </Grid>
                               );
                             })}
@@ -2305,7 +2804,11 @@ function ClientBookingCreateView() {
                           color: m.teal,
                           flexShrink: 0,
                           ...(isPastDay(addDays(selectedDate, -7))
-                            ? { opacity: 0.45, borderColor: alpha(m.navy, 0.10), color: alpha(m.navy, 0.35) }
+                            ? {
+                                opacity: 0.45,
+                                borderColor: alpha(m.navy, 0.1),
+                                color: alpha(m.navy, 0.35),
+                              }
                             : null),
                         }}
                       >
@@ -2334,7 +2837,7 @@ function ClientBookingCreateView() {
                                 flex: 1,
                                 minWidth: 0,
                                 borderRadius: "8px",
-                                border: `1px solid ${active ? alpha(m.teal, 0.6) : alpha(m.navy, 0.10)}`,
+                                border: `1px solid ${active ? alpha(m.teal, 0.6) : alpha(m.navy, 0.1)}`,
                                 bgcolor: active ? m.teal : "#fff",
                                 py: 0.9,
                                 display: "flex",
@@ -2350,10 +2853,22 @@ function ClientBookingCreateView() {
                                   : null),
                               }}
                             >
-                              <Typography sx={{ fontSize: 10, fontWeight: 800, color: active ? "#fff" : alpha(m.navy, 0.55) }}>
+                              <Typography
+                                sx={{
+                                  fontSize: 10,
+                                  fontWeight: 800,
+                                  color: active ? "#fff" : alpha(m.navy, 0.55),
+                                }}
+                              >
                                 {d.dow}
                               </Typography>
-                              <Typography sx={{ fontSize: 13.5, fontWeight: 900, color: active ? "#fff" : alpha(m.navy, 0.76) }}>
+                              <Typography
+                                sx={{
+                                  fontSize: 13.5,
+                                  fontWeight: 900,
+                                  color: active ? "#fff" : alpha(m.navy, 0.76),
+                                }}
+                              >
                                 {d.day}
                               </Typography>
                             </ButtonBase>
@@ -2390,10 +2905,23 @@ function ClientBookingCreateView() {
                         py: 1.1,
                       }}
                     >
-                      <Typography sx={{ fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.62) }}>
+                      <Typography
+                        sx={{
+                          fontSize: 11,
+                          fontWeight: 800,
+                          color: alpha(m.navy, 0.62),
+                        }}
+                      >
                         Select Time
                       </Typography>
-                      <Box sx={{ height: 1, bgcolor: alpha(m.navy, 0.08), mt: 1, mb: 1.25 }} />
+                      <Box
+                        sx={{
+                          height: 1,
+                          bgcolor: alpha(m.navy, 0.08),
+                          mt: 1,
+                          mb: 1.25,
+                        }}
+                      />
 
                       <Stack direction="row" alignItems="center" spacing={0.75}>
                         <IconButton
@@ -2404,7 +2932,7 @@ function ClientBookingCreateView() {
                             height: 32,
                             flexShrink: 0,
                             borderRadius: "10px",
-                            border: `1px solid ${alpha(m.navy, 0.10)}`,
+                            border: `1px solid ${alpha(m.navy, 0.1)}`,
                             color: alpha(m.navy, 0.55),
                             bgcolor: "#fff",
                           }}
@@ -2430,52 +2958,44 @@ function ClientBookingCreateView() {
                             const active = t === selectedTime;
                             const unavailable = isTimeUnavailable(t);
                             return (
-                              <Button
+                              <AppButton
+                                tone="primary"
                                 key={t}
                                 data-time-slot={t}
                                 variant={active ? "contained" : "outlined"}
                                 onClick={() => {
                                   if (unavailable) {
-                                    setTimeValidationError(CLIENT_BOOKING_MIN_LEAD_ERROR);
+                                    setTimeValidationError(
+                                      CLIENT_BOOKING_MIN_LEAD_ERROR,
+                                    );
                                     return;
                                   }
                                   setTimeValidationError(null);
                                   setSelectedTime(t);
                                 }}
                                 disabled={unavailable}
-                                disableElevation
                                 sx={{
                                   flexShrink: 0,
                                   minWidth: 76,
                                   px: 1.25,
-                                  borderRadius: "8px",
-                                  textTransform: "none",
                                   height: 32,
                                   fontSize: 11.5,
-                                  fontWeight: 900,
                                   whiteSpace: "nowrap",
                                   ...(unavailable
                                     ? {
                                         borderColor: alpha(m.navy, 0.08),
-                                        bgcolor: alpha(m.navy, 0.03),
                                         color: alpha(m.navy, 0.32),
-                                        "&.Mui-disabled": {
-                                          borderColor: alpha(m.navy, 0.08),
-                                          bgcolor: alpha(m.navy, 0.03),
-                                          color: alpha(m.navy, 0.32),
-                                        },
                                       }
-                                    : active
-                                      ? { bgcolor: m.teal, color: "#fff", "&:hover": { bgcolor: m.tealDark } }
-                                      : {
-                                          borderColor: alpha(m.navy, 0.10),
-                                          bgcolor: "#fff",
+                                    : !active
+                                      ? {
+                                          borderColor: alpha(m.navy, 0.1),
                                           color: alpha(m.navy, 0.65),
-                                        }),
+                                        }
+                                      : {}),
                                 }}
                               >
                                 {t}
-                              </Button>
+                              </AppButton>
                             );
                           })}
                         </Box>
@@ -2488,7 +3008,7 @@ function ClientBookingCreateView() {
                             height: 32,
                             flexShrink: 0,
                             borderRadius: "10px",
-                            border: `1px solid ${alpha(m.navy, 0.10)}`,
+                            border: `1px solid ${alpha(m.navy, 0.1)}`,
                             color: alpha(m.navy, 0.55),
                             bgcolor: "#fff",
                           }}
@@ -2517,13 +3037,24 @@ function ClientBookingCreateView() {
                           control={
                             <Checkbox
                               checked={combineServices}
-                              onChange={(e) => setCombineServices(e.target.checked)}
+                              onChange={(e) =>
+                                setCombineServices(e.target.checked)
+                              }
                               size="small"
-                              sx={{ color: alpha(m.navy, 0.35), "&.Mui-checked": { color: m.teal } }}
+                              sx={{
+                                color: alpha(m.navy, 0.35),
+                                "&.Mui-checked": { color: m.teal },
+                              }}
                             />
                           }
                           label={
-                            <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: alpha(m.navy, 0.62) }}>
+                            <Typography
+                              sx={{
+                                fontSize: 11.5,
+                                fontWeight: 800,
+                                color: alpha(m.navy, 0.62),
+                              }}
+                            >
                               Combine Services
                             </Typography>
                           }
@@ -2531,134 +3062,195 @@ function ClientBookingCreateView() {
                         />
 
                         {isDesiredLocation ? (
-                          <Box id="booking-project-section" sx={{ width: "100%", mt: 1.25, textAlign: "left" }}>
-                            <Typography sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.78), mb: 1.25 }}>
+                          <Box
+                            id="booking-project-section"
+                            sx={{ width: "100%", mt: 1.25, textAlign: "left" }}
+                          >
+                            <Typography
+                              sx={{
+                                fontSize: 12,
+                                fontWeight: 900,
+                                color: alpha(m.navy, 0.78),
+                                mb: 1.25,
+                              }}
+                            >
                               Project Details
                             </Typography>
-                                <Typography sx={{ fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.62), mb: 0.5 }}>
-                                  Description
-                                </Typography>
-                                <TextField
-                                  value={projectDescription}
-                                  onChange={(e) => setProjectDescription(e.target.value)}
-                                  placeholder="Project description"
-                                  multiline
-                                  minRows={3}
-                                  fullWidth
-                                  sx={{
-                                    mb: 1.5,
-                                    "& .MuiOutlinedInput-root": {
-                                      borderRadius: "10px",
-                                      bgcolor: "#fff",
-                                      fontSize: 12,
-                                    },
-                                  }}
-                                />
-                                <Typography sx={{ fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.62), mb: 0.75 }}>
-                                  Upload Section
-                                </Typography>
+                            <Typography
+                              sx={{
+                                fontSize: 11,
+                                fontWeight: 800,
+                                color: alpha(m.navy, 0.62),
+                                mb: 0.5,
+                              }}
+                            >
+                              Description
+                            </Typography>
+                            <TextField
+                              value={projectDescription}
+                              onChange={(e) =>
+                                setProjectDescription(e.target.value)
+                              }
+                              placeholder="Project description"
+                              multiline
+                              minRows={3}
+                              fullWidth
+                              sx={{
+                                mb: 1.5,
+                                "& .MuiOutlinedInput-root": {
+                                  borderRadius: "10px",
+                                  bgcolor: "#fff",
+                                  fontSize: 12,
+                                },
+                              }}
+                            />
+                            <Typography
+                              sx={{
+                                fontSize: 11,
+                                fontWeight: 800,
+                                color: alpha(m.navy, 0.62),
+                                mb: 0.75,
+                              }}
+                            >
+                              Upload Section
+                            </Typography>
+                            <Box
+                              component="button"
+                              type="button"
+                              onClick={() =>
+                                projectFileInputRef.current?.click()
+                              }
+                              sx={{
+                                width: "100%",
+                                border: `1px dashed ${alpha(m.navy, 0.18)}`,
+                                borderRadius: "10px",
+                                bgcolor: "#fff",
+                                py: 2.5,
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: 0.75,
+                                cursor: "pointer",
+                                mb: 1.25,
+                                "&:hover": {
+                                  bgcolor: alpha(m.teal, 0.04),
+                                  borderColor: alpha(m.teal, 0.35),
+                                },
+                              }}
+                            >
+                              <FileUploadOutlinedIcon
+                                sx={{
+                                  fontSize: 28,
+                                  color: alpha(m.navy, 0.35),
+                                }}
+                              />
+                              <Typography
+                                sx={{
+                                  fontSize: 11.5,
+                                  fontWeight: 800,
+                                  color: alpha(m.navy, 0.48),
+                                }}
+                              >
+                                Upload Image &amp; Documents
+                              </Typography>
+                            </Box>
+                            <input
+                              ref={projectFileInputRef}
+                              type="file"
+                              accept="image/*,.pdf"
+                              multiple
+                              hidden
+                              onChange={handleProjectFilePick}
+                            />
+                            <Stack
+                              direction="row"
+                              spacing={1}
+                              sx={{ overflowX: "auto", pb: 0.5 }}
+                            >
+                              {projectUploads.map((img) => (
                                 <Box
-                                  component="button"
-                                  type="button"
-                                  onClick={() => projectFileInputRef.current?.click()}
+                                  key={img.id}
                                   sx={{
-                                    width: "100%",
-                                    border: `1px dashed ${alpha(m.navy, 0.18)}`,
-                                    borderRadius: "10px",
-                                    bgcolor: "#fff",
-                                    py: 2.5,
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    gap: 0.75,
-                                    cursor: "pointer",
-                                    mb: 1.25,
-                                    "&:hover": { bgcolor: alpha(m.teal, 0.04), borderColor: alpha(m.teal, 0.35) },
+                                    flex: "0 0 88px",
+                                    minWidth: 88,
+                                    position: "relative",
                                   }}
                                 >
-                                  <FileUploadOutlinedIcon sx={{ fontSize: 28, color: alpha(m.navy, 0.35) }} />
-                                  <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: alpha(m.navy, 0.48) }}>
-                                    Upload Image &amp; Documents
-                                  </Typography>
-                                </Box>
-                                <input
-                                  ref={projectFileInputRef}
-                                  type="file"
-                                  accept="image/*,.pdf"
-                                  multiple
-                                  hidden
-                                  onChange={handleProjectFilePick}
-                                />
-                                <Stack direction="row" spacing={1} sx={{ overflowX: "auto", pb: 0.5 }}>
-                                  {projectUploads.map((img) => (
-                                    <Box key={img.id} sx={{ flex: "0 0 88px", minWidth: 88, position: "relative" }}>
-                                      <IconButton
-                                        size="small"
-                                        onClick={() => deleteProjectUpload(img.id)}
-                                        aria-label={`Remove ${img.name}`}
-                                        sx={{
-                                          position: "absolute",
-                                          top: 4,
-                                          right: 4,
-                                          zIndex: 1,
-                                          width: 20,
-                                          height: 20,
-                                          bgcolor: alpha(m.navy, 0.55),
-                                          color: "#fff",
-                                          "&:hover": { bgcolor: alpha(m.navy, 0.72) },
-                                        }}
-                                      >
-                                        <CloseRoundedIcon sx={{ fontSize: 12 }} />
-                                      </IconButton>
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => deleteProjectUpload(img.id)}
+                                    aria-label={`Remove ${img.name}`}
+                                    sx={{
+                                      position: "absolute",
+                                      top: 4,
+                                      right: 4,
+                                      zIndex: 1,
+                                      width: 20,
+                                      height: 20,
+                                      bgcolor: alpha(m.navy, 0.55),
+                                      color: "#fff",
+                                      "&:hover": {
+                                        bgcolor: alpha(m.navy, 0.72),
+                                      },
+                                    }}
+                                  >
+                                    <CloseRoundedIcon sx={{ fontSize: 12 }} />
+                                  </IconButton>
+                                  <Box
+                                    sx={{
+                                      width: 88,
+                                      height: 62,
+                                      borderRadius: "8px",
+                                      border: `1px solid ${alpha(m.navy, 0.08)}`,
+                                      overflow: "hidden",
+                                      bgcolor: alpha(m.navy, 0.04),
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                    }}
+                                  >
+                                    {img.file.type.startsWith("image/") ? (
                                       <Box
+                                        component="img"
+                                        src={img.previewUrl}
+                                        alt={img.name}
                                         sx={{
-                                          width: 88,
-                                          height: 62,
-                                          borderRadius: "8px",
-                                          border: `1px solid ${alpha(m.navy, 0.08)}`,
-                                          overflow: "hidden",
-                                          bgcolor: alpha(m.navy, 0.04),
-                                          display: "flex",
-                                          alignItems: "center",
-                                          justifyContent: "center",
+                                          width: "100%",
+                                          height: "100%",
+                                          objectFit: "cover",
+                                          display: "block",
                                         }}
-                                      >
-                                        {img.file.type.startsWith("image/") ? (
-                                          <Box
-                                            component="img"
-                                            src={img.previewUrl}
-                                            alt={img.name}
-                                            sx={{
-                                              width: "100%",
-                                              height: "100%",
-                                              objectFit: "cover",
-                                              display: "block",
-                                            }}
-                                          />
-                                        ) : (
-                                          <Typography sx={{ fontSize: 10, fontWeight: 800, color: alpha(m.navy, 0.45) }}>
-                                            PDF
-                                          </Typography>
-                                        )}
-                                      </Box>
+                                      />
+                                    ) : (
                                       <Typography
                                         sx={{
-                                          mt: 0.4,
-                                          fontSize: 9,
+                                          fontSize: 10,
                                           fontWeight: 800,
-                                          color: alpha(m.navy, 0.48),
-                                          textAlign: "center",
-                                          whiteSpace: "nowrap",
-                                          overflow: "hidden",
-                                          textOverflow: "ellipsis",
+                                          color: alpha(m.navy, 0.45),
                                         }}
                                       >
-                                        {img.name}
+                                        PDF
                                       </Typography>
-                                    </Box>
-                                  ))}
-                                </Stack>
+                                    )}
+                                  </Box>
+                                  <Typography
+                                    sx={{
+                                      mt: 0.4,
+                                      fontSize: 9,
+                                      fontWeight: 800,
+                                      color: alpha(m.navy, 0.48),
+                                      textAlign: "center",
+                                      whiteSpace: "nowrap",
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                    }}
+                                  >
+                                    {img.name}
+                                  </Typography>
+                                </Box>
+                              ))}
+                            </Stack>
                           </Box>
                         ) : null}
                       </Stack>
@@ -2680,7 +3272,10 @@ function ClientBookingCreateView() {
                             borderColor: alpha(m.navy, 0.12),
                             color: alpha(m.navy, 0.62),
                             "& .MuiChip-icon": { color: m.teal, ml: 0.8 },
-                            "&:hover": { bgcolor: alpha(m.teal, 0.06), borderColor: alpha(m.teal, 0.35) },
+                            "&:hover": {
+                              bgcolor: alpha(m.teal, 0.06),
+                              borderColor: alpha(m.teal, 0.35),
+                            },
                           }}
                         />
                       </Stack>
@@ -2692,10 +3287,19 @@ function ClientBookingCreateView() {
                   {/* People */}
                   <Box id="booking-services-section" sx={{ p: 1.5 }}>
                     {isDesiredLocation ? (
-                      <Stack direction="row" alignItems="center" justifyContent="flex-end" sx={{ mb: 1 }}>
-                        <Button
+                      <Stack
+                        direction="row"
+                        alignItems="center"
+                        justifyContent="flex-end"
+                        sx={{ mb: 1 }}
+                      >
+                        <AppButton
                           variant="outlined"
-                          endIcon={<KeyboardArrowDownRoundedIcon sx={{ fontSize: 16 }} />}
+                          endIcon={
+                            <KeyboardArrowDownRoundedIcon
+                              sx={{ fontSize: 16 }}
+                            />
+                          }
                           startIcon={
                             <Box
                               component="span"
@@ -2713,10 +3317,14 @@ function ClientBookingCreateView() {
                                 lineHeight: 0,
                               }}
                             >
-                              <AddRoundedIcon sx={{ fontSize: 14, display: "block" }} />
+                              <AddRoundedIcon
+                                sx={{ fontSize: 14, display: "block" }}
+                              />
                             </Box>
                           }
-                          onClick={(e) => setParticipantMenuAnchor(e.currentTarget)}
+                          onClick={(e) =>
+                            setParticipantMenuAnchor(e.currentTarget)
+                          }
                           sx={{
                             display: "inline-flex",
                             alignItems: "center",
@@ -2742,34 +3350,60 @@ function ClientBookingCreateView() {
                             },
                             "& .MuiButton-startIcon": { mr: 0.75, ml: 0 },
                             "& .MuiButton-endIcon": { ml: 0.35, mr: 0 },
-                            "& .MuiButton-startIcon > *:nth-of-type(1)": { fontSize: "inherit" },
+                            "& .MuiButton-startIcon > *:nth-of-type(1)": {
+                              fontSize: "inherit",
+                            },
                           }}
                         >
                           Add
-                        </Button>
+                        </AppButton>
                         <Menu
                           anchorEl={participantMenuAnchor}
                           open={Boolean(participantMenuAnchor)}
                           onClose={() => setParticipantMenuAnchor(null)}
-                          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-                          transformOrigin={{ vertical: "top", horizontal: "right" }}
-                          PaperProps={{ sx: { borderRadius: "10px", minWidth: 140, mt: 0.5 } }}
+                          anchorOrigin={{
+                            vertical: "bottom",
+                            horizontal: "right",
+                          }}
+                          transformOrigin={{
+                            vertical: "top",
+                            horizontal: "right",
+                          }}
+                          PaperProps={{
+                            sx: {
+                              borderRadius: "10px",
+                              minWidth: 140,
+                              mt: 0.5,
+                            },
+                          }}
                         >
                           <MenuItem
                             onClick={() => addParticipant("Guest")}
-                            sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.78) }}
+                            sx={{
+                              fontSize: 12,
+                              fontWeight: 900,
+                              color: alpha(m.navy, 0.78),
+                            }}
                           >
                             Guest
                           </MenuItem>
                           <MenuItem
                             onClick={() => addParticipant("Model")}
-                            sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.78) }}
+                            sx={{
+                              fontSize: 12,
+                              fontWeight: 900,
+                              color: alpha(m.navy, 0.78),
+                            }}
                           >
                             Model
                           </MenuItem>
                           <MenuItem
                             onClick={() => addParticipant("Planning")}
-                            sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.78) }}
+                            sx={{
+                              fontSize: 12,
+                              fontWeight: 900,
+                              color: alpha(m.navy, 0.78),
+                            }}
                           >
                             Planning
                           </MenuItem>
@@ -2798,7 +3432,9 @@ function ClientBookingCreateView() {
                             }}
                             onDrop={(e) => {
                               e.preventDefault();
-                              const from = e.dataTransfer.getData("text/plain") || draggingPersonId;
+                              const from =
+                                e.dataTransfer.getData("text/plain") ||
+                                draggingPersonId;
                               if (!from) return;
                               reorderPeople(from, p.id);
                               setDraggingPersonId(null);
@@ -2806,20 +3442,25 @@ function ClientBookingCreateView() {
                             sx={{
                               flex: 1,
                               borderRadius: "10px",
-                              border: `1px solid ${active ? alpha(m.teal, 0.7) : alpha(m.navy, 0.10)}`,
+                              border: `1px solid ${active ? alpha(m.teal, 0.7) : alpha(m.navy, 0.1)}`,
                               bgcolor: "#fff",
                               px: 1,
                               pt: 1.05,
                               pb: 0.75,
                               cursor: "pointer",
-                              boxShadow: active ? `0 0 0 4px ${alpha(m.teal, 0.08)}` : "none",
+                              boxShadow: active
+                                ? `0 0 0 4px ${alpha(m.teal, 0.08)}`
+                                : "none",
                               position: "relative",
                               minHeight: 72,
                               overflow: "visible",
                               ...(draggingPersonId === p.id
                                 ? { opacity: 0.7 }
                                 : draggingPersonId
-                                  ? { outline: `2px dashed ${alpha(m.teal, 0.45)}`, outlineOffset: "2px" }
+                                  ? {
+                                      outline: `2px dashed ${alpha(m.teal, 0.45)}`,
+                                      outlineOffset: "2px",
+                                    }
                                   : null),
                             }}
                             onClick={() => {
@@ -2854,23 +3495,43 @@ function ClientBookingCreateView() {
                                 }}
                                 aria-label={`Remove ${p.name}`}
                               >
-                                <DeleteOutlineRoundedIcon sx={{ fontSize: 14 }} />
+                                <DeleteOutlineRoundedIcon
+                                  sx={{ fontSize: 14 }}
+                                />
                               </IconButton>
                             ) : null}
 
-                            <Stack spacing={0.55} sx={{ pb: p.isRequester ? 0 : 2.25, alignItems: "center" }}>
+                            <Stack
+                              spacing={0.55}
+                              sx={{
+                                pb: p.isRequester ? 0 : 2.25,
+                                alignItems: "center",
+                              }}
+                            >
                               {p.isRequester ? (
-                                <Typography sx={{ fontWeight: 900, fontSize: 12.5, color: alpha(m.navy, 0.82) }}>
+                                <Typography
+                                  sx={{
+                                    fontWeight: 900,
+                                    fontSize: 12.5,
+                                    color: alpha(m.navy, 0.82),
+                                  }}
+                                >
                                   {p.name}
                                 </Typography>
                               ) : (
                                 <Box
-                                  sx={{ display: "flex", justifyContent: "center", width: "100%" }}
+                                  sx={{
+                                    display: "flex",
+                                    justifyContent: "center",
+                                    width: "100%",
+                                  }}
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   <TextField
                                     value={p.name}
-                                    onChange={(e) => updateGuestName(p.id, e.target.value)}
+                                    onChange={(e) =>
+                                      updateGuestName(p.id, e.target.value)
+                                    }
                                     size="small"
                                     inputProps={{
                                       "aria-label": `${getParticipantLabel(p)} name`,
@@ -2931,12 +3592,20 @@ function ClientBookingCreateView() {
                         gap: 0.75,
                       }}
                     >
-                      <InfoOutlinedIcon sx={{ fontSize: 16, color: m.teal, flexShrink: 0 }} />
-                      <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: alpha(m.navy, 0.6), lineHeight: 1.2 }}>
+                      <InfoOutlinedIcon
+                        sx={{ fontSize: 16, color: m.teal, flexShrink: 0 }}
+                      />
+                      <Typography
+                        sx={{
+                          fontSize: 11.5,
+                          fontWeight: 800,
+                          color: alpha(m.navy, 0.6),
+                          lineHeight: 1.2,
+                        }}
+                      >
                         Assign Services By Selecting The Person
                       </Typography>
                     </Box>
-
                   </Box>
 
                   {isDesiredLocation && isPlanningCardSelected ? (
@@ -2962,18 +3631,29 @@ function ClientBookingCreateView() {
                   }}
                 >
                   <Box sx={{ px: 1.8, pt: 1.2, pb: 1.05 }}>
-                    <Typography sx={{ fontWeight: 900, color: alpha(m.navy, 0.72), fontSize: 13, textAlign: "center" }}>
+                    <Typography
+                      sx={{
+                        fontWeight: 900,
+                        color: alpha(m.navy, 0.72),
+                        fontSize: 13,
+                        textAlign: "center",
+                      }}
+                    >
                       Service Summary
                     </Typography>
 
                     <Box sx={{ mt: 0.8 }}>
                       <Chip
-                        label={shop?.locationMode === "desired" ? "Desired Location" : "Fixed Location"}
+                        label={
+                          shop?.locationMode === "desired"
+                            ? "Desired Location"
+                            : "Fixed Location"
+                        }
                         size="small"
                         sx={{
                           height: 18,
                           borderRadius: "2px",
-                          bgcolor: alpha(m.teal, 0.10),
+                          bgcolor: alpha(m.teal, 0.1),
                           color: m.teal,
                           fontSize: 9.5,
                           fontWeight: 900,
@@ -2982,7 +3662,15 @@ function ClientBookingCreateView() {
                       />
                     </Box>
 
-                    <Typography sx={{ mt: 0.65, fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 15, lineHeight: 1.2 }}>
+                    <Typography
+                      sx={{
+                        mt: 0.65,
+                        fontWeight: 900,
+                        color: alpha(m.navy, 0.88),
+                        fontSize: 15,
+                        lineHeight: 1.2,
+                      }}
+                    >
                       {shop?.shopName ?? "Beyond Beauty Salon"}
                     </Typography>
 
@@ -2992,8 +3680,15 @@ function ClientBookingCreateView() {
                       justifyContent="space-between"
                       sx={{ mt: 0.65, gap: 1.25, minWidth: 0 }}
                     >
-                      <Stack direction="row" alignItems="center" spacing={0.55} sx={{ minWidth: 0, flex: 1 }}>
-                        <AccessTimeRoundedIcon sx={{ fontSize: 15, color: m.teal, flexShrink: 0 }} />
+                      <Stack
+                        direction="row"
+                        alignItems="center"
+                        spacing={0.55}
+                        sx={{ minWidth: 0, flex: 1 }}
+                      >
+                        <AccessTimeRoundedIcon
+                          sx={{ fontSize: 15, color: m.teal, flexShrink: 0 }}
+                        />
                         <Typography
                           sx={{
                             fontWeight: 800,
@@ -3010,7 +3705,8 @@ function ClientBookingCreateView() {
                             month: "short",
                             year: "numeric",
                           })}{" "}
-                          ({fmtMinutesToTimeLabel(bookingStartMinutes)} – {fmtMinutesToTimeLabel(bookingEndMinutes)})
+                          ({fmtMinutesToTimeLabel(bookingStartMinutes)} –{" "}
+                          {fmtMinutesToTimeLabel(bookingEndMinutes)})
                         </Typography>
                       </Stack>
 
@@ -3018,9 +3714,20 @@ function ClientBookingCreateView() {
                         direction="row"
                         alignItems="center"
                         spacing={0.45}
-                        sx={{ minWidth: 0, maxWidth: "46%", justifyContent: "flex-end", flexShrink: 0 }}
+                        sx={{
+                          minWidth: 0,
+                          maxWidth: "46%",
+                          justifyContent: "flex-end",
+                          flexShrink: 0,
+                        }}
                       >
-                        <LocationOnOutlinedIcon sx={{ fontSize: 15, color: alpha(m.navy, 0.45), flexShrink: 0 }} />
+                        <LocationOnOutlinedIcon
+                          sx={{
+                            fontSize: 15,
+                            color: alpha(m.navy, 0.45),
+                            flexShrink: 0,
+                          }}
+                        />
                         <Typography
                           sx={{
                             fontWeight: 800,
@@ -3041,135 +3748,214 @@ function ClientBookingCreateView() {
 
                   <Box sx={{ p: 1.6 }}>
                     <Stack spacing={1.25}>
-                      {summarySections.map(({ key, title, items, planningItem, teamMemberLabel }) => {
-                        const uniqueTeamMemberLabels = [
-                          ...new Set(
-                            items
-                              .map((s) => teamMemberFirstName(s.teamMemberId))
-                              .filter((name): name is string => Boolean(name)),
-                          ),
-                        ];
-                        // Prefer section chips for every assigned professional (fixed may have several).
-                        const sectionTeamLabels =
-                          uniqueTeamMemberLabels.length > 0
-                            ? uniqueTeamMemberLabels
-                            : teamMemberLabel
-                              ? [teamMemberLabel]
-                              : [];
+                      {summarySections.map(
+                        ({
+                          key,
+                          title,
+                          items,
+                          planningItem,
+                          teamMemberLabel,
+                        }) => {
+                          const uniqueTeamMemberLabels = [
+                            ...new Set(
+                              items
+                                .map((s) => teamMemberFirstName(s.teamMemberId))
+                                .filter((name): name is string =>
+                                  Boolean(name),
+                                ),
+                            ),
+                          ];
+                          // Prefer section chips for every assigned professional (fixed may have several).
+                          const sectionTeamLabels =
+                            uniqueTeamMemberLabels.length > 0
+                              ? uniqueTeamMemberLabels
+                              : teamMemberLabel
+                                ? [teamMemberLabel]
+                                : [];
 
-                        return (
-                          <Box key={key}>
-                            <Typography sx={{ fontWeight: 900, fontSize: 12, color: alpha(m.navy, 0.78), mb: 0.75 }}>
-                              {title}
-                            </Typography>
-                            {sectionTeamLabels.length > 0 ? (
-                              <Stack direction="row" flexWrap="wrap" useFlexGap spacing={0.65} sx={{ mb: 0.75 }}>
-                                {sectionTeamLabels.map((label) => (
-                                  <Box
-                                    key={label}
-                                    sx={{
-                                      display: "inline-flex",
-                                      alignItems: "center",
-                                      gap: 0.65,
-                                      borderRadius: "999px",
-                                      border: `1px solid ${alpha(m.navy, 0.12)}`,
-                                      bgcolor: "#fff",
-                                      px: 1,
-                                      py: 0.45,
-                                    }}
-                                  >
+                          return (
+                            <Box key={key}>
+                              <Typography
+                                sx={{
+                                  fontWeight: 900,
+                                  fontSize: 12,
+                                  color: alpha(m.navy, 0.78),
+                                  mb: 0.75,
+                                }}
+                              >
+                                {title}
+                              </Typography>
+                              {sectionTeamLabels.length > 0 ? (
+                                <Stack
+                                  direction="row"
+                                  flexWrap="wrap"
+                                  useFlexGap
+                                  spacing={0.65}
+                                  sx={{ mb: 0.75 }}
+                                >
+                                  {sectionTeamLabels.map((label) => (
                                     <Box
+                                      key={label}
                                       sx={{
-                                        width: 22,
-                                        height: 22,
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: 0.65,
                                         borderRadius: "999px",
-                                        border: `1px solid ${alpha(m.navy, 0.14)}`,
-                                        display: "grid",
-                                        placeItems: "center",
-                                        flexShrink: 0,
+                                        border: `1px solid ${alpha(m.navy, 0.12)}`,
+                                        bgcolor: "#fff",
+                                        px: 1,
+                                        py: 0.45,
                                       }}
                                     >
-                                      <PersonOutlineRoundedIcon sx={{ fontSize: 14, color: alpha(m.navy, 0.45) }} />
+                                      <Box
+                                        sx={{
+                                          width: 22,
+                                          height: 22,
+                                          borderRadius: "999px",
+                                          border: `1px solid ${alpha(m.navy, 0.14)}`,
+                                          display: "grid",
+                                          placeItems: "center",
+                                          flexShrink: 0,
+                                        }}
+                                      >
+                                        <PersonOutlineRoundedIcon
+                                          sx={{
+                                            fontSize: 14,
+                                            color: alpha(m.navy, 0.45),
+                                          }}
+                                        />
+                                      </Box>
+                                      <Typography
+                                        sx={{
+                                          fontSize: 11.5,
+                                          fontWeight: 800,
+                                          color: alpha(m.navy, 0.62),
+                                          lineHeight: 1,
+                                        }}
+                                      >
+                                        {label}
+                                      </Typography>
                                     </Box>
-                                    <Typography
-                                      sx={{ fontSize: 11.5, fontWeight: 800, color: alpha(m.navy, 0.62), lineHeight: 1 }}
+                                  ))}
+                                </Stack>
+                              ) : null}
+                              <Stack spacing={0.75}>
+                                {planningItem ? (
+                                  <Box
+                                    sx={{
+                                      borderRadius: "10px",
+                                      border: `1px solid ${alpha(m.navy, 0.06)}`,
+                                      px: 1.2,
+                                      py: 0.9,
+                                      bgcolor: alpha(m.navy, 0.02),
+                                    }}
+                                  >
+                                    <Box sx={{ minWidth: 0 }}>
+                                      {planningItem.activity ? (
+                                        <Typography
+                                          sx={{
+                                            fontSize: 12,
+                                            fontWeight: 900,
+                                            color: alpha(m.navy, 0.78),
+                                            lineHeight: 1.1,
+                                          }}
+                                        >
+                                          {planningItem.activity}
+                                        </Typography>
+                                      ) : null}
+                                      {planningItem.duration ? (
+                                        <Typography
+                                          sx={{
+                                            mt: planningItem.activity
+                                              ? 0.25
+                                              : 0,
+                                            fontSize: 10.5,
+                                            fontWeight: 700,
+                                            color: alpha(m.navy, 0.48),
+                                          }}
+                                        >
+                                          {planningItem.duration}
+                                        </Typography>
+                                      ) : null}
+                                    </Box>
+                                  </Box>
+                                ) : null}
+                                {items.map((s) => (
+                                  <Box
+                                    key={s.id}
+                                    sx={{
+                                      borderRadius: "10px",
+                                      border: `1px solid ${alpha(m.navy, 0.06)}`,
+                                      px: 1.2,
+                                      py: 0.9,
+                                      bgcolor: alpha(m.navy, 0.02),
+                                    }}
+                                  >
+                                    <Stack
+                                      direction="row"
+                                      justifyContent="space-between"
+                                      spacing={1}
                                     >
-                                      {label}
-                                    </Typography>
+                                      <Box sx={{ minWidth: 0 }}>
+                                        <Typography
+                                          sx={{
+                                            fontSize: 12,
+                                            fontWeight: 900,
+                                            color: alpha(m.navy, 0.78),
+                                            lineHeight: 1.1,
+                                          }}
+                                        >
+                                          {s.name}
+                                        </Typography>
+                                        <ServiceSummaryMetaLine
+                                          timeRange={serviceTimeRangeLabel(
+                                            bookingStartMinutes,
+                                            s.durationMins,
+                                          )}
+                                          durationLabel={`${s.durationMins} Mins`}
+                                        />
+                                      </Box>
+                                      <Typography
+                                        sx={{
+                                          fontSize: 12,
+                                          fontWeight: 900,
+                                          color: alpha(m.navy, 0.76),
+                                        }}
+                                      >
+                                        {s.price} €
+                                      </Typography>
+                                    </Stack>
                                   </Box>
                                 ))}
                               </Stack>
-                            ) : null}
-                            <Stack spacing={0.75}>
-                              {planningItem ? (
-                                <Box
-                                  sx={{
-                                    borderRadius: "10px",
-                                    border: `1px solid ${alpha(m.navy, 0.06)}`,
-                                    px: 1.2,
-                                    py: 0.9,
-                                    bgcolor: alpha(m.navy, 0.02),
-                                  }}
-                                >
-                                  <Box sx={{ minWidth: 0 }}>
-                                    {planningItem.activity ? (
-                                      <Typography sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.78), lineHeight: 1.1 }}>
-                                        {planningItem.activity}
-                                      </Typography>
-                                    ) : null}
-                                    {planningItem.duration ? (
-                                      <Typography
-                                        sx={{
-                                          mt: planningItem.activity ? 0.25 : 0,
-                                          fontSize: 10.5,
-                                          fontWeight: 700,
-                                          color: alpha(m.navy, 0.48),
-                                        }}
-                                      >
-                                        {planningItem.duration}
-                                      </Typography>
-                                    ) : null}
-                                  </Box>
-                                </Box>
-                              ) : null}
-                              {items.map((s) => (
-                                <Box
-                                  key={s.id}
-                                  sx={{
-                                    borderRadius: "10px",
-                                    border: `1px solid ${alpha(m.navy, 0.06)}`,
-                                    px: 1.2,
-                                    py: 0.9,
-                                    bgcolor: alpha(m.navy, 0.02),
-                                  }}
-                                >
-                                  <Stack direction="row" justifyContent="space-between" spacing={1}>
-                                    <Box sx={{ minWidth: 0 }}>
-                                      <Typography sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.78), lineHeight: 1.1 }}>
-                                        {s.name}
-                                      </Typography>
-                                      <ServiceSummaryMetaLine
-                                        timeRange={serviceTimeRangeLabel(bookingStartMinutes, s.durationMins)}
-                                        durationLabel={`${s.durationMins} Mins`}
-                                      />
-                                    </Box>
-                                    <Typography sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.76) }}>
-                                      {s.price} €
-                                    </Typography>
-                                  </Stack>
-                                </Box>
-                              ))}
-                            </Stack>
-                            <Divider sx={{ mt: 1.1 }} />
-                          </Box>
-                        );
-                      })}
+                              <Divider sx={{ mt: 1.1 }} />
+                            </Box>
+                          );
+                        },
+                      )}
 
-                      <Stack direction="row" justifyContent="space-between" alignItems="center">
-                        <Typography sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.78) }}>
+                      <Stack
+                        direction="row"
+                        justifyContent="space-between"
+                        alignItems="center"
+                      >
+                        <Typography
+                          sx={{
+                            fontSize: 12,
+                            fontWeight: 900,
+                            color: alpha(m.navy, 0.78),
+                          }}
+                        >
                           Total
                         </Typography>
-                        <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78), lineHeight: 1.1 }}>
+                        <Typography
+                          sx={{
+                            fontSize: 12.5,
+                            fontWeight: 900,
+                            color: alpha(m.navy, 0.78),
+                            lineHeight: 1.1,
+                          }}
+                        >
                           {total} €
                         </Typography>
                       </Stack>
@@ -3204,38 +3990,39 @@ function ClientBookingCreateView() {
                         </Typography>
                       ) : null}
 
-                      <Button
+                      <AppButton
+                        tone="primary"
                         fullWidth
-                        variant="contained"
-                        disableElevation
-                        disabled={!allServicesAssigned || isContinuing || selectedTimeTooSoon}
+                        disabled={
+                          !allServicesAssigned ||
+                          isContinuing ||
+                          selectedTimeTooSoon
+                        }
                         onClick={() => void onContinue()}
                         sx={{
                           mt: 1.25,
-                          borderRadius: "10px",
-                          textTransform: "none",
-                          fontWeight: 900,
                           height: 40,
-                          bgcolor: m.teal,
-                          "&:hover": { bgcolor: m.tealDark },
-                          ...(allServicesAssigned && !isContinuing && !selectedTimeTooSoon
+                          ...(allServicesAssigned &&
+                          !isContinuing &&
+                          !selectedTimeTooSoon
                             ? null
                             : {
-                                bgcolor: alpha(m.navy, 0.10),
                                 color: alpha(m.navy, 0.45),
-                                "&:hover": { bgcolor: alpha(m.navy, 0.10) },
                               }),
                         }}
                       >
                         {isContinuing ? (
                           <>
-                            <CircularProgress size={18} sx={{ mr: 1, color: "inherit" }} />
+                            <CircularProgress
+                              size={18}
+                              sx={{ mr: 1, color: "inherit" }}
+                            />
                             {continueLabel}
                           </>
                         ) : (
                           continueLabel
                         )}
-                      </Button>
+                      </AppButton>
                     </Stack>
                   </Box>
                 </Paper>
@@ -3254,7 +4041,9 @@ export default function ClientBookingPage() {
   const showCreate = mode === "create";
   const tabParam = searchParams?.get("tab");
   const legacyView = searchParams?.get("view");
-  const activeTab = parseBookingListTab(tabParam ?? (legacyView === "history" ? "ongoing" : undefined));
+  const activeTab = parseBookingListTab(
+    tabParam ?? (legacyView === "history" ? "ongoing" : undefined),
+  );
 
   if (showCreate) {
     return (

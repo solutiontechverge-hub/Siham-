@@ -1,9 +1,10 @@
 "use client";
 
+import AppButton from "./AppButton";
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Avatar, Box, Button, Popover, Stack, Typography } from "@mui/material";
+import { Avatar, Box, Popover, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { clearPersistedAuthSession } from "../../lib/auth-storage";
 import { useAppDispatch } from "../../store/hooks";
@@ -101,7 +102,14 @@ export default function ClientProfileMenuPopover({
             {avatarSrc ? null : getInitials(name || email)}
           </Avatar>
           <Box sx={{ minWidth: 0 }}>
-            <Typography sx={{ fontWeight: 900, color: tokens.navy, fontSize: 18, lineHeight: 1.2 }}>
+            <Typography
+              sx={{
+                fontWeight: 900,
+                color: tokens.navy,
+                fontSize: 18,
+                lineHeight: 1.2,
+              }}
+            >
               {name}
             </Typography>
             <Typography sx={{ color: tokens.slate, fontSize: 12.5, mt: 0.25 }}>
@@ -110,10 +118,17 @@ export default function ClientProfileMenuPopover({
           </Box>
         </Stack>
 
-        <Button component={Link} href="/clients/booking" variant="outlined" fullWidth sx={outlinedBtnSx} onClick={onClose}>
+        <AppButton
+          component={Link}
+          href="/clients/booking"
+          variant="outlined"
+          fullWidth
+          sx={outlinedBtnSx}
+          onClick={onClose}
+        >
           Booking
-        </Button>
-        <Button
+        </AppButton>
+        <AppButton
           component={Link}
           href="/clients/favourites"
           variant="outlined"
@@ -122,13 +137,20 @@ export default function ClientProfileMenuPopover({
           onClick={onClose}
         >
           Favorites
-        </Button>
-        <Button component={Link} href="/clients/profile" variant="outlined" fullWidth sx={outlinedBtnSx} onClick={onClose}>
+        </AppButton>
+        <AppButton
+          component={Link}
+          href="/clients/profile"
+          variant="outlined"
+          fullWidth
+          sx={outlinedBtnSx}
+          onClick={onClose}
+        >
           Profile
-        </Button>
+        </AppButton>
 
         <Box sx={{ pt: 0.5 }}>
-          <Button
+          <AppButton
             component={Link}
             href="/clients/listing"
             variant="outlined"
@@ -137,16 +159,21 @@ export default function ClientProfileMenuPopover({
             onClick={onClose}
           >
             Go to listing page
-          </Button>
+          </AppButton>
         </Box>
 
         <Box sx={{ pt: 0.5 }}>
-          <Button variant="outlined" fullWidth sx={outlinedBtnSx} onClick={onClose}>
+          <AppButton
+            variant="outlined"
+            fullWidth
+            sx={outlinedBtnSx}
+            onClick={onClose}
+          >
             Delete Account
-          </Button>
+          </AppButton>
         </Box>
 
-        <Button
+        <AppButton
           variant="contained"
           fullWidth
           onClick={handleLogout}
@@ -161,9 +188,8 @@ export default function ClientProfileMenuPopover({
           }}
         >
           Logout
-        </Button>
+        </AppButton>
       </Stack>
     </Popover>
   );
 }
-

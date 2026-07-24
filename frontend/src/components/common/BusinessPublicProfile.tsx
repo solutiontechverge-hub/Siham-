@@ -1,5 +1,6 @@
 "use client";
 
+import AppButton from "./AppButton";
 import * as React from "react";
 import RemoteAwareImage from "./RemoteAwareImage";
 import type { Swiper as SwiperInstance } from "swiper";
@@ -24,7 +25,6 @@ import MaleRoundedIcon from "@mui/icons-material/MaleRounded";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
 import {
   Box,
-  Button,
   ButtonBase,
   Checkbox,
   ClickAwayListener,
@@ -38,7 +38,10 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import type { BusinessPublicProfileData, BusinessPublicProfileServiceForItem } from "../../data/businessPublicProfile.data";
+import type {
+  BusinessPublicProfileData,
+  BusinessPublicProfileServiceForItem,
+} from "../../data/businessPublicProfile.data";
 import {
   buildDesiredMunicipalityList,
   buildDesiredProvinceDisplays,
@@ -97,7 +100,10 @@ function SectionCard({
           borderBottom: `1px solid ${alpha(m.navy, 0.06)}`,
         }}
       >
-        <Typography variant="mainHeading" sx={{ lineHeight: 1, letterSpacing: 0 }}>
+        <Typography
+          variant="mainHeading"
+          sx={{ lineHeight: 1, letterSpacing: 0 }}
+        >
           {title}
         </Typography>
         {headerAction ?? null}
@@ -120,7 +126,14 @@ function ProjectReadOnlyField({ value }: { value: string }) {
         minHeight: 88,
       }}
     >
-      <Typography sx={{ fontSize: 12.5, fontWeight: 500, color: alpha(m.navy, 0.42), lineHeight: 1.55 }}>
+      <Typography
+        sx={{
+          fontSize: 12.5,
+          fontWeight: 500,
+          color: alpha(m.navy, 0.42),
+          lineHeight: 1.55,
+        }}
+      >
         {value}
       </Typography>
     </Box>
@@ -130,8 +143,23 @@ function ProjectReadOnlyField({ value }: { value: string }) {
 function MutedInstructionBox({ children }: { children: React.ReactNode }) {
   const m = useTheme().palette.mollure;
   return (
-    <Box sx={{ mt: 1, px: 1.5, py: 1.15, borderRadius: "8px", bgcolor: m.fxGrayF2F4F7 }}>
-      <Typography sx={{ fontSize: 11.5, fontWeight: 500, color: alpha(m.navy, 0.42), lineHeight: 1.55 }}>
+    <Box
+      sx={{
+        mt: 1,
+        px: 1.5,
+        py: 1.15,
+        borderRadius: "8px",
+        bgcolor: m.fxGrayF2F4F7,
+      }}
+    >
+      <Typography
+        sx={{
+          fontSize: 11.5,
+          fontWeight: 500,
+          color: alpha(m.navy, 0.42),
+          lineHeight: 1.55,
+        }}
+      >
         {children}
       </Typography>
     </Box>
@@ -141,9 +169,28 @@ function MutedInstructionBox({ children }: { children: React.ReactNode }) {
 function PolicyFieldRow({ label, value }: { label: string; value: string }) {
   const m = useTheme().palette.mollure;
   return (
-    <Stack direction="row" alignItems="baseline" justifyContent="space-between" spacing={2} sx={{ py: 0.25 }}>
-      <Typography sx={{ fontSize: 12, fontWeight: 600, color: alpha(m.navy, 0.55) }}>{label}</Typography>
-      <Typography sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.78), whiteSpace: "nowrap" }}>{value}</Typography>
+    <Stack
+      direction="row"
+      alignItems="baseline"
+      justifyContent="space-between"
+      spacing={2}
+      sx={{ py: 0.25 }}
+    >
+      <Typography
+        sx={{ fontSize: 12, fontWeight: 600, color: alpha(m.navy, 0.55) }}
+      >
+        {label}
+      </Typography>
+      <Typography
+        sx={{
+          fontSize: 12,
+          fontWeight: 800,
+          color: alpha(m.navy, 0.78),
+          whiteSpace: "nowrap",
+        }}
+      >
+        {value}
+      </Typography>
     </Stack>
   );
 }
@@ -153,12 +200,24 @@ const SERVICE_FOR_ICONS = {
   women: FemaleRoundedIcon,
 } as const;
 
-function ServiceForIcon({ item }: { item: BusinessPublicProfileServiceForItem }) {
+function ServiceForIcon({
+  item,
+}: {
+  item: BusinessPublicProfileServiceForItem;
+}) {
   const m = useTheme().palette.mollure;
 
   if (item.id === "kids") {
     return (
-      <Box sx={{ width: 16, height: 16, flexShrink: 0, display: "grid", placeItems: "center" }}>
+      <Box
+        sx={{
+          width: 16,
+          height: 16,
+          flexShrink: 0,
+          display: "grid",
+          placeItems: "center",
+        }}
+      >
         <Image src={KidsIcon} alt="" width={13} height={13} />
       </Box>
     );
@@ -221,12 +280,27 @@ function ProfileHeroSwiper({ images, alt }: { images: string[]; alt: string }) {
         onSwiper={(swiper: SwiperInstance) => {
           swiperRef.current = swiper;
         }}
-        onSlideChange={(swiper: SwiperInstance) => setActiveIndex(swiper.realIndex)}
+        onSlideChange={(swiper: SwiperInstance) =>
+          setActiveIndex(swiper.realIndex)
+        }
       >
         {images.map((src, index) => (
           <SwiperSlide key={`${src}-${index}`}>
-            <Box sx={{ position: "relative", width: "100%", height: { xs: 220, md: 280 } }}>
-              <RemoteAwareImage src={src} alt={alt} fill style={{ objectFit: "cover" }} priority={index === 0} draggable={false} />
+            <Box
+              sx={{
+                position: "relative",
+                width: "100%",
+                height: { xs: 220, md: 280 },
+              }}
+            >
+              <RemoteAwareImage
+                src={src}
+                alt={alt}
+                fill
+                style={{ objectFit: "cover" }}
+                priority={index === 0}
+                draggable={false}
+              />
             </Box>
           </SwiperSlide>
         ))}
@@ -270,40 +344,41 @@ function ProfileHeroSwiper({ images, alt }: { images: string[]; alt: string }) {
           >
             <ChevronRightRoundedIcon fontSize="small" />
           </IconButton>
-        <Box
-          sx={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            bottom: 12,
-            zIndex: 2,
-            display: "flex",
-            justifyContent: "center",
-            gap: 0.75,
-            pointerEvents: "none",
-          }}
-        >
-          {images.map((_, index) => (
-            <Box
-              key={index}
-              component="button"
-              type="button"
-              aria-label={`Go to slide ${index + 1}`}
-              onClick={() => swiperRef.current?.slideToLoop(index)}
-              sx={{
-                pointerEvents: "auto",
-                width: 8,
-                height: 8,
-                p: 0,
-                border: 0,
-                borderRadius: "999px",
-                cursor: "pointer",
-                bgcolor: index === activeIndex ? "#fff" : "rgba(255,255,255,0.55)",
-                transition: "background-color 150ms ease",
-              }}
-            />
-          ))}
-        </Box>
+          <Box
+            sx={{
+              position: "absolute",
+              left: 0,
+              right: 0,
+              bottom: 12,
+              zIndex: 2,
+              display: "flex",
+              justifyContent: "center",
+              gap: 0.75,
+              pointerEvents: "none",
+            }}
+          >
+            {images.map((_, index) => (
+              <Box
+                key={index}
+                component="button"
+                type="button"
+                aria-label={`Go to slide ${index + 1}`}
+                onClick={() => swiperRef.current?.slideToLoop(index)}
+                sx={{
+                  pointerEvents: "auto",
+                  width: 8,
+                  height: 8,
+                  p: 0,
+                  border: 0,
+                  borderRadius: "999px",
+                  cursor: "pointer",
+                  bgcolor:
+                    index === activeIndex ? "#fff" : "rgba(255,255,255,0.55)",
+                  transition: "background-color 150ms ease",
+                }}
+              />
+            ))}
+          </Box>
         </>
       ) : null}
     </Box>
@@ -332,8 +407,10 @@ function ProfileLocationSection({
   supportsFixed: boolean;
   supportsDesired: boolean;
 }) {
-  const showFixed = supportsFixed && (!supportsDesired || locationMode === "fixed");
-  const showDesired = supportsDesired && (!supportsFixed || locationMode === "desired");
+  const showFixed =
+    supportsFixed && (!supportsDesired || locationMode === "fixed");
+  const showDesired =
+    supportsDesired && (!supportsFixed || locationMode === "desired");
   const m = useTheme().palette.mollure;
   const [viewMode, setViewMode] = React.useState<DesiredLocationView>("areas");
   const [listOpen, setListOpen] = React.useState(false);
@@ -348,7 +425,10 @@ function ProfileLocationSection({
     [data.desiredLocation],
   );
 
-  const activeItems = viewMode === "areas" ? provinceDisplays.map((item) => item.label) : municipalityList;
+  const activeItems =
+    viewMode === "areas"
+      ? provinceDisplays.map((item) => item.label)
+      : municipalityList;
   const dropdownLabel =
     viewMode === "areas"
       ? `Service areas(${provinceDisplays.length})`
@@ -359,31 +439,62 @@ function ProfileLocationSection({
       {showFixed ? (
         <Box>
           {showDesired ? (
-            <Typography sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.62), mb: 0.75 }}>
+            <Typography
+              sx={{
+                fontSize: 12,
+                fontWeight: 800,
+                color: alpha(m.navy, 0.62),
+                mb: 0.75,
+              }}
+            >
               Fixed Location
             </Typography>
           ) : null}
-          <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: alpha(m.navy, 0.62), lineHeight: 1.55 }}>
+          <Typography
+            sx={{
+              fontSize: 12.5,
+              fontWeight: 600,
+              color: alpha(m.navy, 0.62),
+              lineHeight: 1.55,
+            }}
+          >
             {data.fixedLocation.formattedAddress}
           </Typography>
         </Box>
       ) : null}
 
-      {showFixed && showDesired ? <Divider sx={{ borderColor: alpha(m.navy, 0.08) }} /> : null}
+      {showFixed && showDesired ? (
+        <Divider sx={{ borderColor: alpha(m.navy, 0.08) }} />
+      ) : null}
 
       {showDesired ? (
         <Box>
-          <Typography sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.62), mb: 1 }}>
+          <Typography
+            sx={{
+              fontSize: 12,
+              fontWeight: 800,
+              color: alpha(m.navy, 0.62),
+              mb: 1,
+            }}
+          >
             Specific Provinces
           </Typography>
 
           {data.desiredLocation.areaMode === "All Netherlands" ? (
-            <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: alpha(m.navy, 0.55) }}>
+            <Typography
+              sx={{
+                fontSize: 12.5,
+                fontWeight: 600,
+                color: alpha(m.navy, 0.55),
+              }}
+            >
               Services available across the Netherlands.
             </Typography>
           ) : (
             <>
-              <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, mb: 1.25 }}>
+              <Box
+                sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, mb: 1.25 }}
+              >
                 {(
                   [
                     { label: "Service areas", value: "areas" },
@@ -408,7 +519,9 @@ function ProfileLocationSection({
                         color: active ? "#fff" : alpha(m.navy, 0.72),
                         bgcolor: active ? m.teal : alpha(m.navy, 0.06),
                         border: `1px solid ${active ? m.teal : alpha(m.navy, 0.08)}`,
-                        "&:hover": { bgcolor: active ? m.tealDark : alpha(m.teal, 0.1) },
+                        "&:hover": {
+                          bgcolor: active ? m.tealDark : alpha(m.teal, 0.1),
+                        },
                       }}
                     >
                       {option.label}
@@ -436,7 +549,13 @@ function ProfileLocationSection({
                   textAlign: "left",
                 }}
               >
-                <Typography sx={{ fontSize: 12.5, fontWeight: 500, color: alpha(m.navy, 0.78) }}>
+                <Typography
+                  sx={{
+                    fontSize: 12.5,
+                    fontWeight: 500,
+                    color: alpha(m.navy, 0.78),
+                  }}
+                >
                   {dropdownLabel}
                 </Typography>
                 <KeyboardArrowDownRoundedIcon
@@ -455,7 +574,10 @@ function ProfileLocationSection({
                 anchorEl={listAnchorRef.current}
                 placement="bottom-start"
                 modifiers={[{ name: "offset", options: { offset: [0, 6] } }]}
-                sx={{ zIndex: (theme) => theme.zIndex.modal, width: listAnchorRef.current?.offsetWidth }}
+                sx={{
+                  zIndex: (theme) => theme.zIndex.modal,
+                  width: listAnchorRef.current?.offsetWidth,
+                }}
               >
                 <ClickAwayListener onClickAway={() => setListOpen(false)}>
                   <Paper
@@ -482,7 +604,13 @@ function ProfileLocationSection({
                             bgcolor: alpha(m.navy, 0.02),
                           }}
                         >
-                          <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: alpha(m.navy, 0.78) }}>
+                          <Typography
+                            sx={{
+                              fontSize: 12.5,
+                              fontWeight: 600,
+                              color: alpha(m.navy, 0.78),
+                            }}
+                          >
                             {label}
                           </Typography>
                         </Box>
@@ -516,7 +644,11 @@ function PublicProfilePageShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function PublicProfileDetailsGroup({ children }: { children: React.ReactNode }) {
+function PublicProfileDetailsGroup({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const m = useTheme().palette.mollure;
   return (
     <Box
@@ -555,7 +687,13 @@ function PublicProfileTopBar({ title }: { title: string }) {
           bgcolor: m.fxGrayF2F4F7,
         }}
       >
-        <Typography sx={{ fontWeight: 900, fontSize: { xs: 15, md: 16 }, color: alpha(m.navy, 0.88) }}>
+        <Typography
+          sx={{
+            fontWeight: 900,
+            fontSize: { xs: 15, md: 16 },
+            color: alpha(m.navy, 0.88),
+          }}
+        >
           {title}
         </Typography>
       </Box>
@@ -575,7 +713,8 @@ function ProfileLocationChoiceCard({
   onSelect?: () => void;
 }) {
   const m = useTheme().palette.mollure;
-  const Icon = mode === "fixed" ? EventSeatRoundedIcon : PersonPinCircleRoundedIcon;
+  const Icon =
+    mode === "fixed" ? EventSeatRoundedIcon : PersonPinCircleRoundedIcon;
   const label = mode === "fixed" ? "Fixed Location" : "Desired Location";
 
   return (
@@ -599,9 +738,19 @@ function ProfileLocationChoiceCard({
         cursor: canSwitch ? "pointer" : "default",
       }}
     >
-      <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0 }}>
-        <Icon sx={{ fontSize: 20, color: alpha(m.navy, 0.55), flexShrink: 0 }} />
-        <Typography sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.78) }} noWrap>
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={1}
+        sx={{ minWidth: 0 }}
+      >
+        <Icon
+          sx={{ fontSize: 20, color: alpha(m.navy, 0.55), flexShrink: 0 }}
+        />
+        <Typography
+          sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.78) }}
+          noWrap
+        >
           {label}
         </Typography>
       </Stack>
@@ -696,22 +845,35 @@ export default function BusinessPublicProfile({
   const isDesiredLocation = effectiveLocationMode === "desired";
   // Professional setup: project + km apply when offering is Desired or Both (not Fixed-only).
   const showDesiredOfferingContent =
-    data.supportsDesiredLocation && (!data.supportsFixedLocation || isDesiredLocation);
+    data.supportsDesiredLocation &&
+    (!data.supportsFixedLocation || isDesiredLocation);
   const showKilometerAllowance = showDesiredOfferingContent;
   const showProjectHeader = showDesiredOfferingContent;
 
-  const [projectEnabled, setProjectEnabled] = React.useState(data.projectEnabled);
+  const [projectEnabled, setProjectEnabled] = React.useState(
+    data.projectEnabled,
+  );
   const showProjectSection = showDesiredOfferingContent && projectEnabled;
 
-  const [portfolioLightboxIndex, setPortfolioLightboxIndex] = React.useState<number | null>(null);
+  const [portfolioLightboxIndex, setPortfolioLightboxIndex] = React.useState<
+    number | null
+  >(null);
   const [activeCategory, setActiveCategory] = React.useState("all");
   const [search, setSearch] = React.useState("");
   const [scheduleOpen, setScheduleOpen] = React.useState(false);
   const scheduleAnchorRef = React.useRef<HTMLButtonElement>(null);
-  const [selectedScheduleId, setSelectedScheduleId] = React.useState(data.defaultScheduleOptionId);
-  const [serviceQty, setServiceQty] = React.useState<Record<string, number>>({});
-  const [selectedServiceIds, setSelectedServiceIds] = React.useState<Record<string, boolean>>({});
-  const [memberSlotSelections, setMemberSlotSelections] = React.useState<Record<string, string>>({});
+  const [selectedScheduleId, setSelectedScheduleId] = React.useState(
+    data.defaultScheduleOptionId,
+  );
+  const [serviceQty, setServiceQty] = React.useState<Record<string, number>>(
+    {},
+  );
+  const [selectedServiceIds, setSelectedServiceIds] = React.useState<
+    Record<string, boolean>
+  >({});
+  const [memberSlotSelections, setMemberSlotSelections] = React.useState<
+    Record<string, string>
+  >({});
 
   const activeServices = React.useMemo(
     () => getServicesForLocationMode(data, effectiveLocationMode),
@@ -760,7 +922,9 @@ export default function BusinessPublicProfile({
     data.scheduleOptions[0]?.label ??
     "Today(8:00 - 18:00)";
 
-  const scheduleLabel = isDesiredLocation ? "Desired Schedule" : "Fixed Schedule";
+  const scheduleLabel = isDesiredLocation
+    ? "Desired Schedule"
+    : "Fixed Schedule";
 
   const categoryRecords = React.useMemo(
     () => data.categories.map((c) => ({ id: c.id, title: c.label })),
@@ -770,11 +934,25 @@ export default function BusinessPublicProfile({
   const filteredServices = React.useMemo(() => {
     const q = search.trim().toLowerCase();
     return activeServices.filter((s) => {
-      if (!serviceMatchesCategoryTab(s, activeCategory, data.categories, categoryRecords)) return false;
+      if (
+        !serviceMatchesCategoryTab(
+          s,
+          activeCategory,
+          data.categories,
+          categoryRecords,
+        )
+      )
+        return false;
       if (!q) return true;
       return s.name.toLowerCase().includes(q);
     });
-  }, [activeCategory, activeServices, categoryRecords, data.categories, search]);
+  }, [
+    activeCategory,
+    activeServices,
+    categoryRecords,
+    data.categories,
+    search,
+  ]);
 
   const selectedServices = React.useMemo(
     () => activeServices.filter((s) => selectedServiceIds[s.id]),
@@ -782,7 +960,10 @@ export default function BusinessPublicProfile({
   );
 
   const selectionSummary = React.useMemo(() => {
-    const count = selectedServices.reduce((sum, s) => sum + (serviceQty[s.id] ?? 1), 0);
+    const count = selectedServices.reduce(
+      (sum, s) => sum + (serviceQty[s.id] ?? 1),
+      0,
+    );
     const totalMins = selectedServices.reduce(
       (sum, s) => sum + s.durationMins * (serviceQty[s.id] ?? 1),
       0,
@@ -794,7 +975,11 @@ export default function BusinessPublicProfile({
     const hours = Math.floor(totalMins / 60);
     const mins = totalMins % 60;
     const durationLabel =
-      hours > 0 && mins > 0 ? `${hours} hour${hours > 1 ? "s" : ""}, ${mins} mins` : hours > 0 ? `${hours} hour${hours > 1 ? "s" : ""}` : `${mins} mins`;
+      hours > 0 && mins > 0
+        ? `${hours} hour${hours > 1 ? "s" : ""}, ${mins} mins`
+        : hours > 0
+          ? `${hours} hour${hours > 1 ? "s" : ""}`
+          : `${mins} mins`;
     return { count, durationLabel, totalPrice };
   }, [selectedServices, serviceQty]);
 
@@ -871,12 +1056,17 @@ export default function BusinessPublicProfile({
             <Box sx={{ p: 2.5 }}>
               <Stack direction="row" alignItems="center" spacing={0.5}>
                 {Array.from({ length: 5 }).map((_, i) => (
-                  <StarRoundedIcon key={i} sx={{ fontSize: 18, color: m.star }} />
+                  <StarRoundedIcon
+                    key={i}
+                    sx={{ fontSize: 18, color: m.star }}
+                  />
                 ))}
                 <ButtonBase
                   onClick={() => {
                     const firstMember = visibleTeamMembers[0];
-                    router.push(clientReviewsHref(data.shopId, firstMember?.id));
+                    router.push(
+                      clientReviewsHref(data.shopId, firstMember?.id),
+                    );
                   }}
                   sx={{
                     ml: 0.5,
@@ -885,18 +1075,45 @@ export default function BusinessPublicProfile({
                     "&:hover": { bgcolor: alpha(m.teal, 0.06) },
                   }}
                 >
-                  <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.55) }}>
+                  <Typography
+                    sx={{
+                      fontSize: 12.5,
+                      fontWeight: 800,
+                      color: alpha(m.navy, 0.55),
+                    }}
+                  >
                     ({data.reviewsCount} Reviews)
                   </Typography>
                 </ButtonBase>
               </Stack>
-              <Typography sx={{ mt: 1, fontWeight: 900, fontSize: 22, color: alpha(m.navy, 0.9), lineHeight: 1.2 }}>
+              <Typography
+                sx={{
+                  mt: 1,
+                  fontWeight: 900,
+                  fontSize: 22,
+                  color: alpha(m.navy, 0.9),
+                  lineHeight: 1.2,
+                }}
+              >
                 {data.shopName}
               </Typography>
-              <Typography sx={{ mt: 1, fontSize: 12.5, fontWeight: 600, color: alpha(m.navy, 0.55), lineHeight: 1.5 }}>
+              <Typography
+                sx={{
+                  mt: 1,
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  color: alpha(m.navy, 0.55),
+                  lineHeight: 1.5,
+                }}
+              >
                 {data.about}
               </Typography>
-              <Stack direction="row" flexWrap="wrap" gap={0.75} sx={{ mt: 1.25 }}>
+              <Stack
+                direction="row"
+                flexWrap="wrap"
+                gap={0.75}
+                sx={{ mt: 1.25 }}
+              >
                 {data.specialties.map((tag) => (
                   <Box
                     key={tag}
@@ -915,7 +1132,12 @@ export default function BusinessPublicProfile({
                   </Box>
                 ))}
               </Stack>
-              <Stack direction="row" alignItems="center" spacing={1.25} sx={{ mt: 2, flexWrap: { xs: "wrap", sm: "nowrap" } }}>
+              <Stack
+                direction="row"
+                alignItems="center"
+                spacing={1.25}
+                sx={{ mt: 2, flexWrap: { xs: "wrap", sm: "nowrap" } }}
+              >
                 <Box
                   sx={{
                     width: 36,
@@ -941,7 +1163,13 @@ export default function BusinessPublicProfile({
                 >
                   {scheduleLabel}
                 </Typography>
-                <Box sx={{ flex: 1, minWidth: { xs: "100%", sm: 200 }, maxWidth: 320 }}>
+                <Box
+                  sx={{
+                    flex: 1,
+                    minWidth: { xs: "100%", sm: 200 },
+                    maxWidth: 320,
+                  }}
+                >
                   <ButtonBase
                     ref={scheduleAnchorRef}
                     onClick={() => setScheduleOpen((p) => !p)}
@@ -961,14 +1189,22 @@ export default function BusinessPublicProfile({
                       textAlign: "left",
                     }}
                   >
-                    <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.72) }}>
+                    <Typography
+                      sx={{
+                        fontSize: 12.5,
+                        fontWeight: 700,
+                        color: alpha(m.navy, 0.72),
+                      }}
+                    >
                       {selectedScheduleLabel}
                     </Typography>
                     <KeyboardArrowDownRoundedIcon
                       sx={{
                         fontSize: 20,
                         color: alpha(m.navy, 0.45),
-                        transform: scheduleOpen ? "rotate(180deg)" : "rotate(0deg)",
+                        transform: scheduleOpen
+                          ? "rotate(180deg)"
+                          : "rotate(0deg)",
                         transition: "transform 150ms ease",
                       }}
                     />
@@ -978,15 +1214,20 @@ export default function BusinessPublicProfile({
                     anchorEl={scheduleAnchorRef.current}
                     placement="bottom-start"
                     disablePortal={false}
-                    modifiers={[{ name: "offset", options: { offset: [0, 6] } }]}
+                    modifiers={[
+                      { name: "offset", options: { offset: [0, 6] } },
+                    ]}
                     sx={{ zIndex: (theme) => theme.zIndex.modal }}
                   >
-                    <ClickAwayListener onClickAway={() => setScheduleOpen(false)}>
+                    <ClickAwayListener
+                      onClickAway={() => setScheduleOpen(false)}
+                    >
                       <Paper
                         elevation={0}
                         role="listbox"
                         sx={{
-                          minWidth: scheduleAnchorRef.current?.offsetWidth ?? 200,
+                          minWidth:
+                            scheduleAnchorRef.current?.offsetWidth ?? 200,
                           borderRadius: "10px",
                           border: `1px solid ${alpha(m.navy, 0.1)}`,
                           boxShadow: "0 12px 28px rgba(16,35,63,0.12)",
@@ -1012,7 +1253,9 @@ export default function BusinessPublicProfile({
                                 px: 1.5,
                                 py: 0.85,
                                 textAlign: "left",
-                                bgcolor: active ? alpha(m.teal, 0.08) : "transparent",
+                                bgcolor: active
+                                  ? alpha(m.teal, 0.08)
+                                  : "transparent",
                                 "&:hover": { bgcolor: alpha(m.navy, 0.04) },
                               }}
                             >
@@ -1020,7 +1263,9 @@ export default function BusinessPublicProfile({
                                 sx={{
                                   fontSize: 12.5,
                                   fontWeight: active ? 800 : 700,
-                                  color: active ? alpha(m.teal, 0.95) : alpha(m.navy, 0.72),
+                                  color: active
+                                    ? alpha(m.teal, 0.95)
+                                    : alpha(m.navy, 0.72),
                                 }}
                               >
                                 {opt.label}
@@ -1051,23 +1296,50 @@ export default function BusinessPublicProfile({
         ) : null}
 
         <SectionCard title="Services For">
-          <Typography sx={{ fontSize: 11.5, fontWeight: 600, color: alpha(m.navy, 0.45), mb: 1.1 }}>
+          <Typography
+            sx={{
+              fontSize: 11.5,
+              fontWeight: 600,
+              color: alpha(m.navy, 0.45),
+              mb: 1.1,
+            }}
+          >
             We love to serve
           </Typography>
-          <Stack direction="row" flexWrap="wrap" alignItems="center" useFlexGap spacing={1.25}>
+          <Stack
+            direction="row"
+            flexWrap="wrap"
+            alignItems="center"
+            useFlexGap
+            spacing={1.25}
+          >
             {data.serviceFor.map((item, index, arr) => (
-                  <React.Fragment key={item.id}>
-                    <Stack direction="row" alignItems="center" spacing={0.5}>
-                      <ServiceForIcon item={item} />
-                      <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.62) }}>
-                        {item.label}
-                      </Typography>
-                    </Stack>
-                    {index < arr.length - 1 ? (
-                      <Typography sx={{ fontSize: 12.5, fontWeight: 500, color: alpha(m.navy, 0.28) }}>|</Typography>
-                    ) : null}
-                  </React.Fragment>
-                ))}
+              <React.Fragment key={item.id}>
+                <Stack direction="row" alignItems="center" spacing={0.5}>
+                  <ServiceForIcon item={item} />
+                  <Typography
+                    sx={{
+                      fontSize: 12.5,
+                      fontWeight: 700,
+                      color: alpha(m.navy, 0.62),
+                    }}
+                  >
+                    {item.label}
+                  </Typography>
+                </Stack>
+                {index < arr.length - 1 ? (
+                  <Typography
+                    sx={{
+                      fontSize: 12.5,
+                      fontWeight: 500,
+                      color: alpha(m.navy, 0.28),
+                    }}
+                  >
+                    |
+                  </Typography>
+                ) : null}
+              </React.Fragment>
+            ))}
           </Stack>
         </SectionCard>
 
@@ -1105,8 +1377,18 @@ export default function BusinessPublicProfile({
                     setProjectEnabled(e.target.checked);
                   }}
                 />
-                <Typography sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.82) }}>Project</Typography>
-                <InfoOutlinedIcon sx={{ fontSize: 16, color: m.teal, ml: 0.15 }} />
+                <Typography
+                  sx={{
+                    fontSize: 13,
+                    fontWeight: 800,
+                    color: alpha(m.navy, 0.82),
+                  }}
+                >
+                  Project
+                </Typography>
+                <InfoOutlinedIcon
+                  sx={{ fontSize: 16, color: m.teal, ml: 0.15 }}
+                />
               </Stack>
             ) : null
           }
@@ -1118,7 +1400,12 @@ export default function BusinessPublicProfile({
               onSelect={setActiveCategory}
             />
           </Box>
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            sx={{ mb: 1.5 }}
+          >
             <TextField
               size="small"
               placeholder="Search services"
@@ -1126,10 +1413,18 @@ export default function BusinessPublicProfile({
               onChange={(e) => setSearch(e.target.value)}
               fullWidth
               InputProps={{
-                startAdornment: <SearchRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.4), mr: 0.5 }} />,
+                startAdornment: (
+                  <SearchRoundedIcon
+                    sx={{ fontSize: 18, color: alpha(m.navy, 0.4), mr: 0.5 }}
+                  />
+                ),
               }}
               sx={{
-                "& .MuiOutlinedInput-root": { borderRadius: "10px", bgcolor: alpha(m.navy, 0.02), fontSize: 12.5 },
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: "10px",
+                  bgcolor: alpha(m.navy, 0.02),
+                  fontSize: 12.5,
+                },
               }}
             />
             <IconButton
@@ -1165,19 +1460,56 @@ export default function BusinessPublicProfile({
                 >
                   <Stack direction="row" alignItems="center" spacing={1}>
                     <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
+                      <Typography
+                        sx={{
+                          fontSize: 12.5,
+                          fontWeight: 900,
+                          color: alpha(m.navy, 0.82),
+                        }}
+                      >
                         {service.name}
                       </Typography>
-                      <Typography sx={{ fontSize: 11, fontWeight: 700, color: m.teal }}>{service.durationLabel}</Typography>
+                      <Typography
+                        sx={{ fontSize: 11, fontWeight: 700, color: m.teal }}
+                      >
+                        {service.durationLabel}
+                      </Typography>
                     </Box>
-                    <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78), mr: 0.5 }}>
+                    <Typography
+                      sx={{
+                        fontSize: 12.5,
+                        fontWeight: 900,
+                        color: alpha(m.navy, 0.78),
+                        mr: 0.5,
+                      }}
+                    >
                       {service.priceLabel}
                     </Typography>
-                    <Stack direction="row" alignItems="center" sx={{ border: `1px solid ${alpha(m.navy, 0.12)}`, borderRadius: "8px" }}>
-                      <IconButton size="small" onClick={() => adjustQty(service.id, -1)} disabled={!checked || qty <= 1}>
+                    <Stack
+                      direction="row"
+                      alignItems="center"
+                      sx={{
+                        border: `1px solid ${alpha(m.navy, 0.12)}`,
+                        borderRadius: "8px",
+                      }}
+                    >
+                      <IconButton
+                        size="small"
+                        onClick={() => adjustQty(service.id, -1)}
+                        disabled={!checked || qty <= 1}
+                      >
                         <RemoveRoundedIcon sx={{ fontSize: 16 }} />
                       </IconButton>
-                      <Typography sx={{ width: 22, textAlign: "center", fontSize: 12, fontWeight: 900 }}>{qty}</Typography>
+                      <Typography
+                        sx={{
+                          width: 22,
+                          textAlign: "center",
+                          fontSize: 12,
+                          fontWeight: 900,
+                        }}
+                      >
+                        {qty}
+                      </Typography>
                       <IconButton
                         size="small"
                         onClick={() => adjustQty(service.id, 1)}
@@ -1192,7 +1524,9 @@ export default function BusinessPublicProfile({
                     </Stack>
                     <Checkbox
                       checked={checked}
-                      onChange={(e) => toggleService(service.id, e.target.checked)}
+                      onChange={(e) =>
+                        toggleService(service.id, e.target.checked)
+                      }
                       sx={{ p: 0.25, "&.Mui-checked": { color: m.teal } }}
                     />
                   </Stack>
@@ -1213,11 +1547,16 @@ export default function BusinessPublicProfile({
             }}
           >
             <Box sx={{ px: 2, py: 1.5 }}>
-              <Typography variant="subHeading" sx={{ lineHeight: 1, letterSpacing: 0, mb: 1.25 }}>
+              <Typography
+                variant="subHeading"
+                sx={{ lineHeight: 1, letterSpacing: 0, mb: 1.25 }}
+              >
                 Project
               </Typography>
               <ProjectReadOnlyField
-                value={data.projectInstructions || data.projectPlaceholder || ""}
+                value={
+                  data.projectInstructions || data.projectPlaceholder || ""
+                }
               />
             </Box>
           </Paper>
@@ -1226,7 +1565,13 @@ export default function BusinessPublicProfile({
         <SectionCard title="Our Professional Team">
           <Stack spacing={1.25}>
             {visibleTeamMembers.length === 0 ? (
-              <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.5) }}>
+              <Typography
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: alpha(m.navy, 0.5),
+                }}
+              >
                 No team members available for this location type.
               </Typography>
             ) : null}
@@ -1272,25 +1617,49 @@ export default function BusinessPublicProfile({
                       }}
                     >
                       {member.avatarUrl ? (
-                        <RemoteAwareImage src={member.avatarUrl} alt={member.name} fill style={{ objectFit: "cover" }} />
+                        <RemoteAwareImage
+                          src={member.avatarUrl}
+                          alt={member.name}
+                          fill
+                          style={{ objectFit: "cover" }}
+                        />
                       ) : null}
                     </Box>
                     <Box sx={{ minWidth: 0 }}>
-                      <Typography sx={{ fontWeight: 500, fontSize: 14, color: alpha(m.navy, 0.88), lineHeight: 1.35 }}>
+                      <Typography
+                        sx={{
+                          fontWeight: 500,
+                          fontSize: 14,
+                          color: alpha(m.navy, 0.88),
+                          lineHeight: 1.35,
+                        }}
+                      >
                         {member.name}
                       </Typography>
-                      <Stack direction="row" alignItems="center" spacing={0.25} sx={{ mt: 0.35 }}>
+                      <Stack
+                        direction="row"
+                        alignItems="center"
+                        spacing={0.25}
+                        sx={{ mt: 0.35 }}
+                      >
                         {Array.from({ length: 5 }).map((_, i) => (
                           <StarRoundedIcon
                             key={i}
                             sx={{
                               fontSize: 14,
-                              color: i < Math.round(member.rating) ? m.star : alpha(m.navy, 0.15),
+                              color:
+                                i < Math.round(member.rating)
+                                  ? m.star
+                                  : alpha(m.navy, 0.15),
                             }}
                           />
                         ))}
                         <ButtonBase
-                          onClick={() => router.push(clientReviewsHref(data.shopId, member.id))}
+                          onClick={() =>
+                            router.push(
+                              clientReviewsHref(data.shopId, member.id),
+                            )
+                          }
                           sx={{
                             ml: 0.25,
                             borderRadius: "6px",
@@ -1298,7 +1667,13 @@ export default function BusinessPublicProfile({
                             "&:hover": { bgcolor: alpha(m.teal, 0.06) },
                           }}
                         >
-                          <Typography sx={{ fontSize: 10.5, fontWeight: 500, color: alpha(m.navy, 0.5) }}>
+                          <Typography
+                            sx={{
+                              fontSize: 10.5,
+                              fontWeight: 500,
+                              color: alpha(m.navy, 0.5),
+                            }}
+                          >
                             ({member.reviewsCount} Reviews)
                           </Typography>
                         </ButtonBase>
@@ -1306,7 +1681,14 @@ export default function BusinessPublicProfile({
                     </Box>
                   </Stack>
 
-                  <Box sx={{ flex: 1, minWidth: 0, px: { md: 2 }, py: { xs: 0, md: 0.25 } }}>
+                  <Box
+                    sx={{
+                      flex: 1,
+                      minWidth: 0,
+                      px: { md: 2 },
+                      py: { xs: 0, md: 0.25 },
+                    }}
+                  >
                     {member.serviceSlots.length > 0 ? (
                       <Stack
                         direction={{ xs: "column", sm: "row" }}
@@ -1320,23 +1702,41 @@ export default function BusinessPublicProfile({
                             <Box
                               key={slot.id}
                               sx={{
-                                flex: { sm: member.serviceSlots.length > 1 ? "1 1 calc(50% - 8px)" : "1 1 100%" },
-                                minWidth: { sm: member.serviceSlots.length > 1 ? 0 : "100%" },
+                                flex: {
+                                  sm:
+                                    member.serviceSlots.length > 1
+                                      ? "1 1 calc(50% - 8px)"
+                                      : "1 1 100%",
+                                },
+                                minWidth: {
+                                  sm:
+                                    member.serviceSlots.length > 1 ? 0 : "100%",
+                                },
                                 width: "100%",
                               }}
                             >
                               <AppDropdown
-                                value={memberSlotSelections[slotKey] ?? slot.defaultValue}
+                                value={
+                                  memberSlotSelections[slotKey] ??
+                                  slot.defaultValue
+                                }
                                 onChange={(val) => {
-                                  const next = Array.isArray(val) ? val[0] : String(val ?? "");
-                                  setMemberSlotSelections((prev) => ({ ...prev, [slotKey]: next }));
+                                  const next = Array.isArray(val)
+                                    ? val[0]
+                                    : String(val ?? "");
+                                  setMemberSlotSelections((prev) => ({
+                                    ...prev,
+                                    [slotKey]: next,
+                                  }));
                                 }}
                                 options={slot.options}
                                 placeholder={slot.label}
                                 size="small"
                                 fullWidth
                                 renderValue={() => (
-                                  <span style={{ color: alpha(m.navy, 0.62) }}>{slot.label}</span>
+                                  <span style={{ color: alpha(m.navy, 0.62) }}>
+                                    {slot.label}
+                                  </span>
                                 )}
                               />
                             </Box>
@@ -1348,7 +1748,10 @@ export default function BusinessPublicProfile({
                         value=""
                         onChange={() => {}}
                         options={[]}
-                        placeholder={member.allCategoriesPlaceholder ?? "All Categories and services"}
+                        placeholder={
+                          member.allCategoriesPlaceholder ??
+                          "All Categories and services"
+                        }
                         size="small"
                         fullWidth
                         disabled
@@ -1364,7 +1767,14 @@ export default function BusinessPublicProfile({
         <PublicProfileDetailsGroup>
           <SectionCard title="General Note">
             <Box sx={{ borderRadius: "10px", bgcolor: m.fxGrayF2F4F7, p: 1.5 }}>
-              <Typography sx={{ fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.72), mb: 0.75 }}>
+              <Typography
+                sx={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: alpha(m.navy, 0.72),
+                  mb: 0.75,
+                }}
+              >
                 {data.generalNoteLabel}
               </Typography>
               <Box
@@ -1376,7 +1786,14 @@ export default function BusinessPublicProfile({
                   py: 1,
                 }}
               >
-                <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: alpha(m.navy, 0.62), lineHeight: 1.55 }}>
+                <Typography
+                  sx={{
+                    fontSize: 12.5,
+                    fontWeight: 600,
+                    color: alpha(m.navy, 0.62),
+                    lineHeight: 1.55,
+                  }}
+                >
                   Additional Notes: {data.generalNote}
                 </Typography>
               </Box>
@@ -1386,17 +1803,32 @@ export default function BusinessPublicProfile({
           <SectionCard title="Price">
             <Stack spacing={1.5}>
               <Box>
-                <Typography sx={{ fontSize: 12.5, color: alpha(m.navy, 0.78), lineHeight: 1.5 }}>
+                <Typography
+                  sx={{
+                    fontSize: 12.5,
+                    color: alpha(m.navy, 0.78),
+                    lineHeight: 1.5,
+                  }}
+                >
                   <Box component="span" sx={{ fontWeight: 800 }}>
                     Price Range:
                   </Box>{" "}
-                  <Box component="span" sx={{ fontWeight: 600, color: alpha(m.navy, 0.5) }}>
+                  <Box
+                    component="span"
+                    sx={{ fontWeight: 600, color: alpha(m.navy, 0.5) }}
+                  >
                     {data.priceRangeLabel}
                   </Box>
                 </Typography>
               </Box>
               <Box>
-                <Typography sx={{ fontSize: 12.5, color: alpha(m.navy, 0.78), lineHeight: 1.5 }}>
+                <Typography
+                  sx={{
+                    fontSize: 12.5,
+                    color: alpha(m.navy, 0.78),
+                    lineHeight: 1.5,
+                  }}
+                >
                   <Box component="span" sx={{ fontWeight: 900 }}>
                     Prepayment
                   </Box>{" "}
@@ -1404,13 +1836,25 @@ export default function BusinessPublicProfile({
                 </Typography>
               </Box>
               {showKilometerAllowance ? (
-                <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78) }}>
+                <Typography
+                  sx={{
+                    fontSize: 12.5,
+                    fontWeight: 900,
+                    color: alpha(m.navy, 0.78),
+                  }}
+                >
                   Kilometer allowance: {data.kilometerAllowanceLabel}
                 </Typography>
               ) : null}
-              {data.priceDescription ? <MutedInstructionBox>{data.priceDescription}</MutedInstructionBox> : null}
+              {data.priceDescription ? (
+                <MutedInstructionBox>
+                  {data.priceDescription}
+                </MutedInstructionBox>
+              ) : null}
               {showKilometerAllowance && data.kilometerAllowanceInstructions ? (
-                <MutedInstructionBox>{data.kilometerAllowanceInstructions}</MutedInstructionBox>
+                <MutedInstructionBox>
+                  {data.kilometerAllowanceInstructions}
+                </MutedInstructionBox>
               ) : null}
             </Stack>
           </SectionCard>
@@ -1419,26 +1863,65 @@ export default function BusinessPublicProfile({
             <Stack spacing={2}>
               {data.policySections.map((section) => (
                 <Box key={section.title}>
-                  {section.fields?.length === 1 && section.fields[0].label === section.title ? (
-                    <Stack direction="row" alignItems="baseline" justifyContent="space-between" spacing={2} sx={{ mb: 0.25 }}>
-                      <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78) }}>
+                  {section.fields?.length === 1 &&
+                  section.fields[0].label === section.title ? (
+                    <Stack
+                      direction="row"
+                      alignItems="baseline"
+                      justifyContent="space-between"
+                      spacing={2}
+                      sx={{ mb: 0.25 }}
+                    >
+                      <Typography
+                        sx={{
+                          fontSize: 12.5,
+                          fontWeight: 900,
+                          color: alpha(m.navy, 0.78),
+                        }}
+                      >
                         {section.title}
                       </Typography>
-                      <Typography sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.78) }}>
+                      <Typography
+                        sx={{
+                          fontSize: 12,
+                          fontWeight: 800,
+                          color: alpha(m.navy, 0.78),
+                        }}
+                      >
                         {section.fields[0].value}
                       </Typography>
                     </Stack>
                   ) : (
-                    <Typography sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78), mb: 0.5 }}>
+                    <Typography
+                      sx={{
+                        fontSize: 12.5,
+                        fontWeight: 900,
+                        color: alpha(m.navy, 0.78),
+                        mb: 0.5,
+                      }}
+                    >
                       {section.title}
                     </Typography>
                   )}
-                  {section.fields && section.fields.length > 0 && !(section.fields.length === 1 && section.fields[0].label === section.title)
+                  {section.fields &&
+                  section.fields.length > 0 &&
+                  !(
+                    section.fields.length === 1 &&
+                    section.fields[0].label === section.title
+                  )
                     ? section.fields.map((field) => (
-                        <PolicyFieldRow key={`${section.title}-${field.label}`} label={field.label} value={field.value} />
+                        <PolicyFieldRow
+                          key={`${section.title}-${field.label}`}
+                          label={field.label}
+                          value={field.value}
+                        />
                       ))
                     : null}
-                  {section.description ? <MutedInstructionBox>{section.description}</MutedInstructionBox> : null}
+                  {section.description ? (
+                    <MutedInstructionBox>
+                      {section.description}
+                    </MutedInstructionBox>
+                  ) : null}
                 </Box>
               ))}
             </Stack>
@@ -1454,7 +1937,9 @@ export default function BusinessPublicProfile({
                   <Box
                     component={src ? "button" : "div"}
                     type={src ? "button" : undefined}
-                    onClick={src ? () => setPortfolioLightboxIndex(idx) : undefined}
+                    onClick={
+                      src ? () => setPortfolioLightboxIndex(idx) : undefined
+                    }
                     sx={{
                       position: "relative",
                       display: "block",
@@ -1476,9 +1961,20 @@ export default function BusinessPublicProfile({
                     }}
                   >
                     {src ? (
-                      <RemoteAwareImage src={src} alt={`Portfolio ${idx + 1}`} fill style={{ objectFit: "cover" }} />
+                      <RemoteAwareImage
+                        src={src}
+                        alt={`Portfolio ${idx + 1}`}
+                        fill
+                        style={{ objectFit: "cover" }}
+                      />
                     ) : (
-                      <Box sx={{ position: "absolute", inset: 0, bgcolor: alpha(m.navy, 0.06) }} />
+                      <Box
+                        sx={{
+                          position: "absolute",
+                          inset: 0,
+                          bgcolor: alpha(m.navy, 0.06),
+                        }}
+                      />
                     )}
                   </Box>
                 </Grid>
@@ -1575,7 +2071,8 @@ export default function BusinessPublicProfile({
               py: 6,
             }}
           >
-            {portfolioLightboxIndex !== null && toImageSrc(data.portfolioImages[portfolioLightboxIndex]) ? (
+            {portfolioLightboxIndex !== null &&
+            toImageSrc(data.portfolioImages[portfolioLightboxIndex]) ? (
               <Box
                 onClick={(event) => event.stopPropagation()}
                 sx={{
@@ -1608,15 +2105,21 @@ export default function BusinessPublicProfile({
             py: 1.35,
           }}
         >
-          <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
-            <Typography sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.55) }}>
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+            spacing={2}
+          >
+            <Typography
+              sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.55) }}
+            >
               {selectionSummary.count > 0
                 ? `${selectionSummary.count} service${selectionSummary.count > 1 ? "s" : ""} selected - Total: ${selectionSummary.durationLabel} for ${selectionSummary.totalPrice} EUR`
                 : "Select services to continue"}
             </Typography>
-            <Button
-              variant="contained"
-              disableElevation
+            <AppButton
+              tone="primary"
               disabled={selectionSummary.count === 0}
               onClick={() => {
                 onBookNow(
@@ -1632,25 +2135,14 @@ export default function BusinessPublicProfile({
                 );
               }}
               sx={{
-                borderRadius: "10px",
-                textTransform: "none",
-                fontWeight: 900,
-                fontSize: 13,
                 minWidth: 132,
                 height: 40,
                 px: 2.5,
-                bgcolor: m.teal,
-                color: "#fff",
                 boxShadow: "none",
-                "&:hover": { bgcolor: m.tealDark, boxShadow: "none" },
-                "&.Mui-disabled": {
-                  bgcolor: alpha(m.teal, 0.35),
-                  color: alpha("#fff", 0.85),
-                },
               }}
             >
               Book Now
-            </Button>
+            </AppButton>
           </Stack>
         </Paper>
       </Stack>

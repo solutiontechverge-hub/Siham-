@@ -16,7 +16,8 @@ export default function AppSearchField({
   InputProps,
   ...props
 }: AppSearchFieldProps) {
-  const hasValue = typeof value === "string" ? value.length > 0 : Boolean(value);
+  const hasValue =
+    typeof value === "string" ? value.length > 0 : Boolean(value);
 
   return (
     <AppTextField
@@ -32,7 +33,11 @@ export default function AppSearchField({
         endAdornment:
           hasValue && onClear ? (
             <InputAdornment position="end">
-              <IconButton aria-label="Clear search" edge="end" onClick={onClear}>
+              <IconButton
+                aria-label="Clear search"
+                edge="end"
+                onClick={onClear}
+              >
                 <ClearRoundedIcon />
               </IconButton>
             </InputAdornment>

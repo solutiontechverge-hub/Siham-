@@ -1,12 +1,12 @@
 "use client";
 
+import AppButton from "../AppButton";
 import * as React from "react";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import StorefrontOutlinedIcon from "@mui/icons-material/StorefrontOutlined";
 import {
   Box,
-  Button,
   IconButton,
   Popover,
   Radio,
@@ -66,10 +66,12 @@ function tomorrowIso(): string {
 }
 
 function linesFromCard(card: SalesOverviewCardData): ManualEntryLine[] {
-  const source =
-    card.highlightedLineIds?.length
-      ? card.lines.filter((line) => card.highlightedLineIds!.includes(line.id) && line.amount >= 0)
-      : card.lines.filter((line) => line.amount >= 0);
+  const source = card.highlightedLineIds?.length
+    ? card.lines.filter(
+        (line) =>
+          card.highlightedLineIds!.includes(line.id) && line.amount >= 0,
+      )
+    : card.lines.filter((line) => line.amount >= 0);
 
   return source.map((line) => ({
     id: line.id,
@@ -112,14 +114,24 @@ export default function SalesEditCheckout({
   const businessSetup = businessSetupResponse?.data ?? null;
 
   const [step, setStep] = React.useState<Step>("items");
-  const [lines, setLines] = React.useState<ManualEntryLine[]>(() => linesFromCard(card));
-  const [discount, setDiscount] = React.useState<ManualEntryDiscount | null>(null);
+  const [lines, setLines] = React.useState<ManualEntryLine[]>(() =>
+    linesFromCard(card),
+  );
+  const [discount, setDiscount] = React.useState<ManualEntryDiscount | null>(
+    null,
+  );
   const [discountModalOpen, setDiscountModalOpen] = React.useState(false);
-  const [editingLine, setEditingLine] = React.useState<ManualEntryLine | null>(null);
+  const [editingLine, setEditingLine] = React.useState<ManualEntryLine | null>(
+    null,
+  );
   const [paymentMethod, setPaymentMethod] =
-    React.useState<SalesCheckoutPaymentMethod>(card.paymentMethod || "onlineDirect");
+    React.useState<SalesCheckoutPaymentMethod>(
+      card.paymentMethod || "onlineDirect",
+    );
   const [dueDate, setDueDate] = React.useState(card.dueDate || tomorrowIso());
-  const [dueDateAnchor, setDueDateAnchor] = React.useState<null | HTMLElement>(null);
+  const [dueDateAnchor, setDueDateAnchor] = React.useState<null | HTMLElement>(
+    null,
+  );
   const [productDrawerOpen, setProductDrawerOpen] = React.useState(false);
   const [itemDrawerOpen, setItemDrawerOpen] = React.useState(false);
   const [uniqueItemOpen, setUniqueItemOpen] = React.useState(false);
@@ -151,26 +163,45 @@ export default function SalesEditCheckout({
     }
     return settings.services.map((service) => ({
       id: service.id,
-      label: service.service ? `${service.category} - ${service.service}` : service.category,
+      label: service.service
+        ? `${service.category} - ${service.service}`
+        : service.category,
       unitPrice: 0,
     }));
   }, [businessSetup?.service_details, settings.services]);
 
-  const productLines = React.useMemo(() => lines.filter((l) => l.kind === "product"), [lines]);
-  const itemLines = React.useMemo(() => lines.filter((l) => l.kind !== "product"), [lines]);
-  const subtotal = React.useMemo(() => lines.reduce((sum, line) => sum + lineTotal(line), 0), [lines]);
+  const productLines = React.useMemo(
+    () => lines.filter((l) => l.kind === "product"),
+    [lines],
+  );
+  const itemLines = React.useMemo(
+    () => lines.filter((l) => l.kind !== "product"),
+    [lines],
+  );
+  const subtotal = React.useMemo(
+    () => lines.reduce((sum, line) => sum + lineTotal(line), 0),
+    [lines],
+  );
   const discountAmount = React.useMemo(
     () => calculateManualEntryDiscountAmount(subtotal, discount),
     [discount, subtotal],
   );
   const totalPrice = Math.max(0, subtotal - discountAmount);
   const hasItems = lines.length > 0;
-  const needsDueDate = paymentMethod === "onlineNonDirect" || paymentMethod === "offlineNonDirect";
+  const needsDueDate =
+    paymentMethod === "onlineNonDirect" || paymentMethod === "offlineNonDirect";
 
-  const addLinesFromCatalog = (kind: ManualEntryLineKind, options: ManualEntryCatalogOption[]) => {
-    setLines((prev) => [...prev, ...options.map((option) => createManualEntryLineFromOption(kind, option))]);
+  const addLinesFromCatalog = (
+    kind: ManualEntryLineKind,
+    options: ManualEntryCatalogOption[],
+  ) => {
+    setLines((prev) => [
+      ...prev,
+      ...options.map((option) => createManualEntryLineFromOption(kind, option)),
+    ]);
   };
-  const removeLine = (id: string) => setLines((prev) => prev.filter((l) => l.id !== id));
+  const removeLine = (id: string) =>
+    setLines((prev) => prev.filter((l) => l.id !== id));
   const updateLine = (next: ManualEntryLine) =>
     setLines((prev) => prev.map((l) => (l.id === next.id ? next : l)));
 
@@ -204,14 +235,19 @@ export default function SalesEditCheckout({
     });
   };
 
-  const paymentOptions: Array<{ id: SalesCheckoutPaymentMethod; label: string }> = [
+  const paymentOptions: Array<{
+    id: SalesCheckoutPaymentMethod;
+    label: string;
+  }> = [
     { id: "onlineDirect", label: "Online Direct" },
     { id: "offlineDirect", label: "Offline Direct" },
     { id: "onlineNonDirect", label: "Online Non-Direct" },
     { id: "offlineNonDirect", label: "Offline Non-Direct" },
   ];
 
-  const paymentLabel = paymentOptions.find((o) => o.id === paymentMethod)?.label || "Online Direct";
+  const paymentLabel =
+    paymentOptions.find((o) => o.id === paymentMethod)?.label ||
+    "Online Direct";
 
   return (
     <Box sx={{ pt: 0.5 }}>
@@ -224,7 +260,9 @@ export default function SalesEditCheckout({
         >
           <ArrowBackRoundedIcon sx={{ fontSize: 20 }} />
         </IconButton>
-        <Typography sx={{ fontSize: 16, fontWeight: 900, color: alpha(m.navy, 0.88) }}>
+        <Typography
+          sx={{ fontSize: 16, fontWeight: 900, color: alpha(m.navy, 0.88) }}
+        >
           Checkout
         </Typography>
       </Stack>
@@ -232,7 +270,14 @@ export default function SalesEditCheckout({
       {step === "items" ? (
         <Stack spacing={2}>
           <Box>
-            <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.55), mb: 0.75 }}>
+            <Typography
+              sx={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.55),
+                mb: 0.75,
+              }}
+            >
               Client
             </Typography>
             <Box
@@ -244,18 +289,44 @@ export default function SalesEditCheckout({
                 py: 1.25,
               }}
             >
-              <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 0.25 }}>
-                <Typography sx={{ fontSize: 13.5, fontWeight: 800, color: alpha(m.navy, 0.82) }}>
+              <Stack
+                direction="row"
+                alignItems="center"
+                spacing={0.75}
+                sx={{ mb: 0.25 }}
+              >
+                <Typography
+                  sx={{
+                    fontSize: 13.5,
+                    fontWeight: 800,
+                    color: alpha(m.navy, 0.82),
+                  }}
+                >
                   {card.clientName}
                 </Typography>
-                <Box sx={{ px: 0.7, py: 0.15, borderRadius: "999px", bgcolor: alpha(m.teal, 0.12) }}>
-                  <Typography sx={{ fontSize: 10.5, fontWeight: 800, color: m.teal }}>
+                <Box
+                  sx={{
+                    px: 0.7,
+                    py: 0.15,
+                    borderRadius: "999px",
+                    bgcolor: alpha(m.teal, 0.12),
+                  }}
+                >
+                  <Typography
+                    sx={{ fontSize: 10.5, fontWeight: 800, color: m.teal }}
+                  >
                     {kindBadge}
                   </Typography>
                 </Box>
               </Stack>
               {card.clientEmail ? (
-                <Typography sx={{ fontSize: 12, fontWeight: 650, color: alpha(m.navy, 0.5) }}>
+                <Typography
+                  sx={{
+                    fontSize: 12,
+                    fontWeight: 650,
+                    color: alpha(m.navy, 0.5),
+                  }}
+                >
                   {card.clientEmail}
                 </Typography>
               ) : null}
@@ -275,10 +346,22 @@ export default function SalesEditCheckout({
                         py: 0.9,
                       }}
                     >
-                      <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.78) }}>
+                      <Typography
+                        sx={{
+                          fontSize: 12.5,
+                          fontWeight: 800,
+                          color: alpha(m.navy, 0.78),
+                        }}
+                      >
                         {person.label}
                       </Typography>
-                      <Typography sx={{ fontSize: 12, fontWeight: 650, color: alpha(m.navy, 0.5) }}>
+                      <Typography
+                        sx={{
+                          fontSize: 12,
+                          fontWeight: 650,
+                          color: alpha(m.navy, 0.5),
+                        }}
+                      >
                         {person.name}
                       </Typography>
                     </Box>
@@ -288,10 +371,24 @@ export default function SalesEditCheckout({
           </Box>
 
           <Box>
-            <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.55), mb: 0.75 }}>
+            <Typography
+              sx={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.55),
+                mb: 0.75,
+              }}
+            >
               Items
             </Typography>
-            <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.45), mb: 0.6 }}>
+            <Typography
+              sx={{
+                fontSize: 11.5,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.45),
+                mb: 0.6,
+              }}
+            >
               Service
             </Typography>
             <Stack spacing={0.75} sx={{ mb: 1.25 }}>
@@ -303,10 +400,20 @@ export default function SalesEditCheckout({
                   onDelete={() => removeLine(line.id)}
                 />
               ))}
-              <ManualEntryCatalogOpenButton label="Service" onClick={() => setItemDrawerOpen(true)} />
+              <ManualEntryCatalogOpenButton
+                label="Service"
+                onClick={() => setItemDrawerOpen(true)}
+              />
             </Stack>
 
-            <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.45), mb: 0.6 }}>
+            <Typography
+              sx={{
+                fontSize: 11.5,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.45),
+                mb: 0.6,
+              }}
+            >
               Product
             </Typography>
             <Stack spacing={0.75}>
@@ -318,8 +425,11 @@ export default function SalesEditCheckout({
                   onDelete={() => removeLine(line.id)}
                 />
               ))}
-              <ManualEntryCatalogOpenButton label="Product" onClick={() => setProductDrawerOpen(true)} />
-              <Button
+              <ManualEntryCatalogOpenButton
+                label="Product"
+                onClick={() => setProductDrawerOpen(true)}
+              />
+              <AppButton
                 variant="outlined"
                 onClick={() => setUniqueItemOpen(true)}
                 sx={{
@@ -332,26 +442,45 @@ export default function SalesEditCheckout({
                 }}
               >
                 + Unique Item
-              </Button>
+              </AppButton>
             </Stack>
           </Box>
 
           {hasItems ? (
             <Stack spacing={1}>
               <Stack direction="row" justifyContent="space-between">
-                <Typography sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.55) }}>
+                <Typography
+                  sx={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.55),
+                  }}
+                >
                   Total Price:
                 </Typography>
-                <Typography sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}>
+                <Typography
+                  sx={{
+                    fontSize: 14,
+                    fontWeight: 900,
+                    color: alpha(m.navy, 0.88),
+                  }}
+                >
                   {formatEurAmount(totalPrice)} EUR
                 </Typography>
               </Stack>
               {discount && discount.amount > 0 ? (
-                <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.55) }}>
-                  Discount ({formatManualEntryDiscountLabel(discount)}): -{formatEurAmount(discountAmount)}
+                <Typography
+                  sx={{
+                    fontSize: 12.5,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.55),
+                  }}
+                >
+                  Discount ({formatManualEntryDiscountLabel(discount)}): -
+                  {formatEurAmount(discountAmount)}
                 </Typography>
               ) : null}
-              <Button
+              <AppButton
                 variant="text"
                 onClick={() => setDiscountModalOpen(true)}
                 sx={{
@@ -364,8 +493,10 @@ export default function SalesEditCheckout({
                   color: m.teal,
                 }}
               >
-                {discount && discount.amount > 0 ? "Edit Discount" : "+ Discount"}
-              </Button>
+                {discount && discount.amount > 0
+                  ? "Edit Discount"
+                  : "+ Discount"}
+              </AppButton>
             </Stack>
           ) : null}
         </Stack>
@@ -373,14 +504,22 @@ export default function SalesEditCheckout({
 
       {step === "payment" ? (
         <Box>
-          <Typography sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.86), mb: 1.25 }}>
+          <Typography
+            sx={{
+              fontSize: 13,
+              fontWeight: 800,
+              color: alpha(m.navy, 0.86),
+              mb: 1.25,
+            }}
+          >
             Checkout
           </Typography>
           <Stack spacing={1}>
             {paymentOptions.map((option) => {
               const selected = paymentMethod === option.id;
               const showCalendarIcon =
-                option.id === "onlineNonDirect" || option.id === "offlineNonDirect";
+                option.id === "onlineNonDirect" ||
+                option.id === "offlineNonDirect";
               const dueLabel =
                 dueDate && selected
                   ? dueDate.split("-").reverse().join("/")
@@ -408,7 +547,11 @@ export default function SalesEditCheckout({
                     sx={{ width: "100%", minWidth: 0 }}
                   >
                     <StorefrontOutlinedIcon
-                      sx={{ fontSize: 20, color: alpha(m.navy, 0.45), flexShrink: 0 }}
+                      sx={{
+                        fontSize: 20,
+                        color: alpha(m.navy, 0.45),
+                        flexShrink: 0,
+                      }}
                     />
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Typography
@@ -423,7 +566,12 @@ export default function SalesEditCheckout({
                       </Typography>
                       {showCalendarIcon && dueLabel ? (
                         <Typography
-                          sx={{ fontSize: 11, fontWeight: 650, color: alpha(m.navy, 0.48), mt: 0.15 }}
+                          sx={{
+                            fontSize: 11,
+                            fontWeight: 650,
+                            color: alpha(m.navy, 0.48),
+                            mt: 0.15,
+                          }}
                         >
                           Due {dueLabel}
                         </Typography>
@@ -510,8 +658,12 @@ export default function SalesEditCheckout({
           }}
         >
           <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
-            <Typography sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.86) }}>
-              {needsDueDate ? "Reissued Invoice Summary" : "After treatment Summary"}
+            <Typography
+              sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.86) }}
+            >
+              {needsDueDate
+                ? "Reissued Invoice Summary"
+                : "After treatment Summary"}
             </Typography>
             <Box
               sx={{
@@ -521,16 +673,27 @@ export default function SalesEditCheckout({
                 bgcolor: alpha("#F79009", 0.16),
               }}
             >
-              <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#B54708" }}>
+              <Typography
+                sx={{ fontSize: 11, fontWeight: 800, color: "#B54708" }}
+              >
                 {needsDueDate ? "Payment Due" : "Pending"}
               </Typography>
             </Box>
           </Stack>
-          <Typography sx={{ fontSize: 13.5, fontWeight: 800, color: alpha(m.navy, 0.82) }}>
+          <Typography
+            sx={{ fontSize: 13.5, fontWeight: 800, color: alpha(m.navy, 0.82) }}
+          >
             {card.clientName}
           </Typography>
           {card.clientEmail ? (
-            <Typography sx={{ fontSize: 12, fontWeight: 650, color: alpha(m.navy, 0.5), mb: 1.25 }}>
+            <Typography
+              sx={{
+                fontSize: 12,
+                fontWeight: 650,
+                color: alpha(m.navy, 0.5),
+                mb: 1.25,
+              }}
+            >
               {card.clientEmail}
             </Typography>
           ) : (
@@ -538,22 +701,44 @@ export default function SalesEditCheckout({
           )}
           <Stack spacing={0.75} sx={{ mb: 1.25 }}>
             {lines.map((line) => (
-              <Stack key={line.id} direction="row" justifyContent="space-between">
-                <Typography sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.72) }}>
-                  {line.quantity > 1 ? `${line.name} ×${line.quantity}` : line.name}
+              <Stack
+                key={line.id}
+                direction="row"
+                justifyContent="space-between"
+              >
+                <Typography
+                  sx={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.72),
+                  }}
+                >
+                  {line.quantity > 1
+                    ? `${line.name} ×${line.quantity}`
+                    : line.name}
                 </Typography>
-                <Typography sx={{ fontSize: 13, fontWeight: 800 }}>€{lineTotal(line).toFixed(2)}</Typography>
+                <Typography sx={{ fontSize: 13, fontWeight: 800 }}>
+                  €{lineTotal(line).toFixed(2)}
+                </Typography>
               </Stack>
             ))}
           </Stack>
-          <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.75 }}>
-            <Typography sx={{ fontSize: 13, fontWeight: 900 }}>Total</Typography>
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            sx={{ mb: 0.75 }}
+          >
+            <Typography sx={{ fontSize: 13, fontWeight: 900 }}>
+              Total
+            </Typography>
             <Typography sx={{ fontSize: 22, fontWeight: 900, color: m.teal }}>
               €{totalPrice % 1 === 0 ? totalPrice : totalPrice.toFixed(2)}
             </Typography>
           </Stack>
           <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
-            <Typography sx={{ fontSize: 13, fontWeight: 900 }}>Payment</Typography>
+            <Typography sx={{ fontSize: 13, fontWeight: 900 }}>
+              Payment
+            </Typography>
             <Typography sx={{ fontSize: 22, fontWeight: 900, color: m.teal }}>
               €{totalPrice % 1 === 0 ? totalPrice : totalPrice.toFixed(2)}
             </Typography>
@@ -570,7 +755,9 @@ export default function SalesEditCheckout({
             }}
           >
             {needsDueDate ? (
-              <CalendarMonthRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.45) }} />
+              <CalendarMonthRoundedIcon
+                sx={{ fontSize: 16, color: alpha(m.navy, 0.45) }}
+              />
             ) : null}
             {needsDueDate
               ? `${paymentLabel} (Due date ${dueDate.split("-").reverse().join("/")})`
@@ -579,40 +766,28 @@ export default function SalesEditCheckout({
         </Box>
       ) : null}
 
-      <Stack direction="row" justifyContent="flex-end" spacing={1} sx={{ mt: 2.5 }}>
-        <Button
-          variant="outlined"
-          onClick={onCancel}
-          sx={{
-            textTransform: "none",
-            fontWeight: 800,
-            borderRadius: "8px",
-            borderColor: alpha(m.navy, 0.14),
-            color: alpha(m.navy, 0.72),
-            height: 36,
-            px: 2.25,
-          }}
-        >
+      <Stack
+        direction="row"
+        justifyContent="flex-end"
+        spacing={1}
+        sx={{ mt: 2.5 }}
+      >
+        <AppButton tone="secondary" onClick={onCancel}>
           Cancel
-        </Button>
-        <Button
-          variant="contained"
-          disableElevation
-          disabled={(step === "items" && !hasItems) || (step === "payment" && needsDueDate && !dueDate)}
+        </AppButton>
+        <AppButton
+          tone="primary"
+          disabled={
+            (step === "items" && !hasItems) ||
+            (step === "payment" && needsDueDate && !dueDate)
+          }
           onClick={handleNext}
           sx={{
-            textTransform: "none",
-            fontWeight: 900,
-            borderRadius: "8px",
-            bgcolor: m.teal,
-            color: "#fff",
-            "&:hover": { bgcolor: m.tealDark },
-            height: 36,
             px: 2.5,
           }}
         >
           Next
-        </Button>
+        </AppButton>
       </Stack>
 
       <ManualEntryDiscountModal

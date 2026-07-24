@@ -1,9 +1,9 @@
 "use client";
 
+import AppButton from "../../../../components/common/AppButton";
 import * as React from "react";
 import {
   Box,
-  Button,
   Checkbox,
   FormControlLabel,
   Stack,
@@ -40,40 +40,32 @@ export default function ClientListFilterDrawer({
       onClose={onClose}
       title="Filter clients"
       footer={
-        <Stack direction="row" spacing={1} justifyContent="space-between" sx={{ px: 2.5, py: 2, width: "100%" }}>
-          <Button
-            onClick={onClear}
-            variant="outlined"
-            sx={{
-              borderRadius: "8px",
-              textTransform: "none",
-              fontWeight: 800,
-              borderColor: alpha(m.navy, 0.14),
-              color: alpha(m.navy, 0.72),
-            }}
-          >
+        <Stack
+          direction="row"
+          spacing={1}
+          justifyContent="space-between"
+          sx={{ px: 2.5, py: 2, width: "100%" }}
+        >
+          <AppButton tone="secondary" onClick={onClear}>
             All clients
-          </Button>
-          <Button
-            onClick={onClose}
-            variant="contained"
-            disableElevation
-            sx={{
-              borderRadius: "8px",
-              textTransform: "none",
-              fontWeight: 900,
-              bgcolor: m.teal,
-              "&:hover": { bgcolor: m.tealDark },
-            }}
-          >
+          </AppButton>
+          <AppButton tone="primary" onClick={onClose}>
             Apply
-          </Button>
+          </AppButton>
         </Stack>
       }
     >
       <Box sx={{ px: 2.5, py: 2 }}>
-        <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.55), mb: 1.5 }}>
-          Select one or more client types. Matching any selected filter will show the client.
+        <Typography
+          sx={{
+            fontSize: 12,
+            fontWeight: 700,
+            color: alpha(m.navy, 0.55),
+            mb: 1.5,
+          }}
+        >
+          Select one or more client types. Matching any selected filter will
+          show the client.
         </Typography>
         <Stack spacing={0.5}>
           {CLIENT_LIST_FILTER_OPTIONS.map(({ key, label }) => (
@@ -88,7 +80,13 @@ export default function ClientListFilterDrawer({
                 />
               }
               label={
-                <Typography sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.78) }}>
+                <Typography
+                  sx={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.78),
+                  }}
+                >
                   {label}
                 </Typography>
               }

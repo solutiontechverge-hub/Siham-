@@ -1,9 +1,18 @@
 "use client";
 
 import * as React from "react";
-import { Box, FormControlLabel, Radio, RadioGroup, Typography } from "@mui/material";
+import {
+  Box,
+  FormControlLabel,
+  Radio,
+  RadioGroup,
+  Typography,
+} from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import AppModal, { MessagingModalCancelButton, MessagingModalPrimaryButton } from "../AppModal";
+import AppModal, {
+  MessagingModalCancelButton,
+  MessagingModalPrimaryButton,
+} from "../AppModal";
 
 export type MessagingMessageDeleteScope = "me" | "everyone";
 
@@ -53,18 +62,55 @@ export default function MessagingDeleteMessageDialog({
       }
     >
       <Box sx={{ py: 1 }}>
-        <RadioGroup value={scope} onChange={(_, value) => setScope(value as MessagingMessageDeleteScope)}>
+        <RadioGroup
+          value={scope}
+          onChange={(_, value) =>
+            setScope(value as MessagingMessageDeleteScope)
+          }
+        >
           <FormControlLabel
             value="me"
-            control={<Radio size="small" sx={{ color: alpha(m.navy, 0.35), "&.Mui-checked": { color: m.teal } }} />}
-            label={<Typography sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.72) }}>Delete for me</Typography>}
+            control={
+              <Radio
+                size="small"
+                sx={{
+                  color: alpha(m.navy, 0.35),
+                  "&.Mui-checked": { color: m.teal },
+                }}
+              />
+            }
+            label={
+              <Typography
+                sx={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: alpha(m.navy, 0.72),
+                }}
+              >
+                Delete for me
+              </Typography>
+            }
           />
           {canDeleteForEveryone ? (
             <FormControlLabel
               value="everyone"
-              control={<Radio size="small" sx={{ color: alpha(m.navy, 0.35), "&.Mui-checked": { color: m.teal } }} />}
+              control={
+                <Radio
+                  size="small"
+                  sx={{
+                    color: alpha(m.navy, 0.35),
+                    "&.Mui-checked": { color: m.teal },
+                  }}
+                />
+              }
               label={
-                <Typography sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.72) }}>
+                <Typography
+                  sx={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.72),
+                  }}
+                >
                   Delete for everyone
                 </Typography>
               }

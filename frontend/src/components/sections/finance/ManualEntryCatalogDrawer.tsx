@@ -1,9 +1,10 @@
 "use client";
 
+import AppButton from "../../common/AppButton";
 import * as React from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
-import { Box, Button, Checkbox, Stack, Typography } from "@mui/material";
+import { Box, Checkbox, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDrawer from "../../common/AppDrawer";
 import { FinanceDrawerActionsFooter } from "../../common/FinanceDrawerFooter";
@@ -16,11 +17,14 @@ type ManualEntryCatalogOpenButtonProps = {
   onClick: () => void;
 };
 
-export function ManualEntryCatalogOpenButton({ label, onClick }: ManualEntryCatalogOpenButtonProps) {
+export function ManualEntryCatalogOpenButton({
+  label,
+  onClick,
+}: ManualEntryCatalogOpenButtonProps) {
   const m = useTheme().palette.mollure;
 
   return (
-    <Button
+    <AppButton
       fullWidth
       variant="outlined"
       onClick={onClick}
@@ -43,7 +47,7 @@ export function ManualEntryCatalogOpenButton({ label, onClick }: ManualEntryCata
       }}
     >
       {label}
-    </Button>
+    </AppButton>
   );
 }
 
@@ -121,13 +125,30 @@ export default function ManualEntryCatalogDrawer({
           size="small"
           fullWidth
           InputProps={{
-            endAdornment: <SearchRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.45) }} />,
+            endAdornment: (
+              <SearchRoundedIcon
+                sx={{ fontSize: 18, color: alpha(m.navy, 0.45) }}
+              />
+            ),
           }}
-          sx={{ "& .MuiOutlinedInput-root": { borderRadius: "10px", bgcolor: "#fff" } }}
+          sx={{
+            "& .MuiOutlinedInput-root": {
+              borderRadius: "10px",
+              bgcolor: "#fff",
+            },
+          }}
         />
 
         {filteredOptions.length === 0 ? (
-          <Typography sx={{ fontSize: 13, fontWeight: 600, color: alpha(m.navy, 0.5), py: 2, textAlign: "center" }}>
+          <Typography
+            sx={{
+              fontSize: 13,
+              fontWeight: 600,
+              color: alpha(m.navy, 0.5),
+              py: 2,
+              textAlign: "center",
+            }}
+          >
             {emptyLabel}
           </Typography>
         ) : (
@@ -148,7 +169,11 @@ export default function ManualEntryCatalogDrawer({
                     cursor: "pointer",
                     border: `1px solid ${checked ? m.teal : alpha(m.navy, 0.1)}`,
                     bgcolor: checked ? alpha(m.teal, 0.06) : "#fff",
-                    "&:hover": { bgcolor: checked ? alpha(m.teal, 0.08) : alpha(m.navy, 0.02) },
+                    "&:hover": {
+                      bgcolor: checked
+                        ? alpha(m.teal, 0.08)
+                        : alpha(m.navy, 0.02),
+                    },
                   }}
                 >
                   <Checkbox
@@ -162,11 +187,24 @@ export default function ManualEntryCatalogDrawer({
                     }}
                   />
                   <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography sx={{ fontSize: 13.5, fontWeight: 800, color: alpha(m.navy, 0.86) }}>
+                    <Typography
+                      sx={{
+                        fontSize: 13.5,
+                        fontWeight: 800,
+                        color: alpha(m.navy, 0.86),
+                      }}
+                    >
                       {option.label}
                     </Typography>
                   </Box>
-                  <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.55), flexShrink: 0 }}>
+                  <Typography
+                    sx={{
+                      fontSize: 12.5,
+                      fontWeight: 700,
+                      color: alpha(m.navy, 0.55),
+                      flexShrink: 0,
+                    }}
+                  >
                     {formatEurAmount(option.unitPrice)}
                   </Typography>
                 </Box>

@@ -21,8 +21,8 @@ function readFavorites(): Record<string, boolean> {
 
 export function useClientFavouritesPage() {
   const tokens = useFavouritesTokens();
-  const [favorites, setFavorites] = React.useState<Record<string, boolean>>(() =>
-    readFavorites(),
+  const [favorites, setFavorites] = React.useState<Record<string, boolean>>(
+    () => readFavorites(),
   );
   const [page, setPage] = React.useState(1);
 
@@ -79,4 +79,3 @@ export function useClientFavouritesPage() {
     isLoading,
   };
 }
-

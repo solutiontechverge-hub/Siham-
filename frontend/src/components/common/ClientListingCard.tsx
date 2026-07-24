@@ -1,5 +1,6 @@
 "use client";
 
+import AppButton from "./AppButton";
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
@@ -8,7 +9,14 @@ import FavoriteBorderRoundedIcon from "@mui/icons-material/FavoriteBorderRounded
 import FavoriteRoundedIcon from "@mui/icons-material/FavoriteRounded";
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
-import { Box, Button, CardContent, Divider, IconButton, Stack, Typography } from "@mui/material";
+import {
+  Box,
+  CardContent,
+  Divider,
+  IconButton,
+  Stack,
+  Typography,
+} from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import Image from "next/image";
 import type { ListingCardData } from "../../app/clients/listing/listing.data";
@@ -26,7 +34,13 @@ function toImageSrc(img: ListingCardData["image"]) {
   return String(img);
 }
 
-function ListingCardImage({ image, alt }: { image: ListingCardData["image"]; alt: string }) {
+function ListingCardImage({
+  image,
+  alt,
+}: {
+  image: ListingCardData["image"];
+  alt: string;
+}) {
   const src = toImageSrc(image);
   const isRemote = src.startsWith("http://") || src.startsWith("https://");
 
@@ -36,12 +50,26 @@ function ListingCardImage({ image, alt }: { image: ListingCardData["image"]; alt
         component="img"
         src={src}
         alt={alt}
-        sx={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
+        sx={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+        }}
       />
     );
   }
 
-  return <Image src={image} alt={alt} fill priority={false} style={{ objectFit: "cover" }} />;
+  return (
+    <Image
+      src={image}
+      alt={alt}
+      fill
+      priority={false}
+      style={{ objectFit: "cover" }}
+    />
+  );
 }
 
 export type ClientListingCardProps = {
@@ -69,13 +97,16 @@ export default function ClientListingCard({
   const [mode, setMode] = React.useState<"fixed" | "desired">(initialMode);
   const filterAllowsAll = !visibleLocationModes?.length;
   const canPickFixed =
-    offering.supportsFixedLocation && (filterAllowsAll || visibleLocationModes.includes("fixed"));
+    offering.supportsFixedLocation &&
+    (filterAllowsAll || visibleLocationModes.includes("fixed"));
   const canPickDesired =
-    offering.supportsDesiredLocation && (filterAllowsAll || visibleLocationModes.includes("desired"));
+    offering.supportsDesiredLocation &&
+    (filterAllowsAll || visibleLocationModes.includes("desired"));
 
   React.useEffect(() => {
     if (canPickFixed && !canPickDesired && mode !== "fixed") setMode("fixed");
-    if (canPickDesired && !canPickFixed && mode !== "desired") setMode("desired");
+    if (canPickDesired && !canPickFixed && mode !== "desired")
+      setMode("desired");
   }, [canPickFixed, canPickDesired, mode]);
   const slides = React.useMemo(() => {
     const list = item.media.length > 0 ? item.media : [item.image];
@@ -95,7 +126,10 @@ export default function ClientListingCard({
     if (keywords.length === 0) return [];
     if (keywords.length <= 2) return [keywords.join(" | ")];
     const midpoint = Math.ceil(keywords.length / 2);
-    return [keywords.slice(0, midpoint).join(" | "), keywords.slice(midpoint).join(" | ")];
+    return [
+      keywords.slice(0, midpoint).join(" | "),
+      keywords.slice(midpoint).join(" | "),
+    ];
   }, [item.businessKeywords]);
 
   const onOpenProfile = () => {
@@ -107,7 +141,10 @@ export default function ClientListingCard({
         addressLabel: item.addressLabel,
         locationMode: mode,
       };
-      window.sessionStorage.setItem("mollure:selected_shop", JSON.stringify(payload));
+      window.sessionStorage.setItem(
+        "mollure:selected_shop",
+        JSON.stringify(payload),
+      );
     } catch {
       // ignore
     }
@@ -128,7 +165,9 @@ export default function ClientListingCard({
       onClick={onOpenProfile}
     >
       <Box sx={{ position: "relative" }}>
-        <Box sx={{ position: "relative", height: { xs: 220, sm: 240, md: 260 } }}>
+        <Box
+          sx={{ position: "relative", height: { xs: 220, sm: 240, md: 260 } }}
+        >
           <ListingCardImage image={currentImage} alt={item.title} />
         </Box>
 
@@ -153,7 +192,9 @@ export default function ClientListingCard({
           {isFavorite ? (
             <FavoriteRoundedIcon sx={{ color: tokens.teal, fontSize: 18 }} />
           ) : (
-            <FavoriteBorderRoundedIcon sx={{ color: alpha(tokens.navy, 0.55), fontSize: 18 }} />
+            <FavoriteBorderRoundedIcon
+              sx={{ color: alpha(tokens.navy, 0.55), fontSize: 18 }}
+            />
           )}
         </IconButton>
 
@@ -205,39 +246,43 @@ export default function ClientListingCard({
             >
               <ChevronRightRoundedIcon sx={{ fontSize: 18 }} />
             </IconButton>
-          <Box
-            sx={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: 10,
-              display: "flex",
-              justifyContent: "center",
-              gap: 0.75,
-            }}
-          >
-            {slides.map((_, i) => (
-              <Box
-                key={i}
-                component="button"
-                type="button"
-                aria-label={`Show image ${i + 1}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setActiveSlide(i);
-                }}
-                sx={{
-                  width: 8,
-                  height: 8,
-                  p: 0,
-                  border: i === safeSlideIndex ? "1px solid rgba(0,0,0,0.12)" : "1px solid rgba(0,0,0,0.08)",
-                  borderRadius: 999,
-                  cursor: "pointer",
-                  bgcolor: i === safeSlideIndex ? "#fff" : "rgba(255,255,255,0.55)",
-                }}
-              />
-            ))}
-          </Box>
+            <Box
+              sx={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                bottom: 10,
+                display: "flex",
+                justifyContent: "center",
+                gap: 0.75,
+              }}
+            >
+              {slides.map((_, i) => (
+                <Box
+                  key={i}
+                  component="button"
+                  type="button"
+                  aria-label={`Show image ${i + 1}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveSlide(i);
+                  }}
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    p: 0,
+                    border:
+                      i === safeSlideIndex
+                        ? "1px solid rgba(0,0,0,0.12)"
+                        : "1px solid rgba(0,0,0,0.08)",
+                    borderRadius: 999,
+                    cursor: "pointer",
+                    bgcolor:
+                      i === safeSlideIndex ? "#fff" : "rgba(255,255,255,0.55)",
+                  }}
+                />
+              ))}
+            </Box>
           </>
         ) : null}
       </Box>
@@ -247,33 +292,73 @@ export default function ClientListingCard({
           {keywordRows.map((row, rowIndex) => (
             <Typography
               key={`${row}-${rowIndex}`}
-              sx={{ color: alpha(tokens.navy, 0.5), fontSize: 13, lineHeight: 1.2 }}
+              sx={{
+                color: alpha(tokens.navy, 0.5),
+                fontSize: 13,
+                lineHeight: 1.2,
+              }}
             >
               {row}
             </Typography>
           ))}
 
-          <Typography sx={{ fontWeight: 700, color: alpha(tokens.navy, 0.78), fontSize: 18, lineHeight: 1.35 }}>
+          <Typography
+            sx={{
+              fontWeight: 700,
+              color: alpha(tokens.navy, 0.78),
+              fontSize: 18,
+              lineHeight: 1.35,
+            }}
+          >
             {item.title}
           </Typography>
 
           {item.subtitle ? (
-            <Typography sx={{ fontSize: 13, color: alpha(tokens.navy, 0.55), lineHeight: 1.35 }}>
+            <Typography
+              sx={{
+                fontSize: 13,
+                color: alpha(tokens.navy, 0.55),
+                lineHeight: 1.35,
+              }}
+            >
               {item.subtitle}
             </Typography>
           ) : null}
 
-          <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.75}>
-            <LocationOnOutlinedIcon sx={{ fontSize: 16, color: alpha(tokens.navy, 0.78) }} />
-            <Typography sx={{ fontSize: 13, fontWeight: 700, color: alpha(tokens.navy, 0.78) }}>
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="center"
+            spacing={0.75}
+          >
+            <LocationOnOutlinedIcon
+              sx={{ fontSize: 16, color: alpha(tokens.navy, 0.78) }}
+            />
+            <Typography
+              sx={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: alpha(tokens.navy, 0.78),
+              }}
+            >
               {item.municipalityLabel}
             </Typography>
           </Stack>
 
-          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0.5 }}>
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 0.5,
+            }}
+          >
             <Box sx={{ display: "flex", alignItems: "center", gap: 0.4 }}>
               {Array.from({ length: 5 }).map((_, i) => (
-                <StarRoundedIcon key={i} sx={{ fontSize: 22, color: tokens.star }} />
+                <StarRoundedIcon
+                  key={i}
+                  sx={{ fontSize: 22, color: tokens.star }}
+                />
               ))}
             </Box>
             <Typography sx={{ fontSize: 12, color: alpha(tokens.navy, 0.55) }}>
@@ -291,7 +376,7 @@ export default function ClientListingCard({
                 bgcolor: "#fff",
               }}
             >
-              <Button
+              <AppButton
                 onClick={(e) => {
                   e.stopPropagation();
                   setMode("fixed");
@@ -305,13 +390,22 @@ export default function ClientListingCard({
                   borderRadius: 0,
                   color: mode === "fixed" ? "#fff" : tokens.slate,
                   bgcolor: mode === "fixed" ? tokens.teal : "transparent",
-                  "&:hover": { bgcolor: mode === "fixed" ? tokens.tealDark : "rgba(33, 184, 191, 0.08)" },
+                  "&:hover": {
+                    bgcolor:
+                      mode === "fixed"
+                        ? tokens.tealDark
+                        : "rgba(33, 184, 191, 0.08)",
+                  },
                 }}
               >
                 Fixed Location
-              </Button>
-              <Divider orientation="vertical" flexItem sx={{ borderColor: alpha(tokens.navy, 0.12) }} />
-              <Button
+              </AppButton>
+              <Divider
+                orientation="vertical"
+                flexItem
+                sx={{ borderColor: alpha(tokens.navy, 0.12) }}
+              />
+              <AppButton
                 onClick={(e) => {
                   e.stopPropagation();
                   setMode("desired");
@@ -325,11 +419,16 @@ export default function ClientListingCard({
                   borderRadius: 0,
                   color: mode === "desired" ? "#fff" : tokens.slate,
                   bgcolor: mode === "desired" ? tokens.teal : "transparent",
-                  "&:hover": { bgcolor: mode === "desired" ? tokens.tealDark : "rgba(33, 184, 191, 0.08)" },
+                  "&:hover": {
+                    bgcolor:
+                      mode === "desired"
+                        ? tokens.tealDark
+                        : "rgba(33, 184, 191, 0.08)",
+                  },
                 }}
               >
                 Desired Location
-              </Button>
+              </AppButton>
             </Box>
           ) : (
             <Box
@@ -341,7 +440,9 @@ export default function ClientListingCard({
                 border: `1px solid ${alpha(tokens.teal, 0.25)}`,
               }}
             >
-              <Typography sx={{ fontSize: 13, fontWeight: 800, color: tokens.teal }}>
+              <Typography
+                sx={{ fontSize: 13, fontWeight: 800, color: tokens.teal }}
+              >
                 {canPickDesired ? "Desired Location" : "Fixed Location"}
               </Typography>
             </Box>
@@ -358,14 +459,30 @@ export default function ClientListingCard({
                   spacing={1}
                 >
                   <Box sx={{ minWidth: 0 }}>
-                    <Typography sx={{ fontSize: 13, fontWeight: 800, color: alpha(tokens.navy, 0.9) }}>
+                    <Typography
+                      sx={{
+                        fontSize: 13,
+                        fontWeight: 800,
+                        color: alpha(tokens.navy, 0.9),
+                      }}
+                    >
                       {svc.name}
                     </Typography>
                     {svc.durationLabel ? (
-                      <Typography sx={{ fontSize: 12, color: alpha(tokens.navy, 0.55) }}>{svc.durationLabel}</Typography>
+                      <Typography
+                        sx={{ fontSize: 12, color: alpha(tokens.navy, 0.55) }}
+                      >
+                        {svc.durationLabel}
+                      </Typography>
                     ) : null}
                   </Box>
-                  <Typography sx={{ fontSize: 12, color: alpha(tokens.navy, 0.65), whiteSpace: "nowrap" }}>
+                  <Typography
+                    sx={{
+                      fontSize: 12,
+                      color: alpha(tokens.navy, 0.65),
+                      whiteSpace: "nowrap",
+                    }}
+                  >
                     {svc.priceLabel}
                   </Typography>
                 </Stack>

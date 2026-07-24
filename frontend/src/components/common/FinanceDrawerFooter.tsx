@@ -1,36 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { Button, Stack } from "@mui/material";
-import { alpha, useTheme } from "@mui/material/styles";
-
-export function financeDrawerCancelButtonSx(m: { navy: string }) {
-  return {
-    borderRadius: "10px",
-    textTransform: "none",
-    fontWeight: 800,
-    borderColor: alpha(m.navy, 0.14),
-    color: alpha(m.navy, 0.72),
-    bgcolor: "#fff",
-    height: 36,
-    px: 2.25,
-    minWidth: 92,
-  } as const;
-}
-
-export function financeDrawerPrimaryButtonSx(m: { teal: string; tealDark: string }) {
-  return {
-    borderRadius: "10px",
-    textTransform: "none",
-    fontWeight: 900,
-    bgcolor: m.teal,
-    color: "#fff",
-    "&:hover": { bgcolor: m.tealDark },
-    height: 36,
-    px: 2.25,
-    minWidth: 92,
-  } as const;
-}
+import { Stack } from "@mui/material";
+import AppButton from "./AppButton";
 
 type FinanceDrawerActionsFooterProps = {
   onCancel: () => void;
@@ -48,28 +20,19 @@ export function FinanceDrawerActionsFooter({
   cancelLabel = "Cancel",
   primaryDisabled = false,
 }: FinanceDrawerActionsFooterProps) {
-  const m = useTheme().palette.mollure;
-
   return (
-    <Stack direction="row" spacing={1.25} justifyContent="flex-end" sx={{ px: 2.5, py: 1.75 }}>
-      <Button variant="outlined" onClick={onCancel} sx={financeDrawerCancelButtonSx(m)}>
+    <Stack
+      direction="row"
+      spacing={1.25}
+      justifyContent="flex-end"
+      sx={{ px: 2.5, py: 1.75 }}
+    >
+      <AppButton tone="secondary" onClick={onCancel}>
         {cancelLabel}
-      </Button>
-      <Button
-        variant="contained"
-        disableElevation
-        disabled={primaryDisabled}
-        onClick={onPrimary}
-        sx={{
-          ...financeDrawerPrimaryButtonSx(m),
-          "&.Mui-disabled": {
-            bgcolor: alpha(m.navy, 0.12),
-            color: alpha(m.navy, 0.35),
-          },
-        }}
-      >
+      </AppButton>
+      <AppButton tone="primary" disabled={primaryDisabled} onClick={onPrimary}>
         {primaryLabel}
-      </Button>
+      </AppButton>
     </Stack>
   );
 }
@@ -81,42 +44,40 @@ type FinanceDrawerFiltersFooterProps = {
 };
 
 /** Finance filters drawer footer: Cancel, Reset, Apply (full width). */
-export function FinanceDrawerFiltersFooter({ onCancel, onReset, onApply }: FinanceDrawerFiltersFooterProps) {
-  const m = useTheme().palette.mollure;
-  const sharedSx = {
-    borderRadius: "10px",
-    textTransform: "none",
-    fontWeight: 800,
-    height: 38,
-  } as const;
-
+export function FinanceDrawerFiltersFooter({
+  onCancel,
+  onReset,
+  onApply,
+}: FinanceDrawerFiltersFooterProps) {
   return (
     <Stack direction="row" spacing={1.25} sx={{ px: 2.5, py: 1.75 }}>
-      <Button
+      <AppButton
         fullWidth
-        variant="outlined"
+        tone="secondary"
+        presetSize="md"
         onClick={onCancel}
-        sx={{ ...sharedSx, borderColor: alpha(m.navy, 0.14), color: alpha(m.navy, 0.72), bgcolor: "#fff" }}
+        sx={{ height: 38 }}
       >
         Cancel
-      </Button>
-      <Button
+      </AppButton>
+      <AppButton
         fullWidth
-        variant="outlined"
+        tone="secondary"
+        presetSize="md"
         onClick={onReset}
-        sx={{ ...sharedSx, borderColor: alpha(m.navy, 0.14), color: alpha(m.navy, 0.72), bgcolor: "#fff" }}
+        sx={{ height: 38 }}
       >
         Reset
-      </Button>
-      <Button
+      </AppButton>
+      <AppButton
         fullWidth
-        variant="contained"
-        disableElevation
+        tone="primary"
+        presetSize="md"
         onClick={onApply}
-        sx={{ ...sharedSx, bgcolor: m.teal, color: "#fff", "&:hover": { bgcolor: m.tealDark } }}
+        sx={{ height: 38 }}
       >
         Apply
-      </Button>
+      </AppButton>
     </Stack>
   );
 }

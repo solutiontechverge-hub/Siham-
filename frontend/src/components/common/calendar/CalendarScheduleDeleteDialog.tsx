@@ -1,6 +1,7 @@
 "use client";
 
-import { Box, Button, Stack, Typography } from "@mui/material";
+import AppButton from "../AppButton";
+import { Box, Stack, Typography } from "@mui/material";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppModal from "../AppModal";
@@ -47,48 +48,46 @@ export default function CalendarScheduleDeleteDialog({
       footer={
         <Box sx={{ px: 2.5, py: 2 }}>
           <Stack direction="row" justifyContent="center" spacing={1.25}>
-            <Button
-              variant="outlined"
+            <AppButton
+              tone="secondary"
               onClick={onClose}
               sx={{
-                borderRadius: "10px",
-                textTransform: "none",
-                fontWeight: 800,
                 height: 40,
                 minWidth: 120,
-                borderColor: alpha(m.navy, 0.14),
-                color: alpha(m.navy, 0.72),
-                bgcolor: "#fff",
               }}
             >
               Cancel
-            </Button>
-            <Button
-              variant="contained"
-              disableElevation
+            </AppButton>
+            <AppButton
+              tone="primary"
               onClick={() => {
                 onConfirm();
                 onClose();
               }}
               sx={{
-                borderRadius: "10px",
-                textTransform: "none",
-                fontWeight: 800,
                 height: 40,
                 minWidth: 120,
-                bgcolor: m.teal,
-                "&:hover": { bgcolor: m.tealDark },
               }}
             >
               {copy.confirmLabel}
-            </Button>
+            </AppButton>
           </Stack>
         </Box>
       }
     >
       <Box sx={{ py: 3, px: 2.5, textAlign: "center" }}>
-        <WarningAmberRoundedIcon sx={{ fontSize: 56, color: "#E85D5D", mb: 1.75 }} />
-        <Typography sx={{ fontWeight: 900, fontSize: 14, color: alpha(m.navy, 0.88), lineHeight: 1.55, px: 1 }}>
+        <WarningAmberRoundedIcon
+          sx={{ fontSize: 56, color: "#E85D5D", mb: 1.75 }}
+        />
+        <Typography
+          sx={{
+            fontWeight: 900,
+            fontSize: 14,
+            color: alpha(m.navy, 0.88),
+            lineHeight: 1.55,
+            px: 1,
+          }}
+        >
           {copy.message}
         </Typography>
       </Box>

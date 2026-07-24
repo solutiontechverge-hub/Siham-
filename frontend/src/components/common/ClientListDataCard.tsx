@@ -6,7 +6,11 @@ import { alpha, useTheme } from "@mui/material/styles";
 
 type ClientListDataCardProps = PaperProps;
 
-export default function ClientListDataCard({ sx, children, ...rest }: ClientListDataCardProps) {
+export default function ClientListDataCard({
+  sx,
+  children,
+  ...rest
+}: ClientListDataCardProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
 
@@ -26,4 +30,3 @@ export default function ClientListDataCard({ sx, children, ...rest }: ClientList
     </Paper>
   );
 }
-

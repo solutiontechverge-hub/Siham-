@@ -31,7 +31,8 @@ const SnackbarContext = React.createContext<SnackbarContextValue | null>(null);
 
 export function useSnackbar() {
   const ctx = React.useContext(SnackbarContext);
-  if (!ctx) throw new Error("useSnackbar must be used within <AppSnackbarProvider />");
+  if (!ctx)
+    throw new Error("useSnackbar must be used within <AppSnackbarProvider />");
   return ctx;
 }
 
@@ -49,7 +50,11 @@ function buildSnackbarState(
   };
 }
 
-export function AppSnackbarProvider({ children }: { children: React.ReactNode }) {
+export function AppSnackbarProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const pathname = usePathname();
   const tokenRef = React.useRef(0);
   const [state, setState] = React.useState<SnackbarState>(() =>

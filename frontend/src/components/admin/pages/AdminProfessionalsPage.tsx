@@ -28,11 +28,19 @@ import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
 import GroupsOutlinedIcon from "@mui/icons-material/GroupsOutlined";
 import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
 import { alpha, useTheme } from "@mui/material/styles";
-import { AppButton, AppDropdown, AppPagination, AppSearchField, AppSelect } from "../../common";
+import {
+  AppButton,
+  AppDropdown,
+  AppPagination,
+  AppSearchField,
+  AppSelect,
+} from "../../common";
 import AdminFilterDateRange from "../AdminFilterDateRange";
 import AdminPageHeader from "../AdminPageHeader";
 import AdminSectionCard from "../AdminSectionCard";
-import AdminSegmentedFilterBar, { ADMIN_FLUSHED_FIELD_SX } from "../AdminSegmentedFilterBar";
+import AdminSegmentedFilterBar, {
+  ADMIN_FLUSHED_FIELD_SX,
+} from "../AdminSegmentedFilterBar";
 import AdminDataTable, { type AdminTableColumn } from "../AdminDataTable";
 import AdminKpiCard from "../AdminKpiCard";
 import {
@@ -62,7 +70,10 @@ const CATEGORY_OPTIONS: { value: string; label: string }[] = [
   { value: "Barber", label: "Barber" },
 ];
 
-const CATEGORY_CHIP_COLORS: Record<ProfessionalCategory, { bg: string; fg: string }> = {
+const CATEGORY_CHIP_COLORS: Record<
+  ProfessionalCategory,
+  { bg: string; fg: string }
+> = {
   "Hair & Beauty": { bg: "rgba(33, 184, 191, 0.12)", fg: "#149CA7" },
   "Wellness & Spa": { bg: "rgba(127, 86, 217, 0.12)", fg: "#6941C6" },
   "Fitness & Training": { bg: "rgba(2, 132, 199, 0.12)", fg: "#0284C7" },
@@ -74,14 +85,26 @@ const VERIFICATION_STYLES: Record<
   MockProfessional["validationStatus"],
   { bg: string; fg: string; label: string }
 > = {
-  validated: { bg: "rgba(76, 175, 80, 0.12)", fg: "#2E7D32", label: "Verified" },
+  validated: {
+    bg: "rgba(76, 175, 80, 0.12)",
+    fg: "#2E7D32",
+    label: "Verified",
+  },
   pending: { bg: "rgba(255, 181, 71, 0.2)", fg: "#DC6803", label: "Pending" },
-  not_validated: { bg: "rgba(240, 68, 56, 0.12)", fg: "#B42318", label: "Rejected" },
+  not_validated: {
+    bg: "rgba(240, 68, 56, 0.12)",
+    fg: "#B42318",
+    label: "Rejected",
+  },
 };
 
 function formatDisplayDate(iso: string) {
   const d = new Date(`${iso}T00:00:00`);
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }
 
 function getInitials(name: string) {
@@ -96,7 +119,15 @@ function isActiveAccount(status: MockProfessional["accountStatus"]) {
   return status === "active";
 }
 
-function StatusPill({ bg, fg, label }: { bg: string; fg: string; label: string }) {
+function StatusPill({
+  bg,
+  fg,
+  label,
+}: {
+  bg: string;
+  fg: string;
+  label: string;
+}) {
   return (
     <Box
       sx={{
@@ -119,7 +150,9 @@ function StatusPill({ bg, fg, label }: { bg: string; fg: string; label: string }
 function StarRating({ value, count }: { value: number; count: number }) {
   const tokens = useTheme().palette.mollure;
   if (count === 0) {
-    return <Typography sx={{ fontSize: 12, color: tokens.slate }}>—</Typography>;
+    return (
+      <Typography sx={{ fontSize: 12, color: tokens.slate }}>—</Typography>
+    );
   }
   return (
     <Stack spacing={0.25}>
@@ -130,14 +163,21 @@ function StarRating({ value, count }: { value: number; count: number }) {
               key={star}
               sx={{
                 fontSize: 13,
-                color: star <= Math.round(value) ? "#FAAF00" : alpha(tokens.slate, 0.25),
+                color:
+                  star <= Math.round(value)
+                    ? "#FAAF00"
+                    : alpha(tokens.slate, 0.25),
               }}
             />
           ))}
         </Stack>
-        <Typography sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}>{value.toFixed(1)}</Typography>
+        <Typography sx={{ fontSize: 12, fontWeight: 600, color: tokens.navy }}>
+          {value.toFixed(1)}
+        </Typography>
       </Stack>
-      <Typography sx={{ fontSize: 10.5, color: tokens.bodyText }}>({count} reviews)</Typography>
+      <Typography sx={{ fontSize: 10.5, color: tokens.bodyText }}>
+        ({count} reviews)
+      </Typography>
     </Stack>
   );
 }
@@ -160,13 +200,20 @@ export default function AdminProfessionalsPage() {
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(10);
-  const [bulkMenuAnchor, setBulkMenuAnchor] = React.useState<null | HTMLElement>(null);
-  const [exportMenuAnchor, setExportMenuAnchor] = React.useState<null | HTMLElement>(null);
-  const [rowMenuAnchor, setRowMenuAnchor] = React.useState<null | HTMLElement>(null);
+  const [bulkMenuAnchor, setBulkMenuAnchor] =
+    React.useState<null | HTMLElement>(null);
+  const [exportMenuAnchor, setExportMenuAnchor] =
+    React.useState<null | HTMLElement>(null);
+  const [rowMenuAnchor, setRowMenuAnchor] = React.useState<null | HTMLElement>(
+    null,
+  );
   const [exportNotice, setExportNotice] = React.useState<string | null>(null);
-  const [highlightedIds, setHighlightedIds] = React.useState<Set<string>>(new Set());
+  const [highlightedIds, setHighlightedIds] = React.useState<Set<string>>(
+    new Set(),
+  );
 
-  const { total, verified, pending, rejected, inactive, growthTrend } = professionalManagementSummary;
+  const { total, verified, pending, rejected, inactive, growthTrend } =
+    professionalManagementSummary;
 
   const filtered = React.useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -177,21 +224,47 @@ export default function AdminProfessionalsPage() {
         p.email.toLowerCase().includes(q) ||
         p.phone.includes(q) ||
         p.id.toLowerCase().includes(q);
-      const matchesCategory = categoryFilter === "all" || p.primaryCategory === categoryFilter;
+      const matchesCategory =
+        categoryFilter === "all" || p.primaryCategory === categoryFilter;
       const matchesStatus =
         statusFilter === "all" ||
-        (statusFilter === "active" ? isActiveAccount(p.accountStatus) : !isActiveAccount(p.accountStatus));
+        (statusFilter === "active"
+          ? isActiveAccount(p.accountStatus)
+          : !isActiveAccount(p.accountStatus));
       const matchesVerification =
-        verificationFilter === "all" || p.validationStatus === verificationFilter;
+        verificationFilter === "all" ||
+        p.validationStatus === verificationFilter;
       const matchesFrom = !regDateFrom || p.registrationDate >= regDateFrom;
       const matchesTo = !regDateTo || p.registrationDate <= regDateTo;
-      return matchesSearch && matchesCategory && matchesStatus && matchesVerification && matchesFrom && matchesTo;
+      return (
+        matchesSearch &&
+        matchesCategory &&
+        matchesStatus &&
+        matchesVerification &&
+        matchesFrom &&
+        matchesTo
+      );
     });
-  }, [search, categoryFilter, statusFilter, verificationFilter, regDateFrom, regDateTo]);
+  }, [
+    search,
+    categoryFilter,
+    statusFilter,
+    verificationFilter,
+    regDateFrom,
+    regDateTo,
+  ]);
 
   React.useEffect(() => {
     setPage(1);
-  }, [search, categoryFilter, statusFilter, verificationFilter, regDateFrom, regDateTo, pageSize]);
+  }, [
+    search,
+    categoryFilter,
+    statusFilter,
+    verificationFilter,
+    regDateFrom,
+    regDateTo,
+    pageSize,
+  ]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
   const displayed = React.useMemo(() => {
@@ -256,7 +329,10 @@ export default function AdminProfessionalsPage() {
   };
 
   const handleExportPdf = async () => {
-    const ok = await exportProfessionalsToPdf(filtered, "professional-management");
+    const ok = await exportProfessionalsToPdf(
+      filtered,
+      "professional-management",
+    );
     setExportNotice(
       ok
         ? `Exported ${filtered.length} professional${filtered.length === 1 ? "" : "s"} to PDF.`
@@ -272,8 +348,10 @@ export default function AdminProfessionalsPage() {
     return () => window.clearTimeout(timer);
   }, [exportNotice]);
 
-  const allPageSelected = displayed.length > 0 && displayed.every((r) => selected.has(r.id));
-  const somePageSelected = displayed.some((r) => selected.has(r.id)) && !allPageSelected;
+  const allPageSelected =
+    displayed.length > 0 && displayed.every((r) => selected.has(r.id));
+  const somePageSelected =
+    displayed.some((r) => selected.has(r.id)) && !allPageSelected;
 
   const columns: AdminTableColumn<MockProfessional>[] = [
     {
@@ -288,7 +366,11 @@ export default function AdminProfessionalsPage() {
       ),
       minWidth: 44,
       render: (r) => (
-        <Checkbox size="small" checked={selected.has(r.id)} onChange={() => toggleSelect(r.id)} />
+        <Checkbox
+          size="small"
+          checked={selected.has(r.id)}
+          onChange={() => toggleSelect(r.id)}
+        />
       ),
     },
     {
@@ -312,10 +394,15 @@ export default function AdminProfessionalsPage() {
               {getInitials(r.brandName)}
             </Avatar>
             <Stack spacing={0.2} sx={{ minWidth: 0 }}>
-              <Typography sx={{ fontSize: 13, fontWeight: 600, color: tokens.navy }} noWrap>
+              <Typography
+                sx={{ fontSize: 13, fontWeight: 600, color: tokens.navy }}
+                noWrap
+              >
                 {r.brandName}
               </Typography>
-              <Typography sx={{ fontSize: 10.5, color: tokens.bodyText }}>ID: {r.id.toUpperCase()}</Typography>
+              <Typography sx={{ fontSize: 10.5, color: tokens.bodyText }}>
+                ID: {r.id.toUpperCase()}
+              </Typography>
             </Stack>
           </Stack>
         );
@@ -333,8 +420,12 @@ export default function AdminProfessionalsPage() {
       minWidth: 180,
       render: (r) => (
         <Stack spacing={0.25}>
-          <Typography sx={{ fontSize: 12, color: tokens.navy }}>{r.email}</Typography>
-          <Typography sx={{ fontSize: 11, color: tokens.bodyText }}>{r.phone}</Typography>
+          <Typography sx={{ fontSize: 12, color: tokens.navy }}>
+            {r.email}
+          </Typography>
+          <Typography sx={{ fontSize: 11, color: tokens.bodyText }}>
+            {r.phone}
+          </Typography>
         </Stack>
       ),
     },
@@ -393,7 +484,9 @@ export default function AdminProfessionalsPage() {
       render: () => (
         <Stack direction="row" spacing={0.25} justifyContent="center">
           <IconButton size="small" aria-label="View professional">
-            <VisibilityOutlinedIcon sx={{ fontSize: 18, color: tokens.slate }} />
+            <VisibilityOutlinedIcon
+              sx={{ fontSize: 18, color: tokens.slate }}
+            />
           </IconButton>
           <IconButton
             size="small"
@@ -507,21 +600,40 @@ export default function AdminProfessionalsPage() {
         ),
       },
     ],
-    [search, categoryFilter, statusFilter, verificationFilter, regDateFrom, regDateTo],
+    [
+      search,
+      categoryFilter,
+      statusFilter,
+      verificationFilter,
+      regDateFrom,
+      regDateTo,
+    ],
   );
 
   return (
     <>
-      <Stack direction="row" alignItems="center" spacing={0.75} sx={{ mb: 1.5 }}>
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={0.75}
+        sx={{ mb: 1.5 }}
+      >
         <Typography
           component={Link}
           href="/admin/dashboard"
-          sx={{ fontSize: 12, color: tokens.bodyText, textDecoration: "none", "&:hover": { color: tokens.teal } }}
+          sx={{
+            fontSize: 12,
+            color: tokens.bodyText,
+            textDecoration: "none",
+            "&:hover": { color: tokens.teal },
+          }}
         >
           Home
         </Typography>
         <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>/</Typography>
-        <Typography sx={{ fontSize: 12, color: tokens.navy, fontWeight: 500 }}>Professional Management</Typography>
+        <Typography sx={{ fontSize: 12, color: tokens.navy, fontWeight: 500 }}>
+          Professional Management
+        </Typography>
       </Stack>
 
       <AdminPageHeader
@@ -557,16 +669,30 @@ export default function AdminProfessionalsPage() {
                 },
               }}
             >
-              <MenuItem onClick={handleExportPdf} sx={{ fontSize: 13, gap: 1.25 }}>
-                <PictureAsPdfOutlinedIcon sx={{ fontSize: 18, color: tokens.slate }} />
+              <MenuItem
+                onClick={handleExportPdf}
+                sx={{ fontSize: 13, gap: 1.25 }}
+              >
+                <PictureAsPdfOutlinedIcon
+                  sx={{ fontSize: 18, color: tokens.slate }}
+                />
                 Export as PDF
               </MenuItem>
-              <MenuItem onClick={handleExportExcel} sx={{ fontSize: 13, gap: 1.25 }}>
-                <TableChartOutlinedIcon sx={{ fontSize: 18, color: tokens.slate }} />
+              <MenuItem
+                onClick={handleExportExcel}
+                sx={{ fontSize: 13, gap: 1.25 }}
+              >
+                <TableChartOutlinedIcon
+                  sx={{ fontSize: 18, color: tokens.slate }}
+                />
                 Export as Excel
               </MenuItem>
             </Menu>
-            <AppButton variant="contained" startIcon={<AddOutlinedIcon />} sx={{ textTransform: "none" }}>
+            <AppButton
+              variant="contained"
+              startIcon={<AddOutlinedIcon />}
+              sx={{ textTransform: "none" }}
+            >
               Add Professional
             </AppButton>
           </>
@@ -634,10 +760,15 @@ export default function AdminProfessionalsPage() {
         <Grid size={{ xs: 12, xl: 8 }}>
           <AdminSectionCard noPadding sx={{ mb: 2 }}>
             <Stack spacing={1.5} sx={{ px: pad.bodyCompact, py: 1.75 }}>
-              <AdminSegmentedFilterBar onReset={resetFilters} segments={filterSegments} />
+              <AdminSegmentedFilterBar
+                onReset={resetFilters}
+                segments={filterSegments}
+              />
 
               {exportNotice ? (
-                <Typography sx={{ fontSize: 12, color: tokens.tealDark, fontWeight: 500 }}>
+                <Typography
+                  sx={{ fontSize: 12, color: tokens.tealDark, fontWeight: 500 }}
+                >
                   {exportNotice}
                 </Typography>
               ) : null}
@@ -656,7 +787,9 @@ export default function AdminProfessionalsPage() {
                 borderBottom: `1px solid ${tokens.cardBorder}`,
               }}
             >
-              <Typography sx={{ fontSize: 13, fontWeight: 600, color: tokens.navy }}>
+              <Typography
+                sx={{ fontSize: 13, fontWeight: 600, color: tokens.navy }}
+              >
                 Total Professionals:{" "}
                 <Box component="span" sx={{ fontWeight: 700 }}>
                   {filtered.length.toLocaleString()}
@@ -665,7 +798,9 @@ export default function AdminProfessionalsPage() {
               <AppButton
                 variant="outlined"
                 size="small"
-                endIcon={<KeyboardArrowDownOutlinedIcon sx={{ fontSize: 18 }} />}
+                endIcon={
+                  <KeyboardArrowDownOutlinedIcon sx={{ fontSize: 18 }} />
+                }
                 onClick={(e) => setBulkMenuAnchor(e.currentTarget)}
                 disabled={selected.size === 0}
                 sx={{ textTransform: "none", fontSize: 12 }}
@@ -700,8 +835,13 @@ export default function AdminProfessionalsPage() {
                 </MenuItem>
                 <MenuItem
                   onClick={() => {
-                    const rows = mockProfessionals.filter((p) => selected.has(p.id));
-                    const ok = exportProfessionalsToExcel(rows, "professional-management-selected");
+                    const rows = mockProfessionals.filter((p) =>
+                      selected.has(p.id),
+                    );
+                    const ok = exportProfessionalsToExcel(
+                      rows,
+                      "professional-management-selected",
+                    );
                     if (ok) highlightExportedRows(rows);
                     setBulkMenuAnchor(null);
                   }}
@@ -732,10 +872,16 @@ export default function AdminProfessionalsPage() {
               }}
             >
               <Typography sx={{ fontSize: 12, color: tokens.bodyText }}>
-                Showing {showingFrom.toLocaleString()} to {showingTo.toLocaleString()} of{" "}
+                Showing {showingFrom.toLocaleString()} to{" "}
+                {showingTo.toLocaleString()} of{" "}
                 {filtered.length.toLocaleString()} results
               </Typography>
-              <Stack direction="row" alignItems="center" spacing={2} flexWrap="wrap">
+              <Stack
+                direction="row"
+                alignItems="center"
+                spacing={2}
+                flexWrap="wrap"
+              >
                 {filtered.length > pageSize ? (
                   <AppPagination
                     page={page}
@@ -748,7 +894,10 @@ export default function AdminProfessionalsPage() {
                 <AppDropdown
                   value={String(pageSize)}
                   onChange={(val) => setPageSize(Number(val))}
-                  options={PAGE_SIZE_OPTIONS.map((n) => ({ value: String(n), label: `${n} / page` }))}
+                  options={PAGE_SIZE_OPTIONS.map((n) => ({
+                    value: String(n),
+                    label: `${n} / page`,
+                  }))}
                   size="small"
                   sx={{ minWidth: 110 }}
                 />

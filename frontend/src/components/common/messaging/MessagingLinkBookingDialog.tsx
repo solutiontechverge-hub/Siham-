@@ -3,8 +3,15 @@
 import * as React from "react";
 import { Box, Radio, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import { formatLinkableBookingLabel, linkableBookingsMock, type LinkableBooking } from "./messagingBookingsMock";
-import AppModal, { MessagingModalCancelButton, MessagingModalPrimaryButton } from "../AppModal";
+import {
+  formatLinkableBookingLabel,
+  linkableBookingsMock,
+  type LinkableBooking,
+} from "./messagingBookingsMock";
+import AppModal, {
+  MessagingModalCancelButton,
+  MessagingModalPrimaryButton,
+} from "../AppModal";
 
 type Props = {
   open: boolean;
@@ -55,7 +62,14 @@ export default function MessagingLinkBookingDialog({
         </>
       }
     >
-      <Typography sx={{ fontSize: 12.5, fontWeight: 600, color: alpha(m.navy, 0.5), mb: 2 }}>
+      <Typography
+        sx={{
+          fontSize: 12.5,
+          fontWeight: 600,
+          color: alpha(m.navy, 0.5),
+          mb: 2,
+        }}
+      >
         Select One Booking To Link This Conversation To
       </Typography>
       <Stack spacing={1.25}>
@@ -78,7 +92,13 @@ export default function MessagingLinkBookingDialog({
                 "&:hover": { bgcolor: alpha(m.navy, 0.07) },
               }}
             >
-              <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.72) }}>
+              <Typography
+                sx={{
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  color: alpha(m.navy, 0.72),
+                }}
+              >
                 {formatLinkableBookingLabel(booking)}
               </Typography>
               <Radio

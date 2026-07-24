@@ -1,8 +1,9 @@
 "use client";
 
+import AppButton from "../common/AppButton";
 import * as React from "react";
 import AppleIcon from "@mui/icons-material/Apple";
-import { Box, Button, Stack, SvgIcon } from "@mui/material";
+import { Box, Stack, SvgIcon } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { GoogleLogin, type CredentialResponse } from "@react-oauth/google";
 import { getApiErrorMessage } from "../../lib/api-error";
@@ -89,13 +90,19 @@ const loadAppleScript = () => {
   }
 
   appleScriptPromise = new Promise((resolve, reject) => {
-    const existing = document.querySelector<HTMLScriptElement>(`script[src="${APPLE_SCRIPT_SRC}"]`);
+    const existing = document.querySelector<HTMLScriptElement>(
+      `script[src="${APPLE_SCRIPT_SRC}"]`,
+    );
 
     if (existing) {
       existing.addEventListener("load", () => resolve(), { once: true });
-      existing.addEventListener("error", () => reject(new Error("Apple script failed to load.")), {
-        once: true,
-      });
+      existing.addEventListener(
+        "error",
+        () => reject(new Error("Apple script failed to load.")),
+        {
+          once: true,
+        },
+      );
       return;
     }
 
@@ -123,8 +130,10 @@ export default function SocialSignInButtons({
 }: SocialSignInButtonsProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
-  const [loginWithGoogle, { isLoading: isGoogleLoading }] = useLoginWithGoogleMutation();
-  const [loginWithApple, { isLoading: isAppleLoading }] = useLoginWithAppleMutation();
+  const [loginWithGoogle, { isLoading: isGoogleLoading }] =
+    useLoginWithGoogleMutation();
+  const [loginWithApple, { isLoading: isAppleLoading }] =
+    useLoginWithAppleMutation();
   const [appleReady, setAppleReady] = React.useState(false);
 
   const socialButtonSx = {
@@ -135,7 +144,10 @@ export default function SocialSignInButtons({
     color: alpha(m.navy, 0.78),
     fontWeight: 600,
     border: `1px solid ${alpha(m.navy, 0.08)}`,
-    "&:hover": { bgcolor: alpha(m.navy, 0.07), borderColor: alpha(m.navy, 0.12) },
+    "&:hover": {
+      bgcolor: alpha(m.navy, 0.07),
+      borderColor: alpha(m.navy, 0.12),
+    },
   };
 
   const isBusy = disabled || isGoogleLoading || isAppleLoading;
@@ -167,7 +179,9 @@ export default function SocialSignInButtons({
     }
 
     try {
-      const result = await loginWithGoogle({ id_token: response.credential }).unwrap();
+      const result = await loginWithGoogle({
+        id_token: response.credential,
+      }).unwrap();
       onLoginSuccess(result.data);
     } catch (error) {
       onError(getApiErrorMessage(error, "Google sign-in failed."));
@@ -201,7 +215,7 @@ export default function SocialSignInButtons({
   return (
     <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
       <Box sx={{ position: "relative", flex: 1 }}>
-        <Button
+        <AppButton
           type="button"
           fullWidth
           disabled={isBusy || !isGoogleSignInEnabled()}
@@ -209,7 +223,7 @@ export default function SocialSignInButtons({
           startIcon={<GoogleLogoIcon sx={{ fontSize: 20 }} />}
         >
           Continue with Google
-        </Button>
+        </AppButton>
         {isGoogleSignInEnabled() ? (
           <Box
             sx={{
@@ -218,7 +232,10 @@ export default function SocialSignInButtons({
               opacity: 0.01,
               overflow: "hidden",
               "& > div": { height: "100%", width: "100%" },
-              "& iframe": { width: "100% !important", height: "100% !important" },
+              "& iframe": {
+                width: "100% !important",
+                height: "100% !important",
+              },
             }}
           >
             <GoogleLogin
@@ -235,7 +252,7 @@ export default function SocialSignInButtons({
         ) : null}
       </Box>
 
-      <Button
+      <AppButton
         type="button"
         fullWidth
         disabled={isBusy || !isAppleSignInEnabled()}
@@ -244,7 +261,7 @@ export default function SocialSignInButtons({
         startIcon={<AppleIcon sx={{ fontSize: 20 }} />}
       >
         Continue With Apple
-      </Button>
+      </AppButton>
     </Stack>
   );
 }

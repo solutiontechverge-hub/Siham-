@@ -106,7 +106,11 @@ function writePersistedClientProfile(next: PersistedClientProfile) {
 }
 
 function computedDisplayName(form: ProfileFormState): string {
-  return resolveDisplayNameFromMode(form.reviewNameMode, form.firstName, form.lastName);
+  return resolveDisplayNameFromMode(
+    form.reviewNameMode,
+    form.firstName,
+    form.lastName,
+  );
 }
 
 const COMPANY_FORM_KEYS = [
@@ -148,7 +152,9 @@ function profileFormHasChanges(
 
   const keys = isCompany ? COMPANY_FORM_KEYS : INDIVIDUAL_FORM_KEYS;
   return keys.some(
-    (key) => normalizeFormValue(String(current[key] ?? "")) !== normalizeFormValue(String(baseline[key] ?? "")),
+    (key) =>
+      normalizeFormValue(String(current[key] ?? "")) !==
+      normalizeFormValue(String(baseline[key] ?? "")),
   );
 }
 
@@ -199,9 +205,12 @@ export function useClientProfilePage() {
   const tokens = useProfileTokens();
   const { data, isLoading, error: loadError, refetch } = useGetProfileQuery();
   const [updateProfile, { isLoading: isSaving }] = useUpdateProfileMutation();
-  const [profileMenuAnchor, setProfileMenuAnchor] = React.useState<HTMLElement | null>(null);
+  const [profileMenuAnchor, setProfileMenuAnchor] =
+    React.useState<HTMLElement | null>(null);
   const [isManageSharingOpen, setIsManageSharingOpen] = React.useState(false);
-  const [sharingVisibility, setSharingVisibility] = React.useState<Record<string, boolean>>(() => {
+  const [sharingVisibility, setSharingVisibility] = React.useState<
+    Record<string, boolean>
+  >(() => {
     const initial: Record<string, boolean> = {};
     for (const field of profilePageData.popovers.manageSharing.fields) {
       initial[field.key] = field.defaultChecked;
@@ -210,7 +219,9 @@ export function useClientProfilePage() {
   });
   const [isEditing, setIsEditing] = React.useState(false);
   const [form, setForm] = React.useState<ProfileFormState>(initialForm);
-  const [pendingAvatarFile, setPendingAvatarFile] = React.useState<File | null>(null);
+  const [pendingAvatarFile, setPendingAvatarFile] = React.useState<File | null>(
+    null,
+  );
   const [successMessage, setSuccessMessage] = React.useState("");
   const [errorMessage, setErrorMessage] = React.useState("");
 
@@ -303,7 +314,12 @@ export function useClientProfilePage() {
 
   const hasProfileChanges = React.useMemo(() => {
     if (!baselineForm) return false;
-    return profileFormHasChanges(form, baselineForm, isCompanyProfile, Boolean(pendingAvatarFile));
+    return profileFormHasChanges(
+      form,
+      baselineForm,
+      isCompanyProfile,
+      Boolean(pendingAvatarFile),
+    );
   }, [form, baselineForm, isCompanyProfile, pendingAvatarFile]);
 
   const toggleEditing = React.useCallback(() => {
@@ -348,9 +364,16 @@ export function useClientProfilePage() {
     }
 
     if (!isCompanyProfile) {
-      const phoneErrors = getOptionalPhoneValidationErrors(form.countryCode, form.phone);
+      const phoneErrors = getOptionalPhoneValidationErrors(
+        form.countryCode,
+        form.phone,
+      );
       if (phoneErrors.phone || phoneErrors.countryCode) {
-        setErrorMessage(phoneErrors.phone ?? phoneErrors.countryCode ?? "Enter a valid phone number.");
+        setErrorMessage(
+          phoneErrors.phone ??
+            phoneErrors.countryCode ??
+            "Enter a valid phone number.",
+        );
         return;
       }
     }
@@ -422,7 +445,8 @@ export function useClientProfilePage() {
           logo: companyProfile?.logo ?? null,
         });
       } else {
-        const individualProfile = result.data.profile as IndividualProfile | null;
+        const individualProfile = result.data
+          .profile as IndividualProfile | null;
         writePersistedClientProfile({
           first_name: individualProfile?.first_name ?? "",
           last_name: individualProfile?.last_name ?? "",

@@ -2,7 +2,14 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Box, Container, Divider, Grid, Stack, Typography } from "@mui/material";
+import {
+  Box,
+  Container,
+  Divider,
+  Grid,
+  Stack,
+  Typography,
+} from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import type { SxProps, Theme } from "@mui/material/styles";
 
@@ -26,7 +33,13 @@ const itemTypographySx = {
   lineHeight: 1.65,
 } as const;
 
-function FooterItem({ item, muted }: { item: MarketingFooterItem; muted: string }) {
+function FooterItem({
+  item,
+  muted,
+}: {
+  item: MarketingFooterItem;
+  muted: string;
+}) {
   const label = typeof item === "string" ? item : item.label;
   const href = typeof item === "object" && item.href ? item.href : undefined;
 
@@ -39,7 +52,10 @@ function FooterItem({ item, muted }: { item: MarketingFooterItem; muted: string 
           ...itemTypographySx,
           color: muted,
           textDecoration: "none",
-          "&:hover": { textDecoration: "underline", textDecorationColor: alpha("#fff", 0.35) },
+          "&:hover": {
+            textDecoration: "underline",
+            textDecorationColor: alpha("#fff", 0.35),
+          },
         }}
       >
         {label}
@@ -48,16 +64,18 @@ function FooterItem({ item, muted }: { item: MarketingFooterItem; muted: string 
   }
 
   return (
-    <Typography sx={{ ...itemTypographySx, color: muted }}>
-      {label}
-    </Typography>
+    <Typography sx={{ ...itemTypographySx, color: muted }}>{label}</Typography>
   );
 }
 
 /**
  * Shared marketing footer — layout and type match the professionals Features/Pricing footer.
  */
-export default function MarketingSiteFooter({ columns, copyright, sx }: MarketingSiteFooterProps) {
+export default function MarketingSiteFooter({
+  columns,
+  copyright,
+  sx,
+}: MarketingSiteFooterProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
   const muted = m.footerText;
@@ -95,7 +113,10 @@ export default function MarketingSiteFooter({ columns, copyright, sx }: Marketin
               </Typography>
               <Stack spacing={0.9}>
                 {column.items.map((item, i) => {
-                  const key = typeof item === "string" ? item : `${item.label}-${item.href ?? i}`;
+                  const key =
+                    typeof item === "string"
+                      ? item
+                      : `${item.label}-${item.href ?? i}`;
                   if (index === 0 && typeof item === "string") {
                     return (
                       <Typography

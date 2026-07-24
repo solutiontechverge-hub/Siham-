@@ -1,8 +1,9 @@
 "use client";
 
+import AppButton from "../../common/AppButton";
 import * as React from "react";
 import ReportProblemRoundedIcon from "@mui/icons-material/ReportProblemRounded";
-import { Box, Button, Stack, Typography } from "@mui/material";
+import { Box, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppModal from "../../common/AppModal";
 
@@ -26,41 +27,30 @@ export default function CancelPendingPaymentModal({
   const m = useTheme().palette.mollure;
 
   const footer = (
-    <Stack direction="row" spacing={1} justifyContent="center" sx={{ px: 2.5, py: 2 }}>
-      <Button
+    <Stack
+      direction="row"
+      spacing={1}
+      justifyContent="center"
+      sx={{ px: 2.5, py: 2 }}
+    >
+      <AppButton
+        tone="secondary"
         onClick={onClose}
-        variant="outlined"
         sx={{
-          borderRadius: "8px",
-          textTransform: "none",
-          fontWeight: 800,
-          borderColor: alpha(m.navy, 0.14),
-          color: alpha(m.navy, 0.72),
-          bgcolor: "#fff",
           height: 34,
-          px: 2.25,
-          minWidth: 92,
         }}
       >
         Cancel
-      </Button>
-      <Button
-        variant="contained"
-        disableElevation
+      </AppButton>
+      <AppButton
+        tone="primary"
         onClick={onConfirm}
         sx={{
-          borderRadius: "8px",
-          textTransform: "none",
-          fontWeight: 900,
-          bgcolor: m.teal,
-          "&:hover": { bgcolor: m.tealDark },
           height: 34,
-          px: 2.25,
-          minWidth: 92,
         }}
       >
         {confirmLabel}
-      </Button>
+      </AppButton>
     </Stack>
   );
 

@@ -101,7 +101,8 @@ const TAB_PANELS: Record<PlatformManagementTabId, React.ReactNode> = {
 };
 
 export default function AdminPlatformManagementPage() {
-  const [activeTab, setActiveTab] = React.useState<PlatformManagementTabId>("overview");
+  const [activeTab, setActiveTab] =
+    React.useState<PlatformManagementTabId>("overview");
 
   return (
     <>

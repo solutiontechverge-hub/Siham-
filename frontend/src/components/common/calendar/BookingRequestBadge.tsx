@@ -2,10 +2,21 @@
 
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import CheckCircleOutlinedIcon from "@mui/icons-material/CheckCircleOutlined";
-import { Box, Stack, Tooltip, Typography, type SxProps, type Theme } from "@mui/material";
+import {
+  Box,
+  Stack,
+  Tooltip,
+  Typography,
+  type SxProps,
+  type Theme,
+} from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import BookingRequestSentIcon, { BOOKING_REQUEST_SENT_LABEL } from "./BookingRequestSentIcon";
-import BookingRequestReceivedIcon, { BOOKING_REQUEST_RECEIVED_LABEL } from "./BookingRequestReceivedIcon";
+import BookingRequestSentIcon, {
+  BOOKING_REQUEST_SENT_LABEL,
+} from "./BookingRequestSentIcon";
+import BookingRequestReceivedIcon, {
+  BOOKING_REQUEST_RECEIVED_LABEL,
+} from "./BookingRequestReceivedIcon";
 
 export const BOOKING_REQUEST_ACCEPTED_LABEL = "Booking request accepted";
 export const BOOKING_REQUEST_REJECTED_LABEL = "Booking request rejected";
@@ -28,7 +39,10 @@ type BookingRequestBadgeProps = {
 function resolveBadgeState({
   accepted,
   state,
-}: Pick<BookingRequestBadgeProps, "accepted" | "state">): BookingRequestBadgeState {
+}: Pick<
+  BookingRequestBadgeProps,
+  "accepted" | "state"
+>): BookingRequestBadgeState {
   if (state) return state;
   if (accepted) return "accepted";
   return "sent";
@@ -47,7 +61,9 @@ function BookingRequestRejectedIcon({ size }: { size: number }) {
         flexShrink: 0,
       }}
     >
-      <CloseRoundedIcon sx={{ fontSize: Math.max(8, size - 6), color: "#fff" }} />
+      <CloseRoundedIcon
+        sx={{ fontSize: Math.max(8, size - 6), color: "#fff" }}
+      />
     </Box>
   );
 }
@@ -93,7 +109,9 @@ export default function BookingRequestBadge({
       </Typography>
       <Box sx={{ display: "grid", placeItems: "center", lineHeight: 0 }}>
         {state === "accepted" ? (
-          <CheckCircleOutlinedIcon sx={{ fontSize: statusIconSize, color: m.success }} />
+          <CheckCircleOutlinedIcon
+            sx={{ fontSize: statusIconSize, color: m.success }}
+          />
         ) : state === "rejected" ? (
           <BookingRequestRejectedIcon size={statusIconSize} />
         ) : direction === "incoming" ? (
@@ -153,17 +171,30 @@ export default function BookingRequestBadge({
 }
 
 export function resolveBookingRequestBadgeState(
-  event: Pick<{ status?: string; bookingScenario?: string }, "status" | "bookingScenario"> | null | undefined,
+  event:
+    | Pick<
+        { status?: string; bookingScenario?: string },
+        "status" | "bookingScenario"
+      >
+    | null
+    | undefined,
 ): BookingRequestBadgeState {
   if (!event || event.bookingScenario !== "BR") return "sent";
-  if (event.status === "Confirmed" || event.status === "Completed") return "accepted";
+  if (event.status === "Confirmed" || event.status === "Completed")
+    return "accepted";
   if (event.status === "Invalid") return "rejected";
   return "sent";
 }
 
 /** BR arrow direction on the professional calendar (incoming = client sent). */
 export function resolveProfessionalBookingRequestDirection(
-  event: Pick<{ details?: { requestDirection?: "incoming" | "outgoing" } }, "details"> | null | undefined,
+  event:
+    | Pick<
+        { details?: { requestDirection?: "incoming" | "outgoing" } },
+        "details"
+      >
+    | null
+    | undefined,
 ): BookingRequestDirection {
   if (event?.details?.requestDirection === "outgoing") return "outgoing";
   if (event?.details?.requestDirection === "incoming") return "incoming";

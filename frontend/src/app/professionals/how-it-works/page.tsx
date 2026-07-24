@@ -1,6 +1,9 @@
 "use client";
 
-import { HowItWorksPageContent, MarketingShellLayout } from "../../../components/marketing";
+import {
+  HowItWorksPageContent,
+  MarketingShellLayout,
+} from "../../../components/marketing";
 
 export default function ProfessionalsHowItWorksPage() {
   return (

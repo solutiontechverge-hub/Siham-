@@ -1,7 +1,8 @@
 "use client";
 
+import AppButton from "../AppButton";
 import * as React from "react";
-import { Box, Button, Stack } from "@mui/material";
+import { Box, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDrawer from "../AppDrawer";
 import MessagingFilterCheckboxList from "./MessagingFilterCheckboxList";
@@ -43,7 +44,9 @@ function FiltersContent({
   onChange: (next: MessagingDrawerFilters) => void;
   audience?: "client" | "professional";
 }) {
-  const visibleOptions = SEARCH_OPTIONS.filter((opt) => !opt.professionalOnly || audience === "professional");
+  const visibleOptions = SEARCH_OPTIONS.filter(
+    (opt) => !opt.professionalOnly || audience === "professional",
+  );
   const searchChecked = visibleOptions.reduce(
     (acc, opt) => {
       acc[opt.key] = filters.searchFor === opt.key;
@@ -61,7 +64,10 @@ function FiltersContent({
         singleSelect
         onToggle={(key, value) => {
           if (!value) return;
-          onChange({ ...filters, searchFor: key as MessagingDrawerFilters["searchFor"] });
+          onChange({
+            ...filters,
+            searchFor: key as MessagingDrawerFilters["searchFor"],
+          });
         }}
       />
       <Box sx={{ mt: 2.5 }}>
@@ -71,12 +77,16 @@ function FiltersContent({
             { key: "fixed", label: "Fixed location" },
             { key: "desired", label: "Desired location" },
           ]}
-          checked={{ fixed: filters.locationFixed, desired: filters.locationDesired }}
+          checked={{
+            fixed: filters.locationFixed,
+            desired: filters.locationDesired,
+          }}
           onToggle={(key, value) =>
             onChange({
               ...filters,
               locationFixed: key === "fixed" ? value : filters.locationFixed,
-              locationDesired: key === "desired" ? value : filters.locationDesired,
+              locationDesired:
+                key === "desired" ? value : filters.locationDesired,
             })
           }
         />
@@ -97,35 +107,12 @@ function FiltersFooter({
   return (
     <Box sx={{ px: 2.5, py: 2, width: "100%" }}>
       <Stack direction="row" spacing={1.5} sx={{ width: "100%" }}>
-        <Button
-          fullWidth
-          variant="outlined"
-          onClick={onCancel}
-          sx={{
-            textTransform: "none",
-            fontWeight: 800,
-            borderRadius: "10px",
-            borderColor: alpha(m.navy, 0.18),
-            color: alpha(m.navy, 0.7),
-          }}
-        >
+        <AppButton tone="secondary" fullWidth onClick={onCancel}>
           Cancel
-        </Button>
-        <Button
-          fullWidth
-          variant="contained"
-          disableElevation
-          onClick={onApply}
-          sx={{
-            textTransform: "none",
-            fontWeight: 800,
-            borderRadius: "10px",
-            bgcolor: m.teal,
-            "&:hover": { bgcolor: m.tealDark },
-          }}
-        >
+        </AppButton>
+        <AppButton tone="primary" fullWidth onClick={onApply}>
           Apply
-        </Button>
+        </AppButton>
       </Stack>
     </Box>
   );
@@ -142,11 +129,19 @@ export default function MessagingFiltersDrawer({
   embedded = false,
 }: Props) {
   const footer = <FiltersFooter onCancel={onCancel} onApply={onApply} />;
-  const body = <FiltersContent filters={filters} onChange={onChange} audience={audience} />;
+  const body = (
+    <FiltersContent filters={filters} onChange={onChange} audience={audience} />
+  );
 
   if (embedded) {
     return (
-      <MessagingInsetOverlay open={open} title="Filter messages" onClose={onClose} maxWidth={560} footer={footer}>
+      <MessagingInsetOverlay
+        open={open}
+        title="Filter messages"
+        onClose={onClose}
+        maxWidth={560}
+        footer={footer}
+      >
         {body}
       </MessagingInsetOverlay>
     );

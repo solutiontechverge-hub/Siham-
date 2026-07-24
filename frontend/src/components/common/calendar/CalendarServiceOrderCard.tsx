@@ -28,7 +28,13 @@ export type CalendarServiceOrderCardProps = {
   onClick?: () => void;
 };
 
-function CategoryIcon({ iconId, color }: { iconId: ServiceCategorySliderIconId; color: string }) {
+function CategoryIcon({
+  iconId,
+  color,
+}: {
+  iconId: ServiceCategorySliderIconId;
+  color: string;
+}) {
   const src = SERVICE_CATEGORY_ICON_SRC[iconId];
   if (src) {
     return (
@@ -37,7 +43,13 @@ function CategoryIcon({ iconId, color }: { iconId: ServiceCategorySliderIconId; 
         src={src}
         alt=""
         aria-hidden
-        sx={{ height: 24, width: "auto", maxWidth: 40, objectFit: "contain", display: "block" }}
+        sx={{
+          height: 24,
+          width: "auto",
+          maxWidth: 40,
+          objectFit: "contain",
+          display: "block",
+        }}
       />
     );
   }
@@ -103,9 +115,11 @@ export default function CalendarServiceOrderCard({
         pb: 1.1,
         textAlign: "center",
         overflow: "hidden",
-        cursor: onClick || draggable ? (draggable ? "grab" : "pointer") : "default",
+        cursor:
+          onClick || draggable ? (draggable ? "grab" : "pointer") : "default",
         opacity: isDragging ? 0.55 : checked ? 1 : 0.55,
-        transition: "opacity 0.15s ease, border-color 0.15s ease, background-color 0.15s ease",
+        transition:
+          "opacity 0.15s ease, border-color 0.15s ease, background-color 0.15s ease",
         userSelect: "none",
       }}
     >
@@ -150,7 +164,9 @@ export default function CalendarServiceOrderCard({
             event.stopPropagation();
             onCheckedChange?.(event.target.checked);
           }}
-          inputProps={{ "aria-label": checked ? `Hide ${label}` : `Show ${label}` }}
+          inputProps={{
+            "aria-label": checked ? `Hide ${label}` : `Show ${label}`,
+          }}
           sx={{
             position: "absolute",
             top: 2,

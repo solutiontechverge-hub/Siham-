@@ -46,8 +46,18 @@ function LockedSectionRow({
         py: 1.5,
       }}
     >
-      <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
-        <Typography sx={{ fontSize: 13.5, fontWeight: 800, color: alpha(m.navy, 0.85) }}>{title}</Typography>
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="center"
+        spacing={1}
+        sx={{ mb: 0.5 }}
+      >
+        <Typography
+          sx={{ fontSize: 13.5, fontWeight: 800, color: alpha(m.navy, 0.85) }}
+        >
+          {title}
+        </Typography>
         <Box
           component="span"
           sx={{
@@ -63,7 +73,11 @@ function LockedSectionRow({
           {status}
         </Box>
       </Stack>
-      <Typography sx={{ fontSize: 12, color: alpha(m.navy, 0.55), lineHeight: 1.45 }}>{helper}</Typography>
+      <Typography
+        sx={{ fontSize: 12, color: alpha(m.navy, 0.55), lineHeight: 1.45 }}
+      >
+        {helper}
+      </Typography>
     </Box>
   );
 }
@@ -89,7 +103,14 @@ function ConfigurableSectionBlock({
         py: 1.5,
       }}
     >
-      <Typography sx={{ fontSize: 13.5, fontWeight: 800, color: alpha(m.navy, 0.85), mb: 1 }}>
+      <Typography
+        sx={{
+          fontSize: 13.5,
+          fontWeight: 800,
+          color: alpha(m.navy, 0.85),
+          mb: 1,
+        }}
+      >
         {SYNC_SECTION_LABELS[sectionId]}
       </Typography>
       <RadioGroup
@@ -113,10 +134,22 @@ function ConfigurableSectionBlock({
             sx={{ alignItems: "flex-start", mr: 0, ml: 0, mb: 0.75 }}
             label={
               <Box sx={{ pt: 0.35 }}>
-                <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.8) }}>
+                <Typography
+                  sx={{
+                    fontSize: 12.5,
+                    fontWeight: 800,
+                    color: alpha(m.navy, 0.8),
+                  }}
+                >
                   {option.label}
                 </Typography>
-                <Typography sx={{ fontSize: 11.5, color: alpha(m.navy, 0.52), lineHeight: 1.4 }}>
+                <Typography
+                  sx={{
+                    fontSize: 11.5,
+                    color: alpha(m.navy, 0.52),
+                    lineHeight: 1.4,
+                  }}
+                >
                   {option.description}
                 </Typography>
               </Box>
@@ -137,10 +170,13 @@ export default function TemplateSyncSettingsForm({
 
   return (
     <Stack spacing={1.5}>
-      <Typography sx={{ fontSize: 12.5, color: alpha(m.navy, 0.58), lineHeight: 1.5 }}>
-        Choose how Fixed and Desired location templates share information. They behave as two separate
-        setups. Only shared sections can sync. Desired-only items (project booking, kilometer allowance)
-        always stay on Desired.
+      <Typography
+        sx={{ fontSize: 12.5, color: alpha(m.navy, 0.58), lineHeight: 1.5 }}
+      >
+        Choose how Fixed and Desired location templates share information. They
+        behave as two separate setups. Only shared sections can sync.
+        Desired-only items (project booking, kilometer allowance) always stay on
+        Desired.
       </Typography>
 
       <LockedSectionRow
@@ -163,7 +199,14 @@ export default function TemplateSyncSettingsForm({
           sectionId={sectionId}
           mode={value[sectionId]}
           disabled={disabled}
-          onChange={(mode) => onChange({ ...value, [sectionId]: mode, profile: "sync", location: "independent" })}
+          onChange={(mode) =>
+            onChange({
+              ...value,
+              [sectionId]: mode,
+              profile: "sync",
+              location: "independent",
+            })
+          }
         />
       ))}
     </Stack>

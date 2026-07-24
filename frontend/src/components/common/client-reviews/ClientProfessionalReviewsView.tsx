@@ -1,12 +1,12 @@
 "use client";
 
+import AppButton from "../AppButton";
 import * as React from "react";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import SearchOffRoundedIcon from "@mui/icons-material/SearchOffRounded";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
 import {
   Box,
-  Button,
   Divider,
   Grid,
   IconButton,
@@ -16,7 +16,10 @@ import {
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useRouter } from "next/navigation";
-import type { BusinessPublicProfileData, BusinessPublicProfileTeamMember } from "../../../data/businessPublicProfile.data";
+import type {
+  BusinessPublicProfileData,
+  BusinessPublicProfileTeamMember,
+} from "../../../data/businessPublicProfile.data";
 import { getServicesForLocationMode } from "../../../data/businessPublicProfile.data";
 import {
   REVIEWS_CHANGED_EVENT,
@@ -45,7 +48,9 @@ type Props = {
   seedDemoReviews?: boolean;
 };
 
-function toCardReview(review: ClientProfessionalReview): ProfessionalReviewItem {
+function toCardReview(
+  review: ClientProfessionalReview,
+): ProfessionalReviewItem {
   return {
     id: review.id,
     reviewerName: review.reviewerName,
@@ -66,9 +71,17 @@ export default function ClientProfessionalReviewsView({
 }: Props) {
   const m = useTheme().palette.mollure;
   const router = useRouter();
-  const services = React.useMemo(() => getServicesForLocationMode(profile, locationMode), [profile, locationMode]);
-  const filterGroups = React.useMemo(() => buildReviewFilterGroups(profile.categories, services), [profile.categories, services]);
-  const [filters, setFilters] = React.useState(() => buildClearedReviewFilters(filterGroups));
+  const services = React.useMemo(
+    () => getServicesForLocationMode(profile, locationMode),
+    [profile, locationMode],
+  );
+  const filterGroups = React.useMemo(
+    () => buildReviewFilterGroups(profile.categories, services),
+    [profile.categories, services],
+  );
+  const [filters, setFilters] = React.useState(() =>
+    buildClearedReviewFilters(filterGroups),
+  );
   const [reviews, setReviews] = React.useState<ClientProfessionalReview[]>([]);
   const [writeOpen, setWriteOpen] = React.useState(false);
 
@@ -82,7 +95,8 @@ export default function ClientProfessionalReviewsView({
   React.useEffect(() => {
     refreshReviews();
     window.addEventListener(REVIEWS_CHANGED_EVENT, refreshReviews);
-    return () => window.removeEventListener(REVIEWS_CHANGED_EVENT, refreshReviews);
+    return () =>
+      window.removeEventListener(REVIEWS_CHANGED_EVENT, refreshReviews);
   }, [refreshReviews]);
 
   React.useEffect(() => {
@@ -100,7 +114,8 @@ export default function ClientProfessionalReviewsView({
   );
   const hasReviews = reviews.length > 0;
   const maxDistribution = Math.max(...Object.values(allStats.distribution), 1);
-  const categoryLabel = profile.specialties[0] ?? services[0]?.categoryTitle ?? "Beauty & Spa";
+  const categoryLabel =
+    profile.specialties[0] ?? services[0]?.categoryTitle ?? "Beauty & Spa";
 
   const handleSubmitReview = (rating: number, reviewText: string) => {
     const primaryService = services[0];
@@ -111,7 +126,13 @@ export default function ClientProfessionalReviewsView({
       rating,
       reviewText,
       tags: primaryService
-        ? [{ label: primaryService.name, categoryId: primaryService.categoryId, serviceId: primaryService.id }]
+        ? [
+            {
+              label: primaryService.name,
+              categoryId: primaryService.categoryId,
+              serviceId: primaryService.id,
+            },
+          ]
         : [],
     });
     refreshReviews();
@@ -150,14 +171,25 @@ export default function ClientProfessionalReviewsView({
             <IconButton
               size="small"
               onClick={() => router.push(`/clients/listing/${profile.shopId}`)}
-              sx={{ width: 32, height: 32, borderRadius: "8px", color: alpha(m.navy, 0.65) }}
+              sx={{
+                width: 32,
+                height: 32,
+                borderRadius: "8px",
+                color: alpha(m.navy, 0.65),
+              }}
               aria-label="Back to profile"
             >
               <ArrowBackRoundedIcon sx={{ fontSize: 20 }} />
             </IconButton>
-            <Typography sx={{ fontWeight: 900, fontSize: 18, color: alpha(m.navy, 0.88) }}>Reviews &amp; Ratings</Typography>
+            <Typography
+              sx={{ fontWeight: 900, fontSize: 18, color: alpha(m.navy, 0.88) }}
+            >
+              Reviews &amp; Ratings
+            </Typography>
           </Stack>
-          <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.55) }}>
+          <Typography
+            sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.55) }}
+          >
             {categoryLabel} | {member.name}
           </Typography>
         </Stack>
@@ -176,7 +208,14 @@ export default function ClientProfessionalReviewsView({
           >
             <Grid container spacing={2} alignItems="center">
               <Grid item xs={12} md={4}>
-                <Typography sx={{ fontWeight: 1000, fontSize: 42, lineHeight: 1, color: alpha(m.navy, 0.88) }}>
+                <Typography
+                  sx={{
+                    fontWeight: 1000,
+                    fontSize: 42,
+                    lineHeight: 1,
+                    color: alpha(m.navy, 0.88),
+                  }}
+                >
                   {hasReviews ? allStats.average.toFixed(1) : "0"}
                 </Typography>
                 <Stack direction="row" spacing={0.25} sx={{ mt: 0.75 }}>
@@ -186,29 +225,76 @@ export default function ClientProfessionalReviewsView({
                       sx={{
                         fontSize: 18,
                         color:
-                          hasReviews && i < Math.round(allStats.average) ? m.star : alpha(m.navy, 0.15),
+                          hasReviews && i < Math.round(allStats.average)
+                            ? m.star
+                            : alpha(m.navy, 0.15),
                       }}
                     />
                   ))}
                 </Stack>
-                <Typography sx={{ mt: 0.75, fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.5) }}>
-                  Based on {allStats.total} review{allStats.total === 1 ? "" : "s"}
+                <Typography
+                  sx={{
+                    mt: 0.75,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.5),
+                  }}
+                >
+                  Based on {allStats.total} review
+                  {allStats.total === 1 ? "" : "s"}
                 </Typography>
               </Grid>
               <Grid item xs={12} md={8}>
                 <Stack spacing={0.85}>
                   {([5, 4, 3, 2, 1] as const).map((stars) => {
                     const count = hasReviews ? allStats.distribution[stars] : 0;
-                    const widthPct = hasReviews ? (count / maxDistribution) * 100 : 0;
+                    const widthPct = hasReviews
+                      ? (count / maxDistribution) * 100
+                      : 0;
                     return (
-                      <Stack key={stars} direction="row" alignItems="center" spacing={1}>
-                        <Typography sx={{ width: 12, fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.55) }}>
+                      <Stack
+                        key={stars}
+                        direction="row"
+                        alignItems="center"
+                        spacing={1}
+                      >
+                        <Typography
+                          sx={{
+                            width: 12,
+                            fontSize: 12,
+                            fontWeight: 800,
+                            color: alpha(m.navy, 0.55),
+                          }}
+                        >
                           {stars}
                         </Typography>
-                        <Box sx={{ flex: 1, height: 10, borderRadius: "999px", bgcolor: alpha(m.navy, 0.06), overflow: "hidden" }}>
-                          <Box sx={{ width: `${widthPct}%`, height: "100%", bgcolor: hasReviews ? m.star : "transparent", borderRadius: "999px" }} />
+                        <Box
+                          sx={{
+                            flex: 1,
+                            height: 10,
+                            borderRadius: "999px",
+                            bgcolor: alpha(m.navy, 0.06),
+                            overflow: "hidden",
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              width: `${widthPct}%`,
+                              height: "100%",
+                              bgcolor: hasReviews ? m.star : "transparent",
+                              borderRadius: "999px",
+                            }}
+                          />
                         </Box>
-                        <Typography sx={{ width: 24, textAlign: "right", fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.55) }}>
+                        <Typography
+                          sx={{
+                            width: 24,
+                            textAlign: "right",
+                            fontSize: 12,
+                            fontWeight: 800,
+                            color: alpha(m.navy, 0.55),
+                          }}
+                        >
                           {count}
                         </Typography>
                       </Stack>
@@ -221,30 +307,34 @@ export default function ClientProfessionalReviewsView({
 
           <Grid container spacing={2}>
             <Grid item xs={12} md={8}>
-              <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1.25 }}>
-                <Typography sx={{ fontWeight: 900, fontSize: 14, color: alpha(m.navy, 0.78) }}>
+              <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                sx={{ mb: 1.25 }}
+              >
+                <Typography
+                  sx={{
+                    fontWeight: 900,
+                    fontSize: 14,
+                    color: alpha(m.navy, 0.78),
+                  }}
+                >
                   {!hasReviews
                     ? "No Reviews Found"
                     : filteredReviews.length
                       ? `Showing ${filteredReviews.length} Review${filteredReviews.length === 1 ? "" : "s"}`
                       : "No Reviews Found"}
                 </Typography>
-                <Button
-                  variant="contained"
-                  disableElevation
+                <AppButton
+                  tone="primary"
                   onClick={() => setWriteOpen(true)}
                   sx={{
-                    borderRadius: "10px",
-                    textTransform: "none",
-                    fontWeight: 900,
                     fontSize: 12.5,
-                    bgcolor: m.teal,
-                    color: "#fff",
-                    "&:hover": { bgcolor: m.tealDark, color: "#fff" },
                   }}
                 >
                   Write a review
-                </Button>
+                </AppButton>
               </Stack>
 
               {!hasReviews ? (
@@ -258,8 +348,16 @@ export default function ClientProfessionalReviewsView({
                     textAlign: "center",
                   }}
                 >
-                  <SearchOffRoundedIcon sx={{ fontSize: 56, color: alpha(m.navy, 0.18), mb: 1 }} />
-                  <Typography sx={{ fontWeight: 800, fontSize: 14, color: alpha(m.navy, 0.45) }}>
+                  <SearchOffRoundedIcon
+                    sx={{ fontSize: 56, color: alpha(m.navy, 0.18), mb: 1 }}
+                  />
+                  <Typography
+                    sx={{
+                      fontWeight: 800,
+                      fontSize: 14,
+                      color: alpha(m.navy, 0.45),
+                    }}
+                  >
                     No reviews for {member.name} yet.
                   </Typography>
                 </Paper>
@@ -274,8 +372,16 @@ export default function ClientProfessionalReviewsView({
                     textAlign: "center",
                   }}
                 >
-                  <SearchOffRoundedIcon sx={{ fontSize: 56, color: alpha(m.navy, 0.18), mb: 1 }} />
-                  <Typography sx={{ fontWeight: 800, fontSize: 14, color: alpha(m.navy, 0.45) }}>
+                  <SearchOffRoundedIcon
+                    sx={{ fontSize: 56, color: alpha(m.navy, 0.18), mb: 1 }}
+                  />
+                  <Typography
+                    sx={{
+                      fontWeight: 800,
+                      fontSize: 14,
+                      color: alpha(m.navy, 0.45),
+                    }}
+                  >
                     No results found for the selected filters.
                   </Typography>
                 </Paper>
@@ -285,7 +391,9 @@ export default function ClientProfessionalReviewsView({
                     <RatingReviewCard
                       key={review.id}
                       review={toCardReview(review)}
-                      onSendReply={(message) => handleSendReply(review.id, message)}
+                      onSendReply={(message) =>
+                        handleSendReply(review.id, message)
+                      }
                       onDeleteReply={() => handleDeleteReply(review.id)}
                     />
                   ))}
@@ -298,14 +406,20 @@ export default function ClientProfessionalReviewsView({
                 groups={filterGroups}
                 filters={filters}
                 onChange={setFilters}
-                onClear={() => setFilters(buildClearedReviewFilters(filterGroups))}
+                onClear={() =>
+                  setFilters(buildClearedReviewFilters(filterGroups))
+                }
               />
             </Grid>
           </Grid>
         </Box>
       </Paper>
 
-      <ClientWriteReviewDialog open={writeOpen} onClose={() => setWriteOpen(false)} onSubmit={handleSubmitReview} />
+      <ClientWriteReviewDialog
+        open={writeOpen}
+        onClose={() => setWriteOpen(false)}
+        onSubmit={handleSubmitReview}
+      />
     </>
   );
 }

@@ -1,11 +1,11 @@
 "use client";
 
+import AppButton from "./AppButton";
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Box,
-  Button,
   Card,
   CardContent,
   Chip,
@@ -16,8 +16,14 @@ import {
 import { alpha } from "@mui/material/styles";
 import type { ClientsLandingData } from "../../app/clients/clients.data";
 import { buildListingSearchHref } from "../../app/clients/listing/listingSearchParams";
-import { clientsShellHeader, type ClientsShellHeaderConfig } from "../../data/marketingShell.data";
-import { getFeatureIcon, useClientsPageTokens } from "../../app/clients/clients.use";
+import {
+  clientsShellHeader,
+  type ClientsShellHeaderConfig,
+} from "../../data/marketingShell.data";
+import {
+  getFeatureIcon,
+  useClientsPageTokens,
+} from "../../app/clients/clients.use";
 import { MOLLURE_SECTION_GAP_PX } from "../../theme/spacing";
 import MarketingSectionHeading from "./MarketingSectionHeading";
 import MarketingSiteFooter from "./MarketingSiteFooter";
@@ -37,7 +43,10 @@ export type ClientsLandingProps = {
   overrides?: ClientsLandingOverrides;
 };
 
-export default function ClientsLanding({ data, overrides }: ClientsLandingProps) {
+export default function ClientsLanding({
+  data,
+  overrides,
+}: ClientsLandingProps) {
   const tokens = useClientsPageTokens();
   const router = useRouter();
 
@@ -47,13 +56,27 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
     ...(overrides?.header ?? {}),
   } as ClientsShellHeaderConfig;
   const hero = { ...data.hero, ...(overrides?.hero ?? {}) };
-  const { whyChooseSection, stepsSection, testimonialsSection, professionalCta, footer } = data;
+  const {
+    whyChooseSection,
+    stepsSection,
+    testimonialsSection,
+    professionalCta,
+    footer,
+  } = data;
 
-  const [filterValues, setFilterValues] = React.useState<Record<string, string[]>>(
-    () => Object.fromEntries(hero.filters.map((f) => [f.label, []])) as Record<string, string[]>,
+  const [filterValues, setFilterValues] = React.useState<
+    Record<string, string[]>
+  >(
+    () =>
+      Object.fromEntries(hero.filters.map((f) => [f.label, []])) as Record<
+        string,
+        string[]
+      >,
   );
 
-  const hasSearchSelection = Object.values(filterValues).some((values) => values.length > 0);
+  const hasSearchSelection = Object.values(filterValues).some(
+    (values) => values.length > 0,
+  );
 
   function handleSearch() {
     if (!hasSearchSelection) return;
@@ -100,7 +123,10 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
             pointerEvents: "none",
           }}
         />
-        <Container maxWidth="lg" sx={{ position: "relative", zIndex: 1, py: { xs: 7, md: 10 } }}>
+        <Container
+          maxWidth="lg"
+          sx={{ position: "relative", zIndex: 1, py: { xs: 7, md: 10 } }}
+        >
           <Stack alignItems="center" textAlign="center">
             <Chip
               label={hero.eyebrow}
@@ -136,7 +162,7 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
             >
               {hero.description}
             </Typography>
-            <Button
+            <AppButton
               component={Link}
               href={hero.primaryActionHref ?? "/clients/listing"}
               variant="outlined"
@@ -149,11 +175,14 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
                 fontWeight: 600,
                 borderColor: tokens.teal,
                 color: tokens.tealDark,
-                "&:hover": { borderColor: tokens.teal, bgcolor: "rgba(255,255,255,0.35)" },
+                "&:hover": {
+                  borderColor: tokens.teal,
+                  bgcolor: "rgba(255,255,255,0.35)",
+                },
               }}
             >
               {hero.primaryAction}
-            </Button>
+            </AppButton>
           </Stack>
 
           <Card
@@ -167,7 +196,11 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
             }}
           >
             <CardContent sx={{ p: { xs: 2, md: 2.75 } }}>
-              <Grid container spacing={{ xs: 1.75, md: 2.25 }} alignItems="flex-end">
+              <Grid
+                container
+                spacing={{ xs: 1.75, md: 2.25 }}
+                alignItems="flex-end"
+              >
                 {hero.filters.map((filter) => (
                   <Grid item xs={12} sm={6} md={3} key={filter.label}>
                     <Typography
@@ -216,7 +249,7 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
                 ))}
 
                 <Grid item xs={12} sm={6} md={3}>
-                  <Button
+                  <AppButton
                     type="button"
                     onClick={handleSearch}
                     fullWidth
@@ -238,7 +271,7 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
                     }}
                   >
                     {hero.searchAction}
-                  </Button>
+                  </AppButton>
                 </Grid>
               </Grid>
             </CardContent>
@@ -276,13 +309,36 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
                     >
                       {getFeatureIcon(item.iconKey)}
                     </Box>
-                    <Typography sx={{ mb: 2, fontSize: 16, fontWeight: 600, lineHeight: 1.25, color: tokens.textcolorgrey700 }}>
+                    <Typography
+                      sx={{
+                        mb: 2,
+                        fontSize: 16,
+                        fontWeight: 600,
+                        lineHeight: 1.25,
+                        color: tokens.textcolorgrey700,
+                      }}
+                    >
                       {item.title}
                     </Typography>
-                    <Typography sx={{ mb: 2, fontSize: 12.5, fontWeight: 600, lineHeight: 1.35, color: tokens.teal }}>
+                    <Typography
+                      sx={{
+                        mb: 2,
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                        lineHeight: 1.35,
+                        color: tokens.teal,
+                      }}
+                    >
                       {item.body}
                     </Typography>
-                    <Typography sx={{ color: tokens.slate, lineHeight: 1.75, fontSize: 13, fontWeight: 400 }}>
+                    <Typography
+                      sx={{
+                        color: tokens.slate,
+                        lineHeight: 1.75,
+                        fontSize: 13,
+                        fontWeight: 400,
+                      }}
+                    >
                       {item.description}
                     </Typography>
                   </CardContent>
@@ -315,10 +371,25 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
                 >
                   {step.number}
                 </Box>
-                <Typography sx={{ mt: 2, mb: 2, fontSize: 21, fontWeight: 600, color: tokens.textcolorgrey700 }}>
+                <Typography
+                  sx={{
+                    mt: 2,
+                    mb: 2,
+                    fontSize: 21,
+                    fontWeight: 600,
+                    color: tokens.textcolorgrey700,
+                  }}
+                >
                   {step.title}
                 </Typography>
-                <Typography sx={{ maxWidth: 240, color: tokens.slate, lineHeight: 1.7, fontSize: 13 }}>
+                <Typography
+                  sx={{
+                    maxWidth: 240,
+                    color: tokens.slate,
+                    lineHeight: 1.7,
+                    fontSize: 13,
+                  }}
+                >
                   {step.body}
                 </Typography>
               </Stack>
@@ -339,7 +410,12 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
           <Stack alignItems="center" textAlign="center">
             <Typography
               sx={{
-                fontSize: { xs: "1.75rem", sm: "2rem", md: "2.5rem", lg: "2.8rem" },
+                fontSize: {
+                  xs: "1.75rem",
+                  sm: "2rem",
+                  md: "2.5rem",
+                  lg: "2.8rem",
+                },
                 fontWeight: 800,
                 lineHeight: 1.1,
                 color: "#fff",
@@ -348,10 +424,18 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
             >
               {professionalCta.title}
             </Typography>
-            <Typography sx={{ mt: 2, maxWidth: 700, color: "rgba(255,255,255,0.86)", fontSize: 17, lineHeight: 1.8 }}>
+            <Typography
+              sx={{
+                mt: 2,
+                maxWidth: 700,
+                color: "rgba(255,255,255,0.86)",
+                fontSize: 17,
+                lineHeight: 1.8,
+              }}
+            >
               {professionalCta.description}
             </Typography>
-            <Button
+            <AppButton
               component={Link}
               href={professionalCta.href}
               variant="contained"
@@ -368,16 +452,20 @@ export default function ClientsLanding({ data, overrides }: ClientsLandingProps)
               }}
             >
               {professionalCta.action}
-            </Button>
-            <Typography sx={{ mt: 2.25, color: "rgba(255,255,255,0.84)", fontSize: 14 }}>
+            </AppButton>
+            <Typography
+              sx={{ mt: 2.25, color: "rgba(255,255,255,0.84)", fontSize: 14 }}
+            >
               {professionalCta.supportingText}
             </Typography>
           </Stack>
         </Container>
       </Box>
 
-      <MarketingSiteFooter columns={[...footer.columns]} copyright={footer.copyright} />
+      <MarketingSiteFooter
+        columns={[...footer.columns]}
+        copyright={footer.copyright}
+      />
     </Box>
   );
 }
-

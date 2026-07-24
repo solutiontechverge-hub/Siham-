@@ -1,7 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { Box, Stack, Typography, type SxProps, type Theme } from "@mui/material";
+import {
+  Box,
+  Stack,
+  Typography,
+  type SxProps,
+  type Theme,
+} from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 import AppCard from "../common/AppCard";
 import { ADMIN_CARD_PADDING as pad } from "./adminCardPadding";
@@ -50,8 +56,14 @@ export default function AdminSectionCard({
           spacing={1.5}
           sx={{
             px: compact ? pad.headerXCompact : pad.headerX,
-            py: compact ? pad.headerYCompact : separateContent ? 2.25 : pad.headerY,
-            borderBottom: separateContent ? "none" : `1px solid ${tokens.cardBorder}`,
+            py: compact
+              ? pad.headerYCompact
+              : separateContent
+                ? 2.25
+                : pad.headerY,
+            borderBottom: separateContent
+              ? "none"
+              : `1px solid ${tokens.cardBorder}`,
           }}
         >
           <Stack spacing={0.25}>
@@ -67,7 +79,9 @@ export default function AdminSectionCard({
               </Typography>
             ) : null}
             {description ? (
-              <Typography sx={{ fontSize: 13, color: tokens.bodyText }}>{description}</Typography>
+              <Typography sx={{ fontSize: 13, color: tokens.bodyText }}>
+                {description}
+              </Typography>
             ) : null}
           </Stack>
           {actions}

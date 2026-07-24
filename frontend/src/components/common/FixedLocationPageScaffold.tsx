@@ -2,7 +2,9 @@
 
 import * as React from "react";
 import { Box, Container, Stack } from "@mui/material";
-import FixedLocationTopTabs, { type FixedLocationTopTab } from "./FixedLocationTopTabs";
+import FixedLocationTopTabs, {
+  type FixedLocationTopTab,
+} from "./FixedLocationTopTabs";
 import MarketingSiteFooter from "./MarketingSiteFooter";
 import { professionalsMarketingFooter } from "../../data/marketingShell.data";
 
@@ -12,7 +14,11 @@ export type FixedLocationPageScaffoldProps = {
   children: React.ReactNode;
 };
 
-export default function FixedLocationPageScaffold({ activeTopTab, topTabs, children }: FixedLocationPageScaffoldProps) {
+export default function FixedLocationPageScaffold({
+  activeTopTab,
+  topTabs,
+  children,
+}: FixedLocationPageScaffoldProps) {
   return (
     <Box sx={{ bgcolor: "mollure.pageBg", minHeight: "100vh" }}>
       <Container maxWidth="lg" sx={{ py: 2.5 }}>
@@ -23,11 +29,13 @@ export default function FixedLocationPageScaffold({ activeTopTab, topTabs, child
       </Container>
 
       <MarketingSiteFooter
-        columns={professionalsMarketingFooter.columns.map((col) => ({ title: col.title, items: [...col.items] }))}
+        columns={professionalsMarketingFooter.columns.map((col) => ({
+          title: col.title,
+          items: [...col.items],
+        }))}
         copyright={professionalsMarketingFooter.copyright}
         sx={{ mt: 2 }}
       />
     </Box>
   );
 }
-

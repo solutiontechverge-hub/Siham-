@@ -1,9 +1,15 @@
 "use client";
 
+import AppButton from "../AppButton";
 import * as React from "react";
-import { Box, Button, CircularProgress, Stack, Typography } from "@mui/material";
+import { Box, CircularProgress, Stack, Typography } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
-import { Elements, PaymentElement, useElements, useStripe } from "@stripe/react-stripe-js";
+import {
+  Elements,
+  PaymentElement,
+  useElements,
+  useStripe,
+} from "@stripe/react-stripe-js";
 import type { StripeElementsOptions } from "@stripe/stripe-js";
 import { getStripeJs } from "../../../lib/stripe/client";
 import AppModal from "../AppModal";
@@ -72,34 +78,37 @@ function PaymentForm({
         }}
       />
       {errorMessage ? (
-        <Typography sx={{ mt: 1.5, fontSize: 12.5, fontWeight: 700, color: "#C62828" }}>{errorMessage}</Typography>
+        <Typography
+          sx={{ mt: 1.5, fontSize: 12.5, fontWeight: 700, color: "#C62828" }}
+        >
+          {errorMessage}
+        </Typography>
       ) : null}
       <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
-        <Button
+        <AppButton
           type="button"
           variant="outlined"
           onClick={onClose}
           disabled={submitting}
-          sx={{ flex: 1, borderRadius: "10px", textTransform: "none", fontWeight: 800 }}
+          sx={{
+            flex: 1,
+            borderRadius: "10px",
+            textTransform: "none",
+            fontWeight: 800,
+          }}
         >
           Cancel
-        </Button>
-        <Button
+        </AppButton>
+        <AppButton
+          tone="primary"
           type="submit"
-          variant="contained"
-          disableElevation
           disabled={!stripe || !elements || submitting}
           sx={{
             flex: 1.4,
-            borderRadius: "10px",
-            textTransform: "none",
-            fontWeight: 900,
-            bgcolor: m.teal,
-            "&:hover": { bgcolor: m.tealDark },
           }}
         >
           {submitting ? "Processing…" : `Pay €${amount.toFixed(2)}`}
-        </Button>
+        </AppButton>
       </Stack>
     </Box>
   );
@@ -144,7 +153,10 @@ export default function StripePrepaymentDialog({
       }),
     })
       .then(async (res) => {
-        const data = (await res.json()) as { clientSecret?: string; error?: string };
+        const data = (await res.json()) as {
+          clientSecret?: string;
+          error?: string;
+        };
         if (!res.ok) {
           throw new Error(data.error ?? "Could not start payment.");
         }
@@ -155,7 +167,9 @@ export default function StripePrepaymentDialog({
       })
       .catch((err: unknown) => {
         if (!cancelled) {
-          setSetupError(err instanceof Error ? err.message : "Could not start payment.");
+          setSetupError(
+            err instanceof Error ? err.message : "Could not start payment.",
+          );
         }
       })
       .finally(() => {
@@ -194,10 +208,17 @@ export default function StripePrepaymentDialog({
           <CircularProgress size={32} sx={{ color: m.teal }} />
         </Stack>
       ) : setupError ? (
-        <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#C62828" }}>{setupError}</Typography>
+        <Typography sx={{ fontSize: 13, fontWeight: 700, color: "#C62828" }}>
+          {setupError}
+        </Typography>
       ) : clientSecret && elementsOptions ? (
         <Elements stripe={getStripeJs()} options={elementsOptions}>
-          <PaymentForm amount={amount} bookingRef={bookingRef} onClose={onClose} onSuccess={onSuccess} />
+          <PaymentForm
+            amount={amount}
+            bookingRef={bookingRef}
+            onClose={onClose}
+            onSuccess={onSuccess}
+          />
         </Elements>
       ) : null}
     </AppModal>

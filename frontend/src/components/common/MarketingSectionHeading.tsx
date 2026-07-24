@@ -4,7 +4,10 @@ import * as React from "react";
 import { Stack } from "@mui/material";
 import type { ResponsiveStyleValue } from "@mui/system";
 import { Description, MainHeading } from "../ui/typography";
-import { MOLLURE_HEADING_BODY_GAP, MOLLURE_HEADING_BODY_GAP_PX } from "../../theme/spacing";
+import {
+  MOLLURE_HEADING_BODY_GAP,
+  MOLLURE_HEADING_BODY_GAP_PX,
+} from "../../theme/spacing";
 
 type MarketingSectionHeadingProps = {
   title: React.ReactNode;
@@ -26,7 +29,11 @@ export default function MarketingSectionHeading({
         mb,
         textAlign: align,
         alignItems:
-          align === "center" ? "center" : align === "right" ? "flex-end" : "flex-start",
+          align === "center"
+            ? "center"
+            : align === "right"
+              ? "flex-end"
+              : "flex-start",
       }}
     >
       <MainHeading sx={{ textAlign: align }}>{title}</MainHeading>

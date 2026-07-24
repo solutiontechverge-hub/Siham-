@@ -1,11 +1,12 @@
 "use client";
 
+import AppButton from "./AppButton";
 import * as React from "react";
 import Image from "next/image";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
-import { Box, Button, IconButton, MenuItem, Stack, Typography } from "@mui/material";
+import { Box, IconButton, MenuItem, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import MollureFormField from "./MollureFormField";
 import AppDrawer from "./AppDrawer";
@@ -66,7 +67,9 @@ export default function BusinessTeamMemberFormModal({
   const theme = useTheme();
   const m = theme.palette.mollure;
   const { showSnackbar } = useSnackbar();
-  const fieldInputSx = { "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" } } as const;
+  const fieldInputSx = {
+    "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" },
+  } as const;
 
   const categoryOptions = React.useMemo(
     () => buildTeamCategoryOptions(businessCategories, serviceContext),
@@ -77,13 +80,21 @@ export default function BusinessTeamMemberFormModal({
 
   React.useEffect(() => {
     if (!open || categoryOptions.length === 0) return;
-    if (!draft.categoryId || !categoryOptions.some((option) => option.value === draft.categoryId)) {
+    if (
+      !draft.categoryId ||
+      !categoryOptions.some((option) => option.value === draft.categoryId)
+    ) {
       onChange({ categoryId: categoryOptions[0].value, serviceId: "" });
     }
   }, [open, categoryOptions, draft.categoryId, onChange]);
 
   const serviceOptions = React.useMemo(
-    () => buildTeamServiceOptionsForCategory(activeCategoryId, businessCategories, serviceContext),
+    () =>
+      buildTeamServiceOptionsForCategory(
+        activeCategoryId,
+        businessCategories,
+        serviceContext,
+      ),
     [activeCategoryId, businessCategories, serviceContext],
   );
 
@@ -94,64 +105,56 @@ export default function BusinessTeamMemberFormModal({
 
   const displaySelectedGroups = React.useMemo(() => {
     if (!draft.categoryId || !draft.serviceId) return draft.selectedGroups;
-    return addTeamMemberServiceSelection(draft, businessCategories, serviceContext).selectedGroups;
+    return addTeamMemberServiceSelection(
+      draft,
+      businessCategories,
+      serviceContext,
+    ).selectedGroups;
   }, [businessCategories, draft, serviceContext]);
 
   const footer = (
-    <Stack direction="row" spacing={1.25} justifyContent="flex-end" sx={{ px: 2.5, py: 1.75 }}>
-      <Button
-        variant="outlined"
+    <Stack
+      direction="row"
+      spacing={1.25}
+      justifyContent="flex-end"
+      sx={{ px: 2.5, py: 1.75 }}
+    >
+      <AppButton
+        tone="secondary"
         onClick={onClose}
         disabled={disabled}
         sx={{
-          borderRadius: "10px",
-          textTransform: "none",
-          fontWeight: 800,
-          height: 36,
           px: 3,
-          borderColor: alpha(m.navy, 0.16),
-          color: alpha(m.navy, 0.65),
-          bgcolor: "#fff",
         }}
       >
         {businessTeamMemberModalCopy.cancelLabel}
-      </Button>
-      <Button
-        variant="contained"
-        disableElevation
+      </AppButton>
+      <AppButton
+        tone="primary"
         onClick={onSubmit}
         disabled={disabled || !canSubmit}
         sx={{
-          borderRadius: "10px",
-          textTransform: "none",
-          fontWeight: 900,
-          height: 36,
           px: 4,
-          bgcolor: m.teal,
-          color: "#fff",
-          "&:hover": { bgcolor: m.tealDark },
-          "&.Mui-disabled": {
-            bgcolor: alpha(m.navy, 0.12),
-            color: alpha(m.navy, 0.35),
-          },
         }}
       >
         {submitLabel}
-      </Button>
+      </AppButton>
     </Stack>
   );
 
   return (
-    <AppDrawer
-      open={open}
-      onClose={onClose}
-      title={title}
-      footer={footer}
-    >
+    <AppDrawer open={open} onClose={onClose} title={title} footer={footer}>
       <Box sx={{ px: 2.5, py: 2, width: "100%", boxSizing: "border-box" }}>
         <Stack spacing={2} sx={{ width: "100%", alignItems: "stretch" }}>
           <Box>
-            <Typography sx={{ fontWeight: 800, fontSize: 14, color: alpha(m.navy, 0.88), mb: 1 }}>
+            <Typography
+              sx={{
+                fontWeight: 800,
+                fontSize: 14,
+                color: alpha(m.navy, 0.88),
+                mb: 1,
+              }}
+            >
               {businessTeamMemberModalCopy.profilePictureLabel}
             </Typography>
             <Box
@@ -206,7 +209,9 @@ export default function BusinessTeamMemberFormModal({
                     boxShadow: "0 8px 20px rgba(16,35,63,0.18)",
                   }}
                 >
-                  <UploadFileRoundedIcon sx={{ fontSize: 22, color: alpha(m.navy, 0.55) }} />
+                  <UploadFileRoundedIcon
+                    sx={{ fontSize: 22, color: alpha(m.navy, 0.55) }}
+                  />
                 </Box>
               </Box>
             </Box>
@@ -219,7 +224,10 @@ export default function BusinessTeamMemberFormModal({
                 const file = e.target.files?.[0];
                 if (!file) return;
                 if (!isAllowedProfileImageFile(file)) {
-                  showSnackbar({ severity: "error", message: PROFILE_IMAGE_INVALID_MESSAGE });
+                  showSnackbar({
+                    severity: "error",
+                    message: PROFILE_IMAGE_INVALID_MESSAGE,
+                  });
                   e.target.value = "";
                   return;
                 }
@@ -243,7 +251,9 @@ export default function BusinessTeamMemberFormModal({
               label={businessTeamMemberModalCopy.selectCategoryLabel}
               select
               value={draft.categoryId}
-              onChange={(e) => onChange({ categoryId: e.target.value, serviceId: "" })}
+              onChange={(e) =>
+                onChange({ categoryId: e.target.value, serviceId: "" })
+              }
               disabled={disabled}
               fullWidth
               sx={fieldInputSx}
@@ -266,7 +276,14 @@ export default function BusinessTeamMemberFormModal({
 
           {activeCategoryId ? (
             <Box sx={{ width: "100%" }}>
-              <Typography sx={{ fontWeight: 800, fontSize: 14, color: alpha(m.navy, 0.88), mb: 1.25 }}>
+              <Typography
+                sx={{
+                  fontWeight: 800,
+                  fontSize: 14,
+                  color: alpha(m.navy, 0.88),
+                  mb: 1.25,
+                }}
+              >
                 {businessTeamMemberModalCopy.selectServicesLabel}
               </Typography>
               {selectableServices.length === 0 ? (
@@ -283,14 +300,17 @@ export default function BusinessTeamMemberFormModal({
                 >
                   {selectableServices.map((option) => {
                     const isSelected =
-                      draft.categoryId === activeCategoryId && draft.serviceId === option.value;
+                      draft.categoryId === activeCategoryId &&
+                      draft.serviceId === option.value;
 
                     return (
-                      <Button
+                      <AppButton
                         key={option.value}
                         variant="outlined"
                         disabled={disabled}
-                        onClick={() => onPickService(activeCategoryId, option.value)}
+                        onClick={() =>
+                          onPickService(activeCategoryId, option.value)
+                        }
                         sx={{
                           borderRadius: "10px",
                           textTransform: "none",
@@ -298,7 +318,9 @@ export default function BusinessTeamMemberFormModal({
                           fontSize: 13,
                           px: 1.75,
                           py: 0.75,
-                          borderColor: isSelected ? m.teal : alpha(m.navy, 0.14),
+                          borderColor: isSelected
+                            ? m.teal
+                            : alpha(m.navy, 0.14),
                           color: isSelected ? m.teal : alpha(m.navy, 0.78),
                           bgcolor: isSelected ? alpha(m.teal, 0.08) : "#fff",
                           "&:hover": {
@@ -308,7 +330,7 @@ export default function BusinessTeamMemberFormModal({
                         }}
                       >
                         {option.label}
-                      </Button>
+                      </AppButton>
                     );
                   })}
                 </Box>
@@ -326,7 +348,14 @@ export default function BusinessTeamMemberFormModal({
               boxSizing: "border-box",
             }}
           >
-            <Typography sx={{ fontWeight: 800, fontSize: 14, color: alpha(m.navy, 0.88), mb: 1.5 }}>
+            <Typography
+              sx={{
+                fontWeight: 800,
+                fontSize: 14,
+                color: alpha(m.navy, 0.88),
+                mb: 1.5,
+              }}
+            >
               {businessTeamMemberModalCopy.selectedHeading}
             </Typography>
 
@@ -338,7 +367,10 @@ export default function BusinessTeamMemberFormModal({
               <Box
                 sx={{
                   display: "grid",
-                  gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))" },
+                  gridTemplateColumns: {
+                    xs: "1fr",
+                    sm: "repeat(2, minmax(0, 1fr))",
+                  },
                   gap: 1.25,
                 }}
               >
@@ -361,7 +393,10 @@ export default function BusinessTeamMemberFormModal({
                         flex: 1,
                         minWidth: 0,
                         ...fieldInputSx,
-                        "& .MuiSelect-select": { display: "flex", alignItems: "center" },
+                        "& .MuiSelect-select": {
+                          display: "flex",
+                          alignItems: "center",
+                        },
                       }}
                       SelectProps={{
                         readOnly: true,
@@ -369,7 +404,11 @@ export default function BusinessTeamMemberFormModal({
                       }}
                     >
                       <MenuItem value={group.categoryId}>
-                        {formatTeamMemberGroupLabel(group, businessCategories, serviceContext)}
+                        {formatTeamMemberGroupLabel(
+                          group,
+                          businessCategories,
+                          serviceContext,
+                        )}
                       </MenuItem>
                     </MollureFormField>
                     <IconButton

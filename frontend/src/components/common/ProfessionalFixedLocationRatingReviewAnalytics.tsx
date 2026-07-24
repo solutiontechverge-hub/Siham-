@@ -2,7 +2,18 @@
 
 import * as React from "react";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
-import { Box, Divider, Paper, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from "@mui/material";
+import {
+  Box,
+  Divider,
+  Paper,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+} from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useRouter } from "next/navigation";
 import type { ProfessionalFixedLocationRatingReviewAnalyticsData } from "../../app/professionals/fixed-location/analytics/ratingReviewAnalytics.data";
@@ -15,7 +26,9 @@ export type ProfessionalFixedLocationRatingReviewAnalyticsProps = {
   data: ProfessionalFixedLocationRatingReviewAnalyticsData;
 };
 
-export default function ProfessionalFixedLocationRatingReviewAnalytics({ data }: ProfessionalFixedLocationRatingReviewAnalyticsProps) {
+export default function ProfessionalFixedLocationRatingReviewAnalytics({
+  data,
+}: ProfessionalFixedLocationRatingReviewAnalyticsProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
   const router = useRouter();
@@ -32,7 +45,9 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({ data }:
   return (
     <Box sx={{ px: 2.25, pb: 2.5 }}>
       <Box sx={{ pt: 2.25, pb: 1.4 }}>
-        <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}>
+        <BodyText
+          sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}
+        >
           {overview.title}
         </BodyText>
       </Box>
@@ -47,7 +62,10 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({ data }:
           bgcolor: "#fff",
         }}
       >
-        <Stack direction="row" divider={<Divider orientation="vertical" flexItem />}>
+        <Stack
+          direction="row"
+          divider={<Divider orientation="vertical" flexItem />}
+        >
           <Box
             component="button"
             type="button"
@@ -68,13 +86,29 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({ data }:
               "&:hover": { bgcolor: alpha(m.teal, 0.04) },
             }}
           >
-            <BodyText sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.55), mb: 0.5 }}>
+            <BodyText
+              sx={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.55),
+                mb: 0.5,
+              }}
+            >
               Overall Rating (Avg.):
             </BodyText>
             <Stack direction="row" alignItems="center" spacing={0.6}>
-              <StarRoundedIcon sx={{ fontSize: 22, color: theme.palette.warning.main }} />
-              <BodyText sx={{ fontSize: 18, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
-                {overview.overallRating.toFixed(1)}/{overview.ratingOutOf.toFixed(1)}
+              <StarRoundedIcon
+                sx={{ fontSize: 22, color: theme.palette.warning.main }}
+              />
+              <BodyText
+                sx={{
+                  fontSize: 18,
+                  fontWeight: 900,
+                  color: alpha(m.navy, 0.82),
+                }}
+              >
+                {overview.overallRating.toFixed(1)}/
+                {overview.ratingOutOf.toFixed(1)}
               </BodyText>
             </Stack>
           </Box>
@@ -91,10 +125,19 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({ data }:
               gap: 0.5,
             }}
           >
-            <BodyText sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.55), mb: 0.5 }}>
+            <BodyText
+              sx={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.55),
+                mb: 0.5,
+              }}
+            >
               Total Reviews:
             </BodyText>
-            <BodyText sx={{ fontSize: 18, fontWeight: 900, color: alpha(m.navy, 0.82) }}>
+            <BodyText
+              sx={{ fontSize: 18, fontWeight: 900, color: alpha(m.navy, 0.82) }}
+            >
               {overview.totalReviews}
             </BodyText>
           </Box>
@@ -102,11 +145,16 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({ data }:
       </Paper>
 
       {overview.explanationContent ? (
-        <AnalyticsSectionExplanation label={overview.explanationLabel} content={overview.explanationContent} />
+        <AnalyticsSectionExplanation
+          label={overview.explanationLabel}
+          content={overview.explanationContent}
+        />
       ) : null}
 
       <Box sx={{ pt: 2.7, pb: 1.4 }}>
-        <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}>
+        <BodyText
+          sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}
+        >
           {analytics42.title}
         </BodyText>
       </Box>
@@ -124,9 +172,31 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({ data }:
         <Table size="small">
           <TableHead>
             <TableRow sx={{ bgcolor: alpha("#9BA3B5", 0.14) }}>
-              {(["Rating Category", "Range", "Count", "Share (%)", "Replied To", "Action"] as const).map((h) => (
-                <TableCell key={h} sx={{ py: 1.2, borderBottom: `1px solid ${alpha(m.navy, 0.08)}` }}>
-                  <BodyText component="span" sx={{ fontSize: 11.5, fontWeight: 800, color: alpha(m.navy, 0.62) }}>
+              {(
+                [
+                  "Rating Category",
+                  "Range",
+                  "Count",
+                  "Share (%)",
+                  "Replied To",
+                  "Action",
+                ] as const
+              ).map((h) => (
+                <TableCell
+                  key={h}
+                  sx={{
+                    py: 1.2,
+                    borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
+                  }}
+                >
+                  <BodyText
+                    component="span"
+                    sx={{
+                      fontSize: 11.5,
+                      fontWeight: 800,
+                      color: alpha(m.navy, 0.62),
+                    }}
+                  >
                     {h}
                   </BodyText>
                 </TableCell>
@@ -144,27 +214,62 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({ data }:
                 }}
               >
                 <TableCell sx={{ py: 1.1 }}>
-                  <BodyText component="span" sx={{ fontSize: 12.5, fontWeight: r.isTotal ? 900 : 700, color: alpha(m.navy, r.isTotal ? 0.82 : 0.65) }}>
+                  <BodyText
+                    component="span"
+                    sx={{
+                      fontSize: 12.5,
+                      fontWeight: r.isTotal ? 900 : 700,
+                      color: alpha(m.navy, r.isTotal ? 0.82 : 0.65),
+                    }}
+                  >
                     {r.category}
                   </BodyText>
                 </TableCell>
                 <TableCell sx={{ py: 1.1 }}>
-                  <BodyText component="span" sx={{ fontSize: 12.5, fontWeight: r.isTotal ? 900 : 700, color: alpha(m.navy, r.isTotal ? 0.82 : 0.65) }}>
+                  <BodyText
+                    component="span"
+                    sx={{
+                      fontSize: 12.5,
+                      fontWeight: r.isTotal ? 900 : 700,
+                      color: alpha(m.navy, r.isTotal ? 0.82 : 0.65),
+                    }}
+                  >
                     {r.range}
                   </BodyText>
                 </TableCell>
                 <TableCell sx={{ py: 1.1 }}>
-                  <BodyText component="span" sx={{ fontSize: 12.5, fontWeight: r.isTotal ? 900 : 700, color: alpha(m.navy, r.isTotal ? 0.82 : 0.65) }}>
+                  <BodyText
+                    component="span"
+                    sx={{
+                      fontSize: 12.5,
+                      fontWeight: r.isTotal ? 900 : 700,
+                      color: alpha(m.navy, r.isTotal ? 0.82 : 0.65),
+                    }}
+                  >
                     {r.count}
                   </BodyText>
                 </TableCell>
                 <TableCell sx={{ py: 1.1 }}>
-                  <BodyText component="span" sx={{ fontSize: 12.5, fontWeight: r.isTotal ? 900 : 700, color: alpha(m.navy, r.isTotal ? 0.82 : 0.65) }}>
+                  <BodyText
+                    component="span"
+                    sx={{
+                      fontSize: 12.5,
+                      fontWeight: r.isTotal ? 900 : 700,
+                      color: alpha(m.navy, r.isTotal ? 0.82 : 0.65),
+                    }}
+                  >
                     {r.sharePct}%
                   </BodyText>
                 </TableCell>
                 <TableCell sx={{ py: 1.1 }}>
-                  <BodyText component="span" sx={{ fontSize: 12.5, fontWeight: r.isTotal ? 900 : 700, color: alpha(m.navy, r.isTotal ? 0.82 : 0.65) }}>
+                  <BodyText
+                    component="span"
+                    sx={{
+                      fontSize: 12.5,
+                      fontWeight: r.isTotal ? 900 : 700,
+                      color: alpha(m.navy, r.isTotal ? 0.82 : 0.65),
+                    }}
+                  >
                     {r.repliedTo}
                   </BodyText>
                 </TableCell>
@@ -195,11 +300,16 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({ data }:
       </TableContainer>
 
       {analytics42.explanationContent ? (
-        <AnalyticsSectionExplanation label={analytics42.explanationLabel} content={analytics42.explanationContent} />
+        <AnalyticsSectionExplanation
+          label={analytics42.explanationLabel}
+          content={analytics42.explanationContent}
+        />
       ) : null}
 
       <Box sx={{ pt: 2.7, pb: 1.4 }}>
-        <BodyText sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}>
+        <BodyText
+          sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.88) }}
+        >
           {analytics43.title}
         </BodyText>
       </Box>
@@ -217,9 +327,30 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({ data }:
         <Table size="small">
           <TableHead>
             <TableRow sx={{ bgcolor: alpha("#9BA3B5", 0.14) }}>
-              {(["Category", "Bad (%)", "Good (%)", "Excellent (%)", "Total Reviews"] as const).map((h) => (
-                <TableCell key={h} sx={{ py: 1.2, borderBottom: `1px solid ${alpha(m.navy, 0.08)}` }}>
-                  <BodyText component="span" sx={{ fontSize: 11.5, fontWeight: 800, color: alpha(m.navy, 0.62) }}>
+              {(
+                [
+                  "Category",
+                  "Bad (%)",
+                  "Good (%)",
+                  "Excellent (%)",
+                  "Total Reviews",
+                ] as const
+              ).map((h) => (
+                <TableCell
+                  key={h}
+                  sx={{
+                    py: 1.2,
+                    borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
+                  }}
+                >
+                  <BodyText
+                    component="span"
+                    sx={{
+                      fontSize: 11.5,
+                      fontWeight: 800,
+                      color: alpha(m.navy, 0.62),
+                    }}
+                  >
                     {h}
                   </BodyText>
                 </TableCell>
@@ -265,7 +396,10 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({ data }:
       </TableContainer>
 
       {analytics43.explanationContent ? (
-        <AnalyticsSectionExplanation label={analytics43.explanationLabel} content={analytics43.explanationContent} />
+        <AnalyticsSectionExplanation
+          label={analytics43.explanationLabel}
+          content={analytics43.explanationContent}
+        />
       ) : null}
 
       <ReviewSummaryByCategoryChart

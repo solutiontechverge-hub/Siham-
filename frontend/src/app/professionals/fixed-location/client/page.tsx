@@ -1,11 +1,11 @@
 "use client";
 
+import AppButton from "../../../../components/common/AppButton";
 import { useMemo } from "react";
 import {
   Alert,
   Avatar,
   Box,
-  Button,
   Chip,
   Divider,
   IconButton,
@@ -30,12 +30,19 @@ import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import StickyNote2OutlinedIcon from "@mui/icons-material/StickyNote2Outlined";
-import AppDatePicker, { normalizeDateToIso } from "../../../../components/common/AppDatePicker";
+import AppDatePicker, {
+  normalizeDateToIso,
+} from "../../../../components/common/AppDatePicker";
 import MollureFormField from "../../../../components/common/MollureFormField";
 import AppModal from "../../../../components/common/AppModal";
 import AppDrawer from "../../../../components/common/AppDrawer";
 import MollureListToolbar from "../../../../components/common/MollureListToolbar";
-import { AppCountryPhoneFields, ClientListDataCard, ClientListHeaderCard, MollureSnackbar } from "../../../../components/common";
+import {
+  AppCountryPhoneFields,
+  ClientListDataCard,
+  ClientListHeaderCard,
+  MollureSnackbar,
+} from "../../../../components/common";
 import { useFixedLocationClientPage } from "./useFixedLocationClientPage";
 import ClientDetailsViewPanel from "./ClientDetailsViewPanel";
 import ClientListFilterDrawer from "./ClientListFilterDrawer";
@@ -54,7 +61,14 @@ export default function FixedLocationClientPage() {
         const v = String(selected ?? "").trim();
         if (!v) {
           return (
-            <Typography component="span" sx={{ color: alpha(m.navy, 0.48), fontWeight: 500, fontSize: "0.8125rem" }}>
+            <Typography
+              component="span"
+              sx={{
+                color: alpha(m.navy, 0.48),
+                fontWeight: 500,
+                fontSize: "0.8125rem",
+              }}
+            >
               Select gender
             </Typography>
           );
@@ -72,7 +86,14 @@ export default function FixedLocationClientPage() {
         const v = String(selected ?? "").trim();
         if (!v) {
           return (
-            <Typography component="span" sx={{ color: alpha(m.navy, 0.48), fontWeight: 500, fontSize: "0.8125rem" }}>
+            <Typography
+              component="span"
+              sx={{
+                color: alpha(m.navy, 0.48),
+                fontWeight: 500,
+                fontSize: "0.8125rem",
+              }}
+            >
               Select client type
             </Typography>
           );
@@ -205,9 +226,10 @@ export default function FixedLocationClientPage() {
   );
 
   const rowMenuOptions = useMemo(() => {
-    const base = rowMenuClient && isClientBlocked(rowMenuClient)
-      ? ["View", "Edit technical note", "Unblock", "Delete"]
-      : ["View", "Edit technical note", "Block", "Delete"];
+    const base =
+      rowMenuClient && isClientBlocked(rowMenuClient)
+        ? ["View", "Edit technical note", "Unblock", "Delete"]
+        : ["View", "Edit technical note", "Block", "Delete"];
     return base;
   }, [rowMenuClient]);
 
@@ -233,7 +255,10 @@ export default function FixedLocationClientPage() {
       >
         {/* Header Card */}
         <Box sx={{ px: 2.25, py: 1.75 }}>
-          <ClientListHeaderCard title="Client List" subtitle="View Clients added to the list" />
+          <ClientListHeaderCard
+            title="Client List"
+            subtitle="View Clients added to the list"
+          />
         </Box>
 
         {/* Toolbar */}
@@ -262,7 +287,7 @@ export default function FixedLocationClientPage() {
           PaperProps={{
             sx: {
               borderRadius: "10px",
-              border: `1px solid ${alpha(m.navy, 0.10)}`,
+              border: `1px solid ${alpha(m.navy, 0.1)}`,
               boxShadow: "0 14px 30px rgba(16,35,63,0.12)",
               mt: 0.75,
               minWidth: 240,
@@ -304,7 +329,7 @@ export default function FixedLocationClientPage() {
           PaperProps={{
             sx: {
               borderRadius: "10px",
-              border: `1px solid ${alpha(m.navy, 0.10)}`,
+              border: `1px solid ${alpha(m.navy, 0.1)}`,
               boxShadow: "0 14px 30px rgba(16,35,63,0.12)",
               mt: 0.75,
               minWidth: 190,
@@ -347,246 +372,352 @@ export default function FixedLocationClientPage() {
                 mb: 1.25,
               }}
             >
-              Clients ({filtered.length}{filtered.length !== clients.length ? ` of ${clients.length}` : ""})
+              Clients ({filtered.length}
+              {filtered.length !== clients.length
+                ? ` of ${clients.length}`
+                : ""}
+              )
             </Typography>
 
             {clientsLoading ? (
-              <Typography sx={{ fontWeight: 700, fontSize: 13, color: alpha(m.navy, 0.5), py: 3, textAlign: "center" }}>
+              <Typography
+                sx={{
+                  fontWeight: 700,
+                  fontSize: 13,
+                  color: alpha(m.navy, 0.5),
+                  py: 3,
+                  textAlign: "center",
+                }}
+              >
                 Loading clients…
               </Typography>
             ) : clientsError ? (
-              <Typography sx={{ fontWeight: 700, fontSize: 13, color: theme.palette.error.main, py: 3, textAlign: "center" }}>
+              <Typography
+                sx={{
+                  fontWeight: 700,
+                  fontSize: 13,
+                  color: theme.palette.error.main,
+                  py: 3,
+                  textAlign: "center",
+                }}
+              >
                 Unable to load clients. Please try again.
               </Typography>
             ) : filtered.length === 0 ? (
-              <Typography sx={{ fontWeight: 700, fontSize: 13, color: alpha(m.navy, 0.5), py: 3, textAlign: "center" }}>
+              <Typography
+                sx={{
+                  fontWeight: 700,
+                  fontSize: 13,
+                  color: alpha(m.navy, 0.5),
+                  py: 3,
+                  textAlign: "center",
+                }}
+              >
                 No clients match your search or filters.
               </Typography>
             ) : (
-            <TableContainer
-              component={Paper}
-              elevation={0}
-              sx={{
-                borderRadius: "12px",
-                border: `1px solid ${alpha(m.navy, 0.06)}`,
-                overflow: "hidden",
-              }}
-            >
-              <Table
-                size="small"
+              <TableContainer
+                component={Paper}
+                elevation={0}
                 sx={{
-                  borderCollapse: "collapse",
-                  "& td": {
-                    borderBottom: `1px solid ${alpha(m.navy, 0.035)}`,
-                    borderRight: `1px solid ${alpha(m.navy, 0.04)}`,
-                  },
-                  "& tr > td:last-of-type": {
-                    borderRight: "none",
-                  },
-                  "& tbody tr:hover": {
-                    backgroundColor: alpha(m.navy, 0.025),
-                  },
+                  borderRadius: "12px",
+                  border: `1px solid ${alpha(m.navy, 0.06)}`,
+                  overflow: "hidden",
                 }}
               >
-                <TableHead>
-                  <TableRow sx={{ bgcolor: alpha(m.navy, 0.02) }}>
-                    {[
-                      "Client Name",
-                      "Type",
-                      "Platform",
-                      "Date Added",
-                      "Phone Number",
-                      "Total Sales",
-                      "Last Booking",
-                      "",
-                    ].map((h, colIdx, arr) => (
-                      <TableCell
-                        key={h || "actions"}
-                        sx={{
-                          fontSize: 12,
-                          fontWeight: 800,
-                          color: alpha(m.navy, 0.7),
-                          py: 1.25,
-                          letterSpacing: "0.02em",
-                          borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
-                          borderRight: colIdx < arr.length - 1 ? `1px solid ${alpha(m.navy, 0.04)}` : "none",
-                        }}
-                        align={h === "" ? "right" : "left"}
-                      >
-                        {h}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filtered.map((c) => {
-                    const blocked = isClientBlocked(c);
-                    const typeLabel = clientTypeLabel(c);
-                    const platform = platformLabel(c);
-                    return (
-                    <TableRow
-                      key={c.id}
-                      hover={!blocked}
-                      sx={
-                        blocked
-                          ? {
-                              bgcolor: alpha(theme.palette.error.main, 0.05),
-                              boxShadow: `inset 4px 0 0 ${theme.palette.error.main}`,
-                              "& td": {
-                                borderBottom: `1px solid ${alpha(theme.palette.error.main, 0.18)}`,
-                              },
-                            }
-                          : undefined
-                      }
-                    >
-                      <TableCell sx={{ py: 1.35 }}>
-                        <Stack direction="row" spacing={1.1} alignItems="center">
-                          <Avatar
-                            src={c.photoSrc}
-                            sx={{
-                              width: 32,
-                              height: 32,
-                              bgcolor: alpha(m.navy, 0.08),
-                              color: alpha(m.navy, 0.78),
-                              fontWeight: 800,
-                              fontSize: 13,
-                            }}
-                          >
-                            {c.name
-                              .split(" ")
-                              .map((p: string) => p[0])
-                              .join("")
-                              .slice(0, 2)
-                              .toUpperCase()}
-                          </Avatar>
-                          <Box sx={{ minWidth: 0 }}>
-                            <Stack direction="row" spacing={0.75} alignItems="center">
-                              <Typography
+                <Table
+                  size="small"
+                  sx={{
+                    borderCollapse: "collapse",
+                    "& td": {
+                      borderBottom: `1px solid ${alpha(m.navy, 0.035)}`,
+                      borderRight: `1px solid ${alpha(m.navy, 0.04)}`,
+                    },
+                    "& tr > td:last-of-type": {
+                      borderRight: "none",
+                    },
+                    "& tbody tr:hover": {
+                      backgroundColor: alpha(m.navy, 0.025),
+                    },
+                  }}
+                >
+                  <TableHead>
+                    <TableRow sx={{ bgcolor: alpha(m.navy, 0.02) }}>
+                      {[
+                        "Client Name",
+                        "Type",
+                        "Platform",
+                        "Date Added",
+                        "Phone Number",
+                        "Total Sales",
+                        "Last Booking",
+                        "",
+                      ].map((h, colIdx, arr) => (
+                        <TableCell
+                          key={h || "actions"}
+                          sx={{
+                            fontSize: 12,
+                            fontWeight: 800,
+                            color: alpha(m.navy, 0.7),
+                            py: 1.25,
+                            letterSpacing: "0.02em",
+                            borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
+                            borderRight:
+                              colIdx < arr.length - 1
+                                ? `1px solid ${alpha(m.navy, 0.04)}`
+                                : "none",
+                          }}
+                          align={h === "" ? "right" : "left"}
+                        >
+                          {h}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {filtered.map((c) => {
+                      const blocked = isClientBlocked(c);
+                      const typeLabel = clientTypeLabel(c);
+                      const platform = platformLabel(c);
+                      return (
+                        <TableRow
+                          key={c.id}
+                          hover={!blocked}
+                          sx={
+                            blocked
+                              ? {
+                                  bgcolor: alpha(
+                                    theme.palette.error.main,
+                                    0.05,
+                                  ),
+                                  boxShadow: `inset 4px 0 0 ${theme.palette.error.main}`,
+                                  "& td": {
+                                    borderBottom: `1px solid ${alpha(theme.palette.error.main, 0.18)}`,
+                                  },
+                                }
+                              : undefined
+                          }
+                        >
+                          <TableCell sx={{ py: 1.35 }}>
+                            <Stack
+                              direction="row"
+                              spacing={1.1}
+                              alignItems="center"
+                            >
+                              <Avatar
+                                src={c.photoSrc}
                                 sx={{
-                                  fontWeight: 900,
+                                  width: 32,
+                                  height: 32,
+                                  bgcolor: alpha(m.navy, 0.08),
+                                  color: alpha(m.navy, 0.78),
+                                  fontWeight: 800,
                                   fontSize: 13,
-                                  color: blocked ? alpha(theme.palette.error.main, 0.88) : alpha(m.navy, 0.88),
-                                  textDecoration: blocked ? "line-through" : "none",
                                 }}
                               >
-                                {c.name}
-                              </Typography>
-                              {blocked ? (
-                                <Chip
-                                  label="Blocked"
-                                  size="small"
-                                  sx={{
-                                    height: 18,
-                                    borderRadius: "999px",
-                                    bgcolor: alpha(theme.palette.error.main, 0.12),
-                                    color: theme.palette.error.main,
-                                    fontSize: 10,
-                                    fontWeight: 800,
-                                    px: 0.5,
-                                  }}
-                                />
-                              ) : null}
-                              {c.hasNoShow ? (
-                                <Chip
-                                  label="No show"
-                                  size="small"
-                                  sx={{
-                                    height: 18,
-                                    borderRadius: "999px",
-                                    bgcolor: alpha("#7B1FA2", 0.12),
-                                    color: "#7B1FA2",
-                                    fontSize: 10,
-                                    fontWeight: 800,
-                                    px: 0.5,
-                                  }}
-                                />
-                              ) : null}
-                              {c.technicalNote?.trim() ? (
-                                <Tooltip title="View technical note" arrow>
-                                  <IconButton
-                                    size="small"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      openClientDetailsView(c.id, { focusTechnicalNote: true });
-                                    }}
+                                {c.name
+                                  .split(" ")
+                                  .map((p: string) => p[0])
+                                  .join("")
+                                  .slice(0, 2)
+                                  .toUpperCase()}
+                              </Avatar>
+                              <Box sx={{ minWidth: 0 }}>
+                                <Stack
+                                  direction="row"
+                                  spacing={0.75}
+                                  alignItems="center"
+                                >
+                                  <Typography
                                     sx={{
-                                      width: 22,
-                                      height: 22,
-                                      p: 0,
-                                      color: c.tags.includes("Mollure")
-                                        ? theme.palette.primary.main
-                                        : alpha(m.teal, 0.95),
-                                      "&:hover": {
-                                        bgcolor: alpha(
-                                          c.tags.includes("Mollure")
-                                            ? theme.palette.primary.main
-                                            : m.teal,
-                                          0.1,
-                                        ),
-                                      },
+                                      fontWeight: 900,
+                                      fontSize: 13,
+                                      color: blocked
+                                        ? alpha(theme.palette.error.main, 0.88)
+                                        : alpha(m.navy, 0.88),
+                                      textDecoration: blocked
+                                        ? "line-through"
+                                        : "none",
                                     }}
-                                    aria-label="View technical note"
                                   >
-                                    <StickyNote2OutlinedIcon sx={{ fontSize: 16 }} />
-                                  </IconButton>
-                                </Tooltip>
-                              ) : null}
+                                    {c.name}
+                                  </Typography>
+                                  {blocked ? (
+                                    <Chip
+                                      label="Blocked"
+                                      size="small"
+                                      sx={{
+                                        height: 18,
+                                        borderRadius: "999px",
+                                        bgcolor: alpha(
+                                          theme.palette.error.main,
+                                          0.12,
+                                        ),
+                                        color: theme.palette.error.main,
+                                        fontSize: 10,
+                                        fontWeight: 800,
+                                        px: 0.5,
+                                      }}
+                                    />
+                                  ) : null}
+                                  {c.hasNoShow ? (
+                                    <Chip
+                                      label="No show"
+                                      size="small"
+                                      sx={{
+                                        height: 18,
+                                        borderRadius: "999px",
+                                        bgcolor: alpha("#7B1FA2", 0.12),
+                                        color: "#7B1FA2",
+                                        fontSize: 10,
+                                        fontWeight: 800,
+                                        px: 0.5,
+                                      }}
+                                    />
+                                  ) : null}
+                                  {c.technicalNote?.trim() ? (
+                                    <Tooltip title="View technical note" arrow>
+                                      <IconButton
+                                        size="small"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          openClientDetailsView(c.id, {
+                                            focusTechnicalNote: true,
+                                          });
+                                        }}
+                                        sx={{
+                                          width: 22,
+                                          height: 22,
+                                          p: 0,
+                                          color: c.tags.includes("Mollure")
+                                            ? theme.palette.primary.main
+                                            : alpha(m.teal, 0.95),
+                                          "&:hover": {
+                                            bgcolor: alpha(
+                                              c.tags.includes("Mollure")
+                                                ? theme.palette.primary.main
+                                                : m.teal,
+                                              0.1,
+                                            ),
+                                          },
+                                        }}
+                                        aria-label="View technical note"
+                                      >
+                                        <StickyNote2OutlinedIcon
+                                          sx={{ fontSize: 16 }}
+                                        />
+                                      </IconButton>
+                                    </Tooltip>
+                                  ) : null}
+                                </Stack>
+                                <Typography
+                                  sx={{
+                                    fontSize: 11.5,
+                                    fontWeight: 600,
+                                    color: alpha(m.navy, 0.5),
+                                  }}
+                                >
+                                  {c.email}
+                                </Typography>
+                              </Box>
                             </Stack>
-                            <Typography sx={{ fontSize: 11.5, fontWeight: 600, color: alpha(m.navy, 0.50) }}>
-                              {c.email}
-                            </Typography>
-                          </Box>
-                        </Stack>
-                      </TableCell>
-                      <TableCell sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.72) }}>
-                        <Chip
-                          label={typeLabel}
-                          size="small"
-                          sx={{
-                            height: 20,
-                            borderRadius: "6px",
-                            fontSize: 10,
-                            fontWeight: 900,
-                            bgcolor: typeLabel === "CC" ? alpha(m.teal, 0.12) : alpha(m.navy, 0.06),
-                            color: typeLabel === "CC" ? m.teal : alpha(m.navy, 0.65),
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.72) }}>
-                        {platform}
-                      </TableCell>
-                      <TableCell sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.62) }}>
-                        {c.addedOn}
-                      </TableCell>
-                      <TableCell sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.75) }}>
-                        {c.phone}
-                      </TableCell>
-                      <TableCell sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.78) }}>
-                        {c.totalSales}
-                      </TableCell>
-                      <TableCell sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.75) }}>
-                        {c.lastBooking}
-                      </TableCell>
-                      <TableCell align="right">
-                        <IconButton
-                          size="small"
-                          onClick={(e) => setRowMenu({ id: c.id, anchor: e.currentTarget })}
-                          sx={{
-                            width: 30,
-                            height: 30,
-                            borderRadius: "8px",
-                            color: alpha(m.navy, 0.55),
-                          }}
-                        >
-                          <MoreVertRoundedIcon sx={{ fontSize: 18 }} />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                          </TableCell>
+                          <TableCell
+                            sx={{
+                              fontSize: 12,
+                              fontWeight: 800,
+                              color: alpha(m.navy, 0.72),
+                            }}
+                          >
+                            <Chip
+                              label={typeLabel}
+                              size="small"
+                              sx={{
+                                height: 20,
+                                borderRadius: "6px",
+                                fontSize: 10,
+                                fontWeight: 900,
+                                bgcolor:
+                                  typeLabel === "CC"
+                                    ? alpha(m.teal, 0.12)
+                                    : alpha(m.navy, 0.06),
+                                color:
+                                  typeLabel === "CC"
+                                    ? m.teal
+                                    : alpha(m.navy, 0.65),
+                              }}
+                            />
+                          </TableCell>
+                          <TableCell
+                            sx={{
+                              fontSize: 12,
+                              fontWeight: 700,
+                              color: alpha(m.navy, 0.72),
+                            }}
+                          >
+                            {platform}
+                          </TableCell>
+                          <TableCell
+                            sx={{
+                              fontSize: 12,
+                              fontWeight: 700,
+                              color: alpha(m.navy, 0.62),
+                            }}
+                          >
+                            {c.addedOn}
+                          </TableCell>
+                          <TableCell
+                            sx={{
+                              fontSize: 12.5,
+                              fontWeight: 700,
+                              color: alpha(m.navy, 0.75),
+                            }}
+                          >
+                            {c.phone}
+                          </TableCell>
+                          <TableCell
+                            sx={{
+                              fontSize: 12.5,
+                              fontWeight: 800,
+                              color: alpha(m.navy, 0.78),
+                            }}
+                          >
+                            {c.totalSales}
+                          </TableCell>
+                          <TableCell
+                            sx={{
+                              fontSize: 12.5,
+                              fontWeight: 700,
+                              color: alpha(m.navy, 0.75),
+                            }}
+                          >
+                            {c.lastBooking}
+                          </TableCell>
+                          <TableCell align="right">
+                            <IconButton
+                              size="small"
+                              onClick={(e) =>
+                                setRowMenu({
+                                  id: c.id,
+                                  anchor: e.currentTarget,
+                                })
+                              }
+                              sx={{
+                                width: 30,
+                                height: 30,
+                                borderRadius: "8px",
+                                color: alpha(m.navy, 0.55),
+                              }}
+                            >
+                              <MoreVertRoundedIcon sx={{ fontSize: 18 }} />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
             )}
           </ClientListDataCard>
         </Box>
@@ -598,7 +729,7 @@ export default function FixedLocationClientPage() {
           PaperProps={{
             sx: {
               borderRadius: "10px",
-              border: `1px solid ${alpha(m.navy, 0.10)}`,
+              border: `1px solid ${alpha(m.navy, 0.1)}`,
               boxShadow: "0 14px 30px rgba(16,35,63,0.12)",
               mt: 0.75,
               minWidth: 140,
@@ -634,7 +765,10 @@ export default function FixedLocationClientPage() {
                 borderRadius: "8px",
                 fontSize: 12.5,
                 fontWeight: 700,
-                color: opt === "Delete" ? theme.palette.error.main : alpha(m.navy, 0.75),
+                color:
+                  opt === "Delete"
+                    ? theme.palette.error.main
+                    : alpha(m.navy, 0.75),
                 my: 0.25,
               }}
             >
@@ -654,25 +788,22 @@ export default function FixedLocationClientPage() {
         contentMinHeight={250}
         headerTone="danger"
         footer={
-          <Stack direction="row" spacing={1} justifyContent="center" sx={{ px: 2.5, py: 2 }}>
-            <Button
+          <Stack
+            direction="row"
+            spacing={1}
+            justifyContent="center"
+            sx={{ px: 2.5, py: 2 }}
+          >
+            <AppButton
+              tone="secondary"
               onClick={() => setBlockClientId(null)}
-              variant="outlined"
               sx={{
-                borderRadius: "8px",
-                textTransform: "none",
-                fontWeight: 800,
-                borderColor: alpha(m.navy, 0.14),
-                color: alpha(m.navy, 0.72),
-                bgcolor: "#fff",
                 height: 34,
-                px: 2.25,
-                minWidth: 92,
               }}
             >
               Cancel
-            </Button>
-            <Button
+            </AppButton>
+            <AppButton
               variant="contained"
               disableElevation
               onClick={confirmBlockClient}
@@ -689,18 +820,32 @@ export default function FixedLocationClientPage() {
               }}
             >
               Block
-            </Button>
+            </AppButton>
           </Stack>
         }
       >
         <Box sx={{ px: 2.5, py: 3, textAlign: "center" }}>
-          <Typography sx={{ fontWeight: 900, color: alpha(m.navy, 0.80), fontSize: 15, lineHeight: 1.25 }}>
+          <Typography
+            sx={{
+              fontWeight: 900,
+              color: alpha(m.navy, 0.8),
+              fontSize: 15,
+              lineHeight: 1.25,
+            }}
+          >
             Blocked Clients can&apos;t book
             <br />
             appointment or message you
           </Typography>
           {blockClient && (
-            <Typography sx={{ mt: 1.25, fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.48) }}>
+            <Typography
+              sx={{
+                mt: 1.25,
+                fontSize: 12,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.48),
+              }}
+            >
               {blockClient.name}
             </Typography>
           )}
@@ -717,25 +862,22 @@ export default function FixedLocationClientPage() {
         contentMinHeight={260}
         headerTone="danger"
         footer={
-          <Stack direction="row" spacing={1} justifyContent="center" sx={{ px: 2.5, py: 2 }}>
-            <Button
+          <Stack
+            direction="row"
+            spacing={1}
+            justifyContent="center"
+            sx={{ px: 2.5, py: 2 }}
+          >
+            <AppButton
+              tone="secondary"
               onClick={() => setDeleteClientId(null)}
-              variant="outlined"
               sx={{
-                borderRadius: "8px",
-                textTransform: "none",
-                fontWeight: 800,
-                borderColor: alpha(m.navy, 0.14),
-                color: alpha(m.navy, 0.72),
-                bgcolor: "#fff",
                 height: 34,
-                px: 2.25,
-                minWidth: 92,
               }}
             >
               Cancel
-            </Button>
-            <Button
+            </AppButton>
+            <AppButton
               variant="contained"
               disableElevation
               onClick={confirmDeleteClient}
@@ -751,7 +893,7 @@ export default function FixedLocationClientPage() {
               }}
             >
               Delete
-            </Button>
+            </AppButton>
           </Stack>
         }
       >
@@ -763,7 +905,7 @@ export default function FixedLocationClientPage() {
               borderRadius: "14px",
               mx: "auto",
               mb: 1.25,
-              bgcolor: alpha("#E53935", 0.10),
+              bgcolor: alpha("#E53935", 0.1),
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -771,7 +913,14 @@ export default function FixedLocationClientPage() {
           >
             <WarningAmberRoundedIcon sx={{ fontSize: 26, color: "#E53935" }} />
           </Box>
-          <Typography sx={{ fontWeight: 900, color: alpha(m.navy, 0.80), fontSize: 15, lineHeight: 1.25 }}>
+          <Typography
+            sx={{
+              fontWeight: 900,
+              color: alpha(m.navy, 0.8),
+              fontSize: 15,
+              lineHeight: 1.25,
+            }}
+          >
             Deleting this client will
             <br />
             permanently remove their
@@ -779,7 +928,14 @@ export default function FixedLocationClientPage() {
             booking history and analytics.
           </Typography>
           {deleteClient && (
-            <Typography sx={{ mt: 1.25, fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.48) }}>
+            <Typography
+              sx={{
+                mt: 1.25,
+                fontSize: 12,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.48),
+              }}
+            >
               {deleteClient.name}
             </Typography>
           )}
@@ -791,32 +947,35 @@ export default function FixedLocationClientPage() {
         anchor="right"
         open={Boolean(viewClient)}
         onClose={closeClientDetailsDrawer}
-        title={clientDetailsMode === "edit" ? "Edit Client Details" : "Client Details"}
+        title={
+          clientDetailsMode === "edit"
+            ? "Edit Client Details"
+            : "Client Details"
+        }
         contentSx={{
           bgcolor: alpha(m.navy, 0.03),
           p: 0,
         }}
-        onBack={clientDetailsMode === "edit" ? () => setClientDetailsMode("view") : undefined}
+        onBack={
+          clientDetailsMode === "edit"
+            ? () => setClientDetailsMode("view")
+            : undefined
+        }
         footer={
           clientDetailsMode === "edit" ? (
-            <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ px: 2.5, py: 2 }}>
-              <Button
+            <Stack
+              direction="row"
+              spacing={1}
+              justifyContent="flex-end"
+              sx={{ px: 2.5, py: 2 }}
+            >
+              <AppButton
+                tone="secondary"
                 onClick={() => setClientDetailsMode("view")}
-                variant="outlined"
-                sx={{
-                  borderRadius: "8px",
-                  textTransform: "none",
-                  fontWeight: 800,
-                  borderColor: alpha(m.navy, 0.14),
-                  color: alpha(m.navy, 0.72),
-                  bgcolor: "#fff",
-                  height: 36,
-                  px: 2.25,
-                }}
               >
                 Cancel
-              </Button>
-              <Button
+              </AppButton>
+              <AppButton
                 variant="contained"
                 disableElevation
                 onClick={saveClientEdits}
@@ -832,14 +991,14 @@ export default function FixedLocationClientPage() {
                 }}
               >
                 Update
-              </Button>
+              </AppButton>
             </Stack>
           ) : null
         }
       >
         {viewClient ? (
           <>
-              {clientDetailsMode === "edit" && viewClient.kind === "company" ? (
+            {clientDetailsMode === "edit" && viewClient.kind === "company" ? (
               <Box sx={{ px: 2.5, py: 2 }}>
                 <Stack spacing={1.5}>
                   <Paper
@@ -871,8 +1030,20 @@ export default function FixedLocationClientPage() {
                           .toUpperCase()}
                       </Avatar>
                       <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
-                          <Typography sx={{ fontWeight: 900, fontSize: 13.5, color: alpha(m.navy, 0.88) }}>
+                        <Stack
+                          direction="row"
+                          spacing={0.75}
+                          alignItems="center"
+                          flexWrap="wrap"
+                          useFlexGap
+                        >
+                          <Typography
+                            sx={{
+                              fontWeight: 900,
+                              fontSize: 13.5,
+                              color: alpha(m.navy, 0.88),
+                            }}
+                          >
                             {viewClient.name}
                           </Typography>
                           {viewClient.tags.includes("CC") && (
@@ -894,7 +1065,14 @@ export default function FixedLocationClientPage() {
                             </Box>
                           )}
                         </Stack>
-                        <Typography sx={{ fontSize: 11.5, fontWeight: 600, color: alpha(m.navy, 0.5), mt: 0.25 }}>
+                        <Typography
+                          sx={{
+                            fontSize: 11.5,
+                            fontWeight: 600,
+                            color: alpha(m.navy, 0.5),
+                            mt: 0.25,
+                          }}
+                        >
                           {viewClient.email}
                         </Typography>
                       </Box>
@@ -905,43 +1083,75 @@ export default function FixedLocationClientPage() {
                     <MollureFormField
                       placeholder="Legal Name"
                       value={editCompanyForm.legalName}
-                      onChange={(e) => setEditCompanyForm((p) => ({ ...p, legalName: e.target.value }))}
+                      onChange={(e) =>
+                        setEditCompanyForm((p) => ({
+                          ...p,
+                          legalName: e.target.value,
+                        }))
+                      }
                       sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     />
                     <MollureFormField
                       placeholder="COC"
                       value={editCompanyForm.coc}
-                      onChange={(e) => setEditCompanyForm((p) => ({ ...p, coc: e.target.value }))}
+                      onChange={(e) =>
+                        setEditCompanyForm((p) => ({
+                          ...p,
+                          coc: e.target.value,
+                        }))
+                      }
                       sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     />
                     <MollureFormField
                       placeholder="VAT"
                       value={editCompanyForm.vat}
-                      onChange={(e) => setEditCompanyForm((p) => ({ ...p, vat: e.target.value }))}
+                      onChange={(e) =>
+                        setEditCompanyForm((p) => ({
+                          ...p,
+                          vat: e.target.value,
+                        }))
+                      }
                       sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     />
                     <MollureFormField
                       placeholder="Contact Person's First Name"
                       value={editCompanyForm.contactFirst}
-                      onChange={(e) => setEditCompanyForm((p) => ({ ...p, contactFirst: e.target.value }))}
+                      onChange={(e) =>
+                        setEditCompanyForm((p) => ({
+                          ...p,
+                          contactFirst: e.target.value,
+                        }))
+                      }
                       sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     />
                     <MollureFormField
                       placeholder="Contact Person's Last Name"
                       value={editCompanyForm.contactLast}
-                      onChange={(e) => setEditCompanyForm((p) => ({ ...p, contactLast: e.target.value }))}
+                      onChange={(e) =>
+                        setEditCompanyForm((p) => ({
+                          ...p,
+                          contactLast: e.target.value,
+                        }))
+                      }
                       sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     />
                     <MollureFormField
                       select
                       label="Gender"
                       value={editCompanyForm.gender}
-                      onChange={(e) => setEditCompanyForm((p) => ({ ...p, gender: e.target.value }))}
+                      onChange={(e) =>
+                        setEditCompanyForm((p) => ({
+                          ...p,
+                          gender: e.target.value,
+                        }))
+                      }
                       sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                       SelectProps={genderSelectProps}
                     >
                       <MenuItem value="">
-                        <Typography sx={{ color: alpha(m.navy, 0.5) }}>Select gender</Typography>
+                        <Typography sx={{ color: alpha(m.navy, 0.5) }}>
+                          Select gender
+                        </Typography>
                       </MenuItem>
                       {GENDER_MENU_OPTIONS.map((opt) => (
                         <MenuItem key={opt.value} value={opt.value}>
@@ -954,16 +1164,28 @@ export default function FixedLocationClientPage() {
                       countryCode={editCompanyForm.countryCode}
                       phone={editCompanyForm.phone}
                       onCountryCodeChange={(dialCode) =>
-                        setEditCompanyForm((p) => ({ ...p, countryCode: dialCode }))
+                        setEditCompanyForm((p) => ({
+                          ...p,
+                          countryCode: dialCode,
+                        }))
                       }
-                      onPhoneChange={(phone) => setEditCompanyForm((p) => ({ ...p, phone }))}
+                      onPhoneChange={(phone) =>
+                        setEditCompanyForm((p) => ({ ...p, phone }))
+                      }
                       countryCodeError={editPhoneErrors.countryCode}
                       phoneError={editPhoneErrors.phone}
                       onClearErrors={() => setEditPhoneErrors({})}
                       phonePlaceholder="+442xxxxxxxxxxx"
                     />
 
-                    <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.62), pt: 0.5 }}>
+                    <Typography
+                      sx={{
+                        fontSize: 11.5,
+                        fontWeight: 700,
+                        color: alpha(m.navy, 0.62),
+                        pt: 0.5,
+                      }}
+                    >
                       Business Address
                     </Typography>
                     <Grid container spacing={1}>
@@ -971,34 +1193,67 @@ export default function FixedLocationClientPage() {
                         <MollureFormField
                           placeholder="Street"
                           value={editCompanyForm.street}
-                          onChange={(e) => setEditCompanyForm((p) => ({ ...p, street: e.target.value }))}
-                          sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                          onChange={(e) =>
+                            setEditCompanyForm((p) => ({
+                              ...p,
+                              street: e.target.value,
+                            }))
+                          }
+                          sx={{
+                            "& .MuiOutlinedInput-root": { bgcolor: "#fff" },
+                          }}
                         />
                       </Grid>
                       <Grid item xs={12} md={4}>
                         <MollureFormField
                           placeholder="Number"
                           value={editCompanyForm.streetNumber}
-                          onChange={(e) => setEditCompanyForm((p) => ({ ...p, streetNumber: e.target.value }))}
-                          sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                          onChange={(e) =>
+                            setEditCompanyForm((p) => ({
+                              ...p,
+                              streetNumber: e.target.value,
+                            }))
+                          }
+                          sx={{
+                            "& .MuiOutlinedInput-root": { bgcolor: "#fff" },
+                          }}
                         />
                       </Grid>
                       <Grid item xs={12} md={6}>
                         <MollureFormField
                           placeholder="Postal Code"
                           value={editCompanyForm.postal}
-                          onChange={(e) => setEditCompanyForm((p) => ({ ...p, postal: e.target.value }))}
-                          sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                          onChange={(e) =>
+                            setEditCompanyForm((p) => ({
+                              ...p,
+                              postal: e.target.value,
+                            }))
+                          }
+                          sx={{
+                            "& .MuiOutlinedInput-root": { bgcolor: "#fff" },
+                          }}
                         />
                       </Grid>
                       <Grid item xs={12} md={6}>
                         <MollureFormField
                           select
                           value={editCompanyForm.province || "Province"}
-                          onChange={(e) => setEditCompanyForm((p) => ({ ...p, province: e.target.value }))}
-                          sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                          onChange={(e) =>
+                            setEditCompanyForm((p) => ({
+                              ...p,
+                              province: e.target.value,
+                            }))
+                          }
+                          sx={{
+                            "& .MuiOutlinedInput-root": { bgcolor: "#fff" },
+                          }}
                         >
-                          {["Province", "North Holland", "South Holland", "Utrecht"].map((o) => (
+                          {[
+                            "Province",
+                            "North Holland",
+                            "South Holland",
+                            "Utrecht",
+                          ].map((o) => (
                             <MenuItem key={o} value={o === "Province" ? "" : o}>
                               {o}
                             </MenuItem>
@@ -1009,11 +1264,26 @@ export default function FixedLocationClientPage() {
                         <MollureFormField
                           select
                           value={editCompanyForm.municipality || "Municipality"}
-                          onChange={(e) => setEditCompanyForm((p) => ({ ...p, municipality: e.target.value }))}
-                          sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                          onChange={(e) =>
+                            setEditCompanyForm((p) => ({
+                              ...p,
+                              municipality: e.target.value,
+                            }))
+                          }
+                          sx={{
+                            "& .MuiOutlinedInput-root": { bgcolor: "#fff" },
+                          }}
                         >
-                          {["Municipality", "Amsterdam", "Rotterdam", "Utrecht"].map((o) => (
-                            <MenuItem key={o} value={o === "Municipality" ? "" : o}>
+                          {[
+                            "Municipality",
+                            "Amsterdam",
+                            "Rotterdam",
+                            "Utrecht",
+                          ].map((o) => (
+                            <MenuItem
+                              key={o}
+                              value={o === "Municipality" ? "" : o}
+                            >
                               {o}
                             </MenuItem>
                           ))}
@@ -1024,11 +1294,23 @@ export default function FixedLocationClientPage() {
                     <MollureFormField
                       placeholder="Email Address"
                       value={editCompanyForm.email}
-                      onChange={(e) => setEditCompanyForm((p) => ({ ...p, email: e.target.value }))}
+                      onChange={(e) =>
+                        setEditCompanyForm((p) => ({
+                          ...p,
+                          email: e.target.value,
+                        }))
+                      }
                       sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     />
 
-                    <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.86), pt: 0.5 }}>
+                    <Typography
+                      sx={{
+                        fontSize: 12.5,
+                        fontWeight: 800,
+                        color: alpha(m.navy, 0.86),
+                        pt: 0.5,
+                      }}
+                    >
                       Technical Note (Optional)
                     </Typography>
                     <MollureFormField
@@ -1036,13 +1318,19 @@ export default function FixedLocationClientPage() {
                       minRows={4}
                       placeholder="Any Technical note about Client"
                       value={editCompanyForm.technicalNote}
-                      onChange={(e) => setEditCompanyForm((p) => ({ ...p, technicalNote: e.target.value }))}
+                      onChange={(e) =>
+                        setEditCompanyForm((p) => ({
+                          ...p,
+                          technicalNote: e.target.value,
+                        }))
+                      }
                       sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     />
                   </Stack>
                 </Stack>
               </Box>
-              ) : clientDetailsMode === "edit" && viewClient.kind === "individual" ? (
+            ) : clientDetailsMode === "edit" &&
+              viewClient.kind === "individual" ? (
               <Box sx={{ px: 2.5, py: 2 }}>
                 <Stack spacing={1.5}>
                   <Paper
@@ -1074,8 +1362,20 @@ export default function FixedLocationClientPage() {
                           .toUpperCase()}
                       </Avatar>
                       <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" useFlexGap>
-                          <Typography sx={{ fontWeight: 900, fontSize: 13.5, color: alpha(m.navy, 0.88) }}>
+                        <Stack
+                          direction="row"
+                          spacing={0.75}
+                          alignItems="center"
+                          flexWrap="wrap"
+                          useFlexGap
+                        >
+                          <Typography
+                            sx={{
+                              fontWeight: 900,
+                              fontSize: 13.5,
+                              color: alpha(m.navy, 0.88),
+                            }}
+                          >
                             {viewClient.name}
                           </Typography>
                           {viewClient.tags.includes("CC") && (
@@ -1097,7 +1397,14 @@ export default function FixedLocationClientPage() {
                             </Box>
                           )}
                         </Stack>
-                        <Typography sx={{ fontSize: 11.5, fontWeight: 600, color: alpha(m.navy, 0.5), mt: 0.25 }}>
+                        <Typography
+                          sx={{
+                            fontSize: 11.5,
+                            fontWeight: 600,
+                            color: alpha(m.navy, 0.5),
+                            mt: 0.25,
+                          }}
+                        >
                           {viewClient.email}
                         </Typography>
                       </Box>
@@ -1108,25 +1415,42 @@ export default function FixedLocationClientPage() {
                     <MollureFormField
                       placeholder="First Name"
                       value={editIndividualForm.firstName}
-                      onChange={(e) => setEditIndividualForm((p) => ({ ...p, firstName: e.target.value }))}
+                      onChange={(e) =>
+                        setEditIndividualForm((p) => ({
+                          ...p,
+                          firstName: e.target.value,
+                        }))
+                      }
                       sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     />
                     <MollureFormField
                       placeholder="Last Name"
                       value={editIndividualForm.lastName}
-                      onChange={(e) => setEditIndividualForm((p) => ({ ...p, lastName: e.target.value }))}
+                      onChange={(e) =>
+                        setEditIndividualForm((p) => ({
+                          ...p,
+                          lastName: e.target.value,
+                        }))
+                      }
                       sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     />
                     <MollureFormField
                       select
                       label="Gender"
                       value={editIndividualForm.gender}
-                      onChange={(e) => setEditIndividualForm((p) => ({ ...p, gender: e.target.value }))}
+                      onChange={(e) =>
+                        setEditIndividualForm((p) => ({
+                          ...p,
+                          gender: e.target.value,
+                        }))
+                      }
                       sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                       SelectProps={genderSelectProps}
                     >
                       <MenuItem value="">
-                        <Typography sx={{ color: alpha(m.navy, 0.5) }}>Select gender</Typography>
+                        <Typography sx={{ color: alpha(m.navy, 0.5) }}>
+                          Select gender
+                        </Typography>
                       </MenuItem>
                       {GENDER_MENU_OPTIONS.map((opt) => (
                         <MenuItem key={opt.value} value={opt.value}>
@@ -1135,12 +1459,21 @@ export default function FixedLocationClientPage() {
                       ))}
                     </MollureFormField>
                     <Box sx={{ pt: 0.25 }}>
-                      <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
+                      <Typography
+                        sx={{
+                          fontSize: 11.5,
+                          fontWeight: 700,
+                          color: alpha(m.navy, 0.62),
+                          mb: 0.75,
+                        }}
+                      >
                         Date of Birth
                       </Typography>
                       <AppDatePicker
                         value={normalizeDateToIso(editIndividualForm.dob)}
-                        onChange={(iso) => setEditIndividualForm((p) => ({ ...p, dob: iso }))}
+                        onChange={(iso) =>
+                          setEditIndividualForm((p) => ({ ...p, dob: iso }))
+                        }
                         max={(() => {
                           const d = new Date();
                           return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -1152,9 +1485,14 @@ export default function FixedLocationClientPage() {
                       countryCode={editIndividualForm.countryCode}
                       phone={editIndividualForm.phone}
                       onCountryCodeChange={(dialCode) =>
-                        setEditIndividualForm((p) => ({ ...p, countryCode: dialCode }))
+                        setEditIndividualForm((p) => ({
+                          ...p,
+                          countryCode: dialCode,
+                        }))
                       }
-                      onPhoneChange={(phone) => setEditIndividualForm((p) => ({ ...p, phone }))}
+                      onPhoneChange={(phone) =>
+                        setEditIndividualForm((p) => ({ ...p, phone }))
+                      }
                       countryCodeError={editPhoneErrors.countryCode}
                       phoneError={editPhoneErrors.phone}
                       onClearErrors={() => setEditPhoneErrors({})}
@@ -1163,16 +1501,33 @@ export default function FixedLocationClientPage() {
                     <MollureFormField
                       placeholder="Residential Address"
                       value={editIndividualForm.residentialAddress}
-                      onChange={(e) => setEditIndividualForm((p) => ({ ...p, residentialAddress: e.target.value }))}
+                      onChange={(e) =>
+                        setEditIndividualForm((p) => ({
+                          ...p,
+                          residentialAddress: e.target.value,
+                        }))
+                      }
                       sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     />
                     <MollureFormField
                       placeholder="Email Address"
                       value={editIndividualForm.email}
-                      onChange={(e) => setEditIndividualForm((p) => ({ ...p, email: e.target.value }))}
+                      onChange={(e) =>
+                        setEditIndividualForm((p) => ({
+                          ...p,
+                          email: e.target.value,
+                        }))
+                      }
                       sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     />
-                    <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.86), pt: 0.5 }}>
+                    <Typography
+                      sx={{
+                        fontSize: 12.5,
+                        fontWeight: 800,
+                        color: alpha(m.navy, 0.86),
+                        pt: 0.5,
+                      }}
+                    >
                       Technical Note (Optional)
                     </Typography>
                     <MollureFormField
@@ -1180,21 +1535,30 @@ export default function FixedLocationClientPage() {
                       minRows={4}
                       placeholder="Any Technical note about Client"
                       value={editIndividualForm.technicalNote}
-                      onChange={(e) => setEditIndividualForm((p) => ({ ...p, technicalNote: e.target.value }))}
+                      onChange={(e) =>
+                        setEditIndividualForm((p) => ({
+                          ...p,
+                          technicalNote: e.target.value,
+                        }))
+                      }
                       sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     />
                   </Stack>
                 </Stack>
               </Box>
-              ) : (
-                <ClientDetailsViewPanel
-                  client={viewClient}
-                  onEdit={viewClient.tags.includes("Mollure") ? undefined : openClientDetailsEdit}
-                  onSaveTechnicalNote={saveClientTechnicalNote}
-                  focusTechnicalNote={focusTechnicalNoteOnOpen}
-                  onTechnicalNoteFocused={clearTechnicalNoteFocus}
-                />
-              )}
+            ) : (
+              <ClientDetailsViewPanel
+                client={viewClient}
+                onEdit={
+                  viewClient.tags.includes("Mollure")
+                    ? undefined
+                    : openClientDetailsEdit
+                }
+                onSaveTechnicalNote={saveClientTechnicalNote}
+                focusTechnicalNote={focusTechnicalNoteOnOpen}
+                onTechnicalNoteFocused={clearTechnicalNoteFocus}
+              />
+            )}
           </>
         ) : null}
       </AppDrawer>
@@ -1208,24 +1572,19 @@ export default function FixedLocationClientPage() {
         title="Add Mollure Client"
         contentMinHeight={360}
         footer={
-          <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ px: 2.5, py: 2 }}>
-            <Button
+          <Stack
+            direction="row"
+            spacing={1}
+            justifyContent="flex-end"
+            sx={{ px: 2.5, py: 2 }}
+          >
+            <AppButton
+              tone="secondary"
               onClick={() => setAddMollureOpen(false)}
-              variant="outlined"
-              sx={{
-                borderRadius: "8px",
-                textTransform: "none",
-                fontWeight: 800,
-                borderColor: alpha(m.navy, 0.14),
-                color: alpha(m.navy, 0.72),
-                bgcolor: "#fff",
-                height: 36,
-                px: 2.25,
-              }}
             >
               Cancel
-            </Button>
-            <Button
+            </AppButton>
+            <AppButton
               variant="contained"
               disableElevation
               disabled={!selectedMollureId}
@@ -1242,17 +1601,32 @@ export default function FixedLocationClientPage() {
               }}
             >
               Add to Client List
-            </Button>
+            </AppButton>
           </Stack>
         }
       >
         <Box sx={{ px: 2.5, pb: 2 }}>
           <Box>
-            <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.55), mb: 0.75 }}>
+            <Typography
+              sx={{
+                fontSize: 11.5,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.55),
+                mb: 0.75,
+              }}
+            >
               Search on Mollure by email
             </Typography>
-            <Typography sx={{ fontSize: 11, fontWeight: 600, color: alpha(m.navy, 0.45), mb: 1 }}>
-              Only clients with a confirmed or completed booking with you can be added.
+            <Typography
+              sx={{
+                fontSize: 11,
+                fontWeight: 600,
+                color: alpha(m.navy, 0.45),
+                mb: 1,
+              }}
+            >
+              Only clients with a confirmed or completed booking with you can be
+              added.
             </Typography>
             <MollureFormField
               placeholder="Search by email"
@@ -1260,7 +1634,11 @@ export default function FixedLocationClientPage() {
               onChange={(e) => setMollureSearch(e.target.value)}
               sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
               InputProps={{
-                endAdornment: <SearchRoundedIcon sx={{ fontSize: 18, color: alpha(m.navy, 0.45) }} />,
+                endAdornment: (
+                  <SearchRoundedIcon
+                    sx={{ fontSize: 18, color: alpha(m.navy, 0.45) }}
+                  />
+                ),
               }}
             />
           </Box>
@@ -1269,77 +1647,106 @@ export default function FixedLocationClientPage() {
             sx={{
               mt: 1.5,
               borderRadius: "12px",
-              border: `1px solid ${alpha(m.navy, 0.10)}`,
+              border: `1px solid ${alpha(m.navy, 0.1)}`,
               overflow: "hidden",
               bgcolor: "#fff",
             }}
           >
             {mollureResults.length === 0 ? (
               <Box sx={{ px: 1.6, py: 2.5, textAlign: "center" }}>
-                <Typography sx={{ fontSize: 12, fontWeight: 700, color: alpha(m.navy, 0.5) }}>
-                  No eligible Mollure clients found. Clients need a confirmed or completed booking first.
+                <Typography
+                  sx={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.5),
+                  }}
+                >
+                  No eligible Mollure clients found. Clients need a confirmed or
+                  completed booking first.
                 </Typography>
               </Box>
             ) : (
-            mollureResults.slice(0, 5).map((r, idx) => (
-              <Box
-                key={r.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => setSelectedMollureId(r.id)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") setSelectedMollureId(r.id);
-                }}
-                sx={{
-                  px: 1.6,
-                  py: 1.15,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 1.1,
-                  bgcolor: selectedMollureId === r.id ? alpha(theme.palette.primary.main, 0.06) : "#fff",
-                  "&:hover": { bgcolor: alpha(m.navy, 0.03) },
-                  ...(idx > 0 ? { borderTop: `1px solid ${alpha(m.navy, 0.08)}` } : null),
-                }}
-              >
-                <Avatar
+              mollureResults.slice(0, 5).map((r, idx) => (
+                <Box
+                  key={r.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelectedMollureId(r.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ")
+                      setSelectedMollureId(r.id);
+                  }}
                   sx={{
-                    width: 30,
-                    height: 30,
-                    bgcolor: alpha(m.navy, 0.08),
-                    color: alpha(m.navy, 0.78),
-                    fontWeight: 800,
-                    fontSize: 12,
+                    px: 1.6,
+                    py: 1.15,
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1.1,
+                    bgcolor:
+                      selectedMollureId === r.id
+                        ? alpha(theme.palette.primary.main, 0.06)
+                        : "#fff",
+                    "&:hover": { bgcolor: alpha(m.navy, 0.03) },
+                    ...(idx > 0
+                      ? { borderTop: `1px solid ${alpha(m.navy, 0.08)}` }
+                      : null),
                   }}
                 >
-                  {r.name
-                    .split(" ")
-                    .map((p: string) => p[0])
-                    .join("")
-                    .slice(0, 2)
-                    .toUpperCase()}
-                </Avatar>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Stack direction="row" spacing={0.75} alignItems="center">
-                    <Typography sx={{ fontWeight: 900, fontSize: 12.5, color: alpha(m.navy, 0.86) }}>{r.name}</Typography>
-                    <Chip
-                      label="Mollure"
-                      size="small"
+                  <Avatar
+                    sx={{
+                      width: 30,
+                      height: 30,
+                      bgcolor: alpha(m.navy, 0.08),
+                      color: alpha(m.navy, 0.78),
+                      fontWeight: 800,
+                      fontSize: 12,
+                    }}
+                  >
+                    {r.name
+                      .split(" ")
+                      .map((p: string) => p[0])
+                      .join("")
+                      .slice(0, 2)
+                      .toUpperCase()}
+                  </Avatar>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Stack direction="row" spacing={0.75} alignItems="center">
+                      <Typography
+                        sx={{
+                          fontWeight: 900,
+                          fontSize: 12.5,
+                          color: alpha(m.navy, 0.86),
+                        }}
+                      >
+                        {r.name}
+                      </Typography>
+                      <Chip
+                        label="Mollure"
+                        size="small"
+                        sx={{
+                          height: 18,
+                          borderRadius: "999px",
+                          bgcolor: alpha(theme.palette.primary.main, 0.1),
+                          color: theme.palette.primary.main,
+                          fontSize: 10,
+                          fontWeight: 800,
+                          px: 0.5,
+                        }}
+                      />
+                    </Stack>
+                    <Typography
                       sx={{
-                        height: 18,
-                        borderRadius: "999px",
-                        bgcolor: alpha(theme.palette.primary.main, 0.10),
-                        color: theme.palette.primary.main,
-                        fontSize: 10,
-                        fontWeight: 800,
-                        px: 0.5,
+                        fontSize: 11.5,
+                        fontWeight: 600,
+                        color: alpha(m.navy, 0.5),
                       }}
-                    />
-                  </Stack>
-                  <Typography sx={{ fontSize: 11.5, fontWeight: 600, color: alpha(m.navy, 0.50) }}>{r.email}</Typography>
+                    >
+                      {r.email}
+                    </Typography>
+                  </Box>
                 </Box>
-              </Box>
-            ))
+              ))
             )}
           </Box>
         </Box>
@@ -1352,24 +1759,19 @@ export default function FixedLocationClientPage() {
         onClose={() => setAddNonMollureOpen(false)}
         title="Add Non-Mollure Client"
         footer={
-          <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ px: 2.5, py: 2 }}>
-            <Button
+          <Stack
+            direction="row"
+            spacing={1}
+            justifyContent="flex-end"
+            sx={{ px: 2.5, py: 2 }}
+          >
+            <AppButton
+              tone="secondary"
               onClick={() => setAddNonMollureOpen(false)}
-              variant="outlined"
-              sx={{
-                borderRadius: "8px",
-                textTransform: "none",
-                fontWeight: 800,
-                borderColor: alpha(m.navy, 0.14),
-                color: alpha(m.navy, 0.72),
-                bgcolor: "#fff",
-                height: 36,
-                px: 2.25,
-              }}
             >
               Cancel
-            </Button>
-            <Button
+            </AppButton>
+            <AppButton
               variant="contained"
               disableElevation
               onClick={() => {
@@ -1387,14 +1789,21 @@ export default function FixedLocationClientPage() {
               }}
             >
               Save
-            </Button>
+            </AppButton>
           </Stack>
         }
       >
         <Box sx={{ px: 2.5, py: 2 }}>
           <Stack spacing={2}>
             <Box>
-              <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
+              <Typography
+                sx={{
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  color: alpha(m.navy, 0.62),
+                  mb: 0.75,
+                }}
+              >
                 Client Type
               </Typography>
               <MollureFormField
@@ -1402,7 +1811,8 @@ export default function FixedLocationClientPage() {
                 value={nonMollureClientType}
                 onChange={(e) => {
                   const raw = e.target.value;
-                  const nextType = raw as "" | "Individual Client" | "Company Client";
+                  const nextType = raw as
+                    "" | "Individual Client" | "Company Client";
                   setNonMollureClientType(nextType);
                   setNonMollureTypeError("");
                   setIndErrors({});
@@ -1414,7 +1824,9 @@ export default function FixedLocationClientPage() {
                 SelectProps={clientTypeSelectProps}
               >
                 <MenuItem value="">
-                  <Typography sx={{ color: alpha(m.navy, 0.5) }}>Select client type</Typography>
+                  <Typography sx={{ color: alpha(m.navy, 0.5) }}>
+                    Select client type
+                  </Typography>
                 </MenuItem>
                 <MenuItem value="Individual Client">Individual Client</MenuItem>
                 <MenuItem value="Company Client">Company Client</MenuItem>
@@ -1458,7 +1870,9 @@ export default function FixedLocationClientPage() {
                   SelectProps={genderSelectProps}
                 >
                   <MenuItem value="">
-                    <Typography sx={{ color: alpha(m.navy, 0.5) }}>Select gender</Typography>
+                    <Typography sx={{ color: alpha(m.navy, 0.5) }}>
+                      Select gender
+                    </Typography>
                   </MenuItem>
                   {GENDER_MENU_OPTIONS.map((opt) => (
                     <MenuItem key={opt.value} value={opt.value}>
@@ -1468,7 +1882,14 @@ export default function FixedLocationClientPage() {
                 </MollureFormField>
 
                 <Box sx={{ pt: 0.25 }}>
-                  <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 0.75 }}>
+                  <Typography
+                    sx={{
+                      fontSize: 11.5,
+                      fontWeight: 700,
+                      color: alpha(m.navy, 0.62),
+                      mb: 0.75,
+                    }}
+                  >
                     Date of Birth
                   </Typography>
                   <AppDatePicker
@@ -1492,7 +1913,13 @@ export default function FixedLocationClientPage() {
                   onPhoneChange={setIndPhone}
                   countryCodeError={indErrors.countryCode}
                   phoneError={indErrors.phone}
-                  onClearErrors={() => setIndErrors((p) => ({ ...p, countryCode: undefined, phone: undefined }))}
+                  onClearErrors={() =>
+                    setIndErrors((p) => ({
+                      ...p,
+                      countryCode: undefined,
+                      phone: undefined,
+                    }))
+                  }
                   phonePlaceholder="+442xxxxxxxxxx"
                 />
 
@@ -1576,7 +2003,9 @@ export default function FixedLocationClientPage() {
                   SelectProps={genderSelectProps}
                 >
                   <MenuItem value="">
-                    <Typography sx={{ color: alpha(m.navy, 0.5) }}>Select gender</Typography>
+                    <Typography sx={{ color: alpha(m.navy, 0.5) }}>
+                      Select gender
+                    </Typography>
                   </MenuItem>
                   {GENDER_MENU_OPTIONS.map((opt) => (
                     <MenuItem key={opt.value} value={opt.value}>
@@ -1585,7 +2014,14 @@ export default function FixedLocationClientPage() {
                   ))}
                 </MollureFormField>
 
-                <Typography sx={{ fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.62), pt: 0.5 }}>
+                <Typography
+                  sx={{
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.62),
+                    pt: 0.5,
+                  }}
+                >
                   Business Address
                 </Typography>
                 <Grid container spacing={1}>
@@ -1608,7 +2044,10 @@ export default function FixedLocationClientPage() {
                       value={coStreetNumber}
                       onChange={(e) => {
                         setCoStreetNumber(e.target.value);
-                        setCompErrors((p) => ({ ...p, streetNumber: undefined }));
+                        setCompErrors((p) => ({
+                          ...p,
+                          streetNumber: undefined,
+                        }));
                       }}
                       error={Boolean(compErrors.streetNumber)}
                       helperText={compErrors.streetNumber}
@@ -1640,7 +2079,12 @@ export default function FixedLocationClientPage() {
                       helperText={compErrors.province}
                       sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     >
-                      {["Province", "North Holland", "South Holland", "Utrecht"].map((o) => (
+                      {[
+                        "Province",
+                        "North Holland",
+                        "South Holland",
+                        "Utrecht",
+                      ].map((o) => (
                         <MenuItem key={o} value={o === "Province" ? "" : o}>
                           {o}
                         </MenuItem>
@@ -1653,13 +2097,21 @@ export default function FixedLocationClientPage() {
                       value={coMunicipality || "Municipality"}
                       onChange={(e) => {
                         setCoMunicipality(e.target.value);
-                        setCompErrors((p) => ({ ...p, municipality: undefined }));
+                        setCompErrors((p) => ({
+                          ...p,
+                          municipality: undefined,
+                        }));
                       }}
                       error={Boolean(compErrors.municipality)}
                       helperText={compErrors.municipality}
                       sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                     >
-                      {["Municipality", "Amsterdam", "Rotterdam", "Utrecht"].map((o) => (
+                      {[
+                        "Municipality",
+                        "Amsterdam",
+                        "Rotterdam",
+                        "Utrecht",
+                      ].map((o) => (
                         <MenuItem key={o} value={o === "Municipality" ? "" : o}>
                           {o}
                         </MenuItem>
@@ -1675,7 +2127,13 @@ export default function FixedLocationClientPage() {
                   onPhoneChange={setCoPhone}
                   countryCodeError={compErrors.countryCode}
                   phoneError={compErrors.phone}
-                  onClearErrors={() => setCompErrors((p) => ({ ...p, countryCode: undefined, phone: undefined }))}
+                  onClearErrors={() =>
+                    setCompErrors((p) => ({
+                      ...p,
+                      countryCode: undefined,
+                      phone: undefined,
+                    }))
+                  }
                   phonePlaceholder="+442xxxxxxxxxxx"
                 />
 
@@ -1693,7 +2151,14 @@ export default function FixedLocationClientPage() {
               </Stack>
             )}
 
-            <Typography sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.86), pt: 0.5 }}>
+            <Typography
+              sx={{
+                fontSize: 12.5,
+                fontWeight: 800,
+                color: alpha(m.navy, 0.86),
+                pt: 0.5,
+              }}
+            >
               Technical Note (Optional)
             </Typography>
             <MollureFormField
@@ -1710,4 +2175,3 @@ export default function FixedLocationClientPage() {
     </>
   );
 }
-

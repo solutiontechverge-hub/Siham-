@@ -1,4 +1,5 @@
 export { default as AppButton } from "./AppButton";
+export type { AppButtonProps, AppButtonTone, AppButtonPresetSize } from "./AppButton";
 export { AppSnackbarProvider, useSnackbar } from "./AppSnackbar";
 export { queueSnackbarFlash } from "../../lib/snackbarFlash";
 export type { ShowSnackbarOptions, SnackbarSeverity } from "./AppSnackbar";

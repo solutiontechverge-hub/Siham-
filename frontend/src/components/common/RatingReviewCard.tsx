@@ -4,7 +4,17 @@ import * as React from "react";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
-import { Avatar, Box, Chip, Collapse, IconButton, Menu, MenuItem, Paper, Stack } from "@mui/material";
+import {
+  Avatar,
+  Box,
+  Chip,
+  Collapse,
+  IconButton,
+  Menu,
+  MenuItem,
+  Paper,
+  Stack,
+} from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import type { ProfessionalReviewItem } from "../../app/professionals/fixed-location/analytics/ratingReviewAnalytics.data";
 import { BodyText } from "../ui/typography";
@@ -15,11 +25,21 @@ function RatingPill({ value }: { value: number }) {
   const theme = useTheme();
   const m = theme.palette.mollure;
   return (
-    <Stack direction="row" spacing={0.4} alignItems="center" sx={{ color: alpha(m.navy, 0.7) }}>
-      <BodyText component="span" sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.72) }}>
+    <Stack
+      direction="row"
+      spacing={0.4}
+      alignItems="center"
+      sx={{ color: alpha(m.navy, 0.7) }}
+    >
+      <BodyText
+        component="span"
+        sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.72) }}
+      >
         {value.toFixed(1)}
       </BodyText>
-      <StarRoundedIcon sx={{ fontSize: 14, color: theme.palette.warning.main }} />
+      <StarRoundedIcon
+        sx={{ fontSize: 14, color: theme.palette.warning.main }}
+      />
     </Stack>
   );
 }
@@ -29,7 +49,13 @@ function ReviewTags({ tags }: { tags: readonly { label: string }[] }) {
   const m = theme.palette.mollure;
 
   return (
-    <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mt: 1.05 }}>
+    <Stack
+      direction="row"
+      spacing={0.75}
+      flexWrap="wrap"
+      useFlexGap
+      sx={{ mt: 1.05 }}
+    >
       {tags.map((t, idx) => {
         const isGroup = /^TM\s+\d+/i.test(t.label);
         return (
@@ -60,7 +86,11 @@ export type RatingReviewCardProps = {
   onDeleteReply?: () => void;
 };
 
-export default function RatingReviewCard({ review, onSendReply, onDeleteReply }: RatingReviewCardProps) {
+export default function RatingReviewCard({
+  review,
+  onSendReply,
+  onDeleteReply,
+}: RatingReviewCardProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
   const { showSnackbar } = useSnackbar();
@@ -81,7 +111,10 @@ export default function RatingReviewCard({ review, onSendReply, onDeleteReply }:
   function handleSendReply() {
     const message = draftReply.trim();
     if (!message) {
-      showSnackbar({ severity: "warning", message: "Please type a reply before sending." });
+      showSnackbar({
+        severity: "warning",
+        message: "Please type a reply before sending.",
+      });
       return;
     }
     onSendReply?.(message);
@@ -128,24 +161,60 @@ export default function RatingReviewCard({ review, onSendReply, onDeleteReply }:
       }}
     >
       <Stack direction="row" spacing={1.25} alignItems="flex-start">
-        <Avatar sx={{ width: 28, height: 28, bgcolor: alpha(m.navy, 0.08), color: alpha(m.navy, 0.65), fontWeight: 900, fontSize: 12 }}>
+        <Avatar
+          sx={{
+            width: 28,
+            height: 28,
+            bgcolor: alpha(m.navy, 0.08),
+            color: alpha(m.navy, 0.65),
+            fontWeight: 900,
+            fontSize: 12,
+          }}
+        >
           {review.reviewerName.slice(0, 1).toUpperCase()}
         </Avatar>
 
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+            spacing={1}
+          >
             <Box sx={{ minWidth: 0 }}>
-              <BodyText sx={{ fontSize: 13, fontWeight: 900, color: alpha(m.navy, 0.8), lineHeight: 1.15 }}>
+              <BodyText
+                sx={{
+                  fontSize: 13,
+                  fontWeight: 900,
+                  color: alpha(m.navy, 0.8),
+                  lineHeight: 1.15,
+                }}
+              >
                 {review.reviewerName}
               </BodyText>
-              <BodyText sx={{ mt: 0.15, fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.45) }}>
+              <BodyText
+                sx={{
+                  mt: 0.15,
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  color: alpha(m.navy, 0.45),
+                }}
+              >
                 {review.relativeTimeLabel}
               </BodyText>
             </Box>
             <RatingPill value={review.rating} />
           </Stack>
 
-          <BodyText sx={{ mt: 1.05, fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.55), lineHeight: 1.55 }}>
+          <BodyText
+            sx={{
+              mt: 1.05,
+              fontSize: 12.5,
+              fontWeight: 700,
+              color: alpha(m.navy, 0.55),
+              lineHeight: 1.55,
+            }}
+          >
             {review.reviewText}
           </BodyText>
 
@@ -186,10 +255,24 @@ export default function RatingReviewCard({ review, onSendReply, onDeleteReply }:
             >
               <Stack direction="row" alignItems="flex-start" spacing={1}>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.72) }}>
+                  <BodyText
+                    sx={{
+                      fontSize: 12,
+                      fontWeight: 900,
+                      color: alpha(m.navy, 0.72),
+                    }}
+                  >
                     Reply from {review.reply.authorName}
                   </BodyText>
-                  <BodyText sx={{ mt: 0.35, fontSize: 11.5, fontWeight: 700, color: alpha(m.navy, 0.5), lineHeight: 1.55 }}>
+                  <BodyText
+                    sx={{
+                      mt: 0.35,
+                      fontSize: 11.5,
+                      fontWeight: 700,
+                      color: alpha(m.navy, 0.5),
+                      lineHeight: 1.55,
+                    }}
+                  >
                     {review.reply.message}
                   </BodyText>
                 </Box>
@@ -206,7 +289,9 @@ export default function RatingReviewCard({ review, onSendReply, onDeleteReply }:
                   }}
                   aria-label="Reply actions"
                 >
-                  <MoreVertRoundedIcon sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }} />
+                  <MoreVertRoundedIcon
+                    sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }}
+                  />
                 </IconButton>
 
                 <Menu
@@ -226,10 +311,24 @@ export default function RatingReviewCard({ review, onSendReply, onDeleteReply }:
                     },
                   }}
                 >
-                  <MenuItem onClick={handleEditReply} sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.7) }}>
+                  <MenuItem
+                    onClick={handleEditReply}
+                    sx={{
+                      fontSize: 12.5,
+                      fontWeight: 800,
+                      color: alpha(m.navy, 0.7),
+                    }}
+                  >
                     Edit
                   </MenuItem>
-                  <MenuItem onClick={handleDeleteReply} sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.7) }}>
+                  <MenuItem
+                    onClick={handleDeleteReply}
+                    sx={{
+                      fontSize: 12.5,
+                      fontWeight: 800,
+                      color: alpha(m.navy, 0.7),
+                    }}
+                  >
                     Delete
                   </MenuItem>
                 </Menu>
@@ -238,11 +337,18 @@ export default function RatingReviewCard({ review, onSendReply, onDeleteReply }:
           ) : null}
 
           <Collapse in={showCompose} timeout={180} unmountOnExit>
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 1 }}>
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              sx={{ mt: 1 }}
+            >
               <AppTextField
                 placeholder="Type Reply"
                 value={draftReply}
-                onChange={(e) => setDraftReply((e.target as HTMLInputElement).value)}
+                onChange={(e) =>
+                  setDraftReply((e.target as HTMLInputElement).value)
+                }
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
@@ -251,7 +357,10 @@ export default function RatingReviewCard({ review, onSendReply, onDeleteReply }:
                 }}
                 fullWidth
                 sx={{
-                  "& .MuiOutlinedInput-root": { bgcolor: "#fff", borderRadius: "10px" },
+                  "& .MuiOutlinedInput-root": {
+                    bgcolor: "#fff",
+                    borderRadius: "10px",
+                  },
                   "& .MuiOutlinedInput-input": {
                     fontSize: 12.5,
                     fontWeight: 700,

@@ -17,7 +17,9 @@ export const CLIENT_TOP_TABS: readonly ClientTopTab[] = [
   { label: "Favorites", href: "/clients/favourites" },
 ];
 
-export function clientTopTabsActiveLabel(pathname: string | null | undefined): string {
+export function clientTopTabsActiveLabel(
+  pathname: string | null | undefined,
+): string {
   if (pathname?.includes("/clients/favourites")) return "Favorites";
   if (pathname?.includes("/clients/booking")) return "Booking";
   return "Profile";
@@ -44,7 +46,10 @@ export function ClientPageTabsBar({
   );
 }
 
-export default function ClientTopTabs({ tabs = CLIENT_TOP_TABS, activeLabel }: ClientTopTabsProps) {
+export default function ClientTopTabs({
+  tabs = CLIENT_TOP_TABS,
+  activeLabel,
+}: ClientTopTabsProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
 
@@ -100,7 +105,9 @@ export default function ClientTopTabs({ tabs = CLIENT_TOP_TABS, activeLabel }: C
                 letterSpacing: "-0.01em",
                 bgcolor: "#fff",
                 "&:hover": { bgcolor: "#fff" },
-                color: active ? theme.palette.text.primary : alpha(theme.palette.text.secondary, 0.75),
+                color: active
+                  ? theme.palette.text.primary
+                  : alpha(theme.palette.text.secondary, 0.75),
                 fontSize: 16,
                 pt: 1.6,
                 pb: 1.55,
@@ -129,4 +136,3 @@ export default function ClientTopTabs({ tabs = CLIENT_TOP_TABS, activeLabel }: C
     </Paper>
   );
 }
-

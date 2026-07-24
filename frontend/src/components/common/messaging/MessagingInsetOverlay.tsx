@@ -2,7 +2,14 @@
 
 import * as React from "react";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
-import { Box, DialogActions, IconButton, Paper, Stack, Typography } from "@mui/material";
+import {
+  Box,
+  DialogActions,
+  IconButton,
+  Paper,
+  Stack,
+  Typography,
+} from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 
 export type MessagingInsetOverlayProps = {
@@ -28,7 +35,8 @@ export default function MessagingInsetOverlay({
   headerTone = "default",
 }: MessagingInsetOverlayProps) {
   const m = useTheme().palette.mollure;
-  const headerBg = headerTone === "danger" ? alpha("#E85D5D", 0.14) : alpha(m.teal, 0.12);
+  const headerBg =
+    headerTone === "danger" ? alpha("#E85D5D", 0.14) : alpha(m.teal, 0.12);
 
   if (!open) return null;
 
@@ -73,7 +81,15 @@ export default function MessagingInsetOverlay({
             color: m.navy,
           }}
         >
-          <Typography sx={{ fontWeight: 800, fontSize: { xs: 15, sm: 16 }, color: alpha(m.navy, 0.9) }}>{title}</Typography>
+          <Typography
+            sx={{
+              fontWeight: 800,
+              fontSize: { xs: 15, sm: 16 },
+              color: alpha(m.navy, 0.9),
+            }}
+          >
+            {title}
+          </Typography>
           <IconButton
             size="small"
             onClick={onClose}
@@ -91,7 +107,16 @@ export default function MessagingInsetOverlay({
           </IconButton>
         </Stack>
 
-        <Box sx={{ px: { xs: 2, sm: 2.5 }, pt: { xs: 1.75, sm: 2 }, pb: footer ? 1 : { xs: 2, sm: 2.5 }, overflowY: "auto", flex: 1, minHeight: 0 }}>
+        <Box
+          sx={{
+            px: { xs: 2, sm: 2.5 },
+            pt: { xs: 1.75, sm: 2 },
+            pb: footer ? 1 : { xs: 2, sm: 2.5 },
+            overflowY: "auto",
+            flex: 1,
+            minHeight: 0,
+          }}
+        >
           {children}
         </Box>
 
@@ -104,7 +129,9 @@ export default function MessagingInsetOverlay({
               justifyContent: "center",
               gap: 1.5,
               flexShrink: 0,
-              borderTop: hideDivider ? "none" : `1px solid ${alpha(m.navy, 0.08)}`,
+              borderTop: hideDivider
+                ? "none"
+                : `1px solid ${alpha(m.navy, 0.08)}`,
             }}
           >
             {footer}

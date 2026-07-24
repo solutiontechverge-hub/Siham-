@@ -1,9 +1,20 @@
 "use client";
 
+import AppButton from "../AppButton";
 import * as React from "react";
-import { Box, Button, Grid, MenuItem, Paper, Stack, type PaperProps } from "@mui/material";
+import {
+  Box,
+  Grid,
+  MenuItem,
+  Paper,
+  Stack,
+  type PaperProps,
+} from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import CalendarPopover, { formatListingDateTimeDisplay, type CalendarPopoverValue } from "./CalendarPopover";
+import CalendarPopover, {
+  formatListingDateTimeDisplay,
+  type CalendarPopoverValue,
+} from "./CalendarPopover";
 import ListingLocationModeCards from "./ListingLocationModeCards";
 import Image from "next/image";
 import { ArrowDown } from "../../../../images";
@@ -52,7 +63,8 @@ export default function ListingFilterBox({
   ...props
 }: ListingFilterBoxProps) {
   const tokens = useTheme().palette.mollure;
-  const [calendarAnchor, setCalendarAnchor] = React.useState<HTMLElement | null>(null);
+  const [calendarAnchor, setCalendarAnchor] =
+    React.useState<HTMLElement | null>(null);
 
   const lineFieldSx = {
     "& .MuiOutlinedInput-root": {
@@ -87,7 +99,8 @@ export default function ListingFilterBox({
     },
   } as const;
 
-  const set = (patch: Partial<ListingFilterValues>) => onChange({ ...values, ...patch });
+  const set = (patch: Partial<ListingFilterValues>) =>
+    onChange({ ...values, ...patch });
 
   const dateTimeDisplay = formatListingDateTimeDisplay(values.dateTime);
 
@@ -155,16 +168,24 @@ export default function ListingFilterBox({
               IconComponent: () => null,
               renderValue: (selected) =>
                 selected ? (
-                  selected as any
+                  (selected as any)
                 ) : (
-                  <BodyText sx={{ color: alpha(tokens.navy, 0.55), fontSize: "1.05rem", fontWeight: 500 }}>
+                  <BodyText
+                    sx={{
+                      color: alpha(tokens.navy, 0.55),
+                      fontSize: "1.05rem",
+                      fontWeight: 500,
+                    }}
+                  >
                     Select Category
                   </BodyText>
                 ),
             }}
           >
             <MenuItem value="">
-              <BodyText sx={{ color: tokens.placeholder, fontSize: 13 }}>Select Category</BodyText>
+              <BodyText sx={{ color: tokens.placeholder, fontSize: 13 }}>
+                Select Category
+              </BodyText>
             </MenuItem>
             {categoryOptions.map((opt) => (
               <MenuItem
@@ -183,8 +204,16 @@ export default function ListingFilterBox({
                   spacing={1.75}
                   sx={{ width: "100%", lineHeight: 1 }}
                 >
-                  <ServiceCategoryIcon label={opt.label} fontSize={20} color={tokens.teal} />
-                  <BodyText sx={{ fontSize: 14, lineHeight: 1.2, color: "inherit" }}>{opt.label}</BodyText>
+                  <ServiceCategoryIcon
+                    label={opt.label}
+                    fontSize={20}
+                    color={tokens.teal}
+                  />
+                  <BodyText
+                    sx={{ fontSize: 14, lineHeight: 1.2, color: "inherit" }}
+                  >
+                    {opt.label}
+                  </BodyText>
                 </Stack>
               </MenuItem>
             ))}
@@ -219,16 +248,24 @@ export default function ListingFilterBox({
               IconComponent: () => null,
               renderValue: (selected) =>
                 selected ? (
-                  selected as any
+                  (selected as any)
                 ) : (
-                  <BodyText sx={{ color: alpha(tokens.navy, 0.55), fontSize: "1.05rem", fontWeight: 500 }}>
+                  <BodyText
+                    sx={{
+                      color: alpha(tokens.navy, 0.55),
+                      fontSize: "1.05rem",
+                      fontWeight: 500,
+                    }}
+                  >
                     Select Municipality
                   </BodyText>
                 ),
             }}
           >
             <MenuItem value="">
-              <BodyText sx={{ color: tokens.placeholder, fontSize: 13 }}>Select Municipality</BodyText>
+              <BodyText sx={{ color: tokens.placeholder, fontSize: 13 }}>
+                Select Municipality
+              </BodyText>
             </MenuItem>
             {municipalityOptions.map((opt) => (
               <MenuItem key={opt.value} value={opt.value}>
@@ -250,7 +287,7 @@ export default function ListingFilterBox({
 
         <Grid item xs={12}>
           <Box sx={{ pt: 0.25 }}>
-            <Button
+            <AppButton
               fullWidth
               onClick={onApply}
               variant="contained"
@@ -267,11 +304,10 @@ export default function ListingFilterBox({
               }}
             >
               Apply
-            </Button>
+            </AppButton>
           </Box>
         </Grid>
       </Grid>
     </Paper>
   );
 }
-

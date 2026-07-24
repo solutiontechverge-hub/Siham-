@@ -1,7 +1,8 @@
 "use client";
 
+import AppButton from "../AppButton";
 import * as React from "react";
-import { Box, Button, Checkbox, Divider, FormControlLabel, Stack } from "@mui/material";
+import { Box, Checkbox, Divider, FormControlLabel, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { BodyText } from "../../ui/typography";
 import AppDrawer from "../AppDrawer";
@@ -49,34 +50,33 @@ export default function CalendarFiltersDrawer({
       footer={
         <Box sx={{ p: 2 }}>
           <Stack direction="row" spacing={1}>
-            <Button
+            <AppButton
               fullWidth
-              variant="outlined"
+              tone="secondary"
               onClick={() => {
                 setDraftFilters(appliedFilters);
                 onClose();
               }}
-              sx={{ textTransform: "none", fontWeight: 800, borderRadius: "8px" }}
+              sx={{ borderRadius: "8px" }}
             >
               Cancel
-            </Button>
-            <Button
+            </AppButton>
+            <AppButton
               fullWidth
-              variant="outlined"
+              tone="secondary"
               onClick={() => setDraftFilters(initialFilters)}
-              sx={{ textTransform: "none", fontWeight: 800, borderRadius: "8px" }}
+              sx={{ borderRadius: "8px" }}
             >
               Reset
-            </Button>
-            <Button
+            </AppButton>
+            <AppButton
+              tone="primary"
               fullWidth
-              variant="contained"
-              disableElevation
               onClick={() => onApply(draftFilters)}
-              sx={{ textTransform: "none", fontWeight: 800, borderRadius: "8px", bgcolor: m.teal, "&:hover": { bgcolor: m.tealDark } }}
+              sx={{ borderRadius: "8px" }}
             >
               Apply
-            </Button>
+            </AppButton>
           </Stack>
         </Box>
       }
@@ -84,7 +84,16 @@ export default function CalendarFiltersDrawer({
       <Box sx={{ px: 2, py: 1.5 }}>
         <Stack spacing={2}>
           <Box>
-            <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.7), mb: 0.75 }}>Team Member</BodyText>
+            <BodyText
+              sx={{
+                fontSize: 12,
+                fontWeight: 900,
+                color: alpha(m.navy, 0.7),
+                mb: 0.75,
+              }}
+            >
+              Team Member
+            </BodyText>
             <Stack spacing={0.5}>
               <FormControlLabel
                 control={
@@ -95,13 +104,23 @@ export default function CalendarFiltersDrawer({
                       setDraftFilters((p) => ({
                         ...p,
                         teamAll: e.target.checked,
-                        teamIds: Object.fromEntries(Object.keys(p.teamIds).map((id) => [id, false])),
+                        teamIds: Object.fromEntries(
+                          Object.keys(p.teamIds).map((id) => [id, false]),
+                        ),
                       }))
                     }
                   />
                 }
-                label={<BodyText sx={{ fontSize: 12, color: alpha(m.navy, 0.72) }}>All</BodyText>}
-                sx={{ m: 0, alignItems: "flex-start", "& .MuiFormControlLabel-label": { mt: "2px" } }}
+                label={
+                  <BodyText sx={{ fontSize: 12, color: alpha(m.navy, 0.72) }}>
+                    All
+                  </BodyText>
+                }
+                sx={{
+                  m: 0,
+                  alignItems: "flex-start",
+                  "& .MuiFormControlLabel-label": { mt: "2px" },
+                }}
               />
               {resources.map((r, i) => (
                 <FormControlLabel
@@ -109,7 +128,10 @@ export default function CalendarFiltersDrawer({
                   control={
                     <Checkbox
                       size="small"
-                      checked={!draftFilters.teamAll && Boolean(draftFilters.teamIds[r.id])}
+                      checked={
+                        !draftFilters.teamAll &&
+                        Boolean(draftFilters.teamIds[r.id])
+                      }
                       onChange={(e) =>
                         setDraftFilters((p) => ({
                           ...p,
@@ -119,8 +141,16 @@ export default function CalendarFiltersDrawer({
                       }
                     />
                   }
-                  label={<BodyText sx={{ fontSize: 12, color: alpha(m.navy, 0.72) }}>{`TM ${String.fromCharCode(65 + i)}`}</BodyText>}
-                  sx={{ m: 0, alignItems: "flex-start", "& .MuiFormControlLabel-label": { mt: "2px" } }}
+                  label={
+                    <BodyText
+                      sx={{ fontSize: 12, color: alpha(m.navy, 0.72) }}
+                    >{`TM ${String.fromCharCode(65 + i)}`}</BodyText>
+                  }
+                  sx={{
+                    m: 0,
+                    alignItems: "flex-start",
+                    "& .MuiFormControlLabel-label": { mt: "2px" },
+                  }}
                 />
               ))}
             </Stack>
@@ -129,7 +159,16 @@ export default function CalendarFiltersDrawer({
 
           {locations.length > 1 ? (
             <Box>
-              <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.7), mb: 0.75 }}>Location</BodyText>
+              <BodyText
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 900,
+                  color: alpha(m.navy, 0.7),
+                  mb: 0.75,
+                }}
+              >
+                Location
+              </BodyText>
               <Stack spacing={0.5}>
                 <FormControlLabel
                   control={
@@ -145,8 +184,16 @@ export default function CalendarFiltersDrawer({
                       }
                     />
                   }
-                  label={<BodyText sx={{ fontSize: 12, color: alpha(m.navy, 0.72) }}>All</BodyText>}
-                  sx={{ m: 0, alignItems: "flex-start", "& .MuiFormControlLabel-label": { mt: "2px" } }}
+                  label={
+                    <BodyText sx={{ fontSize: 12, color: alpha(m.navy, 0.72) }}>
+                      All
+                    </BodyText>
+                  }
+                  sx={{
+                    m: 0,
+                    alignItems: "flex-start",
+                    "& .MuiFormControlLabel-label": { mt: "2px" },
+                  }}
                 />
                 {locations.map((loc) => (
                   <FormControlLabel
@@ -154,18 +201,34 @@ export default function CalendarFiltersDrawer({
                     control={
                       <Checkbox
                         size="small"
-                        checked={!draftFilters.locationAll && Boolean(draftFilters.locations[loc])}
+                        checked={
+                          !draftFilters.locationAll &&
+                          Boolean(draftFilters.locations[loc])
+                        }
                         onChange={(e) =>
                           setDraftFilters((p) => ({
                             ...p,
                             locationAll: false,
-                            locations: { ...p.locations, [loc]: e.target.checked },
+                            locations: {
+                              ...p.locations,
+                              [loc]: e.target.checked,
+                            },
                           }))
                         }
                       />
                     }
-                    label={<BodyText sx={{ fontSize: 12, color: alpha(m.navy, 0.72) }}>{loc}</BodyText>}
-                    sx={{ m: 0, alignItems: "flex-start", "& .MuiFormControlLabel-label": { mt: "2px" } }}
+                    label={
+                      <BodyText
+                        sx={{ fontSize: 12, color: alpha(m.navy, 0.72) }}
+                      >
+                        {loc}
+                      </BodyText>
+                    }
+                    sx={{
+                      m: 0,
+                      alignItems: "flex-start",
+                      "& .MuiFormControlLabel-label": { mt: "2px" },
+                    }}
                   />
                 ))}
               </Stack>
@@ -174,7 +237,16 @@ export default function CalendarFiltersDrawer({
           ) : null}
 
           <Box>
-            <BodyText sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.7), mb: 0.75 }}>Booking</BodyText>
+            <BodyText
+              sx={{
+                fontSize: 12,
+                fontWeight: 900,
+                color: alpha(m.navy, 0.7),
+                mb: 0.75,
+              }}
+            >
+              Booking
+            </BodyText>
             <Stack spacing={0.5}>
               <FormControlLabel
                 control={
@@ -185,13 +257,26 @@ export default function CalendarFiltersDrawer({
                       setDraftFilters((p) => ({
                         ...p,
                         bookingAll: e.target.checked,
-                        booking: { Online: false, Offline: false, Project: false, Requests: false },
+                        booking: {
+                          Online: false,
+                          Offline: false,
+                          Project: false,
+                          Requests: false,
+                        },
                       }))
                     }
                   />
                 }
-                label={<BodyText sx={{ fontSize: 12, color: alpha(m.navy, 0.72) }}>All</BodyText>}
-                sx={{ m: 0, alignItems: "flex-start", "& .MuiFormControlLabel-label": { mt: "2px" } }}
+                label={
+                  <BodyText sx={{ fontSize: 12, color: alpha(m.navy, 0.72) }}>
+                    All
+                  </BodyText>
+                }
+                sx={{
+                  m: 0,
+                  alignItems: "flex-start",
+                  "& .MuiFormControlLabel-label": { mt: "2px" },
+                }}
               />
               {bookingTypes.map((bt) => (
                 <FormControlLabel
@@ -199,7 +284,10 @@ export default function CalendarFiltersDrawer({
                   control={
                     <Checkbox
                       size="small"
-                      checked={!draftFilters.bookingAll && Boolean(draftFilters.booking[bt])}
+                      checked={
+                        !draftFilters.bookingAll &&
+                        Boolean(draftFilters.booking[bt])
+                      }
                       onChange={(e) =>
                         setDraftFilters((p) => ({
                           ...p,
@@ -209,8 +297,16 @@ export default function CalendarFiltersDrawer({
                       }
                     />
                   }
-                  label={<BodyText sx={{ fontSize: 12, color: alpha(m.navy, 0.72) }}>{bt}</BodyText>}
-                  sx={{ m: 0, alignItems: "flex-start", "& .MuiFormControlLabel-label": { mt: "2px" } }}
+                  label={
+                    <BodyText sx={{ fontSize: 12, color: alpha(m.navy, 0.72) }}>
+                      {bt}
+                    </BodyText>
+                  }
+                  sx={{
+                    m: 0,
+                    alignItems: "flex-start",
+                    "& .MuiFormControlLabel-label": { mt: "2px" },
+                  }}
                 />
               ))}
             </Stack>

@@ -1,11 +1,12 @@
 "use client";
 
+import AppButton from "../AppButton";
 import * as React from "react";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import EditOutlinedIcon from "@mui/icons-material/EditOutlined";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
-import { Box, Button, IconButton, Paper, Stack, Tooltip } from "@mui/material";
+import { Box, IconButton, Paper, Stack, Tooltip } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDropdown from "../AppDropdown";
 import AppTextField from "../AppTextField";
@@ -39,7 +40,9 @@ type CalendarSettingsPanelProps = {
   isSaving?: boolean;
 };
 
-const DEFAULT_CATEGORY_KEYS = BUSINESS_SERVICE_CATEGORY_CATALOG.map((entry) => entry.key);
+const DEFAULT_CATEGORY_KEYS = BUSINESS_SERVICE_CATEGORY_CATALOG.map(
+  (entry) => entry.key,
+);
 
 function SettingsSection({
   title,
@@ -72,7 +75,11 @@ function SettingsSection({
           bgcolor: alpha(m.navy, 0.02),
         }}
       >
-        <SubHeading sx={{ fontSize: 15, fontWeight: 800, color: alpha(m.navy, 0.82) }}>{title}</SubHeading>
+        <SubHeading
+          sx={{ fontSize: 15, fontWeight: 800, color: alpha(m.navy, 0.82) }}
+        >
+          {title}
+        </SubHeading>
         {action}
       </Stack>
       <Box sx={{ p: 2 }}>{children}</Box>
@@ -80,28 +87,28 @@ function SettingsSection({
   );
 }
 
-function SetButton({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
+function SetButton({
+  onClick,
+  disabled,
+}: {
+  onClick: () => void;
+  disabled?: boolean;
+}) {
   const m = useTheme().palette.mollure;
   return (
-    <Button
-      variant="contained"
-      disableElevation
+    <AppButton
+      tone="primary"
       disabled={disabled}
       onClick={onClick}
       sx={{
-        borderRadius: "6px",
-        textTransform: "none",
-        fontWeight: 800,
         fontSize: 12.5,
         minWidth: 58,
         height: 30,
         px: 1.75,
-        bgcolor: m.teal,
-        "&:hover": { bgcolor: m.tealDark },
       }}
     >
       Set
-    </Button>
+    </AppButton>
   );
 }
 
@@ -175,27 +182,61 @@ function DurationInput({
 
   return (
     <Box>
-      <BodyText sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.72), mb: 0.85 }}>{label}</BodyText>
+      <BodyText
+        sx={{
+          fontSize: 12.5,
+          fontWeight: 700,
+          color: alpha(m.navy, 0.72),
+          mb: 0.85,
+        }}
+      >
+        {label}
+      </BodyText>
       <Stack direction="row" spacing={1.25} alignItems="center">
         <AppTextField
           value={value.hours}
           onChange={(e) => setPart("hours", e.target.value)}
           disabled={disabled}
-          inputProps={{ inputMode: "numeric", maxLength: 2, "aria-label": `${label} hours` }}
+          inputProps={{
+            inputMode: "numeric",
+            maxLength: 2,
+            "aria-label": `${label} hours`,
+          }}
           sx={{ ...fieldSx, flex: 1, minWidth: 0 }}
         />
-        <BodyText sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.5) }}>h</BodyText>
+        <BodyText
+          sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.5) }}
+        >
+          h
+        </BodyText>
         <AppTextField
           value={value.minutes}
           onChange={(e) => setPart("minutes", e.target.value)}
           disabled={disabled}
-          inputProps={{ inputMode: "numeric", maxLength: 2, "aria-label": `${label} minutes` }}
+          inputProps={{
+            inputMode: "numeric",
+            maxLength: 2,
+            "aria-label": `${label} minutes`,
+          }}
           sx={{ ...fieldSx, flex: 1, minWidth: 0 }}
         />
-        <BodyText sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.5) }}>min</BodyText>
+        <BodyText
+          sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.5) }}
+        >
+          min
+        </BodyText>
       </Stack>
       {helperText ? (
-        <BodyText sx={{ mt: 1, fontSize: 11.5, color: alpha(m.navy, 0.45), lineHeight: 1.45 }}>{helperText}</BodyText>
+        <BodyText
+          sx={{
+            mt: 1,
+            fontSize: 11.5,
+            color: alpha(m.navy, 0.45),
+            lineHeight: 1.45,
+          }}
+        >
+          {helperText}
+        </BodyText>
       ) : null}
     </Box>
   );
@@ -219,7 +260,16 @@ function BookingRulesLocationCard({
         py: 1.75,
       }}
     >
-      <BodyText sx={{ fontSize: 13.5, fontWeight: 800, color: alpha(m.navy, 0.78), mb: 1.5 }}>{title}</BodyText>
+      <BodyText
+        sx={{
+          fontSize: 13.5,
+          fontWeight: 800,
+          color: alpha(m.navy, 0.78),
+          mb: 1.5,
+        }}
+      >
+        {title}
+      </BodyText>
       {children}
     </Box>
   );
@@ -251,11 +301,29 @@ function LocationBlock({
         py: 1.5,
       }}
     >
-      <BodyText sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.78), mb: 1.25 }}>{title}</BodyText>
+      <BodyText
+        sx={{
+          fontSize: 13,
+          fontWeight: 800,
+          color: alpha(m.navy, 0.78),
+          mb: 1.25,
+        }}
+      >
+        {title}
+      </BodyText>
       <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-        <Stack direction="row" spacing={0.75} alignItems="center" sx={{ minWidth: 148 }}>
+        <Stack
+          direction="row"
+          spacing={0.75}
+          alignItems="center"
+          sx={{ minWidth: 148 }}
+        >
           <AccessTimeRoundedIcon sx={{ fontSize: 18, color: m.teal }} />
-          <BodyText sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.62) }}>{scheduleLabel}</BodyText>
+          <BodyText
+            sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.62) }}
+          >
+            {scheduleLabel}
+          </BodyText>
         </Stack>
         <Box sx={{ flex: 1, minWidth: 220 }}>
           <AppDropdown
@@ -309,7 +377,9 @@ export default function CalendarSettingsPanel({
 
   const [bookingRulesEditing, setBookingRulesEditing] = React.useState(false);
   const [serviceOrderEditing, setServiceOrderEditing] = React.useState(false);
-  const [draggingCategoryKey, setDraggingCategoryKey] = React.useState<string | null>(null);
+  const [draggingCategoryKey, setDraggingCategoryKey] = React.useState<
+    string | null
+  >(null);
 
   const fixedLocationState = publicHoursState.fixed;
   const desiredLocationState = publicHoursState.desired;
@@ -338,28 +408,33 @@ export default function CalendarSettingsPanel({
   };
 
   const orderedCategories = React.useMemo(() => {
-    const catalogByKey = new Map<string, (typeof BUSINESS_SERVICE_CATEGORY_CATALOG)[number]>(
-      BUSINESS_SERVICE_CATEGORY_CATALOG.map((entry) => [entry.key, entry]),
-    );
-    const keys = serviceOrderKeys.length ? serviceOrderKeys : DEFAULT_CATEGORY_KEYS;
+    const catalogByKey = new Map<
+      string,
+      (typeof BUSINESS_SERVICE_CATEGORY_CATALOG)[number]
+    >(BUSINESS_SERVICE_CATEGORY_CATALOG.map((entry) => [entry.key, entry]));
+    const keys = serviceOrderKeys.length
+      ? serviceOrderKeys
+      : DEFAULT_CATEGORY_KEYS;
     return keys
       .map((key, index) => {
         const entry = catalogByKey.get(key);
         if (!entry) return null;
         return { ...entry, order: index + 1 };
       })
-      .filter(Boolean) as Array<(typeof BUSINESS_SERVICE_CATEGORY_CATALOG)[number] & { order: number }>;
+      .filter(Boolean) as Array<
+      (typeof BUSINESS_SERVICE_CATEGORY_CATALOG)[number] & { order: number }
+    >;
   }, [serviceOrderKeys]);
 
   const customizedServices = React.useMemo(
     () =>
-      BUSINESS_SERVICE_CATEGORY_CATALOG.filter((entry) => Boolean(appliedDesign.colorsByCategory[entry.key])).map(
-        (entry) => ({
-          key: entry.key,
-          label: getCalendarDesignServiceLabel(entry.key),
-          color: appliedDesign.colorsByCategory[entry.key],
-        }),
-      ),
+      BUSINESS_SERVICE_CATEGORY_CATALOG.filter((entry) =>
+        Boolean(appliedDesign.colorsByCategory[entry.key]),
+      ).map((entry) => ({
+        key: entry.key,
+        label: getCalendarDesignServiceLabel(entry.key),
+        color: appliedDesign.colorsByCategory[entry.key],
+      })),
     [appliedDesign.colorsByCategory],
   );
 
@@ -400,13 +475,22 @@ export default function CalendarSettingsPanel({
           borderBottom: `1px solid ${alpha(m.navy, 0.08)}`,
         }}
       >
-        <SubHeading sx={{ fontSize: 18, fontWeight: 800, color: alpha(m.navy, 0.72) }}>Settings</SubHeading>
+        <SubHeading
+          sx={{ fontSize: 18, fontWeight: 800, color: alpha(m.navy, 0.72) }}
+        >
+          Settings
+        </SubHeading>
       </Box>
 
       <Stack spacing={1.75} sx={{ px: 2.5, py: 2.25 }}>
         <SettingsSection
           title="Public Hours"
-          action={<SetButton disabled={isSaving} onClick={() => onOpenPublicBusinessHours(showFixed ? "FL" : "DL")} />}
+          action={
+            <SetButton
+              disabled={isSaving}
+              onClick={() => onOpenPublicBusinessHours(showFixed ? "FL" : "DL")}
+            />
+          }
         >
           <Stack spacing={1.25}>
             {showFixed ? (
@@ -448,7 +532,10 @@ export default function CalendarSettingsPanel({
                   label="Interval Between Bookings"
                   value={bookingRules.fixed.intervalBetweenBookings}
                   onChange={(next) =>
-                    onBookingRulesChange({ ...bookingRules, fixed: { intervalBetweenBookings: next } })
+                    onBookingRulesChange({
+                      ...bookingRules,
+                      fixed: { intervalBetweenBookings: next },
+                    })
                   }
                   helperText="Set the minimum time between consecutive bookings."
                   disabled={!bookingRulesEditing || isSaving}
@@ -464,7 +551,10 @@ export default function CalendarSettingsPanel({
                     onChange={(next) =>
                       onBookingRulesChange({
                         ...bookingRules,
-                        desired: { ...bookingRules.desired, intervalBetweenBookings: next },
+                        desired: {
+                          ...bookingRules.desired,
+                          intervalBetweenBookings: next,
+                        },
                       })
                     }
                     disabled={!bookingRulesEditing || isSaving}
@@ -475,7 +565,10 @@ export default function CalendarSettingsPanel({
                     onChange={(next) =>
                       onBookingRulesChange({
                         ...bookingRules,
-                        desired: { ...bookingRules.desired, minimumTimeslot: next },
+                        desired: {
+                          ...bookingRules.desired,
+                          minimumTimeslot: next,
+                        },
                       })
                     }
                     helperText="Minimum required team member time at DL location."
@@ -499,7 +592,14 @@ export default function CalendarSettingsPanel({
         >
           <Stack spacing={2}>
             <Box>
-              <BodyText sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 1.1 }}>
+              <BodyText
+                sx={{
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  color: alpha(m.navy, 0.62),
+                  mb: 1.1,
+                }}
+              >
                 Select Categories
               </BodyText>
               <Box
@@ -529,9 +629,15 @@ export default function CalendarSettingsPanel({
                     }}
                     onDragOver={(event) => event.preventDefault()}
                     onDrop={() => {
-                      if (!draggingCategoryKey || draggingCategoryKey === category.key) return;
+                      if (
+                        !draggingCategoryKey ||
+                        draggingCategoryKey === category.key
+                      )
+                        return;
                       const nextKeys = reorderKeys(
-                        serviceOrderKeys.length ? serviceOrderKeys : DEFAULT_CATEGORY_KEYS,
+                        serviceOrderKeys.length
+                          ? serviceOrderKeys
+                          : DEFAULT_CATEGORY_KEYS,
                         draggingCategoryKey,
                         category.key,
                       );
@@ -545,7 +651,16 @@ export default function CalendarSettingsPanel({
             </Box>
 
             <Box>
-              <BodyText sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.62), mb: 1.1 }}>Services</BodyText>
+              <BodyText
+                sx={{
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  color: alpha(m.navy, 0.62),
+                  mb: 1.1,
+                }}
+              >
+                Services
+              </BodyText>
               <Stack spacing={0.75}>
                 {orderedCategories.map((category) => (
                   <Box
@@ -558,7 +673,13 @@ export default function CalendarSettingsPanel({
                       py: 1,
                     }}
                   >
-                    <BodyText sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.72) }}>
+                    <BodyText
+                      sx={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: alpha(m.navy, 0.72),
+                      }}
+                    >
                       {getCalendarDesignServiceLabel(category.key)}
                     </BodyText>
                   </Box>
@@ -568,7 +689,10 @@ export default function CalendarSettingsPanel({
           </Stack>
         </SettingsSection>
 
-        <SettingsSection title="Calendar Appearance" action={<SetButton disabled={isSaving} onClick={onOpenDesign} />}>
+        <SettingsSection
+          title="Calendar Appearance"
+          action={<SetButton disabled={isSaving} onClick={onOpenDesign} />}
+        >
           {customizedServices.length ? (
             <Stack spacing={1}>
               {customizedServices.map((service) => (
@@ -595,7 +719,13 @@ export default function CalendarSettingsPanel({
                       border: `1px solid ${alpha(m.navy, 0.14)}`,
                     }}
                   />
-                  <BodyText sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.72) }}>
+                  <BodyText
+                    sx={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: alpha(m.navy, 0.72),
+                    }}
+                  >
                     {service.label} colour {service.color}
                   </BodyText>
                   <IconButton
@@ -639,7 +769,14 @@ export default function CalendarSettingsPanel({
                 px: 2,
               }}
             >
-              <BodyText sx={{ fontSize: 13, fontWeight: 600, color: alpha(m.navy, 0.42), textAlign: "center" }}>
+              <BodyText
+                sx={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: alpha(m.navy, 0.42),
+                  textAlign: "center",
+                }}
+              >
                 Customize Your Calendar Based On Categories Or Services
               </BodyText>
             </Box>

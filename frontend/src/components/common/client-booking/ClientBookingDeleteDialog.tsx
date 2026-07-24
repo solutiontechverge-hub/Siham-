@@ -1,6 +1,9 @@
 "use client";
 
-import AppModal, { MessagingModalCancelButton, MessagingModalPrimaryButton } from "../AppModal";
+import AppModal, {
+  MessagingModalCancelButton,
+  MessagingModalPrimaryButton,
+} from "../AppModal";
 
 type Props = {
   open: boolean;
@@ -9,7 +12,12 @@ type Props = {
   variant?: "cancelled" | "completed";
 };
 
-export default function ClientBookingDeleteDialog({ open, onClose, onConfirm, variant = "cancelled" }: Props) {
+export default function ClientBookingDeleteDialog({
+  open,
+  onClose,
+  onConfirm,
+  variant = "cancelled",
+}: Props) {
   const title =
     variant === "completed"
       ? "Remove this completed booking from your list?"

@@ -18,6 +18,11 @@ export default function ProfessionalDesiredLocationSetup({
   chrome = true,
   ...props
 }: ProfessionalDesiredLocationSetupProps) {
-  return <ProfessionalFixedLocationSetup data={data as any} chrome={chrome} {...props} />;
+  return (
+    <ProfessionalFixedLocationSetup
+      data={data as any}
+      chrome={chrome}
+      {...props}
+    />
+  );
 }
-

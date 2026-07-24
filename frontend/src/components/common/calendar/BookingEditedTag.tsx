@@ -29,7 +29,14 @@ export default function BookingEditedTag({ variant }: BookingEditedTagProps) {
         flexShrink: 0,
       }}
     >
-      <Typography sx={{ fontSize: 10, fontWeight: 800, lineHeight: 1.2, color: "inherit" }}>
+      <Typography
+        sx={{
+          fontSize: 10,
+          fontWeight: 800,
+          lineHeight: 1.2,
+          color: "inherit",
+        }}
+      >
         {TAG_LABELS[variant]}
       </Typography>
     </Box>

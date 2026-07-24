@@ -3,7 +3,10 @@
 import * as React from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { Box, CircularProgress, Container, Typography } from "@mui/material";
-import { MarketingSiteFooter, MollureMarketingHeader } from "../../../../../components/common";
+import {
+  MarketingSiteFooter,
+  MollureMarketingHeader,
+} from "../../../../../components/common";
 import ClientProfessionalReviewsView from "../../../../../components/common/client-reviews/ClientProfessionalReviewsView";
 import { marketingShellFooter } from "../../../../../data/marketingShell.data";
 import { useBusinessPublicProfile } from "../../../../../hooks/useBusinessPublicProfile";
@@ -30,8 +33,12 @@ export default function ClientProfessionalReviewsPage() {
     try {
       const raw = window.sessionStorage.getItem("mollure:selected_shop");
       if (raw) {
-        const parsed = JSON.parse(raw) as { shopId?: string; locationMode?: "fixed" | "desired" };
-        if (parsed.shopId === profile.shopId && parsed.locationMode) return parsed.locationMode;
+        const parsed = JSON.parse(raw) as {
+          shopId?: string;
+          locationMode?: "fixed" | "desired";
+        };
+        if (parsed.shopId === profile.shopId && parsed.locationMode)
+          return parsed.locationMode;
       }
     } catch {
       // ignore
@@ -42,12 +49,17 @@ export default function ClientProfessionalReviewsPage() {
   const member = React.useMemo(() => {
     if (!profile?.teamMembers.length) return null;
     if (memberIdParam) {
-      return profile.teamMembers.find((m) => m.id === memberIdParam) ?? profile.teamMembers[0];
+      return (
+        profile.teamMembers.find((m) => m.id === memberIdParam) ??
+        profile.teamMembers[0]
+      );
     }
     return profile.teamMembers[0];
   }, [memberIdParam, profile]);
 
-  const seedDemoReviews = Boolean(profile && member && profile.teamMembers[0]?.id === member.id);
+  const seedDemoReviews = Boolean(
+    profile && member && profile.teamMembers[0]?.id === member.id,
+  );
 
   if (isLoading) {
     return (
@@ -66,7 +78,9 @@ export default function ClientProfessionalReviewsPage() {
       <Box sx={{ minHeight: "100vh", bgcolor: "mollure.pageBg", py: 4 }}>
         <Container maxWidth="lg">
           <Box sx={{ textAlign: "center", py: 8 }}>
-            <Typography>{isError ? "Unable to load reviews." : "Professional not found."}</Typography>
+            <Typography>
+              {isError ? "Unable to load reviews." : "Professional not found."}
+            </Typography>
           </Box>
         </Container>
       </Box>
@@ -94,7 +108,10 @@ export default function ClientProfessionalReviewsPage() {
       </Container>
 
       <MarketingSiteFooter
-        columns={marketingShellFooter.columns.map((col) => ({ title: col.title, items: [...col.items] }))}
+        columns={marketingShellFooter.columns.map((col) => ({
+          title: col.title,
+          items: [...col.items],
+        }))}
         copyright={marketingShellFooter.copyright}
         sx={{ mt: 2 }}
       />

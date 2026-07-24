@@ -1,14 +1,18 @@
 "use client";
 
+import AppButton from "../../../components/common/AppButton";
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Box, Button, Container, Paper, Stack } from "@mui/material";
+import { Box, Container, Paper, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { getApiErrorMessage } from "../../../lib/api-error";
 import { useForgotPasswordMutation } from "../../../store/services/authApi";
-import { MarketingSiteHeader, MollureLabeledField } from "../../../components/common";
+import {
+  MarketingSiteHeader,
+  MollureLabeledField,
+} from "../../../components/common";
 import { authLoginHeaderClient } from "../../../data/marketingShell.data";
 import { BodyText, SubHeading } from "../../../components/ui/typography";
 import { useSnackbar } from "../../../components/common/AppSnackbar";
@@ -27,20 +31,30 @@ export default function ForgotPasswordPage() {
     event.preventDefault();
 
     try {
-      const result = await forgotPassword({ email: email.trim().toLowerCase() }).unwrap();
+      const result = await forgotPassword({
+        email: email.trim().toLowerCase(),
+      }).unwrap();
 
       showSnackbar({
         severity: "success",
-        message: result.message || "OTP sent to your email if it exists in our system.",
+        message:
+          result.message ||
+          "OTP sent to your email if it exists in our system.",
       });
-      window.sessionStorage.setItem("mollure_reset_email", email.trim().toLowerCase());
+      window.sessionStorage.setItem(
+        "mollure_reset_email",
+        email.trim().toLowerCase(),
+      );
       window.setTimeout(() => {
         router.push("/auth/reset-password/verify-otp");
       }, 700);
     } catch (error) {
       showSnackbar({
         severity: "error",
-        message: getApiErrorMessage(error, "Something went wrong while sending the OTP."),
+        message: getApiErrorMessage(
+          error,
+          "Something went wrong while sending the OTP.",
+        ),
       });
     }
   };
@@ -196,31 +210,35 @@ export default function ForgotPasswordPage() {
                       autoComplete="email"
                     />
 
-                    <Button
+                    <AppButton
+                      tone="primary"
                       type="submit"
-                      variant="contained"
-                      disableElevation
                       fullWidth
                       disabled={isLoading}
                       sx={{
-                        borderRadius: "10px",
-                        textTransform: "uppercase",
                         letterSpacing: "0.04em",
-                        fontWeight: 700,
                         fontSize: "0.9375rem",
                         py: 1.2,
                         minHeight: 44,
-                        bgcolor: m.teal,
                         color: m.white,
-                        "&:hover": { bgcolor: m.tealDark },
                       }}
                     >
                       {isLoading ? "Sending..." : "Send OTP"}
-                    </Button>
+                    </AppButton>
 
-                    <BodyText textAlign="center" sx={{ color: alpha(m.navy, 0.48), fontSize: "0.8125rem" }}>
+                    <BodyText
+                      textAlign="center"
+                      sx={{ color: alpha(m.navy, 0.48), fontSize: "0.8125rem" }}
+                    >
                       Remember your password?{" "}
-                      <Link href="/auth/login" style={{ color: m.teal, textDecoration: "none", fontWeight: 700 }}>
+                      <Link
+                        href="/auth/login"
+                        style={{
+                          color: m.teal,
+                          textDecoration: "none",
+                          fontWeight: 700,
+                        }}
+                      >
                         Back to login
                       </Link>
                     </BodyText>

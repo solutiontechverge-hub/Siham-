@@ -1,15 +1,23 @@
 "use client";
 
+import AppButton from "../../../components/common/AppButton";
 import * as React from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Box, Button, Container, Stack, Typography } from "@mui/material";
+import { Box, Container, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 
 import { MarketingSiteHeader } from "../../../components/common";
 import { authSignupHeaderClient } from "../../../data/marketingShell.data";
 import { BodyText } from "../../../components/ui/typography";
-import { CC, IC, Professional, SignupBg, SignupLs, SignupRs } from "../../../../images";
+import {
+  CC,
+  IC,
+  Professional,
+  SignupBg,
+  SignupLs,
+  SignupRs,
+} from "../../../../images";
 
 type SignupAudience = "individual" | "company" | "professional";
 
@@ -54,11 +62,16 @@ function UserTypeCard({ selected, onSelect, icon, label }: UserTypeCardProps) {
         minHeight: { xs: 92, sm: 104 },
         textAlign: "center",
         bgcolor: m.white ?? "#fff",
-        border: selected ? `2px solid ${m.teal}` : `1px solid ${cardBorderIdle}`,
+        border: selected
+          ? `2px solid ${m.teal}`
+          : `1px solid ${cardBorderIdle}`,
         boxShadow: selected ? `0 6px 18px ${alpha(m.navy, 0.08)}` : "none",
-        transition: theme.transitions.create(["border-color", "box-shadow", "background-color"], {
-          duration: theme.transitions.duration.shorter,
-        }),
+        transition: theme.transitions.create(
+          ["border-color", "box-shadow", "background-color"],
+          {
+            duration: theme.transitions.duration.shorter,
+          },
+        ),
         "&:hover": {
           borderColor: selected ? m.teal : alpha(m.navy, 0.16),
           boxShadow: selected
@@ -102,7 +115,11 @@ export default function SignupSelectUserTypePage() {
   React.useEffect(() => {
     try {
       const stored = window.sessionStorage.getItem(SIGNUP_AUDIENCE_STORAGE_KEY);
-      if (stored === "individual" || stored === "company" || stored === "professional") {
+      if (
+        stored === "individual" ||
+        stored === "company" ||
+        stored === "professional"
+      ) {
         setAudience(stored);
       }
     } catch {
@@ -223,138 +240,141 @@ export default function SignupSelectUserTypePage() {
               pb: { xs: 6, sm: 8 },
             }}
           >
-          <Box sx={{ width: "100%", maxWidth: 720, mx: "auto" }}>
-            <BodyText
-              sx={{
-                fontSize: { xs: "1.125rem", sm: "1.25rem" },
-                color: alpha(m.navy, 0.42),
-                mb: 1,
-                fontWeight: 400,
-              }}
-            >
-              Hi,
-            </BodyText>
-
-            <Typography
-              component="h1"
-              sx={{
-                fontWeight: 500,
-                fontSize: { xs: "1.65rem", sm: "2rem" },
-                lineHeight: 1.25,
-                color: m.navy,
-                mb: { xs: 3, sm: 4 },
-              }}
-            >
-              <Box
-                component="span"
+            <Box sx={{ width: "100%", maxWidth: 720, mx: "auto" }}>
+              <BodyText
                 sx={{
-                  display: "inline-block",
-                  borderBottom: `4px solid ${m.teal}`,
-                  pb: 0.2,
-                  mr: 0.5,
-                  fontWeight: 500,
+                  fontSize: { xs: "1.125rem", sm: "1.25rem" },
+                  color: alpha(m.navy, 0.42),
+                  mb: 1,
+                  fontWeight: 400,
                 }}
               >
-                Select
-              </Box>
-              <Box component="span" sx={{ fontWeight: 500 }}>
-                {" "}
-                User Type
-              </Box>
-            </Typography>
+                Hi,
+              </BodyText>
 
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              spacing={2.25}
-              sx={{ mb: 3.5 }}
-              alignItems="stretch"
-            >
-              <UserTypeCard
-                selected={audience === "individual"}
-                onSelect={() => {
-                  setAudience("individual");
-                  try {
-                    window.sessionStorage.setItem(SIGNUP_AUDIENCE_STORAGE_KEY, "individual");
-                  } catch {
-                    // ignore storage access failures
-                  }
+              <Typography
+                component="h1"
+                sx={{
+                  fontWeight: 500,
+                  fontSize: { xs: "1.65rem", sm: "2rem" },
+                  lineHeight: 1.25,
+                  color: m.navy,
+                  mb: { xs: 3, sm: 4 },
                 }}
-                icon={
-                  <Image
-                    src={IC}
-                    alt="Individual Client"
-                    width={34}
-                    height={30}
-                    style={{ display: "block" }}
-                  />
-                }
-                label="Individual Client (IC)"
-              />
-              <UserTypeCard
-                selected={audience === "company"}
-                onSelect={() => {
-                  setAudience("company");
-                  try {
-                    window.sessionStorage.setItem(SIGNUP_AUDIENCE_STORAGE_KEY, "company");
-                  } catch {
-                    // ignore storage access failures
-                  }
-                }}
-                icon={
-                  <Image
-                    src={CC}
-                    alt="Company Client"
-                    width={28}
-                    height={36}
-                    style={{ display: "block" }}
-                  />
-                }
-                label="Company Client (CC)"
-              />
-              <UserTypeCard
-                selected={audience === "professional"}
-                onSelect={() => {
-                  setAudience("professional");
-                  try {
-                    window.sessionStorage.setItem(SIGNUP_AUDIENCE_STORAGE_KEY, "professional");
-                  } catch {
-                    // ignore storage access failures
-                  }
-                }}
-                icon={
-                  <Image
-                    src={Professional}
-                    alt="Professional"
-                    width={34}
-                    height={28}
-                    style={{ display: "block" }}
-                  />
-                }
-                label="Professional"
-              />
-            </Stack>
+              >
+                <Box
+                  component="span"
+                  sx={{
+                    display: "inline-block",
+                    borderBottom: `4px solid ${m.teal}`,
+                    pb: 0.2,
+                    mr: 0.5,
+                    fontWeight: 500,
+                  }}
+                >
+                  Select
+                </Box>
+                <Box component="span" sx={{ fontWeight: 500 }}>
+                  {" "}
+                  User Type
+                </Box>
+              </Typography>
 
-            <Button
-              type="button"
-              variant="contained"
-              disableElevation
-              fullWidth
-              onClick={handleContinue}
-              sx={{
-                borderRadius: "10px",
-                textTransform: "none",
-                fontWeight: 700,
-                fontSize: "1rem",
-                py: 1.35,
-                bgcolor: m.teal,
-                color: m.white,
-                "&:hover": { bgcolor: m.tealDark },
-              }}
-            >
-              Continue
-            </Button>
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={2.25}
+                sx={{ mb: 3.5 }}
+                alignItems="stretch"
+              >
+                <UserTypeCard
+                  selected={audience === "individual"}
+                  onSelect={() => {
+                    setAudience("individual");
+                    try {
+                      window.sessionStorage.setItem(
+                        SIGNUP_AUDIENCE_STORAGE_KEY,
+                        "individual",
+                      );
+                    } catch {
+                      // ignore storage access failures
+                    }
+                  }}
+                  icon={
+                    <Image
+                      src={IC}
+                      alt="Individual Client"
+                      width={34}
+                      height={30}
+                      style={{ display: "block" }}
+                    />
+                  }
+                  label="Individual Client (IC)"
+                />
+                <UserTypeCard
+                  selected={audience === "company"}
+                  onSelect={() => {
+                    setAudience("company");
+                    try {
+                      window.sessionStorage.setItem(
+                        SIGNUP_AUDIENCE_STORAGE_KEY,
+                        "company",
+                      );
+                    } catch {
+                      // ignore storage access failures
+                    }
+                  }}
+                  icon={
+                    <Image
+                      src={CC}
+                      alt="Company Client"
+                      width={28}
+                      height={36}
+                      style={{ display: "block" }}
+                    />
+                  }
+                  label="Company Client (CC)"
+                />
+                <UserTypeCard
+                  selected={audience === "professional"}
+                  onSelect={() => {
+                    setAudience("professional");
+                    try {
+                      window.sessionStorage.setItem(
+                        SIGNUP_AUDIENCE_STORAGE_KEY,
+                        "professional",
+                      );
+                    } catch {
+                      // ignore storage access failures
+                    }
+                  }}
+                  icon={
+                    <Image
+                      src={Professional}
+                      alt="Professional"
+                      width={34}
+                      height={28}
+                      style={{ display: "block" }}
+                    />
+                  }
+                  label="Professional"
+                />
+              </Stack>
+
+              <AppButton
+                tone="primary"
+                type="button"
+                fullWidth
+                onClick={handleContinue}
+                sx={{
+                  fontSize: "1rem",
+                  py: 1.35,
+                  color: m.white,
+                }}
+              >
+                Continue
+              </AppButton>
+            </Box>
           </Box>
-        </Box>
         </Container>
       </Box>
     </Box>

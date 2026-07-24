@@ -5,9 +5,16 @@ import FixedLocationPageScaffold from "../../../../components/common/FixedLocati
 import { fixedLocationTopTabs } from "../fixedLocationTopTabs";
 import FinanceSubTabs from "./FinanceSubTabs";
 
-export default function FinanceLayout({ children }: { children: React.ReactNode }) {
+export default function FinanceLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
-    <FixedLocationPageScaffold activeTopTab="Finance" topTabs={fixedLocationTopTabs}>
+    <FixedLocationPageScaffold
+      activeTopTab="Finance"
+      topTabs={fixedLocationTopTabs}
+    >
       <Stack spacing={2}>
         <FinanceSubTabs />
         {children}

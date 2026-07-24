@@ -2,10 +2,20 @@
 
 import * as React from "react";
 import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
-import { Box, Container, Divider, Grid, Stack, Typography } from "@mui/material";
+import {
+  Box,
+  Container,
+  Divider,
+  Grid,
+  Stack,
+  Typography,
+} from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import Link from "next/link";
-import { MollureMarketingHeader, MarketingSiteFooter } from "../../../components/common";
+import {
+  MollureMarketingHeader,
+  MarketingSiteFooter,
+} from "../../../components/common";
 import {
   professionalsMarketingFooter,
   professionalsMarketingHeader,
@@ -71,7 +81,9 @@ function BulletRow({
           flexShrink: 0,
         }}
       />
-      <Typography sx={{ fontSize: 12.5, color: "inherit", lineHeight: 1.65, flex: 1 }}>
+      <Typography
+        sx={{ fontSize: 12.5, color: "inherit", lineHeight: 1.65, flex: 1 }}
+      >
         {children}
       </Typography>
     </Stack>
@@ -91,17 +103,26 @@ export default function PricingPage() {
   ] as const;
 
   return (
-    <Box sx={{ bgcolor: tokens.surface, color: tokens.navy, minHeight: "100vh" }}>
+    <Box
+      sx={{ bgcolor: tokens.surface, color: tokens.navy, minHeight: "100vh" }}
+    >
       <MollureMarketingHeader
         navItems={[...professionalsMarketingHeader.navItems]}
         localeLabel={professionalsMarketingHeader.localeLabel}
         loginLabel={professionalsMarketingHeader.loginLabel}
-        professionalLinkLabel={professionalsMarketingHeader.professionalLinkLabel}
+        professionalLinkLabel={
+          professionalsMarketingHeader.professionalLinkLabel
+        }
         professionalHref={professionalsMarketingHeader.professionalHref}
         homeHref="/professionals"
       />
 
-      <Box sx={{ bgcolor: alpha(tokens.teal, 0.16), borderBottom: `1px solid ${tokens.border}` }}>
+      <Box
+        sx={{
+          bgcolor: alpha(tokens.teal, 0.16),
+          borderBottom: `1px solid ${tokens.border}`,
+        }}
+      >
         <Container maxWidth="lg" sx={{ py: { xs: 5.25, md: 6.25 } }}>
           <Stack alignItems="center" textAlign="center">
             <Typography
@@ -141,9 +162,18 @@ export default function PricingPage() {
               p: { xs: 2.5, md: 3.25 },
             }}
           >
-            <Grid container spacing={{ xs: 2.5, md: 4 }} alignItems="flex-start">
+            <Grid
+              container
+              spacing={{ xs: 2.5, md: 4 }}
+              alignItems="flex-start"
+            >
               <Grid item xs={12} md={6}>
-                <Stack direction="row" alignItems="baseline" spacing={0.9} sx={{ flexWrap: "wrap" }}>
+                <Stack
+                  direction="row"
+                  alignItems="baseline"
+                  spacing={0.9}
+                  sx={{ flexWrap: "wrap" }}
+                >
                   <Typography
                     sx={{
                       fontWeight: 900,
@@ -154,7 +184,9 @@ export default function PricingPage() {
                   >
                     Stripe Fee + 1% Mollure Fee
                   </Typography>
-                  <Typography sx={{ fontSize: 11, color: alpha(tokens.navy, 0.5) }}>
+                  <Typography
+                    sx={{ fontSize: 11, color: alpha(tokens.navy, 0.5) }}
+                  >
                     (Per Online Transaction)
                   </Typography>
                 </Stack>
@@ -163,9 +195,20 @@ export default function PricingPage() {
               <Grid item xs={12} md={6}>
                 <Stack spacing={1.5}>
                   {featureItems.map((t) => (
-                    <Stack key={t} direction="row" spacing={1.25} alignItems="center">
+                    <Stack
+                      key={t}
+                      direction="row"
+                      spacing={1.25}
+                      alignItems="center"
+                    >
                       <FeatureCheckIcon color={tokens.teal} />
-                      <Typography sx={{ fontSize: 13.5, color: alpha(tokens.navy, 0.7), lineHeight: 1.6 }}>
+                      <Typography
+                        sx={{
+                          fontSize: 13.5,
+                          color: alpha(tokens.navy, 0.7),
+                          lineHeight: 1.6,
+                        }}
+                      >
                         {t}
                       </Typography>
                     </Stack>
@@ -205,26 +248,57 @@ export default function PricingPage() {
               }}
             >
               <Box sx={{ p: { xs: 2, md: 2.25 } }}>
-                <Typography sx={{ fontWeight: 900, color: alpha(tokens.navy, 0.86), fontSize: 13 }}>
+                <Typography
+                  sx={{
+                    fontWeight: 900,
+                    color: alpha(tokens.navy, 0.86),
+                    fontSize: 13,
+                  }}
+                >
                   Online Payments
                 </Typography>
                 <Stack spacing={0.9} sx={{ mt: 1.1 }}>
-                  <Typography sx={{ color: alpha(tokens.navy, 0.62), fontSize: 12.5, lineHeight: 1.65 }}>
+                  <Typography
+                    sx={{
+                      color: alpha(tokens.navy, 0.62),
+                      fontSize: 12.5,
+                      lineHeight: 1.65,
+                    }}
+                  >
                     Online payments are securely processed via Stripe.
                   </Typography>
-                  <Typography sx={{ color: alpha(tokens.navy, 0.62), fontSize: 12.5, lineHeight: 1.65 }}>
+                  <Typography
+                    sx={{
+                      color: alpha(tokens.navy, 0.62),
+                      fontSize: 12.5,
+                      lineHeight: 1.65,
+                    }}
+                  >
                     For each online transaction:
                   </Typography>
                   <Box sx={{ pl: 1, color: alpha(tokens.navy, 0.7) }}>
                     <BulletRow dotColor={alpha(tokens.navy, 0.35)}>
-                      <Box component="span" sx={{ fontWeight: 900, color: alpha(tokens.navy, 0.82) }}>
+                      <Box
+                        component="span"
+                        sx={{
+                          fontWeight: 900,
+                          color: alpha(tokens.navy, 0.82),
+                        }}
+                      >
                         Stripe processing fee (based on payment method)
                       </Box>{" "}
                       + 1% Mollure fee (Excluding VAT)
                     </BulletRow>
                   </Box>
-                  <Typography sx={{ color: alpha(tokens.navy, 0.62), fontSize: 12.5, lineHeight: 1.65 }}>
-                    All funds go directly to your own Stripe account. Mollure never holds, processes, or delays your money.
+                  <Typography
+                    sx={{
+                      color: alpha(tokens.navy, 0.62),
+                      fontSize: 12.5,
+                      lineHeight: 1.65,
+                    }}
+                  >
+                    All funds go directly to your own Stripe account. Mollure
+                    never holds, processes, or delays your money.
                   </Typography>
                 </Stack>
               </Box>
@@ -232,14 +306,32 @@ export default function PricingPage() {
               <Divider sx={{ borderColor: alpha(tokens.navy, 0.12) }} />
 
               <Box sx={{ p: { xs: 2, md: 2.25 } }}>
-                <Typography sx={{ fontWeight: 900, color: alpha(tokens.navy, 0.86), fontSize: 13 }}>
+                <Typography
+                  sx={{
+                    fontWeight: 900,
+                    color: alpha(tokens.navy, 0.86),
+                    fontSize: 13,
+                  }}
+                >
                   Offline Payments
                 </Typography>
                 <Stack spacing={0.9} sx={{ mt: 1.1 }}>
-                  <Typography sx={{ color: alpha(tokens.navy, 0.62), fontSize: 12.5, lineHeight: 1.65 }}>
+                  <Typography
+                    sx={{
+                      color: alpha(tokens.navy, 0.62),
+                      fontSize: 12.5,
+                      lineHeight: 1.65,
+                    }}
+                  >
                     No additional transaction fees.
                   </Typography>
-                  <Typography sx={{ color: alpha(tokens.navy, 0.62), fontSize: 12.5, lineHeight: 1.65 }}>
+                  <Typography
+                    sx={{
+                      color: alpha(tokens.navy, 0.62),
+                      fontSize: 12.5,
+                      lineHeight: 1.65,
+                    }}
+                  >
                     You keep 100% of the payment.
                   </Typography>
                 </Stack>
@@ -294,7 +386,9 @@ export default function PricingPage() {
               ))}
             </Grid>
 
-            <Typography sx={{ mt: 3, fontSize: 12.5, color: alpha(tokens.navy, 0.6) }}>
+            <Typography
+              sx={{ mt: 3, fontSize: 12.5, color: alpha(tokens.navy, 0.6) }}
+            >
               For the Stripe fees refer to the official pricing page:
             </Typography>
             <Typography
@@ -333,7 +427,9 @@ export default function PricingPage() {
             >
               Payout Options
             </Typography>
-            <Typography sx={{ mt: 1.25, fontSize: 12.5, color: alpha(tokens.navy, 0.6) }}>
+            <Typography
+              sx={{ mt: 1.25, fontSize: 12.5, color: alpha(tokens.navy, 0.6) }}
+            >
               All payouts are handled directly by Stripe.
             </Typography>
 
@@ -347,12 +443,25 @@ export default function PricingPage() {
                     minHeight: 130,
                   }}
                 >
-                  <Typography sx={{ fontWeight: 900, fontSize: 13.5, color: alpha(tokens.navy, 0.86) }}>
+                  <Typography
+                    sx={{
+                      fontWeight: 900,
+                      fontSize: 13.5,
+                      color: alpha(tokens.navy, 0.86),
+                    }}
+                  >
                     Standard Payout (Default)
                   </Typography>
-                  <Typography sx={{ mt: 1, fontSize: 12.5, color: alpha(tokens.navy, 0.62), lineHeight: 1.7 }}>
-                    Free — Funds are deposited to your bank account according to Stripe’s standard schedule (typically 2–3
-                    business days).
+                  <Typography
+                    sx={{
+                      mt: 1,
+                      fontSize: 12.5,
+                      color: alpha(tokens.navy, 0.62),
+                      lineHeight: 1.7,
+                    }}
+                  >
+                    Free — Funds are deposited to your bank account according to
+                    Stripe’s standard schedule (typically 2–3 business days).
                   </Typography>
                 </Box>
               </Grid>
@@ -365,12 +474,26 @@ export default function PricingPage() {
                     minHeight: 130,
                   }}
                 >
-                  <Typography sx={{ fontWeight: 900, fontSize: 13.5, color: alpha(tokens.navy, 0.86) }}>
+                  <Typography
+                    sx={{
+                      fontWeight: 900,
+                      fontSize: 13.5,
+                      color: alpha(tokens.navy, 0.86),
+                    }}
+                  >
                     Instant Payout
                   </Typography>
-                  <Typography sx={{ mt: 1, fontSize: 12.5, color: alpha(tokens.navy, 0.62), lineHeight: 1.7 }}>
-                    1% of payout amount (minimum €0.50) Funds are transferred instantly to your linked debit card.
-                    You can manage payout speed and bank details directly in your Stripe dashboard.
+                  <Typography
+                    sx={{
+                      mt: 1,
+                      fontSize: 12.5,
+                      color: alpha(tokens.navy, 0.62),
+                      lineHeight: 1.7,
+                    }}
+                  >
+                    1% of payout amount (minimum €0.50) Funds are transferred
+                    instantly to your linked debit card. You can manage payout
+                    speed and bank details directly in your Stripe dashboard.
                   </Typography>
                 </Box>
               </Grid>
@@ -396,8 +519,11 @@ export default function PricingPage() {
             >
               Stripe &amp; MOLLURE Partnership
             </Typography>
-            <Typography sx={{ mt: 1.25, fontSize: 12.5, color: alpha(tokens.navy, 0.6) }}>
-              When you activate online payments, you receive your own Stripe Standard Connected Account.
+            <Typography
+              sx={{ mt: 1.25, fontSize: 12.5, color: alpha(tokens.navy, 0.6) }}
+            >
+              When you activate online payments, you receive your own Stripe
+              Standard Connected Account.
             </Typography>
 
             <Box
@@ -409,7 +535,13 @@ export default function PricingPage() {
               }}
             >
               <Box sx={{ p: { xs: 2, md: 2.25 } }}>
-                <Typography sx={{ fontWeight: 900, fontSize: 13.5, color: alpha(tokens.navy, 0.86) }}>
+                <Typography
+                  sx={{
+                    fontWeight: 900,
+                    fontSize: 13.5,
+                    color: alpha(tokens.navy, 0.86),
+                  }}
+                >
                   This Means:
                 </Typography>
                 <Stack spacing={0.7} sx={{ mt: 1.15 }}>
@@ -421,7 +553,9 @@ export default function PricingPage() {
                     "MOLLURE does not access or hold your funds",
                   ].map((t) => (
                     <Box key={t} sx={{ color: alpha(tokens.navy, 0.62) }}>
-                      <BulletRow dotColor={alpha(tokens.navy, 0.35)}>{t}</BulletRow>
+                      <BulletRow dotColor={alpha(tokens.navy, 0.35)}>
+                        {t}
+                      </BulletRow>
                     </Box>
                   ))}
                 </Stack>
@@ -430,10 +564,23 @@ export default function PricingPage() {
               <Divider sx={{ borderColor: alpha(tokens.navy, 0.12) }} />
 
               <Box sx={{ p: { xs: 2, md: 2.25 } }}>
-                <Typography sx={{ fontWeight: 900, fontSize: 13.5, color: alpha(tokens.navy, 0.86) }}>
+                <Typography
+                  sx={{
+                    fontWeight: 900,
+                    fontSize: 13.5,
+                    color: alpha(tokens.navy, 0.86),
+                  }}
+                >
                   Inside Your Stripe Dashboard, You Can:
                 </Typography>
-                <Typography sx={{ mt: 1.1, fontSize: 12.5, color: alpha(tokens.navy, 0.62), lineHeight: 1.65 }}>
+                <Typography
+                  sx={{
+                    mt: 1.1,
+                    fontSize: 12.5,
+                    color: alpha(tokens.navy, 0.62),
+                    lineHeight: 1.65,
+                  }}
+                >
                   Inside your Stripe dashboard, you can:
                 </Typography>
 
@@ -445,17 +592,35 @@ export default function PricingPage() {
                     "Provide additional business information if requested by Stripe",
                   ].map((t) => (
                     <Box key={t} sx={{ color: alpha(tokens.navy, 0.62) }}>
-                      <BulletRow dotColor={alpha(tokens.navy, 0.35)}>{t}</BulletRow>
+                      <BulletRow dotColor={alpha(tokens.navy, 0.35)}>
+                        {t}
+                      </BulletRow>
                     </Box>
                   ))}
                 </Stack>
 
-                <Typography sx={{ mt: 1.4, fontSize: 12.5, color: alpha(tokens.navy, 0.62), lineHeight: 1.65 }}>
-                  Additional customization options are available within your Stripe dashboard.
+                <Typography
+                  sx={{
+                    mt: 1.4,
+                    fontSize: 12.5,
+                    color: alpha(tokens.navy, 0.62),
+                    lineHeight: 1.65,
+                  }}
+                >
+                  Additional customization options are available within your
+                  Stripe dashboard.
                 </Typography>
-                <Typography sx={{ mt: 0.85, fontSize: 12.5, color: alpha(tokens.navy, 0.62), lineHeight: 1.65 }}>
-                  If you disconnect your Stripe account, your MOLLURE public booking profile will be temporarily disabled
-                  until reconnected.
+                <Typography
+                  sx={{
+                    mt: 0.85,
+                    fontSize: 12.5,
+                    color: alpha(tokens.navy, 0.62),
+                    lineHeight: 1.65,
+                  }}
+                >
+                  If you disconnect your Stripe account, your MOLLURE public
+                  booking profile will be temporarily disabled until
+                  reconnected.
                 </Typography>
               </Box>
             </Box>
@@ -474,4 +639,3 @@ export default function PricingPage() {
     </Box>
   );
 }
-

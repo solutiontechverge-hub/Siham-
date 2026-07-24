@@ -47,7 +47,14 @@ export default function ReviewSummaryByCategoryChart({ title, bars }: Props) {
     >
       {title ? (
         <Box sx={{ px: 2.25, pt: 2, pb: 1 }}>
-          <BodyText sx={{ fontSize: 13.5, fontWeight: 900, color: alpha(m.navy, 0.85), textAlign: "center" }}>
+          <BodyText
+            sx={{
+              fontSize: 13.5,
+              fontWeight: 900,
+              color: alpha(m.navy, 0.85),
+              textAlign: "center",
+            }}
+          >
             {title}
           </BodyText>
         </Box>
@@ -64,7 +71,8 @@ export default function ReviewSummaryByCategoryChart({ title, bars }: Props) {
           }}
         >
           {bars.map((bar) => {
-            const barWidthPct = ((bar.totalReviews * REVIEW_SCALE) / MAX_AXIS) * 100;
+            const barWidthPct =
+              ((bar.totalReviews * REVIEW_SCALE) / MAX_AXIS) * 100;
             const segments = [
               { pct: bar.badPct, color: SEG_COLORS[0] },
               { pct: bar.goodPct, color: SEG_COLORS[1] },
@@ -131,12 +139,23 @@ export default function ReviewSummaryByCategoryChart({ title, bars }: Props) {
                                   display: "flex",
                                   alignItems: "center",
                                   justifyContent: "center",
-                                  color: isWhiteText ? "#fff" : alpha(m.navy, 0.72),
-                                  textShadow: isWhiteText ? "0 1px 3px rgba(0,60,70,0.45)" : "none",
+                                  color: isWhiteText
+                                    ? "#fff"
+                                    : alpha(m.navy, 0.72),
+                                  textShadow: isWhiteText
+                                    ? "0 1px 3px rgba(0,60,70,0.45)"
+                                    : "none",
                                   pointerEvents: "none",
                                 }}
                               >
-                                <BodyText component="span" sx={{ fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}>
+                                <BodyText
+                                  component="span"
+                                  sx={{
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
                                   {pctLabel(seg.pct)}
                                 </BodyText>
                               </Box>
@@ -174,13 +193,28 @@ export default function ReviewSummaryByCategoryChart({ title, bars }: Props) {
               }}
             >
               <Box>
-                <Box sx={{ height: 1, bgcolor: alpha(m.navy, 0.35), width: "100%" }} />
-                <Stack direction="row" justifyContent="space-between" sx={{ mt: 0.75 }}>
+                <Box
+                  sx={{
+                    height: 1,
+                    bgcolor: alpha(m.navy, 0.35),
+                    width: "100%",
+                  }}
+                />
+                <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  sx={{ mt: 0.75 }}
+                >
                   {Array.from({ length: TICK_COUNT }).map((_, i) => (
                     <BodyText
                       key={i}
                       component="span"
-                      sx={{ fontSize: 10.5, fontWeight: 500, color: alpha(m.navy, 0.5), lineHeight: 1 }}
+                      sx={{
+                        fontSize: 10.5,
+                        fontWeight: 500,
+                        color: alpha(m.navy, 0.5),
+                        lineHeight: 1,
+                      }}
                     >
                       {(TICK_STEP * i).toLocaleString()}
                     </BodyText>
@@ -197,9 +231,29 @@ export default function ReviewSummaryByCategoryChart({ title, bars }: Props) {
       <Box sx={{ px: 2.25, pt: 1.5, pb: 2 }}>
         <Stack direction="row" spacing={3} justifyContent="center">
           {(["Bad", "Good", "Excellent"] as const).map((label, i) => (
-            <Stack key={label} direction="row" alignItems="center" spacing={0.75}>
-              <Box sx={{ width: 11, height: 11, borderRadius: "2px", bgcolor: SEG_COLORS[i], flexShrink: 0 }} />
-              <BodyText component="span" sx={{ fontSize: 11, fontWeight: 700, color: alpha(m.navy, 0.6) }}>
+            <Stack
+              key={label}
+              direction="row"
+              alignItems="center"
+              spacing={0.75}
+            >
+              <Box
+                sx={{
+                  width: 11,
+                  height: 11,
+                  borderRadius: "2px",
+                  bgcolor: SEG_COLORS[i],
+                  flexShrink: 0,
+                }}
+              />
+              <BodyText
+                component="span"
+                sx={{
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: alpha(m.navy, 0.6),
+                }}
+              >
                 {label}
               </BodyText>
             </Stack>

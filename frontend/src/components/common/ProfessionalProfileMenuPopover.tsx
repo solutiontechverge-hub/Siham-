@@ -1,10 +1,11 @@
 "use client";
 
+import AppButton from "./AppButton";
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import ReportProblemRoundedIcon from "@mui/icons-material/ReportProblemRounded";
-import { Avatar, Box, Button, Popover, Stack, Typography } from "@mui/material";
+import { Avatar, Box, Popover, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { clearPersistedAuthSession } from "../../lib/auth-storage";
 import { useAppDispatch } from "../../store/hooks";
@@ -111,8 +112,13 @@ export default function ProfessionalProfileMenuPopover({
   ] as const;
 
   const deleteDialogFooter = (
-    <Stack direction="row" spacing={1} justifyContent="center" sx={{ px: 2.5, py: 2 }}>
-      <Button
+    <Stack
+      direction="row"
+      spacing={1}
+      justifyContent="center"
+      sx={{ px: 2.5, py: 2 }}
+    >
+      <AppButton
         onClick={closeDeleteDialog}
         variant="outlined"
         sx={{
@@ -128,8 +134,8 @@ export default function ProfessionalProfileMenuPopover({
         }}
       >
         Cancel
-      </Button>
-      <Button
+      </AppButton>
+      <AppButton
         variant="contained"
         disableElevation
         onClick={handleConfirmDeleteAccount}
@@ -145,7 +151,7 @@ export default function ProfessionalProfileMenuPopover({
         }}
       >
         Delete account
-      </Button>
+      </AppButton>
     </Stack>
   );
 
@@ -184,17 +190,26 @@ export default function ProfessionalProfileMenuPopover({
               {avatarSrc ? null : getInitials(name || email)}
             </Avatar>
             <Box sx={{ minWidth: 0 }}>
-              <Typography sx={{ fontWeight: 900, color: tokens.navy, fontSize: 18, lineHeight: 1.2 }}>
+              <Typography
+                sx={{
+                  fontWeight: 900,
+                  color: tokens.navy,
+                  fontSize: 18,
+                  lineHeight: 1.2,
+                }}
+              >
                 {name}
               </Typography>
-              <Typography sx={{ color: tokens.slate, fontSize: 12.5, mt: 0.25 }}>
+              <Typography
+                sx={{ color: tokens.slate, fontSize: 12.5, mt: 0.25 }}
+              >
                 {email}
               </Typography>
             </Box>
           </Stack>
 
           {menuItems.map((item) => (
-            <Button
+            <AppButton
               key={item.href}
               component={Link}
               href={item.href}
@@ -204,14 +219,19 @@ export default function ProfessionalProfileMenuPopover({
               onClick={onClose}
             >
               {item.label}
-            </Button>
+            </AppButton>
           ))}
 
-          <Button variant="outlined" fullWidth sx={deleteBtnSx} onClick={openDeleteDialog}>
+          <AppButton
+            variant="outlined"
+            fullWidth
+            sx={deleteBtnSx}
+            onClick={openDeleteDialog}
+          >
             Delete account
-          </Button>
+          </AppButton>
 
-          <Button
+          <AppButton
             variant="contained"
             fullWidth
             onClick={handleLogout}
@@ -226,7 +246,7 @@ export default function ProfessionalProfileMenuPopover({
             }}
           >
             Logout
-          </Button>
+          </AppButton>
         </Stack>
       </Popover>
 
@@ -266,11 +286,11 @@ export default function ProfessionalProfileMenuPopover({
               mx: "auto",
             }}
           >
-            This will permanently delete your professional account and cannot be undone.
+            This will permanently delete your professional account and cannot be
+            undone.
           </Typography>
         </Box>
       </AppModal>
     </>
   );
 }
-

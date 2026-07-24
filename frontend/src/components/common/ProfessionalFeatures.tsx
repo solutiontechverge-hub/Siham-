@@ -468,19 +468,24 @@ function toneStyles(tokens: any, tone: MiniCard["tone"]) {
   }
 }
 
-function BulletList({
-  items,
-}: {
-  items: readonly string[];
-}) {
+function BulletList({ items }: { items: readonly string[] }) {
   const tokens = useTheme().palette.mollure;
 
   return (
     <Stack spacing={1.25} sx={{ mt: 2 }}>
       {items.map((text) => (
-        <Stack key={text} direction="row" spacing={1.25} alignItems="flex-start">
-          <CheckCircleRoundedIcon sx={{ mt: "2px", fontSize: 20, color: tokens.teal }} />
-          <Typography sx={{ color: tokens.slate, fontSize: 13.5, lineHeight: 1.7 }}>
+        <Stack
+          key={text}
+          direction="row"
+          spacing={1.25}
+          alignItems="flex-start"
+        >
+          <CheckCircleRoundedIcon
+            sx={{ mt: "2px", fontSize: 20, color: tokens.teal }}
+          />
+          <Typography
+            sx={{ color: tokens.slate, fontSize: 13.5, lineHeight: 1.7 }}
+          >
             {text}
           </Typography>
         </Stack>
@@ -494,8 +499,16 @@ function BusinessSetupCard() {
 
   const Bullet = ({ children }: { children: React.ReactNode }) => (
     <Stack direction="row" spacing={1.25} alignItems="flex-start">
-      <CheckCircleRoundedIcon sx={{ mt: "2px", fontSize: 18, color: tokens.teal }} />
-      <Typography sx={{ color: alpha(tokens.navy, 0.72), fontSize: 13.5, lineHeight: 1.7 }}>
+      <CheckCircleRoundedIcon
+        sx={{ mt: "2px", fontSize: 18, color: tokens.teal }}
+      />
+      <Typography
+        sx={{
+          color: alpha(tokens.navy, 0.72),
+          fontSize: 13.5,
+          lineHeight: 1.7,
+        }}
+      >
         {children}
       </Typography>
     </Stack>
@@ -539,10 +552,24 @@ function BusinessSetupCard() {
         {icon}
       </Box>
       <Box sx={{ minWidth: 0 }}>
-        <Typography sx={{ fontWeight: 900, fontSize: 13, color: tokens.navy, lineHeight: 1.15 }}>
+        <Typography
+          sx={{
+            fontWeight: 900,
+            fontSize: 13,
+            color: tokens.navy,
+            lineHeight: 1.15,
+          }}
+        >
           {title}
         </Typography>
-        <Typography sx={{ mt: 0.25, fontSize: 10.5, color: alpha(tokens.navy, 0.46), lineHeight: 1.25 }}>
+        <Typography
+          sx={{
+            mt: 0.25,
+            fontSize: 10.5,
+            color: alpha(tokens.navy, 0.46),
+            lineHeight: 1.25,
+          }}
+        >
           {description}
         </Typography>
       </Box>
@@ -565,7 +592,8 @@ function BusinessSetupCard() {
         sx={{
           position: "absolute",
           inset: 0,
-          background: "linear-gradient(180deg, rgba(218, 244, 255, 0.65) 0%, rgba(255,255,255,0.94) 100%)",
+          background:
+            "linear-gradient(180deg, rgba(218, 244, 255, 0.65) 0%, rgba(255,255,255,0.94) 100%)",
           pointerEvents: "none",
         }}
       />
@@ -592,19 +620,26 @@ function BusinessSetupCard() {
       </Box>
 
       <Box sx={{ position: "relative", p: { xs: 2.4, md: 3 } }}>
-        <Typography sx={{ fontWeight: 900, fontSize: 15.5, color: tokens.navy }}>
+        <Typography
+          sx={{ fontWeight: 900, fontSize: 15.5, color: tokens.navy }}
+        >
           Business Setup &amp; Professional Presence
         </Typography>
-        <Typography sx={{ mt: 1.1, fontSize: 11.5, color: alpha(tokens.navy, 0.5) }}>
-          Create A Professional Presence That Clearly Reflects Who You Are And How You Work.
+        <Typography
+          sx={{ mt: 1.1, fontSize: 11.5, color: alpha(tokens.navy, 0.5) }}
+        >
+          Create A Professional Presence That Clearly Reflects Who You Are And
+          How You Work.
         </Typography>
 
         <Stack spacing={1.35} sx={{ mt: 2.25 }}>
           <Bullet>
-            Choose whether you offer services at a Fixed Location, Desired Location, or both
+            Choose whether you offer services at a Fixed Location, Desired
+            Location, or both
           </Bullet>
           <Bullet>
-            Option to use the same content for both locations or manage them separately
+            Option to use the same content for both locations or manage them
+            separately
           </Bullet>
           <Bullet>
             Present your professional name, bio, cover images, and keywords
@@ -637,7 +672,9 @@ function BusinessSetupCard() {
         </Box>
 
         <Box sx={{ mt: 2.25 }}>
-          <Bullet>Structure your services and sub-services with clear pricing</Bullet>
+          <Bullet>
+            Structure your services and sub-services with clear pricing
+          </Bullet>
         </Box>
 
         <Box
@@ -674,7 +711,9 @@ function BusinessSetupCard() {
         </Box>
 
         <Stack spacing={1.35} sx={{ mt: 2.2 }}>
-          <Bullet>Add team members and define which services they provide</Bullet>
+          <Bullet>
+            Add team members and define which services they provide
+          </Bullet>
           <Bullet>
             <Box component="span" sx={{ fontWeight: 900, color: tokens.navy }}>
               Display key business information on your profile:
@@ -685,10 +724,32 @@ function BusinessSetupCard() {
         <Grid container spacing={1.5} sx={{ mt: 1.4, pl: 3.75 }}>
           <Grid item xs={12} md={6}>
             <Stack spacing={1.1}>
-              {["Price Range", "Kilometer Allowance For On-Location Services"].map((t) => (
-                <Stack key={t} direction="row" spacing={1} alignItems="flex-start">
-                  <Box sx={{ mt: "7px", width: 4, height: 4, borderRadius: 99, bgcolor: alpha(tokens.navy, 0.35) }} />
-                  <Typography sx={{ color: alpha(tokens.navy, 0.6), fontSize: 12, lineHeight: 1.6 }}>
+              {[
+                "Price Range",
+                "Kilometer Allowance For On-Location Services",
+              ].map((t) => (
+                <Stack
+                  key={t}
+                  direction="row"
+                  spacing={1}
+                  alignItems="flex-start"
+                >
+                  <Box
+                    sx={{
+                      mt: "7px",
+                      width: 4,
+                      height: 4,
+                      borderRadius: 99,
+                      bgcolor: alpha(tokens.navy, 0.35),
+                    }}
+                  />
+                  <Typography
+                    sx={{
+                      color: alpha(tokens.navy, 0.6),
+                      fontSize: 12,
+                      lineHeight: 1.6,
+                    }}
+                  >
                     {t}
                   </Typography>
                 </Stack>
@@ -701,9 +762,28 @@ function BusinessSetupCard() {
                 "Policies (Response Time, Cancellation, Rescheduling, No-Show)",
                 "Prepayment Requirements (If Applicable)",
               ].map((t) => (
-                <Stack key={t} direction="row" spacing={1} alignItems="flex-start">
-                  <Box sx={{ mt: "7px", width: 4, height: 4, borderRadius: 99, bgcolor: alpha(tokens.navy, 0.35) }} />
-                  <Typography sx={{ color: alpha(tokens.navy, 0.6), fontSize: 12, lineHeight: 1.6 }}>
+                <Stack
+                  key={t}
+                  direction="row"
+                  spacing={1}
+                  alignItems="flex-start"
+                >
+                  <Box
+                    sx={{
+                      mt: "7px",
+                      width: 4,
+                      height: 4,
+                      borderRadius: 99,
+                      bgcolor: alpha(tokens.navy, 0.35),
+                    }}
+                  />
+                  <Typography
+                    sx={{
+                      color: alpha(tokens.navy, 0.6),
+                      fontSize: 12,
+                      lineHeight: 1.6,
+                    }}
+                  >
                     {t}
                   </Typography>
                 </Stack>
@@ -713,7 +793,10 @@ function BusinessSetupCard() {
         </Grid>
 
         <Box sx={{ mt: 1.8 }}>
-          <Bullet>Showcase your work with a portfolio of images visible on your public profile</Bullet>
+          <Bullet>
+            Showcase your work with a portfolio of images visible on your public
+            profile
+          </Bullet>
         </Box>
       </Box>
     </Paper>
@@ -725,8 +808,16 @@ function CalendarSchedulingCard() {
 
   const Bullet = ({ children }: { children: React.ReactNode }) => (
     <Stack direction="row" spacing={1.25} alignItems="flex-start">
-      <CheckCircleRoundedIcon sx={{ mt: "2px", fontSize: 18, color: tokens.teal }} />
-      <Typography sx={{ color: alpha(tokens.navy, 0.72), fontSize: 13.5, lineHeight: 1.7 }}>
+      <CheckCircleRoundedIcon
+        sx={{ mt: "2px", fontSize: 18, color: tokens.teal }}
+      />
+      <Typography
+        sx={{
+          color: alpha(tokens.navy, 0.72),
+          fontSize: 13.5,
+          lineHeight: 1.7,
+        }}
+      >
         {children}
       </Typography>
     </Stack>
@@ -762,7 +853,13 @@ function CalendarSchedulingCard() {
       >
         {icon}
       </Box>
-      <Typography sx={{ fontSize: 11.5, color: alpha(tokens.navy, 0.62), lineHeight: 1.3 }}>
+      <Typography
+        sx={{
+          fontSize: 11.5,
+          color: alpha(tokens.navy, 0.62),
+          lineHeight: 1.3,
+        }}
+      >
         {text}
       </Typography>
     </Paper>
@@ -784,7 +881,8 @@ function CalendarSchedulingCard() {
         sx={{
           position: "absolute",
           inset: 0,
-          background: "linear-gradient(180deg, rgba(232, 251, 247, 0.85) 0%, rgba(255,255,255,0.94) 100%)",
+          background:
+            "linear-gradient(180deg, rgba(232, 251, 247, 0.85) 0%, rgba(255,255,255,0.94) 100%)",
           pointerEvents: "none",
         }}
       />
@@ -823,19 +921,28 @@ function CalendarSchedulingCard() {
             boxShadow: MARKETING_CARD_SHADOW_INNER,
           }}
         >
-          <Typography sx={{ fontWeight: 900, fontSize: 14, color: tokens.navy }}>
+          <Typography
+            sx={{ fontWeight: 900, fontSize: 14, color: tokens.navy }}
+          >
             Calendar &amp; Scheduling
           </Typography>
         </Box>
 
-        <Typography sx={{ mt: 1.5, fontSize: 11.5, color: alpha(tokens.navy, 0.5) }}>
+        <Typography
+          sx={{ mt: 1.5, fontSize: 11.5, color: alpha(tokens.navy, 0.5) }}
+        >
           Manage Your Entire Schedule From One Central Place.
         </Typography>
 
         <Stack spacing={1.35} sx={{ mt: 2.25 }}>
-          <Bullet>Central calendar with a full overview of all bookings (online and offline)</Bullet>
+          <Bullet>
+            Central calendar with a full overview of all bookings (online and
+            offline)
+          </Bullet>
           <Bullet>Team scheduling with long-term availability planning</Bullet>
-          <Bullet>Time blocking for breaks, meetings, or unavailable periods</Bullet>
+          <Bullet>
+            Time blocking for breaks, meetings, or unavailable periods
+          </Bullet>
         </Stack>
 
         <Box
@@ -855,10 +962,16 @@ function CalendarSchedulingCard() {
 
           <Grid container spacing={2} sx={{ mt: 1.6 }}>
             <Grid item xs={12} md={4}>
-              <Mini icon={<EventNoteRoundedIcon sx={{ fontSize: 16 }} />} text="Booking Details" />
+              <Mini
+                icon={<EventNoteRoundedIcon sx={{ fontSize: 16 }} />}
+                text="Booking Details"
+              />
             </Grid>
             <Grid item xs={12} md={4}>
-              <Mini icon={<LinkRoundedIcon sx={{ fontSize: 16 }} />} text="Linked Sales And Payment Activity" />
+              <Mini
+                icon={<LinkRoundedIcon sx={{ fontSize: 16 }} />}
+                text="Linked Sales And Payment Activity"
+              />
             </Grid>
             <Grid item xs={12} md={4}>
               <Mini
@@ -871,8 +984,9 @@ function CalendarSchedulingCard() {
 
         <Box sx={{ mt: 2.2 }}>
           <Bullet>
-            Set your public hours and define booking preferences, including time intervals between appointments,
-            service order logic and calendar appearance.
+            Set your public hours and define booking preferences, including time
+            intervals between appointments, service order logic and calendar
+            appearance.
           </Bullet>
         </Box>
       </Box>
@@ -888,19 +1002,19 @@ function InteractiveBookingFlowCard() {
   const Bullet = ({ children }: { children: React.ReactNode }) => (
     <Stack direction="row" spacing={1.25} alignItems="flex-start">
       <CheckCircleRoundedIcon sx={{ mt: "2px", fontSize: 18, color: orange }} />
-      <Typography sx={{ color: alpha(tokens.navy, 0.72), fontSize: 13.5, lineHeight: 1.7 }}>
+      <Typography
+        sx={{
+          color: alpha(tokens.navy, 0.72),
+          fontSize: 13.5,
+          lineHeight: 1.7,
+        }}
+      >
         {children}
       </Typography>
     </Stack>
   );
 
-  const Mini = ({
-    icon,
-    title,
-  }: {
-    icon: React.ReactNode;
-    title: string;
-  }) => (
+  const Mini = ({ icon, title }: { icon: React.ReactNode; title: string }) => (
     <Paper
       elevation={0}
       sx={{
@@ -1009,18 +1123,23 @@ function InteractiveBookingFlowCard() {
             boxShadow: MARKETING_CARD_SHADOW_INNER,
           }}
         >
-          <Typography sx={{ fontWeight: 900, fontSize: 14, color: tokens.navy }}>
+          <Typography
+            sx={{ fontWeight: 900, fontSize: 14, color: tokens.navy }}
+          >
             Interactive Booking Flow
           </Typography>
         </Box>
 
-        <Typography sx={{ mt: 1.5, fontSize: 11.5, color: alpha(tokens.navy, 0.5) }}>
+        <Typography
+          sx={{ mt: 1.5, fontSize: 11.5, color: alpha(tokens.navy, 0.5) }}
+        >
           Handle Online Bookings Through A Structured, Fair Approval Process.
         </Typography>
 
         <Stack spacing={1.35} sx={{ mt: 2.25 }}>
           <Bullet>
-            Online bookings follow Mollure&apos;s interactive booking flow when confirmation is required
+            Online bookings follow Mollure&apos;s interactive booking flow when
+            confirmation is required
           </Bullet>
         </Stack>
 
@@ -1041,10 +1160,16 @@ function InteractiveBookingFlowCard() {
 
           <Grid container spacing={1.8} sx={{ mt: 1.5 }}>
             <Grid item xs={12} md={4}>
-              <Mini icon={<TaskAltRoundedIcon sx={{ fontSize: 16 }} />} title="Booking Requests" />
+              <Mini
+                icon={<TaskAltRoundedIcon sx={{ fontSize: 16 }} />}
+                title="Booking Requests"
+              />
             </Grid>
             <Grid item xs={12} md={4}>
-              <Mini icon={<EditNoteRoundedIcon sx={{ fontSize: 16 }} />} title="Edited Booking Requests" />
+              <Mini
+                icon={<EditNoteRoundedIcon sx={{ fontSize: 16 }} />}
+                title="Edited Booking Requests"
+              />
             </Grid>
             <Grid item xs={12} md={4}>
               <Mini
@@ -1057,8 +1182,12 @@ function InteractiveBookingFlowCard() {
 
         <Stack spacing={1.35} sx={{ mt: 2.2 }}>
           <Bullet>Clear comparison of changes before approval</Bullet>
-          <Bullet>Ability to accept, edit, or reject requests with full transparency</Bullet>
-          <Bullet>Major changes always require approval from the other party</Bullet>
+          <Bullet>
+            Ability to accept, edit, or reject requests with full transparency
+          </Bullet>
+          <Bullet>
+            Major changes always require approval from the other party
+          </Bullet>
         </Stack>
       </Box>
     </Paper>
@@ -1070,8 +1199,16 @@ function ClientManagementInsightsCard() {
 
   const Bullet = ({ children }: { children: React.ReactNode }) => (
     <Stack direction="row" spacing={1.25} alignItems="flex-start">
-      <CheckCircleRoundedIcon sx={{ mt: "2px", fontSize: 18, color: tokens.teal }} />
-      <Typography sx={{ color: alpha(tokens.navy, 0.72), fontSize: 13.5, lineHeight: 1.7 }}>
+      <CheckCircleRoundedIcon
+        sx={{ mt: "2px", fontSize: 18, color: tokens.teal }}
+      />
+      <Typography
+        sx={{
+          color: alpha(tokens.navy, 0.72),
+          fontSize: 13.5,
+          lineHeight: 1.7,
+        }}
+      >
         {children}
       </Typography>
     </Stack>
@@ -1102,18 +1239,25 @@ function ClientManagementInsightsCard() {
             boxShadow: MARKETING_CARD_SHADOW_INNER,
           }}
         >
-          <Typography sx={{ fontWeight: 900, fontSize: 14, color: tokens.navy }}>
+          <Typography
+            sx={{ fontWeight: 900, fontSize: 14, color: tokens.navy }}
+          >
             Client Management &amp; Insights
           </Typography>
         </Box>
 
-        <Typography sx={{ mt: 1.5, fontSize: 11.5, color: alpha(tokens.navy, 0.5) }}>
+        <Typography
+          sx={{ mt: 1.5, fontSize: 11.5, color: alpha(tokens.navy, 0.5) }}
+        >
           Understand Your Clients And Build Stronger Relationships.
         </Typography>
 
         <Stack spacing={1.35} sx={{ mt: 2.25 }}>
           <Bullet>Overview of all clients in one place</Bullet>
-          <Bullet>Includes both registered Mollure clients and client profiles you created</Bullet>
+          <Bullet>
+            Includes both registered Mollure clients and client profiles you
+            created
+          </Bullet>
           <Bullet>Access client details and client-level insights</Bullet>
           <Bullet>Add internal notes to track preferences and context</Bullet>
         </Stack>
@@ -1127,20 +1271,22 @@ function PaymentsInvoicingFinancialControlCard() {
 
   const Bullet = ({ children }: { children: React.ReactNode }) => (
     <Stack direction="row" spacing={1.25} alignItems="flex-start">
-      <CheckCircleRoundedIcon sx={{ mt: "2px", fontSize: 18, color: tokens.teal }} />
-      <Typography sx={{ color: alpha(tokens.navy, 0.72), fontSize: 13.5, lineHeight: 1.7 }}>
+      <CheckCircleRoundedIcon
+        sx={{ mt: "2px", fontSize: 18, color: tokens.teal }}
+      />
+      <Typography
+        sx={{
+          color: alpha(tokens.navy, 0.72),
+          fontSize: 13.5,
+          lineHeight: 1.7,
+        }}
+      >
         {children}
       </Typography>
     </Stack>
   );
 
-  const Mini = ({
-    icon,
-    title,
-  }: {
-    icon: React.ReactNode;
-    title: string;
-  }) => (
+  const Mini = ({ icon, title }: { icon: React.ReactNode; title: string }) => (
     <Paper
       elevation={0}
       sx={{
@@ -1170,7 +1316,14 @@ function PaymentsInvoicingFinancialControlCard() {
       >
         {icon}
       </Box>
-      <Typography sx={{ fontSize: 12, fontWeight: 800, color: alpha(tokens.navy, 0.72), lineHeight: 1.25 }}>
+      <Typography
+        sx={{
+          fontSize: 12,
+          fontWeight: 800,
+          color: alpha(tokens.navy, 0.72),
+          lineHeight: 1.25,
+        }}
+      >
         {title}
       </Typography>
     </Paper>
@@ -1201,28 +1354,44 @@ function PaymentsInvoicingFinancialControlCard() {
             boxShadow: MARKETING_CARD_SHADOW_INNER,
           }}
         >
-          <Typography sx={{ fontWeight: 900, fontSize: 14, color: tokens.navy }}>
+          <Typography
+            sx={{ fontWeight: 900, fontSize: 14, color: tokens.navy }}
+          >
             Payments, Invoicing &amp; Financial Control
           </Typography>
         </Box>
 
-        <Typography sx={{ mt: 1.5, fontSize: 11.5, color: alpha(tokens.navy, 0.5) }}>
+        <Typography
+          sx={{ mt: 1.5, fontSize: 11.5, color: alpha(tokens.navy, 0.5) }}
+        >
           Stay In Control Of Your Finances With Stripe-Powered Payments.
         </Typography>
 
         <Stack spacing={1.35} sx={{ mt: 2.25 }}>
-          <Bullet>Clear overview of all transactions (online and offline)</Bullet>
+          <Bullet>
+            Clear overview of all transactions (online and offline)
+          </Bullet>
           <Bullet>Stripe-powered online payments with direct payouts</Bullet>
-          <Bullet>Access to your connected Stripe dashboard for online payment details</Bullet>
-          <Bullet>Control which post-booking payment methods are available at checkout</Bullet>
+          <Bullet>
+            Access to your connected Stripe dashboard for online payment details
+          </Bullet>
+          <Bullet>
+            Control which post-booking payment methods are available at checkout
+          </Bullet>
         </Stack>
 
         <Grid container spacing={2} sx={{ mt: 2.25 }}>
           <Grid item xs={12} md={4}>
-            <Mini icon={<PersonRoundedIcon sx={{ fontSize: 18 }} />} title="Individual Client Invoices" />
+            <Mini
+              icon={<PersonRoundedIcon sx={{ fontSize: 18 }} />}
+              title="Individual Client Invoices"
+            />
           </Grid>
           <Grid item xs={12} md={4}>
-            <Mini icon={<ReceiptLongRoundedIcon sx={{ fontSize: 18 }} />} title="Tax-Compliant Business Invoices" />
+            <Mini
+              icon={<ReceiptLongRoundedIcon sx={{ fontSize: 18 }} />}
+              title="Tax-Compliant Business Invoices"
+            />
           </Grid>
           <Grid item xs={12} md={4}>
             <Mini
@@ -1233,7 +1402,9 @@ function PaymentsInvoicingFinancialControlCard() {
         </Grid>
 
         <Box sx={{ mt: 2.2 }}>
-          <Bullet>Refunds and payment adjustments handled per booking when applicable</Bullet>
+          <Bullet>
+            Refunds and payment adjustments handled per booking when applicable
+          </Bullet>
         </Box>
       </Box>
     </Paper>
@@ -1245,8 +1416,16 @@ function AnalyticsPerformanceCard() {
 
   const Bullet = ({ children }: { children: React.ReactNode }) => (
     <Stack direction="row" spacing={1.25} alignItems="flex-start">
-      <CheckCircleRoundedIcon sx={{ mt: "2px", fontSize: 18, color: tokens.teal }} />
-      <Typography sx={{ color: alpha(tokens.navy, 0.72), fontSize: 13.5, lineHeight: 1.7 }}>
+      <CheckCircleRoundedIcon
+        sx={{ mt: "2px", fontSize: 18, color: tokens.teal }}
+      />
+      <Typography
+        sx={{
+          color: alpha(tokens.navy, 0.72),
+          fontSize: 13.5,
+          lineHeight: 1.7,
+        }}
+      >
         {children}
       </Typography>
     </Stack>
@@ -1299,12 +1478,16 @@ function AnalyticsPerformanceCard() {
             boxShadow: MARKETING_CARD_SHADOW_INNER,
           }}
         >
-          <Typography sx={{ fontWeight: 900, fontSize: 14, color: tokens.navy }}>
+          <Typography
+            sx={{ fontWeight: 900, fontSize: 14, color: tokens.navy }}
+          >
             Analytics &amp; Performance
           </Typography>
         </Box>
 
-        <Typography sx={{ mt: 1.5, fontSize: 11.5, color: alpha(tokens.navy, 0.5) }}>
+        <Typography
+          sx={{ mt: 1.5, fontSize: 11.5, color: alpha(tokens.navy, 0.5) }}
+        >
           Track Performance And Make Informed Decisions.
         </Typography>
 
@@ -1324,8 +1507,16 @@ function NotificationsCard() {
 
   const Bullet = ({ children }: { children: React.ReactNode }) => (
     <Stack direction="row" spacing={1.25} alignItems="flex-start">
-      <CheckCircleRoundedIcon sx={{ mt: "2px", fontSize: 18, color: tokens.teal }} />
-      <Typography sx={{ color: alpha(tokens.navy, 0.72), fontSize: 13.5, lineHeight: 1.7 }}>
+      <CheckCircleRoundedIcon
+        sx={{ mt: "2px", fontSize: 18, color: tokens.teal }}
+      />
+      <Typography
+        sx={{
+          color: alpha(tokens.navy, 0.72),
+          fontSize: 13.5,
+          lineHeight: 1.7,
+        }}
+      >
         {children}
       </Typography>
     </Stack>
@@ -1356,22 +1547,31 @@ function NotificationsCard() {
             boxShadow: MARKETING_CARD_SHADOW_INNER,
           }}
         >
-          <Typography sx={{ fontWeight: 900, fontSize: 14, color: tokens.navy }}>
+          <Typography
+            sx={{ fontWeight: 900, fontSize: 14, color: tokens.navy }}
+          >
             Notifications
           </Typography>
         </Box>
 
-        <Typography sx={{ mt: 1.5, fontSize: 11.5, color: alpha(tokens.navy, 0.5) }}>
+        <Typography
+          sx={{ mt: 1.5, fontSize: 11.5, color: alpha(tokens.navy, 0.5) }}
+        >
           Never Miss An Important Update.
         </Typography>
 
         <Stack spacing={1.35} sx={{ mt: 2.25 }}>
-          <Bullet>In-app notifications and emails are sent for important booking actions</Bullet>
           <Bullet>
-            This includes booking requests, edits, confirmations, cancellations, and payment-related updates
+            In-app notifications and emails are sent for important booking
+            actions
           </Bullet>
           <Bullet>
-            All notifications include direct access to the booking for quick review and action
+            This includes booking requests, edits, confirmations, cancellations,
+            and payment-related updates
+          </Bullet>
+          <Bullet>
+            All notifications include direct access to the booking for quick
+            review and action
           </Bullet>
         </Stack>
       </Box>
@@ -1415,7 +1615,9 @@ function MiniCards({ cards }: { cards: readonly MiniCard[] }) {
               >
                 {c.icon}
               </Box>
-              <Typography sx={{ fontWeight: 800, fontSize: 13.5, color: tokens.navy }}>
+              <Typography
+                sx={{ fontWeight: 800, fontSize: 13.5, color: tokens.navy }}
+              >
                 {c.title}
               </Typography>
             </Paper>
@@ -1485,10 +1687,19 @@ function FeatureSection({
         }}
       />
       <Box sx={{ position: "relative", p: { xs: 2.5, md: 3 } }}>
-        <Typography sx={{ fontWeight: 900, fontSize: 16.5, color: tokens.navy }}>
+        <Typography
+          sx={{ fontWeight: 900, fontSize: 16.5, color: tokens.navy }}
+        >
           {title}
         </Typography>
-        <Typography sx={{ mt: 0.75, color: tokens.bodyText, fontSize: 13.5, lineHeight: 1.75 }}>
+        <Typography
+          sx={{
+            mt: 0.75,
+            color: tokens.bodyText,
+            fontSize: 13.5,
+            lineHeight: 1.75,
+          }}
+        >
           {subtitle}
         </Typography>
         <BulletList items={bullets} />
@@ -1498,12 +1709,16 @@ function FeatureSection({
   );
 }
 
-export default function ProfessionalFeatures({ data }: ProfessionalFeaturesProps) {
+export default function ProfessionalFeatures({
+  data,
+}: ProfessionalFeaturesProps) {
   const tokens = useTheme().palette.mollure;
   const { header, footer } = data;
 
   return (
-    <Box sx={{ bgcolor: tokens.surface, color: tokens.navy, minHeight: "100vh" }}>
+    <Box
+      sx={{ bgcolor: tokens.surface, color: tokens.navy, minHeight: "100vh" }}
+    >
       <MollureMarketingHeader
         navItems={[...header.navItems]}
         localeLabel={header.localeLabel}
@@ -1577,4 +1792,3 @@ export default function ProfessionalFeatures({ data }: ProfessionalFeaturesProps
     </Box>
   );
 }
-

@@ -1,7 +1,8 @@
 "use client";
 
+import AppButton from "../AppButton";
 import * as React from "react";
-import { Box, Button, Stack, Typography } from "@mui/material";
+import { Box, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDrawer from "../AppDrawer";
 import AppTextField from "../AppTextField";
@@ -16,7 +17,13 @@ type Props = {
 };
 
 /** Client EBR suggest drawer — note + edit services/products (shared AppDrawer shell). */
-export default function ClientEbrSuggestDrawer({ open, draft, onClose, onEditServices, onSend }: Props) {
+export default function ClientEbrSuggestDrawer({
+  open,
+  draft,
+  onClose,
+  onEditServices,
+  onSend,
+}: Props) {
   const m = useTheme().palette.mollure;
   const [note, setNote] = React.useState("");
   const [sending, setSending] = React.useState(false);
@@ -24,7 +31,9 @@ export default function ClientEbrSuggestDrawer({ open, draft, onClose, onEditSer
   React.useEffect(() => {
     if (!open) return;
     const saved =
-      typeof window !== "undefined" ? window.sessionStorage.getItem("mollure:ebr_suggest_note") ?? "" : "";
+      typeof window !== "undefined"
+        ? (window.sessionStorage.getItem("mollure:ebr_suggest_note") ?? "")
+        : "";
     setNote(saved);
     setSending(false);
     if (saved && typeof window !== "undefined") {
@@ -54,7 +63,14 @@ export default function ClientEbrSuggestDrawer({ open, draft, onClose, onEditSer
         />
 
         <Box>
-          <Typography sx={{ fontWeight: 900, fontSize: 12.5, color: alpha(m.navy, 0.7), mb: 1 }}>
+          <Typography
+            sx={{
+              fontWeight: 900,
+              fontSize: 12.5,
+              color: alpha(m.navy, 0.7),
+              mb: 1,
+            }}
+          >
             Current services
           </Typography>
           <Stack spacing={0.75}>
@@ -70,25 +86,47 @@ export default function ClientEbrSuggestDrawer({ open, draft, onClose, onEditSer
                     bgcolor: "#fff",
                   }}
                 >
-                  <Stack direction="row" justifyContent="space-between" spacing={1}>
-                    <Typography sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.82) }}>
+                  <Stack
+                    direction="row"
+                    justifyContent="space-between"
+                    spacing={1}
+                  >
+                    <Typography
+                      sx={{
+                        fontWeight: 900,
+                        fontSize: 13,
+                        color: alpha(m.navy, 0.82),
+                      }}
+                    >
                       {service.name}
                     </Typography>
-                    <Typography sx={{ fontWeight: 900, fontSize: 13, color: alpha(m.navy, 0.82) }}>
+                    <Typography
+                      sx={{
+                        fontWeight: 900,
+                        fontSize: 13,
+                        color: alpha(m.navy, 0.82),
+                      }}
+                    >
                       €{service.price}
                     </Typography>
                   </Stack>
                 </Box>
               ))
             ) : (
-              <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: alpha(m.navy, 0.45) }}>
+              <Typography
+                sx={{
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  color: alpha(m.navy, 0.45),
+                }}
+              >
                 No services yet
               </Typography>
             )}
           </Stack>
         </Box>
 
-        <Button
+        <AppButton
           fullWidth
           variant="outlined"
           onClick={() => onEditServices(note.trim())}
@@ -103,28 +141,22 @@ export default function ClientEbrSuggestDrawer({ open, draft, onClose, onEditSer
           }}
         >
           Edit services &amp; products
-        </Button>
+        </AppButton>
 
         <Stack direction="row" spacing={1.25} sx={{ pt: 0.5 }}>
-          <Button
+          <AppButton
+            tone="secondary"
             fullWidth
-            variant="outlined"
             onClick={onClose}
             sx={{
-              textTransform: "none",
-              fontWeight: 800,
-              borderRadius: "10px",
               height: 40,
-              borderColor: alpha(m.navy, 0.18),
-              color: alpha(m.navy, 0.65),
             }}
           >
             Cancel
-          </Button>
-          <Button
+          </AppButton>
+          <AppButton
+            tone="primary"
             fullWidth
-            variant="contained"
-            disableElevation
             disabled={sending}
             onClick={async () => {
               setSending(true);
@@ -135,16 +167,11 @@ export default function ClientEbrSuggestDrawer({ open, draft, onClose, onEditSer
               }
             }}
             sx={{
-              textTransform: "none",
-              fontWeight: 800,
-              borderRadius: "10px",
               height: 40,
-              bgcolor: m.teal,
-              "&:hover": { bgcolor: m.tealDark },
             }}
           >
             Send
-          </Button>
+          </AppButton>
         </Stack>
       </Stack>
     </AppDrawer>

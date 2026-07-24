@@ -4,4 +4,7 @@
 import MollureMarketingHeader from "./MollureMarketingHeader";
 
 export default MollureMarketingHeader;
-export type { MarketingNavItem, MollureMarketingHeaderProps as MarketingSiteHeaderProps } from "./MollureMarketingHeader";
+export type {
+  MarketingNavItem,
+  MollureMarketingHeaderProps as MarketingSiteHeaderProps,
+} from "./MollureMarketingHeader";
