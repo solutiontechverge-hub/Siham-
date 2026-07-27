@@ -430,7 +430,7 @@ export function useFixedLocationCalendarPage() {
 
   const onDispatchBookingNotification = async (
     id: string,
-    event: string,
+    event: BookingNotificationEvent,
     options?: Omit<
       Parameters<typeof dispatchBookingNotification>[0],
       "id" | "event"
@@ -438,7 +438,7 @@ export function useFixedLocationCalendarPage() {
   ) => {
     await dispatchBookingNotification({
       id,
-      event: event as BookingNotificationEvent,
+      event,
       ...options,
     }).unwrap();
   };

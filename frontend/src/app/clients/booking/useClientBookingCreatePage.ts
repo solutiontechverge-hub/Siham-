@@ -289,7 +289,7 @@ export function useClientBookingCreatePage() {
   const ebrSuggestBaselineRef = React.useRef<Service[] | null>(null);
   const [projectDescription, setProjectDescription] = React.useState("");
   const [projectUploads, setProjectUploads] = React.useState<
-    Array<{ id: string; name: string; previewUrl: string; file: File }>
+    Array<{ id: string; name: string; previewUrl: string; file?: File }>
   >([]);
   const [participantMenuAnchor, setParticipantMenuAnchor] =
     React.useState<HTMLElement | null>(null);
@@ -1384,10 +1384,11 @@ export function useClientBookingCreatePage() {
         mimeType?: string;
         kind?: "image" | "document";
       }> = projectUploads.map((u) => ({ id: u.id, name: u.name }));
-      if (isDesiredLocation && projectUploads.length > 0) {
-        const uploaded = await uploadBookingAttachments(
-          projectUploads.map((u) => u.file),
-        ).unwrap();
+      const filesToUpload = projectUploads
+        .map((u) => u.file)
+        .filter((file): file is File => Boolean(file));
+      if (isDesiredLocation && filesToUpload.length > 0) {
+        const uploaded = await uploadBookingAttachments(filesToUpload).unwrap();
         const attachments = uploaded.data?.attachments ?? [];
         projectDetailsUploads = attachments.map((att) => ({
           id: att.id,

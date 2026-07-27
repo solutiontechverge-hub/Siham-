@@ -251,7 +251,9 @@ function SalesActionsMenu({
           ) : (
             <MenuItem
               key={item.id}
-              onClick={() => run(item.id)}
+              onClick={() => {
+                if (item.id !== "downloadInvoice") run(item.id);
+              }}
               sx={{
                 fontSize: 13,
                 fontWeight: 700,
