@@ -3,11 +3,12 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import ChevronRightOutlinedIcon from "@mui/icons-material/ChevronRightOutlined";
 import ExpandLessOutlinedIcon from "@mui/icons-material/ExpandLessOutlined";
 import ExpandMoreOutlinedIcon from "@mui/icons-material/ExpandMoreOutlined";
 import HeadsetMicOutlinedIcon from "@mui/icons-material/HeadsetMicOutlined";
+import LogoutOutlinedIcon from "@mui/icons-material/LogoutOutlined";
 import {
   Box,
   Chip,
@@ -20,6 +21,11 @@ import {
 import { alpha, useTheme } from "@mui/material/styles";
 import { LogoOnDark } from "../../../images";
 import { AppButton } from "../common";
+import { useSnackbar } from "../common/AppSnackbar";
+import { clearPersistedAuthSession } from "../../lib/auth-storage";
+import { queueSnackbarFlash } from "../../lib/snackbarFlash";
+import { useAppDispatch } from "../../store/hooks";
+import { clearAuthSession } from "../../store/slices/authSlice";
 import {
   adminDashboardNavItem,
   adminNavSections,
@@ -115,9 +121,22 @@ function NavLink({
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const dispatch = useAppDispatch();
+  const { showSnackbar } = useSnackbar();
   const theme = useTheme();
   const tokens = theme.palette.mollure;
   const dashboardActive = isNavItemActive(pathname, adminDashboardNavItem.href);
+
+  const handleLogout = () => {
+    onNavigate?.();
+    dispatch(clearAuthSession());
+    clearPersistedAuthSession();
+    const logoutMessage = "Signed out successfully.";
+    queueSnackbarFlash({ severity: "success", message: logoutMessage });
+    showSnackbar({ severity: "success", message: logoutMessage });
+    router.push("/auth/admin/login");
+  };
 
   const [collapsedSections, setCollapsedSections] = React.useState<
     Record<string, boolean>
@@ -242,9 +261,31 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         })}
       </Stack>
 
+      <Stack spacing={1.25} sx={{ mt: 2 }}>
+        <AppButton
+          variant="outlined"
+          size="small"
+          startIcon={<LogoutOutlinedIcon sx={{ fontSize: 18 }} />}
+          onClick={handleLogout}
+          sx={{
+            alignSelf: "stretch",
+            borderColor: alpha(tokens.white, 0.18),
+            color: tokens.footerText,
+            textTransform: "none",
+            fontWeight: 600,
+            fontSize: 12.5,
+            px: 1.75,
+            "&:hover": {
+              borderColor: alpha(tokens.white, 0.28),
+              bgcolor: alpha(tokens.white, 0.06),
+            },
+          }}
+        >
+          Sign out
+        </AppButton>
+
       <Box
         sx={{
-          mt: 2,
           p: 1.75,
           borderRadius: 2,
           bgcolor: alpha(tokens.white, 0.06),
@@ -289,6 +330,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           </Stack>
         </Stack>
       </Box>
+      </Stack>
     </Stack>
   );
 }

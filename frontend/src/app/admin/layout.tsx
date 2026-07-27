@@ -1,5 +1,6 @@
 "use client";
 
+import AuthGuard from "../../components/common/auth/AuthGuard";
 import AdminShell from "../../components/admin/AdminShell";
 
 export default function AdminLayout({
@@ -7,5 +8,9 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <AdminShell>{children}</AdminShell>;
+  return (
+    <AuthGuard allowedRoles={["admin"]} loginPath="/auth/admin/login">
+      <AdminShell>{children}</AdminShell>
+    </AuthGuard>
+  );
 }

@@ -47,13 +47,24 @@ const baseQueryWithAuthHandling: BaseQueryFn<string | FetchArgs, unknown, FetchB
 ) => {
   const result = await rawBaseQuery(args, api, extraOptions);
   const status = result.error?.status;
+  const requestUrl = typeof args === "string" ? args : args.url || "";
+  const isCredentialAttempt =
+    requestUrl.includes("/api/auth/login") ||
+    requestUrl.includes("/api/admin/auth/login") ||
+    requestUrl.includes("/api/auth/google") ||
+    requestUrl.includes("/api/auth/apple");
 
-  if (status === 401 || status === 403) {
+  if ((status === 401 || status === 403) && !isCredentialAttempt) {
     api.dispatch(clearAuthSession());
     if (typeof window !== "undefined") {
       clearPersistedAuthSession();
-      if (window.location.pathname !== "/auth/login") {
-        window.location.href = "/auth/login";
+      const pathname = window.location.pathname;
+      const loginPath =
+        pathname.startsWith("/admin") || pathname.startsWith("/auth/admin")
+          ? "/auth/admin/login"
+          : "/auth/login";
+      if (pathname !== loginPath) {
+        window.location.href = loginPath;
       }
     }
   }
