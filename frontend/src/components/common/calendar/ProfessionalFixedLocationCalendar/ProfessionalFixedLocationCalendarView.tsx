@@ -232,6 +232,7 @@ import {
   mapCalendarEntryToEvent,
 } from "../calendar-entry.mappers";
 import type {
+  BookingNotificationEvent,
   CreateCalendarEntryRequest,
   CalendarEntry,
   UpsertCalendarSettingsRequest,
@@ -274,7 +275,7 @@ export type ProfessionalFixedLocationCalendarProps = {
       | "in_progress"
       | "no_show",
     options?: {
-      notification_event?: string;
+      notification_event?: BookingNotificationEvent;
       notify_incoming_er?: boolean;
       initiated_by?: "client" | "professional";
       notes?: string | null;
@@ -286,7 +287,7 @@ export type ProfessionalFixedLocationCalendarProps = {
   ) => Promise<void>;
   onDispatchBookingNotification?: (
     id: string,
-    event: string,
+    event: BookingNotificationEvent,
     options?: { initiated_by?: "client" | "professional"; message?: string },
   ) => Promise<void>;
   onUpdateCalendarEntryStatus?: (
@@ -1362,7 +1363,7 @@ export default function ProfessionalFixedLocationCalendar({
       eventId: string,
       status: CalendarEvent["status"],
       options?: {
-        notification_event?: string;
+        notification_event?: BookingNotificationEvent;
         notify_incoming_er?: boolean;
         initiated_by?: "client" | "professional";
         notes?: string | null;
@@ -1402,7 +1403,7 @@ export default function ProfessionalFixedLocationCalendar({
   const dispatchBookingEventIfApi = React.useCallback(
     async (
       eventId: string | null | undefined,
-      event: string,
+      event: BookingNotificationEvent,
       options?: { initiated_by?: "client" | "professional"; message?: string },
     ) => {
       const parsed = eventId ? parseApiCalendarEventId(eventId) : null;

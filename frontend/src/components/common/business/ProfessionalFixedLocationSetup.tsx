@@ -3779,19 +3779,19 @@ export default function ProfessionalFixedLocationSetup({
       </Box>
 
       <Box sx={{ mt: 0.5 }}>
-        <Typography
-          component={Link}
-          href="/terms-and-conditions"
-          sx={{
-            color: "primary.main",
-            fontWeight: 700,
-            fontSize: 14,
-            textDecoration: "none",
-            "&:hover": { textDecoration: "underline" },
-          }}
-        >
-          Terms & Conditions
-        </Typography>
+        <Link href="/terms-and-conditions" style={{ textDecoration: "none" }}>
+          <Typography
+            sx={{
+              color: "primary.main",
+              fontWeight: 700,
+              fontSize: 14,
+              textDecoration: "none",
+              "&:hover": { textDecoration: "underline" },
+            }}
+          >
+            Terms & Conditions
+          </Typography>
+        </Link>
       </Box>
     </Stack>
   );
