@@ -3,15 +3,23 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { getPersistedAuthSession } from "../../../lib/auth-storage";
-import { getDefaultRouteForUser } from "../../../lib/auth-routing";
+import {
+  getDefaultRouteForUser,
+  getLoginRouteForPath,
+} from "../../../lib/auth-routing";
 import { useAppSelector } from "../../../store/hooks";
 
 type AuthGuardProps = {
   children: React.ReactNode;
   allowedRoles?: string[];
+  loginPath?: string;
 };
 
-export default function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
+export default function AuthGuard({
+  children,
+  allowedRoles,
+  loginPath,
+}: AuthGuardProps) {
   const router = useRouter();
   const accessToken = useAppSelector((state) => state.auth.accessToken);
   const user = useAppSelector((state) => state.auth.user);
@@ -34,7 +42,12 @@ export default function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
     if (!isReady) return;
 
     if (!hasSession) {
-      router.replace("/auth/login");
+      const fallbackLogin =
+        loginPath ||
+        getLoginRouteForPath(
+          typeof window !== "undefined" ? window.location.pathname : null,
+        );
+      router.replace(fallbackLogin);
       return;
     }
 
@@ -49,7 +62,15 @@ export default function AuthGuard({ children, allowedRoles }: AuthGuardProps) {
     ) {
       router.replace(getDefaultRouteForUser(user.user_type));
     }
-  }, [accessToken, allowedRoles, hasSession, isReady, router, user?.user_type]);
+  }, [
+    accessToken,
+    allowedRoles,
+    hasSession,
+    isReady,
+    loginPath,
+    router,
+    user?.user_type,
+  ]);
 
   if (!isReady || !hasSession) {
     return null;

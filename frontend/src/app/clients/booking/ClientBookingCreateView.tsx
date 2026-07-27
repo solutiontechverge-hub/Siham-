@@ -1806,7 +1806,8 @@ export default function ClientBookingCreateView() {
                                       justifyContent: "center",
                                     }}
                                   >
-                                    {img.file.type.startsWith("image/") ? (
+                                    {img.file?.type.startsWith("image/") ||
+                                    (!img.file && Boolean(img.previewUrl)) ? (
                                       <Box
                                         component="img"
                                         src={img.previewUrl}

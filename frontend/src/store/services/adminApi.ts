@@ -258,6 +258,27 @@ export const adminApi = baseApi.injectEndpoints({
 
   endpoints: (builder) => ({
 
+    adminLogin: builder.mutation<
+      ApiEnvelope<{
+        access_token: string;
+        refresh_token: string;
+        user: {
+          id: string;
+          email: string;
+          user_type: string;
+          is_email_verified: boolean;
+          is_active: boolean;
+        };
+      }>,
+      { email: string; password: string }
+    >({
+      query: (body) => ({
+        url: "/api/admin/auth/login",
+        method: "POST",
+        body,
+      }),
+    }),
+
     getAdminDashboard: builder.query<ApiEnvelope<AdminDashboardData>, AdminDashboardRangeParams>({
 
       query: ({ preset, from, to }) => {
@@ -337,6 +358,8 @@ export const adminApi = baseApi.injectEndpoints({
 
 
 export const {
+
+  useAdminLoginMutation,
 
   useGetAdminDashboardQuery,
 

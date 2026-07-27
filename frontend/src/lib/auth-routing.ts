@@ -1,4 +1,8 @@
 export const getDefaultRouteForUser = (userType?: string) => {
+  if (userType === "admin") {
+    return "/admin/dashboard";
+  }
+
   if (userType === "individual" || userType === "company") {
     return "/clients/listing";
   }
@@ -8,4 +12,11 @@ export const getDefaultRouteForUser = (userType?: string) => {
   }
 
   return "/clients/profile";
+};
+
+export const getLoginRouteForPath = (pathname?: string | null) => {
+  if (pathname?.startsWith("/admin")) {
+    return "/auth/admin/login";
+  }
+  return "/auth/login";
 };

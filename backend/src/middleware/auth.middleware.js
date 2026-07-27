@@ -102,3 +102,76 @@ export const authorizeRoles = (...allowedRoles) => {
     return next();
   };
 };
+
+export const authenticateAdmin = async (req, res, next) => {
+  try {
+    const token = extractAccessToken(req);
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: "Authorization token is required.",
+        data: null,
+      });
+    }
+
+    const decoded = verifyAccessToken(token);
+    const isAdminToken =
+      decoded?.token_kind === "admin" ||
+      String(decoded?.user_type || "").toLowerCase() === "admin";
+
+    if (!isAdminToken || !decoded?.id) {
+      return res.status(403).json({
+        success: false,
+        message: "Admin authentication is required.",
+        data: null,
+      });
+    }
+
+    const result = await query(
+      `SELECT id, email, user_type, is_email_verified, is_active, created_at, updated_at
+       FROM users
+       WHERE id = $1`,
+      [decoded.id],
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid authentication token.",
+        data: null,
+      });
+    }
+
+    const user = result.rows[0];
+    if (String(user.user_type).toLowerCase() !== "admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Admin authentication is required.",
+        data: null,
+      });
+    }
+
+    if (!user.is_active) {
+      return res.status(403).json({
+        success: false,
+        message: "Admin account is inactive.",
+        data: null,
+      });
+    }
+
+    req.user = user;
+    req.admin = {
+      id: user.id,
+      email: user.email,
+      name: user.email.split("@")[0],
+      status: user.is_active ? "active" : "disabled",
+    };
+    return next();
+  } catch (_error) {
+    return res.status(401).json({
+      success: false,
+      message: "Invalid or expired authentication token.",
+      data: null,
+    });
+  }
+};
