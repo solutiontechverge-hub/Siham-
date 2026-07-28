@@ -19,6 +19,7 @@ import { alpha, type Theme } from "@mui/material/styles";
 import {
   formatEntryIdDisplay,
   formatTransactionDate,
+  formatTransactionStatusLabel,
   getTransactionClientTypeLabel,
   getTransactionStatusTone,
   isTransactionClientClickable,
@@ -44,7 +45,7 @@ function statusChipSx(status: TransactionStatus, theme: Theme) {
     case "warning":
       return { bgcolor: m.statusOrangeBg, color: m.statusOrangeFg };
     case "danger":
-      return { bgcolor: m.statusOrangeBg, color: m.statusOrangeFg };
+      return { bgcolor: m.statusRedBg, color: m.statusRedFg };
     case "muted":
       return { bgcolor: m.fxGrayF2F4F7, color: m.statusGreyFg };
     default:
@@ -403,7 +404,7 @@ export default function TransactionsTable({
                   <TableCell sx={{ verticalAlign: "top" }}>
                     <Stack spacing={0.35}>
                       <Chip
-                        label={row.status}
+                        label={formatTransactionStatusLabel(row.status)}
                         size="small"
                         sx={{
                           height: 18,

@@ -177,7 +177,7 @@ export default function ClientBookingDetailsHeader({
             <Typography
               sx={{
                 fontWeight: 900,
-                fontSize: 16,
+                fontSize: 20,
                 lineHeight: 1.25,
                 color: alpha(m.navy, 0.88),
               }}

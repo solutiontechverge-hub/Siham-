@@ -130,13 +130,21 @@ function statusBadgeSx(
     statusOrangeFg: string;
     statusGreenBg: string;
     statusGreenFg: string;
+    statusRedBg: string;
+    statusRedFg: string;
     statusGreyFg: string;
     fxGrayF2F4F7: string;
   },
 ) {
-  const value = String(badge ?? "").toLowerCase();
+  const value = String(badge ?? "")
+    .toLowerCase()
+    .replace(/^!/, "")
+    .trim();
   if (value === "prepaid" || value === "paid") {
     return { color: m.statusGreenFg, bgcolor: m.statusGreenBg };
+  }
+  if (value === "failed") {
+    return { color: m.statusRedFg, bgcolor: m.statusRedBg };
   }
   if (
     value === "prepayment due" ||
