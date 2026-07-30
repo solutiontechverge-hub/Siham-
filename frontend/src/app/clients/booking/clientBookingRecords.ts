@@ -39,6 +39,9 @@ export type ClientBookingRecord = {
   contactPhone?: string;
   /** Raw booking notes (may include EBR meta). */
   notes?: string | null;
+  /** Service/product ids marked edited in notes (pro BR update / EBR). */
+  editedServiceIds?: string[];
+  editedProductIds?: string[];
   /** Incoming EBR from professional, parsed from booking notes. */
   incomingEditRequest?: BookingEditRequestRecord | null;
 };

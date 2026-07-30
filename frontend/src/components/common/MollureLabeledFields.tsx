@@ -37,6 +37,9 @@ function useMollureFieldSx() {
         "&.Mui-focused fieldset": {
           borderColor: m.teal,
         },
+        "&.Mui-disabled": {
+          bgcolor: alpha(m.navy, 0.04),
+        },
       },
       "& .MuiOutlinedInput-input": {
         fontSize: "0.8125rem",
@@ -48,7 +51,7 @@ function useMollureFieldSx() {
         opacity: 1,
       },
     }),
-    [m.inputBorder, m.inputBorderHover, m.placeholder, m.teal, m.white],
+    [m.inputBorder, m.inputBorderHover, m.navy, m.placeholder, m.teal, m.white],
   );
 }
 

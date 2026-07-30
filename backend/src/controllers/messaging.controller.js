@@ -5,8 +5,11 @@ import {
   getInboxForUser,
   getPeerUserIdForThread,
   getThreadMessages,
+  linkThreadToBooking,
+  listLinkableBookingsForThread,
   listProfessionalsForClient,
   markThreadRead,
+  openThreadForBooking,
 } from "../messaging/messaging.repository.js";
 import { emitMessagingMessage, emitMessagingMessageDeleted, emitMessagingThreadRead } from "../messaging/messagingSocket.js";
 import { saveMessagingAttachments } from "../services/messaging-upload.service.js";
@@ -50,6 +53,26 @@ export const getMessagingInbox = async (req, res) => {
     return res.status(error.statusCode || 500).json({
       success: false,
       message: error.message || "Failed to fetch messaging inbox.",
+      data: null,
+    });
+  }
+};
+
+export const openMessagingForBooking = async (req, res) => {
+  try {
+    const bookingRef = String(
+      req.query.bookingRef ?? req.query.booking ?? req.body?.bookingRef ?? "",
+    ).trim();
+    const data = await openThreadForBooking(req.user.id, bookingRef);
+    return res.status(200).json({
+      success: true,
+      message: "Conversation opened for booking.",
+      data,
+    });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || "Failed to open conversation for booking.",
       data: null,
     });
   }
@@ -189,6 +212,43 @@ export const clearMessagingThread = async (req, res) => {
     return res.status(error.statusCode || 500).json({
       success: false,
       message: error.message || "Failed to clear chat.",
+      data: null,
+    });
+  }
+};
+
+export const getMessagingLinkableBookings = async (req, res) => {
+  try {
+    const { threadId } = req.params;
+    const data = await listLinkableBookingsForThread(threadId, req.user.id);
+    return res.status(200).json({
+      success: true,
+      message: "Linkable bookings fetched successfully.",
+      data,
+    });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || "Failed to fetch linkable bookings.",
+      data: null,
+    });
+  }
+};
+
+export const postMessagingLinkBooking = async (req, res) => {
+  try {
+    const { threadId } = req.params;
+    const bookingRef = req.body?.bookingId || req.body?.bookingRef || req.body?.id;
+    const data = await linkThreadToBooking(threadId, req.user.id, bookingRef);
+    return res.status(200).json({
+      success: true,
+      message: "Conversation linked to booking.",
+      data,
+    });
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || "Failed to link conversation to booking.",
       data: null,
     });
   }

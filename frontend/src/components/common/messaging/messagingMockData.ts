@@ -1,5 +1,4 @@
-import type { MessagingChatMessage, MessagingStore, MessagingThread } from "./messagingTypes";
-import { formatConversationTimeLabel, withMessageCreatedAt } from "./messagingRetention";
+import type { MessagingStore, MessagingThread } from "./messagingTypes";
 
 export const messagingThreadsSeed: MessagingThread[] = [
   {
@@ -73,103 +72,25 @@ export const messagingThreadsSeed: MessagingThread[] = [
   },
 ];
 
-function daysAgoIso(days: number, hour = 12, minute = 0): string {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  d.setHours(hour, minute, 0, 0);
-  return d.toISOString();
-}
-
-function seedMessagesForThread(thread: MessagingThread): MessagingChatMessage[] {
-  const recent = daysAgoIso(2, 20, 15);
-  const recent2 = daysAgoIso(2, 20, 22);
-  const recent3 = daysAgoIso(1, 9, 2);
-  return [
-    withMessageCreatedAt({
-      id: `${thread.id}-m1`,
-      senderSide: "peer",
-      senderRole: "professional",
-      senderName: thread.name,
-      senderAvatarSeed: thread.avatarSeed,
-      timeLabel: "08:15 pm",
-      body: "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
-      dateKey: recent.slice(0, 10),
-      createdAt: recent,
-    }),
-    withMessageCreatedAt({
-      id: `${thread.id}-m2`,
-      senderSide: "self",
-      senderRole: "client",
-      senderName: "You",
-      senderAvatarSeed: "you",
-      timeLabel: "08:22 pm",
-      body: "Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
-      dateKey: recent2.slice(0, 10),
-      createdAt: recent2,
-    }),
-    withMessageCreatedAt({
-      id: `${thread.id}-m3`,
-      senderSide: "peer",
-      senderRole: "professional",
-      senderName: thread.name,
-      senderAvatarSeed: thread.avatarSeed,
-      timeLabel: "09:02 am",
-      body: "Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.",
-      dateKey: recent3.slice(0, 10),
-      createdAt: recent3,
-    }),
-  ];
-}
-
-export function createInitialMessagingStore(): MessagingStore {
-  const messagesByThreadId: Record<string, MessagingChatMessage[]> = {};
-  for (const thread of messagingThreadsSeed) {
-    if (thread.id === "lissa-j") {
-      const createdAt = new Date().toISOString();
-      messagesByThreadId[thread.id] = [
-        withMessageCreatedAt({
-          id: "lissa-j-m1",
-          senderSide: "peer",
-          senderRole: "client",
-          senderName: "Lissa J",
-          senderAvatarSeed: "lissa",
-          timeLabel: "08:10 am",
-          body: "Hi, can we confirm the hot stone massage time?",
-          dateKey: todayDateKey(),
-          createdAt,
-        }),
-      ];
-      continue;
-    }
-    messagesByThreadId[thread.id] = seedMessagesForThread(thread);
-  }
-
-  const threads = messagingThreadsSeed.map((thread) => {
-    const messages = messagesByThreadId[thread.id] ?? [];
-    const last = messages[messages.length - 1];
-    const lastActivityAt = last?.createdAt;
-    return {
-      ...thread,
-      lastActivityAt,
-      timeLabel: lastActivityAt ? formatConversationTimeLabel(lastActivityAt) : thread.timeLabel,
-    };
-  });
-
-  const clientLastRead: Record<string, string> = {};
-  for (const thread of messagingThreadsSeed) {
-    const messages = messagesByThreadId[thread.id] ?? [];
-    const last = messages[messages.length - 1];
-    if (last) clientLastRead[thread.id] = last.id;
-  }
-
+export function createEmptyMessagingStore(): MessagingStore {
   return {
-    threads,
-    messagesByThreadId,
+    threads: [],
+    messagesByThreadId: {},
     hiddenByAudience: {},
     blockedThreadIds: [],
-    lastReadMessageIdByAudience: { client: clientLastRead, professional: { ...clientLastRead } },
+    lastReadMessageIdByAudience: { client: {}, professional: {} },
     presenceStatus: "online",
   };
+}
+
+/** @deprecated Prefer createEmptyMessagingStore — mock seed must not appear in production inbox. */
+export function createInitialMessagingStore(): MessagingStore {
+  return createEmptyMessagingStore();
+}
+
+/** Demo seed threads (ids like lissa-j) — never merge into an authenticated inbox. */
+export function isMockMessagingThreadId(id: string): boolean {
+  return messagingThreadsSeed.some((thread) => thread.id === id);
 }
 
 export function formatMessageDateLabel(dateKey: string): string {

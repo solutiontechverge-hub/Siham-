@@ -102,8 +102,6 @@ export function getBookingServiceEditErrors(draft: BookingServiceEditDraft) {
   if (!draft.name.trim()) errors.name = "Service name is required.";
   const duration = Number.parseInt(draft.durationMins, 10);
   if (!Number.isFinite(duration) || duration <= 0) errors.durationMins = "Duration is required.";
-  if (!draft.startTime.trim()) errors.startTime = "Start time is required.";
-  if (!draft.endTime.trim()) errors.endTime = "End time is required.";
   const price = Number.parseFloat(draft.price.replace(",", "."));
   if (!Number.isFinite(price) || price < 0) errors.price = "Price is required.";
   return errors;
@@ -142,12 +140,7 @@ export function getEffectiveServicePrice(service: BookingServiceLineItem) {
 }
 
 export function formatBookingServiceLineMeta(service: BookingServiceLineItem) {
-  const parts: string[] = [];
-  if (service.startTime && service.endTime) {
-    parts.push(`${service.startTime} to ${service.endTime}`);
-  } else {
-    parts.push(`${service.durationMins} Mins`);
-  }
+  const parts: string[] = [`${service.durationMins} Mins`];
   parts.push(`€${getEffectiveServicePrice(service)}`);
   if (service.discount?.amount) {
     parts.push(

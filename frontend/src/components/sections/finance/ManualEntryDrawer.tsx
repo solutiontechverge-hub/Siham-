@@ -55,7 +55,7 @@ export default function ManualEntryDrawer({
 }: ManualEntryDrawerProps) {
   const m = useTheme().palette.mollure;
   const rootRef = React.useRef<HTMLDivElement | null>(null);
-  const { settings } = useFinanceInvoiceSettings();
+  const { settings, setSettings } = useFinanceInvoiceSettings();
   const { data: businessSetupResponse } = useGetBusinessSetupQuery(undefined, {
     skip: !open,
   });
@@ -116,6 +116,7 @@ export default function ManualEntryDrawer({
         id: product.id,
         label: product.name,
         unitPrice: parseFinancePrice(product.price),
+        vat: product.vat,
       })),
     [settings.products],
   );
@@ -136,8 +137,61 @@ export default function ManualEntryDrawer({
         ? `${service.category} - ${service.service}`
         : service.category,
       unitPrice: 0,
+      vat: service.vat,
     }));
   }, [businessSetup?.service_details, settings.services]);
+
+  const [itemCatalogOverrides, setItemCatalogOverrides] = React.useState<
+    Record<string, ManualEntryCatalogOption>
+  >({});
+
+  const resolvedItemOptions = React.useMemo(
+    () =>
+      itemOptions.map((option) => itemCatalogOverrides[option.id] ?? option),
+    [itemCatalogOverrides, itemOptions],
+  );
+
+  const handleUpdateProductOption = React.useCallback(
+    (option: ManualEntryCatalogOption) => {
+      setSettings((prev) => ({
+        ...prev,
+        products: prev.products.map((product) =>
+          product.id === option.id
+            ? {
+                ...product,
+                name: option.label,
+                price: `${option.unitPrice}EUR`,
+                vat: option.vat?.trim() || product.vat,
+              }
+            : product,
+        ),
+      }));
+    },
+    [setSettings],
+  );
+
+  const handleUpdateItemOption = React.useCallback(
+    (option: ManualEntryCatalogOption) => {
+      setItemCatalogOverrides((prev) => ({ ...prev, [option.id]: option }));
+      setSettings((prev) => {
+        const hasService = prev.services.some((s) => s.id === option.id);
+        if (!hasService) return prev;
+        return {
+          ...prev,
+          services: prev.services.map((service) =>
+            service.id === option.id
+              ? {
+                  ...service,
+                  service: option.label,
+                  vat: option.vat?.trim() || service.vat,
+                }
+              : service,
+          ),
+        };
+      });
+    },
+    [setSettings],
+  );
 
   const productLines = React.useMemo(
     () => lines.filter((l) => l.kind === "product"),
@@ -944,6 +998,9 @@ export default function ManualEntryDrawer({
         emptyLabel="No products configured yet."
         withQuantity
         allowAddProduct
+        addScreenTitle="Add Product"
+        editScreenTitle="Edit Product"
+        onUpdateOption={handleUpdateProductOption}
         onSave={(selected) => addLinesFromCatalog("product", selected)}
       />
 
@@ -951,11 +1008,14 @@ export default function ManualEntryDrawer({
         open={itemDrawerOpen}
         onClose={() => setItemDrawerOpen(false)}
         title="Select items"
-        options={itemOptions}
+        options={resolvedItemOptions}
         emptyLabel="No services configured yet."
         withQuantity
         allowAddProduct
         addProductLabel="Add Item"
+        addScreenTitle="Add Unique Item"
+        editScreenTitle="Edit Item"
+        onUpdateOption={handleUpdateItemOption}
         onSave={(selected) => addLinesFromCatalog("item", selected)}
       />
 

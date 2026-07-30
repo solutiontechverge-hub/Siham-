@@ -1075,7 +1075,13 @@ export default function BusinessPublicProfile({
                   {Array.from({ length: 5 }).map((_, i) => (
                     <StarRoundedIcon
                       key={i}
-                      sx={{ fontSize: 18, color: m.star }}
+                      sx={{
+                        fontSize: 18,
+                        color:
+                          i < Math.round(Math.min(5, Math.max(0, data.rating)))
+                            ? m.star
+                            : alpha(m.navy, 0.15),
+                      }}
                     />
                   ))}
                   <Typography

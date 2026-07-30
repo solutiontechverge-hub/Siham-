@@ -108,10 +108,10 @@ const initialState: FixedLocationFormState = {
   province: "",
   municipalities: [],
 
-  serviceFor: { men: true, women: true, kids: false },
-  amenities: { parking: true, wifi: false, wheelchair: false, pets: false },
+  serviceFor: { men: false, women: false, kids: false },
+  amenities: { parking: false, wifi: false, wheelchair: false, pets: false },
 
-  projectEnabled: true,
+  projectEnabled: false,
   projectInstructions: "",
 
   bookCategory: "",
@@ -131,7 +131,7 @@ const initialState: FixedLocationFormState = {
 
   notes: "",
 
-  professionalPhotoSrc: "/professionals/hero.png",
+  professionalPhotoSrc: "",
   companyLegalName: "",
   companyCocNumber: "",
   companyVatNumber: "",

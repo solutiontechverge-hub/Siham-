@@ -16,11 +16,13 @@ import {
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { useSnackbar } from "../AppSnackbar";
+import { getApiErrorMessage } from "../../../lib/api-error";
 import {
   getMessagingHref,
   useClientMessagingUnread,
   useMessagingWidgetOptional,
 } from "../messaging";
+import { useOpenMessagingForBookingMutation } from "../../../store/services/messagingApi";
 import type {
   BookingRequestDirection,
   ClientBookingStatus,
@@ -90,11 +92,33 @@ export default function ClientBookingDetailsHeader({
   const m = useTheme().palette.mollure;
   const { showSnackbar } = useSnackbar();
   const messagingWidget = useMessagingWidgetOptional();
+  const [openMessagingForBooking] = useOpenMessagingForBookingMutation();
   const [editAnchor, setEditAnchor] = React.useState<HTMLElement | null>(null);
   const [activityAnchor, setActivityAnchor] =
     React.useState<HTMLElement | null>(null);
   const unreadFromProfessional = useClientMessagingUnread(bookingRef);
   const editRequest = useBookingEditRequest(bookingRef);
+
+  const openBookingChat = React.useCallback(async () => {
+    if (!bookingRef) return;
+    try {
+      const result = await openMessagingForBooking({ bookingRef }).unwrap();
+      messagingWidget?.openMessaging({
+        threadId: result.threadId,
+        bookingRef: result.bookingRef,
+        businessSetupId: result.businessSetupId,
+        searchPrefill: result.thread?.name || undefined,
+      });
+    } catch (error) {
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(
+          error,
+          "Unable to open chat for this booking.",
+        ),
+      });
+    }
+  }, [bookingRef, messagingWidget, openMessagingForBooking, showSnackbar]);
 
   const chatIcon = (
     <ChatBubbleOutlineRoundedIcon
@@ -221,7 +245,7 @@ export default function ClientBookingDetailsHeader({
                 <IconButton
                   size="small"
                   aria-label="Open messaging"
-                  onClick={() => messagingWidget?.openMessaging({ bookingRef })}
+                  onClick={() => void openBookingChat()}
                   sx={{ ml: 0.25, p: 0.35 }}
                 >
                   {unreadFromProfessional > 0 ? (
@@ -420,7 +444,9 @@ export default function ClientBookingDetailsHeader({
             disabled
             sx={{ ...menuItemSx, whiteSpace: "normal", opacity: 1 }}
           >
-            Booking request sent — awaiting professional approval
+            {bookingRequestDirection === "incoming"
+              ? "Booking request received — respond with Accept, Reject, or Suggest Changes"
+              : "Booking request sent — awaiting professional approval"}
           </MenuItem>
         ) : editRequest.isPending ? (
           <MenuItem

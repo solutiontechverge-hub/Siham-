@@ -57,6 +57,142 @@ export function minutesSinceMidnight(hhmm: string) {
   return h * 60 + m;
 }
 
+const ISO_DOW_TO_DAY_NAME = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+] as const;
+
+export type PublicBusinessHoursLike = {
+  location?: string;
+  day?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  startTime?: string;
+  endTime?: string;
+  notAvailable?: boolean;
+  note?: string;
+};
+
+export type PublicBusinessHoursDayStatus =
+  | { kind: "open"; interval: Interval; note?: string }
+  | { kind: "notAvailable"; note?: string }
+  | { kind: "none" };
+
+/** Fallback when a not-available day has no custom note saved. */
+export const DEFAULT_PUBLIC_HOURS_NOT_AVAILABLE_NOTE =
+  "Shop will be remain close";
+
+function rankPublicBusinessHoursCandidates(
+  entries: readonly PublicBusinessHoursLike[],
+  isoDate: string,
+  location: string,
+): PublicBusinessHoursLike[] {
+  const dayName = ISO_DOW_TO_DAY_NAME[parseIsoDate(isoDate).getUTCDay()];
+  const candidates = entries.filter((entry) => {
+    if (entry.location !== location) return false;
+    // Incomplete rows (no weekday + no dates) must not match every day.
+    if (!entry.day && !entry.dateFrom && !entry.dateTo) return false;
+    // Empty day = applies to every weekday within the date span.
+    if (entry.day && entry.day !== dayName) return false;
+    // Legacy entries without a range still apply by weekday.
+    if (entry.dateFrom && isoDate < entry.dateFrom) return false;
+    if (entry.dateTo && isoDate > entry.dateTo) return false;
+    return true;
+  });
+  if (!candidates.length) return [];
+
+  // Prefer exact single-date overrides (incl. off days) over broader ranges.
+  return [...candidates].sort((a, b) => {
+    const aExact =
+      a.dateFrom &&
+      a.dateFrom === (a.dateTo || a.dateFrom) &&
+      a.dateFrom === isoDate
+        ? 0
+        : 1;
+    const bExact =
+      b.dateFrom &&
+      b.dateFrom === (b.dateTo || b.dateFrom) &&
+      b.dateFrom === isoDate
+        ? 0
+        : 1;
+    if (aExact !== bExact) return aExact - bExact;
+    const aOff = a.notAvailable ? 0 : 1;
+    const bOff = b.notAvailable ? 0 : 1;
+    return aOff - bOff;
+  });
+}
+
+/** Resolve open / not-available / none for a date + FL/DL location. */
+export function resolvePublicBusinessHoursDay(
+  entries: readonly PublicBusinessHoursLike[] | undefined,
+  isoDate: string,
+  location: string,
+): PublicBusinessHoursDayStatus {
+  if (!entries?.length) return { kind: "none" };
+  const ranked = rankPublicBusinessHoursCandidates(entries, isoDate, location);
+  const match = ranked[0];
+  if (!match) return { kind: "none" };
+  if (match.notAvailable) {
+    return { kind: "notAvailable", note: match.note };
+  }
+  if (!match.startTime || !match.endTime) return { kind: "none" };
+  const openMin = minutesSinceMidnight(match.startTime);
+  const closeMin = minutesSinceMidnight(match.endTime);
+  if (
+    !Number.isFinite(openMin) ||
+    !Number.isFinite(closeMin) ||
+    closeMin <= openMin
+  ) {
+    return { kind: "none" };
+  }
+  return {
+    kind: "open",
+    interval: { startMin: openMin, endMin: closeMin },
+    note: match.note,
+  };
+}
+
+export function isPublicBusinessHoursNotAvailable(
+  entries: readonly PublicBusinessHoursLike[] | undefined,
+  isoDate: string,
+  location: string,
+): boolean {
+  return (
+    resolvePublicBusinessHoursDay(entries, isoDate, location).kind ===
+    "notAvailable"
+  );
+}
+
+/** Note for a not-available day (per-professional), or null if the day is open. */
+export function getPublicBusinessHoursNotAvailableNote(
+  entries: readonly PublicBusinessHoursLike[] | undefined,
+  isoDate: string,
+  location: string,
+): string | null {
+  const status = resolvePublicBusinessHoursDay(entries, isoDate, location);
+  if (status.kind !== "notAvailable") return null;
+  return status.note?.trim() || DEFAULT_PUBLIC_HOURS_NOT_AVAILABLE_NOTE;
+}
+
+/** Resolve open/close window from public business hours for a date + FL/DL location. */
+export function getPublicBusinessHoursInterval(
+  entries: readonly PublicBusinessHoursLike[] | undefined,
+  isoDate: string,
+  location: string,
+): Interval | null {
+  const status = resolvePublicBusinessHoursDay(entries, isoDate, location);
+  return status.kind === "open" ? status.interval : null;
+}
+
+export function intervalsOverlap(a: Interval, b: Interval) {
+  return a.startMin < b.endMin && a.endMin > b.startMin;
+}
+
 export function pad2(n: number) {
   return String(n).padStart(2, "0");
 }

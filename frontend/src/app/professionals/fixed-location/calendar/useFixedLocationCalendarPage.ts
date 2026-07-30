@@ -22,10 +22,10 @@ import {
   useDeleteCalendarEntryMutation,
   useGetBusinessSetupQuery,
   useGetCalendarOverviewQuery,
-  useGetMollureClientDirectoryQuery,
   useGetProfessionalClientsQuery,
   useUpdateBookingStatusMutation,
   useDispatchBookingNotificationMutation,
+  useUpdateCalendarEntryMutation,
   useUpdateCalendarEntryStatusMutation,
   useUpsertCalendarSettingsMutation,
   useUpsertBusinessSetupMutation,
@@ -36,6 +36,7 @@ import {
   type UpsertBusinessSetupRequest,
 } from "../../../../store/services/businessApi";
 import type { BookingCatalogService } from "../../../../data/bookingServiceCatalog.data";
+import { buildPlatformServiceOrderDefaults } from "../../../../data/businessServiceCategorySlider.data";
 import { useBookingRealtimeSync } from "../../../../hooks/useBookingRealtimeSync";
 import { applyServiceOrderToServiceCategories } from "../../../../components/common/calendar/serviceOrder.utils";
 import type { ServiceOrderSettings } from "../../../../components/common/calendar/calendar-settings.types";
@@ -169,7 +170,6 @@ export function useFixedLocationCalendarPage() {
     },
   );
   const { data: professionalClientsData } = useGetProfessionalClientsQuery();
-  const { data: mollureDirectoryData } = useGetMollureClientDirectoryQuery();
   const [createCalendarEntry, { isLoading: isCreatingCalendarEntry }] =
     useCreateCalendarEntryMutation();
   const [deleteCalendarEntry, { isLoading: isDeletingCalendarEntry }] =
@@ -180,6 +180,8 @@ export function useFixedLocationCalendarPage() {
   const [updateBookingStatus] = useUpdateBookingStatusMutation();
   const [dispatchBookingNotification] =
     useDispatchBookingNotificationMutation();
+  const [updateCalendarEntry, { isLoading: isUpdatingCalendarEntry }] =
+    useUpdateCalendarEntryMutation();
   const [updateCalendarEntryStatus] = useUpdateCalendarEntryStatusMutation();
   const { showSnackbar } = useSnackbar();
 
@@ -192,10 +194,6 @@ export function useFixedLocationCalendarPage() {
         name: member.full_name?.trim() || `Team Member ${index + 1}`,
         avatarText: member.full_name?.trim()?.[0]?.toUpperCase() || "T",
       })) ?? [];
-
-    if (!resources.length) {
-      resources.push({ id: "unassigned", name: "Unassigned", avatarText: "U" });
-    }
 
     const supportedLocations: CalendarBookingLocation[] =
       businessSetup?.location_mode === "fixed"
@@ -269,23 +267,39 @@ export function useFixedLocationCalendarPage() {
 
   const serviceOrderDefaults = React.useMemo(() => {
     const setup = setupData?.data;
-    const categories = Array.from(
+    const platformDefaults = buildPlatformServiceOrderDefaults();
+    const fromSetup = Array.from(
       new Set(
         setup?.service_details
           ?.map((service) => service.category_title)
           .filter(Boolean) ?? [],
       ),
     );
-    if (!categories.length) {
-      return { categories: [], servicesByCategory: {} };
+    const categories = [...platformDefaults.categories];
+    for (const category of fromSetup) {
+      if (
+        !categories.some(
+          (entry) => entry.toLowerCase() === category.toLowerCase(),
+        )
+      ) {
+        categories.push(category);
+      }
     }
-    const servicesByCategory: Record<string, string[]> = {};
+    const servicesByCategory: Record<string, string[]> = {
+      ...platformDefaults.servicesByCategory,
+    };
     for (const category of categories) {
+      const matchedSetupKey =
+        fromSetup.find(
+          (entry) => entry.toLowerCase() === category.toLowerCase(),
+        ) ?? category;
       servicesByCategory[category] =
         setup?.service_details
-          ?.filter((service) => service.category_title === category)
+          ?.filter((service) => service.category_title === matchedSetupKey)
           .map((service) => service.service_title)
-          .filter(Boolean) ?? [];
+          .filter(Boolean) ??
+        servicesByCategory[category] ??
+        [];
     }
     return { categories, servicesByCategory };
   }, [setupData]);
@@ -295,17 +309,9 @@ export function useFixedLocationCalendarPage() {
       (professionalClientsData?.data ?? []).map((client) => ({
         name: client.display_name,
         email: client.email,
+        mollureUserId: client.mollure_user_id,
       })),
     [professionalClientsData],
-  );
-
-  const platformClientOptions = React.useMemo(
-    () =>
-      (mollureDirectoryData?.data ?? []).map((client) => ({
-        name: client.name,
-        email: client.email,
-      })),
-    [mollureDirectoryData],
   );
 
   const fixedLocationAddress =
@@ -320,6 +326,7 @@ export function useFixedLocationCalendarPage() {
 
   const isSaving =
     isCreatingCalendarEntry ||
+    isUpdatingCalendarEntry ||
     isSavingCalendarSettings ||
     isDeletingCalendarEntry;
 
@@ -327,6 +334,14 @@ export function useFixedLocationCalendarPage() {
     payload: Parameters<typeof createCalendarEntry>[0],
   ) => {
     const response = await createCalendarEntry(payload).unwrap();
+    return response.data;
+  };
+
+  const onUpdateCalendarEntry = async (
+    id: string,
+    payload: Omit<Parameters<typeof updateCalendarEntry>[0], "id">,
+  ) => {
+    const response = await updateCalendarEntry({ id, ...payload }).unwrap();
     return response.data;
   };
 
@@ -458,11 +473,11 @@ export function useFixedLocationCalendarPage() {
     serviceCatalog,
     serviceOrderDefaults,
     clientOptions,
-    platformClientOptions,
     fixedLocationAddress,
     lateRescheduleFeePercentDefault,
     isSaving,
     onCreateCalendarEntry,
+    onUpdateCalendarEntry,
     onDeleteCalendarEntry,
     onSaveCalendarSettings,
     onSyncServiceOrderToSetup,

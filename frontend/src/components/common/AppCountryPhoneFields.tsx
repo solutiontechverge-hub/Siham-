@@ -100,7 +100,11 @@ export default function AppCountryPhoneFields({
               if (!validateOnBlur) return;
               runValidation();
             }}
-            sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                bgcolor: disabled ? alpha(m.navy, 0.04) : "#fff",
+              },
+            }}
           />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -121,7 +125,11 @@ export default function AppCountryPhoneFields({
             error={Boolean(displayPhoneError)}
             helperText={displayPhoneError}
             inputProps={{ inputMode: "tel", autoComplete: "tel-national" }}
-            sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+            sx={{
+              "& .MuiOutlinedInput-root": {
+                bgcolor: disabled ? alpha(m.navy, 0.04) : "#fff",
+              },
+            }}
           />
         </Box>
       </Stack>

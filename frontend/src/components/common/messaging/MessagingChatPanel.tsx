@@ -1,17 +1,21 @@
 "use client";
 
 import * as React from "react";
+import NextLink from "next/link";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
-import { Box, IconButton, Stack, Typography } from "@mui/material";
+import { Box, IconButton, Link, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import MessagingAvatar from "./MessagingAvatar";
 import MessagingMessageBubble from "./MessagingMessageBubble";
 import MessagingComposer from "./MessagingComposer";
 import { isMessageOwn } from "./messagingPreview";
-import type { MessagingAudience } from "./messagingRoutes";
+import {
+  getMessagingPeerProfileHref,
+  type MessagingAudience,
+} from "./messagingRoutes";
 import type {
   MessagingChatMessage,
   MessagingThread,
@@ -37,6 +41,8 @@ type Props = {
   onClose?: () => void;
   onBack?: () => void;
   peerReadAt?: string | null;
+  /** Shown in the chat pane when there is no active conversation. */
+  emptyStateMessage?: string;
 };
 
 export default function MessagingChatPanel({
@@ -52,6 +58,7 @@ export default function MessagingChatPanel({
   onClose,
   onBack,
   peerReadAt,
+  emptyStateMessage,
 }: Props) {
   const m = useTheme().palette.mollure;
   const scrollRef = React.useRef<HTMLDivElement>(null);
@@ -62,6 +69,9 @@ export default function MessagingChatPanel({
   }, [messageGroups, thread?.id]);
 
   if (!thread) {
+    const message =
+      emptyStateMessage?.trim() ||
+      "Select a conversation to start messaging";
     return (
       <Box
         sx={{
@@ -70,18 +80,31 @@ export default function MessagingChatPanel({
           placeItems: "center",
           p: { xs: 2, sm: 3 },
           minWidth: 0,
+          bgcolor: alpha(m.teal, 0.06),
         }}
       >
-        <Typography
+        <Box
           sx={{
-            fontSize: { xs: 13, sm: 14 },
-            fontWeight: 700,
-            color: alpha(m.navy, 0.45),
-            textAlign: "center",
+            maxWidth: 420,
+            px: { xs: 2, sm: 2.5 },
+            py: { xs: 2, sm: 2.25 },
+            borderRadius: "14px",
+            bgcolor: alpha(m.teal, 0.12),
+            border: `1px solid ${alpha(m.teal, 0.22)}`,
           }}
         >
-          Select a conversation to start messaging
-        </Typography>
+          <Typography
+            sx={{
+              fontSize: { xs: 13, sm: 14 },
+              fontWeight: 700,
+              color: alpha(m.navy, 0.72),
+              textAlign: "center",
+              lineHeight: 1.55,
+            }}
+          >
+            {message}
+          </Typography>
+        </Box>
       </Box>
     );
   }
@@ -136,16 +159,21 @@ export default function MessagingChatPanel({
                 spacing={0.6}
                 flexWrap="wrap"
               >
-                <Typography
+                <Link
+                  component={NextLink}
+                  href={getMessagingPeerProfileHref(audience, thread)}
+                  underline="hover"
+                  noWrap
+                  onClick={() => onClose?.()}
                   sx={{
                     fontWeight: 900,
                     fontSize: { xs: 13, sm: 14 },
                     color: alpha(m.navy, 0.9),
+                    maxWidth: "100%",
                   }}
-                  noWrap
                 >
                   {thread.name}
-                </Typography>
+                </Link>
                 <Typography
                   sx={{
                     fontSize: { xs: 10, sm: 11 },

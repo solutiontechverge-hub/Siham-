@@ -39,8 +39,15 @@ import {
 } from "../../../store/services/profileApi";
 import {
   useCreateBookingMutation,
+  useGetPublicBusinessHoursQuery,
   useUploadBookingAttachmentsMutation,
 } from "../../../store/services/businessApi";
+import {
+  isPublicBusinessHoursNotAvailable,
+  getPublicBusinessHoursNotAvailableNote,
+  resolvePublicBusinessHoursDay,
+  type PublicBusinessHoursLike,
+} from "../../../components/common/calendar/calendar.utils";
 
 import {
   FIXED_LOCATION_MAX_GUESTS,
@@ -84,6 +91,23 @@ export function useClientBookingCreatePage() {
     () => businessSetups.find((row) => row.id === shop?.shopId) ?? null,
     [businessSetups, shop?.shopId],
   );
+  const setupIdForHours =
+    (bookingSetup?.id && UUID_RE.test(bookingSetup.id)
+      ? bookingSetup.id
+      : extractUuidFromSyntheticId(shop?.shopId)) ?? "";
+  const { data: publicHoursResponse } = useGetPublicBusinessHoursQuery(
+    setupIdForHours,
+    { skip: !setupIdForHours },
+  );
+  const publicBusinessHours = React.useMemo((): PublicBusinessHoursLike[] => {
+    const raw = publicHoursResponse?.data?.publicBusinessHours;
+    if (!Array.isArray(raw)) return [];
+    return raw as PublicBusinessHoursLike[];
+  }, [publicHoursResponse?.data?.publicBusinessHours]);
+  const bookingLocationCode = React.useMemo(
+    () => ((shop?.locationMode ?? "fixed") === "desired" ? "DL" : "FL"),
+    [shop?.locationMode],
+  );
   const [createBooking] = useCreateBookingMutation();
   const [uploadBookingAttachments] = useUploadBookingAttachmentsMutation();
   const [isContinuing, setIsContinuing] = React.useState(false);
@@ -97,6 +121,10 @@ export function useClientBookingCreatePage() {
   const isPastDay = React.useCallback(
     (d: Date) => startOfDay(d).getTime() < today0.getTime(),
     [today0],
+  );
+  const clampToBookableDay = React.useCallback(
+    (d: Date) => (isPastDay(d) ? today0 : startOfDay(d)),
+    [isPastDay, today0],
   );
 
   const toISO = (d: Date) => {
@@ -161,17 +189,70 @@ export function useClientBookingCreatePage() {
       next.setFullYear(year, month0, 1);
       const daysInTargetMonth = new Date(year, month0 + 1, 0).getDate();
       next.setDate(Math.min(day, daysInTargetMonth));
-      return next;
+      return clampToBookableDay(next);
     });
   };
 
   const allDayTimes = React.useMemo(() => {
+    const iso = toISO(selectedDate);
+    const status = resolvePublicBusinessHoursDay(
+      publicBusinessHours,
+      iso,
+      bookingLocationCode,
+    );
+    // Explicit off day → no bookable times.
+    if (status.kind === "notAvailable") return [] as string[];
+
+    const hours =
+      status.kind === "open"
+        ? status.interval
+        : publicBusinessHours.length
+          ? null
+          : // No public hours configured yet → keep legacy 9–18 fallback.
+            { startMin: 9 * 60, endMin: 18 * 60 + 1 };
+
+    if (!hours) return [] as string[];
+
     const slots: string[] = [];
-    for (let minutes = 9 * 60; minutes <= 18 * 60; minutes += 30) {
+    for (
+      let minutes = hours.startMin;
+      minutes < hours.endMin;
+      minutes += 30
+    ) {
       slots.push(fmtMinutesToTimeLabel(minutes));
     }
     return slots;
-  }, []);
+  }, [bookingLocationCode, publicBusinessHours, selectedDate]);
+
+  const isDayNotAvailable = React.useCallback(
+    (d: Date) =>
+      isPublicBusinessHoursNotAvailable(
+        publicBusinessHours,
+        toISO(d),
+        bookingLocationCode,
+      ),
+    [bookingLocationCode, publicBusinessHours],
+  );
+
+  const getDayClosedNote = React.useCallback(
+    (d: Date) =>
+      getPublicBusinessHoursNotAvailableNote(
+        publicBusinessHours,
+        toISO(d),
+        bookingLocationCode,
+      ),
+    [bookingLocationCode, publicBusinessHours],
+  );
+
+  const selectedDayNotAvailable = React.useMemo(
+    () => isDayNotAvailable(selectedDate),
+    [isDayNotAvailable, selectedDate],
+  );
+
+  const selectedDayClosedNote = React.useMemo(
+    () => getDayClosedNote(selectedDate),
+    [getDayClosedNote, selectedDate],
+  );
 
   const isSelectedToday = React.useMemo(
     () => startOfDay(selectedDate).getTime() === today0.getTime(),
@@ -190,6 +271,56 @@ export function useClientBookingCreatePage() {
     [nowTick, selectedDate],
   );
   const minBookableMinutes = nowMinutes + CLIENT_BOOKING_MIN_LEAD_MINUTES;
+
+  const getBookableTimesForDate = React.useCallback(
+    (d: Date) => {
+      if (isPastDay(d)) return [] as string[];
+      const iso = toISO(d);
+      const status = resolvePublicBusinessHoursDay(
+        publicBusinessHours,
+        iso,
+        bookingLocationCode,
+      );
+      if (status.kind === "notAvailable") return [] as string[];
+      const hours =
+        status.kind === "open"
+          ? status.interval
+          : publicBusinessHours.length
+            ? null
+            : { startMin: 9 * 60, endMin: 18 * 60 + 1 };
+      if (!hours) return [] as string[];
+      const slots: string[] = [];
+      for (
+        let minutes = hours.startMin;
+        minutes < hours.endMin;
+        minutes += 30
+      ) {
+        slots.push(fmtMinutesToTimeLabel(minutes));
+      }
+      const isToday = startOfDay(d).getTime() === today0.getTime();
+      if (!isToday) return slots;
+      return slots.filter(
+        (t) => parseTimeLabelToMinutes(t) > minBookableMinutes,
+      );
+    },
+    [
+      bookingLocationCode,
+      isPastDay,
+      minBookableMinutes,
+      publicBusinessHours,
+      today0,
+    ],
+  );
+
+  /** Day cannot be chosen: past, explicitly closed, or no public hours/slots. */
+  const isDayUnselectable = React.useCallback(
+    (d: Date) => {
+      if (isPastDay(d)) return true;
+      if (isDayNotAvailable(d)) return true;
+      return getBookableTimesForDate(d).length === 0;
+    },
+    [getBookableTimesForDate, isDayNotAvailable, isPastDay],
+  );
 
   const times = allDayTimes;
 
@@ -291,6 +422,13 @@ export function useClientBookingCreatePage() {
   const [projectUploads, setProjectUploads] = React.useState<
     Array<{ id: string; name: string; previewUrl: string; file?: File }>
   >([]);
+  const [desiredVisitAddress, setDesiredVisitAddress] = React.useState({
+    street: "",
+    number: "",
+    postalCode: "",
+    province: "",
+    municipality: "",
+  });
   const [participantMenuAnchor, setParticipantMenuAnchor] =
     React.useState<HTMLElement | null>(null);
   const [planningPersonId, setPlanningPersonId] = React.useState<string | null>(
@@ -302,6 +440,29 @@ export function useClientBookingCreatePage() {
 
   const locationMode = shop?.locationMode ?? "fixed";
   const isDesiredLocation = locationMode === "desired";
+  const isDesiredVisitAddressComplete = React.useMemo(() => {
+    if (!isDesiredLocation) return true;
+    return Boolean(
+      desiredVisitAddress.street.trim() &&
+        desiredVisitAddress.number.trim() &&
+        desiredVisitAddress.postalCode.trim() &&
+        desiredVisitAddress.province.trim() &&
+        desiredVisitAddress.municipality.trim(),
+    );
+  }, [desiredVisitAddress, isDesiredLocation]);
+  const desiredVisitAddressLabel = React.useMemo(() => {
+    if (!isDesiredLocation) return "";
+    return [
+      desiredVisitAddress.street,
+      desiredVisitAddress.number,
+      desiredVisitAddress.postalCode,
+      desiredVisitAddress.municipality,
+      desiredVisitAddress.province,
+    ]
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .join(", ");
+  }, [desiredVisitAddress, isDesiredLocation]);
   const getParticipantLabel = React.useCallback(
     (person: BookingPerson) => {
       if (person.participantType === "planning" || person.name === "Planning")
@@ -603,9 +764,21 @@ export function useClientBookingCreatePage() {
   }, [selectedTimeTooSoon]);
 
   React.useEffect(() => {
-    // If today has no remaining slots, move to tomorrow.
-    if (isSelectedToday && availableTimes.length === 0) {
-      setSelectedDate(addDays(today0, 1));
+    // Jump once to the next day that actually has bookable slots.
+    // Avoids briefly selecting closed/empty days (red flash / glitch).
+    if (isDayUnselectable(selectedDate)) {
+      let cursor = isPastDay(selectedDate)
+        ? today0
+        : startOfDay(selectedDate);
+      for (let i = 0; i < 60; i += 1) {
+        if (!isDayUnselectable(cursor)) {
+          if (toISO(cursor) !== toISO(selectedDate)) {
+            setSelectedDate(cursor);
+          }
+          return;
+        }
+        cursor = addDays(cursor, 1);
+      }
       return;
     }
     // Keep selection on a bookable future slot (nearest by default).
@@ -613,7 +786,14 @@ export function useClientBookingCreatePage() {
       setSelectedTime(availableTimes[0]);
       setTimeValidationError(null);
     }
-  }, [availableTimes, isSelectedToday, selectedTime, today0]);
+  }, [
+    availableTimes,
+    isDayUnselectable,
+    isPastDay,
+    selectedDate,
+    selectedTime,
+    today0,
+  ]);
 
   React.useEffect(() => {
     const el = timeScrollRef.current;
@@ -856,7 +1036,9 @@ export function useClientBookingCreatePage() {
 
       if (existing.draft.selectedDateISO) {
         const parsed = new Date(`${existing.draft.selectedDateISO}T00:00:00`);
-        if (!Number.isNaN(parsed.getTime())) setSelectedDate(parsed);
+        if (!Number.isNaN(parsed.getTime())) {
+          setSelectedDate(clampToBookableDay(parsed));
+        }
       }
       if (existing.draft.selectedTime)
         setSelectedTime(existing.draft.selectedTime);
@@ -1237,6 +1419,14 @@ export function useClientBookingCreatePage() {
     )
       return;
 
+    if (isDesiredLocation && !isDesiredVisitAddressComplete) {
+      showSnackbar({
+        severity: "error",
+        message: "Please enter the full visit address for this Desired Location booking.",
+      });
+      return;
+    }
+
     if (isSelectedToday && isSameDayBookingTooSoon(selectedTime)) {
       setTimeValidationError(CLIENT_BOOKING_MIN_LEAD_ERROR);
       showSnackbar({
@@ -1292,6 +1482,13 @@ export function useClientBookingCreatePage() {
                 name: u.name,
                 previewUrl: u.previewUrl,
               })),
+            },
+            desiredLocation: {
+              street: desiredVisitAddress.street.trim(),
+              number: desiredVisitAddress.number.trim(),
+              postalCode: desiredVisitAddress.postalCode.trim(),
+              province: desiredVisitAddress.province.trim(),
+              municipality: desiredVisitAddress.municipality.trim(),
             },
           }
         : {}),
@@ -1413,15 +1610,35 @@ export function useClientBookingCreatePage() {
                 description: projectDescription,
                 uploads: projectDetailsUploads,
               },
+              desiredLocation: {
+                street: desiredVisitAddress.street.trim(),
+                number: desiredVisitAddress.number.trim(),
+                postalCode: desiredVisitAddress.postalCode.trim(),
+                province: desiredVisitAddress.province.trim(),
+                municipality: desiredVisitAddress.municipality.trim(),
+              },
             }
           : {}),
       };
+
+      const shopForSession = shop
+        ? {
+            ...shop,
+            ...(isDesiredLocation && desiredVisitAddressLabel
+              ? {
+                  addressLabel: desiredVisitAddressLabel,
+                  municipalityLabel:
+                    desiredVisitAddress.municipality.trim() || shop.municipalityLabel,
+                }
+              : {}),
+          }
+        : shop;
 
       const draftRecord = {
         id: `bk_draft_${Date.now()}`,
         bookingRef,
         status: "draft" as const,
-        shop,
+        shop: shopForSession,
         draft: payload,
         createdAt: new Date().toISOString(),
         requiresPrepayment,
@@ -1529,6 +1746,11 @@ export function useClientBookingCreatePage() {
     monthPickerMonth,
     setMonthYear,
     allDayTimes,
+    isDayNotAvailable,
+    isDayUnselectable,
+    getDayClosedNote,
+    selectedDayNotAvailable,
+    selectedDayClosedNote,
     isSelectedToday,
     nowTick,
     setNowTick,
@@ -1579,6 +1801,10 @@ export function useClientBookingCreatePage() {
     setProjectDescription,
     projectUploads,
     setProjectUploads,
+    desiredVisitAddress,
+    setDesiredVisitAddress,
+    isDesiredVisitAddressComplete,
+    desiredVisitAddressLabel,
     participantMenuAnchor,
     setParticipantMenuAnchor,
     planningPersonId,

@@ -6,6 +6,7 @@ const DRAFT_SNAPSHOT_KEY = "mollure:booking_draft_snapshots_v1";
 type DraftSnapshot = {
   people?: ClientBookingDraft["people"];
   services?: ClientBookingDraft["services"];
+  products?: ClientBookingDraft["products"];
   projectDetails?: ClientBookingDraft["projectDetails"];
   teamMembers?: ClientBookingDraft["teamMembers"];
   total?: number;
@@ -47,6 +48,7 @@ function toSnapshot(draft: ClientBookingDraft): DraftSnapshot {
   return {
     people: draft.people,
     services: draft.services,
+    products: draft.products,
     projectDetails: draft.projectDetails
       ? {
           description: draft.projectDetails.description ?? "",
@@ -108,6 +110,7 @@ function servicesHaveGuestIds(draft?: ClientBookingDraft | DraftSnapshot | null)
 /**
  * Prefer API draft, but fill missing Project/people/guest assignments from
  * session/local snapshot so Past/Ongoing/Upcoming reopen matches Continue design.
+ * Never replace a newer/longer API services list with a poorer cache snapshot.
  */
 export function mergeClientBookingDraftRichness(
   primary: ClientBookingDraft,
@@ -123,33 +126,15 @@ export function mergeClientBookingDraftRichness(
     ? primary.teamMembers
     : fallback.teamMembers ?? primary.teamMembers;
 
-  let services = primary.services ?? [];
+  const primaryServices = primary.services ?? [];
   const fallbackServices = fallback.services ?? [];
-  const primaryAssignedCount = (primary.services ?? []).filter((s) => Boolean(s.guestId)).length;
-  const fallbackAssignedCount = fallbackServices.filter((s) => Boolean(s.guestId)).length;
-  const fallbackIsRicher =
-    fallbackServices.length > (primary.services?.length ?? 0) ||
-    fallbackAssignedCount > primaryAssignedCount ||
-    ((fallback.people?.length ?? 0) > (primary.people?.length ?? 0) &&
-      fallbackAssignedCount >= primaryAssignedCount &&
-      fallbackServices.length > 0);
+  let services = primaryServices;
 
-  // Desired Model/Guest reopen: prefer the local/API snapshot when it still has
-  // person assignments the stripped notes draft no longer carries.
-  if (fallbackIsRicher && fallbackServices.length > 0) {
-    services = fallbackServices.map((service) => ({
-      id: service.id,
-      name: service.name,
-      durationMins: service.durationMins,
-      price: service.price,
-      guestId: service.guestId ?? null,
-      teamMemberId: service.teamMemberId ?? null,
-      isAddOn: service.isAddOn,
-    }));
-  } else if (!servicesHaveGuestIds(primary) && fallbackServices.length > 0) {
+  if (fallbackServices.length > 0) {
     const byId = new Map(fallbackServices.map((s) => [s.id, s]));
     const byName = new Map(fallbackServices.map((s) => [s.name, s]));
-    services = services.map((service) => {
+    // Always keep primary rows (API / notes) — only borrow guest/team assignments.
+    services = primaryServices.map((service) => {
       const match = byId.get(service.id) ?? byName.get(service.name);
       return {
         ...service,
@@ -157,19 +142,46 @@ export function mergeClientBookingDraftRichness(
         teamMemberId: service.teamMemberId ?? match?.teamMemberId ?? null,
       };
     });
-    // If API flattened to fewer rows, keep richer snapshot services when primary has no guest mapping.
-    if (!services.some((s) => s.guestId) && fallbackServices.length) {
-      services = fallbackServices.map((service) => ({
-        id: service.id,
-        name: service.name,
-        durationMins: service.durationMins,
-        price: service.price,
-        guestId: service.guestId ?? null,
-        teamMemberId: service.teamMemberId ?? null,
-        isAddOn: service.isAddOn,
-      }));
+
+    // If notes stripped guest lines entirely, append cache-only guest rows that
+    // are not already present — but never when primary already has more rows.
+    if (
+      !servicesHaveGuestIds({ services }) &&
+      fallbackServices.some((s) => Boolean(s.guestId)) &&
+      fallbackServices.length >= primaryServices.length
+    ) {
+      const primaryIds = new Set(services.map((s) => s.id));
+      for (const fb of fallbackServices) {
+        if (!fb.guestId || primaryIds.has(fb.id)) continue;
+        services = [
+          ...services,
+          {
+            id: fb.id,
+            name: fb.name,
+            durationMins: fb.durationMins,
+            price: fb.price,
+            guestId: fb.guestId ?? null,
+            teamMemberId: fb.teamMemberId ?? null,
+            isAddOn: fb.isAddOn,
+          },
+        ];
+        primaryIds.add(fb.id);
+      }
     }
   }
+
+  const fallbackProducts = fallback.products;
+  const products =
+    (primary.products?.length ?? 0) > 0
+      ? primary.products
+      : fallbackProducts?.length
+        ? fallbackProducts
+        : primary.products;
+
+  const primaryTotal =
+    typeof primary.total === "number" && primary.total > 0 ? primary.total : null;
+  const fallbackTotal =
+    typeof fallback.total === "number" && fallback.total > 0 ? fallback.total : null;
 
   return {
     ...primary,
@@ -177,6 +189,8 @@ export function mergeClientBookingDraftRichness(
     projectDetails,
     teamMembers,
     services,
+    products,
+    total: primaryTotal ?? fallbackTotal ?? primary.total,
   };
 }
 

@@ -84,6 +84,56 @@ export function detectEditedServiceIds(
   return [...new Set(editedIds)];
 }
 
+function productSignature(product: {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  unitPrice?: number;
+}) {
+  return JSON.stringify({
+    name: product.name,
+    price: product.price,
+    quantity: product.quantity,
+    unitPrice: product.unitPrice ?? product.price,
+  });
+}
+
+export function detectEditedProductIds(
+  originalProducts: readonly {
+    id: string;
+    name: string;
+    price: number;
+    quantity: number;
+    unitPrice?: number;
+  }[],
+  currentProducts: readonly {
+    id: string;
+    name: string;
+    price: number;
+    quantity: number;
+    unitPrice?: number;
+  }[],
+) {
+  const originalById = new Map(originalProducts.map((product) => [product.id, product]));
+  const editedIds: string[] = [];
+
+  for (const product of currentProducts) {
+    const original = originalById.get(product.id);
+    if (!original || productSignature(original) !== productSignature(product)) {
+      editedIds.push(product.id);
+    }
+  }
+
+  for (const original of originalProducts) {
+    if (!currentProducts.some((product) => product.id === original.id)) {
+      editedIds.push(original.id);
+    }
+  }
+
+  return [...new Set(editedIds)];
+}
+
 export function resolveOriginalServices(
   event: CalendarEvent,
   hydratedServices: CalendarBookingServiceItem[],

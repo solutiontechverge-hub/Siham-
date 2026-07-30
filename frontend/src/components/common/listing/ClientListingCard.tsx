@@ -161,7 +161,14 @@ export default function ClientListingCard({
         border: `1px solid ${tokens.cardBorder}`,
         boxShadow: "0 10px 22px rgba(16, 24, 40, 0.08)",
         cursor: "pointer",
-        "&:hover": { transform: "translateY(-1px)" },
+        transition:
+          "transform 0.22s ease, box-shadow 0.22s ease, background-color 0.22s ease, border-color 0.22s ease",
+        "&:hover": {
+          transform: "translateY(-6px)",
+          backgroundColor: tokens.pageBg,
+          borderColor: alpha(tokens.teal, 0.35),
+          boxShadow: `0 18px 36px ${alpha(tokens.teal, 0.18)}, 0 8px 16px rgba(16, 24, 40, 0.08)`,
+        },
       }}
       onClick={onOpenProfile}
     >
@@ -376,7 +383,13 @@ export default function ClientListingCard({
               {Array.from({ length: 5 }).map((_, i) => (
                 <StarRoundedIcon
                   key={i}
-                  sx={{ fontSize: 22, color: tokens.star }}
+                  sx={{
+                    fontSize: 22,
+                    color:
+                      i < Math.round(Math.min(5, Math.max(0, item.rating)))
+                        ? tokens.star
+                        : alpha(tokens.navy, 0.15),
+                  }}
                 />
               ))}
             </Box>
@@ -469,43 +482,51 @@ export default function ClientListingCard({
 
           <Box sx={{ pt: 0.75, textAlign: "left" }}>
             <Stack spacing={1}>
-              {item.services.slice(0, 3).map((svc, idx) => (
-                <Stack
-                  key={`${svc.name}-${idx}`}
-                  direction="row"
-                  alignItems="baseline"
-                  justifyContent="space-between"
-                  spacing={1}
+              {item.services.length === 0 ? (
+                <Typography
+                  sx={{ fontSize: 13, color: alpha(tokens.navy, 0.5) }}
                 >
-                  <Box sx={{ minWidth: 0 }}>
+                  No services listed yet.
+                </Typography>
+              ) : (
+                item.services.slice(0, 3).map((svc, idx) => (
+                  <Stack
+                    key={`${svc.name}-${idx}`}
+                    direction="row"
+                    alignItems="baseline"
+                    justifyContent="space-between"
+                    spacing={1}
+                  >
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography
+                        sx={{
+                          fontSize: 13,
+                          fontWeight: 800,
+                          color: alpha(tokens.navy, 0.9),
+                        }}
+                      >
+                        {svc.name}
+                      </Typography>
+                      {svc.durationLabel ? (
+                        <Typography
+                          sx={{ fontSize: 12, color: alpha(tokens.navy, 0.55) }}
+                        >
+                          {svc.durationLabel}
+                        </Typography>
+                      ) : null}
+                    </Box>
                     <Typography
                       sx={{
-                        fontSize: 13,
-                        fontWeight: 800,
-                        color: alpha(tokens.navy, 0.9),
+                        fontSize: 12,
+                        color: alpha(tokens.navy, 0.65),
+                        whiteSpace: "nowrap",
                       }}
                     >
-                      {svc.name}
+                      {svc.priceLabel}
                     </Typography>
-                    {svc.durationLabel ? (
-                      <Typography
-                        sx={{ fontSize: 12, color: alpha(tokens.navy, 0.55) }}
-                      >
-                        {svc.durationLabel}
-                      </Typography>
-                    ) : null}
-                  </Box>
-                  <Typography
-                    sx={{
-                      fontSize: 12,
-                      color: alpha(tokens.navy, 0.65),
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {svc.priceLabel}
-                  </Typography>
-                </Stack>
-              ))}
+                  </Stack>
+                ))
+              )}
             </Stack>
           </Box>
         </Stack>

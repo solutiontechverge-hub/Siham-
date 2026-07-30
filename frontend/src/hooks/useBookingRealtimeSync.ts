@@ -41,7 +41,14 @@ export function useBookingRealtimeSync(options?: Options) {
 
     const handleBookingChanged = (payload: BookingChangedPayload) => {
       if (businessSetupId && payload.business_setup_id !== businessSetupId) return;
+      // Client details page stays open — force Bookings + Calendar refetch immediately.
       dispatch(businessApi.util.invalidateTags(["Calendar", "Bookings"]));
+      void dispatch(
+        businessApi.endpoints.getMyBookings.initiate(undefined, {
+          forceRefetch: true,
+          subscribe: false,
+        }),
+      );
     };
 
     return onBookingChanged(handleBookingChanged);
