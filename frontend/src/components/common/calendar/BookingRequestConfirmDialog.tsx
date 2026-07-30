@@ -8,7 +8,7 @@ import AppModal, {
   MessagingModalPrimaryButton,
 } from "../AppModal";
 
-export type BookingRequestConfirmAction = "accept" | "reject";
+export type BookingRequestConfirmAction = "accept" | "suggest" | "reject";
 
 type Props = {
   open: boolean;
@@ -25,6 +25,11 @@ const COPY: Record<
     title: "Accept request",
     body: "By accepting, the requested changes will be applied to this booking.",
     confirmLabel: "Accept",
+  },
+  suggest: {
+    title: "Suggest change",
+    body: "By choosing “Suggest Change”, you can communicate your changes through the messaging tool.",
+    confirmLabel: "Suggest Change",
   },
   reject: {
     title: "Reject request",

@@ -103,10 +103,13 @@ export function mapCalendarBookingToEvent(
       ? String(booking.team_member_id)
       : fallbackResourceId || "unassigned";
   const ebrMeta = status === "Cancelled" ? null : parseStoredEbrFromNotes(booking.notes);
-  const isOutgoingEbr =
+  // Notes requestDirection is the source of truth (pro POV). Do not require
+  // lastEditedBy — plain pro-sent BRs only store requestDirection: "outgoing".
+  const isOutgoingRequest =
     status !== "Cancelled" &&
-    parsedNotes?.lastEditedBy === "professional" &&
-    (parsedNotes?.requestDirection === "outgoing" || parsedNotes?.responseStatus === "suggestion_for_change");
+    (parsedNotes?.requestDirection === "outgoing" ||
+      (parsedNotes?.lastEditedBy === "professional" &&
+        parsedNotes?.responseStatus === "suggestion_for_change"));
   const isIncomingClientEbr =
     status !== "Cancelled" &&
     Boolean(ebrMeta) &&
@@ -116,6 +119,14 @@ export function mapCalendarBookingToEvent(
       parsedNotes?.lastEditedBy === "client");
   const clientNote = ebrMeta?.clientNote?.trim() || "";
   const noteText = clientNote || parsedNotes?.internalNote?.trim() || "";
+  const resolvedRequestDirection: "outgoing" | "incoming" =
+    parsedNotes?.requestDirection === "outgoing"
+      ? "outgoing"
+      : parsedNotes?.requestDirection === "incoming"
+        ? "incoming"
+        : isOutgoingRequest
+          ? "outgoing"
+          : "incoming";
 
   return {
     id: `b-${booking.id}`,
@@ -139,7 +150,7 @@ export function mapCalendarBookingToEvent(
     notes: booking.notes ?? null,
     details: {
       clientEmail: booking.customer_email ?? "",
-      requestDirection: isOutgoingEbr ? "outgoing" : "incoming",
+      requestDirection: resolvedRequestDirection,
       services: ebrServices ?? [
         {
           id: booking.service_id || `svc-b-${booking.id}`,
@@ -150,6 +161,7 @@ export function mapCalendarBookingToEvent(
       ],
       ...(parsedNotes?.products?.length ? { products: parsedNotes.products } : {}),
       ...(parsedNotes?.editedServiceIds?.length ? { editedServiceIds: parsedNotes.editedServiceIds } : {}),
+      ...(parsedNotes?.editedProductIds?.length ? { editedProductIds: parsedNotes.editedProductIds } : {}),
       ...(isIncomingClientEbr
         ? { lastEditedBy: "client" as const, responseStatus: "suggestion_for_change" as const }
         : parsedNotes?.lastEditedBy
@@ -244,15 +256,29 @@ export function mergeCalendarOverviewEvents(
     .filter((entry) => entry.status !== "blocked")
     .map((entry) => mapCalendarEntryToOverviewEvent(entry, fallbackResourceId));
 
-  const bookingEvents = bookings.map((booking) => mapCalendarBookingToEvent(booking, fallbackResourceId));
+  const bookingEvents = bookings.map((booking) =>
+    mapCalendarBookingToEvent(booking, fallbackResourceId),
+  );
 
+  const bookingCodes = new Set(
+    bookingEvents
+      .map((event) => String(event.bookingCode ?? "").trim())
+      .filter(Boolean),
+  );
   const bookingKeys = new Set(
-    bookingEvents.map((event) => `${event.date}|${event.start}|${event.end}|${event.resourceId}`),
+    bookingEvents.map(
+      (event) => `${event.date}|${event.start}|${event.end}|${event.resourceId}`,
+    ),
   );
 
-  const dedupedEntries = entryEvents.filter(
-    (event) => !bookingKeys.has(`${event.date}|${event.start}|${event.end}|${event.resourceId}`),
-  );
+  // Prefer booking rows over mirrored calendar entries (same OF123 / same slot).
+  const dedupedEntries = entryEvents.filter((event) => {
+    const code = String(event.bookingCode ?? "").trim();
+    if (code && bookingCodes.has(code)) return false;
+    return !bookingKeys.has(
+      `${event.date}|${event.start}|${event.end}|${event.resourceId}`,
+    );
+  });
 
   return [...dedupedEntries, ...bookingEvents];
 }

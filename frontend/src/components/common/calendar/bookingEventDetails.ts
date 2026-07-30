@@ -50,6 +50,7 @@ type StoredBookingNoteMeta = Partial<
     | "responseStatus"
     | "requestDirection"
     | "editedServiceIds"
+    | "editedProductIds"
     | "lastEditedBy"
     | "clientSnapshot"
     | "services"
@@ -104,6 +105,7 @@ export function serializeCalendarEntryNotes(
     responseStatus: details?.responseStatus,
     requestDirection: details?.requestDirection,
     editedServiceIds: details?.editedServiceIds,
+    editedProductIds: details?.editedProductIds,
     lastEditedBy: details?.lastEditedBy,
     clientSnapshot: details?.clientSnapshot,
     ...(details?.services?.length ? { services: details.services } : {}),
@@ -322,6 +324,7 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
       ...(meta.responseStatus ? { responseStatus: meta.responseStatus } : {}),
       ...(meta.requestDirection ? { requestDirection: meta.requestDirection } : {}),
       ...(meta.editedServiceIds?.length ? { editedServiceIds: meta.editedServiceIds } : {}),
+      ...(meta.editedProductIds?.length ? { editedProductIds: meta.editedProductIds } : {}),
       ...(meta.lastEditedBy ? { lastEditedBy: meta.lastEditedBy } : {}),
       ...(meta.clientSnapshot ? { clientSnapshot: meta.clientSnapshot } : {}),
       ...(meta.services?.length

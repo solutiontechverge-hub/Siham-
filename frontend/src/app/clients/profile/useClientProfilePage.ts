@@ -267,6 +267,31 @@ export function useClientProfilePage() {
       password: prev.password,
       confirmPassword: prev.confirmPassword,
     }));
+
+    // Keep messaging / header avatar in sync even before the user hits Save.
+    if (profile.user_type === "company") {
+      const companyProfile = profile.profile as CompanyProfile | null;
+      writePersistedClientProfile({
+        email: profile.email,
+        display_name: companyProfile?.legal_name ?? "",
+        first_name: companyProfile?.contact_first_name ?? "",
+        last_name: companyProfile?.contact_last_name ?? "",
+        avatar_url: companyProfile?.logo ?? null,
+      });
+    } else if (profile.user_type === "individual") {
+      const individualProfile = profile.profile as IndividualProfile | null;
+      writePersistedClientProfile({
+        first_name: individualProfile?.first_name ?? "",
+        last_name: individualProfile?.last_name ?? "",
+        display_name: individualProfile?.display_name ?? "",
+        date_of_birth: individualProfile?.date_of_birth ?? "",
+        gender: individualProfile?.gender ?? "",
+        country_code: individualProfile?.country_code ?? "",
+        phone: individualProfile?.phone ?? "",
+        email: profile.email,
+        avatar_url: individualProfile?.profile_picture ?? null,
+      });
+    }
   }, [profile]);
 
   const clearMessages = React.useCallback(() => {

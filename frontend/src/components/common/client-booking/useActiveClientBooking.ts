@@ -6,6 +6,7 @@ import {
   ACTIVE_BOOKING_ID_KEY,
   CHECKOUT_REF_KEY,
   getActiveBookingSession,
+  setActiveBookingSession,
 } from "../../../app/clients/booking/clientBookingSession";
 import {
   enrichClientBookingRecord,
@@ -41,10 +42,28 @@ function sameBooking(a: ClientBookingRecord, b: ClientBookingRecord) {
   return false;
 }
 
+function bookingContentKey(record: ClientBookingRecord | null | undefined) {
+  if (!record) return "";
+  return [
+    record.notes ?? "",
+    record.status,
+    record.draft?.total ?? "",
+    record.draft?.services?.length ?? 0,
+    record.draft?.products?.length ?? 0,
+    (record.draft?.services ?? []).map((s) => `${s.id}:${s.price}`).join("|"),
+    (record.draft?.products ?? []).map((p) => `${p.id}:${p.price}x${p.quantity}`).join("|"),
+  ].join("::");
+}
+
 export function useActiveClientBooking() {
-  const { data, isLoading, isFetching, refetch } = useGetMyBookingsQuery();
+  const { data, isLoading, isFetching, refetch } = useGetMyBookingsQuery(undefined, {
+    // Keep details page fresh while open (pro edits arrive via tag invalidation + socket).
+    refetchOnFocus: true,
+    refetchOnReconnect: true,
+  });
   const [activeId, setActiveId] = React.useState<string | null>(null);
   const [bookingRef, setBookingRef] = React.useState<string | null>(null);
+  const [sessionTick, setSessionTick] = React.useState(0);
 
   const syncSessionKeys = React.useCallback(() => {
     if (typeof window === "undefined") return;
@@ -61,6 +80,7 @@ export function useActiveClientBooking() {
         event.key === null
       ) {
         syncSessionKeys();
+        setSessionTick((n) => n + 1);
       }
     };
     window.addEventListener("storage", onStorage);
@@ -77,13 +97,16 @@ export function useActiveClientBooking() {
   }, [data]);
 
   const record = React.useMemo(() => {
+    void sessionTick;
     const fromApi = matchActiveBooking(bookings, activeId, bookingRef);
     const sessionRecord = getActiveBookingSession();
 
     if (fromApi && sessionRecord && sameBooking(fromApi, sessionRecord) && sessionRecord.draft && fromApi.draft) {
+      // API is source of truth for pro BR updates; session only fills missing guest/project richness.
+      const draft = mergeClientBookingDraftRichness(fromApi.draft, sessionRecord.draft);
       return enrichClientBookingRecord({
         ...fromApi,
-        draft: mergeClientBookingDraftRichness(fromApi.draft, sessionRecord.draft),
+        draft,
         incomingEditRequest: fromApi.incomingEditRequest ?? sessionRecord.incomingEditRequest,
       });
     }
@@ -102,13 +125,23 @@ export function useActiveClientBooking() {
     }
 
     return enrichClientBookingRecord(sessionRecord);
-  }, [activeId, bookingRef, bookings]);
+  }, [activeId, bookingRef, bookings, sessionTick]);
 
+  // Keep sessionStorage in sync with latest API so staying on the page shows pro edits.
   React.useEffect(() => {
     if (!record || typeof window === "undefined") return;
-    window.sessionStorage.setItem(ACTIVE_BOOKING_ID_KEY, record.id);
+    window.sessionStorage.setItem(ACTIVE_BOOKING_ID_KEY, record.apiBookingId ?? record.id);
     if (record.bookingRef) {
       window.sessionStorage.setItem(CHECKOUT_REF_KEY, record.bookingRef);
+    }
+
+    const sessionRecord = getActiveBookingSession();
+    if (!sessionRecord || !sameBooking(record, sessionRecord)) {
+      setActiveBookingSession(record);
+      return;
+    }
+    if (bookingContentKey(record) !== bookingContentKey(sessionRecord)) {
+      setActiveBookingSession(record);
     }
   }, [record]);
 

@@ -148,6 +148,8 @@ export default function AdminAuthLoginShell() {
             localeLabel={authLoginHeaderClient.localeLabel}
             loginLabel={authLoginHeaderClient.loginLabel}
             loginHref={authLoginHeaderClient.loginHref}
+            professionalLinkLabel={authLoginHeaderClient.professionalLinkLabel}
+            professionalHref={authLoginHeaderClient.professionalHref}
             homeHref="/"
           />
 

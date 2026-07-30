@@ -1,6 +1,6 @@
 import type { MessagingAudience } from "./messagingRoutes";
 import { buildThreadPreviewFromMessage } from "./messagingPreview";
-import { createInitialMessagingStore } from "./messagingMockData";
+import { createEmptyMessagingStore, isMockMessagingThreadId } from "./messagingMockData";
 import {
   formatConversationTimeLabel,
   getMessageTimestamp,
@@ -19,6 +19,16 @@ export function isApiBackedStore(store: MessagingStore): boolean {
   return store.threads.some((thread) => UUID_RE.test(thread.id) || thread.id.startsWith("draft:"));
 }
 
+function stripMockThreads(store: MessagingStore): MessagingStore {
+  const threads = store.threads.filter((thread) => !isMockMessagingThreadId(thread.id));
+  if (threads.length === store.threads.length) return store;
+  const messagesByThreadId: MessagingStore["messagesByThreadId"] = {};
+  for (const thread of threads) {
+    messagesByThreadId[thread.id] = store.messagesByThreadId[thread.id] ?? [];
+  }
+  return { ...store, threads, messagesByThreadId };
+}
+
 export function extractMessagingPrefs(store: MessagingStore) {
   return {
     hiddenByAudience: store.hiddenByAudience ?? {},
@@ -30,17 +40,17 @@ export function extractMessagingPrefs(store: MessagingStore) {
 
 export function loadMessagingPrefs() {
   if (typeof window === "undefined") {
-    return extractMessagingPrefs(createInitialMessagingStore());
+    return extractMessagingPrefs(createEmptyMessagingStore());
   }
   try {
     const raw = window.localStorage.getItem(PREFS_KEY);
-    if (raw) return extractMessagingPrefs({ ...createInitialMessagingStore(), ...JSON.parse(raw) });
+    if (raw) return extractMessagingPrefs({ ...createEmptyMessagingStore(), ...JSON.parse(raw) });
     const legacy = window.localStorage.getItem(STORAGE_KEY);
     if (legacy) return extractMessagingPrefs(JSON.parse(legacy) as MessagingStore);
   } catch {
     // ignore
   }
-  return extractMessagingPrefs(createInitialMessagingStore());
+  return extractMessagingPrefs(createEmptyMessagingStore());
 }
 
 export function mergeApiInboxWithPrefs(
@@ -87,15 +97,22 @@ export function mergeApiInboxIntoStore(
 ): MessagingStore {
   const apiProfessionalKeys = new Set(api.threads.map(threadProfessionalKey));
 
-  const keptDrafts = current.threads.filter((thread) => {
-    if (!thread.id.startsWith("draft:") && !thread.isNewConversation) return false;
-    return !apiProfessionalKeys.has(threadProfessionalKey(thread));
-  });
+  // Draft "Tap to start…" professionals are client-only; never carry them into the pro inbox.
+  // Also never keep legacy demo seed threads (lissa-j, craig-martha, …).
+  const keptDrafts =
+    audience === "professional"
+      ? []
+      : current.threads.filter((thread) => {
+          if (isMockMessagingThreadId(thread.id)) return false;
+          if (!thread.id.startsWith("draft:") && !thread.isNewConversation) return false;
+          return !apiProfessionalKeys.has(threadProfessionalKey(thread));
+        });
 
-  const mergedThreads = [...api.threads, ...keptDrafts];
+  const apiThreads = api.threads.filter((thread) => !isMockMessagingThreadId(thread.id));
+  const mergedThreads = [...apiThreads, ...keptDrafts];
   const messagesByThreadId: MessagingStore["messagesByThreadId"] = { ...current.messagesByThreadId };
 
-  for (const apiThread of api.threads) {
+  for (const apiThread of apiThreads) {
     const draftKeys = [
       apiThread.businessSetupId ? `draft:setup-${apiThread.businessSetupId}` : null,
       apiThread.peerProfileId ? `draft:setup-${apiThread.peerProfileId}` : null,
@@ -198,7 +215,7 @@ export function saveMessagingRuntimeSnapshot(store: MessagingStore): void {
 }
 
 export function loadMessagingStore(): MessagingStore {
-  if (typeof window === "undefined") return createInitialMessagingStore();
+  if (typeof window === "undefined") return createEmptyMessagingStore();
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     const runtime = loadMessagingRuntimeSnapshot();
@@ -208,15 +225,22 @@ export function loadMessagingStore(): MessagingStore {
       if (runtime) {
         return mergeApiInboxWithPrefs(runtime, prefs);
       }
-      return createInitialMessagingStore();
+      return createEmptyMessagingStore();
     }
 
     const parsed = JSON.parse(raw) as MessagingStore;
+    // Drop legacy demo seeds (Lissa J / Craig Martha / …) so they never poison the real inbox.
+    if (parsed?.threads?.some((thread) => isMockMessagingThreadId(thread.id))) {
+      window.localStorage.removeItem(STORAGE_KEY);
+      if (runtime) return mergeApiInboxWithPrefs(runtime, prefs);
+      return createEmptyMessagingStore();
+    }
+
     if (!parsed?.threads?.length) {
       if (runtime) {
         return mergeApiInboxWithPrefs(runtime, prefs);
       }
-      return createInitialMessagingStore();
+      return createEmptyMessagingStore();
     }
 
     let hydrated: MessagingStore = {
@@ -228,7 +252,7 @@ export function loadMessagingStore(): MessagingStore {
       peerLastReadAtByThreadId: parsed.peerLastReadAtByThreadId ?? {},
       presenceStatus: parsed.presenceStatus ?? "online",
     };
-    hydrated = filterToRetentionWindow(hydrated);
+    hydrated = stripMockThreads(filterToRetentionWindow(hydrated));
 
     if (runtime) {
       hydrated = mergeApiInboxIntoStore(hydrated, runtime, prefs);
@@ -240,7 +264,7 @@ export function loadMessagingStore(): MessagingStore {
     if (runtime) {
       return mergeApiInboxWithPrefs(runtime, loadMessagingPrefs());
     }
-    return createInitialMessagingStore();
+    return createEmptyMessagingStore();
   }
 }
 

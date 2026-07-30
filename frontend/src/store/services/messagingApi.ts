@@ -1,5 +1,6 @@
 import { baseApi } from "./baseApi";
-import type { MessagingChatMessage, MessagingStore } from "../../components/common/messaging/messagingTypes";
+import type { LinkableBooking } from "../../components/common/messaging/messagingBookingsMock";
+import type { MessagingChatMessage, MessagingStore, MessagingThread } from "../../components/common/messaging/messagingTypes";
 import type { MessagingProfessionalListItem } from "../../components/common/messaging/messagingProfessionals";
 
 type ApiEnvelope<T> = {
@@ -26,6 +27,33 @@ export const messagingApi = baseApi.injectEndpoints({
       query: () => "/api/messaging/inbox",
       transformResponse: (response: ApiEnvelope<MessagingInboxResponse>) => response.data,
       providesTags: ["Messaging"],
+    }),
+    openMessagingForBooking: build.mutation<
+      {
+        threadId: string;
+        thread: MessagingThread;
+        bookingRef: string;
+        businessSetupId: string;
+      },
+      { bookingRef: string }
+    >({
+      query: ({ bookingRef }) => {
+        const params = new URLSearchParams();
+        params.set("bookingRef", bookingRef);
+        return {
+          url: `/api/messaging/open-for-booking?${params.toString()}`,
+          method: "GET",
+        };
+      },
+      transformResponse: (
+        response: ApiEnvelope<{
+          threadId: string;
+          thread: MessagingThread;
+          bookingRef: string;
+          businessSetupId: string;
+        }>,
+      ) => response.data,
+      invalidatesTags: ["Messaging"],
     }),
     getMessagingProfessionals: build.query<
       MessagingProfessionalsResponse,
@@ -110,16 +138,42 @@ export const messagingApi = baseApi.injectEndpoints({
         }>,
       ) => response.data,
     }),
+    getMessagingLinkableBookings: build.query<
+      { bookings: LinkableBooking[] },
+      string
+    >({
+      query: (threadId) => `/api/messaging/threads/${encodeURIComponent(threadId)}/linkable-bookings`,
+      transformResponse: (response: ApiEnvelope<{ bookings: LinkableBooking[] }>) =>
+        response.data,
+      providesTags: (_result, _error, threadId) => [{ type: "Messaging", id: `linkable-${threadId}` }],
+    }),
+    linkMessagingThreadToBooking: build.mutation<
+      { threadId: string; thread: MessagingThread; booking: LinkableBooking },
+      { threadId: string; bookingId: string }
+    >({
+      query: ({ threadId, bookingId }) => ({
+        url: `/api/messaging/threads/${encodeURIComponent(threadId)}/link-booking`,
+        method: "POST",
+        body: { bookingId },
+      }),
+      transformResponse: (
+        response: ApiEnvelope<{ threadId: string; thread: MessagingThread; booking: LinkableBooking }>,
+      ) => response.data,
+      invalidatesTags: ["Messaging"],
+    }),
   }),
 });
 
 export const {
   useGetMessagingInboxQuery,
+  useOpenMessagingForBookingMutation,
   useGetMessagingProfessionalsQuery,
   useLazyGetMessagingProfessionalsQuery,
   useGetMessagingThreadMessagesQuery,
+  useGetMessagingLinkableBookingsQuery,
   useSendMessagingMessageMutation,
   useDeleteMessagingMessageMutation,
   useClearMessagingThreadMutation,
   useMarkMessagingThreadReadMutation,
+  useLinkMessagingThreadToBookingMutation,
 } = messagingApi;

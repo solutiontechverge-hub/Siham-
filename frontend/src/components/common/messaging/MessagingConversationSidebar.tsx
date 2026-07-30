@@ -2,6 +2,7 @@
 
 import AppButton from "../AppButton";
 import * as React from "react";
+import NextLink from "next/link";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
@@ -29,6 +30,7 @@ import {
 } from "./messagingRoutes";
 import type { MessagingThread } from "./messagingTypes";
 
+
 type Props = {
   audience: MessagingAudience;
   currentUserName: string;
@@ -51,6 +53,8 @@ type Props = {
   loadingMore?: boolean;
   onLoadMore?: () => void;
   showBulkActions?: boolean;
+  /** When false, disable settings / filters / bulk actions (search stays enabled). */
+  actionsEnabled?: boolean;
 };
 
 export default function MessagingConversationSidebar({
@@ -75,8 +79,11 @@ export default function MessagingConversationSidebar({
   loadingMore = false,
   onLoadMore,
   showBulkActions = true,
+  actionsEnabled = true,
 }: Props) {
   const m = useTheme().palette.mollure;
+  const hasThreads = threads.length > 0;
+  const canUseListActions = actionsEnabled && hasThreads;
 
   return (
     <Box
@@ -84,7 +91,10 @@ export default function MessagingConversationSidebar({
         width: { xs: "100%", md: embedded ? "38%" : "34%" },
         minWidth: { md: embedded ? 220 : 300 },
         maxWidth: { md: embedded ? 320 : 380 },
-        flex: { xs: "1 1 auto", md: embedded ? "0 0 38%" : undefined },
+        flex: {
+          xs: threads.length === 0 ? "0 0 auto" : "1 1 auto",
+          md: embedded ? "0 0 38%" : undefined,
+        },
         borderRight: { md: `1px solid ${alpha(m.navy, 0.08)}` },
         display: "flex",
         flexDirection: "column",
@@ -112,44 +122,68 @@ export default function MessagingConversationSidebar({
           >
             <Avatar
               src={currentUserAvatarSrc}
+              alt={currentUserName}
               sx={{
-                width: 28,
-                height: 28,
-                fontSize: 12,
+                width: 32,
+                height: 32,
+                fontSize: 13,
                 fontWeight: 900,
                 bgcolor: alpha(m.teal, 0.15),
                 color: m.teal,
+                flexShrink: 0,
               }}
             >
               {currentUserName.slice(0, 1).toUpperCase()}
             </Avatar>
-            <Typography
-              sx={{
-                fontWeight: 900,
-                fontSize: { xs: 14, sm: embedded ? 15 : 18 },
-                color: alpha(m.navy, 0.9),
-              }}
-            >
-              Messaging
-            </Typography>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography
+                noWrap
+                sx={{
+                  fontWeight: 900,
+                  fontSize: { xs: 13, sm: embedded ? 14 : 15 },
+                  color: alpha(m.navy, 0.92),
+                  lineHeight: 1.25,
+                }}
+              >
+                {currentUserName}
+              </Typography>
+              <Typography
+                sx={{
+                  fontWeight: 700,
+                  fontSize: { xs: 11, sm: 12 },
+                  color: alpha(m.navy, 0.48),
+                  lineHeight: 1.2,
+                }}
+              >
+                Messaging
+              </Typography>
+            </Box>
           </Stack>
           <Stack direction="row" spacing={0.25} sx={{ flexShrink: 0 }}>
             <IconButton
               size="small"
               aria-label="Settings"
               onClick={onOpenSettings}
+              disabled={!canUseListActions}
             >
               <SettingsRoundedIcon
-                sx={{ fontSize: 20, color: alpha(m.navy, 0.45) }}
+                sx={{
+                  fontSize: 20,
+                  color: alpha(m.navy, canUseListActions ? 0.45 : 0.22),
+                }}
               />
             </IconButton>
             <IconButton
               size="small"
               aria-label="Filter"
               onClick={onOpenFilters}
+              disabled={!canUseListActions}
             >
               <TuneRoundedIcon
-                sx={{ fontSize: 20, color: alpha(m.navy, 0.45) }}
+                sx={{
+                  fontSize: 20,
+                  color: alpha(m.navy, canUseListActions ? 0.45 : 0.22),
+                }}
               />
             </IconButton>
             {embedded && onClose ? (
@@ -193,6 +227,7 @@ export default function MessagingConversationSidebar({
             <AppButton
               variant="outlined"
               size="small"
+              disabled={!canUseListActions}
               onClick={onRequestDelete}
               sx={{
                 textTransform: "none",
@@ -207,16 +242,22 @@ export default function MessagingConversationSidebar({
                   borderColor: "#D32F2F",
                   bgcolor: alpha("#D32F2F", 0.04),
                 },
+                "&.Mui-disabled": {
+                  color: alpha("#D32F2F", 0.35),
+                  borderColor: alpha("#D32F2F", 0.2),
+                },
               }}
             >
               Delete
             </AppButton>
             <FormControlLabel
+              disabled={!canUseListActions}
               control={
                 <Checkbox
                   size="small"
                   checked={selectAll}
                   onChange={onSelectAll}
+                  disabled={!canUseListActions}
                   sx={{
                     color: alpha(m.navy, 0.35),
                     "&.Mui-checked": { color: m.teal },
@@ -228,7 +269,7 @@ export default function MessagingConversationSidebar({
                   sx={{
                     fontSize: 12,
                     fontWeight: 700,
-                    color: alpha(m.navy, 0.55),
+                    color: alpha(m.navy, canUseListActions ? 0.55 : 0.3),
                   }}
                 >
                   Select All
@@ -243,23 +284,21 @@ export default function MessagingConversationSidebar({
 
       <Box sx={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
         {threads.length === 0 ? (
-          <Typography
-            sx={{
-              px: 2,
-              py: 3,
-              fontSize: 13,
-              color: alpha(m.navy, 0.45),
-              fontWeight: 600,
-            }}
-          >
-            {search.trim()
-              ? audience === "professional"
+          search.trim() ? (
+            <Typography
+              sx={{
+                px: 2,
+                py: 3,
+                fontSize: 13,
+                color: alpha(m.navy, 0.45),
+                fontWeight: 600,
+              }}
+            >
+              {audience === "professional"
                 ? "No client conversations match your search. Try a client name or booking ID."
-                : "No professionals match your search. Try a name or booking ID (e.g. B500844)."
-              : audience === "professional"
-                ? "No client messages yet. You can reply after a client starts the conversation."
-                : "Browse professionals below and tap one to start chatting."}
-          </Typography>
+                : "No professionals match your search. Try a name or booking ID (e.g. B500844)."}
+            </Typography>
+          ) : null
         ) : (
           threads.map((thread) => {
             const active = thread.id === activeThreadId;
@@ -297,9 +336,13 @@ export default function MessagingConversationSidebar({
                       sx={{ minWidth: 0, flexWrap: "wrap" }}
                     >
                       <Link
+                        component={NextLink}
                         href={getMessagingPeerProfileHref(audience, thread)}
                         underline="hover"
-                        onClick={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onClose?.();
+                        }}
                         sx={{
                           fontWeight: 900,
                           fontSize: 13,
@@ -311,6 +354,7 @@ export default function MessagingConversationSidebar({
                       </Link>
                       {!thread.unlinked ? (
                         <Link
+                          component={NextLink}
                           href={getMessagingBookingHref(audience, thread)}
                           underline="hover"
                           onClick={(e) => e.stopPropagation()}

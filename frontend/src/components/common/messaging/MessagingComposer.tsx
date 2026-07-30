@@ -30,7 +30,7 @@ type AttachKind = "picture" | "document";
 const PICTURE_ACCEPT =
   "image/jpeg,image/jpg,image/png,image/webp,image/gif,image/heic,image/heif";
 const DOCUMENT_ACCEPT =
-  ".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain";
+  ".pdf,.doc,.docx,.txt,.xls,.xlsx,.csv,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,text/csv";
 
 type Props = {
   onSend: (body: string, attachments?: MessagingAttachment[]) => void;
@@ -213,7 +213,7 @@ export default function MessagingComposer({
         </Typography>
       ) : null}
 
-      <Stack direction="row" alignItems="flex-end" spacing={1}>
+      <Stack direction="row" alignItems="center" spacing={1}>
         <IconButton
           type="button"
           size="small"
@@ -222,7 +222,6 @@ export default function MessagingComposer({
           onClick={(e) => setAttachMenuAnchor(e.currentTarget)}
           sx={{
             flexShrink: 0,
-            mb: 0.5,
             bgcolor: alpha(m.navy, 0.04),
             "&:hover": { bgcolor: alpha(m.navy, 0.08) },
             opacity: disabled ? 0.45 : 1,
@@ -304,7 +303,6 @@ export default function MessagingComposer({
           onClick={handleSend}
           sx={{
             flexShrink: 0,
-            mb: 0.5,
             bgcolor: m.teal,
             color: "#fff",
             width: { xs: 36, sm: 40 },

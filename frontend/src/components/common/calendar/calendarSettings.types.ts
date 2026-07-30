@@ -1,5 +1,8 @@
 import type { CalendarDesignDraft } from "./CalendarDesignModal";
-import type { PublicBusinessHoursDraft } from "./CalendarPublicBusinessHoursModal";
+import type {
+  PublicBusinessHoursDraft,
+  PublicBusinessHoursEntry,
+} from "./CalendarPublicBusinessHoursModal";
 import type { ServiceCategorySliderIconId } from "../../../data/businessServiceCategorySlider.data";
 import { BUSINESS_SERVICE_CATEGORY_CATALOG } from "../../../data/businessServiceCategorySlider.data";
 
@@ -54,7 +57,7 @@ export type ServiceOrderCategoryItem = {
 };
 
 export type CalendarSettingsAvailability = {
-  publicBusinessHours?: PublicBusinessHoursDraft;
+  publicBusinessHours?: PublicBusinessHoursEntry | PublicBusinessHoursEntry[];
   publicHoursSummary?: PublicHoursSummary;
   publicHoursState?: PublicHoursState;
   bookingRules?: BookingRulesDraft;
@@ -200,34 +203,46 @@ export function appendPublicHoursFromDraft(
   draft: PublicBusinessHoursDraft,
   current: PublicHoursState,
 ): PublicHoursState {
-  if (!draft.location) return current;
-  const locationKey = draft.location === "FL" ? "fixed" : "desired";
-  const scheduleType = draft.schedule === "variable" ? "variable" : draft.schedule === "fixed" ? "fixed" : locationKey === "fixed" ? "fixed" : "variable";
-  const nextSlot: PublicHoursSlot = {
-    id: `slot-${Date.now()}`,
-    dayLabel: draft.day || "Today",
-    startTime: draft.startTime || "08:00",
-    endTime: draft.endTime || "18:00",
-    scheduleType,
-    notAvailable: draft.notAvailable,
-    note: draft.note || undefined,
-  };
-  const locationState = current[locationKey];
-  const existingIndex = locationState.slots.findIndex(
-    (slot) =>
-      slot.dayLabel === nextSlot.dayLabel &&
-      slot.startTime === nextSlot.startTime &&
-      slot.endTime === nextSlot.endTime,
-  );
-  const slots =
-    existingIndex >= 0
-      ? locationState.slots.map((slot, index) => (index === existingIndex ? { ...nextSlot, id: slot.id } : slot))
-      : [...locationState.slots, nextSlot];
-  const selectedId = existingIndex >= 0 ? slots[existingIndex].id : nextSlot.id;
-  return {
-    ...current,
-    [locationKey]: { slots, selectedId },
-  };
+  if (!draft.locations.length) return current;
+  return draft.locations.reduce((state, location) => {
+    const locationKey = location === "FL" ? "fixed" : "desired";
+    const scheduleType =
+      draft.schedule === "variable"
+        ? "variable"
+        : draft.schedule === "fixed"
+          ? "fixed"
+          : locationKey === "fixed"
+            ? "fixed"
+            : "variable";
+    const nextSlot: PublicHoursSlot = {
+      id: `slot-${Date.now()}-${location}-${draft.day || "range"}`,
+      dayLabel: draft.day || "Date range",
+      startTime: draft.startTime || "08:00",
+      endTime: draft.endTime || "18:00",
+      scheduleType,
+      notAvailable: draft.notAvailable,
+      note: draft.note || undefined,
+    };
+    const locationState = state[locationKey];
+    const existingIndex = locationState.slots.findIndex(
+      (slot) =>
+        slot.dayLabel === nextSlot.dayLabel &&
+        slot.startTime === nextSlot.startTime &&
+        slot.endTime === nextSlot.endTime,
+    );
+    const slots =
+      existingIndex >= 0
+        ? locationState.slots.map((slot, index) =>
+            index === existingIndex ? { ...nextSlot, id: slot.id } : slot,
+          )
+        : [...locationState.slots, nextSlot];
+    const selectedId =
+      existingIndex >= 0 ? slots[existingIndex].id : nextSlot.id;
+    return {
+      ...state,
+      [locationKey]: { slots, selectedId },
+    };
+  }, current);
 }
 
 export function parseAvailability(raw: Record<string, unknown> | undefined): CalendarSettingsAvailability {
@@ -273,8 +288,10 @@ export function parseAvailability(raw: Record<string, unknown> | undefined): Cal
     : undefined;
 
   const publicBusinessHours = isRecord(raw.publicBusinessHours)
-    ? (raw.publicBusinessHours as unknown as PublicBusinessHoursDraft)
-    : undefined;
+    ? (raw.publicBusinessHours as unknown as PublicBusinessHoursEntry)
+    : Array.isArray(raw.publicBusinessHours)
+      ? (raw.publicBusinessHours as PublicBusinessHoursEntry[])
+      : undefined;
 
   return { publicBusinessHours, publicHoursSummary, publicHoursState, bookingRules, serviceOrder };
 }
@@ -306,7 +323,7 @@ export function summaryFromPublicHoursDraft(
 }
 
 export function buildAvailabilityPayload(
-  publicBusinessHours: PublicBusinessHoursDraft,
+  publicBusinessHours: PublicBusinessHoursEntry | PublicBusinessHoursEntry[],
   publicHoursState: PublicHoursState,
   bookingRules: BookingRulesDraft,
   serviceOrderKeys: readonly string[],

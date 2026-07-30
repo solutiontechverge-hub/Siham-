@@ -130,6 +130,16 @@ export function buildClientBookingApiPayload(input: {
   const serviceNames = services.map((service) => service.name).filter(Boolean);
   const projectDescription = input.draft.projectDetails?.description?.trim() || "";
   const projectUploads = input.draft.projectDetails?.uploads ?? [];
+  const desiredLocation = input.draft.desiredLocation;
+  const hasDesiredVisitAddress =
+    input.locationMode === "desired" &&
+    Boolean(
+      desiredLocation?.street?.trim() ||
+        desiredLocation?.number?.trim() ||
+        desiredLocation?.postalCode?.trim() ||
+        desiredLocation?.province?.trim() ||
+        desiredLocation?.municipality?.trim(),
+    );
 
   const isImageUpload = (upload: (typeof projectUploads)[number]) => {
     if (upload.kind === "image") return true;
@@ -202,17 +212,41 @@ export function buildClientBookingApiPayload(input: {
     unique_code: input.bookingRef,
     total_price: input.total,
     notes,
-    ...(input.draft.projectDetails
+    ...(hasDesiredVisitAddress && desiredLocation
+      ? {
+          province: desiredLocation.province.trim() || null,
+          municipality: desiredLocation.municipality.trim() || null,
+          street_address: desiredLocation.street.trim() || null,
+          street_number: desiredLocation.number.trim() || null,
+          postal_code: desiredLocation.postalCode.trim() || null,
+        }
+      : {}),
+    ...(input.draft.projectDetails || hasDesiredVisitAddress
       ? {
           location_details: {
-            projectDescription,
-            uploads: projectUploads.map((upload) => ({
-              id: upload.id,
-              name: upload.name,
-              url: upload.url ?? null,
-              mimeType: upload.mimeType ?? null,
-              kind: upload.kind ?? null,
-            })),
+            ...(input.draft.projectDetails
+              ? {
+                  projectDescription,
+                  uploads: projectUploads.map((upload) => ({
+                    id: upload.id,
+                    name: upload.name,
+                    url: upload.url ?? null,
+                    mimeType: upload.mimeType ?? null,
+                    kind: upload.kind ?? null,
+                  })),
+                }
+              : {}),
+            ...(hasDesiredVisitAddress && desiredLocation
+              ? {
+                  desiredLocation: {
+                    street: desiredLocation.street.trim(),
+                    number: desiredLocation.number.trim(),
+                    postalCode: desiredLocation.postalCode.trim(),
+                    province: desiredLocation.province.trim(),
+                    municipality: desiredLocation.municipality.trim(),
+                  },
+                }
+              : {}),
           },
         }
       : {}),
@@ -229,6 +263,18 @@ function hhmmToTimeLabel(hhmm?: string | null) {
 }
 
 function buildAddressLabel(booking: CalendarBooking) {
+  if (booking.location_type === "desired") {
+    const visitParts = [
+      booking.street_address,
+      booking.street_number,
+      booking.postal_code,
+      booking.municipality,
+      booking.province,
+    ]
+      .map((part) => String(part ?? "").trim())
+      .filter(Boolean);
+    if (visitParts.length) return visitParts.join(", ");
+  }
   const parts = [
     booking.fixed_location_address,
     booking.fixed_location_street_number,
@@ -303,13 +349,18 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
     "Booking";
   const names = activeEbr?.suggestedServices?.length
     ? activeEbr.suggestedServices.map((s) => s.name)
-    : serviceNames.length
-      ? serviceNames
-      : [title];
+    : notesDetails?.services?.length
+      ? notesDetails.services.map((s) => s.name)
+      : serviceNames.length
+        ? serviceNames
+        : [title];
   const total = activeEbr?.suggestedServices?.length
     ? activeEbr.suggestedServices.reduce((sum, s) => sum + (s.price || 0), 0) +
       (activeEbr.suggestedProducts ?? []).reduce((sum, p) => sum + p.price * (p.quantity || 1), 0)
-    : Number(booking.total_price) || 0;
+    : notesDetails?.services?.length
+      ? notesDetails.services.reduce((sum, s) => sum + (s.price || 0), 0) +
+        (notesDetails.products ?? []).reduce((sum, p) => sum + p.price * (p.quantity || 1), 0)
+      : Number(booking.total_price) || 0;
   const durationMins = (() => {
     if (activeEbr?.suggestedServices?.length) {
       return activeEbr.suggestedServices.reduce((sum, s) => sum + (s.durationMins || 0), 0) || 60;
@@ -337,6 +388,13 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
     booking.location_details && typeof booking.location_details === "object"
       ? (booking.location_details as {
           projectDescription?: string;
+          desiredLocation?: {
+            street?: string;
+            number?: string;
+            postalCode?: string;
+            province?: string;
+            municipality?: string;
+          };
           uploads?: Array<{
             id?: string;
             name?: string;
@@ -372,6 +430,32 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
   const projectDescription =
     typeof locationDetails?.projectDescription === "string" ? locationDetails.projectDescription : "";
 
+  const desiredLocationFromColumns =
+    booking.location_type === "desired" &&
+    (booking.street_address ||
+      booking.street_number ||
+      booking.postal_code ||
+      booking.province ||
+      booking.municipality)
+      ? {
+          street: String(booking.street_address ?? "").trim(),
+          number: String(booking.street_number ?? "").trim(),
+          postalCode: String(booking.postal_code ?? "").trim(),
+          province: String(booking.province ?? "").trim(),
+          municipality: String(booking.municipality ?? "").trim(),
+        }
+      : null;
+  const desiredLocationFromDetails = locationDetails?.desiredLocation
+    ? {
+        street: String(locationDetails.desiredLocation.street ?? "").trim(),
+        number: String(locationDetails.desiredLocation.number ?? "").trim(),
+        postalCode: String(locationDetails.desiredLocation.postalCode ?? "").trim(),
+        province: String(locationDetails.desiredLocation.province ?? "").trim(),
+        municipality: String(locationDetails.desiredLocation.municipality ?? "").trim(),
+      }
+    : null;
+  const desiredLocation = desiredLocationFromColumns ?? desiredLocationFromDetails;
+
   return {
     id: booking.id,
     apiBookingId: booking.id,
@@ -400,10 +484,29 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
         planningIsLocked: p.planningIsLocked,
       })),
       services: (() => {
-        const snapshotById = new Map((clientSnapshot?.services ?? []).map((s) => [s.id, s]));
-        const snapshotByName = new Map((clientSnapshot?.services ?? []).map((s) => [s.name, s]));
-        const resolveGuestId = (id: string, name: string, fallback: string | null | undefined) =>
-          fallback ?? snapshotById.get(id)?.guestId ?? snapshotByName.get(name)?.guestId ?? null;
+        const snapshotServices = clientSnapshot?.services ?? [];
+        const noteServices = notesDetails?.services ?? [];
+        const guestNestedServices = (notesDetails?.guests ?? []).flatMap((guest) =>
+          (guest.services ?? []).map((service) => ({
+            id: service.id,
+            name: service.name,
+            durationMins: service.durationMins,
+            price: service.price,
+            guestId: guest.id,
+            teamMemberId: service.staffResourceId ?? service.teamMemberId ?? null,
+          })),
+        );
+        const snapshotById = new Map(snapshotServices.map((s) => [s.id, s]));
+        const snapshotByName = new Map(snapshotServices.map((s) => [s.name, s]));
+        const resolveGuestId = (
+          id: string,
+          name: string,
+          fallback: string | null | undefined,
+        ) =>
+          fallback ??
+          snapshotById.get(id)?.guestId ??
+          snapshotByName.get(name)?.guestId ??
+          null;
 
         if (activeEbr?.suggestedServices?.length) {
           return activeEbr.suggestedServices.map((service) => ({
@@ -415,16 +518,66 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
             teamMemberId: service.staffResourceId ?? booking.team_member_id,
           }));
         }
-        if (clientSnapshot?.services?.length) {
-          return clientSnapshot.services.map((service) => ({
+
+        // Prefer pro-updated notes lines; merge guest/model lines from snapshot/guests
+        // so FL + DL both show the full booking on the client.
+        const merged: Array<{
+          id: string;
+          name: string;
+          durationMins: number;
+          price: number;
+          guestId: string | null;
+          teamMemberId: string | null | undefined;
+        }> = [];
+        const pushUnique = (row: {
+          id: string;
+          name: string;
+          durationMins: number;
+          price: number;
+          guestId?: string | null;
+          teamMemberId?: string | null;
+        }) => {
+          const guestId = row.guestId ?? null;
+          const exists = merged.some(
+            (item) => item.id === row.id && String(item.guestId ?? "") === String(guestId ?? ""),
+          );
+          if (exists) return;
+          merged.push({
+            id: row.id,
+            name: row.name,
+            durationMins: row.durationMins,
+            price: row.price,
+            guestId,
+            teamMemberId: row.teamMemberId ?? booking.team_member_id,
+          });
+        };
+
+        for (const service of noteServices) {
+          pushUnique({
+            id: service.id,
+            name: service.name,
+            durationMins: service.durationMins,
+            price: service.price,
+            guestId: resolveGuestId(service.id, service.name, service.guestId ?? null),
+            teamMemberId: service.staffResourceId ?? service.teamMemberId ?? null,
+          });
+        }
+        for (const service of snapshotServices) {
+          pushUnique({
             id: service.id,
             name: service.name,
             durationMins: service.durationMins,
             price: service.price,
             guestId: service.guestId ?? null,
-            teamMemberId: service.teamMemberId ?? booking.team_member_id,
-          }));
+            teamMemberId: service.teamMemberId ?? null,
+          });
         }
+        for (const service of guestNestedServices) {
+          pushUnique(service);
+        }
+
+        if (merged.length) return merged;
+
         return names.map((name, index) => ({
           id: `${booking.service_id ?? booking.id}-${index}`,
           name,
@@ -433,6 +586,43 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
           guestId: null as string | null,
           teamMemberId: booking.team_member_id,
         }));
+      })(),
+      products: (() => {
+        if (activeEbr?.suggestedProducts?.length) {
+          return activeEbr.suggestedProducts.map((product) => ({
+            id: product.id,
+            name: product.name,
+            price: product.price,
+            quantity: product.quantity || 1,
+            unitPrice: product.unitPrice ?? product.price,
+          }));
+        }
+        const noteProducts = notesDetails?.products ?? [];
+        const guestProducts = (notesDetails?.guests ?? []).flatMap((guest) =>
+          (guest.products ?? []).map((product) => ({
+            id: product.id,
+            name: product.name,
+            price: product.price,
+            quantity: product.quantity || 1,
+            unitPrice: product.unitPrice ?? product.price,
+          })),
+        );
+        const mergedProducts = [...noteProducts];
+        for (const product of guestProducts) {
+          if (!mergedProducts.some((p) => p.id === product.id)) {
+            mergedProducts.push(product);
+          }
+        }
+        if (mergedProducts.length) {
+          return mergedProducts.map((product) => ({
+            id: product.id,
+            name: product.name,
+            price: product.price,
+            quantity: product.quantity || 1,
+            unitPrice: product.unitPrice ?? product.price,
+          }));
+        }
+        return [];
       })(),
       teamMembers: clientSnapshot?.teamMembers?.length
         ? clientSnapshot.teamMembers
@@ -453,22 +643,68 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
                 uploads: clientSnapshot.projectDetails.uploads ?? [],
               }
             : undefined,
-      total: activeEbr?.suggestedServices?.length
-        ? activeEbr.suggestedServices.reduce((sum, s) => sum + (s.price || 0), 0) +
-          (activeEbr.suggestedProducts ?? []).reduce(
-            (sum, p) => sum + p.price * (p.quantity || 1),
+      ...(desiredLocation &&
+      (desiredLocation.street ||
+        desiredLocation.number ||
+        desiredLocation.postalCode ||
+        desiredLocation.province ||
+        desiredLocation.municipality)
+        ? { desiredLocation }
+        : {}),
+      total: (() => {
+        if (activeEbr?.suggestedServices?.length) {
+          return (
+            activeEbr.suggestedServices.reduce((sum, s) => sum + (s.price || 0), 0) +
+            (activeEbr.suggestedProducts ?? []).reduce(
+              (sum, p) => sum + p.price * (p.quantity || 1),
+              0,
+            )
+          );
+        }
+        const noteServices = notesDetails?.services ?? [];
+        const noteProducts = [
+          ...(notesDetails?.products ?? []),
+          ...(notesDetails?.guests ?? []).flatMap((guest) => guest.products ?? []),
+        ];
+        const snapshotServices = clientSnapshot?.services ?? [];
+        if (noteServices.length || noteProducts.length || snapshotServices.length) {
+          const serviceSum = (noteServices.length ? noteServices : snapshotServices).reduce(
+            (sum, s) => sum + (s.price || 0),
             0,
-          )
-        : clientSnapshot?.services?.length
-          ? clientSnapshot.services.reduce((sum, s) => sum + (s.price || 0), 0)
-          : total,
+          );
+          // Deduplicate guest product ids already in notes.products
+          const seen = new Set<string>();
+          const productSum = noteProducts.reduce((sum, p) => {
+            if (seen.has(p.id)) return sum;
+            seen.add(p.id);
+            return sum + p.price * (p.quantity || 1);
+          }, 0);
+          return serviceSum + productSum;
+        }
+        return total;
+      })(),
     },
     createdAt: booking.created_at ?? undefined,
     prepaid,
-    requiresPrepayment: prepaid || String(booking.prepayment_status ?? "").toLowerCase() === "required",
-    prepaymentPercent: 0,
+    requiresPrepayment:
+      prepaid ||
+      String(booking.prepayment_status ?? "").toLowerCase() === "required" ||
+      Boolean(notesDetails?.showPrepayment),
+    prepaymentPercent: Number(notesDetails?.prepaymentPercent) || 0,
     contactPhone: booking.contact_number ?? undefined,
     notes: booking.notes ?? null,
+    editedServiceIds:
+      notesDetails?.editedServiceIds?.length
+        ? notesDetails.editedServiceIds
+        : ebr?.editedServiceIds?.length
+          ? ebr.editedServiceIds
+          : undefined,
+    editedProductIds:
+      notesDetails?.editedProductIds?.length
+        ? notesDetails.editedProductIds
+        : ebr?.editedProductIds?.length
+          ? ebr.editedProductIds
+          : undefined,
     incomingEditRequest,
   };
 }

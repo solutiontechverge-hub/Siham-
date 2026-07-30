@@ -27,6 +27,7 @@ export const NOTIFICATION_TYPES = {
   CLIENT_BR_ACCEPTED: "client.br.accepted",
   CLIENT_BR_REJECTED: "client.br.rejected",
   CLIENT_BR_EBR_DISCARDED: "client.br.ebr_discarded",
+  CLIENT_BR_INCOMING: "client.br.incoming",
   CLIENT_BOOKING_CONFIRMED: "client.booking.confirmed",
   CLIENT_BOOKING_CANCELLED: "client.booking.cancelled",
   CLIENT_BOOKING_COMPLETED: "client.booking.completed",
@@ -143,6 +144,11 @@ const NOTIFICATION_META = {
   [NOTIFICATION_TYPES.CLIENT_BR_EBR_DISCARDED]: {
     title: "EBR Discarded",
     statusType: "rejected",
+    audience: "client",
+  },
+  [NOTIFICATION_TYPES.CLIENT_BR_INCOMING]: {
+    title: "New Booking Request",
+    statusType: "pending",
     audience: "client",
   },
   [NOTIFICATION_TYPES.CLIENT_ER_SUGGESTED]: {
@@ -454,12 +460,18 @@ export async function dispatchBookingEventNotification(bookingId, event, options
   }
 }
 
-export async function dispatchBookingCreatedNotifications(booking) {
+export async function dispatchBookingCreatedNotifications(booking, options = {}) {
   if (!booking?.id) return;
   const ctx = await loadBookingNotificationContext(booking.id);
   if (!ctx) return;
 
   if (booking.status === "requested") {
+    // Professional → client BR (calendar "Add from Mollure platform")
+    if (options.fromProfessional) {
+      await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_BR_INCOMING, ctx.professional_name);
+      return;
+    }
+    // Client → professional BR
     await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_BR_INCOMING, ctx.client_name);
   }
 

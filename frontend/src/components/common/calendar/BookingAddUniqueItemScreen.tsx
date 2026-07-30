@@ -15,27 +15,44 @@ type BookingAddUniqueItemScreenProps = {
   errors?: Partial<Record<"productName" | "price", string>>;
   onChange: (patch: Partial<BookingUniqueItemDraft>) => void;
   disabled?: boolean;
+  /** Drawer/section heading — depends on Add Product / Service / Unique Item entry. */
+  heading?: string;
 };
+
+const priceTypeOptions = [
+  { label: "Fixed price", value: "fixed" },
+  { label: "Starting from", value: "starting_from" },
+];
+
+const discountTypeOptions = [
+  { label: "Fixed discount", value: "fixed" },
+  { label: "Percentage discount", value: "percentage" },
+];
 
 export default function BookingAddUniqueItemScreen({
   draft,
   errors = {},
   onChange,
   disabled = false,
+  heading = "Add Unique Item",
 }: BookingAddUniqueItemScreenProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
+  const [priceType, setPriceType] = React.useState<"fixed" | "starting_from">(
+    "fixed",
+  );
 
   return (
     <Stack spacing={1.6}>
       <BodyText
         sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 15 }}
       >
-        Add Unique Item
+        {heading}
       </BodyText>
 
       <AppTextField
-        placeholder="Product Name"
+        label="Product Name"
+        placeholder="Enter product name"
         value={draft.productName}
         onChange={(e) => onChange({ productName: e.target.value })}
         fullWidth
@@ -45,25 +62,49 @@ export default function BookingAddUniqueItemScreen({
       />
 
       <AppTextField
-        placeholder="VAT"
+        label="VAT"
+        placeholder="e.g. 21"
         value={draft.vat}
         onChange={(e) => onChange({ vat: e.target.value })}
         fullWidth
         disabled={disabled}
       />
 
-      <AppTextField
-        placeholder="Price"
-        value={draft.price}
-        onChange={(e) => onChange({ price: e.target.value })}
-        fullWidth
-        disabled={disabled}
-        error={Boolean(errors.price)}
-        helperText={errors.price}
-      />
+      <Stack direction="row" spacing={1} alignItems="flex-start">
+        <AppSelect
+          label="Price type"
+          value={priceType}
+          onChange={(e) =>
+            setPriceType(String(e.target.value) as "fixed" | "starting_from")
+          }
+          options={priceTypeOptions}
+          fullWidth
+          disabled={disabled}
+          sx={{ flex: 1 }}
+        />
+        <AppTextField
+          label="Price"
+          placeholder="0"
+          value={draft.price}
+          onChange={(e) => onChange({ price: e.target.value })}
+          fullWidth
+          disabled={disabled}
+          error={Boolean(errors.price)}
+          helperText={errors.price}
+          inputProps={{ inputMode: "decimal" }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">€</InputAdornment>
+            ),
+            endAdornment: <InputAdornment position="end">EUR</InputAdornment>,
+          }}
+          sx={{ flex: 1 }}
+        />
+      </Stack>
 
       <AppTextField
-        placeholder="Unit"
+        label="Unit"
+        placeholder="1"
         type="number"
         value={String(draft.unit)}
         onChange={(e) =>
@@ -136,51 +177,49 @@ export default function BookingAddUniqueItemScreen({
             mb: 1.25,
           }}
         >
-          Add Discount (Optional)
+          Discount (Optional)
         </BodyText>
-
-        <Stack spacing={1.25}>
+        <Stack direction="row" spacing={1}>
           <AppSelect
             label="Discount type"
             value={draft.discountType}
             onChange={(e) =>
               onChange({
-                discountType: e.target
-                  .value as BookingUniqueItemDraft["discountType"],
+                discountType: String(
+                  e.target.value,
+                ) as BookingUniqueItemDraft["discountType"],
               })
             }
-            options={[
-              { label: "Fixed discount", value: "fixed" },
-              { label: "Percentage discount", value: "percentage" },
-            ]}
+            options={discountTypeOptions}
             fullWidth
             disabled={disabled}
+            sx={{ flex: 1 }}
           />
-
           <AppTextField
-            placeholder="Discount Amount"
-            value={draft.discountAmount}
+            label="Discount Amount"
+            placeholder="0"
+            value={draft.discountAmount === "0" ? "" : draft.discountAmount}
             onChange={(e) => onChange({ discountAmount: e.target.value })}
             fullWidth
             disabled={disabled}
+            inputProps={{ inputMode: "decimal" }}
             InputProps={
-              draft.discountType === "fixed"
+              draft.discountType === "percentage"
                 ? {
+                    endAdornment: (
+                      <InputAdornment position="end">%</InputAdornment>
+                    ),
+                  }
+                : {
                     startAdornment: (
                       <InputAdornment position="start">€</InputAdornment>
                     ),
                     endAdornment: (
                       <InputAdornment position="end">EUR</InputAdornment>
                     ),
-                    inputMode: "decimal",
-                  }
-                : {
-                    endAdornment: (
-                      <InputAdornment position="end">%</InputAdornment>
-                    ),
-                    inputMode: "decimal",
                   }
             }
+            sx={{ flex: 1 }}
           />
         </Stack>
       </Box>

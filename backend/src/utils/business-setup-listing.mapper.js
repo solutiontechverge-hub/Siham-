@@ -42,16 +42,29 @@ const toTimeBlock = (hours, minutes) => ({
   minutes: toNullableNumber(minutes),
 });
 
-const mapTeamMember = (member) => ({
-  id: member.id ?? null,
-  fullName: toNullableString(member.full_name),
-  role: toNullableString(member.role) ?? "Team member",
-  profilePhoto: toNullableString(member.profile_photo),
-  assignedServices: parseJsonArray(member.assigned_services),
-  displayOrder: toNullableNumber(member.display_order) ?? 1,
-  createdAt: toIsoTimestamp(member.created_at),
-  updatedAt: toIsoTimestamp(member.updated_at),
-});
+const mapTeamMember = (member, memberRatingStats = null) => {
+  const rating =
+    memberRatingStats && Number.isFinite(Number(memberRatingStats.rating))
+      ? Number(memberRatingStats.rating)
+      : LISTING_RATING;
+  const totalReviews =
+    memberRatingStats && Number.isFinite(Number(memberRatingStats.totalReviews))
+      ? Number(memberRatingStats.totalReviews)
+      : LISTING_TOTAL_REVIEWS;
+
+  return {
+    id: member.id ?? null,
+    fullName: toNullableString(member.full_name),
+    role: toNullableString(member.role) ?? "Team member",
+    profilePhoto: toNullableString(member.profile_photo),
+    assignedServices: parseJsonArray(member.assigned_services),
+    displayOrder: toNullableNumber(member.display_order) ?? 1,
+    rating,
+    totalReviews,
+    createdAt: toIsoTimestamp(member.created_at),
+    updatedAt: toIsoTimestamp(member.updated_at),
+  };
+};
 
 const mapServiceDetail = (detail, durationByServiceId = new Map()) => ({
   id: detail.id ?? null,
@@ -70,7 +83,13 @@ const mapServiceDetail = (detail, durationByServiceId = new Map()) => ({
 
 export const transformBusinessSetupForListing = (
   row,
-  { teamMembers = [], serviceDetails = [], ratingStats = null } = {},
+  {
+    teamMembers = [],
+    serviceDetails = [],
+    ratingStats = null,
+    serviceOrder = null,
+    teamMemberRatingStats = null,
+  } = {},
 ) => {
   if (!row) {
     return null;
@@ -87,6 +106,8 @@ export const transformBusinessSetupForListing = (
     ratingStats && Number.isFinite(Number(ratingStats.totalReviews))
       ? Number(ratingStats.totalReviews)
       : LISTING_TOTAL_REVIEWS;
+  const memberStatsMap =
+    teamMemberRatingStats instanceof Map ? teamMemberRatingStats : null;
 
   return {
     id: row.id,
@@ -114,6 +135,7 @@ export const transformBusinessSetupForListing = (
     serviceFor: parseTextArray(row.service_for),
     bookServiceCombinations: parseJsonArray(row.book_service_combinations),
     serviceDetails: normalizedServiceDetails.map((detail) => mapServiceDetail(detail, durationByServiceId)),
+    serviceOrder: serviceOrder && typeof serviceOrder === "object" ? serviceOrder : null,
     priceRange: toNullableString(row.price_range),
     prepaymentPercentage: toNullableNumber(row.prepayment_percentage),
     prepaymentInstruction: toNullableString(row.prepayment_instruction),
@@ -144,7 +166,14 @@ export const transformBusinessSetupForListing = (
     notes: toNullableString(row.book_service_notes),
     project: toNullableString(row.project),
     teamMemberIds: parseEntityIdArray(row.team_member_ids),
-    teamMembers: normalizedTeamMembers.map(mapTeamMember),
+    teamMembers: normalizedTeamMembers.map((member) =>
+      mapTeamMember(
+        member,
+        member.id != null && memberStatsMap
+          ? memberStatsMap.get(String(member.id)) ?? null
+          : null,
+      ),
+    ),
     createdAt: toIsoTimestamp(row.created_at),
     updatedAt: toIsoTimestamp(row.updated_at),
   };

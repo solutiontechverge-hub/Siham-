@@ -2,7 +2,7 @@ import type { MessagingStore } from "./messagingTypes";
 import { isMessageFromClient } from "./messagingUnread";
 import { normalizeBookingIdQuery } from "./messagingStorage";
 
-const BOOKING_REPLY_STATUSES = new Set(["requested", "confirmed", "completed"]);
+const BOOKING_REPLY_STATUSES = new Set(["requested", "confirmed", "completed", "in_progress"]);
 
 export function threadHasClientMessage(store: MessagingStore, threadId: string) {
   const messages = store.messagesByThreadId[threadId] ?? [];
@@ -12,6 +12,8 @@ export function threadHasClientMessage(store: MessagingStore, threadId: string) 
 export function threadHasActiveBooking(store: MessagingStore, threadId: string) {
   const thread = store.threads.find((item) => item.id === threadId);
   if (!thread) return false;
+  // Unlinked / no booking id = no booking-based visibility (do not treat default status as active).
+  if (thread.unlinked || !thread.bookingId?.trim()) return false;
   return BOOKING_REPLY_STATUSES.has(thread.bookingStatus);
 }
 
@@ -46,4 +48,26 @@ export function findThreadIdByClientName(store: MessagingStore, clientName?: str
     return threadName.startsWith(normalized) || normalized.startsWith(threadName);
   });
   return partial?.id ?? "";
+}
+
+/** Prefer an existing conversation with this business setup, else its draft thread. */
+export function findThreadIdByBusinessSetupId(
+  store: MessagingStore,
+  businessSetupId?: string,
+) {
+  if (!businessSetupId?.trim()) return "";
+  const setupId = businessSetupId.trim();
+  const existing = store.threads.find(
+    (thread) =>
+      !thread.isNewConversation &&
+      (thread.businessSetupId === setupId || thread.peerProfileId === setupId),
+  );
+  if (existing) return existing.id;
+  const draft = store.threads.find(
+    (thread) =>
+      thread.businessSetupId === setupId ||
+      thread.peerProfileId === setupId ||
+      thread.id === `draft:setup-${setupId}`,
+  );
+  return draft?.id ?? "";
 }

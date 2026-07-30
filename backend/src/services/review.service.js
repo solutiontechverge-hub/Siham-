@@ -299,28 +299,38 @@ export async function getReviewAggregatesForSetups(setupIds = []) {
 
 export async function getTeamMemberReviewAggregates(setupId) {
   if (!setupId) return new Map();
+  const bySetup = await getTeamMemberReviewAggregatesForSetups([setupId]);
+  return bySetup.get(String(setupId)) ?? new Map();
+}
+
+/** @returns {Map<string, Map<string, { rating: number, totalReviews: number }>>} setupId -> memberId -> stats */
+export async function getTeamMemberReviewAggregatesForSetups(setupIds = []) {
+  if (!setupIds.length) return new Map();
 
   const result = await query(
     `SELECT
+       business_setup_id,
        team_member_id,
        COUNT(*)::int AS total,
        COALESCE(ROUND(AVG(rating)::numeric, 1), 0)::float AS average
      FROM reviews
-     WHERE business_setup_id = $1
+     WHERE business_setup_id = ANY($1::uuid[])
        AND submitted_at IS NOT NULL
        AND team_member_id IS NOT NULL
-     GROUP BY team_member_id`,
-    [setupId],
+     GROUP BY business_setup_id, team_member_id`,
+    [setupIds],
   );
 
-  const map = new Map();
+  const bySetup = new Map();
   for (const row of result.rows) {
-    map.set(String(row.team_member_id), {
+    const setupKey = String(row.business_setup_id);
+    if (!bySetup.has(setupKey)) bySetup.set(setupKey, new Map());
+    bySetup.get(setupKey).set(String(row.team_member_id), {
       rating: Number(row.average) || 0,
       totalReviews: Number(row.total) || 0,
     });
   }
-  return map;
+  return bySetup;
 }
 
 async function assertProfessionalOwnsReview(userId, reviewId) {

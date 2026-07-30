@@ -20,6 +20,8 @@ type Props = {
   onClose: () => void;
   onAction: (action: MessagingChatAction) => void;
   embedded?: boolean;
+  /** When false, "Link to Booking" is hidden (no peer bookings). */
+  canLinkToBooking?: boolean;
 };
 
 export default function MessagingChatActionsMenu({
@@ -28,6 +30,7 @@ export default function MessagingChatActionsMenu({
   onClose,
   onAction,
   embedded = false,
+  canLinkToBooking = true,
 }: Props) {
   const m = useTheme().palette.mollure;
   const items: { action: MessagingChatAction; label: string }[] = [
@@ -35,7 +38,9 @@ export default function MessagingChatActionsMenu({
     { action: "deleteForMe", label: "Delete for me" },
     { action: "deleteForEveryone", label: "Delete for everyone" },
     { action: "block", label: "Block" },
-    { action: "link", label: "Link to Booking" },
+    ...(canLinkToBooking
+      ? [{ action: "link" as const, label: "Link to Booking" }]
+      : []),
     { action: "report", label: "Report" },
   ];
 

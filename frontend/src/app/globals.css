@@ -6,6 +6,11 @@
   box-sizing: border-box;
 }
 
+html {
+  /* Reserve scrollbar width so open menus/modals don't shift the layout */
+  scrollbar-gutter: stable;
+}
+
 html,
 body {
   margin: 0;
@@ -14,4 +19,17 @@ body {
     sans-serif;
   font-size: 16px;
   line-height: 1.5;
+}
+
+/*
+  MUI scroll-lock adds padding-right when it hides the scrollbar.
+  With scrollbar-gutter: stable that space is already reserved, so the extra
+  padding causes a visible jump — cancel it app-wide.
+*/
+body {
+  padding-right: 0 !important;
+}
+
+.mui-fixed {
+  padding-right: 0 !important;
 }

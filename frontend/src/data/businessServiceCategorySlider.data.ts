@@ -30,6 +30,23 @@ export const BUSINESS_SERVICE_CATEGORY_CATALOG = [
   iconId: Exclude<ServiceCategorySliderIconId, "all" | "generic">;
 }>;
 
+/** Default category labels for a new professional (Services Details + Calendar Service Order). */
+export const PLATFORM_DEFAULT_SERVICE_CATEGORY_LABELS =
+  BUSINESS_SERVICE_CATEGORY_CATALOG.map((entry) => entry.label);
+
+/** Empty service-order seed used until the professional customizes hide/order in Calendar Settings. */
+export function buildPlatformServiceOrderDefaults(): {
+  categories: string[];
+  servicesByCategory: Record<string, string[]>;
+} {
+  return {
+    categories: [...PLATFORM_DEFAULT_SERVICE_CATEGORY_LABELS],
+    servicesByCategory: Object.fromEntries(
+      PLATFORM_DEFAULT_SERVICE_CATEGORY_LABELS.map((label) => [label, [] as string[]]),
+    ),
+  };
+}
+
 export type ServiceCategoryTab = {
   id: string;
   label: string;
@@ -122,26 +139,19 @@ export function buildDynamicServiceCategoryTabs(
 }
 
 function buildCatalogFallbackTabs(): ServiceCategoryTab[] {
-  return [
-    { id: "all", label: "All", iconId: "all" },
-    ...BUSINESS_SERVICE_CATEGORY_CATALOG.map((entry) => ({
-      id: entry.key,
-      label: entry.label,
-      iconId: entry.iconId,
-    })),
-  ];
+  return [{ id: "all", label: "All", iconId: "all" }];
 }
 
 /**
  * Dynamic category tabs for business setup and listings.
- * Uses database categories when available; falls back to the static catalog only while categories are loading.
+ * Uses database categories when available; otherwise only "All" (no hardcoded catalog).
  */
 export function buildServiceCategoryTabs(businessCategories: readonly BusinessCategoryLike[]): ServiceCategoryTab[] {
   if (businessCategories.length > 0) {
     return buildDynamicServiceCategoryTabs(businessCategories);
   }
 
-  return buildCatalogFallbackTabs();
+  return [{ id: "all", label: "All", iconId: "all" }];
 }
 
 export function resolveCategoryTabId(

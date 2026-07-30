@@ -275,9 +275,16 @@ export default function ClientListingPageView() {
             </Typography>
           </Box>
         ) : (
-          <Grid container spacing={2.5}>
+          <Grid container spacing={2.5} alignItems="stretch">
             {state.items.map((item) => (
-              <Grid item xs={12} sm={6} md={4} key={item.id}>
+              <Grid
+                item
+                xs={12}
+                sm={6}
+                md={4}
+                key={item.id}
+                sx={{ display: "flex" }}
+              >
                 <ClientListingCard
                   item={item}
                   visibleLocationModes={state.appliedFilters.locationModes}

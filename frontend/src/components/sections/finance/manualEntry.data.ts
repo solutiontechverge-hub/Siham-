@@ -43,15 +43,15 @@ export type ManualEntryLine = {
 };
 
 export const DEFAULT_MANUAL_ENTRY_PRODUCT: Pick<ManualEntryLine, "name" | "quantity" | "unitPrice"> = {
-  name: "Shampoo",
-  quantity: 2,
-  unitPrice: 25,
+  name: "",
+  quantity: 1,
+  unitPrice: 0,
 };
 
 export const DEFAULT_MANUAL_ENTRY_ITEM: Pick<ManualEntryLine, "name" | "quantity" | "unitPrice"> = {
-  name: "Extra Conditioner",
-  quantity: 2,
-  unitPrice: 25,
+  name: "",
+  quantity: 1,
+  unitPrice: 0,
 };
 
 export function lineTotal(line: Pick<ManualEntryLine, "quantity" | "unitPrice">): number {
@@ -76,6 +76,11 @@ export type ManualEntryCatalogOption = {
   id: string;
   label: string;
   unitPrice: number;
+  /** Optional fields kept for edit round-trip (Add/Edit Product form). */
+  vat?: string;
+  unit?: number;
+  discountType?: "fixed" | "percentage";
+  discountAmount?: string;
 };
 
 export function parseFinancePrice(price: string): number {
@@ -148,11 +153,10 @@ export function createManualEntryLine(
   index: number,
 ): ManualEntryLine {
   const base = kind === "product" ? DEFAULT_MANUAL_ENTRY_PRODUCT : DEFAULT_MANUAL_ENTRY_ITEM;
-  const name = index === 0 ? base.name : `${base.name} ${index + 1}`;
   return {
     id: `${kind}-${Date.now()}-${index}`,
     kind,
-    name,
+    name: base.name,
     quantity: base.quantity,
     unitPrice: base.unitPrice,
   };

@@ -31,12 +31,25 @@ export function getTransactionStatusTone(status: TransactionStatus): Transaction
     case "Overdue":
     case "Overdue response":
       return "warning";
+    case "Failed":
+      return "danger";
     case "Refunded":
     case "Voided":
-    case "Failed":
       return "muted";
     default:
       return "neutral";
+  }
+}
+
+/** Chip label per Transaction overview status design. */
+export function formatTransactionStatusLabel(status: TransactionStatus): string {
+  switch (status) {
+    case "Overdue":
+      return "!Overdue";
+    case "Voided":
+      return "Void";
+    default:
+      return status;
   }
 }
 

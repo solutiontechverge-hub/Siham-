@@ -1,4 +1,7 @@
-import { formatProductLineName } from "./bookingProductCatalog.data";
+import {
+  formatProductLineName,
+  type BookingCatalogProduct,
+} from "./bookingProductCatalog.data";
 
 export type BookingUniqueItemDiscountType = "fixed" | "percentage";
 
@@ -19,6 +22,43 @@ export const emptyBookingUniqueItemDraft = (): BookingUniqueItemDraft => ({
   discountType: "fixed",
   discountAmount: "0",
 });
+
+export function buildUniqueItemDraftFromProduct(
+  product: Pick<
+    BookingCatalogProduct,
+    "name" | "price" | "vat" | "unit" | "discountType" | "discountAmount"
+  >,
+): BookingUniqueItemDraft {
+  return {
+    productName: product.name,
+    vat: product.vat ?? "",
+    price: String(product.price),
+    unit: Math.max(1, product.unit ?? 1),
+    discountType: product.discountType ?? "fixed",
+    discountAmount: product.discountAmount ?? "0",
+  };
+}
+
+export function buildCatalogProductFromUniqueItemDraft(
+  draft: BookingUniqueItemDraft,
+  id: string,
+): BookingCatalogProduct | null {
+  const productName = draft.productName.trim();
+  if (!productName) return null;
+  const unitPrice = Math.max(
+    0,
+    Number.parseFloat(draft.price.replace(",", ".")) || 0,
+  );
+  return {
+    id,
+    name: productName,
+    price: unitPrice,
+    vat: draft.vat.trim() || undefined,
+    unit: Math.max(1, draft.unit),
+    discountType: draft.discountType,
+    discountAmount: draft.discountAmount,
+  };
+}
 
 export type BookingUniqueItemLine = {
   id: string;

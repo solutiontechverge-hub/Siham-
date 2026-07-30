@@ -163,7 +163,7 @@ function applyDueDateMeta<T extends {
   const due = new Date(`${meta.dueDate}T00:00:00`);
   const isOverdue = !Number.isNaN(due.getTime()) && due < today && !meta.canceled;
   next.paymentState = isOverdue ? "overdue" : "payment_due";
-  next.statusBadge = "Payment Due";
+  next.statusBadge = isOverdue ? "!Overdue" : "Payment Due";
   next.highlightLabel = "Payment";
 
   if (typeof next.title === "string") {

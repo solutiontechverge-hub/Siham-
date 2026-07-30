@@ -521,18 +521,10 @@ export default function ClientProfilePageView() {
                       ))}
                     </MollureLabeledField>
                   </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Stack spacing={0.75}>
-                      <Typography
-                        sx={{
-                          fontSize: 12,
-                          fontWeight: 700,
-                          color: "text.secondary",
-                        }}
-                      >
-                        {profilePageData.fields.birthDate.label}
-                      </Typography>
+                  <Grid item xs={12} sm={6} sx={{ display: "flex" }}>
+                    <Box sx={{ width: "100%" }}>
                       <AppDatePicker
+                        label={profilePageData.fields.birthDate.label}
                         name="birthDate"
                         value={form.birthDate}
                         onChange={(iso) =>
@@ -547,26 +539,29 @@ export default function ClientProfilePageView() {
                         })()}
                         fullWidth
                       />
-                    </Stack>
+                    </Box>
                   </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <MollureLabeledField
-                      select
-                      fieldLabel={profilePageData.fields.gender.label}
-                      name="gender"
-                      value={form.gender}
-                      onChange={handleChange}
-                      disabled={fieldsDisabled}
-                    >
-                      <MenuItem value="">
-                        <em>Select</em>
-                      </MenuItem>
-                      {profilePageData.genderOptions.map((opt) => (
-                        <MenuItem key={opt.value} value={opt.value}>
-                          {opt.label}
+                  <Grid item xs={12} sm={6} sx={{ display: "flex" }}>
+                    <Box sx={{ width: "100%" }}>
+                      <MollureLabeledField
+                        select
+                        fieldLabel={profilePageData.fields.gender.label}
+                        name="gender"
+                        value={form.gender}
+                        onChange={handleChange}
+                        disabled
+                        SelectProps={{ displayEmpty: true }}
+                      >
+                        <MenuItem value="">
+                          <em>Select</em>
                         </MenuItem>
-                      ))}
-                    </MollureLabeledField>
+                        {profilePageData.genderOptions.map((opt) => (
+                          <MenuItem key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </MenuItem>
+                        ))}
+                      </MollureLabeledField>
+                    </Box>
                   </Grid>
                 </Grid>
               ) : (
@@ -731,11 +726,6 @@ export default function ClientProfilePageView() {
                     placeholder={profilePageData.fields.email.placeholder}
                     value={form.email}
                     disabled
-                    sx={{
-                      "& .MuiOutlinedInput-root": {
-                        bgcolor: "rgba(52, 74, 102, 0.03)",
-                      },
-                    }}
                   />
                 </Grid>
                 <Grid item xs={12} sm={6}>

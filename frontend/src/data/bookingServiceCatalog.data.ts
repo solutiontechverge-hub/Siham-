@@ -12,28 +12,12 @@ export type BookingServiceCategory = {
   services: readonly BookingCatalogService[];
 };
 
-export const bookingServiceCatalog: readonly BookingServiceCategory[] = [
-  {
-    category: "Hair",
-    services: [
-      { id: "svc-buzz-cut", name: "Buzz Cut", durationMins: 45, price: 25, category: "Hair" },
-      { id: "svc-scissor-cut", name: "Scissor Cut", durationMins: 60, price: 35, category: "Hair" },
-      { id: "svc-hair-wash-style", name: "Hair Wash Style", durationMins: 30, price: 20, category: "Hair" },
-      { id: "svc-hair-wash-style-2", name: "Hair Wash Style", durationMins: 30, price: 20, category: "Hair" },
-    ],
-  },
-  {
-    category: "Makeup",
-    services: [
-      { id: "svc-makeup", name: "Makeup", durationMins: 45, price: 25, category: "Makeup" },
-      { id: "svc-makeup-buzz-1", name: "Buzz Cut", durationMins: 45, price: 25, category: "Makeup" },
-      { id: "svc-makeup-buzz-2", name: "Buzz Cut", durationMins: 45, price: 25, category: "Makeup" },
-      { id: "svc-makeup-buzz-3", name: "Buzz Cut", durationMins: 45, price: 25, category: "Makeup" },
-    ],
-  },
-] as const;
+/** Empty — professionals load their own services from business setup. */
+export const bookingServiceCatalog: readonly BookingServiceCategory[] = [];
 
-export const allBookingCatalogServices = bookingServiceCatalog.flatMap((group) => group.services);
+export const allBookingCatalogServices = bookingServiceCatalog.flatMap(
+  (group) => group.services,
+);
 
 export function formatBookingServiceMeta(service: BookingCatalogService) {
   return `${service.durationMins} Mins • €${service.price}`;
@@ -91,7 +75,10 @@ export function buildOrderedBookingServiceCategories(
           [...groups.keys()].some((key) => categoriesMatch(key, category)),
         ),
         ...[...groups.keys()].filter(
-          (key) => !serviceOrder.categories?.some((category) => categoriesMatch(key, category)),
+          (key) =>
+            !serviceOrder.categories?.some((category) =>
+              categoriesMatch(key, category),
+            ),
         ),
       ]
     : [...groups.keys()];
@@ -101,7 +88,8 @@ export function buildOrderedBookingServiceCategories(
   const uniqueOrderedCategories: string[] = [];
   for (const category of orderedCategoryNames) {
     const actualKey =
-      [...groups.keys()].find((key) => categoriesMatch(key, category)) ?? category;
+      [...groups.keys()].find((key) => categoriesMatch(key, category)) ??
+      category;
     if (seen.has(actualKey)) continue;
     seen.add(actualKey);
     uniqueOrderedCategories.push(actualKey);
@@ -114,8 +102,11 @@ export function buildOrderedBookingServiceCategories(
     })
     .map((category) => {
       const servicesInCategory = groups.get(category) ?? [];
-      const orderKey = findOrderedCategoryKey(category, serviceOrder?.categories ?? []) ?? category;
-      const preferredOrder = serviceOrder?.servicesByCategory?.[orderKey] ??
+      const orderKey =
+        findOrderedCategoryKey(category, serviceOrder?.categories ?? []) ??
+        category;
+      const preferredOrder =
+        serviceOrder?.servicesByCategory?.[orderKey] ??
         serviceOrder?.servicesByCategory?.[category] ??
         [];
       const hiddenServices =
@@ -125,11 +116,20 @@ export function buildOrderedBookingServiceCategories(
 
       const orderedServices = [
         ...preferredOrder
-          .map((name) => servicesInCategory.find((service) => service.name === name))
-          .filter((service): service is BookingCatalogService => Boolean(service)),
-        ...servicesInCategory.filter((service) => !preferredOrder.includes(service.name)),
+          .map((name) =>
+            servicesInCategory.find((service) => service.name === name),
+          )
+          .filter(
+            (service): service is BookingCatalogService => Boolean(service),
+          ),
+        ...servicesInCategory.filter(
+          (service) => !preferredOrder.includes(service.name),
+        ),
       ].filter(
-        (service) => !hiddenServices.some((entry) => categoriesMatch(entry, service.name)),
+        (service) =>
+          !hiddenServices.some((entry) =>
+            categoriesMatch(entry, service.name),
+          ),
       );
 
       return { category, services: orderedServices };
