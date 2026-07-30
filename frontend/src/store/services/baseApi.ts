@@ -67,6 +67,8 @@ const baseQueryWithAuthHandling: BaseQueryFn<string | FetchArgs, unknown, FetchB
         window.location.href = loginPath;
       }
     }
+    // Runs after module init; clears cached profile/setup so the next session cannot reuse them.
+    api.dispatch(baseApi.util.resetApiState());
   }
 
   return result;

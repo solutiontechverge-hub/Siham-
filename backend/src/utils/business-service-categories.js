@@ -199,7 +199,7 @@ export const buildServiceDetailsFromCategories = async (
 export const buildServiceDetailsMapForSetups = async (
   setupRows,
   queryFn,
-  { teamMembersBySetupId = {}, useTeamAssignmentsFallback = true } = {},
+  { teamMembersBySetupId = {}, useTeamAssignmentsFallback = false } = {},
 ) => {
   const categoriesBySetupId = new Map();
   const allServiceIds = new Set();

@@ -2,12 +2,13 @@
 
 import * as React from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import RemoveRoundedIcon from "@mui/icons-material/RemoveRounded";
 import { Box, ButtonBase, Checkbox, IconButton, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import AppSearchField from "../AppSearchField";
 import { BodyText } from "../../ui/typography";
 import {
-  bookingProductCatalog,
   formatProductUnitPrice,
   type BookingCatalogProduct,
   type BookingProductSelectionDraft,
@@ -15,10 +16,13 @@ import {
 
 type BookingSelectProductsScreenProps = {
   draft: BookingProductSelectionDraft;
+  /** Professional product list from finance settings. */
+  catalog?: readonly BookingCatalogProduct[];
   customProducts?: readonly BookingCatalogProduct[];
   onToggle: (product: BookingCatalogProduct) => void;
   onQuantityChange: (productId: string, delta: number) => void;
   onAddProduct?: () => void;
+  onEdit?: (product: BookingCatalogProduct) => void;
   disabled?: boolean;
 };
 
@@ -28,12 +32,14 @@ function ProductRow({
   disabled,
   onToggle,
   onQuantityChange,
+  onEdit,
 }: {
   product: BookingCatalogProduct;
   draft: BookingProductSelectionDraft;
   disabled: boolean;
   onToggle: (product: BookingCatalogProduct) => void;
   onQuantityChange: (productId: string, delta: number) => void;
+  onEdit?: (product: BookingCatalogProduct) => void;
 }) {
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -92,6 +98,27 @@ function ProductRow({
           {formatProductUnitPrice(product.price)}
         </BodyText>
       </Box>
+
+      {onEdit ? (
+        <IconButton
+          size="small"
+          onClick={() => {
+            if (disabled) return;
+            onEdit(product);
+          }}
+          disabled={disabled}
+          aria-label={`Edit ${product.name}`}
+          sx={{
+            color: alpha(m.navy, 0.42),
+            "&:hover": {
+              color: m.teal,
+              bgcolor: alpha(m.teal, 0.08),
+            },
+          }}
+        >
+          <EditRoundedIcon sx={{ fontSize: 17 }} />
+        </IconButton>
+      ) : null}
 
       <Stack
         direction="row"
@@ -160,18 +187,30 @@ function ProductRow({
 
 export default function BookingSelectProductsScreen({
   draft,
+  catalog = [],
   customProducts = [],
   onToggle,
   onQuantityChange,
   onAddProduct,
+  onEdit,
   disabled = false,
 }: BookingSelectProductsScreenProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
+  const [query, setQuery] = React.useState("");
+
   const allProducts = React.useMemo(
-    () => [...bookingProductCatalog, ...customProducts],
-    [customProducts],
+    () => [...catalog, ...customProducts],
+    [catalog, customProducts],
   );
+
+  const filteredProducts = React.useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return allProducts;
+    return allProducts.filter((product) =>
+      product.name.toLowerCase().includes(q),
+    );
+  }, [allProducts, query]);
 
   return (
     <Stack spacing={1.5}>
@@ -181,8 +220,21 @@ export default function BookingSelectProductsScreen({
         Select Product
       </BodyText>
 
+      <AppSearchField
+        fullWidth
+        placeholder="Search products..."
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onClear={() => setQuery("")}
+        sx={{
+          "& .MuiOutlinedInput-root": {
+            bgcolor: "#fff",
+          },
+        }}
+      />
+
       <Stack spacing={0.75}>
-        {allProducts.map((product) => (
+        {filteredProducts.map((product) => (
           <ProductRow
             key={product.id}
             product={product}
@@ -190,6 +242,7 @@ export default function BookingSelectProductsScreen({
             disabled={disabled}
             onToggle={onToggle}
             onQuantityChange={onQuantityChange}
+            onEdit={onEdit}
           />
         ))}
 

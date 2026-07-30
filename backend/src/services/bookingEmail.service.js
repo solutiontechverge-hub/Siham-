@@ -176,7 +176,7 @@ export const sendBookingClientEmail = async (bookingId, emailType, extras = {}) 
   const { html, text } = config.build({ ...ctx, ...extras });
   await sendMail({
     to: ctx.customerEmail,
-    subject: config.subject,
+    subject: extras.title || config.subject,
     html,
     text,
   });
@@ -304,6 +304,7 @@ function mapNotificationTypeToEmailType(notificationType, isProfessional) {
   }
   if (type === "client.reminder.appointment") return BOOKING_EMAIL_TYPES.APPOINTMENT_REMINDER;
   if (type === "client.booking.no_show") return BOOKING_EMAIL_TYPES.PROFESSIONAL_ACTION;
+  if (type === "client.br.incoming") return BOOKING_EMAIL_TYPES.PROFESSIONAL_ACTION;
   if (type === "pro.br.incoming") return BOOKING_EMAIL_TYPES.NEW_BOOKING_REQUEST;
   if (type === "pro.payment.prepayment_received") return BOOKING_EMAIL_TYPES.PREPAYMENT_RECEIVED;
   if (type === "pro.reminder.respond_request") return BOOKING_EMAIL_TYPES.RESPOND_REQUEST_REMINDER;

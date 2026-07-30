@@ -3,14 +3,8 @@
 export const DEFAULT_INVOICE_SETTINGS = {
   logoDataUrl: null,
   defaultInvoiceType: "individual",
-  products: [
-    { id: "p1", name: "Shampoo", price: "30EUR", vat: "21%" },
-    { id: "p2", name: "Eye Lashes", price: "50EUR", vat: "21%" },
-  ],
-  services: [
-    { id: "s1", category: "Hair", service: "Dye", vat: "21%" },
-    { id: "s2", category: "Makeup", service: "Eye Makeup", vat: "9%" },
-  ],
+  products: [],
+  services: [],
   paymentTerms: {
     originalDueValue: "2",
     originalDueUnit: "Weeks",

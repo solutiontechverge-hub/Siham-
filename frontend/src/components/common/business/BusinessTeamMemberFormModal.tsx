@@ -179,14 +179,16 @@ export default function BusinessTeamMemberFormModal({
                 cursor: disabled ? "default" : "pointer",
               }}
             >
-              <Image
-                src={draft.photoSrc}
-                alt="Team member"
-                fill
-                unoptimized
-                sizes="120px"
-                style={{ objectFit: "cover" }}
-              />
+              {draft.photoSrc ? (
+                <Image
+                  src={draft.photoSrc}
+                  alt="Team member"
+                  fill
+                  unoptimized
+                  sizes="120px"
+                  style={{ objectFit: "cover" }}
+                />
+              ) : null}
               <Box
                 sx={{
                   position: "absolute",

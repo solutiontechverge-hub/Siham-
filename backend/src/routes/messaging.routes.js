@@ -2,9 +2,12 @@ import { Router } from "express";
 import {
   clearMessagingThread,
   getMessagingInbox,
+  getMessagingLinkableBookings,
   getMessagingProfessionals,
   getMessagingThreadMessages,
   markMessagingThreadRead,
+  openMessagingForBooking,
+  postMessagingLinkBooking,
   postMessagingMessage,
   removeMessagingMessage,
   uploadMessagingAttachments,
@@ -34,8 +37,11 @@ router.post(
 );
 
 router.get("/inbox", getMessagingInbox);
+router.get("/open-for-booking", openMessagingForBooking);
 router.get("/professionals", getMessagingProfessionals);
 router.get("/threads/:threadId/messages", getMessagingThreadMessages);
+router.get("/threads/:threadId/linkable-bookings", getMessagingLinkableBookings);
+router.post("/threads/:threadId/link-booking", postMessagingLinkBooking);
 router.post("/threads/:threadId/read", markMessagingThreadRead);
 router.post("/threads/:threadId/messages", postMessagingMessage);
 router.post("/threads/:threadId/clear", clearMessagingThread);

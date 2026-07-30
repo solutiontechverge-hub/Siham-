@@ -1,6 +1,6 @@
 import type { CalendarBookingLocation } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { BlockTimeDraft } from "./calendar.utils";
-import type { PublicBusinessHoursDraft } from "./CalendarPublicBusinessHoursModal";
+import type { PublicBusinessHoursEntry } from "./CalendarPublicBusinessHoursModal";
 import type { CalendarDesignDraft } from "./CalendarDesignModal";
 
 export type ScheduleShift = {
@@ -102,7 +102,7 @@ export function normalizeServiceOrderSettings(
 }
 
 export type CalendarAvailabilitySettings = {
-  publicBusinessHours?: PublicBusinessHoursDraft[];
+  publicBusinessHours?: PublicBusinessHoursEntry[];
   bookingRules?: BookingRules;
   serviceOrder?: ServiceOrderSettings;
   scheduleAvailability?: ScheduleAvailabilityRow[];
@@ -125,16 +125,16 @@ export const defaultBookingRules = (): BookingRules => ({
 
 function normalizePublicBusinessHours(
   raw: unknown,
-): PublicBusinessHoursDraft[] {
+): PublicBusinessHoursEntry[] {
   if (Array.isArray(raw)) {
     return raw.filter(
-      (entry): entry is PublicBusinessHoursDraft =>
+      (entry): entry is PublicBusinessHoursEntry =>
         typeof entry === "object" && entry !== null,
     );
   }
   // Legacy shape: a single hours object was stored instead of an array.
   if (typeof raw === "object" && raw !== null) {
-    return [raw as PublicBusinessHoursDraft];
+    return [raw as PublicBusinessHoursEntry];
   }
   return [];
 }

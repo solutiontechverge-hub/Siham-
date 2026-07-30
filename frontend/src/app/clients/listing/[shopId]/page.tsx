@@ -67,13 +67,29 @@ export default function ClientBusinessProfilePage() {
     (mode: "fixed" | "desired" = locationMode) => {
       if (!profile) return;
       try {
+        const desiredAreaLabel =
+          profile.desiredLocation.areas
+            .map((area) => {
+              const municipalities = area.municipalities.filter(Boolean).join(", ");
+              return [area.province, municipalities].filter(Boolean).join(" · ");
+            })
+            .filter(Boolean)
+            .join("; ") || "Desired Location";
         window.sessionStorage.setItem(
           "mollure:selected_shop",
           JSON.stringify({
             shopId: profile.shopId,
             shopName: profile.shopName,
-            municipalityLabel: profile.fixedLocation.municipality,
-            addressLabel: profile.fixedLocation.formattedAddress,
+            municipalityLabel:
+              mode === "desired"
+                ? profile.desiredLocation.areas[0]?.municipalities[0] ||
+                  profile.desiredLocation.areas[0]?.province ||
+                  ""
+                : profile.fixedLocation.municipality,
+            addressLabel:
+              mode === "desired"
+                ? desiredAreaLabel
+                : profile.fixedLocation.formattedAddress,
             locationMode: mode,
           }),
         );
@@ -99,13 +115,29 @@ export default function ClientBusinessProfilePage() {
   const onBookNow = (selection: PublicProfileBookingSelection) => {
     persistSelectedShop(selection.locationMode);
     try {
+      const desiredAreaLabel =
+        profile?.desiredLocation.areas
+          .map((area) => {
+            const municipalities = area.municipalities.filter(Boolean).join(", ");
+            return [area.province, municipalities].filter(Boolean).join(" · ");
+          })
+          .filter(Boolean)
+          .join("; ") || "Desired Location";
       window.sessionStorage.setItem(
         "mollure:selected_shop",
         JSON.stringify({
           shopId: selection.shopId,
           shopName: selection.shopName ?? profile?.shopName,
-          municipalityLabel: profile?.fixedLocation.municipality,
-          addressLabel: profile?.fixedLocation.formattedAddress,
+          municipalityLabel:
+            selection.locationMode === "desired"
+              ? profile?.desiredLocation.areas[0]?.municipalities[0] ||
+                profile?.desiredLocation.areas[0]?.province ||
+                ""
+              : profile?.fixedLocation.municipality,
+          addressLabel:
+            selection.locationMode === "desired"
+              ? desiredAreaLabel
+              : profile?.fixedLocation.formattedAddress,
           locationMode: selection.locationMode,
         }),
       );

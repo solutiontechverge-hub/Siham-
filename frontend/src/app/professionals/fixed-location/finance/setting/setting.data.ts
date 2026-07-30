@@ -89,12 +89,12 @@ export const SERVICE_OPTIONS: ServiceOption[] = [
 ];
 
 export const DEFAULT_PRODUCT_DRAFT: ProductDraft = {
-  productName: "Hair Protein",
+  productName: "",
   vat: "21%",
-  price: "0",
+  price: "",
 };
 
 export const DEFAULT_SERVICE_DRAFT: ServiceDraft = {
-  service: "Hair Protein",
-  vat: "20%",
+  service: "",
+  vat: "21%",
 };

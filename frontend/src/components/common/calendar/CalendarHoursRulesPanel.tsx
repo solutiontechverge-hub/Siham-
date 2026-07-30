@@ -30,7 +30,7 @@ import type {
 } from "./calendar-settings.types";
 import type { CalendarDesignDraft } from "./CalendarDesignModal";
 import { getCalendarDesignServiceLabel } from "./CalendarDesignModal";
-import type { PublicBusinessHoursDraft } from "./CalendarPublicBusinessHoursModal";
+import type { PublicBusinessHoursEntry } from "./CalendarPublicBusinessHoursModal";
 import CalendarServiceOrderCard from "./CalendarServiceOrderCard";
 import {
   isCategoryVisibleInServiceOrder,
@@ -42,7 +42,7 @@ import {
 type CalendarHoursRulesPanelProps = {
   availableLocations: readonly CalendarBookingLocation[];
   bookingRules: BookingRules;
-  publicBusinessHours?: readonly PublicBusinessHoursDraft[];
+  publicBusinessHours?: readonly PublicBusinessHoursEntry[];
   serviceOrder: ServiceOrderSettings;
   appliedDesign: CalendarDesignDraft;
   isSaving?: boolean;
@@ -309,16 +309,138 @@ function LocationRulesCard({
   );
 }
 
-function formatHoursLabel(entry: PublicBusinessHoursDraft): string {
-  const day = entry.day || "Today";
-  if (entry.notAvailable) return `${day} (Not available)`;
-  const start = entry.startTime || "--:--";
-  const end = entry.endTime || "--:--";
-  return `${day} (${start} - ${end})`;
+function formatDisplayDate(iso?: string): string {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return "";
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
 }
 
-function hoursOptionId(entry: PublicBusinessHoursDraft, index: number): string {
-  return `${entry.location}-${entry.day}-${entry.startTime}-${entry.endTime}-${index}`;
+function isSingleDateEntry(entry: PublicBusinessHoursEntry): boolean {
+  return Boolean(entry.dateFrom && entry.dateFrom === (entry.dateTo || entry.dateFrom));
+}
+
+function isRangeEntry(entry: PublicBusinessHoursEntry): boolean {
+  return Boolean(
+    entry.dateFrom && entry.dateTo && entry.dateFrom !== entry.dateTo,
+  );
+}
+
+const WEEKDAY_ORDER = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+] as const;
+
+function weekdaySortIndex(day: string | undefined): number {
+  if (!day) return WEEKDAY_ORDER.length;
+  const idx = WEEKDAY_ORDER.indexOf(
+    day as (typeof WEEKDAY_ORDER)[number],
+  );
+  return idx >= 0 ? idx : WEEKDAY_ORDER.length;
+}
+
+function formatHoursLabel(entry: PublicBusinessHoursEntry): string {
+  const start = entry.startTime || "--:--";
+  const end = entry.endTime || "--:--";
+  const fromLabel = formatDisplayDate(entry.dateFrom);
+  const toLabel = formatDisplayDate(entry.dateTo || entry.dateFrom);
+  const dateSpan =
+    fromLabel && toLabel && fromLabel !== toLabel
+      ? `${fromLabel} – ${toLabel}`
+      : fromLabel;
+
+  // Off / not available — show specific date when present (pinned to top separately).
+  if (entry.notAvailable) {
+    if (dateSpan) {
+      const dayPrefix = entry.day ? `${entry.day} ` : "";
+      return `${dayPrefix}${dateSpan} (Not available)`;
+    }
+    return `${entry.day || "Day"} (Not available)`;
+  }
+
+  // Specific day override inside a range — show that date + changed time.
+  if (isSingleDateEntry(entry)) {
+    const dayPrefix = entry.day ? `${entry.day} ` : "";
+    return `${dayPrefix}${fromLabel} (${start} - ${end})`;
+  }
+
+  // Date range schedule — weekday + start/end dates + time.
+  if (isRangeEntry(entry)) {
+    const day = entry.day || "Every day";
+    return `${day} ${dateSpan} (${start} - ${end})`;
+  }
+
+  // Legacy weekday-only rows.
+  return `${entry.day || "Today"} (${start} - ${end})`;
+}
+
+function hoursOptionId(entry: PublicBusinessHoursEntry, index: number): string {
+  return `${entry.location}-${entry.day}-${entry.dateFrom}-${entry.dateTo}-${entry.startTime}-${entry.endTime}-${index}`;
+}
+
+function buildHoursDropdownOptions(
+  entries: PublicBusinessHoursEntry[],
+  colors: { override: string; notAvailable: string },
+) {
+  if (!entries.length) {
+    return [{ label: "No hours set yet", value: "empty" }];
+  }
+
+  const indexed = entries.map((entry, index) => ({ entry, index }));
+  const notAvailable = indexed.filter((item) => item.entry.notAvailable);
+  const singleDayOverrides = indexed.filter(
+    (item) => !item.entry.notAvailable && isSingleDateEntry(item.entry),
+  );
+  const rangeOrWeek = indexed.filter(
+    (item) => !item.entry.notAvailable && !isSingleDateEntry(item.entry),
+  );
+
+  // Days already shown prominently at the top should not repeat in the week list.
+  const prominentDays = new Set<string>();
+  for (const item of [...notAvailable, ...singleDayOverrides]) {
+    if (item.entry.day) prominentDays.add(item.entry.day);
+  }
+
+  // One clean week row per weekday (latest wins). Prefer dated ranges over legacy.
+  const uniqueWeek = new Map<string, (typeof indexed)[number]>();
+  for (const item of rangeOrWeek) {
+    const day = item.entry.day || "all";
+    if (day !== "all" && prominentDays.has(day)) continue;
+
+    const existing = uniqueWeek.get(day);
+    if (!existing) {
+      uniqueWeek.set(day, item);
+      continue;
+    }
+    // Prefer a real date-range row over a legacy day-only row.
+    const existingIsRange = isRangeEntry(existing.entry);
+    const nextIsRange = isRangeEntry(item.entry);
+    if (nextIsRange || !existingIsRange) {
+      uniqueWeek.set(day, item);
+    }
+  }
+
+  const weekRows = [...uniqueWeek.values()].sort(
+    (a, b) =>
+      weekdaySortIndex(a.entry.day) - weekdaySortIndex(b.entry.day),
+  );
+
+  // Image-2 layout: changed/off days first (prominent), then the rest of the week.
+  const ordered = [...notAvailable, ...singleDayOverrides, ...weekRows];
+
+  return ordered.map(({ entry, index }) => ({
+    label: formatHoursLabel(entry),
+    value: hoursOptionId(entry, index),
+    color: entry.notAvailable
+      ? colors.notAvailable
+      : isSingleDateEntry(entry)
+        ? colors.override
+        : undefined,
+  }));
 }
 
 function LocationHoursBlock({
@@ -331,19 +453,18 @@ function LocationHoursBlock({
 }: {
   title: string;
   scheduleLabel: string;
-  entries: PublicBusinessHoursDraft[];
+  entries: PublicBusinessHoursEntry[];
   selectedId: string;
   onSelectedIdChange: (id: string) => void;
   showInfo?: boolean;
 }) {
   const m = useTheme().palette.mollure;
-  const options =
-    entries.length > 0
-      ? entries.map((entry, index) => ({
-          label: formatHoursLabel(entry),
-          value: hoursOptionId(entry, index),
-        }))
-      : [{ label: "No hours set yet", value: "empty" }];
+  const options = buildHoursDropdownOptions(entries, {
+    // Requested / changed-day accent (orange).
+    override: m.requestAccent,
+    // Delete / blocked accent (red).
+    notAvailable: m.blockedTimeFg,
+  });
 
   return (
     <Box

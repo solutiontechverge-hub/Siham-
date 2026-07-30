@@ -12,11 +12,11 @@ export default function FixedLocationCalendarPageView() {
     serviceCatalog,
     serviceOrderDefaults,
     clientOptions,
-    platformClientOptions,
     fixedLocationAddress,
     lateRescheduleFeePercentDefault,
     isSaving,
     onCreateCalendarEntry,
+    onUpdateCalendarEntry,
     onDeleteCalendarEntry,
     onSaveCalendarSettings,
     onSyncServiceOrderToSetup,
@@ -34,11 +34,11 @@ export default function FixedLocationCalendarPageView() {
       serviceCatalog={serviceCatalog}
       serviceOrderDefaults={serviceOrderDefaults}
       clientOptions={clientOptions}
-      platformClientOptions={platformClientOptions}
       fixedLocationAddress={fixedLocationAddress}
       lateRescheduleFeePercentDefault={lateRescheduleFeePercentDefault}
       isSaving={isSaving}
       onCreateCalendarEntry={onCreateCalendarEntry}
+      onUpdateCalendarEntry={onUpdateCalendarEntry}
       onDeleteCalendarEntry={onDeleteCalendarEntry}
       onSaveCalendarSettings={onSaveCalendarSettings}
       onSyncServiceOrderToSetup={onSyncServiceOrderToSetup}

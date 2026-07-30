@@ -19,6 +19,7 @@ import {
   Tab,
   Tabs,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
@@ -36,6 +37,7 @@ import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
 import ModeEditOutlineRoundedIcon from "@mui/icons-material/ModeEditOutlineRounded";
 import {
   AppDropdown,
+  AppTextField,
 } from "../../../components/common";
 import AppModal, {
   MessagingModalCancelButton,
@@ -47,6 +49,7 @@ import {
   fmtMinutesToTimeLabel,
   serviceTimeRangeLabel,
 } from "./booking-time";
+import { netherlandsProvinces } from "../clients.data";
 
 import { useClientBookingCreatePage } from "./useClientBookingCreatePage";
 import type { BookingPerson } from "./booking.page.types";
@@ -94,6 +97,11 @@ export default function ClientBookingCreateView() {
     monthPickerMonth,
     setMonthYear,
     allDayTimes,
+    isDayNotAvailable,
+    isDayUnselectable,
+    getDayClosedNote,
+    selectedDayNotAvailable,
+    selectedDayClosedNote,
     isSelectedToday,
     nowTick,
     setNowTick,
@@ -144,6 +152,10 @@ export default function ClientBookingCreateView() {
     setProjectDescription,
     projectUploads,
     setProjectUploads,
+    desiredVisitAddress,
+    setDesiredVisitAddress,
+    isDesiredVisitAddressComplete,
+    desiredVisitAddressLabel,
     participantMenuAnchor,
     setParticipantMenuAnchor,
     planningPersonId,
@@ -1331,9 +1343,13 @@ export default function ClientBookingCreateView() {
                                 1,
                               ).toLocaleDateString("en-US", { month: "short" });
                               const active = i === monthPickerMonth;
-                              const probe = new Date(selectedDate);
-                              probe.setFullYear(monthPickerYear, i, 1);
-                              const disabled = isPastDay(probe);
+                              // Disable only when the whole month is already past.
+                              const lastOfMonth = new Date(
+                                monthPickerYear,
+                                i + 1,
+                                0,
+                              );
+                              const disabled = isPastDay(lastOfMonth);
                               return (
                                 <Grid item xs={4} key={i}>
                                   <AppButton
@@ -1405,30 +1421,77 @@ export default function ClientBookingCreateView() {
                       >
                         {weekDays.map((d) => {
                           const active = toISO(selectedDate) === d.key;
-                          const disabled = isPastDay(d.date);
+                          const past = isPastDay(d.date);
+                          const closed = isDayNotAvailable(d.date) && !past;
+                          const noSlots =
+                            !past && !closed && isDayUnselectable(d.date);
+                          const closedNote = closed
+                            ? getDayClosedNote(d.date)
+                            : noSlots
+                              ? "No public hours available for this day."
+                              : null;
+                          const disabled = past || closed || noSlots;
+                          const blocked = closed || noSlots;
                           return (
-                            <ButtonBase
+                            <Tooltip
                               key={d.key}
+                              title={closedNote || ""}
+                              disableHoverListener={!closedNote}
+                              arrow
+                              placement="top"
+                            >
+                              <Box
+                                component="span"
+                                sx={{
+                                  flex: 1,
+                                  minWidth: 0,
+                                  display: "flex",
+                                }}
+                              >
+                            <ButtonBase
                               onClick={() => {
                                 if (disabled) return;
                                 setSelectedDate(d.date);
                               }}
                               disabled={disabled}
+                              aria-disabled={disabled}
                               sx={{
                                 flex: 1,
+                                width: "100%",
                                 minWidth: 0,
                                 borderRadius: "8px",
-                                border: `1px solid ${active ? alpha(m.teal, 0.6) : alpha(m.navy, 0.1)}`,
-                                bgcolor: active ? m.teal : "#fff",
+                                border: `1px solid ${
+                                  past
+                                    ? alpha(m.navy, 0.08)
+                                    : blocked
+                                      ? alpha(m.blockedTimeFg, 0.45)
+                                      : active
+                                        ? alpha(m.teal, 0.6)
+                                        : alpha(m.navy, 0.1)
+                                }`,
+                                bgcolor: past
+                                  ? alpha(m.navy, 0.015)
+                                  : blocked
+                                    ? m.blockedTimeBg
+                                    : active
+                                      ? m.teal
+                                      : "#fff",
                                 py: 0.9,
                                 display: "flex",
                                 flexDirection: "column",
                                 gap: 0.35,
-                                ...(disabled
+                                pointerEvents: disabled ? "none" : "auto",
+                                "&.Mui-disabled": {
+                                  opacity: past ? 0.45 : 1,
+                                },
+                                ...(past
                                   ? {
                                       opacity: 0.45,
-                                      borderColor: alpha(m.navy, 0.08),
-                                      bgcolor: alpha(m.navy, 0.015),
+                                      cursor: "not-allowed",
+                                    }
+                                  : null),
+                                ...(blocked
+                                  ? {
                                       cursor: "not-allowed",
                                     }
                                   : null),
@@ -1438,7 +1501,13 @@ export default function ClientBookingCreateView() {
                                 sx={{
                                   fontSize: 10,
                                   fontWeight: 800,
-                                  color: active ? "#fff" : alpha(m.navy, 0.55),
+                                  color: past
+                                    ? alpha(m.navy, 0.55)
+                                    : blocked
+                                      ? m.blockedTimeFg
+                                      : active
+                                        ? "#fff"
+                                        : alpha(m.navy, 0.55),
                                 }}
                               >
                                 {d.dow}
@@ -1447,12 +1516,20 @@ export default function ClientBookingCreateView() {
                                 sx={{
                                   fontSize: 13.5,
                                   fontWeight: 900,
-                                  color: active ? "#fff" : alpha(m.navy, 0.76),
+                                  color: past
+                                    ? alpha(m.navy, 0.76)
+                                    : blocked
+                                      ? m.blockedTimeFg
+                                      : active
+                                        ? "#fff"
+                                        : alpha(m.navy, 0.76),
                                 }}
                               >
                                 {d.day}
                               </Typography>
                             </ButtonBase>
+                              </Box>
+                            </Tooltip>
                           );
                         })}
                       </Stack>
@@ -1628,6 +1705,22 @@ export default function ClientBookingCreateView() {
                         </Typography>
                       )}
 
+                      {(selectedDayNotAvailable || availableTimes.length === 0) && (
+                        <Typography
+                          sx={{
+                            mt: 0.9,
+                            px: 0.25,
+                            fontSize: 11.5,
+                            fontWeight: 800,
+                            color: m.blockedTimeFg,
+                            lineHeight: 1.35,
+                          }}
+                        >
+                          {selectedDayClosedNote ||
+                            "No public hours available for this day."}
+                        </Typography>
+                      )}
+
                       <Stack alignItems="flex-end" sx={{ mt: 1 }}>
                         <FormControlLabel
                           control={
@@ -1662,6 +1755,90 @@ export default function ClientBookingCreateView() {
                             id="booking-project-section"
                             sx={{ width: "100%", mt: 1.25, textAlign: "left" }}
                           >
+                            <Typography
+                              sx={{
+                                fontSize: 12,
+                                fontWeight: 900,
+                                color: alpha(m.navy, 0.78),
+                                mb: 1.25,
+                              }}
+                            >
+                              Visit Address
+                            </Typography>
+                            <Stack spacing={1.25} sx={{ mb: 2 }}>
+                              <Stack direction="row" spacing={1}>
+                                <AppTextField
+                                  label="Street"
+                                  placeholder="Enter street"
+                                  value={desiredVisitAddress.street}
+                                  onChange={(e) =>
+                                    setDesiredVisitAddress((prev) => ({
+                                      ...prev,
+                                      street: e.target.value,
+                                    }))
+                                  }
+                                  fullWidth
+                                />
+                                <AppTextField
+                                  label="Number"
+                                  placeholder="Enter number"
+                                  value={desiredVisitAddress.number}
+                                  onChange={(e) =>
+                                    setDesiredVisitAddress((prev) => ({
+                                      ...prev,
+                                      number: e.target.value,
+                                    }))
+                                  }
+                                  fullWidth
+                                />
+                              </Stack>
+                              <Stack direction="row" spacing={1}>
+                                <AppTextField
+                                  label="Postal Code"
+                                  placeholder="Enter postal code"
+                                  value={desiredVisitAddress.postalCode}
+                                  onChange={(e) =>
+                                    setDesiredVisitAddress((prev) => ({
+                                      ...prev,
+                                      postalCode: e.target.value,
+                                    }))
+                                  }
+                                  fullWidth
+                                />
+                                <AppDropdown
+                                  label="Province"
+                                  value={desiredVisitAddress.province}
+                                  onChange={(val) =>
+                                    setDesiredVisitAddress((prev) => ({
+                                      ...prev,
+                                      province: String(val),
+                                    }))
+                                  }
+                                  options={[
+                                    { label: "Select province", value: "" },
+                                    ...netherlandsProvinces.map((province) => ({
+                                      label: province,
+                                      value: province,
+                                    })),
+                                  ]}
+                                  fullWidth
+                                  placeholder="Select province"
+                                />
+                              </Stack>
+                              <AppTextField
+                                label="Municipality"
+                                placeholder="Enter municipality"
+                                value={desiredVisitAddress.municipality}
+                                onChange={(e) =>
+                                  setDesiredVisitAddress((prev) => ({
+                                    ...prev,
+                                    municipality: e.target.value,
+                                  }))
+                                }
+                                fullWidth
+                              />
+                            </Stack>
+
                             <Typography
                               sx={{
                                 fontSize: 12,
@@ -2336,7 +2513,12 @@ export default function ClientBookingCreateView() {
                             textAlign: "right",
                           }}
                         >
-                          {shop?.addressLabel ?? shop?.municipalityLabel ?? ""}
+                          {desiredVisitAddressLabel ||
+                            (shop?.locationMode === "desired"
+                              ? "Enter visit address"
+                              : (shop?.addressLabel ??
+                                shop?.municipalityLabel ??
+                                ""))}
                         </Typography>
                       </Stack>
                     </Stack>
@@ -2593,7 +2775,8 @@ export default function ClientBookingCreateView() {
                         disabled={
                           !allServicesAssigned ||
                           isContinuing ||
-                          selectedTimeTooSoon
+                          selectedTimeTooSoon ||
+                          !isDesiredVisitAddressComplete
                         }
                         onClick={() => void onContinue()}
                         sx={{
@@ -2601,7 +2784,8 @@ export default function ClientBookingCreateView() {
                           height: 40,
                           ...(allServicesAssigned &&
                           !isContinuing &&
-                          !selectedTimeTooSoon
+                          !selectedTimeTooSoon &&
+                          isDesiredVisitAddressComplete
                             ? null
                             : {
                                 color: alpha(m.navy, 0.45),

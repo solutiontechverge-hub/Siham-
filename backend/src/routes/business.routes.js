@@ -5,6 +5,7 @@ import {
   createBookingNotification,
   createCalendarEntry,
   deleteCalendarEntry,
+  updateCalendarEntry,
   updateCalendarEntryStatus,
   updateBookingStatus,
   updateMyBooking,
@@ -26,6 +27,7 @@ import {
   deleteProfessionalClient,
   listMollureClientDirectory,
   listProfessionalClients,
+  lookupMollureClientByEmail,
   setProfessionalClientBlocked,
   updateProfessionalClient,
   updateProfessionalClientTechnicalNote,
@@ -284,6 +286,35 @@ router.patch(
   updateCalendarEntryStatus,
 );
 
+router.put(
+  "/calendar/:id",
+  requireProfessional,
+  [
+    body("status")
+      .optional({ values: "falsy" })
+      .trim()
+      .isIn(calendarStatuses)
+      .withMessage("status must be requested, cancelled, completed, confirmed, or blocked."),
+    body("title").optional({ values: "falsy" }).trim(),
+    body("team_member_id")
+      .optional({ values: "falsy" })
+      .isUUID()
+      .withMessage("team_member_id must be a valid UUID."),
+    body("booking_type")
+      .optional({ values: "falsy" })
+      .trim()
+      .isIn(["online", "offline", "project", "request"])
+      .withMessage("booking_type must be online, offline, project, or request."),
+    body("location_type")
+      .optional({ values: "falsy" })
+      .trim()
+      .isIn(locationTypes)
+      .withMessage("location_type must be fixed or desired."),
+  ],
+  validateRequest,
+  updateCalendarEntry,
+);
+
 router.delete(
   "/calendar/:id",
   requireProfessional,
@@ -409,6 +440,7 @@ router.patch(
 );
 
 router.get("/clients", requireProfessional, listProfessionalClients);
+router.get("/clients/mollure-lookup", requireProfessional, lookupMollureClientByEmail);
 router.get("/clients/mollure-directory", requireProfessional, listMollureClientDirectory);
 router.post(
   "/clients",

@@ -87,6 +87,7 @@ export const transformBusinessSetupForListing = (
     teamMembers = [],
     serviceDetails = [],
     ratingStats = null,
+    serviceOrder = null,
     teamMemberRatingStats = null,
   } = {},
 ) => {
@@ -134,6 +135,7 @@ export const transformBusinessSetupForListing = (
     serviceFor: parseTextArray(row.service_for),
     bookServiceCombinations: parseJsonArray(row.book_service_combinations),
     serviceDetails: normalizedServiceDetails.map((detail) => mapServiceDetail(detail, durationByServiceId)),
+    serviceOrder: serviceOrder && typeof serviceOrder === "object" ? serviceOrder : null,
     priceRange: toNullableString(row.price_range),
     prepaymentPercentage: toNullableNumber(row.prepayment_percentage),
     prepaymentInstruction: toNullableString(row.prepayment_instruction),

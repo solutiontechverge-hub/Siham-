@@ -3,13 +3,12 @@
 import AppButton from "../AppButton";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
-import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import { Stack } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 
 type BookingRequestResponseActionsProps = {
   onAccept: () => void;
-  onEdit: () => void;
+  onSuggestChange: () => void;
   onReject: () => void;
 };
 
@@ -22,7 +21,7 @@ const ACTION_SX = {
 
 export default function BookingRequestResponseActions({
   onAccept,
-  onEdit,
+  onSuggestChange,
   onReject,
 }: BookingRequestResponseActionsProps) {
   const m = useTheme().palette.mollure;
@@ -47,11 +46,10 @@ export default function BookingRequestResponseActions({
       <AppButton
         tone="secondary"
         fullWidth
-        startIcon={<EditRoundedIcon sx={{ fontSize: 18 }} />}
-        onClick={onEdit}
+        onClick={onSuggestChange}
         sx={ACTION_SX}
       >
-        Edit
+        Suggest Change
       </AppButton>
       <AppButton
         tone="danger"

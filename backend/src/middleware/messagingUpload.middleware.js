@@ -15,6 +15,9 @@ const ALLOWED_MIME = new Set([
   "text/plain",
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "text/csv",
 ]);
 
 const ALLOWED_EXT = new Set([
@@ -29,6 +32,9 @@ const ALLOWED_EXT = new Set([
   ".doc",
   ".docx",
   ".txt",
+  ".xls",
+  ".xlsx",
+  ".csv",
 ]);
 
 export const messagingUpload = multer({

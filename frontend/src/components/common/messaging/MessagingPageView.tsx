@@ -21,6 +21,7 @@ import { getReportModalTitle } from "./messagingPeerLabels";
 import MessagingReportDialog from "./MessagingReportDialog";
 import MessagingSettingsDialog from "./MessagingSettingsDialog";
 import { useSnackbar } from "../AppSnackbar";
+import { useGetMessagingLinkableBookingsQuery } from "../../../store/services/messagingApi";
 import type { MessagingAudience } from "./messagingRoutes";
 import type { MessagingChatMessage } from "./messagingTypes";
 import { isMessageFromClient } from "./messagingUnread";
@@ -70,6 +71,20 @@ export default function MessagingPageView({
   const [messageToDelete, setMessageToDelete] =
     React.useState<MessagingChatMessage | null>(null);
 
+  const activeThreadId = inbox.activeThread?.id ?? "";
+  const {
+    data: linkableBookingsData,
+    isFetching: linkableBookingsLoading,
+    isSuccess: linkableBookingsReady,
+  } = useGetMessagingLinkableBookingsQuery(activeThreadId, {
+    skip: !activeThreadId,
+  });
+  const linkableBookings = linkableBookingsData?.bookings ?? [];
+  // Hide only after we know there are no peer bookings.
+  const canLinkToBooking = !(
+    linkableBookingsReady && linkableBookings.length === 0
+  );
+
   React.useEffect(() => {
     if (!isCompactEmbedded) setMobileChatOpen(false);
   }, [isCompactEmbedded]);
@@ -102,7 +117,11 @@ export default function MessagingPageView({
   }, []);
 
   const showSidebar = !isCompactEmbedded || !mobileChatOpen;
-  const showChatPanel = !isCompactEmbedded || mobileChatOpen;
+  // When the inbox is empty, always show the chat pane empty-state (even on compact),
+  // otherwise the message disappears behind the list-only mobile layout.
+  const inboxIsEmpty = inbox.visibleThreads.length === 0;
+  const showChatPanel =
+    !isCompactEmbedded || mobileChatOpen || inboxIsEmpty;
 
   const handleChatAction = (action: MessagingChatAction) => {
     if (!inbox.activeThread) return;
@@ -125,6 +144,7 @@ export default function MessagingPageView({
         setBlockOpen(true);
         break;
       case "link":
+        if (!canLinkToBooking) return;
         setLinkBookingOpen(true);
         break;
       case "report":
@@ -197,6 +217,7 @@ export default function MessagingPageView({
             loadingMore={inbox.loadingMore}
             onLoadMore={() => void inbox.loadMoreThreads()}
             showBulkActions={audience !== "client"}
+            actionsEnabled={inbox.visibleThreads.length > 0}
           />
         ) : null}
 
@@ -223,6 +244,17 @@ export default function MessagingPageView({
                 : undefined
             }
             peerReadAt={inbox.peerReadAt}
+            emptyStateMessage={
+              inbox.visibleThreads.length === 0
+                ? audience === "professional"
+                  ? inbox.search.trim()
+                    ? "No client conversations match your search. Try a client name or booking ID."
+                    : "No conversations yet. Clients appear here after they message you, or when they have a requested, confirmed, or completed booking."
+                  : inbox.search.trim()
+                    ? "No professionals match your search. Try a name or booking ID (e.g. B500844)."
+                    : "Browse professionals on the left and tap one to start chatting."
+                : "Select a conversation to start messaging"
+            }
           />
         ) : null}
       </Paper>
@@ -260,11 +292,14 @@ export default function MessagingPageView({
         onClose={() => setActionsAnchor(null)}
         onAction={handleChatAction}
         embedded={embedded}
+        canLinkToBooking={canLinkToBooking}
       />
 
       <MessagingLinkBookingDialog
         open={linkBookingOpen}
         onClose={() => setLinkBookingOpen(false)}
+        bookings={linkableBookings}
+        loading={linkableBookingsLoading}
         onSubmit={inbox.linkThreadToBooking}
         embedded={embedded}
       />

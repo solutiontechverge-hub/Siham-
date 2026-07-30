@@ -131,6 +131,77 @@ export const listProfessionalClients = async (req, res) => {
   }
 };
 
+/**
+ * Lookup any registered Mollure client (individual/company) by exact email.
+ * Used by calendar "Add from Mollure platform" — no prior booking required.
+ */
+export const lookupMollureClientByEmail = async (req, res) => {
+  try {
+    if (req.user.user_type !== "professional") {
+      return res.status(403).json({
+        success: false,
+        message: "Only professionals can look up Mollure clients.",
+        data: null,
+      });
+    }
+
+    const email = String(req.query.email ?? "").trim().toLowerCase();
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/i.test(email)) {
+      return res.status(400).json({
+        success: false,
+        message: "A valid email is required.",
+        data: null,
+      });
+    }
+
+    const result = await query(
+      `SELECT
+         u.id,
+         u.email,
+         COALESCE(
+           NULLIF(TRIM(CONCAT(ip.first_name, ' ', ip.last_name)), ''),
+           NULLIF(TRIM(ip.display_name), ''),
+           NULLIF(TRIM(cp.legal_name), ''),
+           NULLIF(TRIM(CONCAT(cp.contact_first_name, ' ', cp.contact_last_name)), ''),
+           u.email
+         ) AS name
+       FROM users u
+       LEFT JOIN individual_profiles ip ON ip.user_id = u.id
+       LEFT JOIN company_profiles cp ON cp.user_id = u.id
+       WHERE LOWER(TRIM(u.email)) = $1
+         AND u.user_type IN ('individual', 'company')
+         AND COALESCE(u.is_active, true) = true
+       LIMIT 1`,
+      [email],
+    );
+
+    const row = result.rows[0];
+    if (!row) {
+      return res.status(404).json({
+        success: false,
+        message: "User is not a Mollure client",
+        data: null,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Mollure client found.",
+      data: {
+        id: row.id,
+        name: row.name,
+        email: row.email,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to look up Mollure client.",
+      data: { error: error.message },
+    });
+  }
+};
+
 export const listMollureClientDirectory = async (req, res) => {
   try {
     if (req.user.user_type !== "professional") {

@@ -21,6 +21,11 @@ import type {
   BusinessPublicProfileTeamMember,
 } from "../../../data/businessPublicProfile.data";
 import { buildDynamicServiceCategoryTabs } from "../../../data/businessServiceCategorySlider.data";
+import {
+  isCategoryVisibleInServiceOrder,
+  isServiceVisibleInServiceOrder,
+} from "../../../components/common/calendar/serviceOrder.utils";
+import type { ServiceOrderSettings } from "../../../components/common/calendar/calendar-settings.types";
 import { normalizeServiceDurationLabel } from "../../../utils/serviceDuration";
 import type {
   BusinessSetupListing,
@@ -193,39 +198,42 @@ function buildDesiredLocation(setup: BusinessSetupListing): BusinessPublicProfil
   };
 }
 
-function buildServicesFromTeamAssignments(setup: BusinessSetupListing): BusinessPublicProfileService[] {
-  const seen = new Set<string>();
-  const services: BusinessPublicProfileService[] = [];
+function getSetupServiceOrder(
+  setup: BusinessSetupListing,
+): ServiceOrderSettings | null {
+  const raw = setup.serviceOrder;
+  if (!raw || typeof raw !== "object") return null;
+  return {
+    categories: raw.categories ?? [],
+    servicesByCategory: raw.servicesByCategory ?? {},
+    hiddenCategories: raw.hiddenCategories ?? [],
+    hiddenServicesByCategory: raw.hiddenServicesByCategory ?? {},
+  };
+}
 
-  for (const member of setup.teamMembers ?? []) {
-    for (const assigned of member.assignedServices ?? []) {
-      const serviceId = String(assigned.service_id ?? assigned.serviceId ?? "").trim();
-      if (!serviceId || seen.has(serviceId)) continue;
-      seen.add(serviceId);
-
-      const title = assigned.title?.trim() || "Service";
-      services.push({
-        id: serviceId,
-        categoryId: "services",
-        categoryTitle: title,
-        name: title,
-        durationLabel: "",
-        priceLabel: formatPriceLabel(0),
-        priceValue: 0,
-        durationMins: 45,
-      });
-    }
-  }
-
-  return services;
+function isPubliclyVisibleService(
+  setup: BusinessSetupListing,
+  categoryTitle: string | null | undefined,
+  serviceTitle: string | null | undefined,
+) {
+  const serviceOrder = getSetupServiceOrder(setup);
+  const category = String(categoryTitle ?? "").trim();
+  const service = String(serviceTitle ?? "").trim();
+  if (!category) return true;
+  if (!isCategoryVisibleInServiceOrder(serviceOrder, category)) return false;
+  if (!service) return true;
+  return isServiceVisibleInServiceOrder(serviceOrder, category, service);
 }
 
 function buildProfileServices(setup: BusinessSetupListing): BusinessPublicProfileService[] {
   const durationByServiceId = buildDurationByServiceId(setup);
 
   const fromDetails = (setup.serviceDetails ?? [])
-    .filter((detail) => detail.serviceTitle && detail.price != null)
+    .filter((detail) => Boolean(detail.serviceTitle?.trim()))
     .filter((detail) => detail.isVisible !== false)
+    .filter((detail) =>
+      isPubliclyVisibleService(setup, detail.categoryTitle, detail.serviceTitle),
+    )
     .map((detail, index) => {
       const categoryTitle = detail.categoryTitle?.trim() || "Services";
       const categoryId = detail.categoryId != null ? String(detail.categoryId) : slugifyCategory(categoryTitle);
@@ -274,7 +282,10 @@ function buildProfileServices(setup: BusinessSetupListing): BusinessPublicProfil
           "",
       ).trim();
       const amount = Number(entry.amount);
-      if (!serviceId || !Number.isFinite(amount)) {
+      if (!serviceId || !serviceTitle) {
+        return null;
+      }
+      if (!isPubliclyVisibleService(setup, categoryTitle, serviceTitle)) {
         return null;
       }
 
@@ -288,54 +299,28 @@ function buildProfileServices(setup: BusinessSetupListing): BusinessPublicProfil
         categoryTitle: categoryTitle || undefined,
         name: serviceTitle || "Service",
         durationLabel,
-        priceLabel: formatPriceLabel(amount),
-        priceValue: amount,
+        priceLabel: formatPriceLabel(Number.isFinite(amount) ? amount : 0),
+        priceValue: Number.isFinite(amount) ? amount : 0,
         durationMins,
       };
     })
     .filter((service): service is BusinessPublicProfileService => service !== null);
 
-  if (fromCategories.length > 0) {
-    return fromCategories;
-  }
-
-  return buildServicesFromTeamAssignments(setup);
+  return fromCategories;
 }
 
-function buildCategoriesFromDetails(setup: BusinessSetupListing, services: BusinessPublicProfileService[]) {
+function buildCategoriesFromDetails(
+  _setup: BusinessSetupListing,
+  services: BusinessPublicProfileService[],
+) {
   const categoriesById = new Map<string, { id: string; title: string }>();
 
-  const appendCategory = (categoryId: string, title: string) => {
-    const trimmedTitle = title.trim();
-    const id = categoryId || slugifyCategory(trimmedTitle);
-    if (!trimmedTitle || !id || categoriesById.has(id)) return;
-    categoriesById.set(id, { id, title: trimmedTitle });
-  };
-
-  for (const detail of setup.serviceDetails ?? []) {
-    const title = detail.categoryTitle?.trim();
-    if (!title) continue;
-    appendCategory(detail.categoryId != null ? String(detail.categoryId) : slugifyCategory(title), title);
-  }
-
-  for (const entry of setup.serviceCategories ?? []) {
-    const categoryId = String(entry.category_id ?? entry.categoryId ?? "").trim();
-    const categoryTitle = String(
-      (entry as { category_title?: string; categoryTitle?: string }).category_title ??
-        (entry as { category_title?: string; categoryTitle?: string }).categoryTitle ??
-        "",
-    ).trim();
-    if (categoryTitle) {
-      appendCategory(categoryId, categoryTitle);
-    }
-  }
-
+  // Only categories that have at least one real service — never empty catalog tabs.
   for (const service of services) {
     const categoryId = String(service.categoryId ?? "").trim();
     const categoryTitle = service.categoryTitle?.trim() || categoryId;
-    if (categoryId && categoryTitle) {
-      appendCategory(categoryId, categoryTitle);
-    }
+    if (!categoryId || !categoryTitle || categoriesById.has(categoryId)) continue;
+    categoriesById.set(categoryId, { id: categoryId, title: categoryTitle });
   }
 
   const categories = Array.from(categoriesById.values());
