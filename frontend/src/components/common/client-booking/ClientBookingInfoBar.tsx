@@ -46,7 +46,7 @@ export default function ClientBookingInfoBar({
         <Grid item xs={12} md={4} sx={colSx}>
           <Typography
             sx={{
-              fontSize: 11,
+              fontSize: 14,
               fontWeight: 800,
               color: alpha(m.navy, 0.5),
               mb: 0.75,
@@ -84,7 +84,7 @@ export default function ClientBookingInfoBar({
             sx={{ mb: 0.75 }}
           >
             <Typography
-              sx={{ fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.5) }}
+              sx={{ fontSize: 14, fontWeight: 800, color: alpha(m.navy, 0.5) }}
             >
               Location
             </Typography>
@@ -126,7 +126,7 @@ export default function ClientBookingInfoBar({
         <Grid item xs={12} md={4} sx={colSx}>
           <Typography
             sx={{
-              fontSize: 11,
+              fontSize: 14,
               fontWeight: 800,
               color: alpha(m.navy, 0.5),
               mb: 0.75,

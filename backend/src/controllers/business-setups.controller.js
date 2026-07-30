@@ -10,7 +10,10 @@ import {
   sqlLimitOffset,
   withPaginationParams,
 } from "../utils/pagination.js";
-import { getReviewAggregatesForSetups } from "../services/review.service.js";
+import {
+  getReviewAggregatesForSetups,
+  getTeamMemberReviewAggregatesForSetups,
+} from "../services/review.service.js";
 
 function parseJsonField(value, fallback = {}) {
   if (value == null) return fallback;
@@ -172,6 +175,8 @@ export const listAllBusinessSetups = async (req, res) => {
     }
 
     const reviewAggregates = await getReviewAggregatesForSetups(setupIds);
+    const teamMemberReviewAggregates =
+      await getTeamMemberReviewAggregatesForSetups(setupIds);
 
     const data = setupRows.map((row) =>
       transformBusinessSetupForListing(row, {
@@ -181,6 +186,8 @@ export const listAllBusinessSetups = async (req, res) => {
         serviceOrder:
           calendarSettingsByProfileId.get(String(row.professional_profile_id))?.serviceOrder ??
           null,
+        teamMemberRatingStats:
+          teamMemberReviewAggregates.get(String(row.id)) ?? null,
       }),
     );
 

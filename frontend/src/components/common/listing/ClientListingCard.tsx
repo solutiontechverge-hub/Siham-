@@ -122,16 +122,6 @@ export default function ClientListingCard({
 
   const safeSlideIndex = Math.min(activeSlide, Math.max(0, slides.length - 1));
   const currentImage = slides[safeSlideIndex] ?? item.image;
-  const keywordRows = React.useMemo(() => {
-    const keywords = item.businessKeywords.filter(Boolean);
-    if (keywords.length === 0) return [];
-    if (keywords.length <= 2) return [keywords.join(" | ")];
-    const midpoint = Math.ceil(keywords.length / 2);
-    return [
-      keywords.slice(0, midpoint).join(" | "),
-      keywords.slice(midpoint).join(" | "),
-    ];
-  }, [item.businessKeywords]);
 
   const onOpenProfile = () => {
     try {
@@ -152,9 +142,26 @@ export default function ClientListingCard({
     router.push(`/clients/listing/${item.id}`);
   };
 
+  const serviceRows = React.useMemo(() => {
+    const rows = item.services.slice(0, 2);
+    while (rows.length < 2) {
+      rows.push({ name: "\u00a0", priceLabel: "\u00a0" });
+    }
+    return rows;
+  }, [item.services]);
+
+  const keywordsLine = React.useMemo(
+    () => item.businessKeywords.filter(Boolean).join(" | "),
+    [item.businessKeywords],
+  );
+
   return (
     <AppCard
       sx={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
         overflow: "hidden",
         borderRadius: 2.5,
         backgroundColor: "#fff",
@@ -172,9 +179,9 @@ export default function ClientListingCard({
       }}
       onClick={onOpenProfile}
     >
-      <Box sx={{ position: "relative" }}>
+      <Box sx={{ position: "relative", flexShrink: 0 }}>
         <Box
-          sx={{ position: "relative", height: { xs: 220, sm: 240, md: 260 } }}
+          sx={{ position: "relative", height: { xs: 160, sm: 170, md: 180 } }}
         >
           <ListingCardImage image={currentImage} alt={item.title} />
         </Box>
@@ -295,58 +302,78 @@ export default function ClientListingCard({
         ) : null}
       </Box>
 
-      <CardContent sx={{ p: 2.25 }}>
-        <Stack spacing={1.4} sx={{ textAlign: "center" }}>
-          {keywordRows.map((row, rowIndex) => (
-            <Typography
-              key={`${row}-${rowIndex}`}
-              sx={{
-                color: alpha(tokens.navy, 0.5),
-                fontSize: 13,
-                lineHeight: 1.2,
-              }}
-            >
-              {row}
-            </Typography>
-          ))}
+      <CardContent
+        sx={{
+          p: 1.75,
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          minHeight: 0,
+          "&:last-child": { pb: 1.75 },
+        }}
+      >
+        <Stack spacing={0.85} sx={{ textAlign: "center", flex: 1, minHeight: 0 }}>
+          <Typography
+            sx={{
+              color: alpha(tokens.navy, 0.5),
+              fontSize: 12,
+              lineHeight: 1.2,
+              minHeight: "1.2em",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {keywordsLine || "\u00a0"}
+          </Typography>
 
           <Typography
             sx={{
               fontWeight: 700,
               color: alpha(tokens.navy, 0.78),
-              fontSize: 18,
-              lineHeight: 1.35,
+              fontSize: 16,
+              lineHeight: 1.3,
+              minHeight: "1.3em",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
             }}
           >
             {item.title}
           </Typography>
 
-          {item.subtitle ? (
-            <Typography
-              sx={{
-                fontSize: 13,
-                color: alpha(tokens.navy, 0.55),
-                lineHeight: 1.35,
-              }}
-            >
-              {item.subtitle}
-            </Typography>
-          ) : null}
+          <Typography
+            sx={{
+              fontSize: 12.5,
+              color: alpha(tokens.navy, 0.55),
+              lineHeight: 1.3,
+              minHeight: "1.3em",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {item.subtitle || "\u00a0"}
+          </Typography>
 
           <Stack
             direction="row"
             alignItems="center"
             justifyContent="center"
-            spacing={0.75}
+            spacing={0.5}
+            sx={{ minHeight: 20 }}
           >
             <LocationOnOutlinedIcon
-              sx={{ fontSize: 16, color: alpha(tokens.navy, 0.78) }}
+              sx={{ fontSize: 15, color: alpha(tokens.navy, 0.78) }}
             />
             <Typography
               sx={{
-                fontSize: 13,
+                fontSize: 12.5,
                 fontWeight: 700,
                 color: alpha(tokens.navy, 0.78),
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
               }}
             >
               {item.municipalityLabel}
@@ -368,23 +395,24 @@ export default function ClientListingCard({
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
-              gap: 0.5,
+              gap: 0.25,
               border: 0,
               bgcolor: "transparent",
               cursor: "pointer",
-              p: 0.5,
+              p: 0.25,
               borderRadius: "8px",
               font: "inherit",
+              flexShrink: 0,
               "&:hover": { bgcolor: alpha(tokens.teal, 0.06) },
             }}
             aria-label={`View reviews for ${item.title}`}
           >
-            <Box sx={{ display: "flex", alignItems: "center", gap: 0.4 }}>
+            <Box sx={{ display: "flex", alignItems: "center", gap: 0.25 }}>
               {Array.from({ length: 5 }).map((_, i) => (
                 <StarRoundedIcon
                   key={i}
                   sx={{
-                    fontSize: 22,
+                    fontSize: 18,
                     color:
                       i < Math.round(Math.min(5, Math.max(0, item.rating)))
                         ? tokens.star
@@ -393,140 +421,151 @@ export default function ClientListingCard({
                 />
               ))}
             </Box>
-            <Typography sx={{ fontSize: 12, color: alpha(tokens.navy, 0.55) }}>
+            <Typography sx={{ fontSize: 11, color: alpha(tokens.navy, 0.55) }}>
               {item.reviewsCount} Reviews · {item.rating.toFixed(1)}
             </Typography>
           </Box>
 
-          {canPickFixed && canPickDesired ? (
-            <Box
-              sx={{
-                display: "flex",
-                border: `1px solid ${alpha(tokens.navy, 0.12)}`,
-                borderRadius: "8px",
-                overflow: "hidden",
-                bgcolor: "#fff",
-              }}
-            >
-              <AppButton
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMode("fixed");
-                }}
+          <Box
+            sx={{
+              mt: "auto",
+              minHeight: 38,
+              display: "flex",
+              alignItems: "stretch",
+            }}
+          >
+            {canPickFixed && canPickDesired ? (
+              <Box
                 sx={{
-                  flex: 1,
-                  py: 1.0,
-                  textTransform: "none",
-                  fontWeight: 700,
-                  fontSize: 14,
-                  borderRadius: 0,
-                  color: mode === "fixed" ? "#fff" : tokens.slate,
-                  bgcolor: mode === "fixed" ? tokens.teal : "transparent",
-                  "&:hover": {
-                    bgcolor:
-                      mode === "fixed"
-                        ? tokens.tealDark
-                        : "rgba(33, 184, 191, 0.08)",
-                  },
+                  display: "flex",
+                  width: "100%",
+                  border: `1px solid ${alpha(tokens.navy, 0.12)}`,
+                  borderRadius: "8px",
+                  overflow: "hidden",
+                  bgcolor: "#fff",
                 }}
               >
-                Fixed Location
-              </AppButton>
-              <Divider
-                orientation="vertical"
-                flexItem
-                sx={{ borderColor: alpha(tokens.navy, 0.12) }}
-              />
-              <AppButton
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setMode("desired");
-                }}
-                sx={{
-                  flex: 1,
-                  py: 1.0,
-                  textTransform: "none",
-                  fontWeight: 700,
-                  fontSize: 14,
-                  borderRadius: 0,
-                  color: mode === "desired" ? "#fff" : tokens.slate,
-                  bgcolor: mode === "desired" ? tokens.teal : "transparent",
-                  "&:hover": {
-                    bgcolor:
-                      mode === "desired"
-                        ? tokens.tealDark
-                        : "rgba(33, 184, 191, 0.08)",
-                  },
-                }}
-              >
-                Desired Location
-              </AppButton>
-            </Box>
-          ) : (
-            <Box
-              sx={{
-                py: 1,
-                px: 1.25,
-                borderRadius: "8px",
-                bgcolor: alpha(tokens.teal, 0.1),
-                border: `1px solid ${alpha(tokens.teal, 0.25)}`,
-              }}
-            >
-              <Typography
-                sx={{ fontSize: 13, fontWeight: 800, color: tokens.teal }}
-              >
-                {canPickDesired ? "Desired Location" : "Fixed Location"}
-              </Typography>
-            </Box>
-          )}
-
-          <Box sx={{ pt: 0.75, textAlign: "left" }}>
-            <Stack spacing={1}>
-              {item.services.length === 0 ? (
-                <Typography
-                  sx={{ fontSize: 13, color: alpha(tokens.navy, 0.5) }}
+                <AppButton
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMode("fixed");
+                  }}
+                  sx={{
+                    flex: 1,
+                    py: 0.75,
+                    textTransform: "none",
+                    fontWeight: 700,
+                    fontSize: 13,
+                    borderRadius: 0,
+                    color: mode === "fixed" ? "#fff" : tokens.slate,
+                    bgcolor: mode === "fixed" ? tokens.teal : "transparent",
+                    "&:hover": {
+                      bgcolor:
+                        mode === "fixed"
+                          ? tokens.tealDark
+                          : "rgba(33, 184, 191, 0.08)",
+                    },
+                  }}
                 >
-                  No services listed yet.
+                  Fixed Location
+                </AppButton>
+                <Divider
+                  orientation="vertical"
+                  flexItem
+                  sx={{ borderColor: alpha(tokens.navy, 0.12) }}
+                />
+                <AppButton
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setMode("desired");
+                  }}
+                  sx={{
+                    flex: 1,
+                    py: 0.75,
+                    textTransform: "none",
+                    fontWeight: 700,
+                    fontSize: 13,
+                    borderRadius: 0,
+                    color: mode === "desired" ? "#fff" : tokens.slate,
+                    bgcolor: mode === "desired" ? tokens.teal : "transparent",
+                    "&:hover": {
+                      bgcolor:
+                        mode === "desired"
+                          ? tokens.tealDark
+                          : "rgba(33, 184, 191, 0.08)",
+                    },
+                  }}
+                >
+                  Desired Location
+                </AppButton>
+              </Box>
+            ) : (
+              <Box
+                sx={{
+                  width: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  py: 0.75,
+                  px: 1.25,
+                  borderRadius: "8px",
+                  bgcolor: alpha(tokens.teal, 0.1),
+                  border: `1px solid ${alpha(tokens.teal, 0.25)}`,
+                }}
+              >
+                <Typography
+                  sx={{ fontSize: 13, fontWeight: 800, color: tokens.teal }}
+                >
+                  {canPickDesired ? "Desired Location" : "Fixed Location"}
                 </Typography>
-              ) : (
-                item.services.slice(0, 3).map((svc, idx) => (
+              </Box>
+            )}
+          </Box>
+
+          <Box sx={{ pt: 0.35, textAlign: "left", minHeight: 52 }}>
+            <Stack spacing={0.65}>
+              {serviceRows.map((svc, idx) => {
+                const isPlaceholder = !item.services[idx];
+                return (
                   <Stack
                     key={`${svc.name}-${idx}`}
                     direction="row"
                     alignItems="baseline"
                     justifyContent="space-between"
                     spacing={1}
+                    sx={{
+                      minHeight: 22,
+                      visibility: isPlaceholder ? "hidden" : "visible",
+                    }}
+                    aria-hidden={isPlaceholder || undefined}
                   >
-                    <Box sx={{ minWidth: 0 }}>
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
                       <Typography
                         sx={{
-                          fontSize: 13,
+                          fontSize: 12.5,
                           fontWeight: 800,
                           color: alpha(tokens.navy, 0.9),
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
                         }}
                       >
                         {svc.name}
                       </Typography>
-                      {svc.durationLabel ? (
-                        <Typography
-                          sx={{ fontSize: 12, color: alpha(tokens.navy, 0.55) }}
-                        >
-                          {svc.durationLabel}
-                        </Typography>
-                      ) : null}
                     </Box>
                     <Typography
                       sx={{
-                        fontSize: 12,
+                        fontSize: 11.5,
                         color: alpha(tokens.navy, 0.65),
                         whiteSpace: "nowrap",
+                        flexShrink: 0,
                       }}
                     >
                       {svc.priceLabel}
                     </Typography>
                   </Stack>
-                ))
-              )}
+                );
+              })}
             </Stack>
           </Box>
         </Stack>

@@ -90,6 +90,9 @@ declare module "@mui/material/styles" {
     /** Soft status chip — paid / prepaid */
     statusGreenBg: string;
     statusGreenFg: string;
+    /** Soft status chip — failed */
+    statusRedBg: string;
+    statusRedFg: string;
     /** Soft status chip — void / refunded text (bg: fxGrayF2F4F7) */
     statusGreyFg: string;
     /** Soft status chip — no show */

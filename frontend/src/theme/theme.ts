@@ -136,6 +136,8 @@ const theme = createTheme({
       statusOrangeFg: "#F79009",
       statusGreenBg: "#ECFDF3",
       statusGreenFg: "#039855",
+      statusRedBg: "#FEE4E2",
+      statusRedFg: "#F04438",
       statusGreyFg: "#475467",
       /** No show status chip */
       statusNoShowBg: "#D0D5DD",

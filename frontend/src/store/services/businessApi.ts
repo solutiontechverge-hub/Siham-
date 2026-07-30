@@ -131,6 +131,8 @@ export type BusinessSetupListingTeamMember = {
     title?: string | null;
   }>;
   displayOrder: number;
+  rating?: number;
+  totalReviews?: number;
   createdAt: string | null;
   updatedAt: string | null;
 };

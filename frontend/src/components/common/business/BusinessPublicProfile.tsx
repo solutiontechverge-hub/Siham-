@@ -1092,6 +1092,7 @@ export default function BusinessPublicProfile({
                       color: alpha(m.navy, 0.55),
                     }}
                   >
+                    {data.rating > 0 ? `${data.rating.toFixed(1)} · ` : ""}
                     ({data.reviewsCount} Reviews)
                   </Typography>
                 </Stack>

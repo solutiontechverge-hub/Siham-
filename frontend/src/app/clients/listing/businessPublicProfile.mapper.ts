@@ -582,8 +582,12 @@ function buildTeamMembers(setup: BusinessSetupListing, services: BusinessPublicP
     return {
       id: String(member.id ?? `tm-${index}`),
       name: member.fullName?.trim() || "Team member",
-      rating: setup.rating,
-      reviewsCount: setup.totalReviews,
+      rating: Number.isFinite(Number(member.rating))
+        ? Number(member.rating)
+        : 0,
+      reviewsCount: Number.isFinite(Number(member.totalReviews))
+        ? Number(member.totalReviews)
+        : 0,
       avatarUrl: member.profilePhoto?.trim() || undefined,
       locationModes: modes,
       serviceSlots,
