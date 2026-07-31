@@ -118,7 +118,10 @@ export default function ClientBookingInfoBar({
                 lineHeight: 1.4,
               }}
             >
-              {address}
+              {address?.trim() ||
+                (locationMode === "desired"
+                  ? "Service at your location"
+                  : "Studio location")}
             </Typography>
           </Box>
         </Grid>

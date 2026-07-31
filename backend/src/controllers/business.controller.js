@@ -27,6 +27,15 @@ import {
   sqlLimitOffset,
   withPaginationParams,
 } from "../utils/pagination.js";
+import {
+  buildApprovedEditRequest,
+  buildPendingEditRequest,
+  buildRejectedClear,
+  consumeEditGrant,
+  isEditGrantActiveFor,
+  isEditRequestPending,
+  parseEditRequest,
+} from "../helpers/bookingEditRequest.js";
 
 const parseJsonValue = (value, fallback) => {
   if (value === undefined || value === null || value === "") {
@@ -158,8 +167,25 @@ const bookingDateSql = (alias) =>
   `substring(COALESCE(${alias}.booking_date::text, ${alias}.start_time::text) from 1 for 10)::date`;
 
 const makeCalendarCode = (prefix = "OF123") => `${prefix}${Date.now()}${Math.random().toString(16).slice(2, 6)}`;
-const calendarStatusSet = new Set(["requested", "cancelled", "completed", "confirmed", "blocked", "in_progress", "no_show"]);
-const bookingStatusSet = new Set(["requested", "cancelled", "completed", "confirmed", "in_progress", "no_show"]);
+const calendarStatusSet = new Set([
+  "requested",
+  "cancelled",
+  "completed",
+  "confirmed",
+  "blocked",
+  "in_progress",
+  "no_show",
+  "invalid",
+]);
+const bookingStatusSet = new Set([
+  "requested",
+  "cancelled",
+  "completed",
+  "confirmed",
+  "in_progress",
+  "no_show",
+  "invalid",
+]);
 
 const ensureUniqueBookingCode = async (preferredCode, prefix = "123") => {
   const trimmed = String(preferredCode ?? "").trim();
@@ -1626,35 +1652,31 @@ const ensureIncomingCalendarRequestsMirrored = async (customerUserId) => {
 
 /**
  * Past / Ongoing / Upcoming buckets for client + professional booking lists.
- * Includes requested (BR), confirmed, and in_progress — not only confirmed.
- * A booking moves to Past once its end_time has passed (or booking_date is before
- * today when end_time is missing), matching the client list time rules.
+ *
+ * Upcoming = not started yet (requested, confirmed, invalid, waiting-for-prepayment).
+ * Ongoing  = service currently happening (in_progress only; scoped per client/business).
+ * Past     = finished / cancelled / no-show — never requested or confirmed.
+ *
+ * "Waiting for Prepayment" is confirmed/requested with unpaid required prepayment.
  */
 const parseBookingsTabFilter = (tab, alias = "b") => {
   const normalized = String(tab ?? "").trim().toLowerCase();
-  const daySql = `COALESCE(${alias}.booking_date, ${alias}.start_time::date)`;
-  const endedSql = `(
-    (${alias}.end_time IS NOT NULL AND ${alias}.end_time <= NOW())
-    OR (${alias}.end_time IS NULL AND ${daySql} < CURRENT_DATE)
+  const waitingPrepaymentSql = `(
+    LOWER(TRIM(COALESCE(${alias}.prepayment_status, ''))) IN ('pending', 'required')
+    AND ${alias}.status IN ('requested', 'confirmed')
   )`;
-  // Active = still open for Past/Ongoing/Upcoming timing (includes BR `requested`).
-  const activeSql = `${alias}.status NOT IN ('completed', 'cancelled', 'no_show')`;
 
   if (normalized === "past") {
-    return `AND (
-      ${alias}.status IN ('completed', 'cancelled', 'no_show')
-      OR ${endedSql}
-    )`;
+    return `AND ${alias}.status IN ('completed', 'cancelled', 'no_show')`;
   }
   if (normalized === "ongoing") {
-    return `AND ${activeSql}
-      AND NOT ${endedSql}
-      AND ${daySql} = CURRENT_DATE`;
+    return `AND ${alias}.status = 'in_progress'`;
   }
   if (normalized === "upcoming") {
-    return `AND ${activeSql}
-      AND NOT ${endedSql}
-      AND ${daySql} > CURRENT_DATE`;
+    return `AND (
+      ${alias}.status IN ('requested', 'confirmed', 'invalid')
+      OR ${waitingPrepaymentSql}
+    )`;
   }
   return "";
 };
@@ -2290,11 +2312,11 @@ export const updateMyBooking = async (req, res) => {
     let nextStatus = existing.status;
     if (hasStatus) {
       nextStatus = normalizeBookingStatus(req.body.status, existing.status);
-      const allowedCustomerStatuses = ["cancelled", "confirmed", "requested"];
+      const allowedCustomerStatuses = ["cancelled", "confirmed", "requested", "invalid"];
       if (!allowedCustomerStatuses.includes(nextStatus)) {
         return res.status(400).json({
           success: false,
-          message: "Customers may only set booking status to cancelled, confirmed, or requested.",
+          message: "Customers may only set booking status to cancelled, confirmed, requested, or invalid.",
           data: null,
         });
       }
@@ -2341,6 +2363,36 @@ export const updateMyBooking = async (req, res) => {
         ? req.body.end_time
         : existing.end_time;
 
+    const scheduleOrTotalChanged =
+      hasSchedule ||
+      (req.body.total_price !== undefined &&
+        req.body.total_price !== null &&
+        req.body.total_price !== "" &&
+        Number(req.body.total_price) !== Number(existing.total_price));
+
+    let nextEditRequest = existing.edit_request ?? null;
+    if (
+      scheduleOrTotalChanged &&
+      existing.status === "confirmed" &&
+      nextStatus === "confirmed"
+    ) {
+      if (isEditRequestPending(existing.edit_request)) {
+        return res.status(409).json({
+          success: false,
+          message: "Cannot change booking while an edit request is pending.",
+          data: null,
+        });
+      }
+      if (!isEditGrantActiveFor(existing.edit_request, "client")) {
+        return res.status(403).json({
+          success: false,
+          message: "An accepted edit request is required before changing this booking.",
+          data: null,
+        });
+      }
+      nextEditRequest = consumeEditGrant(existing.edit_request, "client").value;
+    }
+
     const result = await query(
       `UPDATE bookings
        SET status = $1,
@@ -2350,9 +2402,10 @@ export const updateMyBooking = async (req, res) => {
            booking_date = $5,
            start_time = $6,
            end_time = $7,
+           edit_request = $8,
            updated_at = NOW()
-       WHERE id = $8
-         AND customer_id = $9
+       WHERE id = $9
+         AND customer_id = $10
        RETURNING *`,
       [
         nextStatus,
@@ -2362,6 +2415,7 @@ export const updateMyBooking = async (req, res) => {
         nextBookingDate,
         nextStartTime,
         nextEndTime,
+        nextEditRequest,
         bookingId,
         req.user.id,
       ],
@@ -2464,7 +2518,7 @@ export const updateBookingStatus = async (req, res) => {
     // calendar overview lists bookings across setups; Accept/Reject must match that.
     const existingResult = await query(
       `SELECT b.status, b.notes, b.total_price, b.booking_date, b.start_time, b.end_time,
-              b.business_setup_id, b.customer_id
+              b.business_setup_id, b.customer_id, b.edit_request
        FROM bookings b
        INNER JOIN business_setups bs ON bs.id = b.business_setup_id
        WHERE b.id = $1
@@ -2493,16 +2547,28 @@ export const updateBookingStatus = async (req, res) => {
         data: null,
       });
     }
+
+    const existingBooking = existingResult.rows[0];
+    if (
+      isEditRequestPending(existingBooking.edit_request) &&
+      ["cancelled", "in_progress", "no_show"].includes(status)
+    ) {
+      return res.status(409).json({
+        success: false,
+        message: "Cancel, In Progress, and No Show are locked while an edit request is pending.",
+        data: null,
+      });
+    }
+
     const nextNotes =
       req.body.notes !== undefined && req.body.notes !== null
         ? String(req.body.notes)
-        : existingResult.rows[0].notes;
+        : existingBooking.notes;
     const nextTotalPrice =
       req.body.total_price !== undefined && req.body.total_price !== null && req.body.total_price !== ""
         ? Number(req.body.total_price)
-        : existingResult.rows[0].total_price;
+        : existingBooking.total_price;
 
-    const existingBooking = existingResult.rows[0];
     const hasSchedule =
       (req.body.booking_date !== undefined && req.body.booking_date !== null && req.body.booking_date !== "") ||
       (req.body.start_time !== undefined && req.body.start_time !== null && req.body.start_time !== "") ||
@@ -2519,6 +2585,36 @@ export const updateBookingStatus = async (req, res) => {
         ? req.body.end_time
         : existingBooking.end_time;
 
+    const scheduleOrTotalChanged =
+      hasSchedule ||
+      (req.body.total_price !== undefined &&
+        req.body.total_price !== null &&
+        req.body.total_price !== "" &&
+        Number(req.body.total_price) !== Number(existingBooking.total_price));
+
+    let nextEditRequest = existingBooking.edit_request ?? null;
+    if (
+      scheduleOrTotalChanged &&
+      previousStatus === "confirmed" &&
+      status === "confirmed"
+    ) {
+      if (isEditRequestPending(existingBooking.edit_request)) {
+        return res.status(409).json({
+          success: false,
+          message: "Cannot change booking while an edit request is pending.",
+          data: null,
+        });
+      }
+      if (!isEditGrantActiveFor(existingBooking.edit_request, "professional")) {
+        return res.status(403).json({
+          success: false,
+          message: "An accepted edit request is required before changing this booking.",
+          data: null,
+        });
+      }
+      nextEditRequest = consumeEditGrant(existingBooking.edit_request, "professional").value;
+    }
+
     const result = await query(
       `UPDATE bookings
        SET status = $1,
@@ -2527,17 +2623,19 @@ export const updateBookingStatus = async (req, res) => {
            booking_date = $4,
            start_time = $5,
            end_time = $6,
+           edit_request = $7,
            updated_at = NOW()
-       WHERE id = $7
-         AND business_setup_id = $8
+       WHERE id = $8
+         AND business_setup_id = $9
        RETURNING *`,
       [
         status,
         nextNotes,
-        Number.isFinite(nextTotalPrice) ? nextTotalPrice : existingResult.rows[0].total_price,
+        Number.isFinite(nextTotalPrice) ? nextTotalPrice : existingBooking.total_price,
         nextBookingDate,
         nextStartTime,
         nextEndTime,
+        nextEditRequest,
         bookingId,
         businessSetupId,
       ],
@@ -2635,6 +2733,184 @@ export const updateBookingStatus = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to update booking status.",
+      data: {
+        error: error.message,
+      },
+    });
+  }
+};
+
+const loadBookingForEditRequestAccess = async (user, bookingId) => {
+  if (user.user_type === "professional") {
+    const professionalProfile = await getProfessionalProfile(user.id);
+    if (!professionalProfile) return null;
+    const result = await query(
+      `SELECT b.*
+       FROM bookings b
+       INNER JOIN business_setups bs ON bs.id = b.business_setup_id
+       WHERE b.id = $1
+         AND bs.professional_profile_id = $2
+       LIMIT 1`,
+      [bookingId, professionalProfile.id],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  const result = await query(
+    `SELECT *
+     FROM bookings
+     WHERE id = $1
+       AND customer_id = $2
+     LIMIT 1`,
+    [bookingId, user.id],
+  );
+  return result.rows[0] ?? null;
+};
+
+/**
+ * Confirmed Edit Request (ER): send | accept | reject.
+ * Body: { action: "send"|"accept"|"reject", note?: string }
+ */
+export const manageBookingEditRequest = async (req, res) => {
+  try {
+    const bookingId = parseUuid(req.params.id);
+    if (!bookingId) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid booking id.",
+        data: null,
+      });
+    }
+
+    const action = String(req.body.action ?? "").trim().toLowerCase();
+    if (!["send", "accept", "reject"].includes(action)) {
+      return res.status(400).json({
+        success: false,
+        message: "action must be send, accept, or reject.",
+        data: null,
+      });
+    }
+
+    const booking = await loadBookingForEditRequestAccess(req.user, bookingId);
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found.",
+        data: null,
+      });
+    }
+
+    if (String(booking.status).toLowerCase() !== "confirmed") {
+      return res.status(400).json({
+        success: false,
+        message: "Edit requests are only allowed on confirmed bookings.",
+        data: null,
+      });
+    }
+
+    const actor =
+      req.user.user_type === "professional" ? "professional" : "client";
+    const existingEr = parseEditRequest(booking.edit_request);
+    let nextEditRequest = booking.edit_request ?? null;
+    let message = "Edit request updated.";
+    let notificationEvent = null;
+
+    if (action === "send") {
+      if (existingEr?.status === "pending") {
+        return res.status(409).json({
+          success: false,
+          message: "An edit request is already pending.",
+          data: null,
+        });
+      }
+      const built = buildPendingEditRequest({
+        note: req.body.note,
+        initiatedBy: actor,
+      });
+      if (built.error) {
+        return res.status(400).json({
+          success: false,
+          message: built.error,
+          data: null,
+        });
+      }
+      nextEditRequest = built.value;
+      message = "Edit request sent.";
+      notificationEvent =
+        actor === "professional"
+          ? BOOKING_NOTIFICATION_EVENTS.INCOMING_ER
+          : BOOKING_NOTIFICATION_EVENTS.EDIT_REQUEST_OUTGOING;
+    } else if (action === "accept") {
+      if (!existingEr || existingEr.status !== "pending") {
+        return res.status(400).json({
+          success: false,
+          message: "No pending edit request to accept.",
+          data: null,
+        });
+      }
+      if (existingEr.initiated_by === actor) {
+        return res.status(403).json({
+          success: false,
+          message: "You cannot accept your own edit request.",
+          data: null,
+        });
+      }
+      const built = buildApprovedEditRequest(existingEr);
+      if (built.error) {
+        return res.status(400).json({
+          success: false,
+          message: built.error,
+          data: null,
+        });
+      }
+      nextEditRequest = built.value;
+      message = "Edit request accepted.";
+    } else {
+      if (!existingEr || existingEr.status !== "pending") {
+        return res.status(400).json({
+          success: false,
+          message: "No pending edit request to reject.",
+          data: null,
+        });
+      }
+      if (existingEr.initiated_by === actor) {
+        return res.status(403).json({
+          success: false,
+          message: "You cannot reject your own edit request.",
+          data: null,
+        });
+      }
+      nextEditRequest = buildRejectedClear().value;
+      message = "Edit request rejected.";
+    }
+
+    const result = await query(
+      `UPDATE bookings
+       SET edit_request = $1,
+           updated_at = NOW()
+       WHERE id = $2
+       RETURNING *`,
+      [nextEditRequest, bookingId],
+    );
+
+    const updated = result.rows[0];
+    if (notificationEvent) {
+      void dispatchBookingEventNotification(updated.id, notificationEvent, {
+        initiatedBy: actor,
+        message: existingEr?.note || req.body.note || undefined,
+      });
+    }
+    emitBookingChanged(updated, "updated");
+
+    return res.status(200).json({
+      success: true,
+      message,
+      data: updated,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update edit request.",
       data: {
         error: error.message,
       },

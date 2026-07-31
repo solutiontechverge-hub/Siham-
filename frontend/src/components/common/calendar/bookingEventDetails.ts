@@ -3,9 +3,31 @@ import type {
   CalendarBookingServiceItem,
   CalendarEvent,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
+import { ensureServiceStartEndTimes } from "../../../data/bookingServiceEdit.data";
 import type { ManualEntryDiscount } from "../../sections/finance/manualEntry.data";
 
 const NOTES_META_PREFIX = "---mollure-meta---";
+
+/** Auto-appended booking note lines (services/project boilerplate) — not Internal Note. */
+const AUTO_GENERATED_NOTE_LINE_RE =
+  /^(Services:\s*.+|Project:\s*.+|Requested schedule:\s*.+|Team member will be provided by professional)$/i;
+
+/**
+ * Strip create/EBR boilerplate from the human notes prefix so Internal Note
+ * stays blank unless someone typed a real note.
+ */
+export function sanitizeInternalNoteText(note?: string | null): string {
+  if (!note?.trim()) return "";
+  const parts = note
+    .split(/\n+/)
+    .flatMap((line) => line.split(/\s*\|\s*/))
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return parts
+    .filter((part) => !AUTO_GENERATED_NOTE_LINE_RE.test(part))
+    .join("\n")
+    .trim();
+}
 
 export type StoredEbrNotePayload = {
   status: "suggested" | "pending" | "rejected" | "accepted" | "none";
@@ -33,6 +55,21 @@ export type StoredEbrNotePayload = {
   lastEditedBy?: CalendarBookingDetails["lastEditedBy"];
 };
 
+/** Confirmed booking Edit Request (ER) — note-only permission handshake. */
+export type StoredErNotePayload = {
+  status: "pending" | "approved" | "rejected" | "suggested" | "none";
+  note?: string;
+  initiatedBy?: "client" | "professional";
+  requestedAt?: string;
+  approvedAt?: string;
+  rejectedAt?: string;
+  suggestedAt?: string;
+  /** One save window after Accept. */
+  editGrantActive?: boolean;
+  /** Message-only suggest reply. */
+  suggestNote?: string;
+};
+
 type StoredBookingNoteMeta = Partial<
   Pick<
     CalendarBookingDetails,
@@ -43,6 +80,7 @@ type StoredBookingNoteMeta = Partial<
     | "lateCancellationFeePercent"
     | "showPrepayment"
     | "prepaymentPercent"
+    | "prepaymentStatus"
     | "paymentMethod"
     | "showKilometerAllowance"
     | "kilometerAllowance"
@@ -65,6 +103,7 @@ type StoredBookingNoteMeta = Partial<
   >
 > & {
   ebr?: StoredEbrNotePayload;
+  er?: StoredErNotePayload;
 };
 
 export function resolveKilometerAllowanceAmount(
@@ -88,6 +127,7 @@ export function serializeCalendarEntryNotes(
   internalNote: string,
   details?: CalendarBookingDetails,
   ebr?: StoredEbrNotePayload | null,
+  er?: StoredErNotePayload | null,
 ): string | null {
   const trimmed = internalNote.trim();
   const meta: StoredBookingNoteMeta = {
@@ -98,6 +138,7 @@ export function serializeCalendarEntryNotes(
     lateCancellationFeePercent: details?.lateCancellationFeePercent,
     showPrepayment: details?.showPrepayment,
     prepaymentPercent: details?.prepaymentPercent,
+    prepaymentStatus: details?.prepaymentStatus,
     paymentMethod: details?.paymentMethod,
     showKilometerAllowance: details?.showKilometerAllowance,
     kilometerAllowance: details?.kilometerAllowance,
@@ -118,6 +159,7 @@ export function serializeCalendarEntryNotes(
     ...(details?.totalDiscount ? { totalDiscount: details.totalDiscount } : {}),
     ...(details?.originalServices?.length ? { originalServices: details.originalServices } : {}),
     ...(ebr ? { ebr } : {}),
+    ...(er ? { er } : {}),
   };
   const hasMeta = metaHasValues(meta);
   if (!trimmed && !hasMeta) return null;
@@ -136,6 +178,33 @@ export function parseStoredEbrFromNotes(notes?: string | null): StoredEbrNotePay
   } catch {
     return null;
   }
+}
+
+export function parseStoredErFromNotes(notes?: string | null): StoredErNotePayload | null {
+  if (!notes?.trim()) return null;
+  const markerIndex = notes.indexOf(NOTES_META_PREFIX);
+  if (markerIndex === -1) return null;
+  const metaRaw = notes.slice(markerIndex + NOTES_META_PREFIX.length).trim();
+  try {
+    const meta = JSON.parse(metaRaw) as StoredBookingNoteMeta;
+    return meta.er ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Preserve ebr/er when rewriting notes for unrelated fields. */
+export function rewriteCalendarNotesPreservingNegotiation(
+  notes: string | null | undefined,
+  internalNote: string,
+  details?: CalendarBookingDetails,
+  nextEbr?: StoredEbrNotePayload | null,
+  nextEr?: StoredErNotePayload | null,
+): string | null {
+  const ebr =
+    nextEbr === undefined ? parseStoredEbrFromNotes(notes) : nextEbr;
+  const er = nextEr === undefined ? parseStoredErFromNotes(notes) : nextEr;
+  return serializeCalendarEntryNotes(internalNote, details, ebr, er);
 }
 
 /** Keep suggested changes but mark EBR as rejected (booking columns stay original). */
@@ -288,12 +357,13 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
   if (!notes?.trim()) return undefined;
   const markerIndex = notes.indexOf(NOTES_META_PREFIX);
   if (markerIndex === -1) {
+    const plainNote = sanitizeInternalNoteText(notes);
     return {
-      internalNote: notes.trim(),
-      showInternalNote: true,
+      internalNote: plainNote,
+      showInternalNote: Boolean(plainNote),
     };
   }
-  const internalNote = notes.slice(0, markerIndex).trim();
+  const internalNote = sanitizeInternalNoteText(notes.slice(0, markerIndex));
   const metaRaw = notes.slice(markerIndex + NOTES_META_PREFIX.length).trim();
   try {
     const meta = JSON.parse(metaRaw) as StoredBookingNoteMeta;
@@ -301,13 +371,16 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
     const snapshotServices = mainDrawerServicesFromClientSnapshot(meta.clientSnapshot);
     return {
       internalNote,
-      showInternalNote: Boolean(internalNote) || Boolean(meta.showInternalNote),
+      showInternalNote: Boolean(internalNote),
       showLateRescheduling: Boolean(meta.showLateRescheduling),
       lateRescheduleFeePercent: meta.lateRescheduleFeePercent ?? "",
       showLateCancellation: Boolean(meta.showLateCancellation),
       lateCancellationFeePercent: meta.lateCancellationFeePercent ?? "",
       showPrepayment: Boolean(meta.showPrepayment),
       prepaymentPercent: meta.prepaymentPercent ?? "",
+      ...(meta.prepaymentStatus
+        ? { prepaymentStatus: meta.prepaymentStatus }
+        : {}),
       paymentMethod: meta.paymentMethod ?? "online",
       showKilometerAllowance: Boolean(meta.showKilometerAllowance),
       ...(meta.kilometerAllowance
@@ -326,6 +399,11 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
       ...(meta.editedServiceIds?.length ? { editedServiceIds: meta.editedServiceIds } : {}),
       ...(meta.editedProductIds?.length ? { editedProductIds: meta.editedProductIds } : {}),
       ...(meta.lastEditedBy ? { lastEditedBy: meta.lastEditedBy } : {}),
+      ...(ebr?.clientEditedServiceIds?.length
+        ? { clientEditedServiceIds: ebr.clientEditedServiceIds }
+        : ebr?.lastEditedBy === "client" && ebr.editedServiceIds?.length
+          ? { clientEditedServiceIds: ebr.editedServiceIds }
+          : {}),
       ...(meta.clientSnapshot ? { clientSnapshot: meta.clientSnapshot } : {}),
       ...(meta.services?.length
         ? { services: meta.services }
@@ -431,10 +509,11 @@ export function resolveBookingDetailsFromEvent(ev: CalendarEvent): CalendarBooki
 
 export function hydrateBookingDrawerFromEvent(ev: CalendarEvent): BookingDrawerHydration {
   const details = resolveBookingDetailsFromEvent(ev);
-  const services =
+  const rawServices =
     details.services?.length
       ? details.services
       : (mainDrawerServicesFromClientSnapshot(details.clientSnapshot) ?? []);
+  const services = ensureServiceStartEndTimes(rawServices, ev.start);
 
   return {
     clientEmail: details.clientEmail ?? "",
@@ -451,8 +530,8 @@ export function hydrateBookingDrawerFromEvent(ev: CalendarEvent): BookingDrawerH
     lateCancellationFeePercent: details.lateCancellationFeePercent ?? "",
     showLateRescheduling: Boolean(details.showLateRescheduling),
     lateRescheduleFeePercent: details.lateRescheduleFeePercent ?? "",
-    showInternalNote: Boolean(details.showInternalNote) || Boolean(details.internalNote),
-    internalNote: details.internalNote ?? "",
+    showInternalNote: Boolean(sanitizeInternalNoteText(details.internalNote)),
+    internalNote: sanitizeInternalNoteText(details.internalNote),
     totalDiscount: details.totalDiscount ?? null,
     showKilometerAllowance: Boolean(details.showKilometerAllowance),
     kilometerAllowance: details.kilometerAllowance ?? { eurPerKm: "", totalKilometer: "" },

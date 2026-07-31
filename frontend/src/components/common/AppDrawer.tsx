@@ -42,6 +42,8 @@ type AppDrawerProps = Omit<DrawerProps, "children" | "title"> & {
   contentVariant?: "default" | "muted";
   /** Soft teal by default; soft red for cancel/delete/destructive drawers. */
   headerTone?: "default" | "danger";
+  /** Panel shell background (header keeps its own tone). */
+  bodyBgcolor?: string;
 };
 
 /** Single shared Mollure panel drawer — soft teal header, scroll body, optional footer. */
@@ -56,6 +58,7 @@ export default function AppDrawer({
   headerActions,
   contentVariant = "default",
   headerTone = "default",
+  bodyBgcolor,
   onClose,
   anchor = "right",
   PaperProps,
@@ -66,6 +69,7 @@ export default function AppDrawer({
   const m = theme.palette.mollure;
   const useMuted = contentVariant === "muted";
   const paperSx = PaperProps?.sx;
+  const panelBg = bodyBgcolor ?? "#fff";
   const headerBg =
     headerTone === "danger" ? alpha("#E85D5D", 0.14) : alpha(m.teal, 0.12);
 
@@ -116,7 +120,7 @@ export default function AppDrawer({
           height: "100%",
           display: "flex",
           flexDirection: "column",
-          bgcolor: "#fff",
+          bgcolor: panelBg,
         }}
       >
         <Stack

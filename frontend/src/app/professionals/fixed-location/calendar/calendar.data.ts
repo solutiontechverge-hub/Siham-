@@ -132,6 +132,9 @@ export type CalendarBookingDetails = {
   clientEditedServiceIds?: string[];
   /** Who last edited before the current negotiation round */
   lastEditedBy?: "professional" | "client";
+  /** Incoming Confirmed ER note (receiver UI). */
+  editRequestNote?: string;
+  editRequestInitiatedBy?: "professional" | "client";
 };
 
 export type CalendarResource = {
@@ -155,6 +158,8 @@ export type CalendarEvent = {
   bookingScenario?: CalendarBookingScenario;
   /** Raw booking notes (includes mollure EBR meta) for accept/reject apply. */
   notes?: string | null;
+  /** Server updated_at for unseen-update indicators. */
+  updatedAt?: string | null;
   showClientName?: string;
   details?: CalendarBookingDetails;
 };

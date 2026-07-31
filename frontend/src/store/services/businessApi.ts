@@ -265,7 +265,15 @@ export type CalendarEntry = {
   id: string;
   professional_profile_id: string;
   team_member_id: string | null;
-  status: "requested" | "cancelled" | "completed" | "confirmed" | "blocked" | "in_progress" | "no_show";
+  status:
+    | "requested"
+    | "cancelled"
+    | "completed"
+    | "confirmed"
+    | "blocked"
+    | "in_progress"
+    | "no_show"
+    | "invalid";
   title: string;
   unique_code: string;
   start_time: string | null;
@@ -284,6 +292,21 @@ export type CalendarEntry = {
   end?: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type BookingEditRequestPayload = {
+  status: "pending" | "approved" | "rejected";
+  note?: string;
+  initiated_by: "client" | "professional";
+  requested_at?: string | null;
+  responded_at?: string | null;
+  edit_grant_active?: boolean;
+};
+
+export type ManageBookingEditRequestRequest = {
+  id: string;
+  action: "send" | "accept" | "reject";
+  note?: string;
 };
 
 export type CalendarBooking = {
@@ -324,9 +347,12 @@ export type CalendarBooking = {
   street_number?: string | null;
   postal_code?: string | null;
   created_at?: string | null;
+  updated_at?: string | null;
   date?: string | null;
   start?: string | null;
   end?: string | null;
+  /** Confirmed Edit Request (ER) — backend source of truth. */
+  edit_request?: BookingEditRequestPayload | null;
 };
 
 export type CalendarSettings = {
@@ -374,7 +400,14 @@ export type UpsertCalendarSettingsRequest = {
 
 export type UpdateCalendarEntryStatusRequest = {
   id: string;
-  status: "requested" | "cancelled" | "completed" | "confirmed" | "in_progress" | "no_show";
+  status:
+    | "requested"
+    | "cancelled"
+    | "completed"
+    | "confirmed"
+    | "in_progress"
+    | "no_show"
+    | "invalid";
 };
 
 export type UpdateCalendarEntryRequest = CreateCalendarEntryRequest & {
@@ -394,7 +427,14 @@ export type BookingNotificationEvent =
 
 export type UpdateBookingStatusRequest = {
   id: string;
-  status: "requested" | "cancelled" | "completed" | "confirmed" | "in_progress" | "no_show";
+  status:
+    | "requested"
+    | "cancelled"
+    | "completed"
+    | "confirmed"
+    | "in_progress"
+    | "no_show"
+    | "invalid";
   notification_event?: BookingNotificationEvent;
   notify_incoming_er?: boolean;
   initiated_by?: "client" | "professional";
@@ -407,7 +447,7 @@ export type UpdateBookingStatusRequest = {
 
 export type UpdateMyBookingRequest = {
   id: string;
-  status?: "cancelled" | "confirmed" | "requested";
+  status?: "cancelled" | "confirmed" | "requested" | "invalid";
   prepayment_status?: "paid" | "pending" | "failed" | "required";
   notification_event?: BookingNotificationEvent;
   notify_incoming_er?: boolean;
@@ -436,7 +476,14 @@ export type CreateBookingRequest = {
   location_details?: Record<string, unknown>;
   notes?: string | null;
   prepayment_status?: string | null;
-  status?: "requested" | "cancelled" | "completed" | "confirmed" | "in_progress" | "no_show";
+  status?:
+    | "requested"
+    | "cancelled"
+    | "completed"
+    | "confirmed"
+    | "in_progress"
+    | "no_show"
+    | "invalid";
   booking_type?: "online" | "offline" | "project" | "request";
   unique_code?: string | null;
   total_price?: number | string | null;
@@ -1020,6 +1067,33 @@ export const businessApi = baseApi.injectEndpoints({
       },
       invalidatesTags: ["Calendar", "Bookings"],
     }),
+    manageBookingEditRequest: builder.mutation<
+      ApiEnvelope<CalendarBooking>,
+      ManageBookingEditRequestRequest
+    >({
+      async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
+        const body: Record<string, string> = { action: payload.action };
+        if (payload.note) body.note = payload.note;
+
+        const response = await fetchWithBQ({
+          url: `/api/business/bookings/${payload.id}/edit-request`,
+          method: "POST",
+          body,
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<CalendarBooking>;
+        if (!data.success || !data.data) {
+          return { error: customError(data.message || "Unable to update edit request.") };
+        }
+
+        return { data };
+      },
+      invalidatesTags: ["Calendar", "Bookings"],
+    }),
     dispatchBookingNotification: builder.mutation<
       ApiEnvelope<{ bookingId: string; event: string }>,
       DispatchBookingNotificationRequest
@@ -1409,6 +1483,7 @@ export const {
   useCreateBookingMutation,
   useUpdateBookingStatusMutation,
   useUpdateMyBookingMutation,
+  useManageBookingEditRequestMutation,
   useDispatchBookingNotificationMutation,
   useUploadBusinessMediaMutation,
   useUploadBookingAttachmentsMutation,

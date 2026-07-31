@@ -27,6 +27,8 @@ import BookingRequestBadge, {
   type BookingRequestBadgeState,
   type BookingRequestDirection,
 } from "../calendar/BookingRequestBadge";
+import BookingRequestReceivedIcon from "../calendar/BookingRequestReceivedIcon";
+import BookingRequestSentIcon from "../calendar/BookingRequestSentIcon";
 import PrepaymentStatusIcon, {
   type PrepaymentStatusIconVariant,
 } from "../calendar/PrepaymentStatusIcon";
@@ -102,6 +104,13 @@ export type BookingTimelineCardProps = {
   responseIndicators?: readonly BookingIndicatorVariant[];
   /** Payment due / reissued invoice hint shown on the card body. */
   paymentDue?: BookingTimelineCardPaymentDue | null;
+  /**
+   * Incoming edit-request note preview (receiver only), shown under the time row.
+   * e.g. "Note from client: …"
+   */
+  notePreview?: string | null;
+  /** Teal "Updated" pill near status when the other party changed the booking. */
+  showUpdated?: boolean;
   calendarAction?: BookingTimelineCardAction;
   notesAction?: BookingTimelineCardAction;
   messageAction?: BookingTimelineCardAction & { count?: number };
@@ -154,11 +163,25 @@ function stopCardClick(handler?: React.MouseEventHandler<HTMLElement>) {
   };
 }
 
+function prepaymentVariantToIndicator(
+  variant: PrepaymentStatusIconVariant,
+): BookingIndicatorVariant {
+  if (variant === "confirmed") return "prepaid";
+  if (variant === "pending") return "waiting_for_prepayment";
+  return "refund_pending";
+}
+
+function uniqueIndicators(
+  indicators: readonly BookingIndicatorVariant[],
+): BookingIndicatorVariant[] {
+  return [...new Set(indicators)];
+}
+
 function renderResponseIndicators(
   indicators: readonly BookingIndicatorVariant[],
   size = CARD_INDICATOR_ICON_SIZE,
 ) {
-  return indicators.map((indicator) => (
+  return uniqueIndicators(indicators).map((indicator) => (
     <Tooltip
       key={indicator}
       title={BOOKING_INDICATOR_LABELS[indicator]}
@@ -245,7 +268,11 @@ function renderScenarioBadge(
         : !badge.showRequestSentIcon && badge.showAcceptedIcon
           ? renderResponseIndicators(["suggestion_for_change"])
           : null}
-      {badge.prepaymentStatus && badge.prepaymentStatus !== "pending" ? (
+      {badge.prepaymentStatus &&
+      badge.prepaymentStatus !== "pending" &&
+      !badge.responseIndicators?.includes(
+        prepaymentVariantToIndicator(badge.prepaymentStatus),
+      ) ? (
         <Tooltip
           title={PREPAYMENT_STATUS_LABELS[badge.prepaymentStatus]}
           placement="top"
@@ -257,11 +284,18 @@ function renderScenarioBadge(
             />
           </Box>
         </Tooltip>
-      ) : badge.showPaymentIcon ? (
+      ) : badge.showPaymentIcon &&
+        !badge.responseIndicators?.includes("waiting_for_prepayment") ? (
         renderResponseIndicators(["waiting_for_prepayment"])
       ) : null}
       {badge.showExternalLink ? (
         <OpenInNewRoundedIcon sx={{ fontSize: 11, color: "inherit" }} />
+      ) : badge.label === "ER" &&
+        badge.requestDirection === "incoming" ? (
+        <BookingRequestReceivedIcon size={10} />
+      ) : badge.label === "ER" &&
+        badge.requestDirection === "outgoing" ? (
+        <BookingRequestSentIcon size={10} />
       ) : null}
     </Stack>
   );
@@ -305,6 +339,8 @@ export default function BookingTimelineCard({
   locationLabel,
   messageAction,
   notesAction,
+  notePreview,
+  showUpdated = false,
   onClick,
   pattern = "lines",
   paymentDue = null,
@@ -330,20 +366,44 @@ export default function BookingTimelineCard({
     typeof requestBadge === "object" ? requestBadge : {};
   const showRequestBadge = Boolean(requestBadge) && !scenarioBadges?.length;
   const visibleScenarioBadges = scenarioBadges ?? [];
-  const scenarioEmbedsResponse = visibleScenarioBadges.some(
-    (badge) =>
-      (badge.responseIndicators?.length ?? 0) > 0 || badge.showAcceptedIcon,
+  const embeddedIndicatorKeys = new Set<BookingIndicatorVariant>();
+  for (const badge of visibleScenarioBadges) {
+    for (const item of badge.responseIndicators ?? []) {
+      embeddedIndicatorKeys.add(item);
+    }
+    if (badge.showAcceptedIcon) {
+      embeddedIndicatorKeys.add("suggestion_for_change");
+    }
+    if (badge.showPaymentIcon) {
+      embeddedIndicatorKeys.add("waiting_for_prepayment");
+    }
+    if (badge.prepaymentStatus) {
+      embeddedIndicatorKeys.add(
+        prepaymentVariantToIndicator(badge.prepaymentStatus),
+      );
+    }
+  }
+  const standaloneResponseList = uniqueIndicators(
+    (responseIndicators ?? []).filter(
+      (item) => !embeddedIndicatorKeys.has(item),
+    ),
   );
-  const scenarioShowsPrepayment = visibleScenarioBadges.some(
-    (badge) =>
-      Boolean(badge.prepaymentStatus) ||
-      badge.responseIndicators?.includes("waiting_for_prepayment") ||
-      badge.showPaymentIcon,
-  );
+  const prepaymentIndicator = prepaymentStatus
+    ? prepaymentVariantToIndicator(prepaymentStatus)
+    : null;
   const showStandalonePrepayment =
-    Boolean(prepaymentStatus) && !scenarioShowsPrepayment;
-  const showStandaloneResponse =
-    Boolean(responseIndicators?.length) && !scenarioEmbedsResponse;
+    Boolean(prepaymentIndicator) &&
+    !embeddedIndicatorKeys.has(prepaymentIndicator!) &&
+    !standaloneResponseList.includes(prepaymentIndicator!);
+  const showStandaloneResponse = standaloneResponseList.length > 0;
+  const showPaymentDueIcon =
+    paymentDue?.showIcon !== false && Boolean(paymentDue?.dateLabel);
+  const paymentDueOverlaps =
+    showPaymentDueIcon &&
+    (standaloneResponseList.includes("waiting_for_payment") ||
+      standaloneResponseList.includes("overdue_payment") ||
+      embeddedIndicatorKeys.has("waiting_for_payment") ||
+      embeddedIndicatorKeys.has("overdue_payment"));
   const showProfile =
     profileAction?.show !== false &&
     Boolean(profileAction?.name || profileAction?.icon);
@@ -437,6 +497,22 @@ export default function BookingTimelineCard({
               ]}
             />
           ) : null}
+          {showUpdated ? (
+            <Chip
+              size="small"
+              label="Updated"
+              sx={{
+                height: 18,
+                borderRadius: "5px",
+                fontSize: 8.5,
+                fontWeight: 800,
+                border: `1px solid ${alpha(m.teal, 0.4)}`,
+                bgcolor: alpha(m.teal, 0.12),
+                color: m.teal,
+                "& .MuiChip-label": { px: 0.85 },
+              }}
+            />
+          ) : null}
           {showRequestBadge ? (
             <BookingRequestBadge
               variant="compact"
@@ -467,11 +543,11 @@ export default function BookingTimelineCard({
               </Box>
             </Tooltip>
           ) : null}
-          {showStandaloneResponse && responseIndicators
-            ? renderResponseIndicators(responseIndicators)
+          {showStandaloneResponse
+            ? renderResponseIndicators(standaloneResponseList)
             : null}
-          {paymentDue?.showIcon !== false && paymentDue?.dateLabel ? (
-            <Tooltip title="Payment due" placement="top">
+          {showPaymentDueIcon && !paymentDueOverlaps ? (
+            <Tooltip title="Waiting for payment" placement="top">
               <Box
                 sx={{
                   display: "grid",
@@ -521,6 +597,28 @@ export default function BookingTimelineCard({
         >
           {timeLabel}
         </BodyText>
+        {notePreview?.trim() ? (
+          <BodyText
+            sx={{
+              fontSize: 11,
+              fontWeight: 800,
+              color: alpha(m.navy, 0.62),
+              lineHeight: "14px",
+              position: "absolute",
+              top: 62,
+              left: 8,
+              right: 6,
+              display: "-webkit-box",
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+            }}
+          >
+            {notePreview.trim()}
+          </BodyText>
+        ) : null}
         {paymentDue?.dateLabel ? (
           <Tooltip
             title={`${paymentDue.label || "Reissue Invoice"} · ${paymentDue.dateLabel}`}

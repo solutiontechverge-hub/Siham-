@@ -114,6 +114,11 @@ export function isOnlineBookingType(bookingType?: CalendarBookingType) {
   return bookingType === "Online" || bookingType === "Requests";
 }
 
+/** Online/Requests plus Desired Location "Project" bookings (BR / EBR / ER). */
+export function supportsBookingRequestScenario(bookingType?: CalendarBookingType) {
+  return isOnlineBookingType(bookingType) || bookingType === "Project";
+}
+
 export function statusChipSx(status: CalendarBookingStatus): SxProps<Theme> {
   const theme = BOOKING_STATUS_THEME[status] ?? BOOKING_STATUS_THEME["No Show"];
   return {
@@ -153,8 +158,15 @@ export function statusAccentColor(status: CalendarBookingStatus) {
 }
 
 export function resolveBookingScenario(event: Pick<CalendarEvent, "bookingType" | "status" | "bookingScenario">) {
-  if (!isOnlineBookingType(event.bookingType)) return undefined;
-  if (event.bookingScenario) return event.bookingScenario;
+  if (!supportsBookingRequestScenario(event.bookingType)) return undefined;
+  const scenario = event.bookingScenario;
+  // BR / EBR are pending-request markers only — clear once accepted or rejected.
+  if (scenario === "BR" || scenario === "EBR") {
+    if (event.status !== "Requested") return undefined;
+    return scenario;
+  }
+  // ER stays on Confirmed while the edit request is pending (incoming or outgoing).
+  if (scenario) return scenario;
   if (event.status === "Requested") return "BR" as const;
   return undefined;
 }
@@ -185,7 +197,7 @@ export function canDiscardBookingRequest(
   return isOutgoingBookingRequest(event);
 }
 
-/** Client accepted the booking request — status is confirmed while BR indicator remains. */
+/** @deprecated BR badge is hidden after accept — kept for callers that still check. */
 export function isBookingRequestAccepted(
   event: Pick<CalendarEvent, "status" | "bookingScenario"> | null | undefined,
 ) {
@@ -193,7 +205,7 @@ export function isBookingRequestAccepted(
   return event.status === "Confirmed" || event.status === "Completed";
 }
 
-/** Professional or client rejected the booking request — invalid while BR indicator remains. */
+/** @deprecated BR badge is hidden after reject — kept for callers that still check. */
 export function isBookingRequestRejected(
   event: Pick<CalendarEvent, "status" | "bookingScenario"> | null | undefined,
 ) {

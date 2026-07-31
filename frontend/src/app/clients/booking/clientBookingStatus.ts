@@ -1,7 +1,7 @@
 import type { ClientBookingStatus } from "./clientBookingRecords";
 
-export function bookingStatusLabel(status: ClientBookingStatus, opts?: { paymentDue?: boolean }): string {
-  if (opts?.paymentDue) return "Payment Due";
+/** Canonical status chip labels — never use payment/response as status text. */
+export function bookingStatusLabel(status: ClientBookingStatus): string {
   switch (status) {
     case "draft":
       return "Draft";
@@ -17,28 +17,24 @@ export function bookingStatusLabel(status: ClientBookingStatus, opts?: { payment
       return "Cancelled";
     case "no_show":
       return "No Show";
+    case "invalid":
+      return "Invalid";
+    case "waiting_for_prepayment":
+      // Display as Confirmed; hourglass icon carries the waiting meaning.
+      return "Confirmed";
     default:
       return "Requested";
   }
 }
 
-export function bookingStatusChipColors(
-  status: ClientBookingStatus,
-  opts?: { paymentDue?: boolean },
-): {
+export function bookingStatusChipColors(status: ClientBookingStatus): {
   bgcolor: string;
   color: string;
   border: string;
 } {
-  if (opts?.paymentDue) {
-    return {
-      bgcolor: "rgba(245, 166, 35, 0.18)",
-      color: "#C67A00",
-      border: "1px solid rgba(245, 166, 35, 0.35)",
-    };
-  }
   switch (status) {
     case "confirmed":
+    case "waiting_for_prepayment":
       return {
         bgcolor: "rgba(76, 175, 80, 0.14)",
         color: "#2E7D32",
@@ -68,6 +64,12 @@ export function bookingStatusChipColors(
         color: "#667085",
         border: "1px solid #D0D5DD",
       };
+    case "invalid":
+      return {
+        bgcolor: "rgba(239, 68, 68, 0.12)",
+        color: "#DC2626",
+        border: "1px solid rgba(239, 68, 68, 0.45)",
+      };
     case "draft":
       return {
         bgcolor: "rgba(52, 74, 102, 0.06)",
@@ -92,5 +94,10 @@ export function mapApiBookingStatusToClient(status: string): ClientBookingStatus
   if (normalized === "completed") return "completed";
   if (normalized === "cancelled") return "cancelled";
   if (normalized === "no_show" || normalized === "no show") return "no_show";
+  if (normalized === "invalid") return "invalid";
+  // Legacy alias — keep confirmed + waiting icon instead of a fake status.
+  if (normalized === "waiting_for_prepayment" || normalized === "waiting for prepayment") {
+    return "confirmed";
+  }
   return null;
 }

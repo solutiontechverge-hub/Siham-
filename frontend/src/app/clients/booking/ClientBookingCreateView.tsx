@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import AppButton from "../../../components/common/AppButton";
 import {
   Box,
@@ -49,10 +50,13 @@ import {
   fmtMinutesToTimeLabel,
   serviceTimeRangeLabel,
 } from "./booking-time";
-import { netherlandsProvinces } from "../clients.data";
+import {
+  resolveDesiredVisitAddressOptions,
+} from "../../../data/businessPublicProfile.data";
 
 import { useClientBookingCreatePage } from "./useClientBookingCreatePage";
 import type { BookingPerson } from "./booking.page.types";
+import { resolveMediaUrl } from "../../../lib/resolveMediaUrl";
 
 export default function ClientBookingCreateView() {
   const {
@@ -129,8 +133,6 @@ export default function ClientBookingCreateView() {
     timeValidationError,
     setTimeValidationError,
     selectedTimeTooSoon,
-    combineServices,
-    setCombineServices,
     selectedPersonId,
     setSelectedPersonId,
     selectedTeamMemberId,
@@ -168,20 +170,22 @@ export default function ClientBookingCreateView() {
     locationMode,
     isDesiredLocation,
     getParticipantLabel,
-    catalogByTeamMemberId,
     isPlanningPerson,
     selectedPerson,
     isPlanningCardSelected,
     filteredTeamMembers,
+    hasAssignableTeamMembers,
     additionalGuests,
     canAddFixedLocationGuest,
     serviceAssignees,
     canAddService,
+    addServiceCatalog,
     serviceCountLabel,
     personCardSubtitle,
     updateGuestName,
     selectedServicesCount,
     allServicesAssigned,
+    needsTeamMemberProvidedByPro,
     assigned,
     unassigned,
     isModelOrGuestSelected,
@@ -223,6 +227,16 @@ export default function ClientBookingCreateView() {
     deleteProjectUpload,
     deleteGuest,
   } = useClientBookingCreatePage();
+
+  const visitAddressOptions = React.useMemo(
+    () =>
+      resolveDesiredVisitAddressOptions(
+        businessProfile?.desiredLocation,
+        desiredVisitAddress.province,
+      ),
+    [businessProfile?.desiredLocation, desiredVisitAddress.province],
+  );
+
   const planningCardDetails = (person: BookingPerson) => {
     if (!person.planningIsLocked) return { duration: "" };
     return { duration: person.planningDuration?.trim() ?? "" };
@@ -435,7 +449,7 @@ export default function ClientBookingCreateView() {
               value: tm.id,
               label: tm.name,
             }))}
-            placeholder="Select team member"
+            placeholder="Select team member (optional)"
             size="small"
             fullWidth
             InputProps={{
@@ -559,7 +573,7 @@ export default function ClientBookingCreateView() {
                           value: tm.id,
                           label: tm.name,
                         }))}
-                        placeholder="Select team member"
+                        placeholder="Select team member (optional)"
                         size="small"
                         fullWidth
                         InputProps={{
@@ -844,10 +858,11 @@ export default function ClientBookingCreateView() {
         disabled={!canAddService}
         sx={{
           mt: 1.25,
-          display: "flex",
+          display: "inline-flex",
           alignItems: "center",
           gap: 0.75,
           borderRadius: "8px",
+          py: 0.25,
           opacity: canAddService ? 1 : 0.45,
           cursor: canAddService ? "pointer" : "not-allowed",
         }}
@@ -857,18 +872,27 @@ export default function ClientBookingCreateView() {
             width: 18,
             height: 18,
             borderRadius: "999px",
-            bgcolor: m.teal,
+            bgcolor: "primary.light",
             color: "#fff",
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
+            flexShrink: 0,
             lineHeight: 0,
           }}
         >
-          <AddRoundedIcon sx={{ fontSize: 14 }} />
+          <AddRoundedIcon sx={{ fontSize: 14, display: "block" }} />
         </Box>
         <Typography
-          sx={{ fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.48) }}
+          component="span"
+          sx={{
+            fontSize: 11,
+            fontWeight: 800,
+            lineHeight: 1,
+            color: "primary.light",
+            display: "inline-flex",
+            alignItems: "center",
+          }}
         >
           Service to assignment list
         </Typography>
@@ -925,7 +949,7 @@ export default function ClientBookingCreateView() {
                 disabled={
                   !Object.values(addServiceCatalogIds).some(Boolean) ||
                   !addServiceGuestId ||
-                  !selectedTeamMemberId
+                  (hasAssignableTeamMembers && !selectedTeamMemberId)
                 }
               >
                 Add service
@@ -933,54 +957,58 @@ export default function ClientBookingCreateView() {
             </Stack>
           }
         >
-          <Typography
-            sx={{
-              fontSize: 12,
-              fontWeight: 900,
-              color: alpha(m.navy, 0.72),
-              mb: 0.75,
-            }}
-          >
-            Professional
-          </Typography>
-          <AppDropdown
-            value={selectedTeamMemberId}
-            onChange={(val) => {
-              const nextId = String(val ?? "");
-              // Desired: one TM for the whole booking. Fixed: only for this add action.
-              if (isDesiredLocation) applySharedTeamMember(nextId);
-              else setSelectedTeamMemberId(nextId);
-              setAddServiceCatalogIds({});
-            }}
-            options={filteredTeamMembers.map((tm) => ({
-              value: tm.id,
-              label: tm.name,
-            }))}
-            placeholder="Select team member"
-            size="small"
-            fullWidth
-            InputProps={{
-              startAdornment: (
-                <PersonOutlineRoundedIcon
-                  sx={{
-                    fontSize: 18,
-                    color: alpha(m.navy, 0.45),
-                    ml: 0.5,
-                    mr: 0.25,
-                  }}
-                />
-              ),
-            }}
-            sx={{
-              mb: 1.5,
-              "& .MuiOutlinedInput-root": {
-                borderRadius: "10px",
-                bgcolor: alpha(m.navy, 0.015),
-                fontSize: 12,
-                fontWeight: 700,
-              },
-            }}
-          />
+          {hasAssignableTeamMembers ? (
+            <>
+              <Typography
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 900,
+                  color: alpha(m.navy, 0.72),
+                  mb: 0.75,
+                }}
+              >
+                Professional
+              </Typography>
+              <AppDropdown
+                value={selectedTeamMemberId}
+                onChange={(val) => {
+                  const nextId = String(val ?? "");
+                  // Desired: one TM for the whole booking. Fixed: only for this add action.
+                  if (isDesiredLocation) applySharedTeamMember(nextId);
+                  else setSelectedTeamMemberId(nextId);
+                  setAddServiceCatalogIds({});
+                }}
+                options={filteredTeamMembers.map((tm) => ({
+                  value: tm.id,
+                  label: tm.name,
+                }))}
+                placeholder="Select team member (optional)"
+                size="small"
+                fullWidth
+                InputProps={{
+                  startAdornment: (
+                    <PersonOutlineRoundedIcon
+                      sx={{
+                        fontSize: 18,
+                        color: alpha(m.navy, 0.45),
+                        ml: 0.5,
+                        mr: 0.25,
+                      }}
+                    />
+                  ),
+                }}
+                sx={{
+                  mb: 1.5,
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "10px",
+                    bgcolor: alpha(m.navy, 0.015),
+                    fontSize: 12,
+                    fontWeight: 700,
+                  },
+                }}
+              />
+            </>
+          ) : null}
 
           <Typography
             sx={{
@@ -993,7 +1021,7 @@ export default function ClientBookingCreateView() {
             Services
           </Typography>
           <Stack spacing={0.5} sx={{ mb: 1.5 }}>
-            {(catalogByTeamMemberId[selectedTeamMemberId] ?? []).map((item) => (
+            {addServiceCatalog.map((item) => (
               <FormControlLabel
                 key={item.id}
                 control={
@@ -1079,9 +1107,7 @@ export default function ClientBookingCreateView() {
             onChange={(val) => setAddServiceGuestId(String(val))}
             options={serviceAssignees.map((p) => ({
               value: p.id,
-              label: p.isRequester
-                ? `${p.name} (Requester)`
-                : `${p.name} (${getParticipantLabel(p)})`,
+              label: `${p.name} (${getParticipantLabel(p)})`,
             }))}
             placeholder="Select person"
             size="small"
@@ -1721,36 +1747,7 @@ export default function ClientBookingCreateView() {
                         </Typography>
                       )}
 
-                      <Stack alignItems="flex-end" sx={{ mt: 1 }}>
-                        <FormControlLabel
-                          control={
-                            <Checkbox
-                              checked={combineServices}
-                              onChange={(e) =>
-                                setCombineServices(e.target.checked)
-                              }
-                              size="small"
-                              sx={{
-                                color: alpha(m.navy, 0.35),
-                                "&.Mui-checked": { color: m.teal },
-                              }}
-                            />
-                          }
-                          label={
-                            <Typography
-                              sx={{
-                                fontSize: 11.5,
-                                fontWeight: 800,
-                                color: alpha(m.navy, 0.62),
-                              }}
-                            >
-                              Combine Services
-                            </Typography>
-                          }
-                          sx={{ mr: 0 }}
-                        />
-
-                        {isDesiredLocation ? (
+                      {isDesiredLocation ? (
                           <Box
                             id="booking-project-section"
                             sx={{ width: "100%", mt: 1.25, textAlign: "left" }}
@@ -1808,34 +1805,67 @@ export default function ClientBookingCreateView() {
                                 <AppDropdown
                                   label="Province"
                                   value={desiredVisitAddress.province}
-                                  onChange={(val) =>
+                                  onChange={(val) => {
+                                    const nextProvince = String(val);
+                                    const nextOptions =
+                                      resolveDesiredVisitAddressOptions(
+                                        businessProfile?.desiredLocation,
+                                        nextProvince,
+                                      );
                                     setDesiredVisitAddress((prev) => ({
                                       ...prev,
-                                      province: String(val),
-                                    }))
-                                  }
+                                      province: nextProvince,
+                                      municipality:
+                                        nextOptions.municipalityOptions.includes(
+                                          prev.municipality,
+                                        )
+                                          ? prev.municipality
+                                          : "",
+                                    }));
+                                  }}
                                   options={[
                                     { label: "Select province", value: "" },
-                                    ...netherlandsProvinces.map((province) => ({
-                                      label: province,
-                                      value: province,
-                                    })),
+                                    ...visitAddressOptions.provinceOptions.map(
+                                      (province) => ({
+                                        label: province,
+                                        value: province,
+                                      }),
+                                    ),
                                   ]}
                                   fullWidth
                                   placeholder="Select province"
                                 />
                               </Stack>
-                              <AppTextField
+                              <AppDropdown
                                 label="Municipality"
-                                placeholder="Enter municipality"
                                 value={desiredVisitAddress.municipality}
-                                onChange={(e) =>
+                                onChange={(val) =>
                                   setDesiredVisitAddress((prev) => ({
                                     ...prev,
-                                    municipality: e.target.value,
+                                    municipality: String(val),
                                   }))
                                 }
+                                options={[
+                                  {
+                                    label: desiredVisitAddress.province
+                                      ? "Select municipality"
+                                      : "Select province first",
+                                    value: "",
+                                  },
+                                  ...visitAddressOptions.municipalityOptions.map(
+                                    (municipality) => ({
+                                      label: municipality,
+                                      value: municipality,
+                                    }),
+                                  ),
+                                ]}
                                 fullWidth
+                                placeholder={
+                                  desiredVisitAddress.province
+                                    ? "Select municipality"
+                                    : "Select province first"
+                                }
+                                disabled={!desiredVisitAddress.province}
                               />
                             </Stack>
 
@@ -1984,10 +2014,17 @@ export default function ClientBookingCreateView() {
                                     }}
                                   >
                                     {img.file?.type.startsWith("image/") ||
-                                    (!img.file && Boolean(img.previewUrl)) ? (
+                                    (!img.file &&
+                                      Boolean(
+                                        resolveMediaUrl(img.previewUrl) ||
+                                          img.previewUrl,
+                                      )) ? (
                                       <Box
                                         component="img"
-                                        src={img.previewUrl}
+                                        src={
+                                          resolveMediaUrl(img.previewUrl) ||
+                                          img.previewUrl
+                                        }
                                         alt={img.name}
                                         sx={{
                                           width: "100%",
@@ -2027,7 +2064,6 @@ export default function ClientBookingCreateView() {
                             </Stack>
                           </Box>
                         ) : null}
-                      </Stack>
                     </Paper>
 
                     {!isDesiredLocation && canAddFixedLocationGuest ? (
@@ -2515,10 +2551,10 @@ export default function ClientBookingCreateView() {
                         >
                           {desiredVisitAddressLabel ||
                             (shop?.locationMode === "desired"
-                              ? "Enter visit address"
-                              : (shop?.addressLabel ??
-                                shop?.municipalityLabel ??
-                                ""))}
+                              ? "Service at your location"
+                              : (shop?.addressLabel?.trim() ||
+                                shop?.municipalityLabel?.trim() ||
+                                "Studio location"))}
                         </Typography>
                       </Stack>
                     </Stack>
@@ -2531,6 +2567,7 @@ export default function ClientBookingCreateView() {
                         ({
                           key,
                           title,
+                          roleLabel,
                           items,
                           planningItem,
                           teamMemberLabel,
@@ -2554,16 +2591,33 @@ export default function ClientBookingCreateView() {
 
                           return (
                             <Box key={key}>
-                              <Typography
-                                sx={{
-                                  fontWeight: 900,
-                                  fontSize: 12,
-                                  color: alpha(m.navy, 0.78),
-                                  mb: 0.75,
-                                }}
+                              <Stack
+                                direction="row"
+                                alignItems="baseline"
+                                spacing={0.75}
+                                sx={{ mb: 0.75 }}
                               >
-                                {title}
-                              </Typography>
+                                <Typography
+                                  sx={{
+                                    fontWeight: 900,
+                                    fontSize: 12,
+                                    color: alpha(m.navy, 0.78),
+                                  }}
+                                >
+                                  {title}
+                                </Typography>
+                                <Typography
+                                  sx={{
+                                    fontWeight: 800,
+                                    fontSize: 10.5,
+                                    color: "primary.light",
+                                    textTransform: "uppercase",
+                                    letterSpacing: 0.3,
+                                  }}
+                                >
+                                  {roleLabel}
+                                </Typography>
+                              </Stack>
                               {sectionTeamLabels.length > 0 ? (
                                 <Stack
                                   direction="row"
@@ -2750,8 +2804,25 @@ export default function ClientBookingCreateView() {
                           }}
                         >
                           {unassigned.length > 0
-                            ? `${unassigned.length} service${unassigned.length === 1 ? "" : "s"} still need a person and team member.`
-                            : "Every service needs a team member before you can continue."}
+                            ? `${unassigned.length} service${unassigned.length === 1 ? "" : "s"} still need a person.`
+                            : "Every service needs a person before you can continue."}
+                        </Typography>
+                      ) : null}
+
+                      {allServicesAssigned &&
+                      needsTeamMemberProvidedByPro &&
+                      !selectedTeamMemberId &&
+                      services.length > 0 ? (
+                        <Typography
+                          sx={{
+                            mt: 1,
+                            fontSize: 11,
+                            fontWeight: 800,
+                            color: "primary.light",
+                            lineHeight: 1.35,
+                          }}
+                        >
+                          Team member will be provided by professional.
                         </Typography>
                       ) : null}
 

@@ -98,11 +98,25 @@ function CountryCodeSelectedValue({ value }: { value: string }) {
   const entry = findCountryDialCode(value);
   if (!entry) return <>{value}</>;
   return (
-    <Stack direction="row" spacing={0.75} alignItems="center" component="span">
-      <Box component="span" sx={{ fontSize: 16, lineHeight: 1 }}>
+    <Stack
+      direction="row"
+      spacing={0.75}
+      alignItems="center"
+      component="span"
+      sx={{ lineHeight: 1, width: "100%", minHeight: "100%" }}
+    >
+      <Box
+        component="span"
+        sx={{ fontSize: 16, lineHeight: 1, display: "inline-flex", alignItems: "center" }}
+      >
         {countryFlagEmoji(entry.iso)}
       </Box>
-      <Box component="span">{entry.dialCode}</Box>
+      <Box
+        component="span"
+        sx={{ lineHeight: 1, display: "inline-flex", alignItems: "center" }}
+      >
+        {entry.dialCode}
+      </Box>
     </Stack>
   );
 }

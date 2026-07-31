@@ -35,6 +35,10 @@ export function useBookingEditRequest(bookingRef: string) {
     isSuggested: record.status === "suggested",
     isRejected: record.status === "rejected",
     isAccepted: record.status === "accepted",
+    isEditGrantActive:
+      record.status === "approved" &&
+      Boolean(record.editGrantActive) &&
+      record.initiatedBy === "client",
     refresh,
   };
 }

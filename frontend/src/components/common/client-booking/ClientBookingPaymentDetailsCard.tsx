@@ -16,6 +16,7 @@ import {
 } from "./buildBookingSummarySections";
 import type { BookingEditSuggestedProduct } from "./bookingEditRequest";
 import type { ClientBookingDraft, ClientBookingSummarySection } from "./types";
+import { resolveMediaUrl } from "../../../lib/resolveMediaUrl";
 
 export type ClientBookingPrepaymentState = "none" | "required" | "paid";
 
@@ -530,7 +531,11 @@ export default function ClientBookingPaymentDetailsCard({
                   Uploaded
                 </Typography>
                 <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                  {project!.uploads.map((upload) => (
+                  {project!.uploads.map((upload) => {
+                    const thumb =
+                      resolveMediaUrl(upload.previewUrl) ||
+                      resolveMediaUrl(upload.url);
+                    return (
                     <Box
                       key={upload.id}
                       sx={{
@@ -546,8 +551,8 @@ export default function ClientBookingPaymentDetailsCard({
                           width: "100%",
                           height: 72,
                           bgcolor: alpha(m.navy, 0.06),
-                          backgroundImage: upload.previewUrl
-                            ? `url(${upload.previewUrl})`
+                          backgroundImage: thumb
+                            ? `url(${thumb})`
                             : undefined,
                           backgroundSize: "cover",
                           backgroundPosition: "center",
@@ -556,7 +561,7 @@ export default function ClientBookingPaymentDetailsCard({
                           justifyContent: "center",
                         }}
                       >
-                        {!upload.previewUrl ? (
+                        {!thumb ? (
                           <Typography
                             sx={{
                               fontSize: 10,
@@ -586,7 +591,8 @@ export default function ClientBookingPaymentDetailsCard({
                         {upload.name}
                       </Typography>
                     </Box>
-                  ))}
+                    );
+                  })}
                 </Stack>
               </Box>
             ) : null}

@@ -13,7 +13,6 @@ import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import StickyNote2OutlinedIcon from "@mui/icons-material/StickyNote2Outlined";
-import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import ChatBubbleOutlineRoundedIcon from "@mui/icons-material/ChatBubbleOutlineRounded";
 import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
 import {
@@ -76,17 +75,32 @@ import {
   hydrateBookingDrawerFromEvent,
   parseApiCalendarEventId,
   parseStoredEbrFromNotes,
+  parseStoredErFromNotes,
+  resolveKilometerAllowanceAmount,
   serializeCalendarEntryNotes,
 } from "../bookingEventDetails";
 import {
   canDiscardEbr,
+  canRespondToConfirmedEr,
   canRespondToIncomingRequest,
   detectEditedServiceIds,
   detectEditedProductIds,
+  getProductEditTag,
   getServiceEditTag,
   isClientOriginatedBooking,
   resolveOriginalServices,
 } from "../bookingRequestNegotiation";
+import {
+  consumeConfirmedEditGrant,
+  getBookingEditRequest,
+  isConfirmedEditGrantActive,
+  professionalSuggestBookingChanges,
+  syncBookingEditRequestFromRemote,
+} from "../../client-booking/bookingEditRequest";
+import { syncEditRequestFromBookingApi } from "../../client-booking/syncEditRequestFromApi";
+import EditRequestNoteDialog from "../../client-booking/EditRequestNoteDialog";
+import EditRequestIncomingNote from "../../client-booking/EditRequestIncomingNote";
+import { markBookingUpdateSeen } from "../bookingUpdateSeen";
 import CalendarBlockTimeModal from "../CalendarBlockTimeModal";
 import CalendarDesignModal, {
   type CalendarDesignDraft,
@@ -105,11 +119,13 @@ import CalendarEditAvailabilityModal, {
 import CalendarServiceOrderModal from "../CalendarServiceOrderModal";
 import ManualEntryDiscountModal from "../../../sections/finance/ManualEntryDiscountModal";
 import {
-  calculateManualEntryDiscountAmount,
   formatManualEntryDiscountLabel,
   parseFinancePrice,
   type ManualEntryDiscount,
 } from "../../../sections/finance/manualEntry.data";
+import {
+  computeBookingPrice,
+} from "../bookingTotal";
 import { useFinanceInvoiceSettings } from "../../../sections/finance/useFinanceInvoiceSettings";
 import BookingSelectServicesScreen from "../BookingSelectServicesScreen";
 import DiscardBrDialog from "../DiscardBrDialog";
@@ -126,7 +142,6 @@ import BookingEditServiceScreen from "../BookingEditServiceScreen";
 import BookingSelectProductsScreen from "../BookingSelectProductsScreen";
 import BookingAddUniqueItemScreen from "../BookingAddUniqueItemScreen";
 import BookingEditCatalogItemScreen from "../BookingEditCatalogItemScreen";
-import { professionalSuggestBookingChanges } from "../../client-booking/bookingEditRequest";
 import { useCalendarFilters } from "../useCalendarFilters";
 import type { BookingCatalogService } from "../../../../data/bookingServiceCatalog.data";
 import { buildOrderedBookingServiceCategories } from "../../../../data/bookingServiceCatalog.data";
@@ -211,6 +226,12 @@ import {
   isBookingRequestAccepted,
   statusAccentColor,
 } from "../bookingStatus";
+import {
+  isRefundApplicable,
+  resolveProfessionalBookingActions,
+  showProfessionalActionMenu,
+} from "../bookingStatusActions";
+import BookingGuidelineIcon from "../BookingGuidelineIcon";
 import BookingRequestAcceptedPanel from "../BookingRequestAcceptedPanel";
 import PrepaymentStatusIcon from "../PrepaymentStatusIcon";
 import { PREPAYMENT_STATUS_LABELS } from "../PrepaymentStatusIcon";
@@ -221,6 +242,8 @@ import BookingRequestBadge, {
   resolveBookingRequestBadgeState,
   resolveProfessionalBookingRequestDirection,
 } from "../BookingRequestBadge";
+import BookingRequestReceivedIcon from "../BookingRequestReceivedIcon";
+import BookingRequestSentIcon from "../BookingRequestSentIcon";
 import PaymentDueIcon from "../../client-booking/PaymentDueIcon";
 import { useBookingPaymentDueMeta } from "../resolveBookingPaymentDueMeta";
 import { resolveBookingResponseIndicators } from "../bookingResponseStatus";
@@ -253,12 +276,14 @@ import {
   useGetMyBookingsQuery,
   useLazyLookupMollureClientByEmailQuery,
   useUploadBookingAttachmentsMutation,
+  useManageBookingEditRequestMutation,
 } from "../../../../store/services/businessApi";
 import { GENDER_OPTIONS, type GenderOption } from "../../../../lib/gender-options";
 import {
   getOptionalPhoneValidationErrors,
   getPhoneValidationErrors,
 } from "../../../../lib/phone-validation";
+import { resolveMediaUrl } from "../../../../lib/resolveMediaUrl";
 
 export type ProfessionalFixedLocationCalendarProps = {
   data: ProfessionalFixedLocationCalendarData;
@@ -296,7 +321,8 @@ export type ProfessionalFixedLocationCalendarProps = {
       | "completed"
       | "confirmed"
       | "in_progress"
-      | "no_show",
+      | "no_show"
+      | "invalid",
     options?: {
       notification_event?: BookingNotificationEvent;
       notify_incoming_er?: boolean;
@@ -321,7 +347,8 @@ export type ProfessionalFixedLocationCalendarProps = {
       | "completed"
       | "confirmed"
       | "in_progress"
-      | "no_show",
+      | "no_show"
+      | "invalid",
   ) => Promise<void>;
   onDateRangeChange?: (range: CalendarQueryDateRange) => void;
 };
@@ -369,6 +396,7 @@ export default function ProfessionalFixedLocationCalendar({
   const { settings: financeSettings, setSettings: setFinanceSettings } =
     useFinanceInvoiceSettings();
   const [uploadBookingAttachments] = useUploadBookingAttachmentsMutation();
+  const [manageBookingEditRequest] = useManageBookingEditRequestMutation();
 
   /** Same list shown in Select Services and used when saving the selection. */
   const baseServiceCatalog = React.useMemo(
@@ -530,6 +558,7 @@ export default function ProfessionalFixedLocationCalendar({
     React.useState(false);
   const [discardBrOpen, setDiscardBrOpen] = React.useState(false);
   const [discardEbrOpen, setDiscardEbrOpen] = React.useState(false);
+  const [erNoteDialogOpen, setErNoteDialogOpen] = React.useState(false);
   const [incomingConfirmAction, setIncomingConfirmAction] = React.useState<
     "accept" | "suggest" | "reject" | null
   >(null);
@@ -827,28 +856,49 @@ export default function ProfessionalFixedLocationCalendar({
   );
   const subtotalPrice =
     servicesTotal + productsTotal + uniqueItemsTotal + guestsTotal;
-  const bookingDiscountAmount = React.useMemo(
+  const kilometerAllowanceAmount = React.useMemo(
     () =>
-      calculateManualEntryDiscountAmount(subtotalPrice, bookingTotalDiscount),
-    [bookingTotalDiscount, subtotalPrice],
+      showKilometerAllowance
+        ? resolveKilometerAllowanceAmount(kilometerAllowanceDraft)
+        : 0,
+    [kilometerAllowanceDraft, showKilometerAllowance],
   );
-  const totalPrice = Math.max(0, subtotalPrice - bookingDiscountAmount);
-  const lateCancellationFeeAmount = React.useMemo(() => {
-    const pct = Number(lateCancellationFeePercent);
-    if (!Number.isFinite(pct) || pct <= 0) return 0;
-    return Math.round((subtotalPrice * pct) / 100);
-  }, [lateCancellationFeePercent, subtotalPrice]);
-  const lateRescheduleFeeAmount = React.useMemo(() => {
-    const pct = Number(lateRescheduleFeePercent);
-    if (!Number.isFinite(pct) || pct <= 0) return 0;
-    return Math.round((subtotalPrice * pct) / 100);
-  }, [lateRescheduleFeePercent, subtotalPrice]);
-  const prepaymentAmount = React.useMemo(() => {
-    const pct = Number(prepaymentPercent);
-    if (!Number.isFinite(pct) || pct <= 0) return 0;
-    return Math.round((totalPrice * pct) / 100);
-  }, [prepaymentPercent, totalPrice]);
-  const remainingAfterPrepayment = Math.max(0, totalPrice - prepaymentAmount);
+  const bookingPrice = React.useMemo(
+    () =>
+      computeBookingPrice({
+        lineSubtotal: subtotalPrice,
+        extrasAmount: kilometerAllowanceAmount,
+        discount: bookingTotalDiscount,
+        showLateCancellation,
+        lateCancellationFeePercent,
+        showLateRescheduling,
+        lateRescheduleFeePercent,
+        showPrepayment,
+        prepaymentPercent,
+        // When prepayment is configured, Total Price reflects amount still due.
+        prepaymentPaid: showPrepayment,
+      }),
+    [
+      bookingTotalDiscount,
+      kilometerAllowanceAmount,
+      lateCancellationFeePercent,
+      lateRescheduleFeePercent,
+      prepaymentPercent,
+      showLateCancellation,
+      showLateRescheduling,
+      showPrepayment,
+      subtotalPrice,
+    ],
+  );
+  const bookingDiscountAmount = bookingPrice.discountAmount;
+  const lateCancellationFeeAmount = bookingPrice.lateCancellationFeeAmount;
+  const lateRescheduleFeeAmount = bookingPrice.lateRescheduleFeeAmount;
+  const prepaymentAmount = bookingPrice.prepaymentAmount;
+  const remainingAfterPrepayment = bookingPrice.remainingAfterPrepayment;
+  /** Amount due in the drawer (discount + fees + prepaid applied). */
+  const totalPrice = bookingPrice.payableTotal;
+  /** Persisted booking value (discount + fees, before prepaid deduction). */
+  const bookingTotalForSave = bookingPrice.bookingTotal;
   const [bookingPhoneDraft, setBookingPhoneDraft] = React.useState<{
     phoneCode: string;
     phoneNumber: string;
@@ -1128,6 +1178,9 @@ export default function ProfessionalFixedLocationCalendar({
   );
 
   const isCompletedBooking = viewingBookingEvent?.status === "Completed";
+  const isCancelledOrInvalidBooking =
+    viewingBookingEvent?.status === "Cancelled" ||
+    viewingBookingEvent?.status === "Invalid";
 
   const noShowParticipants = React.useMemo(() => {
     if (!viewingBookingEvent) return [];
@@ -1165,91 +1218,65 @@ export default function ProfessionalFixedLocationCalendar({
     isViewingBooking &&
     canRespondToIncomingRequest(viewingBookingEvent) &&
     !isEditingExisting;
+  const showIncomingErActions =
+    isViewingBooking &&
+    canRespondToConfirmedEr(viewingBookingEvent) &&
+    !isEditingExisting;
+  const incomingErNote = React.useMemo(() => {
+    if (!showIncomingErActions || !viewingBookingEvent) return null;
+    const detailsNote = viewingBookingEvent.details?.editRequestNote?.trim();
+    if (
+      detailsNote &&
+      viewingBookingEvent.details?.editRequestInitiatedBy === "client"
+    ) {
+      return detailsNote;
+    }
+    const bookingRef =
+      viewingBookingEvent.bookingCode ??
+      extractBookingId(viewingBookingEvent.id);
+    const rec = getBookingEditRequest(bookingRef);
+    if (
+      rec.status === "pending" &&
+      rec.initiatedBy === "client" &&
+      rec.note?.trim()
+    ) {
+      return rec.note.trim();
+    }
+    return null;
+  }, [showIncomingErActions, viewingBookingEvent]);
   const showDiscardEbr =
     isViewingBooking &&
     canDiscardEbr(viewingBookingEvent) &&
     !isEditingExisting;
   const negotiationDetails = viewingBookingEvent?.details;
-  const liveEditedServiceIds = React.useMemo(() => {
-    if (!incomingRequestEditMode && !isEditingExisting) return new Set<string>();
-    const currentServices = [
-      ...selectedServices,
-      ...bookingGuests.flatMap((guest) =>
-        guest.services.map((service) => ({
-          ...service,
-          price: service.price,
-        })),
-      ),
-    ];
-    return new Set(
-      detectEditedServiceIds(originalServicesSnapshot, currentServices),
-    );
-  }, [
-    bookingGuests,
-    incomingRequestEditMode,
-    isEditingExisting,
-    originalServicesSnapshot,
-    selectedServices,
-  ]);
-
-  const liveEditedProductIds = React.useMemo(() => {
-    if (!incomingRequestEditMode && !isEditingExisting) return new Set<string>();
-    const originalProducts = viewingBookingEvent?.details?.products ?? [];
-    const currentProducts = [
-      ...selectedProducts,
-      ...bookingUniqueItems,
-      ...bookingGuests.flatMap((guest) => guest.products),
-    ];
-    return new Set(detectEditedProductIds(originalProducts, currentProducts));
-  }, [
-    bookingGuests,
-    bookingUniqueItems,
-    incomingRequestEditMode,
-    isEditingExisting,
-    selectedProducts,
-    viewingBookingEvent?.details?.products,
-  ]);
-
+  /** Pro drawer: Edited only for client-originated line changes (never own edits). */
   const resolveServiceEditTag = React.useCallback(
     (serviceId: string) => {
-      if (
-        (incomingRequestEditMode || isEditingExisting) &&
-        liveEditedServiceIds.has(serviceId)
-      ) {
-        return "edited" as const;
-      }
-      return getServiceEditTag(serviceId, negotiationDetails);
+      const ebr = viewingBookingEvent
+        ? parseStoredEbrFromNotes(viewingBookingEvent.notes)
+        : null;
+      const clientRoundEbr =
+        ebr?.lastEditedBy === "client" ? ebr : null;
+      return getServiceEditTag(serviceId, negotiationDetails, clientRoundEbr);
     },
-    [
-      incomingRequestEditMode,
-      isEditingExisting,
-      liveEditedServiceIds,
-      negotiationDetails,
-    ],
+    [negotiationDetails, viewingBookingEvent],
   );
 
   const resolveProductEditTag = React.useCallback(
     (productId: string) => {
-      if (
-        (incomingRequestEditMode || isEditingExisting) &&
-        liveEditedProductIds.has(productId)
-      ) {
-        return "edited" as const;
-      }
-      if (negotiationDetails?.editedProductIds?.includes(productId)) {
-        return "edited" as const;
-      }
-      return null;
+      const ebr = viewingBookingEvent
+        ? parseStoredEbrFromNotes(viewingBookingEvent.notes)
+        : null;
+      const clientRoundEbr =
+        ebr?.lastEditedBy === "client" ? ebr : null;
+      return getProductEditTag(productId, negotiationDetails, clientRoundEbr);
     },
-    [
-      incomingRequestEditMode,
-      isEditingExisting,
-      liveEditedProductIds,
-      negotiationDetails?.editedProductIds,
-    ],
+    [negotiationDetails, viewingBookingEvent],
   );
   const isViewingExisting =
-    isCompletedBooking || (Boolean(editingEventId) && !isEditingExisting);
+    isCompletedBooking ||
+    isCancelledOrInvalidBooking ||
+    (Boolean(editingEventId) && !isEditingExisting);
 
   const bookingEditSignature = React.useMemo(
     () =>
@@ -1624,7 +1651,9 @@ export default function ProfessionalFixedLocationCalendar({
                 ? "completed"
                 : status === "No Show"
                   ? "no_show"
-                  : "cancelled";
+                  : status === "Invalid"
+                    ? "invalid"
+                    : "cancelled";
       if (parsed.kind === "booking") {
         if (onUpdateBookingStatus) {
           await onUpdateBookingStatus(parsed.id, apiStatus, options);
@@ -1653,11 +1682,61 @@ export default function ProfessionalFixedLocationCalendar({
   );
 
   const handleBookingActionSelect = React.useCallback(
-    async (action: "edit" | "in_progress" | "no_show" | "cancel") => {
+    async (
+      action:
+        | "edit"
+        | "in_progress"
+        | "no_show"
+        | "cancel"
+        | "checkout"
+        | "delete"
+        | "rebook"
+        | "refund",
+    ) => {
       setBookingActionAnchor(null);
       if (!editingEventId) return;
 
       if (action === "edit") {
+        if (
+          viewingBookingEvent?.status === "Cancelled" ||
+          viewingBookingEvent?.status === "Invalid"
+        ) {
+          return;
+        }
+        const current =
+          viewingBookingEvent ??
+          events.find((event) => event.id === editingEventId);
+        if (current?.status === "Confirmed") {
+          const bookingRef =
+            current.bookingCode ?? extractBookingId(current.id);
+          const erFromNotes = parseStoredErFromNotes(current.notes);
+          if (erFromNotes) {
+            syncBookingEditRequestFromRemote(bookingRef, {
+              status: erFromNotes.status,
+              note: erFromNotes.note,
+              initiatedBy: erFromNotes.initiatedBy,
+              requestedAt: erFromNotes.requestedAt,
+              approvedAt: erFromNotes.approvedAt,
+              editGrantActive: erFromNotes.editGrantActive,
+            });
+          }
+          if (
+            current.bookingScenario === "ER" &&
+            current.details?.requestDirection === "outgoing"
+          ) {
+            showSnackbar({
+              severity: "info",
+              message: "Edit request pending — waiting for the client.",
+            });
+            return;
+          }
+          if (isConfirmedEditGrantActive(bookingRef, "professional")) {
+            setIsEditingExisting(true);
+            return;
+          }
+          setErNoteDialogOpen(true);
+          return;
+        }
         setIsEditingExisting(true);
         return;
       }
@@ -1672,9 +1751,48 @@ export default function ProfessionalFixedLocationCalendar({
         return;
       }
 
+      if (action === "checkout") {
+        setSlotDrawerTab("sales");
+        return;
+      }
+
+      if (action === "delete") {
+        setEvents((prev) => prev.filter((event) => event.id !== editingEventId));
+        setEditingEventId(null);
+        setSlotDrawerOpen(false);
+        showSnackbar({
+          severity: "success",
+          message: "Booking removed from calendar.",
+        });
+        return;
+      }
+
+      if (action === "rebook") {
+        setIsEditingExisting(false);
+        setEditingEventId(null);
+        setSlotStatus("Confirmed");
+        setAllowDrawerTimeSelection(true);
+        setSlotCalendarOpen(true);
+        setSlotDrawerTab("booking");
+        showSnackbar({
+          severity: "info",
+          message: "Rebook started — pick a new date/time and save.",
+        });
+        return;
+      }
+
+      if (action === "refund") {
+        setSlotDrawerTab("sales");
+        showSnackbar({
+          severity: "info",
+          message: "Open Sales to process the refund.",
+        });
+        return;
+      }
+
       setPendingBookingAction(action);
     },
-    [editingEventId],
+    [editingEventId, events, showSnackbar, viewingBookingEvent],
   );
 
   const handleConfirmCancel = React.useCallback(async () => {
@@ -1682,6 +1800,7 @@ export default function ProfessionalFixedLocationCalendar({
     if (!editingEventId) return;
     try {
       await persistEventStatus(editingEventId, "Cancelled");
+      setIsEditingExisting(false);
       setEvents((prev) =>
         prev.map((event) =>
           event.id === editingEventId
@@ -3165,14 +3284,17 @@ export default function ProfessionalFixedLocationCalendar({
         );
         setBookingProjectDescription(project?.description ?? "");
         setBookingProjectUploads(
-          (project?.uploads ?? []).map((upload) => ({
-            id: upload.id,
-            name: upload.name,
-            previewUrl: upload.url || upload.previewUrl,
-            url: upload.url,
-            mimeType: upload.mimeType,
-            kind: upload.kind,
-          })),
+          (project?.uploads ?? []).map((upload) => {
+            const durable = resolveMediaUrl(upload.url || upload.previewUrl);
+            return {
+              id: upload.id,
+              name: upload.name,
+              previewUrl: durable,
+              url: durable ?? upload.url,
+              mimeType: upload.mimeType,
+              kind: upload.kind,
+            };
+          }),
         );
         if (
           (!hydration.guests || hydration.guests.length === 0) &&
@@ -3235,7 +3357,28 @@ export default function ProfessionalFixedLocationCalendar({
     setSlotAddMenuAnchor(null);
     setBookingMoreAnchor(null);
     setSlotDrawerOpen(true);
+    markBookingUpdateSeen(
+      "professional",
+      ev.bookingCode ?? extractBookingId(ev.id),
+      ev.updatedAt,
+    );
   }, []);
+
+  // Keep "Updated" cleared while the drawer stays open (e.g. after accept/save refresh).
+  React.useEffect(() => {
+    if (!isViewingExisting || !viewingBookingEvent) return;
+    markBookingUpdateSeen(
+      "professional",
+      viewingBookingEvent.bookingCode ??
+        extractBookingId(viewingBookingEvent.id),
+      viewingBookingEvent.updatedAt,
+    );
+  }, [
+    isViewingExisting,
+    viewingBookingEvent?.bookingCode,
+    viewingBookingEvent?.id,
+    viewingBookingEvent?.updatedAt,
+  ]);
 
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -3321,6 +3464,142 @@ export default function ProfessionalFixedLocationCalendar({
     searchParams,
   ]);
 
+  const handleSendConfirmedEr = React.useCallback(
+    async (note: string) => {
+      if (!editingEventId || !viewingBookingEvent) return;
+      const trimmed = note.trim();
+      if (!trimmed) return;
+      const parsed = parseApiCalendarEventId(editingEventId);
+      if (parsed?.kind !== "booking") {
+        showSnackbar({
+          severity: "error",
+          message: "Edit request is only available for bookings.",
+        });
+        return;
+      }
+      const bookingRef =
+        viewingBookingEvent.bookingCode ?? extractBookingId(editingEventId);
+      try {
+        const result = await manageBookingEditRequest({
+          id: parsed.id,
+          action: "send",
+          note: trimmed,
+        }).unwrap();
+        syncEditRequestFromBookingApi(bookingRef, result.data?.edit_request);
+        setEvents((prev) =>
+          prev.map((event) =>
+            event.id === editingEventId
+              ? {
+                  ...event,
+                  status: "Confirmed",
+                  bookingScenario: "ER",
+                  details: {
+                    ...event.details,
+                    requestDirection: "outgoing",
+                  },
+                }
+              : event,
+          ),
+        );
+        showSnackbar({
+          severity: "success",
+          message: "Edit request sent to the client.",
+        });
+        setErNoteDialogOpen(false);
+      } catch (error) {
+        showSnackbar({
+          severity: "error",
+          message: getApiErrorMessage(error, "Unable to send edit request."),
+        });
+      }
+    },
+    [
+      editingEventId,
+      manageBookingEditRequest,
+      showSnackbar,
+      viewingBookingEvent,
+    ],
+  );
+
+  const handleAcceptConfirmedEr = React.useCallback(async () => {
+    if (!editingEventId || !viewingBookingEvent) return;
+    const parsed = parseApiCalendarEventId(editingEventId);
+    if (parsed?.kind !== "booking") return;
+    const bookingRef =
+      viewingBookingEvent.bookingCode ?? extractBookingId(editingEventId);
+    try {
+      const result = await manageBookingEditRequest({
+        id: parsed.id,
+        action: "accept",
+      }).unwrap();
+      syncEditRequestFromBookingApi(bookingRef, result.data?.edit_request);
+      setEvents((prev) =>
+        prev.map((event) =>
+          event.id === editingEventId
+            ? {
+                ...event,
+                bookingScenario: undefined,
+              }
+            : event,
+        ),
+      );
+      showSnackbar({
+        severity: "success",
+        message: "Edit request accepted. Client can edit once.",
+      });
+    } catch (error) {
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Unable to accept edit request."),
+      });
+    }
+  }, [
+    editingEventId,
+    manageBookingEditRequest,
+    showSnackbar,
+    viewingBookingEvent,
+  ]);
+
+  const handleRejectConfirmedEr = React.useCallback(async () => {
+    if (!editingEventId || !viewingBookingEvent) return;
+    const parsed = parseApiCalendarEventId(editingEventId);
+    if (parsed?.kind !== "booking") return;
+    const bookingRef =
+      viewingBookingEvent.bookingCode ?? extractBookingId(editingEventId);
+    try {
+      const result = await manageBookingEditRequest({
+        id: parsed.id,
+        action: "reject",
+      }).unwrap();
+      syncEditRequestFromBookingApi(bookingRef, result.data?.edit_request);
+      setEvents((prev) =>
+        prev.map((event) =>
+          event.id === editingEventId
+            ? {
+                ...event,
+                status: "Confirmed",
+                bookingScenario: undefined,
+              }
+            : event,
+        ),
+      );
+      showSnackbar({
+        severity: "success",
+        message: "Edit request rejected. Booking stays Confirmed.",
+      });
+    } catch (error) {
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Unable to reject edit request."),
+      });
+    }
+  }, [
+    editingEventId,
+    manageBookingEditRequest,
+    showSnackbar,
+    viewingBookingEvent,
+  ]);
+
   const handleDiscardBr = React.useCallback(async () => {
     if (!editingEventId) return;
     try {
@@ -3380,7 +3659,7 @@ export default function ProfessionalFixedLocationCalendar({
       setEvents((prev) =>
         prev.map((event) =>
           event.id === editingEventId
-            ? { ...event, status: "Confirmed" }
+            ? { ...event, status: "Confirmed", bookingScenario: undefined }
             : event,
         ),
       );
@@ -3603,7 +3882,7 @@ export default function ProfessionalFixedLocationCalendar({
     try {
       const parsed = parseApiCalendarEventId(editingEventId);
       if (parsed?.kind === "booking" && onUpdateBookingStatus) {
-        await onUpdateBookingStatus(parsed.id, "cancelled");
+        await onUpdateBookingStatus(parsed.id, "invalid");
       } else {
         await persistEventStatus(editingEventId, "Invalid");
       }
@@ -4482,21 +4761,8 @@ export default function ProfessionalFixedLocationCalendar({
           .filter((product) => !originalProductIds.has(product.id))
           .map((product) => product.id);
         const bookingRef = existingEvent.bookingCode ?? editingEventId;
-        const ebrTotal =
-          suggestedServices.reduce((sum, service) => sum + service.price, 0) +
-          suggestedProducts.reduce(
-            (sum, product) => sum + product.price * (product.quantity || 1),
-            0,
-          );
-        const serviceNames = suggestedServices
-          .map((service) => service.name)
-          .filter(Boolean);
-        const humanNote = [
-          bookingInternalNote.trim(),
-          serviceNames.length ? `Services: ${serviceNames.join(", ")}` : "",
-        ]
-          .filter(Boolean)
-          .join("\n");
+        const ebrTotal = bookingTotalForSave;
+        const humanNote = bookingInternalNote.trim();
         const persistedNotes = serializeCalendarEntryNotes(
           humanNote,
           nextDetails,
@@ -4606,7 +4872,8 @@ export default function ProfessionalFixedLocationCalendar({
         | "completed"
         | "confirmed"
         | "in_progress"
-        | "no_show" => {
+        | "no_show"
+        | "invalid" => {
         switch (status) {
           case "Requested":
             return "requested";
@@ -4618,48 +4885,64 @@ export default function ProfessionalFixedLocationCalendar({
             return "in_progress";
           case "No Show":
             return "no_show";
+          case "Invalid":
+            return "invalid";
           case "Confirmed":
           default:
             return "confirmed";
         }
       };
 
-      const details = buildBookingDetailsSnapshot({
-        selectedClient,
-        selectedServices,
-        selectedProducts: [...selectedProducts, ...bookingUniqueItems],
-        bookingGuests,
-        bookingPhoneDraft,
-        desiredLocationDraft,
-        showPrepayment,
-        prepaymentPercent,
-        paymentMethod,
-        showLateCancellation,
-        lateCancellationFeePercent,
-        showLateRescheduling,
-        lateRescheduleFeePercent,
-        showInternalNote,
-        bookingInternalNote,
-        bookingTotalDiscount,
-        showKilometerAllowance,
-        kilometerAllowanceDraft,
-        ...(isNewManualBooking
-          ? {
-              requestDirection: "outgoing" as const,
-              originalServices: selectedServices,
-            }
-          : existingEvent?.details?.requestDirection
+      const details = {
+        ...buildBookingDetailsSnapshot({
+          selectedClient,
+          selectedServices,
+          selectedProducts: [...selectedProducts, ...bookingUniqueItems],
+          bookingGuests,
+          bookingPhoneDraft,
+          desiredLocationDraft,
+          showPrepayment,
+          prepaymentPercent,
+          paymentMethod,
+          showLateCancellation,
+          lateCancellationFeePercent,
+          showLateRescheduling,
+          lateRescheduleFeePercent,
+          showInternalNote,
+          bookingInternalNote,
+          bookingTotalDiscount,
+          showKilometerAllowance,
+          kilometerAllowanceDraft,
+          ...(isNewManualBooking
             ? {
-                requestDirection: existingEvent.details.requestDirection,
-                ...(existingEvent.details.originalServices?.length
-                  ? { originalServices: existingEvent.details.originalServices }
-                  : { originalServices: selectedServices }),
-              }
-            : {
                 requestDirection: "outgoing" as const,
                 originalServices: selectedServices,
-              }),
-      });
+              }
+            : existingEvent?.details?.requestDirection
+              ? {
+                  requestDirection: existingEvent.details.requestDirection,
+                  ...(existingEvent.details.originalServices?.length
+                    ? {
+                        originalServices:
+                          existingEvent.details.originalServices,
+                      }
+                    : { originalServices: selectedServices }),
+                }
+              : {
+                  requestDirection: "outgoing" as const,
+                  originalServices: selectedServices,
+                }),
+        }),
+        ...(showPrepayment
+          ? {
+              prepaymentStatus:
+                paymentMethod === "offline"
+                  ? ("confirmed" as const)
+                  : (existingEvent?.details?.prepaymentStatus ??
+                    ("pending" as const)),
+            }
+          : {}),
+      };
 
       // Shared FL+DL: persist main + guest/model lines in top-level notes so
       // client mapper sees the full update without location forks.
@@ -4720,13 +5003,14 @@ export default function ProfessionalFixedLocationCalendar({
               projectUploadsForSnapshot = bookingProjectUploads.map(
                 (upload, index) => {
                   if (upload.url && !upload.url.startsWith("blob:")) {
+                    const durable = resolveMediaUrl(upload.url) ?? upload.url;
                     return {
                       id: upload.id,
                       name: upload.name,
                       url: upload.url,
                       mimeType: upload.mimeType,
                       kind: upload.kind,
-                      previewUrl: upload.url,
+                      previewUrl: durable,
                     };
                   }
                   const matched =
@@ -4742,13 +5026,15 @@ export default function ProfessionalFixedLocationCalendar({
                       previewUrl: undefined,
                     };
                   }
+                  const matchedUrl =
+                    resolveMediaUrl(matched.url) ?? matched.url;
                   return {
-                    id: matched.id,
-                    name: matched.name,
+                    id: upload.id,
+                    name: upload.name || matched.name,
                     url: matched.url,
-                    mimeType: matched.mimeType,
-                    kind: matched.kind,
-                    previewUrl: matched.url,
+                    mimeType: matched.mimeType ?? upload.mimeType,
+                    kind: matched.kind ?? upload.kind,
+                    previewUrl: matchedUrl,
                   };
                 },
               );
@@ -4853,7 +5139,10 @@ export default function ProfessionalFixedLocationCalendar({
         );
         if (editedIds.length) details.editedServiceIds = editedIds;
         if (editedProductIds.length) details.editedProductIds = editedProductIds;
-        if (editedIds.length || editedProductIds.length) {
+        // Any save on a Confirmed booking (post ER/EBR accept) is an update.
+        if (existingEvent.status === "Confirmed") {
+          details.lastEditedBy = "professional";
+        } else if (editedIds.length || editedProductIds.length) {
           details.lastEditedBy = "professional";
         }
       }
@@ -4895,24 +5184,12 @@ export default function ProfessionalFixedLocationCalendar({
         bookingScenario:
           resolvedStatus === "Requested"
             ? (existingEvent?.bookingScenario ?? "BR")
-            : existingEvent?.bookingScenario,
+            : undefined,
         showClientName: clientName,
         details,
       });
 
-      const bookingTotal =
-        selectedServices.reduce(
-          (sum, service) => sum + getEffectiveServicePrice(service),
-          0,
-        ) +
-        selectedProducts.reduce(
-          (sum, product) => sum + product.price * (product.quantity || 1),
-          0,
-        ) +
-        bookingUniqueItems.reduce(
-          (sum, item) => sum + item.price * (item.quantity || 1),
-          0,
-        );
+      const bookingTotal = bookingTotalForSave;
 
       // Edit existing API booking / calendar entry — never create a second OF123 code.
       if (editingEventId && parsedEditingId) {
@@ -4974,6 +5251,24 @@ export default function ProfessionalFixedLocationCalendar({
           );
           setSlotStatus(nextEvent.status);
           setIsEditingExisting(false);
+          if (existingEvent?.status === "Confirmed") {
+            const bookingRef =
+              existingEvent.bookingCode ?? extractBookingId(editingEventId);
+            consumeConfirmedEditGrant(bookingRef);
+            setEvents((prev) =>
+              prev.map((event) =>
+                event.id === editingEventId
+                  ? {
+                      ...event,
+                      bookingScenario:
+                        event.bookingScenario === "ER"
+                          ? undefined
+                          : event.bookingScenario,
+                    }
+                  : event,
+              ),
+            );
+          }
           if (existingEvent && selectedSlot) {
             if (existingEvent.date !== selectedSlot.date) {
               void dispatchBookingEventIfApi(
@@ -5037,7 +5332,7 @@ export default function ProfessionalFixedLocationCalendar({
                 bookingScenario:
                   resolvedStatus === "Requested"
                     ? (existingEvent?.bookingScenario ?? "BR")
-                    : existingEvent?.bookingScenario,
+                    : undefined,
                 showClientName: clientName,
                 details,
               }
@@ -5082,6 +5377,11 @@ export default function ProfessionalFixedLocationCalendar({
       setEditingEventId(nextEvent.id);
       setSlotStatus(nextEvent.status);
       setIsEditingExisting(false);
+      if (existingEvent?.status === "Confirmed" && editingEventId) {
+        const bookingRef =
+          existingEvent.bookingCode ?? extractBookingId(editingEventId);
+        consumeConfirmedEditGrant(bookingRef);
+      }
       showSnackbar({
         severity: "success",
         message: "Booking updated.",
@@ -5093,6 +5393,7 @@ export default function ProfessionalFixedLocationCalendar({
       bookingInternalNote,
       bookingPhoneDraft,
       bookingTotalDiscount,
+      bookingTotalForSave,
       desiredLocationDraft,
       dispatchBookingEventIfApi,
       editingEventId,
@@ -6577,6 +6878,9 @@ export default function ProfessionalFixedLocationCalendar({
         anchor="right"
         open={slotDrawerOpen}
         onClose={closeBookingDrawer}
+        bodyBgcolor={
+          isCancelledOrInvalidBooking ? m.cancelledSurface : undefined
+        }
         title={
           activityDetailItem
             ? activityDetailItem.detailType === "cancellation"
@@ -6812,10 +7116,13 @@ export default function ProfessionalFixedLocationCalendar({
                 {slotBookingScreen === "new-booking" &&
                 editingEventId &&
                 !isCompletedBooking &&
+                !isCancelledOrInvalidBooking &&
                 !hideClientBookingEditButton ? (
                   <AppButton
                     tone="secondary"
-                    onClick={() => setIsEditingExisting(true)}
+                    onClick={() => {
+                      void handleBookingActionSelect("edit");
+                    }}
                     disabled={isEditingExisting}
                     sx={{
                       borderRadius: "10px",
@@ -6830,7 +7137,7 @@ export default function ProfessionalFixedLocationCalendar({
                 ) : null}
                 {!hideClientBookingFooterActions &&
                   (slotBookingScreen === "new-booking" &&
-                  isCompletedBooking ? null : (
+                  (isCompletedBooking || isCancelledOrInvalidBooking) ? null : (
                     <AppButton
                       tone="primary"
                       disabled={
@@ -6852,7 +7159,8 @@ export default function ProfessionalFixedLocationCalendar({
                                       isViewingExisting)
                       }
                       onClick={() => {
-                        if (isCompletedBooking) return;
+                        if (isCompletedBooking || isCancelledOrInvalidBooking)
+                          return;
                         setSlotSaveAttempted(true);
                         if (
                           drawerPrimaryActionLabel === "Update" &&
@@ -7979,8 +8287,8 @@ export default function ProfessionalFixedLocationCalendar({
                           >
                             Booking Details
                           </BodyText>
-                          {viewingBookingEvent.status === "Confirmed" ||
-                          viewingBookingEvent.status === "In Progress" ? (
+                          {viewingBookingEvent &&
+                          showProfessionalActionMenu(viewingBookingEvent) ? (
                             <>
                               <AppButton
                                 onClick={(e) =>
@@ -8029,71 +8337,168 @@ export default function ProfessionalFixedLocationCalendar({
                                   },
                                 }}
                               >
-                                {viewingBookingEvent.status === "Confirmed" ? (
-                                  <MenuItem
-                                    onClick={() =>
-                                      void handleBookingActionSelect("edit")
-                                    }
-                                    sx={{
-                                      fontWeight: 800,
-                                      fontSize: 13.5,
-                                      color: alpha(m.navy, 0.78),
-                                      py: 1.1,
-                                    }}
-                                  >
-                                    Edit Booking
-                                  </MenuItem>
-                                ) : null}
-                                {viewingBookingEvent.status === "Confirmed" ? (
-                                  <Divider sx={{ my: "0 !important" }} />
-                                ) : null}
-                                <MenuItem
-                                  onClick={() =>
-                                    void handleBookingActionSelect("cancel")
-                                  }
-                                  sx={{
+                                {(() => {
+                                  const refundApplicable = isRefundApplicable({
+                                    status: viewingBookingEvent.status,
+                                    prepaid:
+                                      viewingBookingEvent.details
+                                        ?.prepaymentStatus === "confirmed",
+                                    prepaymentStatus:
+                                      viewingBookingEvent.details
+                                        ?.prepaymentStatus,
+                                  });
+                                  const actions =
+                                    resolveProfessionalBookingActions(
+                                      viewingBookingEvent,
+                                      { refundApplicable },
+                                    );
+                                  const itemSx = {
                                     fontWeight: 800,
                                     fontSize: 13.5,
                                     color: alpha(m.navy, 0.78),
                                     py: 1.1,
-                                  }}
-                                >
-                                  Cancel Booking
-                                </MenuItem>
-                                <Divider sx={{ my: "0 !important" }} />
-                                {viewingBookingEvent.status === "Confirmed" ? (
-                                  <MenuItem
-                                    onClick={() =>
-                                      void handleBookingActionSelect(
-                                        "in_progress",
-                                      )
-                                    }
-                                    sx={{
-                                      fontWeight: 800,
-                                      fontSize: 13.5,
-                                      color: alpha(m.navy, 0.78),
-                                      py: 1.1,
-                                    }}
-                                  >
-                                    In Progress
-                                  </MenuItem>
-                                ) : null}
-                                {viewingBookingEvent.status === "Confirmed" ? (
-                                  <Divider sx={{ my: "0 !important" }} />
-                                ) : null}
-                                <MenuItem
-                                  onClick={() =>
-                                    void handleBookingActionSelect("no_show")
+                                  } as const;
+                                  const items: React.ReactNode[] = [];
+                                  if (actions.edit) {
+                                    items.push(
+                                      <MenuItem
+                                        key="edit"
+                                        onClick={() =>
+                                          void handleBookingActionSelect("edit")
+                                        }
+                                        sx={itemSx}
+                                      >
+                                        Edit Booking
+                                      </MenuItem>,
+                                    );
                                   }
-                                  sx={{
-                                    fontWeight: 800,
-                                    fontSize: 13.5,
-                                    color: alpha(m.navy, 0.78),
-                                    py: 1.1,
-                                  }}
-                                >
-                                  No Show
-                                </MenuItem>
+                                  if (actions.cancel) {
+                                    items.push(
+                                      <MenuItem
+                                        key="cancel"
+                                        onClick={() =>
+                                          void handleBookingActionSelect(
+                                            "cancel",
+                                          )
+                                        }
+                                        sx={itemSx}
+                                      >
+                                        Cancel Booking
+                                      </MenuItem>,
+                                    );
+                                  }
+                                  if (actions.in_progress) {
+                                    items.push(
+                                      <MenuItem
+                                        key="in_progress"
+                                        onClick={() =>
+                                          void handleBookingActionSelect(
+                                            "in_progress",
+                                          )
+                                        }
+                                        sx={itemSx}
+                                      >
+                                        In Progress
+                                      </MenuItem>,
+                                    );
+                                  }
+                                  if (actions.no_show) {
+                                    items.push(
+                                      <MenuItem
+                                        key="no_show"
+                                        onClick={() =>
+                                          void handleBookingActionSelect(
+                                            "no_show",
+                                          )
+                                        }
+                                        sx={itemSx}
+                                      >
+                                        No Show
+                                      </MenuItem>,
+                                    );
+                                  }
+                                  if (actions.checkout) {
+                                    items.push(
+                                      <MenuItem
+                                        key="checkout"
+                                        onClick={() =>
+                                          void handleBookingActionSelect(
+                                            "checkout",
+                                          )
+                                        }
+                                        sx={itemSx}
+                                      >
+                                        Checkout
+                                      </MenuItem>,
+                                    );
+                                  }
+                                  if (actions.rebook) {
+                                    items.push(
+                                      <MenuItem
+                                        key="rebook"
+                                        onClick={() =>
+                                          void handleBookingActionSelect(
+                                            "rebook",
+                                          )
+                                        }
+                                        sx={itemSx}
+                                      >
+                                        Rebook
+                                      </MenuItem>,
+                                    );
+                                  }
+                                  if (actions.refund) {
+                                    items.push(
+                                      <MenuItem
+                                        key="refund"
+                                        onClick={() =>
+                                          void handleBookingActionSelect(
+                                            "refund",
+                                          )
+                                        }
+                                        sx={itemSx}
+                                      >
+                                        <Stack
+                                          direction="row"
+                                          alignItems="center"
+                                          spacing={0.75}
+                                        >
+                                          <BookingGuidelineIcon
+                                            variant="refund_completed"
+                                            size={14}
+                                          />
+                                          <span>Refund</span>
+                                        </Stack>
+                                      </MenuItem>,
+                                    );
+                                  }
+                                  if (actions.delete) {
+                                    items.push(
+                                      <MenuItem
+                                        key="delete"
+                                        onClick={() =>
+                                          void handleBookingActionSelect(
+                                            "delete",
+                                          )
+                                        }
+                                        sx={itemSx}
+                                      >
+                                        Delete
+                                      </MenuItem>,
+                                    );
+                                  }
+                                  return items.flatMap((item, index) =>
+                                    index === 0
+                                      ? [item]
+                                      : [
+                                          <Divider
+                                            key={`div-${index}`}
+                                            sx={{ my: "0 !important" }}
+                                          />,
+                                          item,
+                                        ],
+                                  );
+                                })()}
                               </Menu>
                             </>
                           ) : null}
@@ -8250,9 +8655,17 @@ export default function ProfessionalFixedLocationCalendar({
                                             </Tooltip>
                                           ))}
                                           {indicator === "ER" ? (
-                                            <OpenInNewRoundedIcon
-                                              sx={{ fontSize: 12 }}
-                                            />
+                                            resolveProfessionalBookingRequestDirection(
+                                              viewingBookingEvent,
+                                            ) === "incoming" ? (
+                                              <BookingRequestReceivedIcon
+                                                size={12}
+                                              />
+                                            ) : (
+                                              <BookingRequestSentIcon
+                                                size={12}
+                                              />
+                                            )
                                           ) : null}
                                           {indicator === "EBR" &&
                                           prepaymentVariant &&
@@ -8321,8 +8734,23 @@ export default function ProfessionalFixedLocationCalendar({
                                     ? prepayment
                                     : undefined;
 
+                                const prepaymentAsIndicator =
+                                  standalonePrepayment === "pending"
+                                    ? ("waiting_for_prepayment" as const)
+                                    : standalonePrepayment === "confirmed"
+                                      ? ("prepaid" as const)
+                                      : standalonePrepayment === "canceled" ||
+                                          standalonePrepayment === "invalid"
+                                        ? ("refund_pending" as const)
+                                        : null;
+
+                                const filteredResponses =
+                                  standaloneResponses.filter(
+                                    (item) => item !== prepaymentAsIndicator,
+                                  );
+
                                 if (
-                                  !standaloneResponses.length &&
+                                  !filteredResponses.length &&
                                   !standalonePrepayment
                                 )
                                   return null;
@@ -8333,7 +8761,7 @@ export default function ProfessionalFixedLocationCalendar({
                                     alignItems="center"
                                     spacing={0.5}
                                   >
-                                    {standaloneResponses.map((item) => (
+                                    {filteredResponses.map((item) => (
                                       <Tooltip
                                         key={item}
                                         title={BOOKING_INDICATOR_LABELS[item]}
@@ -8940,7 +9368,10 @@ export default function ProfessionalFixedLocationCalendar({
                                           .endsWith(".pdf") ? (
                                           <Box
                                             component="img"
-                                            src={img.previewUrl}
+                                            src={
+                                              resolveMediaUrl(img.previewUrl) ??
+                                              img.previewUrl
+                                            }
                                             alt={img.name}
                                             sx={{
                                               width: "100%",
@@ -10052,7 +10483,7 @@ export default function ProfessionalFixedLocationCalendar({
                                   mb: 1,
                                 }}
                               >
-                                Desired Location
+                                Visit Address
                               </BodyText>
                               <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
                                 <AppTextField
@@ -10065,6 +10496,7 @@ export default function ProfessionalFixedLocationCalendar({
                                       street: e.target.value,
                                     }))
                                   }
+                                  disabled={isViewingExisting}
                                   fullWidth
                                 />
                                 <AppTextField
@@ -10077,6 +10509,7 @@ export default function ProfessionalFixedLocationCalendar({
                                       number: e.target.value,
                                     }))
                                   }
+                                  disabled={isViewingExisting}
                                   fullWidth
                                 />
                               </Stack>
@@ -10091,8 +10524,26 @@ export default function ProfessionalFixedLocationCalendar({
                                       postalCode: e.target.value,
                                     }))
                                   }
+                                  disabled={isViewingExisting}
                                   fullWidth
                                 />
+                                {isViewingExisting ? (
+                                  <>
+                                    <AppTextField
+                                      label="Province"
+                                      value={desiredLocationDraft.province}
+                                      disabled
+                                      fullWidth
+                                    />
+                                    <AppTextField
+                                      label="Municipality"
+                                      value={desiredLocationDraft.municipality}
+                                      disabled
+                                      fullWidth
+                                    />
+                                  </>
+                                ) : (
+                                  <>
                                 <AppDropdown
                                   label="Province"
                                   value={desiredLocationDraft.province}
@@ -10104,6 +10555,14 @@ export default function ProfessionalFixedLocationCalendar({
                                   }
                                   options={[
                                     { label: "Province", value: "" },
+                                    ...(desiredLocationDraft.province
+                                      ? [
+                                          {
+                                            label: desiredLocationDraft.province,
+                                            value: desiredLocationDraft.province,
+                                          },
+                                        ]
+                                      : []),
                                     {
                                       label: "Province 1",
                                       value: "Province 1",
@@ -10127,6 +10586,16 @@ export default function ProfessionalFixedLocationCalendar({
                                   }
                                   options={[
                                     { label: "Municipality", value: "" },
+                                    ...(desiredLocationDraft.municipality
+                                      ? [
+                                          {
+                                            label:
+                                              desiredLocationDraft.municipality,
+                                            value:
+                                              desiredLocationDraft.municipality,
+                                          },
+                                        ]
+                                      : []),
                                     {
                                       label: "Municipality 1",
                                       value: "Municipality 1",
@@ -10139,6 +10608,8 @@ export default function ProfessionalFixedLocationCalendar({
                                   fullWidth
                                   placeholder="Select municipality"
                                 />
+                                  </>
+                                )}
                               </Stack>
                             </Box>
                           )}
@@ -10169,7 +10640,7 @@ export default function ProfessionalFixedLocationCalendar({
                         {isViewingBooking &&
                         isBookingRequestAccepted(viewingBookingEvent) ? (
                           <BookingRequestAcceptedPanel
-                            totalPrice={totalPrice}
+                            totalPrice={bookingTotalForSave}
                             prepaymentPercent={
                               Number(prepaymentPercent) || undefined
                             }
@@ -10201,28 +10672,37 @@ export default function ProfessionalFixedLocationCalendar({
                             >
                               Total Price:
                             </BodyText>
-                            {bookingDiscountAmount > 0 &&
-                            bookingTotalDiscount ? (
+                            {bookingDiscountAmount > 0 ||
+                            bookingPrice.feesTotal > 0 ||
+                            bookingPrice.prepaidApplied > 0 ? (
                               <Stack
-                                direction="row"
-                                alignItems="baseline"
-                                spacing={1}
-                                sx={{
-                                  flexWrap: "wrap",
-                                  justifyContent: "flex-end",
-                                }}
+                                alignItems="flex-end"
+                                spacing={0.35}
+                                sx={{ minWidth: 0 }}
                               >
-                                <BodyText
-                                  sx={{
-                                    fontSize: 16,
-                                    fontWeight: 800,
-                                    color: alpha(m.navy, 0.42),
-                                    textDecoration: "line-through",
-                                    lineHeight: 1.2,
-                                  }}
-                                >
-                                  {subtotalPrice}€
-                                </BodyText>
+                                {(bookingDiscountAmount > 0 ||
+                                  bookingPrice.feesTotal > 0 ||
+                                  bookingPrice.prepaidApplied > 0) &&
+                                bookingPrice.lineSubtotal +
+                                  bookingPrice.extrasAmount !==
+                                  totalPrice ? (
+                                  <BodyText
+                                    sx={{
+                                      fontSize: 14,
+                                      fontWeight: 800,
+                                      color: alpha(m.navy, 0.42),
+                                      textDecoration: "line-through",
+                                      lineHeight: 1.2,
+                                    }}
+                                  >
+                                    {Math.round(
+                                      (bookingPrice.lineSubtotal +
+                                        bookingPrice.extrasAmount) *
+                                        100,
+                                    ) / 100}
+                                    €
+                                  </BodyText>
+                                ) : null}
                                 <BodyText
                                   sx={{
                                     fontSize: 18,
@@ -10233,18 +10713,71 @@ export default function ProfessionalFixedLocationCalendar({
                                 >
                                   {totalPrice}€
                                 </BodyText>
-                                <BodyText
-                                  sx={{
-                                    fontSize: 12,
-                                    fontWeight: 800,
-                                    color: m.teal,
-                                    lineHeight: 1.2,
-                                  }}
+                                <Stack
+                                  direction="row"
+                                  spacing={0.75}
+                                  flexWrap="wrap"
+                                  justifyContent="flex-end"
+                                  useFlexGap
                                 >
-                                  {bookingTotalDiscount.type === "percentage"
-                                    ? `${bookingTotalDiscount.amount}% Discount`
-                                    : `${formatManualEntryDiscountLabel(bookingTotalDiscount)} Discount`}
-                                </BodyText>
+                                  {bookingDiscountAmount > 0 &&
+                                  bookingTotalDiscount ? (
+                                    <BodyText
+                                      sx={{
+                                        fontSize: 12,
+                                        fontWeight: 800,
+                                        color: m.teal,
+                                        lineHeight: 1.2,
+                                      }}
+                                    >
+                                      {bookingTotalDiscount.type ===
+                                      "percentage"
+                                        ? `${bookingTotalDiscount.amount}% Discount`
+                                        : `${formatManualEntryDiscountLabel(bookingTotalDiscount)} Discount`}
+                                    </BodyText>
+                                  ) : null}
+                                  {bookingPrice.lateCancellationFeeAmount >
+                                  0 ? (
+                                    <BodyText
+                                      sx={{
+                                        fontSize: 12,
+                                        fontWeight: 800,
+                                        color: alpha(m.navy, 0.55),
+                                        lineHeight: 1.2,
+                                      }}
+                                    >
+                                      +€
+                                      {bookingPrice.lateCancellationFeeAmount}{" "}
+                                      Cancel fee
+                                    </BodyText>
+                                  ) : null}
+                                  {bookingPrice.lateRescheduleFeeAmount >
+                                  0 ? (
+                                    <BodyText
+                                      sx={{
+                                        fontSize: 12,
+                                        fontWeight: 800,
+                                        color: alpha(m.navy, 0.55),
+                                        lineHeight: 1.2,
+                                      }}
+                                    >
+                                      +€{bookingPrice.lateRescheduleFeeAmount}{" "}
+                                      Late fee
+                                    </BodyText>
+                                  ) : null}
+                                  {bookingPrice.prepaidApplied > 0 ? (
+                                    <BodyText
+                                      sx={{
+                                        fontSize: 12,
+                                        fontWeight: 800,
+                                        color: m.teal,
+                                        lineHeight: 1.2,
+                                      }}
+                                    >
+                                      −€{bookingPrice.prepaidApplied} Prepaid
+                                    </BodyText>
+                                  ) : null}
+                                </Stack>
                               </Stack>
                             ) : (
                               <BodyText
@@ -10682,7 +11215,14 @@ export default function ProfessionalFixedLocationCalendar({
                           </>
                         ) : null}
 
-                        {showIncomingRequestActions ? (
+                        {showIncomingErActions && incomingErNote ? (
+                          <EditRequestIncomingNote
+                            note={incomingErNote}
+                            from="client"
+                          />
+                        ) : null}
+
+                        {showIncomingRequestActions || showIncomingErActions ? (
                           <BookingRequestResponseActions
                             onAccept={() => setIncomingConfirmAction("accept")}
                             onSuggestChange={() =>
@@ -10777,6 +11317,7 @@ export default function ProfessionalFixedLocationCalendar({
                           </Box>
                         ) : null}
 
+                        {slotLocation === "DL" && isViewingExisting ? null : (
                         <Box
                           sx={{
                             borderRadius: "10px",
@@ -10790,17 +11331,14 @@ export default function ProfessionalFixedLocationCalendar({
                             useFlexGap
                             flexWrap="wrap"
                           >
-                            {slotLocation === "DL" ? (
+                            {slotLocation === "DL" && !isViewingExisting ? (
                               <>
                                 <ButtonBase
                                   onClick={(e) => {
-                                    if (isViewingExisting || showInlineGuestField)
-                                      return;
+                                    if (showInlineGuestField) return;
                                     setDlGuestMenuAnchor(e.currentTarget);
                                   }}
-                                  disabled={
-                                    isViewingExisting || showInlineGuestField
-                                  }
+                                  disabled={showInlineGuestField}
                                   sx={{
                                     border: `1px solid ${alpha(m.navy, 0.14)}`,
                                     borderRadius: "10px",
@@ -10876,10 +11414,8 @@ export default function ProfessionalFixedLocationCalendar({
                                 </Menu>
                                 <ButtonBase
                                   onClick={() => {
-                                    if (isViewingExisting) return;
                                     addDlParticipant("planning");
                                   }}
-                                  disabled={isViewingExisting}
                                   sx={{
                                     border: `1px solid ${alpha(m.navy, 0.14)}`,
                                     borderRadius: "10px",
@@ -10889,7 +11425,6 @@ export default function ProfessionalFixedLocationCalendar({
                                     gap: 1.25,
                                     px: 1.5,
                                     bgcolor: "#fff",
-                                    "&.Mui-disabled": { opacity: 0.55 },
                                   }}
                                 >
                                   <Box
@@ -10919,10 +11454,8 @@ export default function ProfessionalFixedLocationCalendar({
                                 </ButtonBase>
                                 <ButtonBase
                                   onClick={() => {
-                                    if (isViewingExisting) return;
                                     addDlParticipant("buffer");
                                   }}
-                                  disabled={isViewingExisting}
                                   sx={{
                                     border: `1px solid ${alpha(m.navy, 0.14)}`,
                                     borderRadius: "10px",
@@ -10932,7 +11465,6 @@ export default function ProfessionalFixedLocationCalendar({
                                     gap: 1.25,
                                     px: 1.5,
                                     bgcolor: "#fff",
-                                    "&.Mui-disabled": { opacity: 0.55 },
                                   }}
                                 >
                                   <Box
@@ -10961,7 +11493,7 @@ export default function ProfessionalFixedLocationCalendar({
                                   </BodyText>
                                 </ButtonBase>
                               </>
-                            ) : (
+                            ) : slotLocation !== "DL" ? (
                               <ButtonBase
                                 onClick={() => {
                                   if (isViewingExisting || showInlineGuestField)
@@ -11023,9 +11555,10 @@ export default function ProfessionalFixedLocationCalendar({
                                   Guest
                                 </BodyText>
                               </ButtonBase>
-                            )}
+                            ) : null}
                           </Stack>
                         </Box>
+                        )}
 
                         <Box sx={{ flex: 1, minHeight: 40 }} />
                       </>
@@ -11388,6 +11921,22 @@ export default function ProfessionalFixedLocationCalendar({
         action={incomingConfirmAction}
         onClose={() => setIncomingConfirmAction(null)}
         onConfirm={() => {
+          if (showIncomingErActions) {
+            if (incomingConfirmAction === "accept")
+              void handleAcceptConfirmedEr();
+            else if (incomingConfirmAction === "reject")
+              void handleRejectConfirmedEr();
+            else if (incomingConfirmAction === "suggest" && viewingBookingEvent) {
+              const bookingRef =
+                viewingBookingEvent.bookingCode ??
+                extractBookingId(viewingBookingEvent.id);
+              professionalSuggestBookingChanges(bookingRef, {
+                professionalNote: "Suggested changes via message",
+              });
+              openBookingMessages(viewingBookingEvent);
+            }
+            return;
+          }
           if (incomingConfirmAction === "accept")
             void handleAcceptIncomingRequest();
           else if (incomingConfirmAction === "reject")
@@ -11395,6 +11944,11 @@ export default function ProfessionalFixedLocationCalendar({
           else if (incomingConfirmAction === "suggest" && viewingBookingEvent)
             openBookingMessages(viewingBookingEvent);
         }}
+      />
+      <EditRequestNoteDialog
+        open={erNoteDialogOpen}
+        onClose={() => setErNoteDialogOpen(false)}
+        onConfirm={(note) => void handleSendConfirmedEr(note)}
       />
       <CalendarNoShowModal
         open={noShowModalOpen}

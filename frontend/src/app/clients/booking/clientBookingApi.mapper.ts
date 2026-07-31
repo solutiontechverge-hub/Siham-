@@ -2,10 +2,11 @@ import type { ClientBookingDraft } from "../../../components/common/client-booki
 import type { ClientBookingRecord, ClientBookingStatus } from "./clientBookingRecords";
 import { fmtMinutesToTimeLabel, parseTimeLabelToMinutes, buildWallClockDateTimeIso } from "./booking-time";
 import { wallClockDateFromDateTime, wallClockTimeFromDateTime } from "../../../components/common/calendar/calendar.utils";
-import { parseCalendarEntryNotes, parseStoredEbrFromNotes } from "../../../components/common/calendar/bookingEventDetails";
+import { parseCalendarEntryNotes, parseStoredEbrFromNotes, parseStoredErFromNotes } from "../../../components/common/calendar/bookingEventDetails";
+import { syncEditRequestFromBookingApi } from "../../../components/common/client-booking/syncEditRequestFromApi";
+import { resolveMediaUrl } from "../../../lib/resolveMediaUrl";
 import type { BusinessSetupListing, CalendarBooking, CreateBookingRequest } from "../../../store/services/businessApi";
 import { mapApiBookingStatusToClient } from "./clientBookingStatus";
-
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function isUuid(value: string | null | undefined): value is string {
@@ -91,6 +92,9 @@ function mapApiStatus(status: ClientBookingStatus): CreateBookingRequest["status
   if (status === "completed") return "completed";
   if (status === "cancelled") return "cancelled";
   if (status === "no_show") return "no_show";
+  if (status === "invalid") return "invalid";
+  if (status === "in_progress") return "in_progress";
+  if (status === "waiting_for_prepayment") return "confirmed";
   return "requested";
 }
 
@@ -127,9 +131,8 @@ export function buildClientBookingApiPayload(input: {
     firstService.teamMemberId ?? input.draft.teamMembers?.[0]?.id ?? null,
   );
 
-  const serviceNames = services.map((service) => service.name).filter(Boolean);
-  const projectDescription = input.draft.projectDetails?.description?.trim() || "";
   const projectUploads = input.draft.projectDetails?.uploads ?? [];
+  const projectDescription = input.draft.projectDetails?.description?.trim() || "";
   const desiredLocation = input.draft.desiredLocation;
   const hasDesiredVisitAddress =
     input.locationMode === "desired" &&
@@ -152,11 +155,8 @@ export function buildClientBookingApiPayload(input: {
   const imageUrls = projectUploads.filter((u) => u.url && isImageUpload(u)).map((u) => u.url as string);
   const documentUrls = projectUploads.filter((u) => u.url && !isImageUpload(u)).map((u) => u.url as string);
 
-  const humanNotesParts = [
-    serviceNames.length > 1 ? `Services: ${serviceNames.join(", ")}` : null,
-    projectDescription ? `Project: ${projectDescription}` : null,
-  ].filter(Boolean);
-  const humanNotes = humanNotesParts.length ? humanNotesParts.join(" | ") : "";
+  // Keep human notes blank — services/project live in clientSnapshot, not Internal Note.
+  const humanNotes = "";
 
   const clientSnapshot = {
     people: (input.draft.people ?? []).map((p) => ({
@@ -262,6 +262,11 @@ function hhmmToTimeLabel(hhmm?: string | null) {
   return fmtMinutesToTimeLabel(Number(match[1]) * 60 + Number(match[2]));
 }
 
+function nonEmpty(value: unknown): string | undefined {
+  const trimmed = String(value ?? "").trim();
+  return trimmed || undefined;
+}
+
 function buildAddressLabel(booking: CalendarBooking) {
   if (booking.location_type === "desired") {
     const visitParts = [
@@ -276,8 +281,9 @@ function buildAddressLabel(booking: CalendarBooking) {
     if (visitParts.length) return visitParts.join(", ");
   }
   const parts = [
-    booking.fixed_location_address,
     booking.fixed_location_street_number,
+    booking.fixed_location_address,
+    booking.fixed_location_postal_code,
     booking.fixed_location_municipality,
     booking.fixed_location_province,
   ]
@@ -309,6 +315,26 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
   const notesDetails = parseCalendarEntryNotes(booking.notes);
   const clientSnapshot = notesDetails?.clientSnapshot;
   const bookingCancelled = String(booking.status ?? "").toLowerCase() === "cancelled";
+  const bookingRef = booking.unique_code || String(booking.id);
+  // Backend edit_request is source of truth for Confirmed ER (fallback: notes.er).
+  if (String(booking.status ?? "").toLowerCase() === "confirmed") {
+    syncEditRequestFromBookingApi(
+      bookingRef,
+      booking.edit_request ??
+        (() => {
+          const er = parseStoredErFromNotes(booking.notes);
+          if (!er || er.status === "none") return null;
+          return {
+            status: er.status as "pending" | "approved" | "rejected",
+            note: er.note,
+            initiated_by: (er.initiatedBy ?? "client") as "client" | "professional",
+            requested_at: er.requestedAt ?? null,
+            responded_at: er.approvedAt ?? er.rejectedAt ?? null,
+            edit_grant_active: Boolean(er.editGrantActive),
+          };
+        })(),
+    );
+  }
   const activeEbr =
     !bookingCancelled && ebr && (ebr.status === "suggested" || ebr.status === "pending") ? ebr : null;
   const incomingEditRequest =
@@ -419,14 +445,21 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
   }));
   const projectUploads =
     detailUploads.length > 0
-      ? detailUploads.map((upload, index) => ({
-          id: upload.id || `upload-${index}`,
-          name: upload.name || `File ${index + 1}`,
-          url: upload.url ?? undefined,
-          mimeType: upload.mimeType ?? undefined,
-          kind: upload.kind === "document" ? ("document" as const) : ("image" as const),
-        }))
-      : [...imageUploads, ...documentUploads];
+      ? detailUploads.map((upload, index) => {
+          const resolved = resolveMediaUrl(upload.url);
+          return {
+            id: upload.id || `upload-${index}`,
+            name: upload.name || `File ${index + 1}`,
+            url: upload.url ?? undefined,
+            previewUrl: resolved,
+            mimeType: upload.mimeType ?? undefined,
+            kind: upload.kind === "document" ? ("document" as const) : ("image" as const),
+          };
+        })
+      : [...imageUploads, ...documentUploads].map((upload) => ({
+          ...upload,
+          previewUrl: resolveMediaUrl(upload.url),
+        }));
   const projectDescription =
     typeof locationDetails?.projectDescription === "string" ? locationDetails.projectDescription : "";
 
@@ -464,10 +497,11 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
     bookingRequestSent: status === "requested",
     bookingRequestDirection,
     shop: {
-      shopId: booking.business_setup_id,
-      shopName: booking.business_name ?? "Salon",
+      shopId: String(booking.business_setup_id ?? ""),
+      shopName: nonEmpty(booking.business_name) ?? "Salon",
       addressLabel: buildAddressLabel(booking) ?? undefined,
-      municipalityLabel: booking.fixed_location_municipality ?? undefined,
+      // Empty DB strings must not become "" — that blocks UI fallbacks (`??` only skips null/undefined).
+      municipalityLabel: nonEmpty(booking.fixed_location_municipality),
       locationMode: booking.location_type === "desired" ? "desired" : "fixed",
     },
     draft: {
@@ -688,11 +722,28 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
     prepaid,
     requiresPrepayment:
       prepaid ||
-      String(booking.prepayment_status ?? "").toLowerCase() === "required" ||
+      ["required", "pending"].includes(
+        String(booking.prepayment_status ?? "").toLowerCase(),
+      ) ||
       Boolean(notesDetails?.showPrepayment),
     prepaymentPercent: Number(notesDetails?.prepaymentPercent) || 0,
     contactPhone: booking.contact_number ?? undefined,
     notes: booking.notes ?? null,
+    editRequest: booking.edit_request ?? null,
+    updatedAt: booking.updated_at ?? booking.created_at ?? null,
+    lastEditedBy: (() => {
+      // Pending ER already has its own ER badge — do not invent lastEditedBy
+      // for it or the client list shows a redundant "Updated" chip.
+      if (activeEbr?.lastEditedBy === "professional" || activeEbr?.professionalNote) {
+        return "professional" as const;
+      }
+      if (activeEbr?.lastEditedBy === "client" || activeEbr?.clientNote) {
+        return "client" as const;
+      }
+      if (notesDetails?.lastEditedBy) return notesDetails.lastEditedBy;
+      // First-time BR is not an "update".
+      return null;
+    })(),
     editedServiceIds:
       notesDetails?.editedServiceIds?.length
         ? notesDetails.editedServiceIds

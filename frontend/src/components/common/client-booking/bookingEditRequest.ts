@@ -6,6 +6,8 @@ export type BookingEditRequestStatus =
   | "rejected"
   | "accepted";
 
+export type EditRequestInitiator = "client" | "professional";
+
 export type BookingEditSuggestedService = {
   id: string;
   name: string;
@@ -40,6 +42,15 @@ export type BookingEditRequestRecord = {
   suggestedAt?: string;
   rejectedAt?: string;
   acceptedAt?: string;
+  /** Who started this Confirmed Edit Request (ER). */
+  initiatedBy?: EditRequestInitiator;
+  /** Required notepad message for Confirmed ER. */
+  note?: string;
+  /**
+   * After Accept: one edit/save window is open.
+   * Cleared when the requester saves once (then a new ER is required).
+   */
+  editGrantActive?: boolean;
   /** Optional note from professional when suggesting changes */
   professionalNote?: string;
   /** Optional note from client when suggesting changes on an EBR */
@@ -90,19 +101,31 @@ export function getBookingEditRequest(bookingRef: string): BookingEditRequestRec
   return all[bookingRef] ?? all[normalized] ?? all[`#${normalized}`] ?? { status: "none" };
 }
 
-/** Client sends an edit request to the professional. */
-export function sendBookingEditRequest(bookingRef: string): BookingEditRequestRecord {
+/** Client or professional sends a Confirmed Edit Request (ER). Note is required. */
+export function sendBookingEditRequest(
+  bookingRef: string,
+  options?: {
+    note?: string;
+    initiatedBy?: EditRequestInitiator;
+  },
+): BookingEditRequestRecord {
+  const note = options?.note?.trim() ?? "";
   const all = loadAll();
   const next: BookingEditRequestRecord = {
     status: "pending",
     requestedAt: new Date().toISOString(),
+    initiatedBy: options?.initiatedBy ?? "client",
+    note: note || undefined,
+    editGrantActive: false,
   };
+  const normalized = bookingRef.replace(/^#/, "").trim();
   all[bookingRef] = next;
+  if (normalized && normalized !== bookingRef) all[normalized] = next;
   saveAll(all);
   return next;
 }
 
-/** Professional approves the client's edit request. */
+/** Professional or peer approves the edit request — opens one save window for the requester. */
 export function approveBookingEditRequest(bookingRef: string): BookingEditRequestRecord {
   const all = loadAll();
   const prev = all[bookingRef] ?? getBookingEditRequest(bookingRef);
@@ -110,10 +133,68 @@ export function approveBookingEditRequest(bookingRef: string): BookingEditReques
     status: "approved",
     requestedAt: prev?.requestedAt,
     approvedAt: new Date().toISOString(),
+    initiatedBy: prev?.initiatedBy,
+    note: prev?.note,
+    editGrantActive: true,
   };
+  const normalized = bookingRef.replace(/^#/, "").trim();
   all[bookingRef] = next;
+  if (normalized && normalized !== bookingRef) all[normalized] = next;
   saveAll(all);
   return next;
+}
+
+/** True when the requester may open the normal edit flow (after Accept, before first save). */
+export function isConfirmedEditGrantActive(
+  bookingRef: string,
+  forInitiator?: EditRequestInitiator,
+): boolean {
+  const record = getBookingEditRequest(bookingRef);
+  if (record.status !== "approved" || !record.editGrantActive) return false;
+  if (forInitiator && record.initiatedBy !== forInitiator) return false;
+  return true;
+}
+
+/** Call after a successful Update/save to require a new ER next time. */
+export function consumeConfirmedEditGrant(bookingRef: string): BookingEditRequestRecord {
+  const all = loadAll();
+  const prev = all[bookingRef] ?? getBookingEditRequest(bookingRef);
+  const next: BookingEditRequestRecord = {
+    ...prev,
+    status: "none",
+    editGrantActive: false,
+  };
+  const normalized = bookingRef.replace(/^#/, "").trim();
+  all[bookingRef] = next;
+  if (normalized && normalized !== bookingRef) all[normalized] = next;
+  saveAll(all);
+  return next;
+}
+
+/** Hydrate local ER cache from API notes (cross-user sync). */
+export function syncBookingEditRequestFromRemote(
+  bookingRef: string,
+  remote: Partial<BookingEditRequestRecord> | null | undefined,
+): void {
+  if (!bookingRef || !remote) return;
+  const all = loadAll();
+  const normalized = bookingRef.replace(/^#/, "").trim();
+  const next: BookingEditRequestRecord = {
+    status: remote.status ?? "none",
+    requestedAt: remote.requestedAt,
+    approvedAt: remote.approvedAt,
+    suggestedAt: remote.suggestedAt,
+    rejectedAt: remote.rejectedAt,
+    acceptedAt: remote.acceptedAt,
+    initiatedBy: remote.initiatedBy,
+    note: remote.note,
+    editGrantActive: remote.editGrantActive,
+    professionalNote: remote.professionalNote,
+    clientNote: remote.clientNote,
+  };
+  all[bookingRef] = next;
+  if (normalized && normalized !== bookingRef) all[normalized] = next;
+  saveAll(all);
 }
 
 /** Professional suggests changes — client must accept to confirm. */

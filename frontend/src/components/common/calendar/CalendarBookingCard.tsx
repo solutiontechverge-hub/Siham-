@@ -22,6 +22,8 @@ import {
   toPrepaymentIconVariant,
 } from "./prepaymentStatus";
 import { useBookingPaymentDueMeta } from "./resolveBookingPaymentDueMeta";
+import { hasUnseenBookingUpdate } from "./bookingUpdateSeen";
+import { sanitizeInternalNoteText } from "./bookingEventDetails";
 
 export type CalendarBookingCardProps = {
   event: CalendarEvent;
@@ -76,7 +78,20 @@ export default function CalendarBookingCard({
   const theme = useTheme();
   const m = theme.palette.mollure;
   const isTicket = variant === "ticket";
-  const cardHeight = isTicket ? Math.max(34, height) : Math.max(78, height);
+  const isIncomingEbr =
+    event.bookingScenario === "EBR" &&
+    event.details?.requestDirection !== "outgoing";
+  const isIncomingEr =
+    event.bookingScenario === "ER" &&
+    event.details?.requestDirection === "incoming";
+  const incomingErNote = isIncomingEr
+    ? sanitizeInternalNoteText(
+        event.details?.editRequestNote || event.details?.internalNote,
+      )
+    : "";
+  const cardHeight = isTicket
+    ? Math.max(34, height)
+    : Math.max(incomingErNote ? 96 : 78, height);
   const isCompactTicket = dense || (isTicket && cardHeight < 48);
   const bookingRef = event.bookingCode ?? extractBookingId(event.id);
   const unreadCount = useProfessionalMessagingUnread(bookingRef);
@@ -90,7 +105,9 @@ export default function CalendarBookingCard({
   const paymentDueMeta = useBookingPaymentDueMeta(event);
   const isDesiredLocation = event.location === "DL";
   const isFixedLocation = event.location === "FL";
-  const hasNote = Boolean(event.details?.internalNote?.trim());
+  const hasNote =
+    Boolean(sanitizeInternalNoteText(event.details?.internalNote)) ||
+    Boolean(incomingErNote);
   const accentColor = serviceColor ?? accent.color;
   // Keep custom appearance colors readable on the grid until the user changes them.
   const backgroundColor = serviceColor
@@ -100,16 +117,28 @@ export default function CalendarBookingCard({
     ? alpha(serviceColor, 0.55)
     : event.status === "Requested"
       ? accent.border
-      : accent.border;
+      : isIncomingEr
+        ? alpha(m.teal, 0.65)
+        : accent.border;
   const cardPattern = isDesiredLocation
     ? "dots"
     : isFixedLocation
       ? "lines"
       : "none";
-  const isIncomingEbr =
-    event.bookingScenario === "EBR" &&
-    event.details?.requestDirection !== "outgoing";
-  const emphasizeRequest = isIncomingEbr || event.bookingScenario === "BR";
+  const emphasizeRequest =
+    isIncomingEbr ||
+    isIncomingEr ||
+    (event.bookingScenario === "BR" && event.status === "Requested");
+  const showUpdated =
+    event.bookingScenario !== "EBR" &&
+    event.bookingScenario !== "ER" &&
+    event.status !== "Requested" &&
+    hasUnseenBookingUpdate({
+      viewer: "professional",
+      bookingRef,
+      updatedAt: event.updatedAt,
+      lastEditedBy: event.details?.lastEditedBy ?? null,
+    });
 
   return (
     <Box
@@ -156,6 +185,12 @@ export default function CalendarBookingCard({
         titleBold={emphasizeRequest}
         timeLabel={dense ? "" : `(${event.start} to ${event.end})`}
         locationLabel={event.location}
+        notePreview={
+          incomingErNote
+            ? `Note from client: ${incomingErNote}`
+            : null
+        }
+        showUpdated={showUpdated}
         status={{
           label: event.status,
           sx: {
@@ -165,13 +200,15 @@ export default function CalendarBookingCard({
         }}
         accentColor={accentColor}
         borderColor={borderColor}
-        backgroundColor={backgroundColor}
+        backgroundColor={
+          isIncomingEr ? alpha(m.teal, 0.14) : backgroundColor
+        }
         pattern={cardPattern}
         scenarioBadges={scenarioIndicators.map((label) => ({
           label,
           showRequestSentIcon: label === "BR",
           requestDirection:
-            label === "BR"
+            label === "BR" || label === "ER"
               ? resolveProfessionalBookingRequestDirection(event)
               : undefined,
           requestAccepted: label === "BR" && isBookingRequestAccepted(event),
@@ -186,8 +223,16 @@ export default function CalendarBookingCard({
                 ? undefined
                 : prepaymentIconVariant
               : undefined,
-          showExternalLink: label === "ER",
-          bold: label === "EBR" || label === "BR",
+          showExternalLink: false,
+          bold: label === "EBR" || label === "BR" || label === "ER",
+          sx:
+            label === "ER" && isIncomingEr
+              ? {
+                  border: `1px solid ${alpha(m.teal, 0.45)}`,
+                  bgcolor: alpha(m.teal, 0.12),
+                  color: m.teal,
+                }
+              : undefined,
         }))}
         prepaymentStatus={prepaymentIconVariant}
         paymentDue={
@@ -201,13 +246,24 @@ export default function CalendarBookingCard({
               }
             : null
         }
-        responseIndicators={
-          scenarioIndicators.includes("BR")
-            ? responseIndicators
-            : scenarioIndicators.length
-              ? undefined
-              : responseIndicators
-        }
+        // Prepayment pending already covered by prepaymentStatus — strip duplicate
+        // waiting_for_prepayment / prepaid / refund icons from response list.
+        responseIndicators={(() => {
+          const raw =
+            scenarioIndicators.includes("BR")
+              ? responseIndicators
+              : scenarioIndicators.length
+                ? undefined
+                : responseIndicators;
+          if (!raw?.length) return raw;
+          const skip = new Set<string>();
+          if (prepaymentIconVariant === "pending") skip.add("waiting_for_prepayment");
+          if (prepaymentIconVariant === "confirmed") skip.add("prepaid");
+          if (prepaymentIconVariant === "canceled_or_invalid") {
+            skip.add("refund_pending");
+          }
+          return raw.filter((item) => !skip.has(item));
+        })()}
         titleLineClamp={dense ? 1 : 1}
         calendarAction={{
           show: !isTicket && !dense,
@@ -216,7 +272,9 @@ export default function CalendarBookingCard({
         }}
         notesAction={{
           show: hasNote,
-          tooltip: "Note added",
+          tooltip: incomingErNote
+            ? "Edit request note"
+            : "Note added",
           onClick: onOpenNotes,
         }}
         profileAction={{

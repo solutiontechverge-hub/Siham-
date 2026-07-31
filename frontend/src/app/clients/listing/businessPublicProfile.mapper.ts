@@ -175,26 +175,65 @@ function buildFixedLocation(setup: BusinessSetupListing, shopName: string): Busi
   };
 }
 
+function splitCsv(value: string | null | undefined): string[] {
+  return String(value ?? "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
 function buildDesiredLocation(setup: BusinessSetupListing): BusinessPublicProfileDesiredLocation {
   const { desiredLocation } = setup;
-  const services = (desiredLocation.services ?? []).filter(Boolean);
   const area = desiredLocation.area?.trim() ?? "";
   const province = desiredLocation.province?.trim() ?? "";
 
-  if (!area && !province && services.length === 0) {
+  if (area === "All Netherlands" || province === "All Netherlands") {
+    return { areaMode: "All Netherlands", areas: [] };
+  }
+
+  // `desired_location_area` stores municipalities (comma-separated).
+  // Do not use `services` — that field is service titles, not places.
+  const municipalities = splitCsv(area);
+  const provinces = splitCsv(province);
+
+  if (!municipalities.length && !provinces.length) {
     return { areaMode: "Specific areas only", areas: [] };
   }
 
-  const municipalities = services.length > 0 ? services : area ? [area] : [];
-  const areas = province
-    ? [{ province, municipalities }]
-    : municipalities.length > 0
-      ? [{ province: area || "Service areas", municipalities }]
-      : [];
+  if (provinces.length === 1) {
+    return {
+      areaMode: "Specific areas only",
+      areas: [
+        {
+          province: provinces[0],
+          municipalities,
+          allMunicipalities: municipalities.length === 0,
+        },
+      ],
+    };
+  }
+
+  if (provinces.length > 1) {
+    // Provinces + municipalities are stored as flat lists (pairing is lost).
+    // Keep each province selectable; municipalities stay available for any pick.
+    return {
+      areaMode: "Specific areas only",
+      areas: provinces.map((entry) => ({
+        province: entry,
+        municipalities,
+        allMunicipalities: municipalities.length === 0,
+      })),
+    };
+  }
 
   return {
     areaMode: "Specific areas only",
-    areas,
+    areas: [
+      {
+        province: "Service areas",
+        municipalities,
+      },
+    ],
   };
 }
 
@@ -666,7 +705,9 @@ export function mapBusinessSetupToPublicProfile(setup: BusinessSetupListing): Bu
 
 export function findBusinessSetupByShopId(shopId: string, setups: BusinessSetupListing[] | null | undefined) {
   if (!shopId || !setups?.length) return null;
-  return setups.find((setup) => String(setup.id) === shopId) ?? null;
+  const normalized = String(shopId).trim();
+  if (!normalized) return null;
+  return setups.find((setup) => String(setup.id) === normalized) ?? null;
 }
 
 export function mapBusinessPublicProfileFromSetups(
