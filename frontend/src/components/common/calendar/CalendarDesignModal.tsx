@@ -182,7 +182,7 @@ export default function CalendarDesignModal({
       <Box sx={{ px: 2.5, py: 2 }}>
         <Stack spacing={1.5}>
           <AppDropdown
-            label=""
+            label="Design by"
             value={draft.scope}
             onChange={(val) =>
               setDraft((p) => ({
@@ -196,7 +196,7 @@ export default function CalendarDesignModal({
               { label: "Status", value: "Status" },
               { label: "Team Members", value: "Team Members" },
             ]}
-            placeholder="Categories"
+            placeholder="Select scope"
             fullWidth
           />
 

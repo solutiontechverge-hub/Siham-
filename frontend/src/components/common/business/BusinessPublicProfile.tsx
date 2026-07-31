@@ -1078,7 +1078,7 @@ export default function BusinessPublicProfile({
                       sx={{
                         fontSize: 18,
                         color:
-                          i < Math.round(data.rating)
+                          i < Math.round(Math.min(5, Math.max(0, data.rating)))
                             ? m.star
                             : alpha(m.navy, 0.15),
                       }}

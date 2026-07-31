@@ -143,7 +143,15 @@ export default function AdminAuthLoginShell() {
         </Box>
 
         <Box sx={{ position: "relative", zIndex: 1 }}>
-          <MarketingSiteHeader config={authLoginHeaderClient} />
+          <MarketingSiteHeader
+            navItems={[...authLoginHeaderClient.navItems]}
+            localeLabel={authLoginHeaderClient.localeLabel}
+            loginLabel={authLoginHeaderClient.loginLabel}
+            loginHref={authLoginHeaderClient.loginHref}
+            professionalLinkLabel={authLoginHeaderClient.professionalLinkLabel}
+            professionalHref={authLoginHeaderClient.professionalHref}
+            homeHref="/"
+          />
 
           <Container maxWidth="sm" sx={{ py: { xs: 4, md: 8 } }}>
             <Box sx={{ display: "flex", justifyContent: "center" }}>

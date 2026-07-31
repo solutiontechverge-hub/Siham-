@@ -168,7 +168,14 @@ export default function ClientListingCard({
         border: `1px solid ${tokens.cardBorder}`,
         boxShadow: "0 10px 22px rgba(16, 24, 40, 0.08)",
         cursor: "pointer",
-        "&:hover": { transform: "translateY(-1px)" },
+        transition:
+          "transform 0.22s ease, box-shadow 0.22s ease, background-color 0.22s ease, border-color 0.22s ease",
+        "&:hover": {
+          transform: "translateY(-6px)",
+          backgroundColor: tokens.pageBg,
+          borderColor: alpha(tokens.teal, 0.35),
+          boxShadow: `0 18px 36px ${alpha(tokens.teal, 0.18)}, 0 8px 16px rgba(16, 24, 40, 0.08)`,
+        },
       }}
       onClick={onOpenProfile}
     >
@@ -407,7 +414,7 @@ export default function ClientListingCard({
                   sx={{
                     fontSize: 18,
                     color:
-                      i < Math.round(item.rating)
+                      i < Math.round(Math.min(5, Math.max(0, item.rating)))
                         ? tokens.star
                         : alpha(tokens.navy, 0.15),
                   }}

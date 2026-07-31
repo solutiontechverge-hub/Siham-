@@ -5,9 +5,11 @@ import {
   createBookingNotification,
   createCalendarEntry,
   deleteCalendarEntry,
+  updateCalendarEntry,
   updateCalendarEntryStatus,
   updateBookingStatus,
   updateMyBooking,
+  manageBookingEditRequest,
   getCalendarOverview,
   upsertCalendarSettings,
   createCategory,
@@ -26,6 +28,7 @@ import {
   deleteProfessionalClient,
   listMollureClientDirectory,
   listProfessionalClients,
+  lookupMollureClientByEmail,
   setProfessionalClientBlocked,
   updateProfessionalClient,
   updateProfessionalClientTechnicalNote,
@@ -38,8 +41,25 @@ import { messagingUpload } from "../middleware/messagingUpload.middleware.js";
 const router = express.Router();
 const locationModes = ["fixed", "desired", "both"];
 const locationTypes = ["fixed", "desired"];
-const calendarStatuses = ["requested", "cancelled", "completed", "confirmed", "blocked", "in_progress", "no_show"];
-const bookingStatuses = ["requested", "cancelled", "completed", "confirmed", "in_progress", "no_show"];
+const calendarStatuses = [
+  "requested",
+  "cancelled",
+  "completed",
+  "confirmed",
+  "blocked",
+  "in_progress",
+  "no_show",
+  "invalid",
+];
+const bookingStatuses = [
+  "requested",
+  "cancelled",
+  "completed",
+  "confirmed",
+  "in_progress",
+  "no_show",
+  "invalid",
+];
 const percentageFields = [
   "prepayment_percentage",
   "late_reschedule_fee_percentage",
@@ -284,6 +304,35 @@ router.patch(
   updateCalendarEntryStatus,
 );
 
+router.put(
+  "/calendar/:id",
+  requireProfessional,
+  [
+    body("status")
+      .optional({ values: "falsy" })
+      .trim()
+      .isIn(calendarStatuses)
+      .withMessage("status must be requested, cancelled, completed, confirmed, or blocked."),
+    body("title").optional({ values: "falsy" }).trim(),
+    body("team_member_id")
+      .optional({ values: "falsy" })
+      .isUUID()
+      .withMessage("team_member_id must be a valid UUID."),
+    body("booking_type")
+      .optional({ values: "falsy" })
+      .trim()
+      .isIn(["online", "offline", "project", "request"])
+      .withMessage("booking_type must be online, offline, project, or request."),
+    body("location_type")
+      .optional({ values: "falsy" })
+      .trim()
+      .isIn(locationTypes)
+      .withMessage("location_type must be fixed or desired."),
+  ],
+  validateRequest,
+  updateCalendarEntry,
+);
+
 router.delete(
   "/calendar/:id",
   requireProfessional,
@@ -330,7 +379,7 @@ router.post(
       .optional({ values: "falsy" })
       .trim()
       .isIn(bookingStatuses)
-      .withMessage("status must be requested, cancelled, completed, confirmed, in_progress, or no_show."),
+      .withMessage("status must be requested, cancelled, completed, confirmed, in_progress, no_show, or invalid."),
   ],
   validateRequest,
   createBooking,
@@ -342,7 +391,7 @@ router.patch(
     body("status")
       .trim()
       .isIn(bookingStatuses)
-      .withMessage("status must be requested, cancelled, completed, confirmed, in_progress, or no_show."),
+      .withMessage("status must be requested, cancelled, completed, confirmed, in_progress, no_show, or invalid."),
     body("notes").optional({ values: "falsy" }).isString().withMessage("notes must be a string."),
     body("total_price")
       .optional({ values: "falsy" })
@@ -369,6 +418,19 @@ router.patch(
 );
 
 router.post("/bookings/:id/notifications", createBookingNotification);
+
+router.post(
+  "/bookings/:id/edit-request",
+  [
+    body("action")
+      .trim()
+      .isIn(["send", "accept", "reject"])
+      .withMessage("action must be send, accept, or reject."),
+    body("note").optional({ values: "falsy" }).isString().withMessage("note must be a string."),
+  ],
+  validateRequest,
+  manageBookingEditRequest,
+);
 
 router.patch(
   "/bookings/:id",
@@ -409,6 +471,7 @@ router.patch(
 );
 
 router.get("/clients", requireProfessional, listProfessionalClients);
+router.get("/clients/mollure-lookup", requireProfessional, lookupMollureClientByEmail);
 router.get("/clients/mollure-directory", requireProfessional, listMollureClientDirectory);
 router.post(
   "/clients",

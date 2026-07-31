@@ -6,6 +6,7 @@ import { getDefaultRouteForUser } from "../lib/auth-routing";
 import { persistAuthSession } from "../lib/auth-storage";
 import { useAppDispatch } from "../store/hooks";
 import { setAuthSession } from "../store/slices/authSlice";
+import { baseApi } from "../store/services/baseApi";
 import { useSnackbar } from "../components/common/AppSnackbar";
 import { queueSnackbarFlash } from "../lib/snackbarFlash";
 
@@ -28,6 +29,8 @@ export function useAuthSessionLogin() {
 
   const completeLogin = useCallback(
     (data: AuthLoginPayload, remember: boolean, redirectTo?: string | null) => {
+      // Drop previous user's RTK Query cache before applying the new session.
+      dispatch(baseApi.util.resetApiState());
       dispatch(
         setAuthSession({
           accessToken: data.access_token,

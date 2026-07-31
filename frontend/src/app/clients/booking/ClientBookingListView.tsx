@@ -24,9 +24,16 @@ import {
 } from "./clientBookingRecords";
 import { bookingStatusChipColors } from "./clientBookingStatus";
 import BookingRequestBadge from "../../../components/common/calendar/BookingRequestBadge";
-import PrepaymentPayNowIcon from "../../../components/common/client-booking/PrepaymentPayNowIcon";
-import PaymentDueIcon from "../../../components/common/client-booking/PaymentDueIcon";
+import BookingIndicatorIcon from "../../../components/common/calendar/BookingIndicatorIcon";
+import BookingRequestReceivedIcon from "../../../components/common/calendar/BookingRequestReceivedIcon";
+import BookingRequestSentIcon from "../../../components/common/calendar/BookingRequestSentIcon";
 import { AppPagination, AppSearchField } from "../../../components/common";
+import { getBookingEditRequest } from "../../../components/common/client-booking/bookingEditRequest";
+import { syncEditRequestFromBookingApi } from "../../../components/common/client-booking/syncEditRequestFromApi";
+import {
+  hasUnseenBookingUpdate,
+  markBookingUpdateSeen,
+} from "../../../components/common/calendar/bookingUpdateSeen";
 import {
   getCheckoutPath,
   setActiveBookingSession,
@@ -39,7 +46,7 @@ const BOOKINGS_PAGE_SIZE = 10;
 
 const emptyCopy: Record<BookingListTab, string> = {
   past: "No past bookings yet.",
-  ongoing: "No upcoming booking",
+  ongoing: "No ongoing bookings.",
   upcoming: "No upcoming bookings. Start a new booking to request a service.",
 };
 
@@ -86,6 +93,14 @@ export default function ClientBookingListView({ listTab }: Props) {
     );
   }, [data]);
 
+  React.useEffect(() => {
+    for (const b of bookings) {
+      if (b.bookingRef && b.editRequest) {
+        syncEditRequestFromBookingApi(b.bookingRef, b.editRequest);
+      }
+    }
+  }, [bookings]);
+
   const pagination = data?.pagination;
   const totalPages = Math.max(1, pagination?.totalPages ?? 1);
   const total = pagination?.total ?? bookings.length;
@@ -96,6 +111,7 @@ export default function ClientBookingListView({ listTab }: Props) {
 
   const openBooking = (record: ClientBookingRecord) => {
     const enriched = enrichClientBookingRecord(record);
+    markBookingUpdateSeen("client", enriched.bookingRef, enriched.updatedAt);
     setActiveBookingSession(enriched);
     router.push(getCheckoutPath(enriched, listTab));
   };
@@ -198,30 +214,65 @@ export default function ClientBookingListView({ listTab }: Props) {
               {bookings.map((b) => {
                 const shopName = b.shop?.shopName ?? "Salon";
                 const address =
-                  b.shop?.addressLabel ?? b.shop?.municipalityLabel ?? "";
+                  b.shop?.addressLabel?.trim() ||
+                  b.shop?.municipalityLabel?.trim() ||
+                  "";
                 const date = b.draft?.selectedDateISO ?? "";
                 const time = b.draft?.selectedTime ?? "";
                 const totalPrice = b.draft?.total ?? 0;
                 const bookingIdLabel = formatBookingIdLabel(b.bookingRef);
                 const status = (b.status ?? "confirmed") as ClientBookingStatus;
                 const paymentDue = isClientBookingPaymentDue(b);
+                const displayStatus: ClientBookingStatus =
+                  status === "waiting_for_prepayment" ? "confirmed" : status;
+                // BR only while pending — hide once accepted (confirmed) or rejected.
                 const showBrBadge =
-                  status !== "completed" &&
-                  status !== "cancelled" &&
-                  (status === "requested" || Boolean(b.bookingRequestSent));
+                  status === "requested" ||
+                  (status === "draft" && Boolean(b.bookingRequestSent));
+                // Pending Confirmed ER — show on list for both directions.
+                const pendingEr =
+                  displayStatus === "confirmed"
+                    ? b.editRequest?.status === "pending"
+                      ? b.editRequest
+                      : b.bookingRef
+                        ? (() => {
+                            const local = getBookingEditRequest(b.bookingRef);
+                            return local.status === "pending"
+                              ? {
+                                  note: local.note,
+                                  status: local.status as "pending",
+                                  initiated_by: (local.initiatedBy ??
+                                    "client") as "client" | "professional",
+                                }
+                              : null;
+                          })()
+                        : null
+                    : null;
+                const incomingEr =
+                  pendingEr?.initiated_by === "professional" ? pendingEr : null;
+                const outgoingEr =
+                  pendingEr?.initiated_by === "client" ? pendingEr : null;
+                const erNote =
+                  (incomingEr?.note || outgoingEr?.note || "").trim() || "";
                 const waitingForPayment =
                   paymentDue ||
-                  (status !== "completed" &&
-                    status !== "cancelled" &&
+                  (displayStatus !== "completed" &&
+                    displayStatus !== "cancelled" &&
+                    displayStatus !== "invalid" &&
+                    displayStatus !== "no_show" &&
                     Boolean(b.requiresPrepayment) &&
                     !b.prepaid);
-                const chipLabel =
-                  status === "requested"
-                    ? "Requested"
-                    : statusChipLabel(status, { paymentDue });
-                const chipColors = bookingStatusChipColors(status, {
-                  paymentDue,
-                });
+                const chipLabel = statusChipLabel(displayStatus);
+                const chipColors = bookingStatusChipColors(displayStatus);
+                const showUpdated =
+                  !pendingEr &&
+                  displayStatus === "confirmed" &&
+                  hasUnseenBookingUpdate({
+                    viewer: "client",
+                    bookingRef: b.bookingRef,
+                    updatedAt: b.updatedAt,
+                    lastEditedBy: b.lastEditedBy ?? null,
+                  });
                 return (
                   <ButtonBase
                     key={b.id}
@@ -298,6 +349,25 @@ export default function ClientBookingListView({ listTab }: Props) {
                           >
                             {date} {time ? `• ${time}` : ""}
                           </Typography>
+                          {erNote ? (
+                            <Typography
+                              sx={{
+                                mt: 0.65,
+                                fontSize: 12,
+                                fontWeight: 700,
+                                color: alpha(m.navy, 0.62),
+                                lineHeight: 1.4,
+                                display: "-webkit-box",
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: "vertical",
+                                overflow: "hidden",
+                              }}
+                            >
+                              {incomingEr
+                                ? `Note from professional: ${erNote}`
+                                : `Edit request note: ${erNote}`}
+                            </Typography>
+                          ) : null}
                           {(b.draft?.services ?? []).length > 0 ? (
                             <Stack spacing={0.35} sx={{ mt: 0.75 }}>
                               {b.draft!.services.map((s) => (
@@ -335,35 +405,45 @@ export default function ClientBookingListView({ listTab }: Props) {
                                 border: chipColors.border,
                               }}
                             />
+                            {showUpdated ? (
+                              <Chip
+                                label="Updated"
+                                size="small"
+                                sx={{
+                                  height: 22,
+                                  fontWeight: 900,
+                                  bgcolor: alpha(m.teal, 0.12),
+                                  color: m.teal,
+                                  border: `1px solid ${alpha(m.teal, 0.4)}`,
+                                }}
+                              />
+                            ) : null}
                             {waitingForPayment ? (
                               <Box
                                 sx={{
                                   display: "inline-flex",
                                   alignItems: "center",
                                   justifyContent: "center",
-                                  width: paymentDue ? 26 : undefined,
-                                  height: paymentDue ? 26 : undefined,
-                                  borderRadius: paymentDue ? "7px" : undefined,
-                                  bgcolor: paymentDue
-                                    ? alpha(m.navy, 0.04)
-                                    : undefined,
                                 }}
                                 title={
                                   paymentDue
-                                    ? "Payment due"
-                                    : "Waiting for payment"
+                                    ? "Waiting for payment"
+                                    : "Waiting for prepayment"
                                 }
                                 aria-label={
                                   paymentDue
-                                    ? "Payment due"
-                                    : "Waiting for payment"
+                                    ? "Waiting for payment"
+                                    : "Waiting for prepayment"
                                 }
                               >
-                                {paymentDue ? (
-                                  <PaymentDueIcon size={18} />
-                                ) : (
-                                  <PrepaymentPayNowIcon size={18} />
-                                )}
+                                <BookingIndicatorIcon
+                                  variant={
+                                    paymentDue
+                                      ? "waiting_for_payment"
+                                      : "waiting_for_prepayment"
+                                  }
+                                  size={16}
+                                />
                               </Box>
                             ) : null}
                             {showBrBadge ? (
@@ -374,6 +454,46 @@ export default function ClientBookingListView({ listTab }: Props) {
                                   b.bookingRequestDirection ?? "outgoing"
                                 }
                               />
+                            ) : null}
+                            {pendingEr ? (
+                              <Box
+                                sx={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 0.35,
+                                  height: 22,
+                                  px: 0.75,
+                                  borderRadius: "999px",
+                                  border: `1px solid ${alpha(m.teal, 0.35)}`,
+                                  bgcolor: alpha(m.teal, 0.08),
+                                }}
+                                title={
+                                  incomingEr
+                                    ? "Edit request received"
+                                    : "Edit request sent"
+                                }
+                                aria-label={
+                                  incomingEr
+                                    ? "Edit request received"
+                                    : "Edit request sent"
+                                }
+                              >
+                                <Typography
+                                  sx={{
+                                    fontSize: 10,
+                                    fontWeight: 900,
+                                    color: m.teal,
+                                    lineHeight: 1,
+                                  }}
+                                >
+                                  ER
+                                </Typography>
+                                {incomingEr ? (
+                                  <BookingRequestReceivedIcon size={10} />
+                                ) : (
+                                  <BookingRequestSentIcon size={10} />
+                                )}
+                              </Box>
                             ) : null}
                           </Stack>
                           <Typography

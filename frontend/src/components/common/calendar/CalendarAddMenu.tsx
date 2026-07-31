@@ -10,6 +10,8 @@ type CalendarAddMenuProps = {
   onPublicBusinessHours: () => void;
   onClose: () => void;
   onMockAction: (label: string) => void;
+  /** Disabled only when the selected day is marked Not Availability. */
+  bookingDisabled?: boolean;
 };
 
 const addMenuItems = [
@@ -22,24 +24,29 @@ export default function CalendarAddMenu({
   onBlockedTime,
   onBooking,
   onClose,
+  bookingDisabled = false,
 }: CalendarAddMenuProps) {
   return (
     <Menu open={Boolean(anchorEl)} anchorEl={anchorEl} onClose={onClose}>
-      {addMenuItems.map((item) => (
-        <MenuItem
-          key={item.key}
-          onClick={() => {
-            onClose();
-            if (item.key === "booking") {
-              onBooking();
-              return;
-            }
-            onBlockedTime();
-          }}
-        >
-          {item.label}
-        </MenuItem>
-      ))}
+      {addMenuItems.map((item) => {
+        const isBooking = item.key === "booking";
+        const disabled = isBooking && bookingDisabled;
+        return (
+          <MenuItem
+            key={item.key}
+            disabled={disabled}
+            onClick={() => {
+              if (disabled) return;
+              // Run action before closing so the handler is not dropped.
+              if (isBooking) onBooking();
+              else onBlockedTime();
+              onClose();
+            }}
+          >
+            {item.label}
+          </MenuItem>
+        );
+      })}
     </Menu>
   );
 }

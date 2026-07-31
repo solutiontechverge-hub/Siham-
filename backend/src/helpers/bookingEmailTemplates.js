@@ -116,7 +116,7 @@ export const buildAppointmentReminderEmail = (ctx) =>
 
 export const buildProfessionalActionEmail = (ctx) =>
   bookingCardEmail({
-    title: "Booking update from your professional",
+    title: ctx.title || "Booking update from your professional",
     salonName: ctx.salonName,
     professionalName: ctx.professionalName,
     startTime: ctx.startTime,

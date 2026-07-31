@@ -13,7 +13,7 @@ const statusToApi: Record<CalendarBookingStatus, CreateCalendarEntryRequest["sta
   Confirmed: "confirmed",
   Requested: "requested",
   "In Progress": "in_progress",
-  Invalid: "cancelled",
+  Invalid: "invalid",
   "No Show": "no_show",
   Completed: "completed",
   Cancelled: "cancelled",

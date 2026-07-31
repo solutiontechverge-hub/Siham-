@@ -102,8 +102,6 @@ export function getBookingServiceEditErrors(draft: BookingServiceEditDraft) {
   if (!draft.name.trim()) errors.name = "Service name is required.";
   const duration = Number.parseInt(draft.durationMins, 10);
   if (!Number.isFinite(duration) || duration <= 0) errors.durationMins = "Duration is required.";
-  if (!draft.startTime.trim()) errors.startTime = "Start time is required.";
-  if (!draft.endTime.trim()) errors.endTime = "End time is required.";
   const price = Number.parseFloat(draft.price.replace(",", "."));
   if (!Number.isFinite(price) || price < 0) errors.price = "Price is required.";
   return errors;
@@ -141,13 +139,33 @@ export function getEffectiveServicePrice(service: BookingServiceLineItem) {
   return Math.max(0, base - service.discount.amount);
 }
 
+/** Fill missing per-service start/end so each line has its own window (sequential from booking start). */
+export function ensureServiceStartEndTimes(
+  services: readonly BookingServiceLineItem[],
+  bookingStart?: string,
+): BookingServiceLineItem[] {
+  if (!services.length) return [];
+  let cursor =
+    bookingStart?.trim() ||
+    services.find((service) => service.startTime?.trim())?.startTime ||
+    "08:00";
+
+  return services.map((service) => {
+    const duration = service.durationMins > 0 ? service.durationMins : 60;
+    if (service.startTime?.trim() && service.endTime?.trim()) {
+      cursor = service.endTime.trim();
+      return service;
+    }
+    const startTime = service.startTime?.trim() || cursor;
+    const endTime =
+      service.endTime?.trim() || addMinutesToTime(startTime, duration);
+    cursor = endTime;
+    return { ...service, startTime, endTime };
+  });
+}
+
 export function formatBookingServiceLineMeta(service: BookingServiceLineItem) {
-  const parts: string[] = [];
-  if (service.startTime && service.endTime) {
-    parts.push(`${service.startTime} to ${service.endTime}`);
-  } else {
-    parts.push(`${service.durationMins} Mins`);
-  }
+  const parts: string[] = [`${service.durationMins} Mins`];
   parts.push(`€${getEffectiveServicePrice(service)}`);
   if (service.discount?.amount) {
     parts.push(

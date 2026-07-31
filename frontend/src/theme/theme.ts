@@ -99,7 +99,7 @@ const theme = createTheme({
       logoAccent: "#A7E9A8",
       logoText: "#62758A",
       bgshadow: "#F9FAFB",
-      /** Booking details card when status is cancelled */
+      /** Booking details panel when status is cancelled or invalid */
       cancelledSurface: "#F9FAFB",
       /** Muted section panels (e.g. How it works — Changes Without Approval) */
       sectionSurface: "#F9FAFB",
@@ -204,6 +204,51 @@ const theme = createTheme({
   },
 
   components: {
+    MuiCssBaseline: {
+      styleOverrides: {
+        html: {
+          scrollbarGutter: "stable",
+        },
+        body: {
+          // Keep in sync with globals.css — blocks MUI scroll-lock layout jump
+          paddingRight: "0 !important",
+        },
+        ".mui-fixed": {
+          paddingRight: "0 !important",
+        },
+      },
+    },
+    MuiPopover: {
+      defaultProps: {
+        // Dropdowns / profile menus don't need body scroll lock
+        disableScrollLock: true,
+      },
+    },
+    MuiMenu: {
+      defaultProps: {
+        disableScrollLock: true,
+      },
+    },
+    MuiSelect: {
+      defaultProps: {
+        MenuProps: {
+          disableScrollLock: true,
+        },
+      },
+      styleOverrides: {
+        select: {
+          display: "flex",
+          alignItems: "center",
+        },
+        icon: {
+          top: "50%",
+          transform: "translateY(-50%)",
+        },
+        iconOpen: {
+          transform: "translateY(-50%) rotate(180deg)",
+        },
+      },
+    },
     MuiTypography: {
       defaultProps: {
         variantMapping: {

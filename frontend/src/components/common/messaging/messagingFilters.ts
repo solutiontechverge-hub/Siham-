@@ -30,6 +30,7 @@ export function statusLabel(status: MessagingBookingStatus): string {
     cancelled: "Cancelled",
     invalid: "Invalid",
     no_show: "No Show",
+    in_progress: "In Progress",
   };
   return map[status];
 }

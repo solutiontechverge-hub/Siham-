@@ -66,7 +66,7 @@ export const businessTeamMemberModalCopy = {
 
 export const createEmptyTeamMemberFormDraft = (): TeamMemberFormDraft => ({
   name: "",
-  photoSrc: "/professionals/hero.png",
+  photoSrc: "",
   selectedGroups: [],
   categoryId: "",
   serviceId: "",

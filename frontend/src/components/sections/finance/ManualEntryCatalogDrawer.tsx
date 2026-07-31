@@ -3,13 +3,22 @@
 import AppButton from "../../common/AppButton";
 import * as React from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import RemoveRoundedIcon from "@mui/icons-material/RemoveRounded";
-import { Box, ButtonBase, Checkbox, IconButton, Stack, Typography } from "@mui/material";
+import {
+  Box,
+  ButtonBase,
+  Checkbox,
+  IconButton,
+  Stack,
+  Typography,
+} from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDrawer from "../../common/AppDrawer";
 import { FinanceDrawerActionsFooter } from "../../common/FinanceDrawerFooter";
 import AppSearchField from "../../common/AppSearchField";
 import BookingAddUniqueItemScreen from "../../common/calendar/BookingAddUniqueItemScreen";
+import BookingEditCatalogItemScreen from "../../common/calendar/BookingEditCatalogItemScreen";
 import { BodyText } from "../../ui/typography";
 import {
   buildUniqueItemLine,
@@ -65,9 +74,39 @@ export type ManualEntryCatalogSelection = ManualEntryCatalogOption & {
   quantity: number;
 };
 
-type CatalogScreen = "catalog" | "add-product";
+type CatalogScreen = "catalog" | "add-product" | "edit-product";
 
 type DraftItem = { selected: boolean; quantity: number };
+
+function buildDraftFromOption(
+  option: ManualEntryCatalogOption,
+): BookingUniqueItemDraft {
+  return {
+    productName: option.label,
+    vat: option.vat ?? "",
+    price: String(option.unitPrice),
+    unit: Math.max(1, option.unit ?? 1),
+    discountType: option.discountType ?? "fixed",
+    discountAmount: option.discountAmount ?? "0",
+  };
+}
+
+function buildOptionFromDraft(
+  draft: BookingUniqueItemDraft,
+  id: string,
+): ManualEntryCatalogOption | null {
+  const line = buildUniqueItemLine(draft);
+  if (!line) return null;
+  return {
+    id,
+    label: draft.productName.trim(),
+    unitPrice: line.unitPrice,
+    vat: draft.vat.trim() || undefined,
+    unit: line.quantity,
+    discountType: draft.discountType,
+    discountAmount: draft.discountAmount,
+  };
+}
 
 type ManualEntryCatalogDrawerProps = {
   open: boolean;
@@ -79,8 +118,16 @@ type ManualEntryCatalogDrawerProps = {
   withQuantity?: boolean;
   /** Calendar-style “Add …” → unique-item form in the same drawer. */
   allowAddProduct?: boolean;
+  /** Show edit on every row (default true when allowAddProduct). */
+  allowEditProduct?: boolean;
   /** Label for the add CTA (default: "Add Product"). Use "Add Item" for items. */
   addProductLabel?: string;
+  /** Title/heading when the unique-item form screen is open. */
+  addScreenTitle?: string;
+  /** Title/heading when editing an existing option. */
+  editScreenTitle?: string;
+  /** Persist catalog edits (finance settings / parent state). */
+  onUpdateOption?: (option: ManualEntryCatalogOption) => void;
   onSave: (selected: ManualEntryCatalogSelection[]) => void;
 };
 
@@ -92,16 +139,28 @@ export default function ManualEntryCatalogDrawer({
   emptyLabel = "No options available",
   withQuantity = false,
   allowAddProduct = false,
+  allowEditProduct,
   addProductLabel = "Add Product",
+  addScreenTitle,
+  editScreenTitle,
+  onUpdateOption,
   onSave,
 }: ManualEntryCatalogDrawerProps) {
   const m = useTheme().palette.mollure;
+  const canEdit = allowEditProduct ?? allowAddProduct;
+  const isItemMode = addProductLabel === "Add Item";
   const [screen, setScreen] = React.useState<CatalogScreen>("catalog");
   const [query, setQuery] = React.useState("");
   const [draft, setDraft] = React.useState<Record<string, DraftItem>>({});
   const [customOptions, setCustomOptions] = React.useState<
     ManualEntryCatalogOption[]
   >([]);
+  const [optionOverrides, setOptionOverrides] = React.useState<
+    Record<string, ManualEntryCatalogOption>
+  >({});
+  const [editingOptionId, setEditingOptionId] = React.useState<string | null>(
+    null,
+  );
   const [uniqueItemDraft, setUniqueItemDraft] =
     React.useState<BookingUniqueItemDraft>(emptyBookingUniqueItemDraft());
   const [uniqueItemAttempted, setUniqueItemAttempted] = React.useState(false);
@@ -112,14 +171,21 @@ export default function ManualEntryCatalogDrawer({
     setQuery("");
     setDraft({});
     setCustomOptions([]);
+    setOptionOverrides({});
+    setEditingOptionId(null);
     setUniqueItemDraft(emptyBookingUniqueItemDraft());
     setUniqueItemAttempted(false);
   }, [open]);
 
-  const allOptions = React.useMemo(
-    () => [...options, ...customOptions],
-    [customOptions, options],
-  );
+  const allOptions = React.useMemo(() => {
+    const base = options.map(
+      (option) => optionOverrides[option.id] ?? option,
+    );
+    const customs = customOptions.map(
+      (option) => optionOverrides[option.id] ?? option,
+    );
+    return [...base, ...customs];
+  }, [customOptions, optionOverrides, options]);
 
   const filteredOptions = React.useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -180,9 +246,17 @@ export default function ManualEntryCatalogDrawer({
   };
 
   const openAddProduct = () => {
+    setEditingOptionId(null);
     setUniqueItemDraft(emptyBookingUniqueItemDraft());
     setUniqueItemAttempted(false);
     setScreen("add-product");
+  };
+
+  const openEditProduct = (option: ManualEntryCatalogOption) => {
+    setEditingOptionId(option.id);
+    setUniqueItemDraft(buildDraftFromOption(option));
+    setUniqueItemAttempted(false);
+    setScreen("edit-product");
   };
 
   const applyAddProduct = () => {
@@ -194,6 +268,10 @@ export default function ManualEntryCatalogDrawer({
       id: line.id,
       label: uniqueItemDraft.productName.trim(),
       unitPrice: line.unitPrice,
+      vat: uniqueItemDraft.vat.trim() || undefined,
+      unit: line.quantity,
+      discountType: uniqueItemDraft.discountType,
+      discountAmount: uniqueItemDraft.discountAmount,
     };
 
     setCustomOptions((prev) => [...prev, customOption]);
@@ -206,57 +284,127 @@ export default function ManualEntryCatalogDrawer({
     setScreen("catalog");
   };
 
+  const applyEditProduct = () => {
+    if (!editingOptionId) return;
+    setUniqueItemAttempted(true);
+    const nextOption = buildOptionFromDraft(uniqueItemDraft, editingOptionId);
+    if (!nextOption) return;
+
+    const isCustom = customOptions.some((o) => o.id === editingOptionId);
+    if (isCustom) {
+      setCustomOptions((prev) =>
+        prev.map((option) =>
+          option.id === editingOptionId ? nextOption : option,
+        ),
+      );
+    } else {
+      setOptionOverrides((prev) => ({
+        ...prev,
+        [editingOptionId]: nextOption,
+      }));
+      onUpdateOption?.(nextOption);
+    }
+
+    setDraft((prev) => {
+      const current = prev[editingOptionId];
+      if (!current) return prev;
+      return {
+        ...prev,
+        [editingOptionId]: {
+          ...current,
+          quantity: Math.max(1, nextOption.unit ?? current.quantity),
+        },
+      };
+    });
+
+    setEditingOptionId(null);
+    setUniqueItemDraft(emptyBookingUniqueItemDraft());
+    setUniqueItemAttempted(false);
+    setScreen("catalog");
+  };
+
   const handleClose = () => {
-    if (screen === "add-product") {
+    if (screen === "add-product" || screen === "edit-product") {
       setScreen("catalog");
+      setEditingOptionId(null);
       setUniqueItemAttempted(false);
       return;
     }
     onClose();
   };
 
-  const isAddProductScreen = screen === "add-product";
+  const isFormScreen = screen === "add-product" || screen === "edit-product";
+  const resolvedAddScreenTitle =
+    addScreenTitle ??
+    (isItemMode ? "Add Unique Item" : addProductLabel);
+  const resolvedEditScreenTitle =
+    editScreenTitle ??
+    (isItemMode ? "Edit Item" : "Edit Product");
+  const formHeading =
+    screen === "edit-product"
+      ? resolvedEditScreenTitle
+      : resolvedAddScreenTitle;
+  const searchPlaceholder = isItemMode
+    ? "Search items..."
+    : "Search products...";
 
   return (
     <AppDrawer
       open={open}
       onClose={onClose}
-      title={isAddProductScreen ? "Add Unique Item" : title}
+      title={isFormScreen ? formHeading : title}
       onBack={handleClose}
       contentVariant="muted"
       sx={{ zIndex: (theme) => theme.zIndex.drawer + 2 }}
       footer={
         <FinanceDrawerActionsFooter
           onCancel={handleClose}
-          onPrimary={isAddProductScreen ? applyAddProduct : handleSaveCatalog}
+          onPrimary={
+            screen === "edit-product"
+              ? applyEditProduct
+              : isFormScreen
+                ? applyAddProduct
+                : handleSaveCatalog
+          }
           primaryLabel="Save"
-          primaryDisabled={isAddProductScreen ? false : selectedCount === 0}
+          primaryDisabled={isFormScreen ? false : selectedCount === 0}
         />
       }
     >
-      {isAddProductScreen ? (
-        <BookingAddUniqueItemScreen
-          draft={uniqueItemDraft}
-          errors={uniqueItemErrors}
-          onChange={(patch) =>
-            setUniqueItemDraft((prev) => ({ ...prev, ...patch }))
-          }
-        />
+      {isFormScreen ? (
+        screen === "edit-product" ? (
+          <BookingEditCatalogItemScreen
+            draft={uniqueItemDraft}
+            errors={uniqueItemErrors}
+            heading={formHeading}
+            namePlaceholder={isItemMode ? "Item Name" : "Product Name"}
+            onChange={(patch) =>
+              setUniqueItemDraft((prev) => ({ ...prev, ...patch }))
+            }
+          />
+        ) : (
+          <BookingAddUniqueItemScreen
+            draft={uniqueItemDraft}
+            errors={uniqueItemErrors}
+            heading={formHeading}
+            onChange={(patch) =>
+              setUniqueItemDraft((prev) => ({ ...prev, ...patch }))
+            }
+          />
+        )
       ) : (
         <Stack spacing={1.5}>
           {allowAddProduct ? (
             <BodyText
               sx={{ fontWeight: 900, color: alpha(m.navy, 0.88), fontSize: 15 }}
             >
-              {addProductLabel === "Add Item"
-                ? "Select Item"
-                : "Select Product"}
+              {isItemMode ? "Select Item" : "Select Product"}
             </BodyText>
           ) : null}
 
           <AppSearchField
             fullWidth
-            placeholder="Search..."
+            placeholder={searchPlaceholder}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onClear={() => setQuery("")}
@@ -335,6 +483,26 @@ export default function ManualEntryCatalogDrawer({
                         {formatEurAmount(option.unitPrice)}
                       </Typography>
                     </Box>
+
+                    {canEdit ? (
+                      <IconButton
+                        size="small"
+                        aria-label={`Edit ${option.label}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openEditProduct(option);
+                        }}
+                        sx={{
+                          color: alpha(m.navy, 0.42),
+                          "&:hover": {
+                            color: m.teal,
+                            bgcolor: alpha(m.teal, 0.08),
+                          },
+                        }}
+                      >
+                        <EditRoundedIcon sx={{ fontSize: 17 }} />
+                      </IconButton>
+                    ) : null}
 
                     {withQuantity ? (
                       <Stack

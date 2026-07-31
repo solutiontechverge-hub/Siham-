@@ -23,6 +23,22 @@ export function useClientBookingDraft() {
   const [draft, setDraft] = React.useState<ClientBookingDraft | null>(null);
   const [shop, setShop] = React.useState<ClientBookingSelectedShop | null>(null);
 
+  const draftSyncKey = React.useMemo(() => {
+    if (!activeBooking?.draft) return "";
+    const d = activeBooking.draft;
+    return [
+      activeBooking.notes ?? "",
+      activeBooking.status,
+      d.total,
+      d.selectedDateISO,
+      d.selectedTime,
+      (d.services ?? []).map((s) => `${s.id}:${s.price}:${s.guestId ?? ""}`).join("|"),
+      (d.products ?? []).map((p) => `${p.id}:${p.price}x${p.quantity}`).join("|"),
+      d.projectDetails?.description ?? "",
+      (d.people ?? []).map((p) => `${p.id}:${p.name}`).join("|"),
+    ].join("::");
+  }, [activeBooking]);
+
   React.useEffect(() => {
     if (activeBooking?.draft) {
       setDraft(activeBooking.draft);
@@ -31,7 +47,7 @@ export function useClientBookingDraft() {
     if (recordShop) {
       setShop(recordShop);
     }
-  }, [activeBooking]);
+  }, [activeBooking, draftSyncKey]);
 
   const { profile: businessProfile, isLoading: isBusinessProfileLoading } = useBusinessPublicProfile(shop?.shopId);
 

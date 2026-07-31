@@ -7,11 +7,10 @@ import { useRouter } from "next/navigation";
 import ReportProblemRoundedIcon from "@mui/icons-material/ReportProblemRounded";
 import { Avatar, Box, Popover, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import { clearPersistedAuthSession } from "../../lib/auth-storage";
+import { clearAuthSessionState } from "../../lib/clearAuthSessionState";
 import { useAppDispatch } from "../../store/hooks";
 import { useSnackbar } from "./AppSnackbar";
 import { queueSnackbarFlash } from "../../lib/snackbarFlash";
-import { clearAuthSession } from "../../store/slices/authSlice";
 import AppModal from "./AppModal";
 
 function getInitials(emailOrName?: string) {
@@ -50,8 +49,7 @@ export default function ProfessionalProfileMenuPopover({
 
   const handleLogout = () => {
     onClose();
-    dispatch(clearAuthSession());
-    clearPersistedAuthSession();
+    clearAuthSessionState(dispatch);
     const logoutMessage = "Signed out successfully.";
     queueSnackbarFlash({ severity: "success", message: logoutMessage });
     showSnackbar({ severity: "success", message: logoutMessage });

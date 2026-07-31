@@ -11,6 +11,27 @@ export const UUID_RE =
 
 export const FIXED_LOCATION_MAX_GUESTS = 1;
 
+/** Appended to booking notes when the client leaves team member unselected. */
+export const TEAM_MEMBER_PROVIDED_BY_PRO_NOTE =
+  "Team member will be provided by professional";
+
+export function servicesMissingTeamMember(
+  services: Array<{ teamMemberId?: string | null } | null | undefined>,
+): boolean {
+  return services.some((s) => !String(s?.teamMemberId ?? "").trim());
+}
+
+/** Ensure the professional-facing note is present exactly once. */
+export function withTeamMemberProvidedByProNote(
+  description: string | null | undefined,
+): string {
+  const trimmed = String(description ?? "").trim();
+  if (trimmed.includes(TEAM_MEMBER_PROVIDED_BY_PRO_NOTE)) return trimmed;
+  return trimmed
+    ? `${trimmed}\n${TEAM_MEMBER_PROVIDED_BY_PRO_NOTE}`
+    : TEAM_MEMBER_PROVIDED_BY_PRO_NOTE;
+}
+
 export function resolveNameFromProfileResponse(
   profile: ProfileResponse | null | undefined,
 ): string {

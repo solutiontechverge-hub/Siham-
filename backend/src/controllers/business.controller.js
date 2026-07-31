@@ -27,6 +27,15 @@ import {
   sqlLimitOffset,
   withPaginationParams,
 } from "../utils/pagination.js";
+import {
+  buildApprovedEditRequest,
+  buildPendingEditRequest,
+  buildRejectedClear,
+  consumeEditGrant,
+  isEditGrantActiveFor,
+  isEditRequestPending,
+  parseEditRequest,
+} from "../helpers/bookingEditRequest.js";
 
 const parseJsonValue = (value, fallback) => {
   if (value === undefined || value === null || value === "") {
@@ -158,8 +167,25 @@ const bookingDateSql = (alias) =>
   `substring(COALESCE(${alias}.booking_date::text, ${alias}.start_time::text) from 1 for 10)::date`;
 
 const makeCalendarCode = (prefix = "OF123") => `${prefix}${Date.now()}${Math.random().toString(16).slice(2, 6)}`;
-const calendarStatusSet = new Set(["requested", "cancelled", "completed", "confirmed", "blocked", "in_progress", "no_show"]);
-const bookingStatusSet = new Set(["requested", "cancelled", "completed", "confirmed", "in_progress", "no_show"]);
+const calendarStatusSet = new Set([
+  "requested",
+  "cancelled",
+  "completed",
+  "confirmed",
+  "blocked",
+  "in_progress",
+  "no_show",
+  "invalid",
+]);
+const bookingStatusSet = new Set([
+  "requested",
+  "cancelled",
+  "completed",
+  "confirmed",
+  "in_progress",
+  "no_show",
+  "invalid",
+]);
 
 const ensureUniqueBookingCode = async (preferredCode, prefix = "123") => {
   const trimmed = String(preferredCode ?? "").trim();
@@ -308,16 +334,28 @@ const getProfessionalProfile = async (userId) => {
   return result.rows[0] || null;
 };
 
-const getBusinessSetupByUserId = async (userId) => {
+const getBusinessSetupByUserId = async (userId, preferredLocationType = null) => {
   const result = await query(
     `SELECT bs.*
      FROM business_setups bs
      INNER JOIN professional_profiles pp ON pp.id = bs.professional_profile_id
-     WHERE pp.user_id = $1`,
+     WHERE pp.user_id = $1
+     ORDER BY bs.updated_at DESC NULLS LAST, bs.created_at DESC NULLS LAST`,
     [userId],
   );
 
-  return result.rows[0] || null;
+  const rows = result.rows || [];
+  if (!rows.length) return null;
+  if (!preferredLocationType) return rows[0];
+
+  const preferred = String(preferredLocationType).toLowerCase();
+  const modeMatch =
+    preferred === "desired"
+      ? rows.find((row) => String(row.location_mode || "").toLowerCase() === "desired")
+      : preferred === "fixed"
+        ? rows.find((row) => String(row.location_mode || "").toLowerCase() === "fixed")
+        : null;
+  return modeMatch || rows[0];
 };
 
 const getBusinessSetupDetailById = async (setupId, client = { query }) => {
@@ -1355,7 +1393,12 @@ const resolveMollureCustomerIdForCalendarEntry = async ({
 
   if (email) {
     const byUserEmail = await query(
-      `SELECT id FROM users WHERE LOWER(TRIM(email)) = LOWER(TRIM($1)) LIMIT 1`,
+      `SELECT id
+       FROM users
+       WHERE LOWER(TRIM(email)) = LOWER(TRIM($1))
+         AND user_type IN ('individual', 'company')
+         AND COALESCE(is_active, true) = true
+       LIMIT 1`,
       [email],
     );
     if (byUserEmail.rows[0]?.id) return byUserEmail.rows[0].id;
@@ -1395,16 +1438,13 @@ const mirrorCalendarRequestToBooking = async ({
   });
   if (!customerId) return null;
 
-  const businessSetup = await getBusinessSetupByUserId(professionalUserId);
+  const businessSetup = await getBusinessSetupByUserId(
+    professionalUserId,
+    entry.location_type ?? null,
+  );
   if (!businessSetup?.id) return null;
 
   const uniqueCode = entry.unique_code || makeCalendarCode("OF123");
-  const existing = await query(
-    `SELECT id FROM bookings WHERE unique_code = $1 LIMIT 1`,
-    [uniqueCode],
-  );
-  if (existing.rows[0]) return existing.rows[0];
-
   const bookingDate =
     normalizeBookingDateInput(entry.start_date) ||
     normalizeBookingDateInput(entry.start_time) ||
@@ -1414,11 +1454,26 @@ const mirrorCalendarRequestToBooking = async ({
 
   // Mark as professional-outgoing so the client list can show an incoming BR badge.
   let notes = entry.notes ?? null;
+  let mirroredTotal = null;
   if (notes && String(notes).includes("---mollure-meta---")) {
     try {
       const [human, metaRaw] = String(notes).split("---mollure-meta---");
       const meta = JSON.parse(metaRaw.trim() || "{}");
       if (!meta.requestDirection) meta.requestDirection = "outgoing";
+      const servicesTotal = Array.isArray(meta.services)
+        ? meta.services.reduce((sum, s) => sum + (Number(s?.price) || 0), 0)
+        : 0;
+      const productsTotal = Array.isArray(meta.products)
+        ? meta.products.reduce(
+            (sum, p) => sum + (Number(p?.price) || 0) * (Number(p?.quantity) || 1),
+            0,
+          )
+        : 0;
+      const snapshotServices = Array.isArray(meta.clientSnapshot?.services)
+        ? meta.clientSnapshot.services.reduce((sum, s) => sum + (Number(s?.price) || 0), 0)
+        : 0;
+      const computed = servicesTotal + productsTotal || snapshotServices;
+      if (computed > 0) mirroredTotal = computed;
       notes = `${human}---mollure-meta---\n${JSON.stringify(meta)}`;
     } catch {
       // keep original notes
@@ -1427,6 +1482,66 @@ const mirrorCalendarRequestToBooking = async ({
     notes = `${notes ? `${notes}\n` : ""}---mollure-meta---\n${JSON.stringify({
       requestDirection: "outgoing",
     })}`;
+  }
+
+  const existing = await query(
+    `SELECT id, status, prepayment_status FROM bookings WHERE unique_code = $1 LIMIT 1`,
+    [uniqueCode],
+  );
+  if (existing.rows[0]) {
+    // Update-in-place so pro BR edits do not create a second client booking.
+    const updated = await query(
+      `UPDATE bookings
+       SET booking_date = COALESCE($1, booking_date),
+           service_id = COALESCE($2, service_id),
+           team_member_id = COALESCE($3, team_member_id),
+           start_time = COALESCE($4, start_time),
+           end_time = COALESCE($5, end_time),
+           location_type = COALESCE($6, location_type),
+           notes = $7,
+           status = CASE
+             WHEN LOWER(COALESCE(status, '')) IN ('cancelled', 'completed', 'no_show') THEN status
+             ELSE 'requested'
+           END,
+           booking_type = 'request',
+           total_price = COALESCE($8, total_price),
+           updated_at = NOW()
+       WHERE id = $9
+       RETURNING *`,
+      [
+        bookingDate,
+        serviceId,
+        entry.team_member_id ?? null,
+        entry.start_time ?? null,
+        entry.end_time ?? null,
+        entry.location_type ?? "fixed",
+        notes,
+        mirroredTotal,
+        existing.rows[0].id,
+      ],
+    );
+    const booking = updated.rows[0] ?? existing.rows[0];
+    if (booking?.id) {
+      try {
+        void dispatchBookingUpdatedNotifications(
+          booking,
+          existing.rows[0].status,
+          existing.rows[0].prepayment_status,
+          {
+            notifyIncomingEr: true,
+            initiatedBy: "professional",
+          },
+        );
+      } catch {
+        // best-effort email/notification
+      }
+      try {
+        emitBookingChanged(booking, "updated");
+      } catch {
+        // best-effort
+      }
+    }
+    return booking;
   }
 
   const inserted = await query(
@@ -1445,8 +1560,8 @@ const mirrorCalendarRequestToBooking = async ({
        unique_code,
        total_price
      )
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'requested', 'request', $10, NULL)
-     RETURNING id`,
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'requested', 'request', $10, $11)
+     RETURNING *`,
     [
       bookingDate,
       businessSetup.id,
@@ -1458,9 +1573,23 @@ const mirrorCalendarRequestToBooking = async ({
       entry.location_type ?? "fixed",
       notes,
       uniqueCode,
+      mirroredTotal,
     ],
   );
-  return inserted.rows[0] ?? null;
+  const booking = inserted.rows[0] ?? null;
+  if (booking?.id) {
+    try {
+      await dispatchBookingCreatedNotifications(booking, { fromProfessional: true });
+    } catch {
+      // Notification/email is best-effort; mirrored booking still succeeds.
+    }
+    try {
+      emitBookingChanged(booking, "created");
+    } catch {
+      // Socket emit is best-effort.
+    }
+  }
+  return booking;
 };
 
 /**
@@ -1523,35 +1652,31 @@ const ensureIncomingCalendarRequestsMirrored = async (customerUserId) => {
 
 /**
  * Past / Ongoing / Upcoming buckets for client + professional booking lists.
- * Includes requested (BR), confirmed, and in_progress — not only confirmed.
- * A booking moves to Past once its end_time has passed (or booking_date is before
- * today when end_time is missing), matching the client list time rules.
+ *
+ * Upcoming = not started yet (requested, confirmed, invalid, waiting-for-prepayment).
+ * Ongoing  = service currently happening (in_progress only; scoped per client/business).
+ * Past     = finished / cancelled / no-show — never requested or confirmed.
+ *
+ * "Waiting for Prepayment" is confirmed/requested with unpaid required prepayment.
  */
 const parseBookingsTabFilter = (tab, alias = "b") => {
   const normalized = String(tab ?? "").trim().toLowerCase();
-  const daySql = `COALESCE(${alias}.booking_date, ${alias}.start_time::date)`;
-  const endedSql = `(
-    (${alias}.end_time IS NOT NULL AND ${alias}.end_time <= NOW())
-    OR (${alias}.end_time IS NULL AND ${daySql} < CURRENT_DATE)
+  const waitingPrepaymentSql = `(
+    LOWER(TRIM(COALESCE(${alias}.prepayment_status, ''))) IN ('pending', 'required')
+    AND ${alias}.status IN ('requested', 'confirmed')
   )`;
-  // Active = still open for Past/Ongoing/Upcoming timing (includes BR `requested`).
-  const activeSql = `${alias}.status NOT IN ('completed', 'cancelled', 'no_show')`;
 
   if (normalized === "past") {
-    return `AND (
-      ${alias}.status IN ('completed', 'cancelled', 'no_show')
-      OR ${endedSql}
-    )`;
+    return `AND ${alias}.status IN ('completed', 'cancelled', 'no_show')`;
   }
   if (normalized === "ongoing") {
-    return `AND ${activeSql}
-      AND NOT ${endedSql}
-      AND ${daySql} = CURRENT_DATE`;
+    return `AND ${alias}.status = 'in_progress'`;
   }
   if (normalized === "upcoming") {
-    return `AND ${activeSql}
-      AND NOT ${endedSql}
-      AND ${daySql} > CURRENT_DATE`;
+    return `AND (
+      ${alias}.status IN ('requested', 'confirmed', 'invalid')
+      OR ${waitingPrepaymentSql}
+    )`;
   }
   return "";
 };
@@ -1948,6 +2073,124 @@ export const updateCalendarEntryStatus = async (req, res) => {
   }
 };
 
+export const updateCalendarEntry = async (req, res) => {
+  try {
+    if (req.user.user_type !== "professional") {
+      return res.status(403).json({
+        success: false,
+        message: "Only professional users can update calendar entries.",
+        data: null,
+      });
+    }
+
+    const professionalProfile = await getProfessionalProfile(req.user.id);
+    if (!professionalProfile) {
+      return res.status(404).json({
+        success: false,
+        message: "Professional profile not found.",
+        data: null,
+      });
+    }
+
+    const entryId = parseUuid(req.params.id);
+    if (!entryId) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid calendar entry id.",
+        data: null,
+      });
+    }
+
+    const existingResult = await query(
+      `SELECT * FROM calendar_entries
+       WHERE id = $1 AND professional_profile_id = $2
+       LIMIT 1`,
+      [entryId, professionalProfile.id],
+    );
+    if (!existingResult.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: "Calendar entry not found.",
+        data: null,
+      });
+    }
+
+    const existing = existingResult.rows[0];
+    const normalizedStatus =
+      req.body.status !== undefined && req.body.status !== null && req.body.status !== ""
+        ? normalizeCalendarStatus(req.body.status, existing.status)
+        : existing.status;
+    const normalizedBookingType =
+      req.body.booking_type !== undefined && req.body.booking_type !== null && req.body.booking_type !== ""
+        ? req.body.booking_type
+        : existing.booking_type;
+
+    const result = await query(
+      `UPDATE calendar_entries
+       SET team_member_id = COALESCE($1, team_member_id),
+           status = $2,
+           title = COALESCE(NULLIF($3, ''), title),
+           start_time = COALESCE($4, start_time),
+           end_time = COALESCE($5, end_time),
+           start_date = COALESCE($6, start_date),
+           end_date = COALESCE($7, end_date),
+           location_type = COALESCE($8, location_type),
+           booking_type = COALESCE($9, booking_type),
+           client_name = COALESCE($10, client_name),
+           notes = COALESCE($11, notes),
+           service_ids = COALESCE($12, service_ids),
+           updated_at = NOW()
+       WHERE id = $13
+         AND professional_profile_id = $14
+       RETURNING *`,
+      [
+        parseOptionalUuid(req.body.team_member_id) ?? existing.team_member_id,
+        normalizedStatus,
+        req.body.title ?? existing.title,
+        req.body.start_time !== undefined ? req.body.start_time : existing.start_time,
+        req.body.end_time !== undefined ? req.body.end_time : existing.end_time,
+        req.body.start_date !== undefined ? req.body.start_date : existing.start_date,
+        req.body.end_date !== undefined ? req.body.end_date : existing.end_date,
+        req.body.location_type !== undefined ? req.body.location_type : existing.location_type,
+        normalizedBookingType,
+        req.body.client_name !== undefined ? req.body.client_name : existing.client_name,
+        req.body.notes !== undefined ? req.body.notes : existing.notes,
+        req.body.service_ids !== undefined
+          ? parseUuidArray(req.body.service_ids)
+          : existing.service_ids,
+        entryId,
+        professionalProfile.id,
+      ],
+    );
+
+    const entry = result.rows[0];
+    if (entry && String(entry.status).toLowerCase() === "requested") {
+      try {
+        await mirrorCalendarRequestToBooking({
+          entry,
+          professionalUserId: req.user.id,
+        });
+      } catch {
+        // best-effort mirror upsert
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Calendar entry updated successfully.",
+      data: entry,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update calendar entry.",
+      data: {
+        error: error.message,
+      },
+    });
+  }
+};
+
 export const deleteCalendarEntry = async (req, res) => {
   try {
     if (req.user.user_type !== "professional") {
@@ -2069,11 +2312,11 @@ export const updateMyBooking = async (req, res) => {
     let nextStatus = existing.status;
     if (hasStatus) {
       nextStatus = normalizeBookingStatus(req.body.status, existing.status);
-      const allowedCustomerStatuses = ["cancelled", "confirmed", "requested"];
+      const allowedCustomerStatuses = ["cancelled", "confirmed", "requested", "invalid"];
       if (!allowedCustomerStatuses.includes(nextStatus)) {
         return res.status(400).json({
           success: false,
-          message: "Customers may only set booking status to cancelled, confirmed, or requested.",
+          message: "Customers may only set booking status to cancelled, confirmed, requested, or invalid.",
           data: null,
         });
       }
@@ -2120,6 +2363,36 @@ export const updateMyBooking = async (req, res) => {
         ? req.body.end_time
         : existing.end_time;
 
+    const scheduleOrTotalChanged =
+      hasSchedule ||
+      (req.body.total_price !== undefined &&
+        req.body.total_price !== null &&
+        req.body.total_price !== "" &&
+        Number(req.body.total_price) !== Number(existing.total_price));
+
+    let nextEditRequest = existing.edit_request ?? null;
+    if (
+      scheduleOrTotalChanged &&
+      existing.status === "confirmed" &&
+      nextStatus === "confirmed"
+    ) {
+      if (isEditRequestPending(existing.edit_request)) {
+        return res.status(409).json({
+          success: false,
+          message: "Cannot change booking while an edit request is pending.",
+          data: null,
+        });
+      }
+      if (!isEditGrantActiveFor(existing.edit_request, "client")) {
+        return res.status(403).json({
+          success: false,
+          message: "An accepted edit request is required before changing this booking.",
+          data: null,
+        });
+      }
+      nextEditRequest = consumeEditGrant(existing.edit_request, "client").value;
+    }
+
     const result = await query(
       `UPDATE bookings
        SET status = $1,
@@ -2129,9 +2402,10 @@ export const updateMyBooking = async (req, res) => {
            booking_date = $5,
            start_time = $6,
            end_time = $7,
+           edit_request = $8,
            updated_at = NOW()
-       WHERE id = $8
-         AND customer_id = $9
+       WHERE id = $9
+         AND customer_id = $10
        RETURNING *`,
       [
         nextStatus,
@@ -2141,6 +2415,7 @@ export const updateMyBooking = async (req, res) => {
         nextBookingDate,
         nextStartTime,
         nextEndTime,
+        nextEditRequest,
         bookingId,
         req.user.id,
       ],
@@ -2155,6 +2430,23 @@ export const updateMyBooking = async (req, res) => {
     }
 
     const booking = result.rows[0];
+
+    // Keep mirrored calendar_entries in sync when the client accepts / rejects / suggests.
+    if (booking.unique_code) {
+      try {
+        await query(
+          `UPDATE calendar_entries
+           SET status = $1,
+               notes = $2,
+               updated_at = NOW()
+           WHERE unique_code = $3`,
+          [booking.status, booking.notes, booking.unique_code],
+        );
+      } catch {
+        // best-effort — booking update still succeeds
+      }
+    }
+
     if (["confirmed", "completed"].includes(booking.status)) {
       try {
         await syncBookingToFinanceTransaction(booking.id, {
@@ -2226,7 +2518,7 @@ export const updateBookingStatus = async (req, res) => {
     // calendar overview lists bookings across setups; Accept/Reject must match that.
     const existingResult = await query(
       `SELECT b.status, b.notes, b.total_price, b.booking_date, b.start_time, b.end_time,
-              b.business_setup_id, b.customer_id
+              b.business_setup_id, b.customer_id, b.edit_request
        FROM bookings b
        INNER JOIN business_setups bs ON bs.id = b.business_setup_id
        WHERE b.id = $1
@@ -2255,16 +2547,28 @@ export const updateBookingStatus = async (req, res) => {
         data: null,
       });
     }
+
+    const existingBooking = existingResult.rows[0];
+    if (
+      isEditRequestPending(existingBooking.edit_request) &&
+      ["cancelled", "in_progress", "no_show"].includes(status)
+    ) {
+      return res.status(409).json({
+        success: false,
+        message: "Cancel, In Progress, and No Show are locked while an edit request is pending.",
+        data: null,
+      });
+    }
+
     const nextNotes =
       req.body.notes !== undefined && req.body.notes !== null
         ? String(req.body.notes)
-        : existingResult.rows[0].notes;
+        : existingBooking.notes;
     const nextTotalPrice =
       req.body.total_price !== undefined && req.body.total_price !== null && req.body.total_price !== ""
         ? Number(req.body.total_price)
-        : existingResult.rows[0].total_price;
+        : existingBooking.total_price;
 
-    const existingBooking = existingResult.rows[0];
     const hasSchedule =
       (req.body.booking_date !== undefined && req.body.booking_date !== null && req.body.booking_date !== "") ||
       (req.body.start_time !== undefined && req.body.start_time !== null && req.body.start_time !== "") ||
@@ -2281,6 +2585,36 @@ export const updateBookingStatus = async (req, res) => {
         ? req.body.end_time
         : existingBooking.end_time;
 
+    const scheduleOrTotalChanged =
+      hasSchedule ||
+      (req.body.total_price !== undefined &&
+        req.body.total_price !== null &&
+        req.body.total_price !== "" &&
+        Number(req.body.total_price) !== Number(existingBooking.total_price));
+
+    let nextEditRequest = existingBooking.edit_request ?? null;
+    if (
+      scheduleOrTotalChanged &&
+      previousStatus === "confirmed" &&
+      status === "confirmed"
+    ) {
+      if (isEditRequestPending(existingBooking.edit_request)) {
+        return res.status(409).json({
+          success: false,
+          message: "Cannot change booking while an edit request is pending.",
+          data: null,
+        });
+      }
+      if (!isEditGrantActiveFor(existingBooking.edit_request, "professional")) {
+        return res.status(403).json({
+          success: false,
+          message: "An accepted edit request is required before changing this booking.",
+          data: null,
+        });
+      }
+      nextEditRequest = consumeEditGrant(existingBooking.edit_request, "professional").value;
+    }
+
     const result = await query(
       `UPDATE bookings
        SET status = $1,
@@ -2289,17 +2623,19 @@ export const updateBookingStatus = async (req, res) => {
            booking_date = $4,
            start_time = $5,
            end_time = $6,
+           edit_request = $7,
            updated_at = NOW()
-       WHERE id = $7
-         AND business_setup_id = $8
+       WHERE id = $8
+         AND business_setup_id = $9
        RETURNING *`,
       [
         status,
         nextNotes,
-        Number.isFinite(nextTotalPrice) ? nextTotalPrice : existingResult.rows[0].total_price,
+        Number.isFinite(nextTotalPrice) ? nextTotalPrice : existingBooking.total_price,
         nextBookingDate,
         nextStartTime,
         nextEndTime,
+        nextEditRequest,
         bookingId,
         businessSetupId,
       ],
@@ -2314,6 +2650,38 @@ export const updateBookingStatus = async (req, res) => {
     }
 
     const booking = result.rows[0];
+
+    // Keep mirrored calendar_entries in sync (pro BR edits on b-* events).
+    if (booking.unique_code) {
+      try {
+        await query(
+          `UPDATE calendar_entries
+           SET status = $1,
+               notes = $2,
+               title = COALESCE(NULLIF($3, ''), title),
+               start_time = COALESCE($4, start_time),
+               end_time = COALESCE($5, end_time),
+               start_date = COALESCE($6, start_date),
+               end_date = COALESCE($6, end_date),
+               updated_at = NOW()
+           WHERE unique_code = $7
+             AND professional_profile_id = $8`,
+          [
+            booking.status,
+            booking.notes,
+            booking.service_title || null,
+            booking.start_time,
+            booking.end_time,
+            booking.booking_date,
+            booking.unique_code,
+            professionalProfile.id,
+          ],
+        );
+      } catch {
+        // best-effort
+      }
+    }
+
     if (["confirmed", "completed"].includes(booking.status)) {
       try {
         await syncBookingToFinanceTransaction(booking.id, {
@@ -2365,6 +2733,184 @@ export const updateBookingStatus = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to update booking status.",
+      data: {
+        error: error.message,
+      },
+    });
+  }
+};
+
+const loadBookingForEditRequestAccess = async (user, bookingId) => {
+  if (user.user_type === "professional") {
+    const professionalProfile = await getProfessionalProfile(user.id);
+    if (!professionalProfile) return null;
+    const result = await query(
+      `SELECT b.*
+       FROM bookings b
+       INNER JOIN business_setups bs ON bs.id = b.business_setup_id
+       WHERE b.id = $1
+         AND bs.professional_profile_id = $2
+       LIMIT 1`,
+      [bookingId, professionalProfile.id],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  const result = await query(
+    `SELECT *
+     FROM bookings
+     WHERE id = $1
+       AND customer_id = $2
+     LIMIT 1`,
+    [bookingId, user.id],
+  );
+  return result.rows[0] ?? null;
+};
+
+/**
+ * Confirmed Edit Request (ER): send | accept | reject.
+ * Body: { action: "send"|"accept"|"reject", note?: string }
+ */
+export const manageBookingEditRequest = async (req, res) => {
+  try {
+    const bookingId = parseUuid(req.params.id);
+    if (!bookingId) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid booking id.",
+        data: null,
+      });
+    }
+
+    const action = String(req.body.action ?? "").trim().toLowerCase();
+    if (!["send", "accept", "reject"].includes(action)) {
+      return res.status(400).json({
+        success: false,
+        message: "action must be send, accept, or reject.",
+        data: null,
+      });
+    }
+
+    const booking = await loadBookingForEditRequestAccess(req.user, bookingId);
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: "Booking not found.",
+        data: null,
+      });
+    }
+
+    if (String(booking.status).toLowerCase() !== "confirmed") {
+      return res.status(400).json({
+        success: false,
+        message: "Edit requests are only allowed on confirmed bookings.",
+        data: null,
+      });
+    }
+
+    const actor =
+      req.user.user_type === "professional" ? "professional" : "client";
+    const existingEr = parseEditRequest(booking.edit_request);
+    let nextEditRequest = booking.edit_request ?? null;
+    let message = "Edit request updated.";
+    let notificationEvent = null;
+
+    if (action === "send") {
+      if (existingEr?.status === "pending") {
+        return res.status(409).json({
+          success: false,
+          message: "An edit request is already pending.",
+          data: null,
+        });
+      }
+      const built = buildPendingEditRequest({
+        note: req.body.note,
+        initiatedBy: actor,
+      });
+      if (built.error) {
+        return res.status(400).json({
+          success: false,
+          message: built.error,
+          data: null,
+        });
+      }
+      nextEditRequest = built.value;
+      message = "Edit request sent.";
+      notificationEvent =
+        actor === "professional"
+          ? BOOKING_NOTIFICATION_EVENTS.INCOMING_ER
+          : BOOKING_NOTIFICATION_EVENTS.EDIT_REQUEST_OUTGOING;
+    } else if (action === "accept") {
+      if (!existingEr || existingEr.status !== "pending") {
+        return res.status(400).json({
+          success: false,
+          message: "No pending edit request to accept.",
+          data: null,
+        });
+      }
+      if (existingEr.initiated_by === actor) {
+        return res.status(403).json({
+          success: false,
+          message: "You cannot accept your own edit request.",
+          data: null,
+        });
+      }
+      const built = buildApprovedEditRequest(existingEr);
+      if (built.error) {
+        return res.status(400).json({
+          success: false,
+          message: built.error,
+          data: null,
+        });
+      }
+      nextEditRequest = built.value;
+      message = "Edit request accepted.";
+    } else {
+      if (!existingEr || existingEr.status !== "pending") {
+        return res.status(400).json({
+          success: false,
+          message: "No pending edit request to reject.",
+          data: null,
+        });
+      }
+      if (existingEr.initiated_by === actor) {
+        return res.status(403).json({
+          success: false,
+          message: "You cannot reject your own edit request.",
+          data: null,
+        });
+      }
+      nextEditRequest = buildRejectedClear().value;
+      message = "Edit request rejected.";
+    }
+
+    const result = await query(
+      `UPDATE bookings
+       SET edit_request = $1,
+           updated_at = NOW()
+       WHERE id = $2
+       RETURNING *`,
+      [nextEditRequest, bookingId],
+    );
+
+    const updated = result.rows[0];
+    if (notificationEvent) {
+      void dispatchBookingEventNotification(updated.id, notificationEvent, {
+        initiatedBy: actor,
+        message: existingEr?.note || req.body.note || undefined,
+      });
+    }
+    emitBookingChanged(updated, "updated");
+
+    return res.status(200).json({
+      success: true,
+      message,
+      data: updated,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update edit request.",
       data: {
         error: error.message,
       },

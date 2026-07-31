@@ -50,19 +50,35 @@ function buildFallbackCreateBookingPayload(
     booking_type: locationMode === "desired" ? "project" : "request",
     unique_code: bookingRef,
     total_price: draft.total,
-    ...(draft.projectDetails
+    ...(locationMode === "desired" && draft.desiredLocation
+      ? {
+          province: draft.desiredLocation.province.trim() || null,
+          municipality: draft.desiredLocation.municipality.trim() || null,
+          street_address: draft.desiredLocation.street.trim() || null,
+          street_number: draft.desiredLocation.number.trim() || null,
+          postal_code: draft.desiredLocation.postalCode.trim() || null,
+        }
+      : {}),
+    ...(draft.projectDetails || (locationMode === "desired" && draft.desiredLocation)
       ? {
           location_details: {
-            projectDescription: draft.projectDetails.description ?? "",
-            uploads: draft.projectDetails.uploads ?? [],
+            ...(draft.projectDetails
+              ? {
+                  projectDescription: draft.projectDetails.description ?? "",
+                  uploads: draft.projectDetails.uploads ?? [],
+                }
+              : {}),
+            ...(locationMode === "desired" && draft.desiredLocation
+              ? { desiredLocation: draft.desiredLocation }
+              : {}),
           },
-          notes: draft.projectDetails.description
+          notes: draft.projectDetails?.description
             ? `Project: ${draft.projectDetails.description}`
             : null,
-          images: (draft.projectDetails.uploads ?? [])
+          images: (draft.projectDetails?.uploads ?? [])
             .filter((u) => u.url && (u.kind === "image" || !u.kind))
             .map((u) => u.url as string),
-          documents: (draft.projectDetails.uploads ?? [])
+          documents: (draft.projectDetails?.uploads ?? [])
             .filter((u) => u.url && u.kind === "document")
             .map((u) => u.url as string),
         }

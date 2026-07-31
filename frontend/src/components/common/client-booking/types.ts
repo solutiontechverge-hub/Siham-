@@ -10,11 +10,19 @@ export type ClientBookingDraftService = {
   isAddOn?: boolean;
 };
 
+export type ClientBookingDraftProduct = {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  unitPrice?: number;
+};
+
 export type ClientBookingDraftPerson = {
   id: string;
   name: string;
   isRequester?: boolean;
-  participantType?: "model" | "planning" | "guest";
+  participantType?: "model" | "planning" | "guest" | "buffer";
   planningActivity?: string;
   planningDuration?: string;
   planningIsLocked?: boolean;
@@ -37,15 +45,26 @@ export type ClientBookingDraftProjectDetails = {
   }>;
 };
 
+export type ClientBookingDesiredLocation = {
+  street: string;
+  number: string;
+  postalCode: string;
+  province: string;
+  municipality: string;
+};
+
 export type ClientBookingDraft = {
   selectedDateISO: string;
   selectedTime: string;
   combineServices: boolean;
   people?: ClientBookingDraftPerson[];
   services: ClientBookingDraftService[];
+  products?: ClientBookingDraftProduct[];
   teamMembers?: ClientBookingDraftTeamMember[];
   total: number;
   projectDetails?: ClientBookingDraftProjectDetails;
+  /** Client visit address for Desired Location bookings. */
+  desiredLocation?: ClientBookingDesiredLocation;
 };
 
 export type ClientBookingSelectedShop = {

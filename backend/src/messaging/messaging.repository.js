@@ -15,22 +15,41 @@ const THREAD_SELECT = `
       t.peer_display_name
     ) AS client_display_name,
     COALESCE(
+      NULLIF(TRIM(bs.business_name), ''),
+      NULLIF(TRIM(bs.salon_name), ''),
       NULLIF(TRIM(pp.legal_name), ''),
       NULLIF(TRIM(CONCAT(pp.contact_first_name, ' ', pp.contact_last_name)), ''),
       t.peer_display_name
     ) AS professional_display_name,
     ip.user_id::text AS client_profile_id,
     pp.id::text AS professional_profile_id,
+    bs.id::text AS business_setup_id,
     lm.body AS last_message_preview,
     lm.created_at AS last_message_at,
     lm.sender_role AS last_message_sender_role,
-    lm.sender_display_name AS last_message_sender_name
+    lm.sender_display_name AS last_message_sender_name,
+    lb.linked_booking_id,
+    lb.linked_booking_code,
+    lb.linked_booking_status
   FROM messaging_threads t
   JOIN users cu ON cu.id = t.client_user_id
   JOIN users pu ON pu.id = t.professional_user_id
   LEFT JOIN individual_profiles ip ON ip.user_id = t.client_user_id
   LEFT JOIN company_profiles cp ON cp.user_id = t.client_user_id
   LEFT JOIN professional_profiles pp ON pp.user_id = t.professional_user_id
+  LEFT JOIN LATERAL (
+    SELECT id, business_name, salon_name
+    FROM business_setups
+    WHERE professional_profile_id = pp.id AND is_active = true
+    ORDER BY
+      CASE
+        WHEN t.peer_profile_id IS NOT NULL
+          AND id::text = t.peer_profile_id::text THEN 0
+        ELSE 1
+      END,
+      id ASC
+    LIMIT 1
+  ) bs ON true
   LEFT JOIN LATERAL (
     SELECT
       m.body,
@@ -56,6 +75,20 @@ const THREAD_SELECT = `
     ORDER BY m.created_at DESC
     LIMIT 1
   ) lm ON true
+  LEFT JOIN LATERAL (
+    SELECT
+      b.id::text AS linked_booking_id,
+      b.unique_code AS linked_booking_code,
+      b.status AS linked_booking_status
+    FROM bookings b
+    JOIN business_setups bs ON bs.id = b.business_setup_id
+    JOIN professional_profiles bpp ON bpp.id = bs.professional_profile_id
+    WHERE b.customer_id = t.client_user_id
+      AND bpp.user_id = t.professional_user_id
+      AND b.status IN ('requested', 'confirmed', 'completed', 'in_progress')
+    ORDER BY COALESCE(b.start_time, b.created_at) DESC
+    LIMIT 1
+  ) lb ON true
 `;
 
 export async function purgeExpiredMessages() {
@@ -196,6 +229,8 @@ export async function createOrGetThread(clientUserId, professionalUserId) {
        u.email,
        bs.id AS business_setup_id,
        COALESCE(
+         NULLIF(TRIM(bs.business_name), ''),
+         NULLIF(TRIM(bs.salon_name), ''),
          NULLIF(TRIM(pp.legal_name), ''),
          NULLIF(TRIM(CONCAT(pp.contact_first_name, ' ', pp.contact_last_name)), ''),
          u.email
@@ -203,12 +238,19 @@ export async function createOrGetThread(clientUserId, professionalUserId) {
        pp.service_location_mode
      FROM users u
      JOIN professional_profiles pp ON pp.user_id = u.id
-     JOIN business_setups bs ON bs.professional_profile_id = pp.id
-     WHERE u.id = $1`,
+     JOIN business_setups bs ON bs.professional_profile_id = pp.id AND bs.is_active = true
+     WHERE u.id = $1
+     ORDER BY bs.id ASC
+     LIMIT 1`,
     [professionalUserId],
   );
 
   const proRow = pro.rows[0];
+  if (!proRow) {
+    const error = new Error("Professional not found.");
+    error.statusCode = 404;
+    throw error;
+  }
   const insert = await query(
     `INSERT INTO messaging_threads (
        client_user_id,
@@ -261,6 +303,110 @@ export async function createOrGetThreadByBusinessSetup(clientUserId, businessSet
     throw error;
   }
   return createOrGetThread(clientUserId, result.rows[0].professional_user_id);
+}
+
+/**
+ * Open (create-or-get) the messaging thread for a booking from live DB data.
+ * Works for both the booking client and the booking professional.
+ */
+export async function openThreadForBooking(userId, bookingRef) {
+  const raw = String(bookingRef || "").trim();
+  if (!raw) {
+    const error = new Error("Booking reference is required.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const normalized = raw.replace(/^#/, "").trim();
+  const codeBare = normalized.replace(/^b/i, "");
+
+  const bookingResult = await query(
+    `SELECT
+       b.id,
+       b.unique_code,
+       b.status,
+       b.location_type,
+       b.customer_id,
+       b.business_setup_id,
+       pp.user_id AS professional_user_id,
+       COALESCE(
+         NULLIF(TRIM(bs.business_name), ''),
+         NULLIF(TRIM(bs.salon_name), ''),
+         NULLIF(TRIM(pp.legal_name), ''),
+         NULLIF(TRIM(CONCAT(pp.contact_first_name, ' ', pp.contact_last_name)), ''),
+         pu.email
+       ) AS professional_display_name
+     FROM bookings b
+     JOIN business_setups bs ON bs.id = b.business_setup_id
+     JOIN professional_profiles pp ON pp.id = bs.professional_profile_id
+     JOIN users pu ON pu.id = pp.user_id
+     WHERE b.status <> 'blocked'
+       AND (
+         b.id::text = $1
+         OR LOWER(COALESCE(b.unique_code, '')) = LOWER($1)
+         OR LOWER(REGEXP_REPLACE(COALESCE(b.unique_code, ''), '^[Bb]', '')) = LOWER($2)
+         OR LOWER(COALESCE(b.unique_code, '')) = LOWER('B' || $2)
+       )
+     LIMIT 1`,
+    [normalized, codeBare],
+  );
+
+  if (bookingResult.rowCount === 0) {
+    const error = new Error("Booking not found.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const booking = bookingResult.rows[0];
+  const isClient = String(booking.customer_id) === String(userId);
+  const isProfessional = String(booking.professional_user_id) === String(userId);
+  if (!isClient && !isProfessional) {
+    const error = new Error("You do not have access to this booking conversation.");
+    error.statusCode = 403;
+    throw error;
+  }
+
+  const threadId = await createOrGetThread(
+    booking.customer_id,
+    booking.professional_user_id,
+  );
+
+  const code = booking.unique_code || String(booking.id);
+  const bookingMeta = buildBookingMeta(code, booking.status, booking.location_type);
+
+  await query(
+    `UPDATE messaging_threads
+     SET peer_display_name = $1,
+         peer_profile_id = $2,
+         booking_id = $3,
+         booking_meta = $4,
+         booking_status = $5,
+         unlinked = false,
+         updated_at = NOW()
+     WHERE id = $6`,
+    [
+      booking.professional_display_name,
+      booking.business_setup_id,
+      code,
+      bookingMeta,
+      booking.status || "requested",
+      threadId,
+    ],
+  );
+
+  const threadResult = await query(`${THREAD_SELECT} WHERE t.id = $1`, [threadId]);
+  if (threadResult.rowCount === 0) {
+    const error = new Error("Conversation not found.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  return {
+    threadId,
+    thread: mapThreadRow(threadResult.rows[0], userId),
+    bookingRef: code,
+    businessSetupId: String(booking.business_setup_id),
+  };
 }
 
 export async function getInboxForUser(userId, userType) {
@@ -695,4 +841,229 @@ export async function appendThreadMessageLegacy(threadId, message) {
   );
 
   return getThreadMessagesLegacy(threadId);
+}
+
+const PAST_BOOKING_STATUSES = new Set(["completed", "cancelled", "no_show"]);
+const LINKABLE_PAST_LIMIT = 3;
+
+async function resolveThreadPair(threadId, userId) {
+  const raw = String(threadId || "");
+
+  if (raw.startsWith("draft:setup-")) {
+    const setupId = raw.slice("draft:setup-".length);
+    const result = await query(
+      `SELECT pp.user_id AS professional_user_id
+       FROM business_setups bs
+       JOIN professional_profiles pp ON pp.id = bs.professional_profile_id
+       WHERE bs.id = $1 AND bs.is_active = true`,
+      [setupId],
+    );
+    if (result.rowCount === 0) {
+      const error = new Error("Professional business not found.");
+      error.statusCode = 404;
+      throw error;
+    }
+    return {
+      threadId: null,
+      clientUserId: userId,
+      professionalUserId: result.rows[0].professional_user_id,
+    };
+  }
+
+  if (raw.startsWith("draft:")) {
+    return {
+      threadId: null,
+      clientUserId: userId,
+      professionalUserId: raw.slice("draft:".length),
+    };
+  }
+
+  const thread = await assertThreadAccess(raw, userId);
+  return {
+    threadId: thread.id,
+    clientUserId: thread.client_user_id,
+    professionalUserId: thread.professional_user_id,
+  };
+}
+
+function isPastBookingRow(row) {
+  const status = String(row.status || "").toLowerCase();
+  return PAST_BOOKING_STATUSES.has(status);
+}
+
+function formatBookingDateLabel(value) {
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  return `${months[d.getMonth()]}, ${String(d.getDate()).padStart(2, "0")}, ${d.getFullYear()}`;
+}
+
+function formatBookingTimeLabel(value) {
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  const hours = d.getHours();
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  const hour12 = hours % 12 || 12;
+  return `${hour12}:${minutes}`;
+}
+
+function formatBookingTimeRange(start, end) {
+  const startLabel = start ? formatBookingTimeLabel(start) : "";
+  const endLabel = end ? formatBookingTimeLabel(end) : "";
+  if (startLabel && endLabel) return `${startLabel}-${endLabel}`;
+  return startLabel || endLabel || "";
+}
+
+function mapLinkableBooking(row, closed) {
+  const code = row.unique_code || String(row.id);
+  const dateSource = row.start_time || row.booking_date || row.created_at;
+  return {
+    id: String(row.id),
+    bookingId: code,
+    label: code,
+    dateLabel: formatBookingDateLabel(dateSource),
+    timeRange: formatBookingTimeRange(row.start_time, row.end_time),
+    status: row.status || "",
+    closed: Boolean(closed),
+  };
+}
+
+function buildBookingMeta(code, status, locationType) {
+  const statusLabel = String(status || "requested")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+  const loc = locationType === "desired" ? "DL" : "FL";
+  return `${String(code).replace(/^B/i, "")} - ${statusLabel} - ${loc}`;
+}
+
+async function listPeerBookings(clientUserId, professionalUserId) {
+  const result = await query(
+    `SELECT
+       b.id,
+       b.unique_code,
+       b.status,
+       b.location_type,
+       b.booking_date,
+       b.start_time,
+       b.end_time,
+       b.created_at
+     FROM bookings b
+     JOIN business_setups bs ON bs.id = b.business_setup_id
+     JOIN professional_profiles pp ON pp.id = bs.professional_profile_id
+     WHERE b.customer_id = $1
+       AND pp.user_id = $2
+       AND b.status <> 'blocked'
+     ORDER BY COALESCE(b.start_time, b.created_at) DESC`,
+    [clientUserId, professionalUserId],
+  );
+  return result.rows;
+}
+
+function pickLinkableBookings(rows) {
+  const now = new Date();
+  const active = [];
+  const past = [];
+
+  for (const row of rows) {
+    if (isPastBookingRow(row, now)) past.push(row);
+    else active.push(row);
+  }
+
+  // Active: soonest first. Past: most recent first, cap at last 3.
+  active.sort((a, b) => {
+    const aMs = new Date(a.start_time || a.created_at).getTime();
+    const bMs = new Date(b.start_time || b.created_at).getTime();
+    return aMs - bMs;
+  });
+  past.sort((a, b) => {
+    const aMs = new Date(a.end_time || a.start_time || a.created_at).getTime();
+    const bMs = new Date(b.end_time || b.start_time || b.created_at).getTime();
+    return bMs - aMs;
+  });
+
+  const selectedPast = past.slice(0, LINKABLE_PAST_LIMIT);
+  return [
+    ...active.map((row) => mapLinkableBooking(row, false)),
+    ...selectedPast.map((row) => mapLinkableBooking(row, true)),
+  ];
+}
+
+export async function listLinkableBookingsForThread(threadId, userId) {
+  const pair = await resolveThreadPair(threadId, userId);
+  const rows = await listPeerBookings(pair.clientUserId, pair.professionalUserId);
+  return {
+    bookings: pickLinkableBookings(rows),
+    clientUserId: pair.clientUserId,
+    professionalUserId: pair.professionalUserId,
+  };
+}
+
+export async function linkThreadToBooking(threadId, userId, bookingRef) {
+  const ref = String(bookingRef || "").trim();
+  if (!ref) {
+    const error = new Error("Booking is required.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const pair = await resolveThreadPair(threadId, userId);
+  const rows = await listPeerBookings(pair.clientUserId, pair.professionalUserId);
+  const linkable = pickLinkableBookings(rows);
+  const normalizedRef = ref.replace(/^#/, "").trim().toLowerCase();
+  const normalizedCode = normalizedRef.replace(/^b/i, "");
+
+  const matched = rows.find((row) => {
+    const id = String(row.id).toLowerCase();
+    const code = String(row.unique_code || "").toLowerCase();
+    const codeBare = code.replace(/^b/i, "");
+    return (
+      id === normalizedRef ||
+      code === normalizedRef ||
+      codeBare === normalizedCode ||
+      code === `b${normalizedCode}`
+    );
+  });
+
+  if (!matched) {
+    const error = new Error("Booking not found for this conversation.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const allowed = linkable.some(
+    (item) => item.id === String(matched.id) || item.bookingId === (matched.unique_code || String(matched.id)),
+  );
+  if (!allowed) {
+    const error = new Error("Only upcoming bookings or the last 3 past bookings can be linked.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const resolvedThreadId = await resolveThreadId(threadId, userId);
+  const code = matched.unique_code || String(matched.id);
+  const bookingMeta = buildBookingMeta(code, matched.status, matched.location_type);
+
+  await query(
+    `UPDATE messaging_threads
+     SET booking_id = $1,
+         booking_meta = $2,
+         booking_status = $3,
+         unlinked = false,
+         updated_at = NOW()
+     WHERE id = $4`,
+    [code, bookingMeta, matched.status || "requested", resolvedThreadId],
+  );
+
+  const threadResult = await query(`${THREAD_SELECT} WHERE t.id = $1`, [resolvedThreadId]);
+  if (threadResult.rowCount === 0) {
+    const error = new Error("Conversation not found after linking.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  return {
+    threadId: resolvedThreadId,
+    thread: mapThreadRow(threadResult.rows[0], userId),
+    booking: mapLinkableBooking(matched, isPastBookingRow(matched)),
+  };
 }

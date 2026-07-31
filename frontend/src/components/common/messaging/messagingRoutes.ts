@@ -27,8 +27,10 @@ export function getMessagingPeerProfileHref(audience: MessagingAudience, thread:
     }
     return `/professionals/client?q=${encodeURIComponent(thread.name)}`;
   }
-  if (thread.peerProfileId) {
-    return `/clients/listing/${encodeURIComponent(thread.peerProfileId)}`;
+  // Public profile is keyed by business setup / shop id (not professional_profiles.id).
+  const shopId = thread.businessSetupId || thread.peerProfileId;
+  if (shopId) {
+    return `/clients/listing/${encodeURIComponent(shopId)}`;
   }
   return `/clients/listing?q=${encodeURIComponent(thread.name)}`;
 }

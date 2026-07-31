@@ -131,21 +131,26 @@ export default function BookingDrawerClientSnapshotSection({
         const personServices = services.filter((s) => s.guestId === person.id);
         const isPlanning =
           person.participantType === "planning" || person.name === "Planning";
+        const isBuffer = person.participantType === "buffer";
         const isModel = person.participantType === "model";
         if (isModel) modelOrdinal += 1;
 
-        const title = isPlanning
-          ? "Planning Details"
-          : isModel
-            ? person.name.trim() && person.name.trim().toLowerCase() !== "model"
-              ? person.name
-              : `Model ${modelOrdinal}`
-            : person.name.trim() && person.name.trim().toLowerCase() !== "guest"
-              ? `Guest: ${person.name}`
-              : "Guest";
+        const title = isBuffer
+          ? person.name.trim()
+            ? `Buffer: ${person.name}`
+            : "Buffer"
+          : isPlanning
+            ? "Planning Details"
+            : isModel
+              ? person.name.trim() && person.name.trim().toLowerCase() !== "model"
+                ? person.name
+                : `Model ${modelOrdinal}`
+              : person.name.trim() && person.name.trim().toLowerCase() !== "guest"
+                ? `Guest: ${person.name}`
+                : "Guest";
 
         const hasPlanning =
-          isPlanning &&
+          (isPlanning || isBuffer) &&
           Boolean(
             person.planningActivity?.trim() || person.planningDuration?.trim(),
           );

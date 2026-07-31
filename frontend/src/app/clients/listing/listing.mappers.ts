@@ -8,6 +8,11 @@ import {
 } from "../../../../images";
 import type { BusinessSetupListing } from "../../../store/services/businessApi";
 import { resolvePriceTier } from "../../../components/common/listingDrawerFilters";
+import {
+  isCategoryVisibleInServiceOrder,
+  isServiceVisibleInServiceOrder,
+} from "../../../components/common/calendar/serviceOrder.utils";
+import type { ServiceOrderSettings } from "../../../components/common/calendar/calendar-settings.types";
 import { resolveBusinessOffering } from "./businessPublicProfile.mapper";
 import { normalizeServiceDurationLabel } from "../../../utils/serviceDuration";
 import type { ListingCardData } from "./listing.data";
@@ -21,7 +26,10 @@ const FALLBACK_IMAGES = [
   ListingImage6,
 ];
 
-const formatPriceLabel = (price: number) => `Starting From ${Math.round(price)} EUR`;
+const formatPriceLabel = (price: number) => {
+  if (!Number.isFinite(price) || price <= 0) return "Price on request";
+  return `Starting From ${Math.round(price)} EUR`;
+};
 
 const slugifyCategoryKey = (value: string) =>
   value
@@ -73,7 +81,7 @@ const parsePriceRangeMin = (priceRange: string | null | undefined): number | nul
   const match = priceRange.match(/(\d+(?:\.\d+)?)/);
   if (!match) return null;
   const parsed = Number(match[1]);
-  return Number.isFinite(parsed) ? parsed : null;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 };
 
 /** Avoid broken labels like "From €€ EUR" when priceRange is symbols or tier text. */
@@ -134,18 +142,53 @@ const buildDurationByServiceId = (setup: BusinessSetupListing) => {
   return map;
 };
 
+const getServiceOrder = (
+  setup: BusinessSetupListing,
+): ServiceOrderSettings | null => {
+  const raw = setup.serviceOrder;
+  if (!raw || typeof raw !== "object") return null;
+  return {
+    categories: raw.categories ?? [],
+    servicesByCategory: raw.servicesByCategory ?? {},
+    hiddenCategories: raw.hiddenCategories ?? [],
+    hiddenServicesByCategory: raw.hiddenServicesByCategory ?? {},
+  };
+};
+
+const isSetupServicePubliclyVisible = (
+  setup: BusinessSetupListing,
+  categoryTitle: string | null | undefined,
+  serviceTitle: string | null | undefined,
+) => {
+  const serviceOrder = getServiceOrder(setup);
+  const category = String(categoryTitle ?? "").trim();
+  const service = String(serviceTitle ?? "").trim();
+  if (!category) return true;
+  if (!isCategoryVisibleInServiceOrder(serviceOrder, category)) return false;
+  if (!service) return true;
+  return isServiceVisibleInServiceOrder(serviceOrder, category, service);
+};
+
 const buildServices = (setup: BusinessSetupListing) => {
   const durationByServiceId = buildDurationByServiceId(setup);
 
   const fromDetails = (setup.serviceDetails ?? [])
-    .filter(
-      (detail) =>
-        detail.serviceTitle &&
-        detail.price != null &&
-        Number.isFinite(Number(detail.price)) &&
-        Number(detail.price) > 0,
+    .filter((detail) => Boolean(detail.serviceTitle?.trim()))
+    .filter((detail) => detail.isVisible !== false)
+    .filter((detail) =>
+      isSetupServicePubliclyVisible(
+        setup,
+        detail.categoryTitle,
+        detail.serviceTitle,
+      ),
     )
-    .sort((a, b) => Number(a.price) - Number(b.price))
+    .sort((a, b) => {
+      const priceA = Number(a.price);
+      const priceB = Number(b.price);
+      const validA = Number.isFinite(priceA) && priceA > 0 ? priceA : Number.POSITIVE_INFINITY;
+      const validB = Number.isFinite(priceB) && priceB > 0 ? priceB : Number.POSITIVE_INFINITY;
+      return validA - validB;
+    })
     .slice(0, 3)
     .map((detail) => {
       const rawDuration =
@@ -166,7 +209,14 @@ const buildServices = (setup: BusinessSetupListing) => {
   }
 
   const fromCombinations = (setup.bookServiceCombinations ?? [])
-    .filter((combo) => combo.serviceTitle)
+    .filter((combo) => Boolean(combo.serviceTitle?.trim()))
+    .filter((combo) =>
+      isSetupServicePubliclyVisible(
+        setup,
+        combo.categoryTitle ?? combo.category_title,
+        combo.serviceTitle,
+      ),
+    )
     .slice(0, 3)
     .map((combo) => ({
       name: combo.serviceTitle as string,
@@ -185,7 +235,10 @@ const buildServices = (setup: BusinessSetupListing) => {
   ];
 };
 
-const resolveStartingFromLabel = (setup: BusinessSetupListing, services: ListingCardData["services"]) => {
+const resolveStartingFromLabel = (
+  setup: BusinessSetupListing,
+  services: ListingCardData["services"],
+) => {
   const lowestDetailPrice = (setup.serviceDetails ?? [])
     .map((detail) => Number(detail.price))
     .filter((price) => Number.isFinite(price) && price > 0)
@@ -200,7 +253,11 @@ const resolveStartingFromLabel = (setup: BusinessSetupListing, services: Listing
     return formatPriceLabel(rangeMin);
   }
 
-  return services[0]?.priceLabel ?? "Price on request";
+  const firstRealPrice = services.find(
+    (svc) => svc.priceLabel && !/on request/i.test(svc.priceLabel),
+  )?.priceLabel;
+
+  return firstRealPrice ?? "Price on request";
 };
 
 export const mapBusinessSetupToListingCard = (

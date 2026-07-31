@@ -105,6 +105,7 @@ import { Typography } from "../../ui/typography";
 import {
   BUSINESS_SERVICE_CATEGORY_CATALOG,
   buildDynamicServiceCategoryTabs,
+  findBusinessCategoryForCatalogEntry,
   resolveCategoryTabId,
   resolveServiceCategoryStorageId,
   resolveServiceCategorySliderIconId,
@@ -400,10 +401,7 @@ function buildProfessionalDraftFromProfile(
 function getProfessionalPhotoSrcFromProfile(
   profileData: ProfileResponse | null,
 ) {
-  return (
-    getProfessionalProfileRecord(profileData)?.profile_picture ||
-    "/professionals/hero.png"
-  );
+  return getProfessionalProfileRecord(profileData)?.profile_picture || "";
 }
 
 type BusinessSetupSectionId =
@@ -651,9 +649,7 @@ export default function ProfessionalFixedLocationSetup({
   const [activeServiceCategory, setActiveServiceCategory] =
     React.useState<string>("all");
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
-  const [mediaSlides, setMediaSlides] = React.useState<string[]>([
-    "/professionals/hero.png",
-  ]);
+  const [mediaSlides, setMediaSlides] = React.useState<string[]>([]);
   const [mediaIdx, setMediaIdx] = React.useState(0);
   const [mediaDeleteConfirmOpen, setMediaDeleteConfirmOpen] =
     React.useState(false);
@@ -662,12 +658,7 @@ export default function ProfessionalFixedLocationSetup({
   const portfolioInputRef = React.useRef<HTMLInputElement | null>(null);
   const [portfolioItemsFixed, setPortfolioItemsFixed] = React.useState<
     Array<{ id: string; src: string }>
-  >([
-    { id: "pf-1", src: "/professionals/hero.png" },
-    { id: "pf-2", src: "/professionals/hero.png" },
-    { id: "pf-3", src: "/professionals/hero.png" },
-    { id: "pf-4", src: "/professionals/hero.png" },
-  ]);
+  >([]);
   const [portfolioItemsDesired, setPortfolioItemsDesired] = React.useState<
     Array<{ id: string; src: string }>
   >([]);
@@ -952,7 +943,7 @@ export default function ProfessionalFixedLocationSetup({
     items?: Array<{ id: string; label: string }>;
   } | null>(null);
 
-  const [featureTeamPublic, setFeatureTeamPublic] = React.useState(true);
+  const [featureTeamPublic, setFeatureTeamPublic] = React.useState(false);
 
   const addedBlobUrlsRef = React.useRef<string[]>([]);
   React.useEffect(() => {
@@ -2336,8 +2327,8 @@ export default function ProfessionalFixedLocationSetup({
       depositEnabled: values.depositEnabled,
       depositValue: values.depositValue,
       notes: businessSetupData.additional_notes || "",
-      priceRangeFrom: savedPriceRange[0]?.trim() || "",
-      priceRangeTo: savedPriceRange[1]?.trim() || "",
+      priceRangeFrom: savedPriceRange[0]?.trim() || "Low",
+      priceRangeTo: savedPriceRange[1]?.trim() || "Low",
       prepaymentPercent: toDisplayNumber(
         businessSetupData.prepayment_percentage,
       ),
@@ -2415,7 +2406,7 @@ export default function ProfessionalFixedLocationSetup({
       businessSetupData.business_media &&
       businessSetupData.business_media.length > 0
         ? businessSetupData.business_media
-        : ["/professionals/hero.png"];
+        : [];
     setMediaSlides(nextMediaSlides);
     setMediaIdx(0);
 
@@ -2487,7 +2478,7 @@ export default function ProfessionalFixedLocationSetup({
         id: String(member.id ?? `tm-${member.display_order}`),
         name: member.full_name,
         role: member.role,
-        photoSrc: member.profile_photo || "/professionals/hero.png",
+        photoSrc: member.profile_photo || "",
         rating: 4.5,
         reviewsLabel: "(0 Reviews)",
         services: defaultServices(member.assigned_services),
@@ -2526,53 +2517,52 @@ export default function ProfessionalFixedLocationSetup({
       ? mainServicesFixed
       : mainServicesDesired;
 
-  /** Categories from this business setup, ordered by Calendar Settings → Service Order Rules. "All" stays first. */
+  /**
+   * New professionals see all 8 platform categories by default.
+   * Calendar Service Order hide/unhide + order then control what remains visible.
+   * Custom categories that already have services are also included.
+   */
   const serviceCategoryTabs = React.useMemo(() => {
     const orderedCategories: Array<{ id: string; title: string }> = [];
-    const seen = new Set<string>();
+    const seenIds = new Set<string>();
+    const hasTitle = (title: string) =>
+      orderedCategories.some((entry) =>
+        serviceOrderLabelsMatch(entry.title, title),
+      );
 
     for (const service of activeServices) {
       const categoryId = String(service.categoryId ?? "").trim();
-      if (!categoryId || seen.has(categoryId)) continue;
-      seen.add(categoryId);
+      if (!categoryId || seenIds.has(categoryId)) continue;
       const titleFromApi = businessCategories.find(
         (category) => String(category.id) === categoryId,
       )?.title;
-      orderedCategories.push({
-        id: categoryId,
-        title:
-          service.categoryTitle?.trim() ||
-          titleFromApi ||
-          `Category ${categoryId}`,
-      });
-    }
-
-    // Include settings categories that exist in catalog/API even if services list is temporarily empty.
-    for (const title of calendarServiceOrder?.categories ?? []) {
+      const title =
+        service.categoryTitle?.trim() ||
+        titleFromApi ||
+        `Category ${categoryId}`;
       if (!isCategoryVisibleInServiceOrder(calendarServiceOrder, title))
         continue;
+      seenIds.add(categoryId);
+      orderedCategories.push({ id: categoryId, title });
+    }
+
+    for (const entry of BUSINESS_SERVICE_CATEGORY_CATALOG) {
       if (
-        orderedCategories.some((entry) =>
-          serviceOrderLabelsMatch(entry.title, title),
-        )
-      )
+        !isCategoryVisibleInServiceOrder(calendarServiceOrder, entry.label)
+      ) {
         continue;
-      const apiCategory =
-        businessCategories.find((category) =>
-          serviceOrderLabelsMatch(category.title, title),
-        ) ??
-        BUSINESS_SERVICE_CATEGORY_CATALOG.find(
-          (entry) =>
-            serviceOrderLabelsMatch(entry.label, title) ||
-            serviceOrderLabelsMatch(entry.key, title),
-        );
-      if (!apiCategory) continue;
-      const id = "id" in apiCategory ? String(apiCategory.id) : apiCategory.key;
-      if (seen.has(id)) continue;
-      seen.add(id);
+      }
+      if (hasTitle(entry.label)) continue;
+      const apiCategory = findBusinessCategoryForCatalogEntry(
+        businessCategories,
+        entry,
+      );
+      const id = apiCategory ? String(apiCategory.id) : entry.key;
+      if (seenIds.has(id)) continue;
+      seenIds.add(id);
       orderedCategories.push({
         id,
-        title: "title" in apiCategory ? apiCategory.title : apiCategory.label,
+        title: apiCategory?.title ?? entry.label,
       });
     }
 
@@ -3412,38 +3402,40 @@ export default function ProfessionalFixedLocationSetup({
             },
           }}
         >
-          {/^https?:\/\//i.test(values.professionalPhotoSrc) ? (
-            <Box
-              component="img"
-              src={values.professionalPhotoSrc}
-              alt="Profile"
-              sx={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-                display: "block",
-                pointerEvents: "none",
-              }}
-            />
-          ) : (
-            <Box
-              sx={{
-                width: "100%",
-                height: "100%",
-                pointerEvents: "none",
-                position: "relative",
-              }}
-            >
-              <Image
+          {values.professionalPhotoSrc ? (
+            /^https?:\/\//i.test(values.professionalPhotoSrc) ? (
+              <Box
+                component="img"
                 src={values.professionalPhotoSrc}
                 alt="Profile"
-                width={90}
-                height={90}
-                unoptimized
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                sx={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  display: "block",
+                  pointerEvents: "none",
+                }}
               />
-            </Box>
-          )}
+            ) : (
+              <Box
+                sx={{
+                  width: "100%",
+                  height: "100%",
+                  pointerEvents: "none",
+                  position: "relative",
+                }}
+              >
+                <Image
+                  src={values.professionalPhotoSrc}
+                  alt="Profile"
+                  width={90}
+                  height={90}
+                  unoptimized
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                />
+              </Box>
+            )
+          ) : null}
           <IconButton
             size="small"
             onClick={(ev) => {
@@ -3807,10 +3799,8 @@ export default function ProfessionalFixedLocationSetup({
 
   const onConfirmDeleteMedia = React.useCallback(() => {
     const next = mediaSlides.filter((_, i) => i !== mediaIdx);
-    const fallback =
-      next.length > 0 ? next : ["/professionals/hero.png"];
-    setMediaSlides(fallback);
-    setMediaIdx(Math.min(mediaIdx, fallback.length - 1));
+    setMediaSlides(next);
+    setMediaIdx(next.length === 0 ? 0 : Math.min(mediaIdx, next.length - 1));
     setIsBusinessPublishEnabled(true);
     setMediaDeleteConfirmOpen(false);
   }, [mediaIdx, mediaSlides]);
@@ -3870,9 +3860,7 @@ export default function ProfessionalFixedLocationSetup({
 
       try {
         const uploaded = await onUploadBusinessMedia(toUpload);
-        const nextSlides =
-          uploaded.length > 0 ? uploaded : ["/professionals/hero.png"];
-        setMediaSlides(nextSlides);
+        setMediaSlides(uploaded);
         setMediaIdx(0);
       } catch {
         // Parent shows error snackbar.
@@ -4033,9 +4021,11 @@ export default function ProfessionalFixedLocationSetup({
   );
 
   const goPrevMedia = React.useCallback(() => {
+    if (mediaSlides.length === 0) return;
     setMediaIdx((i) => (i - 1 + mediaSlides.length) % mediaSlides.length);
   }, [mediaSlides.length]);
   const goNextMedia = React.useCallback(() => {
+    if (mediaSlides.length === 0) return;
     setMediaIdx((i) => (i + 1) % mediaSlides.length);
   }, [mediaSlides.length]);
 
@@ -4634,58 +4624,45 @@ export default function ProfessionalFixedLocationSetup({
         onClose={() => setTemplateSyncDrawerOpen(false)}
         title="Template sync settings"
         subtitle="Control how Fixed and Desired templates share section data."
-        contentSx={{ px: 2.5, pb: 3 }}
+        contentSx={{ px: 2.5, py: 2 }}
+        footer={
+          <Stack
+            direction="row"
+            spacing={1.25}
+            justifyContent="flex-end"
+            sx={{ px: 2.5, py: 1.75 }}
+          >
+            <AppButton
+              tone="secondary"
+              onClick={() => setTemplateSyncDrawerOpen(false)}
+              disabled={businessFormDisabled}
+              sx={{ px: 3 }}
+            >
+              Cancel
+            </AppButton>
+            <AppButton
+              tone="primary"
+              onClick={() => {
+                applyTemplateSyncSettings(templateSyncDraft);
+                setTemplateSyncDrawerOpen(false);
+                showSnackbar({
+                  severity: "success",
+                  message: "Template sync settings saved.",
+                });
+              }}
+              disabled={businessFormDisabled}
+              sx={{ px: 4 }}
+            >
+              Save
+            </AppButton>
+          </Stack>
+        }
       >
-        <Box
-          sx={{ maxHeight: "calc(100vh - 180px)", overflow: "auto", pr: 0.5 }}
-        >
-          <TemplateSyncSettingsForm
-            value={templateSyncDraft}
-            disabled={businessFormDisabled}
-            onChange={setTemplateSyncDraft}
-          />
-        </Box>
-        <Stack
-          direction="row"
-          spacing={1.25}
-          justifyContent="flex-end"
-          sx={{ pt: 1 }}
-        >
-          <AppButton
-            tone="secondary"
-            onClick={() => setTemplateSyncDrawerOpen(false)}
-            disabled={businessFormDisabled}
-            sx={{
-              px: 3,
-            }}
-          >
-            Cancel
-          </AppButton>
-          <AppButton
-            variant="contained"
-            disableElevation
-            onClick={() => {
-              applyTemplateSyncSettings(templateSyncDraft);
-              setTemplateSyncDrawerOpen(false);
-              showSnackbar({
-                severity: "success",
-                message: "Template sync settings saved.",
-              });
-            }}
-            disabled={businessFormDisabled}
-            sx={{
-              borderRadius: "10px",
-              textTransform: "none",
-              fontWeight: 900,
-              height: 36,
-              px: 3,
-              bgcolor: "primary.main",
-              "&:hover": { bgcolor: "mollure.tealDark" },
-            }}
-          >
-            Save
-          </AppButton>
-        </Stack>
+        <TemplateSyncSettingsForm
+          value={templateSyncDraft}
+          disabled={businessFormDisabled}
+          onChange={setTemplateSyncDraft}
+        />
       </AppDrawer>
 
       <SectionShell
@@ -4712,21 +4689,24 @@ export default function ProfessionalFixedLocationSetup({
               >
                 <Fade in key={mediaIdx} timeout={180}>
                   <Box sx={{ position: "absolute", inset: 0 }}>
-                    <Image
-                      src={mediaSlides[mediaIdx]}
-                      alt=""
-                      fill
-                      sizes="(max-width: 900px) 100vw, 520px"
-                      unoptimized={
-                        mediaSlides[mediaIdx]?.startsWith("blob:") ||
-                        isPersistedMediaUrl(mediaSlides[mediaIdx] ?? "")
-                      }
-                      style={{ objectFit: "cover" }}
-                    />
+                    {mediaSlides[mediaIdx] ? (
+                      <Image
+                        src={mediaSlides[mediaIdx]}
+                        alt=""
+                        fill
+                        sizes="(max-width: 900px) 100vw, 520px"
+                        unoptimized={
+                          mediaSlides[mediaIdx]?.startsWith("blob:") ||
+                          isPersistedMediaUrl(mediaSlides[mediaIdx] ?? "")
+                        }
+                        style={{ objectFit: "cover" }}
+                      />
+                    ) : null}
                   </Box>
                 </Fade>
 
-                <IconButton
+                {mediaSlides.length > 0 ? (
+                  <IconButton
                   aria-label="Delete image"
                   onClick={() => setMediaDeleteConfirmOpen(true)}
                   disabled={profileDisabled || isBusinessMediaUploading}
@@ -4751,7 +4731,10 @@ export default function ProfessionalFixedLocationSetup({
                     sx={{ fontSize: 18, color: alpha(m.navy, 0.55) }}
                   />
                 </IconButton>
+                ) : null}
 
+                {mediaSlides.length > 1 ? (
+                  <>
                 <IconButton
                   aria-label="Previous image"
                   onClick={goPrevMedia}
@@ -4823,6 +4806,8 @@ export default function ProfessionalFixedLocationSetup({
                     />
                   ))}
                 </Stack>
+                  </>
+                ) : null}
               </Box>
               <Box sx={{ p: 1.25 }}>
                 <input
@@ -5366,18 +5351,20 @@ export default function ProfessionalFixedLocationSetup({
                       flex: "0 0 auto",
                     }}
                   >
-                    <Image
-                      src={mem.photoSrc}
-                      alt={mem.name}
-                      width={48}
-                      height={48}
-                      unoptimized
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                      }}
-                    />
+                    {mem.photoSrc ? (
+                      <Image
+                        src={mem.photoSrc}
+                        alt={mem.name}
+                        width={48}
+                        height={48}
+                        unoptimized
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                      />
+                    ) : null}
                   </Box>
                   <Box sx={{ minWidth: 0 }}>
                     <Typography

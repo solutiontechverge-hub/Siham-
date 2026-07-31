@@ -174,6 +174,13 @@ export type BusinessSetupListing = {
     serviceTitle?: string | null;
   }>;
   serviceDetails: BusinessSetupListingServiceDetail[];
+  /** Calendar Service Order Rules (hidden categories / services). */
+  serviceOrder?: {
+    categories?: string[];
+    servicesByCategory?: Record<string, string[]>;
+    hiddenCategories?: string[];
+    hiddenServicesByCategory?: Record<string, string[]>;
+  } | null;
   priceRange: string | null;
   prepaymentPercentage: number | null;
   prepaymentInstruction: string | null;
@@ -258,7 +265,15 @@ export type CalendarEntry = {
   id: string;
   professional_profile_id: string;
   team_member_id: string | null;
-  status: "requested" | "cancelled" | "completed" | "confirmed" | "blocked" | "in_progress" | "no_show";
+  status:
+    | "requested"
+    | "cancelled"
+    | "completed"
+    | "confirmed"
+    | "blocked"
+    | "in_progress"
+    | "no_show"
+    | "invalid";
   title: string;
   unique_code: string;
   start_time: string | null;
@@ -277,6 +292,21 @@ export type CalendarEntry = {
   end?: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type BookingEditRequestPayload = {
+  status: "pending" | "approved" | "rejected";
+  note?: string;
+  initiated_by: "client" | "professional";
+  requested_at?: string | null;
+  responded_at?: string | null;
+  edit_grant_active?: boolean;
+};
+
+export type ManageBookingEditRequestRequest = {
+  id: string;
+  action: "send" | "accept" | "reject";
+  note?: string;
 };
 
 export type CalendarBooking = {
@@ -310,10 +340,19 @@ export type CalendarBooking = {
   fixed_location_street_number?: string | null;
   fixed_location_postal_code?: string | null;
   fixed_location_province?: string | null;
+  /** Visit address columns (Desired Location bookings). */
+  province?: string | null;
+  municipality?: string | null;
+  street_address?: string | null;
+  street_number?: string | null;
+  postal_code?: string | null;
   created_at?: string | null;
+  updated_at?: string | null;
   date?: string | null;
   start?: string | null;
   end?: string | null;
+  /** Confirmed Edit Request (ER) — backend source of truth. */
+  edit_request?: BookingEditRequestPayload | null;
 };
 
 export type CalendarSettings = {
@@ -361,7 +400,18 @@ export type UpsertCalendarSettingsRequest = {
 
 export type UpdateCalendarEntryStatusRequest = {
   id: string;
-  status: "requested" | "cancelled" | "completed" | "confirmed" | "in_progress" | "no_show";
+  status:
+    | "requested"
+    | "cancelled"
+    | "completed"
+    | "confirmed"
+    | "in_progress"
+    | "no_show"
+    | "invalid";
+};
+
+export type UpdateCalendarEntryRequest = CreateCalendarEntryRequest & {
+  id: string;
 };
 
 export type BookingNotificationEvent =
@@ -377,7 +427,14 @@ export type BookingNotificationEvent =
 
 export type UpdateBookingStatusRequest = {
   id: string;
-  status: "requested" | "cancelled" | "completed" | "confirmed" | "in_progress" | "no_show";
+  status:
+    | "requested"
+    | "cancelled"
+    | "completed"
+    | "confirmed"
+    | "in_progress"
+    | "no_show"
+    | "invalid";
   notification_event?: BookingNotificationEvent;
   notify_incoming_er?: boolean;
   initiated_by?: "client" | "professional";
@@ -390,7 +447,7 @@ export type UpdateBookingStatusRequest = {
 
 export type UpdateMyBookingRequest = {
   id: string;
-  status?: "cancelled" | "confirmed" | "requested";
+  status?: "cancelled" | "confirmed" | "requested" | "invalid";
   prepayment_status?: "paid" | "pending" | "failed" | "required";
   notification_event?: BookingNotificationEvent;
   notify_incoming_er?: boolean;
@@ -419,13 +476,25 @@ export type CreateBookingRequest = {
   location_details?: Record<string, unknown>;
   notes?: string | null;
   prepayment_status?: string | null;
-  status?: "requested" | "cancelled" | "completed" | "confirmed" | "in_progress" | "no_show";
+  status?:
+    | "requested"
+    | "cancelled"
+    | "completed"
+    | "confirmed"
+    | "in_progress"
+    | "no_show"
+    | "invalid";
   booking_type?: "online" | "offline" | "project" | "request";
   unique_code?: string | null;
   total_price?: number | string | null;
   contact_number?: string | null;
   images?: string[];
   documents?: string[];
+  province?: string | null;
+  municipality?: string | null;
+  street_address?: string | null;
+  street_number?: string | null;
+  postal_code?: string | null;
 };
 
 export type UpdateBusinessSetupActiveRequest = {
@@ -531,6 +600,12 @@ export type MollureClientDirectoryEntry = {
   name: string;
   email: string;
   has_eligible_booking: boolean;
+};
+
+export type MollureClientLookupEntry = {
+  id: string;
+  name: string;
+  email: string;
 };
 
 export type CreateProfessionalClientRequest =
@@ -687,6 +762,35 @@ export const businessApi = baseApi.injectEndpoints({
       },
       providesTags: ["BusinessSetupsListing"],
     }),
+    getPublicBusinessHours: builder.query<
+      ApiEnvelope<{ publicBusinessHours: Record<string, unknown>[] }>,
+      string
+    >({
+      async queryFn(setupId, _api, _extraOptions, fetchWithBQ) {
+        const response = await fetchWithBQ({
+          url: `/api/business-setups/${encodeURIComponent(setupId)}/public-hours`,
+          method: "GET",
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<{
+          publicBusinessHours: Record<string, unknown>[];
+        }>;
+        if (!data.success || !data.data) {
+          return {
+            error: customError(
+              data.message || "Unable to fetch public business hours.",
+            ),
+          };
+        }
+
+        return { data };
+      },
+      providesTags: ["Calendar"],
+    }),
     getBusinessSetup: builder.query<ApiEnvelope<BusinessSetup | null>, void>({
       async queryFn(_arg, _api, _extraOptions, fetchWithBQ) {
         const response = await fetchWithBQ({
@@ -754,7 +858,7 @@ export const businessApi = baseApi.injectEndpoints({
 
         return { data };
       },
-      invalidatesTags: ["Calendar"],
+      invalidatesTags: ["Calendar", "Bookings"],
     }),
     upsertCalendarSettings: builder.mutation<ApiEnvelope<CalendarSettings>, UpsertCalendarSettingsRequest>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
@@ -797,6 +901,28 @@ export const businessApi = baseApi.injectEndpoints({
         return { data };
       },
       invalidatesTags: ["Calendar"],
+    }),
+    updateCalendarEntry: builder.mutation<ApiEnvelope<CalendarEntry>, UpdateCalendarEntryRequest>({
+      async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
+        const { id, ...body } = payload;
+        const response = await fetchWithBQ({
+          url: `/api/business/calendar/${id}`,
+          method: "PUT",
+          body,
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<CalendarEntry>;
+        if (!data.success || !data.data) {
+          return { error: customError(data.message || "Unable to update calendar entry.") };
+        }
+
+        return { data };
+      },
+      invalidatesTags: ["Calendar", "Bookings"],
     }),
     deleteCalendarEntry: builder.mutation<ApiEnvelope<{ id: string }>, string>({
       async queryFn(id, _api, _extraOptions, fetchWithBQ) {
@@ -935,6 +1061,33 @@ export const businessApi = baseApi.injectEndpoints({
         const data = response.data as ApiEnvelope<CalendarBooking>;
         if (!data.success || !data.data) {
           return { error: customError(data.message || "Unable to update booking.") };
+        }
+
+        return { data };
+      },
+      invalidatesTags: ["Calendar", "Bookings"],
+    }),
+    manageBookingEditRequest: builder.mutation<
+      ApiEnvelope<CalendarBooking>,
+      ManageBookingEditRequestRequest
+    >({
+      async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
+        const body: Record<string, string> = { action: payload.action };
+        if (payload.note) body.note = payload.note;
+
+        const response = await fetchWithBQ({
+          url: `/api/business/bookings/${payload.id}/edit-request`,
+          method: "POST",
+          body,
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<CalendarBooking>;
+        if (!data.success || !data.data) {
+          return { error: customError(data.message || "Unable to update edit request.") };
         }
 
         return { data };
@@ -1178,6 +1331,29 @@ export const businessApi = baseApi.injectEndpoints({
       },
       providesTags: ["ProfessionalClients"],
     }),
+    lookupMollureClientByEmail: builder.query<
+      ApiEnvelope<MollureClientLookupEntry>,
+      { email: string }
+    >({
+      async queryFn(arg, _api, _extraOptions, fetchWithBQ) {
+        const email = arg.email.trim().toLowerCase();
+        const response = await fetchWithBQ({
+          url: `/api/business/clients/mollure-lookup?email=${encodeURIComponent(email)}`,
+          method: "GET",
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<MollureClientLookupEntry>;
+        if (!data.success || !data.data) {
+          return { error: customError(data.message || "User is not a Mollure client") };
+        }
+
+        return { data };
+      },
+    }),
     createProfessionalClient: builder.mutation<ApiEnvelope<ApiProfessionalClient>, CreateProfessionalClientRequest>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
         const response = await fetchWithBQ({
@@ -1295,16 +1471,19 @@ export const businessApi = baseApi.injectEndpoints({
 export const {
   useGetBusinessCategoriesQuery,
   useGetAllBusinessSetupsQuery,
+  useGetPublicBusinessHoursQuery,
   useGetBusinessSetupQuery,
   useGetCalendarOverviewQuery,
   useCreateCalendarEntryMutation,
   useUpsertCalendarSettingsMutation,
+  useUpdateCalendarEntryMutation,
   useUpdateCalendarEntryStatusMutation,
   useDeleteCalendarEntryMutation,
   useGetMyBookingsQuery,
   useCreateBookingMutation,
   useUpdateBookingStatusMutation,
   useUpdateMyBookingMutation,
+  useManageBookingEditRequestMutation,
   useDispatchBookingNotificationMutation,
   useUploadBusinessMediaMutation,
   useUploadBookingAttachmentsMutation,
@@ -1313,6 +1492,7 @@ export const {
   useUpsertBusinessSetupMutation,
   useGetProfessionalClientsQuery,
   useGetMollureClientDirectoryQuery,
+  useLazyLookupMollureClientByEmailQuery,
   useCreateProfessionalClientMutation,
   useUpdateProfessionalClientMutation,
   useUpdateProfessionalClientTechnicalNoteMutation,

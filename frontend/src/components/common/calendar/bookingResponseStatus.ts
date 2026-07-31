@@ -19,6 +19,14 @@ export function resolveBookingResponseIndicators(
     indicators.push("waiting_for_prepayment");
   }
 
+  if (prepayment === "confirmed") {
+    indicators.push("prepaid");
+  }
+
+  if (prepayment === "canceled" || prepayment === "invalid") {
+    indicators.push("refund_pending");
+  }
+
   if (details?.responseStatus === "overdue_response") {
     indicators.push("overdue_response");
   }

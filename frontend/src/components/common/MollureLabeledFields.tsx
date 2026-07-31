@@ -28,6 +28,7 @@ function useMollureFieldSx() {
         borderRadius: "6px",
         bgcolor: m.white ?? "#fff",
         minHeight: 40,
+        alignItems: "center",
         "& fieldset": {
           borderColor: m.inputBorder,
         },
@@ -37,18 +38,58 @@ function useMollureFieldSx() {
         "&.Mui-focused fieldset": {
           borderColor: m.teal,
         },
+        "&.Mui-disabled": {
+          bgcolor: alpha(m.navy, 0.04),
+        },
+      },
+      // When sx is applied directly on Select (e.g. MollureLabeledSelect)
+      "&.MuiOutlinedInput-root": {
+        borderRadius: "6px",
+        bgcolor: m.white ?? "#fff",
+        minHeight: 40,
+        alignItems: "center",
+        "& fieldset": {
+          borderColor: m.inputBorder,
+        },
+        "&:hover fieldset": {
+          borderColor: m.inputBorderHover,
+        },
+        "&.Mui-focused fieldset": {
+          borderColor: m.teal,
+        },
+        "&.Mui-disabled": {
+          bgcolor: alpha(m.navy, 0.04),
+        },
       },
       "& .MuiOutlinedInput-input": {
         fontSize: "0.8125rem",
         paddingTop: "10px",
         paddingBottom: "10px",
       },
+      "& .MuiSelect-select.MuiOutlinedInput-input": {
+        display: "flex",
+        alignItems: "center",
+        alignSelf: "stretch",
+        boxSizing: "border-box",
+        minHeight: "unset",
+        height: "auto",
+        paddingTop: 0,
+        paddingBottom: 0,
+        lineHeight: 1.25,
+      },
+      "& .MuiSelect-icon": {
+        top: "50%",
+        transform: "translateY(-50%)",
+      },
+      "& .MuiSelect-iconOpen": {
+        transform: "translateY(-50%) rotate(180deg)",
+      },
       "& input::placeholder": {
         color: m.placeholder,
         opacity: 1,
       },
     }),
-    [m.inputBorder, m.inputBorderHover, m.placeholder, m.teal, m.white],
+    [m.inputBorder, m.inputBorderHover, m.navy, m.placeholder, m.teal, m.white],
   );
 }
 

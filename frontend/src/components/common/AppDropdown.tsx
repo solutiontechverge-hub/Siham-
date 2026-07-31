@@ -16,6 +16,8 @@ export type AppDropdownOption = {
   value: string;
   /** Optional leading icon / logo for the menu row. */
   icon?: React.ReactNode;
+  /** Optional text color for the option (and selected value). */
+  color?: string;
 };
 
 type AppDropdownProps = Omit<
@@ -110,8 +112,13 @@ export default function AppDropdown({
                 <span style={{ opacity: 0.6 }}>{placeholder ?? "Select"}</span>
               );
             const v = isMulti ? selected[0] : selected;
-            const label = options.find((o) => o.value === v)?.label;
-            return label ?? String(v);
+            const option = options.find((o) => o.value === v);
+            const label = option?.label;
+            return (
+              <span style={option?.color ? { color: option.color, fontWeight: 700 } : undefined}>
+                {label ?? String(v)}
+              </span>
+            );
           }),
       }}
       {...props}
@@ -149,6 +156,8 @@ export default function AppDropdown({
               minHeight: 40,
               py: 1,
               lineHeight: 1.2,
+              color: option.color,
+              fontWeight: option.color ? 700 : undefined,
             }}
           >
             {multiple ? (

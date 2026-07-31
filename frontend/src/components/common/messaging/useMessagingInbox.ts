@@ -10,6 +10,7 @@ import {
   useDeleteMessagingMessageMutation,
   useGetMessagingInboxQuery,
   useLazyGetMessagingProfessionalsQuery,
+  useLinkMessagingThreadToBookingMutation,
   useMarkMessagingThreadReadMutation,
   useSendMessagingMessageMutation,
 } from "../../../store/services/messagingApi";
@@ -41,6 +42,7 @@ import {
 import {
   canProfessionalReply,
   findThreadIdByBookingRef,
+  findThreadIdByBusinessSetupId,
   findThreadIdByClientName,
   threadHasActiveBooking,
 } from "./messagingThreadAccess";
@@ -53,6 +55,7 @@ import {
   isApiBackedStore,
   loadMessagingPrefs,
   loadMessagingStore,
+  loadMessagingRuntimeSnapshot,
   mergeApiInboxIntoStore,
   mergeApiInboxWithPrefs,
   mapDraftActiveThreadId,
@@ -67,6 +70,7 @@ import {
   mergeClientThreadsWithProfessionals,
   type MessagingProfessionalListItem,
 } from "./messagingProfessionals";
+import { isMockMessagingThreadId } from "./messagingMockData";
 import { threadPassesDrawerFilters } from "./messagingFilters";
 import type { MessagingAudience } from "./messagingRoutes";
 import type {
@@ -122,6 +126,7 @@ function mergeRemoteMessages(
 export type MessagingInboxNavigation = {
   bookingRef?: string;
   threadId?: string;
+  businessSetupId?: string;
   searchPrefill?: string;
 };
 
@@ -153,6 +158,7 @@ export function useMessagingInbox(
   const [deleteMessagingMessage] = useDeleteMessagingMessageMutation();
   const [clearMessagingThread] = useClearMessagingThreadMutation();
   const [markMessagingThreadRead] = useMarkMessagingThreadReadMutation();
+  const [linkMessagingThreadToBooking] = useLinkMessagingThreadToBookingMutation();
   const [store, setStore] = React.useState<MessagingStore | null>(null);
   const [search, setSearch] = React.useState("");
   const [activeThreadId, setActiveThreadId] = React.useState("");
@@ -292,30 +298,50 @@ export function useMessagingInbox(
     if (!store) return;
     const bookingRef = navigation?.bookingRef ?? searchParams.get("booking") ?? "";
     const threadRef = navigation?.threadId ?? searchParams.get("thread") ?? "";
+    const businessSetupId =
+      navigation?.businessSetupId ?? searchParams.get("setup") ?? "";
     const searchPrefill =
       navigation?.searchPrefill ??
       searchParams.get("client") ??
       searchParams.get("professional") ??
       "";
+    const byBooking = findThreadIdByBookingRef(store, bookingRef);
+    const bySetup = findThreadIdByBusinessSetupId(store, businessSetupId);
+    const byName = findThreadIdByClientName(store, searchPrefill);
+    // Prefer the booking shop's current name when it uniquely identifies a thread.
     const resolvedThreadId =
       threadRef ||
-      findThreadIdByBookingRef(store, bookingRef) ||
-      findThreadIdByClientName(store, searchPrefill) ||
-      store.threads.find((thread) => thread.name.toLowerCase() === (searchParams.get("client") ?? "").toLowerCase())?.id ||
+      byBooking ||
+      (byName && bySetup && byName === bySetup ? byName : "") ||
+      bySetup ||
+      byName ||
+      store.threads.find(
+        (thread) =>
+          thread.name.toLowerCase() ===
+          (searchParams.get("client") ?? "").toLowerCase(),
+      )?.id ||
       "";
 
-    if (resolvedThreadId) setActiveThreadId(resolvedThreadId);
+    if (resolvedThreadId) {
+      setActiveThreadId(resolvedThreadId);
+      const thread = store.threads.find((item) => item.id === resolvedThreadId);
+      if (thread) {
+        setSearch(thread.name);
+        return;
+      }
+    }
 
     if (searchPrefill.trim()) {
       setSearch(searchPrefill.trim());
-      return;
     }
-
-    if (resolvedThreadId) {
-      const thread = store.threads.find((item) => item.id === resolvedThreadId);
-      if (thread && bookingRef) setSearch(thread.name);
-    }
-  }, [navigation?.bookingRef, navigation?.searchPrefill, navigation?.threadId, searchParams, store]);
+  }, [
+    navigation?.bookingRef,
+    navigation?.businessSetupId,
+    navigation?.searchPrefill,
+    navigation?.threadId,
+    searchParams,
+    store,
+  ]);
 
   const persist = React.useCallback((next: MessagingStore) => {
     const retained = applyMessageRetention(next);
@@ -327,9 +353,10 @@ export function useMessagingInbox(
     if (!isAuthed) return;
     const onExternalUpdate = () => {
       setStore((prev) => {
-        const loaded = loadMessagingStore();
-        if (!prev) return loaded;
-        return mergeApiInboxIntoStore(prev, loaded, loadMessagingPrefs(), audience);
+        const runtime = loadMessagingRuntimeSnapshot();
+        if (!runtime) return prev;
+        if (!prev) return mergeApiInboxWithPrefs(runtime, loadMessagingPrefs(), audience);
+        return mergeApiInboxIntoStore(prev, runtime, loadMessagingPrefs(), audience);
       });
     };
     window.addEventListener(MESSAGING_UPDATED_EVENT, onExternalUpdate);
@@ -423,7 +450,13 @@ export function useMessagingInbox(
       if (!threadMatchesSearch(thread, search)) return false;
       if (!threadPassesDrawerFilters(thread, appliedDrawerFilters)) return false;
       if (audience === "professional") {
+        // Never show client-side draft professionals or legacy demo seeds on the pro inbox.
+        if (thread.id.startsWith("draft:") || thread.isNewConversation || isMockMessagingThreadId(thread.id)) {
+          return false;
+        }
         const hasClientMsg = (store.messagesByThreadId[thread.id] ?? []).some(isMessageFromClient);
+        // Show only when the client initiated chat, or there is a real linked booking
+        // (requested / confirmed / completed / in_progress).
         if (!hasClientMsg && !threadHasActiveBooking(store, thread.id)) return false;
       }
       return true;
@@ -469,10 +502,13 @@ export function useMessagingInbox(
   ]);
 
   React.useEffect(() => {
-    if (!store?.threads.length) return;
-    if (store.threads.some((thread) => thread.id === activeThreadId)) return;
-    setActiveThreadId(store.threads[0].id);
-  }, [activeThreadId, store]);
+    if (!visibleThreads.length) {
+      if (activeThreadId) setActiveThreadId("");
+      return;
+    }
+    if (visibleThreads.some((thread) => thread.id === activeThreadId)) return;
+    setActiveThreadId(visibleThreads[0].id);
+  }, [activeThreadId, visibleThreads]);
 
   React.useEffect(() => {
     if (!store || !activeThreadId) return;
@@ -490,10 +526,11 @@ export function useMessagingInbox(
   }, [activeThreadId, audience, isAuthed, markMessagingThreadRead, store]);
 
   const activeThread = React.useMemo(() => {
-    if (!store) return undefined;
-    const match = store.threads.find((t) => t.id === activeThreadId);
-    return match ?? visibleThreads[0];
-  }, [store, activeThreadId, visibleThreads]);
+    if (!visibleThreads.length) return undefined;
+    return (
+      visibleThreads.find((t) => t.id === activeThreadId) ?? visibleThreads[0]
+    );
+  }, [activeThreadId, visibleThreads]);
 
   const messages = React.useMemo(() => {
     if (!store || !activeThread) return [];
@@ -536,7 +573,7 @@ export function useMessagingInbox(
         showSnackbar({
           severity: "info",
           message:
-            "You can reply after the client sends the first message, or when there is a requested, confirmed, or completed booking.",
+            "You can reply after the client sends the first message, or when there is a requested, confirmed, completed, or in-progress booking.",
         });
         return;
       }
@@ -791,15 +828,63 @@ export function useMessagingInbox(
   );
 
   const linkThreadToBooking = React.useCallback(
-    (booking: LinkableBooking) => {
+    async (booking: LinkableBooking) => {
       if (!store || !activeThread) return;
-      const statusPart = activeThread.bookingMeta.split("-").slice(1).join("-").trim() || "Confirmed - ER";
+      const draftThreadId = activeThread.id;
+
+      if (isApiBackedStore(store) || isAuthed) {
+        try {
+          const result = await linkMessagingThreadToBooking({
+            threadId: draftThreadId,
+            bookingId: booking.bookingId || booking.id,
+          }).unwrap();
+
+          setStore((prev) => {
+            if (!prev) return prev;
+            let baseStore = prev;
+            if (result.threadId !== draftThreadId) {
+              baseStore = replaceThreadIdInStore(prev, draftThreadId, result.threadId);
+            }
+            const nextThreads = baseStore.threads.map((t) =>
+              t.id === result.threadId
+                ? {
+                    ...t,
+                    ...result.thread,
+                    id: result.threadId,
+                    unlinked: false,
+                  }
+                : t,
+            );
+            const next = { ...baseStore, threads: nextThreads };
+            saveMessagingStore(next);
+            return next;
+          });
+          setActiveThreadId(result.threadId);
+          showSnackbar({
+            severity: "success",
+            message: `Chat linked to ${formatLinkableBookingLabel(result.booking || booking)}.`,
+          });
+          return;
+        } catch {
+          showSnackbar({
+            severity: "error",
+            message: "Failed to link chat to booking. Please try again.",
+          });
+          return;
+        }
+      }
+
+      const statusLabel = (booking.status || "confirmed")
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+      const loc = activeThread.locationType === "desired" ? "DL" : "FL";
       const nextThreads = store.threads.map((t) =>
         t.id === activeThread.id
           ? {
               ...t,
               bookingId: booking.bookingId,
-              bookingMeta: `${booking.bookingId.replace(/^B/i, "")} - ${statusPart}`,
+              bookingMeta: `${booking.bookingId.replace(/^B/i, "")} - ${statusLabel} - ${loc}`,
+              bookingStatus: (booking.status as MessagingThread["bookingStatus"]) || t.bookingStatus,
               unlinked: false,
             }
           : t,
@@ -810,7 +895,14 @@ export function useMessagingInbox(
         message: `Chat linked to ${formatLinkableBookingLabel(booking)}.`,
       });
     },
-    [store, activeThread, persist, showSnackbar],
+    [
+      store,
+      activeThread,
+      persist,
+      showSnackbar,
+      isAuthed,
+      linkMessagingThreadToBooking,
+    ],
   );
 
   const reportThread = React.useCallback(

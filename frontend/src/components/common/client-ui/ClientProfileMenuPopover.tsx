@@ -6,11 +6,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Avatar, Box, Popover, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import { clearPersistedAuthSession } from "../../../lib/auth-storage";
+import { clearAuthSessionState } from "../../../lib/clearAuthSessionState";
 import { useAppDispatch } from "../../../store/hooks";
 import { useSnackbar } from "../AppSnackbar";
 import { queueSnackbarFlash } from "../../../lib/snackbarFlash";
-import { clearAuthSession } from "../../../store/slices/authSlice";
 
 function getInitials(emailOrName?: string) {
   const base = (emailOrName ?? "").trim();
@@ -47,8 +46,7 @@ export default function ClientProfileMenuPopover({
 
   const handleLogout = () => {
     onClose();
-    dispatch(clearAuthSession());
-    clearPersistedAuthSession();
+    clearAuthSessionState(dispatch);
     const logoutMessage = "Signed out successfully.";
     queueSnackbarFlash({ severity: "success", message: logoutMessage });
     showSnackbar({ severity: "success", message: logoutMessage });

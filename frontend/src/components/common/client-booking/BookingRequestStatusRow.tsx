@@ -11,14 +11,17 @@ import {
   bookingStatusChipColors,
   bookingStatusLabel,
 } from "../../../app/clients/booking/clientBookingStatus";
+import type { ReactNode } from "react";
 import BookingRequestBadge from "../calendar/BookingRequestBadge";
 import BookingRequestReceivedIcon from "../calendar/BookingRequestReceivedIcon";
+import BookingRequestSentIcon from "../calendar/BookingRequestSentIcon";
+import BookingIndicatorIcon from "../calendar/BookingIndicatorIcon";
 import EditRequestIndicatorIcon from "./EditRequestIndicatorIcon";
-import PrepaymentPayNowIcon from "./PrepaymentPayNowIcon";
-import PaymentDueIcon from "./PaymentDueIcon";
 
 export type BookingRequestRowMode =
-  "default" | "professional_suggested" | "professional_rejected";
+  | "default"
+  | "professional_suggested"
+  | "professional_rejected";
 
 type Props = {
   bookingStatus: ClientBookingStatus;
@@ -29,9 +32,52 @@ type Props = {
   prepaymentPaid?: boolean;
   /** Past booking still awaiting settlement. */
   paymentDue?: boolean;
+  /** Invoice due date has passed. */
+  paymentOverdue?: boolean;
   bookingRequestDirection?: BookingRequestDirection;
   rowMode?: BookingRequestRowMode;
+  /** Post-accept edit from the other party — show next to Confirmed status. */
+  showUpdated?: boolean;
 };
+
+function ScenarioPill({
+  label,
+  children,
+}: {
+  label: string;
+  children?: ReactNode;
+}) {
+  const m = useTheme().palette.mollure;
+  return (
+    <Box
+      sx={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 0.5,
+        height: 24,
+        px: 1,
+        borderRadius: "8px",
+        bgcolor: alpha(m.navy, 0.04),
+        border: `1px solid ${alpha(m.navy, 0.08)}`,
+      }}
+      title={label}
+      aria-label={label}
+    >
+      <Typography
+        sx={{
+          fontWeight: 900,
+          fontSize: 11,
+          color: alpha(m.navy, 0.55),
+          letterSpacing: "0.02em",
+          lineHeight: 1,
+        }}
+      >
+        {label}
+      </Typography>
+      {children}
+    </Box>
+  );
+}
 
 export default function BookingRequestStatusRow({
   bookingStatus,
@@ -40,95 +86,59 @@ export default function BookingRequestStatusRow({
   requiresPrepayment = false,
   prepaymentPaid = false,
   paymentDue = false,
+  paymentOverdue = false,
   bookingRequestDirection = "outgoing",
   rowMode = "default",
+  showUpdated = false,
 }: Props) {
   const m = useTheme().palette.mollure;
   const isEbrIncoming = rowMode === "professional_suggested";
   const isEbrRejected =
-    rowMode === "professional_rejected" && bookingStatus === "cancelled";
-  const showErPill = rowMode === "professional_rejected" && !isEbrRejected;
+    rowMode === "professional_rejected" &&
+    (bookingStatus === "cancelled" || bookingStatus === "invalid");
   const isDraft = bookingStatus === "draft";
   const isCompleted = bookingStatus === "completed";
+  const isTerminal =
+    bookingStatus === "cancelled" ||
+    bookingStatus === "invalid" ||
+    bookingStatus === "no_show";
+  const showErPill =
+    (rowMode === "professional_rejected" && !isEbrRejected) ||
+    (editRequestPending && !isEbrIncoming && !isTerminal && !isCompleted);
+
   const waitingForPrepayment =
     requiresPrepayment &&
     !prepaymentPaid &&
     !isCompleted &&
-    bookingStatus !== "cancelled";
-  const showPaymentIcon = waitingForPrepayment || paymentDue;
+    !isTerminal;
 
+  const chipStatus: ClientBookingStatus = isEbrRejected
+    ? "invalid"
+    : bookingStatus === "waiting_for_prepayment"
+      ? "confirmed"
+      : bookingStatus;
+
+  const chipColors = bookingStatusChipColors(chipStatus);
+  const chipLabel = isEbrRejected ? "Invalid" : bookingStatusLabel(chipStatus);
+  const isConfirmedChip = !isEbrRejected && chipStatus === "confirmed";
+
+  // BR only while still pending (draft sent / requested) — hide after accept or reject.
   const showBrPill =
     !isCompleted &&
-    !showPaymentIcon &&
+    !isTerminal &&
     !isEbrIncoming &&
     !isEbrRejected &&
-    bookingStatus !== "cancelled" &&
+    !showErPill &&
     rowMode === "default" &&
+    bookingStatus !== "confirmed" &&
+    bookingStatus !== "waiting_for_prepayment" &&
+    bookingStatus !== "in_progress" &&
     (isDraft
-      ? bookingRequestSent || editRequestPending
-      : bookingRequestSent ||
-        bookingStatus === "requested" ||
-        editRequestPending);
-  const brAccepted = bookingStatus === "confirmed";
-  const brRejected = bookingStatus === "cancelled" || isEbrRejected;
-
-  const resolvedStatusForChip: ClientBookingStatus = isEbrIncoming
-    ? "requested"
-    : bookingStatus;
-  const chipColors = isEbrRejected
-    ? {
-        bgcolor: "rgba(229, 115, 115, 0.22)",
-        color: "#C62828",
-        border: "1px solid rgba(229, 115, 115, 0.35)",
-      }
-    : bookingStatusChipColors(resolvedStatusForChip, { paymentDue });
-  const chipLabel = isEbrRejected
-    ? "Invalid"
-    : bookingStatusLabel(resolvedStatusForChip, { paymentDue });
-  const isConfirmedChip =
-    !isEbrRejected && !paymentDue && resolvedStatusForChip === "confirmed";
+      ? bookingRequestSent
+      : bookingRequestSent || bookingStatus === "requested");
 
   return (
     <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
-      {isEbrIncoming ? (
-        <Box
-          sx={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 0.6,
-            height: 24,
-            pl: 1.1,
-            pr: 0.85,
-            borderRadius: "999px",
-            bgcolor: m.teal,
-            color: "#fff",
-            border: `1px solid ${m.tealDark}`,
-          }}
-          title="Edited booking request incoming"
-          aria-label="EBR Incoming"
-        >
-          <Typography
-            sx={{
-              fontWeight: 900,
-              fontSize: 11,
-              color: "#fff",
-              lineHeight: 1,
-              letterSpacing: "0.01em",
-            }}
-          >
-            EBR Incoming
-          </Typography>
-          <Box
-            sx={{
-              display: "grid",
-              placeItems: "center",
-              "& svg path": { stroke: "#fff" },
-            }}
-          >
-            <BookingRequestReceivedIcon size={11} />
-          </Box>
-        </Box>
-      ) : null}
       <Chip
         label={chipLabel}
         size="small"
@@ -146,66 +156,96 @@ export default function BookingRequestStatusRow({
           height: 24,
           fontWeight: 900,
           fontSize: 11,
-          borderRadius: "999px",
+          borderRadius: "8px",
           bgcolor: chipColors.bgcolor,
           color: chipColors.color,
           border: chipColors.border,
           "& .MuiChip-icon": { ml: 0.75, mr: -0.25 },
         }}
       />
+
+      {showUpdated && !isEbrIncoming && !showErPill ? (
+        <Chip
+          label="Updated"
+          size="small"
+          sx={{
+            height: 24,
+            fontWeight: 900,
+            fontSize: 11,
+            borderRadius: "8px",
+            bgcolor: alpha(m.teal, 0.12),
+            color: m.teal,
+            border: `1px solid ${alpha(m.teal, 0.4)}`,
+          }}
+        />
+      ) : null}
+
+      {isEbrIncoming ? (
+        <ScenarioPill label="EBR">
+          <Box sx={{ display: "grid", placeItems: "center", lineHeight: 0 }}>
+            <BookingRequestReceivedIcon size={11} />
+          </Box>
+        </ScenarioPill>
+      ) : null}
+
       {showErPill ? (
-        <Box
-          sx={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 0.75,
-            px: 1.25,
-            py: 0.65,
-            borderRadius: "10px",
-            bgcolor: alpha(m.navy, 0.04),
-            border: `1px solid ${alpha(m.navy, 0.08)}`,
-          }}
-        >
-          <Typography
-            sx={{
-              fontWeight: 900,
-              fontSize: 12.5,
-              color: alpha(m.navy, 0.55),
-              letterSpacing: "0.02em",
-            }}
-          >
-            ER
-          </Typography>
-          <EditRequestIndicatorIcon variant="rejected" />
-        </Box>
-      ) : null}
-      {showPaymentIcon ? (
-        <Box
-          sx={{
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            width: paymentDue ? 30 : undefined,
-            height: paymentDue ? 30 : undefined,
-            borderRadius: paymentDue ? "8px" : undefined,
-            bgcolor: paymentDue ? alpha(m.navy, 0.04) : undefined,
-          }}
-          title={paymentDue ? "Payment due" : "Waiting for payment"}
-          aria-label={paymentDue ? "Payment due" : "Waiting for payment"}
-        >
-          {paymentDue ? (
-            <PaymentDueIcon size={22} />
+        <ScenarioPill label="ER">
+          {rowMode === "professional_rejected" ? (
+            <EditRequestIndicatorIcon variant="rejected" />
+          ) : bookingRequestDirection === "incoming" ? (
+            <BookingRequestReceivedIcon size={11} />
           ) : (
-            <PrepaymentPayNowIcon size={22} />
+            <BookingRequestSentIcon size={11} />
           )}
-        </Box>
+        </ScenarioPill>
       ) : null}
+
       {showBrPill ? (
         <BookingRequestBadge
           iconSize={12}
-          state={brRejected ? "rejected" : brAccepted ? "accepted" : "sent"}
+          state="sent"
           direction={bookingRequestDirection}
         />
+      ) : null}
+
+      {waitingForPrepayment ? (
+        <Box
+          title="Waiting for prepayment"
+          aria-label="Waiting for prepayment"
+          sx={{ display: "grid", placeItems: "center" }}
+        >
+          <BookingIndicatorIcon variant="waiting_for_prepayment" size={16} />
+        </Box>
+      ) : null}
+
+      {prepaymentPaid && !isTerminal && !paymentDue ? (
+        <Box
+          title="Prepayment received"
+          aria-label="Prepayment received"
+          sx={{ display: "grid", placeItems: "center" }}
+        >
+          <BookingIndicatorIcon variant="prepaid" size={16} />
+        </Box>
+      ) : null}
+
+      {paymentDue && !paymentOverdue ? (
+        <Box
+          title="Waiting for payment"
+          aria-label="Waiting for payment"
+          sx={{ display: "grid", placeItems: "center" }}
+        >
+          <BookingIndicatorIcon variant="waiting_for_payment" size={16} />
+        </Box>
+      ) : null}
+
+      {paymentOverdue ? (
+        <Box
+          title="Overdue payment"
+          aria-label="Overdue payment"
+          sx={{ display: "grid", placeItems: "center" }}
+        >
+          <BookingIndicatorIcon variant="overdue_payment" size={16} />
+        </Box>
       ) : null}
     </Stack>
   );

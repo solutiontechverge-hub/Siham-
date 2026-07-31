@@ -5,6 +5,8 @@ import * as React from "react";
 export type MessagingOpenParams = {
   bookingRef?: string;
   threadId?: string;
+  /** Open chat with this business setup (client → that professional). */
+  businessSetupId?: string;
   /** Prefill inbox search (e.g. when opening from a booking). */
   searchPrefill?: string;
 };

@@ -41,9 +41,11 @@ export type CalendarBookingGuestItem = {
   name: string;
   services: CalendarBookingServiceItem[];
   products: CalendarBookingProductItem[];
-  participantType?: "model" | "planning" | "guest";
+  participantType?: "model" | "planning" | "guest" | "buffer";
   planningActivity?: string;
   planningDuration?: string;
+  bufferTeamMemberId?: string;
+  bufferEndTime?: string;
 };
 
 export type CalendarBookingClientSnapshot = {
@@ -51,10 +53,12 @@ export type CalendarBookingClientSnapshot = {
     id: string;
     name: string;
     isRequester?: boolean;
-    participantType?: "model" | "planning" | "guest";
+    participantType?: "model" | "planning" | "guest" | "buffer";
     planningActivity?: string;
     planningDuration?: string;
     planningIsLocked?: boolean;
+    bufferTeamMemberId?: string;
+    bufferEndTime?: string;
   }>;
   services?: Array<{
     id: string;
@@ -66,7 +70,14 @@ export type CalendarBookingClientSnapshot = {
   }>;
   projectDetails?: {
     description: string;
-    uploads: Array<{ id: string; name: string; previewUrl?: string }>;
+    uploads: Array<{
+      id: string;
+      name: string;
+      url?: string;
+      mimeType?: string;
+      kind?: "image" | "document";
+      previewUrl?: string;
+    }>;
   };
   teamMembers?: Array<{ id: string; name: string }>;
 };
@@ -115,10 +126,15 @@ export type CalendarBookingDetails = {
   originalServices?: CalendarBookingServiceItem[];
   /** Service ids edited by the professional before sending EBR */
   editedServiceIds?: string[];
+  /** Product ids edited by the professional (BR update / EBR) */
+  editedProductIds?: string[];
   /** Service ids edited by the client when returning an EBR */
   clientEditedServiceIds?: string[];
   /** Who last edited before the current negotiation round */
   lastEditedBy?: "professional" | "client";
+  /** Incoming Confirmed ER note (receiver UI). */
+  editRequestNote?: string;
+  editRequestInitiatedBy?: "professional" | "client";
 };
 
 export type CalendarResource = {
@@ -142,6 +158,8 @@ export type CalendarEvent = {
   bookingScenario?: CalendarBookingScenario;
   /** Raw booking notes (includes mollure EBR meta) for accept/reject apply. */
   notes?: string | null;
+  /** Server updated_at for unseen-update indicators. */
+  updatedAt?: string | null;
   showClientName?: string;
   details?: CalendarBookingDetails;
 };

@@ -7,11 +7,13 @@ import { MollureMetaDot } from "./MollureMetaDot";
 type ServiceSummaryMetaLineProps = {
   timeRange?: string;
   durationLabel: string;
+  staffName?: string;
 };
 
 export function ServiceSummaryMetaLine({
   timeRange,
   durationLabel,
+  staffName,
 }: ServiceSummaryMetaLineProps) {
   const m = useTheme().palette.mollure;
   const textSx = {
@@ -30,6 +32,8 @@ export function ServiceSummaryMetaLine({
       {timeRange ? <Typography sx={textSx}>{timeRange}</Typography> : null}
       {timeRange ? <MollureMetaDot /> : null}
       <Typography sx={textSx}>{durationLabel}</Typography>
+      {staffName ? <MollureMetaDot /> : null}
+      {staffName ? <Typography sx={textSx}>{staffName}</Typography> : null}
     </Stack>
   );
 }

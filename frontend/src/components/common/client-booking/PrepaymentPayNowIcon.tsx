@@ -1,8 +1,8 @@
 "use client";
 
-import PrepaymentStatusIcon from "../calendar/PrepaymentStatusIcon";
+import BookingGuidelineIcon from "../calendar/BookingGuidelineIcon";
 
-/** Euro prepayment pending — uses shared calendar prepayment icon. */
+/** Waiting for prepayment — product guideline hourglass PNG. */
 export default function PrepaymentPayNowIcon({ size = 28 }: { size?: number }) {
-  return <PrepaymentStatusIcon variant="pending" size={size} />;
+  return <BookingGuidelineIcon variant="response_time_active" size={size} />;
 }

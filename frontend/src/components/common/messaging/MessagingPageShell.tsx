@@ -15,6 +15,7 @@ import {
 } from "../../../data/marketingShell.data";
 import MessagingPageView from "./MessagingPageView";
 import type { MessagingAudience } from "./messagingRoutes";
+import { useMessagingCurrentUserProfile } from "./useMessagingCurrentUserProfile";
 
 export type MessagingPageShellProps = {
   audience: MessagingAudience;
@@ -28,52 +29,13 @@ export default function MessagingPageShell({
   const theme = useTheme();
   const m = theme.palette.mollure;
   const user = useAppSelector((s) => s.auth.user);
-  const fallbackDisplayName =
-    ((user as { display_name?: string })?.display_name as string | undefined) ||
-    `${(user as { first_name?: string })?.first_name ?? ""} ${(user as { last_name?: string })?.last_name ?? ""}`.trim();
-  const [userName, setUserName] = React.useState(fallbackDisplayName || "User");
-  const [avatarUrl, setAvatarUrl] = React.useState<string | undefined>(
-    undefined,
-  );
+  const { userName, avatarUrl } = useMessagingCurrentUserProfile(audience);
 
   const resolvedHome =
     homeHref ??
     (audience === "client" ? "/" : "/professionals/fixed-location/calendar");
 
   const pageBg = m.pageBg;
-
-  React.useEffect(() => {
-    if (audience !== "client") return;
-    try {
-      const raw = window.localStorage.getItem("mollure:client_profile");
-      if (!raw) return;
-      const data = JSON.parse(raw) as {
-        avatar_url?: string | null;
-        email?: string;
-        first_name?: string;
-        last_name?: string;
-        display_name?: string;
-      };
-      const authedEmail = user?.email?.trim().toLowerCase();
-      const persistedEmail = data?.email?.trim().toLowerCase();
-      if (authedEmail && persistedEmail && authedEmail === persistedEmail) {
-        if (typeof data.avatar_url === "string" && data.avatar_url)
-          setAvatarUrl(data.avatar_url);
-        const persistedName = (data.display_name ?? "").trim();
-        const fullName =
-          `${data.first_name ?? ""} ${data.last_name ?? ""}`.trim();
-        const resolved = persistedName || fullName;
-        if (resolved) setUserName(resolved);
-      }
-    } catch {
-      // ignore
-    }
-  }, [audience, user?.email]);
-
-  React.useEffect(() => {
-    const next = fallbackDisplayName.trim();
-    if (next) setUserName(next);
-  }, [fallbackDisplayName]);
 
   const footer =
     audience === "client" ? (

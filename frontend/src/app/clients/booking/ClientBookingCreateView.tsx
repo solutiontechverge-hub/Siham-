@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import AppButton from "../../../components/common/AppButton";
 import {
   Box,
@@ -19,6 +20,7 @@ import {
   Tab,
   Tabs,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
@@ -36,6 +38,7 @@ import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
 import ModeEditOutlineRoundedIcon from "@mui/icons-material/ModeEditOutlineRounded";
 import {
   AppDropdown,
+  AppTextField,
 } from "../../../components/common";
 import AppModal, {
   MessagingModalCancelButton,
@@ -47,9 +50,13 @@ import {
   fmtMinutesToTimeLabel,
   serviceTimeRangeLabel,
 } from "./booking-time";
+import {
+  resolveDesiredVisitAddressOptions,
+} from "../../../data/businessPublicProfile.data";
 
 import { useClientBookingCreatePage } from "./useClientBookingCreatePage";
 import type { BookingPerson } from "./booking.page.types";
+import { resolveMediaUrl } from "../../../lib/resolveMediaUrl";
 
 export default function ClientBookingCreateView() {
   const {
@@ -94,6 +101,11 @@ export default function ClientBookingCreateView() {
     monthPickerMonth,
     setMonthYear,
     allDayTimes,
+    isDayNotAvailable,
+    isDayUnselectable,
+    getDayClosedNote,
+    selectedDayNotAvailable,
+    selectedDayClosedNote,
     isSelectedToday,
     nowTick,
     setNowTick,
@@ -121,8 +133,6 @@ export default function ClientBookingCreateView() {
     timeValidationError,
     setTimeValidationError,
     selectedTimeTooSoon,
-    combineServices,
-    setCombineServices,
     selectedPersonId,
     setSelectedPersonId,
     selectedTeamMemberId,
@@ -144,6 +154,10 @@ export default function ClientBookingCreateView() {
     setProjectDescription,
     projectUploads,
     setProjectUploads,
+    desiredVisitAddress,
+    setDesiredVisitAddress,
+    isDesiredVisitAddressComplete,
+    desiredVisitAddressLabel,
     participantMenuAnchor,
     setParticipantMenuAnchor,
     planningPersonId,
@@ -156,20 +170,22 @@ export default function ClientBookingCreateView() {
     locationMode,
     isDesiredLocation,
     getParticipantLabel,
-    catalogByTeamMemberId,
     isPlanningPerson,
     selectedPerson,
     isPlanningCardSelected,
     filteredTeamMembers,
+    hasAssignableTeamMembers,
     additionalGuests,
     canAddFixedLocationGuest,
     serviceAssignees,
     canAddService,
+    addServiceCatalog,
     serviceCountLabel,
     personCardSubtitle,
     updateGuestName,
     selectedServicesCount,
     allServicesAssigned,
+    needsTeamMemberProvidedByPro,
     assigned,
     unassigned,
     isModelOrGuestSelected,
@@ -211,6 +227,16 @@ export default function ClientBookingCreateView() {
     deleteProjectUpload,
     deleteGuest,
   } = useClientBookingCreatePage();
+
+  const visitAddressOptions = React.useMemo(
+    () =>
+      resolveDesiredVisitAddressOptions(
+        businessProfile?.desiredLocation,
+        desiredVisitAddress.province,
+      ),
+    [businessProfile?.desiredLocation, desiredVisitAddress.province],
+  );
+
   const planningCardDetails = (person: BookingPerson) => {
     if (!person.planningIsLocked) return { duration: "" };
     return { duration: person.planningDuration?.trim() ?? "" };
@@ -423,7 +449,7 @@ export default function ClientBookingCreateView() {
               value: tm.id,
               label: tm.name,
             }))}
-            placeholder="Select team member"
+            placeholder="Select team member (optional)"
             size="small"
             fullWidth
             InputProps={{
@@ -547,7 +573,7 @@ export default function ClientBookingCreateView() {
                           value: tm.id,
                           label: tm.name,
                         }))}
-                        placeholder="Select team member"
+                        placeholder="Select team member (optional)"
                         size="small"
                         fullWidth
                         InputProps={{
@@ -832,10 +858,11 @@ export default function ClientBookingCreateView() {
         disabled={!canAddService}
         sx={{
           mt: 1.25,
-          display: "flex",
+          display: "inline-flex",
           alignItems: "center",
           gap: 0.75,
           borderRadius: "8px",
+          py: 0.25,
           opacity: canAddService ? 1 : 0.45,
           cursor: canAddService ? "pointer" : "not-allowed",
         }}
@@ -845,18 +872,27 @@ export default function ClientBookingCreateView() {
             width: 18,
             height: 18,
             borderRadius: "999px",
-            bgcolor: m.teal,
+            bgcolor: "primary.light",
             color: "#fff",
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
+            flexShrink: 0,
             lineHeight: 0,
           }}
         >
-          <AddRoundedIcon sx={{ fontSize: 14 }} />
+          <AddRoundedIcon sx={{ fontSize: 14, display: "block" }} />
         </Box>
         <Typography
-          sx={{ fontSize: 11, fontWeight: 800, color: alpha(m.navy, 0.48) }}
+          component="span"
+          sx={{
+            fontSize: 11,
+            fontWeight: 800,
+            lineHeight: 1,
+            color: "primary.light",
+            display: "inline-flex",
+            alignItems: "center",
+          }}
         >
           Service to assignment list
         </Typography>
@@ -913,7 +949,7 @@ export default function ClientBookingCreateView() {
                 disabled={
                   !Object.values(addServiceCatalogIds).some(Boolean) ||
                   !addServiceGuestId ||
-                  !selectedTeamMemberId
+                  (hasAssignableTeamMembers && !selectedTeamMemberId)
                 }
               >
                 Add service
@@ -921,54 +957,58 @@ export default function ClientBookingCreateView() {
             </Stack>
           }
         >
-          <Typography
-            sx={{
-              fontSize: 12,
-              fontWeight: 900,
-              color: alpha(m.navy, 0.72),
-              mb: 0.75,
-            }}
-          >
-            Professional
-          </Typography>
-          <AppDropdown
-            value={selectedTeamMemberId}
-            onChange={(val) => {
-              const nextId = String(val ?? "");
-              // Desired: one TM for the whole booking. Fixed: only for this add action.
-              if (isDesiredLocation) applySharedTeamMember(nextId);
-              else setSelectedTeamMemberId(nextId);
-              setAddServiceCatalogIds({});
-            }}
-            options={filteredTeamMembers.map((tm) => ({
-              value: tm.id,
-              label: tm.name,
-            }))}
-            placeholder="Select team member"
-            size="small"
-            fullWidth
-            InputProps={{
-              startAdornment: (
-                <PersonOutlineRoundedIcon
-                  sx={{
-                    fontSize: 18,
-                    color: alpha(m.navy, 0.45),
-                    ml: 0.5,
-                    mr: 0.25,
-                  }}
-                />
-              ),
-            }}
-            sx={{
-              mb: 1.5,
-              "& .MuiOutlinedInput-root": {
-                borderRadius: "10px",
-                bgcolor: alpha(m.navy, 0.015),
-                fontSize: 12,
-                fontWeight: 700,
-              },
-            }}
-          />
+          {hasAssignableTeamMembers ? (
+            <>
+              <Typography
+                sx={{
+                  fontSize: 12,
+                  fontWeight: 900,
+                  color: alpha(m.navy, 0.72),
+                  mb: 0.75,
+                }}
+              >
+                Professional
+              </Typography>
+              <AppDropdown
+                value={selectedTeamMemberId}
+                onChange={(val) => {
+                  const nextId = String(val ?? "");
+                  // Desired: one TM for the whole booking. Fixed: only for this add action.
+                  if (isDesiredLocation) applySharedTeamMember(nextId);
+                  else setSelectedTeamMemberId(nextId);
+                  setAddServiceCatalogIds({});
+                }}
+                options={filteredTeamMembers.map((tm) => ({
+                  value: tm.id,
+                  label: tm.name,
+                }))}
+                placeholder="Select team member (optional)"
+                size="small"
+                fullWidth
+                InputProps={{
+                  startAdornment: (
+                    <PersonOutlineRoundedIcon
+                      sx={{
+                        fontSize: 18,
+                        color: alpha(m.navy, 0.45),
+                        ml: 0.5,
+                        mr: 0.25,
+                      }}
+                    />
+                  ),
+                }}
+                sx={{
+                  mb: 1.5,
+                  "& .MuiOutlinedInput-root": {
+                    borderRadius: "10px",
+                    bgcolor: alpha(m.navy, 0.015),
+                    fontSize: 12,
+                    fontWeight: 700,
+                  },
+                }}
+              />
+            </>
+          ) : null}
 
           <Typography
             sx={{
@@ -981,7 +1021,7 @@ export default function ClientBookingCreateView() {
             Services
           </Typography>
           <Stack spacing={0.5} sx={{ mb: 1.5 }}>
-            {(catalogByTeamMemberId[selectedTeamMemberId] ?? []).map((item) => (
+            {addServiceCatalog.map((item) => (
               <FormControlLabel
                 key={item.id}
                 control={
@@ -1067,9 +1107,7 @@ export default function ClientBookingCreateView() {
             onChange={(val) => setAddServiceGuestId(String(val))}
             options={serviceAssignees.map((p) => ({
               value: p.id,
-              label: p.isRequester
-                ? `${p.name} (Requester)`
-                : `${p.name} (${getParticipantLabel(p)})`,
+              label: `${p.name} (${getParticipantLabel(p)})`,
             }))}
             placeholder="Select person"
             size="small"
@@ -1331,9 +1369,13 @@ export default function ClientBookingCreateView() {
                                 1,
                               ).toLocaleDateString("en-US", { month: "short" });
                               const active = i === monthPickerMonth;
-                              const probe = new Date(selectedDate);
-                              probe.setFullYear(monthPickerYear, i, 1);
-                              const disabled = isPastDay(probe);
+                              // Disable only when the whole month is already past.
+                              const lastOfMonth = new Date(
+                                monthPickerYear,
+                                i + 1,
+                                0,
+                              );
+                              const disabled = isPastDay(lastOfMonth);
                               return (
                                 <Grid item xs={4} key={i}>
                                   <AppButton
@@ -1405,30 +1447,77 @@ export default function ClientBookingCreateView() {
                       >
                         {weekDays.map((d) => {
                           const active = toISO(selectedDate) === d.key;
-                          const disabled = isPastDay(d.date);
+                          const past = isPastDay(d.date);
+                          const closed = isDayNotAvailable(d.date) && !past;
+                          const noSlots =
+                            !past && !closed && isDayUnselectable(d.date);
+                          const closedNote = closed
+                            ? getDayClosedNote(d.date)
+                            : noSlots
+                              ? "No public hours available for this day."
+                              : null;
+                          const disabled = past || closed || noSlots;
+                          const blocked = closed || noSlots;
                           return (
-                            <ButtonBase
+                            <Tooltip
                               key={d.key}
+                              title={closedNote || ""}
+                              disableHoverListener={!closedNote}
+                              arrow
+                              placement="top"
+                            >
+                              <Box
+                                component="span"
+                                sx={{
+                                  flex: 1,
+                                  minWidth: 0,
+                                  display: "flex",
+                                }}
+                              >
+                            <ButtonBase
                               onClick={() => {
                                 if (disabled) return;
                                 setSelectedDate(d.date);
                               }}
                               disabled={disabled}
+                              aria-disabled={disabled}
                               sx={{
                                 flex: 1,
+                                width: "100%",
                                 minWidth: 0,
                                 borderRadius: "8px",
-                                border: `1px solid ${active ? alpha(m.teal, 0.6) : alpha(m.navy, 0.1)}`,
-                                bgcolor: active ? m.teal : "#fff",
+                                border: `1px solid ${
+                                  past
+                                    ? alpha(m.navy, 0.08)
+                                    : blocked
+                                      ? alpha(m.blockedTimeFg, 0.45)
+                                      : active
+                                        ? alpha(m.teal, 0.6)
+                                        : alpha(m.navy, 0.1)
+                                }`,
+                                bgcolor: past
+                                  ? alpha(m.navy, 0.015)
+                                  : blocked
+                                    ? m.blockedTimeBg
+                                    : active
+                                      ? m.teal
+                                      : "#fff",
                                 py: 0.9,
                                 display: "flex",
                                 flexDirection: "column",
                                 gap: 0.35,
-                                ...(disabled
+                                pointerEvents: disabled ? "none" : "auto",
+                                "&.Mui-disabled": {
+                                  opacity: past ? 0.45 : 1,
+                                },
+                                ...(past
                                   ? {
                                       opacity: 0.45,
-                                      borderColor: alpha(m.navy, 0.08),
-                                      bgcolor: alpha(m.navy, 0.015),
+                                      cursor: "not-allowed",
+                                    }
+                                  : null),
+                                ...(blocked
+                                  ? {
                                       cursor: "not-allowed",
                                     }
                                   : null),
@@ -1438,7 +1527,13 @@ export default function ClientBookingCreateView() {
                                 sx={{
                                   fontSize: 10,
                                   fontWeight: 800,
-                                  color: active ? "#fff" : alpha(m.navy, 0.55),
+                                  color: past
+                                    ? alpha(m.navy, 0.55)
+                                    : blocked
+                                      ? m.blockedTimeFg
+                                      : active
+                                        ? "#fff"
+                                        : alpha(m.navy, 0.55),
                                 }}
                               >
                                 {d.dow}
@@ -1447,12 +1542,20 @@ export default function ClientBookingCreateView() {
                                 sx={{
                                   fontSize: 13.5,
                                   fontWeight: 900,
-                                  color: active ? "#fff" : alpha(m.navy, 0.76),
+                                  color: past
+                                    ? alpha(m.navy, 0.76)
+                                    : blocked
+                                      ? m.blockedTimeFg
+                                      : active
+                                        ? "#fff"
+                                        : alpha(m.navy, 0.76),
                                 }}
                               >
                                 {d.day}
                               </Typography>
                             </ButtonBase>
+                              </Box>
+                            </Tooltip>
                           );
                         })}
                       </Stack>
@@ -1628,40 +1731,144 @@ export default function ClientBookingCreateView() {
                         </Typography>
                       )}
 
-                      <Stack alignItems="flex-end" sx={{ mt: 1 }}>
-                        <FormControlLabel
-                          control={
-                            <Checkbox
-                              checked={combineServices}
-                              onChange={(e) =>
-                                setCombineServices(e.target.checked)
-                              }
-                              size="small"
-                              sx={{
-                                color: alpha(m.navy, 0.35),
-                                "&.Mui-checked": { color: m.teal },
-                              }}
-                            />
-                          }
-                          label={
-                            <Typography
-                              sx={{
-                                fontSize: 11.5,
-                                fontWeight: 800,
-                                color: alpha(m.navy, 0.62),
-                              }}
-                            >
-                              Combine Services
-                            </Typography>
-                          }
-                          sx={{ mr: 0 }}
-                        />
+                      {(selectedDayNotAvailable || availableTimes.length === 0) && (
+                        <Typography
+                          sx={{
+                            mt: 0.9,
+                            px: 0.25,
+                            fontSize: 11.5,
+                            fontWeight: 800,
+                            color: m.blockedTimeFg,
+                            lineHeight: 1.35,
+                          }}
+                        >
+                          {selectedDayClosedNote ||
+                            "No public hours available for this day."}
+                        </Typography>
+                      )}
 
-                        {isDesiredLocation ? (
+                      {isDesiredLocation ? (
                           <Box
                             id="booking-project-section"
                             sx={{ width: "100%", mt: 1.25, textAlign: "left" }}
                           >
+                            <Typography
+                              sx={{
+                                fontSize: 12,
+                                fontWeight: 900,
+                                color: alpha(m.navy, 0.78),
+                                mb: 1.25,
+                              }}
+                            >
+                              Visit Address
+                            </Typography>
+                            <Stack spacing={1.25} sx={{ mb: 2 }}>
+                              <Stack direction="row" spacing={1}>
+                                <AppTextField
+                                  label="Street"
+                                  placeholder="Enter street"
+                                  value={desiredVisitAddress.street}
+                                  onChange={(e) =>
+                                    setDesiredVisitAddress((prev) => ({
+                                      ...prev,
+                                      street: e.target.value,
+                                    }))
+                                  }
+                                  fullWidth
+                                />
+                                <AppTextField
+                                  label="Number"
+                                  placeholder="Enter number"
+                                  value={desiredVisitAddress.number}
+                                  onChange={(e) =>
+                                    setDesiredVisitAddress((prev) => ({
+                                      ...prev,
+                                      number: e.target.value,
+                                    }))
+                                  }
+                                  fullWidth
+                                />
+                              </Stack>
+                              <Stack direction="row" spacing={1}>
+                                <AppTextField
+                                  label="Postal Code"
+                                  placeholder="Enter postal code"
+                                  value={desiredVisitAddress.postalCode}
+                                  onChange={(e) =>
+                                    setDesiredVisitAddress((prev) => ({
+                                      ...prev,
+                                      postalCode: e.target.value,
+                                    }))
+                                  }
+                                  fullWidth
+                                />
+                                <AppDropdown
+                                  label="Province"
+                                  value={desiredVisitAddress.province}
+                                  onChange={(val) => {
+                                    const nextProvince = String(val);
+                                    const nextOptions =
+                                      resolveDesiredVisitAddressOptions(
+                                        businessProfile?.desiredLocation,
+                                        nextProvince,
+                                      );
+                                    setDesiredVisitAddress((prev) => ({
+                                      ...prev,
+                                      province: nextProvince,
+                                      municipality:
+                                        nextOptions.municipalityOptions.includes(
+                                          prev.municipality,
+                                        )
+                                          ? prev.municipality
+                                          : "",
+                                    }));
+                                  }}
+                                  options={[
+                                    { label: "Select province", value: "" },
+                                    ...visitAddressOptions.provinceOptions.map(
+                                      (province) => ({
+                                        label: province,
+                                        value: province,
+                                      }),
+                                    ),
+                                  ]}
+                                  fullWidth
+                                  placeholder="Select province"
+                                />
+                              </Stack>
+                              <AppDropdown
+                                label="Municipality"
+                                value={desiredVisitAddress.municipality}
+                                onChange={(val) =>
+                                  setDesiredVisitAddress((prev) => ({
+                                    ...prev,
+                                    municipality: String(val),
+                                  }))
+                                }
+                                options={[
+                                  {
+                                    label: desiredVisitAddress.province
+                                      ? "Select municipality"
+                                      : "Select province first",
+                                    value: "",
+                                  },
+                                  ...visitAddressOptions.municipalityOptions.map(
+                                    (municipality) => ({
+                                      label: municipality,
+                                      value: municipality,
+                                    }),
+                                  ),
+                                ]}
+                                fullWidth
+                                placeholder={
+                                  desiredVisitAddress.province
+                                    ? "Select municipality"
+                                    : "Select province first"
+                                }
+                                disabled={!desiredVisitAddress.province}
+                              />
+                            </Stack>
+
                             <Typography
                               sx={{
                                 fontSize: 12,
@@ -1807,10 +2014,17 @@ export default function ClientBookingCreateView() {
                                     }}
                                   >
                                     {img.file?.type.startsWith("image/") ||
-                                    (!img.file && Boolean(img.previewUrl)) ? (
+                                    (!img.file &&
+                                      Boolean(
+                                        resolveMediaUrl(img.previewUrl) ||
+                                          img.previewUrl,
+                                      )) ? (
                                       <Box
                                         component="img"
-                                        src={img.previewUrl}
+                                        src={
+                                          resolveMediaUrl(img.previewUrl) ||
+                                          img.previewUrl
+                                        }
                                         alt={img.name}
                                         sx={{
                                           width: "100%",
@@ -1850,7 +2064,6 @@ export default function ClientBookingCreateView() {
                             </Stack>
                           </Box>
                         ) : null}
-                      </Stack>
                     </Paper>
 
                     {!isDesiredLocation && canAddFixedLocationGuest ? (
@@ -2336,7 +2549,12 @@ export default function ClientBookingCreateView() {
                             textAlign: "right",
                           }}
                         >
-                          {shop?.addressLabel ?? shop?.municipalityLabel ?? ""}
+                          {desiredVisitAddressLabel ||
+                            (shop?.locationMode === "desired"
+                              ? "Service at your location"
+                              : (shop?.addressLabel?.trim() ||
+                                shop?.municipalityLabel?.trim() ||
+                                "Studio location"))}
                         </Typography>
                       </Stack>
                     </Stack>
@@ -2349,6 +2567,7 @@ export default function ClientBookingCreateView() {
                         ({
                           key,
                           title,
+                          roleLabel,
                           items,
                           planningItem,
                           teamMemberLabel,
@@ -2372,16 +2591,33 @@ export default function ClientBookingCreateView() {
 
                           return (
                             <Box key={key}>
-                              <Typography
-                                sx={{
-                                  fontWeight: 900,
-                                  fontSize: 12,
-                                  color: alpha(m.navy, 0.78),
-                                  mb: 0.75,
-                                }}
+                              <Stack
+                                direction="row"
+                                alignItems="baseline"
+                                spacing={0.75}
+                                sx={{ mb: 0.75 }}
                               >
-                                {title}
-                              </Typography>
+                                <Typography
+                                  sx={{
+                                    fontWeight: 900,
+                                    fontSize: 12,
+                                    color: alpha(m.navy, 0.78),
+                                  }}
+                                >
+                                  {title}
+                                </Typography>
+                                <Typography
+                                  sx={{
+                                    fontWeight: 800,
+                                    fontSize: 10.5,
+                                    color: "primary.light",
+                                    textTransform: "uppercase",
+                                    letterSpacing: 0.3,
+                                  }}
+                                >
+                                  {roleLabel}
+                                </Typography>
+                              </Stack>
                               {sectionTeamLabels.length > 0 ? (
                                 <Stack
                                   direction="row"
@@ -2568,8 +2804,25 @@ export default function ClientBookingCreateView() {
                           }}
                         >
                           {unassigned.length > 0
-                            ? `${unassigned.length} service${unassigned.length === 1 ? "" : "s"} still need a person and team member.`
-                            : "Every service needs a team member before you can continue."}
+                            ? `${unassigned.length} service${unassigned.length === 1 ? "" : "s"} still need a person.`
+                            : "Every service needs a person before you can continue."}
+                        </Typography>
+                      ) : null}
+
+                      {allServicesAssigned &&
+                      needsTeamMemberProvidedByPro &&
+                      !selectedTeamMemberId &&
+                      services.length > 0 ? (
+                        <Typography
+                          sx={{
+                            mt: 1,
+                            fontSize: 11,
+                            fontWeight: 800,
+                            color: "primary.light",
+                            lineHeight: 1.35,
+                          }}
+                        >
+                          Team member will be provided by professional.
                         </Typography>
                       ) : null}
 
@@ -2593,7 +2846,8 @@ export default function ClientBookingCreateView() {
                         disabled={
                           !allServicesAssigned ||
                           isContinuing ||
-                          selectedTimeTooSoon
+                          selectedTimeTooSoon ||
+                          !isDesiredVisitAddressComplete
                         }
                         onClick={() => void onContinue()}
                         sx={{
@@ -2601,7 +2855,8 @@ export default function ClientBookingCreateView() {
                           height: 40,
                           ...(allServicesAssigned &&
                           !isContinuing &&
-                          !selectedTimeTooSoon
+                          !selectedTimeTooSoon &&
+                          isDesiredVisitAddressComplete
                             ? null
                             : {
                                 color: alpha(m.navy, 0.45),
