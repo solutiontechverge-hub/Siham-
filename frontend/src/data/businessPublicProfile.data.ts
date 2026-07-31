@@ -372,6 +372,89 @@ export function buildDesiredMunicipalityList(desired: BusinessPublicProfileDesir
   return municipalities;
 }
 
+/** Same municipality set used on professional Desired Location setup dropdowns. */
+export const DESIRED_LOCATION_MUNICIPALITY_OPTIONS = [
+  "Amsterdam",
+  "Rotterdam",
+  "Utrecht",
+  "Haarlem",
+  "Groningen",
+  "Eindhoven",
+] as const;
+
+const ALL_NL_PROVINCES = [
+  "Drenthe",
+  "Flevoland",
+  "Friesland",
+  "Gelderland",
+  "Groningen",
+  "Limburg",
+  "Noord-Brabant",
+  "Noord-Holland",
+  "Overijssel",
+  "Utrecht",
+  "Zeeland",
+  "Zuid-Holland",
+] as const;
+
+/**
+ * Province / municipality options for client Desired Location visit address,
+ * scoped to what the professional offers.
+ */
+export function resolveDesiredVisitAddressOptions(
+  desired: BusinessPublicProfileDesiredLocation | null | undefined,
+  selectedProvince: string,
+) {
+  const province = String(selectedProvince ?? "").trim();
+  const fallbackMunicipalities = [...DESIRED_LOCATION_MUNICIPALITY_OPTIONS];
+  const isAllNetherlands =
+    !desired ||
+    desired.areaMode === "All Netherlands" ||
+    desired.areas.length === 0;
+
+  if (isAllNetherlands) {
+    return {
+      provinceOptions: [...ALL_NL_PROVINCES],
+      municipalityOptions: province ? fallbackMunicipalities : ([] as string[]),
+    };
+  }
+
+  const provinceOptions = Array.from(
+    new Set(
+      desired.areas
+        .map((area) => area.province.trim())
+        .filter((entry) => entry && entry !== "Service areas"),
+    ),
+  );
+
+  const matched = desired.areas.filter((area) => area.province === province);
+  let municipalityOptions: string[] = [];
+  if (province) {
+    if (matched.some((area) => area.allMunicipalities)) {
+      municipalityOptions = fallbackMunicipalities;
+    } else {
+      municipalityOptions = Array.from(
+        new Set(matched.flatMap((area) => area.municipalities).filter(Boolean)),
+      );
+      if (!municipalityOptions.length) {
+        municipalityOptions = Array.from(
+          new Set(
+            desired.areas.flatMap((area) => area.municipalities).filter(Boolean),
+          ),
+        );
+      }
+      if (!municipalityOptions.length) {
+        municipalityOptions = fallbackMunicipalities;
+      }
+    }
+  }
+
+  return {
+    provinceOptions: provinceOptions.length ? provinceOptions : [...ALL_NL_PROVINCES],
+    municipalityOptions,
+  };
+}
+
 export function resolveBusinessOfferingFlags(offering: ListingCardData["businessOffering"]) {
   return {
     supportsFixedLocation: offering === "fixed" || offering === "both",

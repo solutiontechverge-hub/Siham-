@@ -30,10 +30,10 @@ import type {
 import BookingRequestStatusRow, {
   type BookingRequestRowMode,
 } from "./BookingRequestStatusRow";
+import EditRequestNoteDialog from "./EditRequestNoteDialog";
 import {
   professionalRejectEditRequest,
   professionalSuggestBookingChanges,
-  sendBookingEditRequest,
 } from "./bookingEditRequest";
 import { useBookingEditRequest } from "./useBookingEditRequest";
 
@@ -65,6 +65,10 @@ type Props = {
       | "service_edited"
       | "unique_item_edited",
   ) => void | Promise<void>;
+  /** Persist Confirmed ER note to API (client → professional). */
+  onSendConfirmedEditRequest?: (note: string) => void | Promise<void>;
+  /** Show Updated next to Confirmed after post-accept edits. */
+  showUpdated?: boolean;
   messagingHref?: string;
 };
 
@@ -87,6 +91,8 @@ export default function ClientBookingDetailsHeader({
   onDeleteBooking,
   onDiscardBookingRequest,
   onDispatchBookingNotification,
+  onSendConfirmedEditRequest,
+  showUpdated = false,
   messagingHref,
 }: Props) {
   const m = useTheme().palette.mollure;
@@ -128,14 +134,34 @@ export default function ClientBookingDetailsHeader({
 
   const handleSendEditRequest = () => {
     setEditAnchor(null);
+    if (bookingStatus === "confirmed" && !editRequest.isEditGrantActive) {
+      setErNoteOpen(true);
+      return;
+    }
     void onDispatchBookingNotification?.("edit_request_outgoing");
-    sendBookingEditRequest(bookingRef);
-    editRequest.refresh();
     showSnackbar({
-      severity: "success",
-      message:
-        "Edit request sent to the professional. You can edit after they approve.",
+      severity: "info",
+      message: "Use Request to edit on a confirmed booking.",
     });
+  };
+
+  const handleConfirmErNote = (note: string) => {
+    void (async () => {
+      try {
+        await onSendConfirmedEditRequest?.(note);
+        editRequest.refresh();
+        showSnackbar({
+          severity: "success",
+          message:
+            "Edit request sent to the professional. You can edit after they approve.",
+        });
+      } catch (error) {
+        showSnackbar({
+          severity: "error",
+          message: getApiErrorMessage(error, "Unable to send edit request."),
+        });
+      }
+    })();
   };
 
   const handleSendBookingRequestFromEdit = () => {
@@ -167,19 +193,29 @@ export default function ClientBookingDetailsHeader({
     locationMode === "desired";
   const isCompleted = bookingStatus === "completed";
   const isConfirmed = bookingStatus === "confirmed";
+  const isInvalid = bookingStatus === "invalid";
+  const isNoShow = bookingStatus === "no_show";
+  const canDelete =
+    isCancelled || isCompleted || isInvalid || isNoShow;
   const waitingForPayment =
-    requiresPrepayment && !prepaymentPaid && !isCompleted && !isCancelled;
-  /** Edit after confirm (EBR menu) or while waiting for unpaid prepayment. */
+    requiresPrepayment && !prepaymentPaid && !isCompleted && !isCancelled && !isInvalid;
+  /** Edit only on Confirmed (guideline). Prepay wait may still allow edits. */
   const showEdit =
     !isCancelled &&
     !isCompleted &&
+    !isInvalid &&
+    !isNoShow &&
     !isOutgoingBookingRequest &&
+    bookingStatus !== "in_progress" &&
     !bookingRequestSent &&
     (isConfirmed || waitingForPayment);
   const editActionsDisabled = !showEdit;
+  /** Confirmed edits require an accepted ER grant — no direct FL/DL edit. */
   const showConfirmedEditMenu =
     isConfirmed &&
+    editRequest.isEditGrantActive &&
     Boolean(onEditDateTime || onEditBookingDetails || onEditProject);
+  const [erNoteOpen, setErNoteOpen] = React.useState(false);
 
   const headerActionBtnSx = {
     borderRadius: "8px",
@@ -322,7 +358,7 @@ export default function ClientBookingDetailsHeader({
                   Discard
                 </AppButton>
               ) : null}
-              {isCancelled || isCompleted ? (
+              {canDelete ? (
                 <AppButton
                   tone="secondary"
                   onClick={onDeleteBooking}
@@ -341,8 +377,15 @@ export default function ClientBookingDetailsHeader({
               }
               prepaymentPaid={prepaymentPaid}
               paymentDue={paymentDue}
-              bookingRequestDirection={bookingRequestDirection}
+              bookingRequestDirection={
+                editRequest.isPending
+                  ? editRequest.initiatedBy === "professional"
+                    ? "incoming"
+                    : "outgoing"
+                  : bookingRequestDirection
+              }
               rowMode={requestRowMode}
+              showUpdated={showUpdated}
             />
           </Stack>
         </Stack>
@@ -453,7 +496,13 @@ export default function ClientBookingDetailsHeader({
             disabled
             sx={{ ...menuItemSx, whiteSpace: "normal", opacity: 1 }}
           >
-            Edit request sent — awaiting professional approval
+            {editRequest.initiatedBy === "professional"
+              ? "Edit request received — respond with Accept, Reject, or Suggest Change"
+              : "Edit request sent — awaiting approval"}
+          </MenuItem>
+        ) : isConfirmed ? (
+          <MenuItem onClick={handleSendEditRequest} sx={menuItemSx}>
+            Request to edit booking
           </MenuItem>
         ) : onSendBookingRequest ? (
           <MenuItem onClick={handleSendBookingRequestFromEdit} sx={menuItemSx}>
@@ -465,6 +514,11 @@ export default function ClientBookingDetailsHeader({
           </MenuItem>
         )}
       </Menu>
+      <EditRequestNoteDialog
+        open={erNoteOpen}
+        onClose={() => setErNoteOpen(false)}
+        onConfirm={handleConfirmErNote}
+      />
     </>
   );
 }

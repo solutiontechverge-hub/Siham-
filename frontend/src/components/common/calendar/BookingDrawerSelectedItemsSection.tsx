@@ -42,6 +42,7 @@ export default function BookingDrawerSelectedItemsSection({
   uniqueItems = [],
   nested = false,
   showRemoveButtons = false,
+  resolveStaffName,
   resolveServiceEditTag,
   resolveProductEditTag,
   onRemoveService,
@@ -74,6 +75,7 @@ export default function BookingDrawerSelectedItemsSection({
           </BodyText>
           {services.map((service) => {
             const editTag = resolveServiceEditTag?.(service.id) ?? null;
+            const staffName = resolveStaffName?.(service.staffResourceId);
 
             return (
               <Box
@@ -110,6 +112,7 @@ export default function BookingDrawerSelectedItemsSection({
                           : undefined
                       }
                       durationLabel={`${service.durationMins} Mins`}
+                      staffName={staffName}
                     />
                     {editTag ? (
                       <Box sx={{ mt: 0.55 }}>
@@ -238,7 +241,9 @@ export default function BookingDrawerSelectedItemsSection({
           >
             Unique Item
           </BodyText>
-          {uniqueItems.map((item) => (
+          {uniqueItems.map((item) => {
+            const editTag = resolveProductEditTag?.(item.id) ?? null;
+            return (
             <Box key={`unique-${item.id}`} sx={cardSx}>
               <Stack
                 direction="row"
@@ -267,6 +272,11 @@ export default function BookingDrawerSelectedItemsSection({
                   >
                     Qty {item.quantity} · €{item.unitPrice.toFixed(2)} each
                   </BodyText>
+                  {editTag ? (
+                    <Box sx={{ mt: 0.55 }}>
+                      <BookingEditedTag variant={editTag} />
+                    </Box>
+                  ) : null}
                 </Box>
                 <Stack
                   direction="row"
@@ -296,7 +306,8 @@ export default function BookingDrawerSelectedItemsSection({
                 </Stack>
               </Stack>
             </Box>
-          ))}
+            );
+          })}
         </Stack>
       ) : null}
     </Stack>

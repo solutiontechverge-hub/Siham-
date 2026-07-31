@@ -93,11 +93,13 @@ export function calculateManualEntryDiscountAmount(
   subtotal: number,
   discount: ManualEntryDiscount | null,
 ): number {
-  if (!discount || discount.amount <= 0 || subtotal <= 0) return 0;
+  if (!discount) return 0;
+  const amount = Number(discount.amount);
+  if (!Number.isFinite(amount) || amount <= 0 || subtotal <= 0) return 0;
   if (discount.type === "percentage") {
-    return Math.min(subtotal, (subtotal * discount.amount) / 100);
+    return Math.min(subtotal, (subtotal * amount) / 100);
   }
-  return Math.min(subtotal, discount.amount);
+  return Math.min(subtotal, amount);
 }
 
 export function formatManualEntryDiscountLabel(discount: ManualEntryDiscount): string {

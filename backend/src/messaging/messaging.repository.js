@@ -886,24 +886,9 @@ async function resolveThreadPair(threadId, userId) {
   };
 }
 
-function isPastBookingRow(row, now = new Date()) {
+function isPastBookingRow(row) {
   const status = String(row.status || "").toLowerCase();
-  if (PAST_BOOKING_STATUSES.has(status)) return true;
-
-  if (row.end_time) {
-    const end = row.end_time instanceof Date ? row.end_time : new Date(row.end_time);
-    if (!Number.isNaN(end.getTime()) && end.getTime() <= now.getTime()) return true;
-  }
-
-  if (row.booking_date) {
-    const day =
-      row.booking_date instanceof Date
-        ? row.booking_date
-        : new Date(`${String(row.booking_date).slice(0, 10)}T23:59:59`);
-    if (!Number.isNaN(day.getTime()) && day.getTime() < now.getTime() && !row.end_time) return true;
-  }
-
-  return false;
+  return PAST_BOOKING_STATUSES.has(status);
 }
 
 function formatBookingDateLabel(value) {

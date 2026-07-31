@@ -139,6 +139,31 @@ export function getEffectiveServicePrice(service: BookingServiceLineItem) {
   return Math.max(0, base - service.discount.amount);
 }
 
+/** Fill missing per-service start/end so each line has its own window (sequential from booking start). */
+export function ensureServiceStartEndTimes(
+  services: readonly BookingServiceLineItem[],
+  bookingStart?: string,
+): BookingServiceLineItem[] {
+  if (!services.length) return [];
+  let cursor =
+    bookingStart?.trim() ||
+    services.find((service) => service.startTime?.trim())?.startTime ||
+    "08:00";
+
+  return services.map((service) => {
+    const duration = service.durationMins > 0 ? service.durationMins : 60;
+    if (service.startTime?.trim() && service.endTime?.trim()) {
+      cursor = service.endTime.trim();
+      return service;
+    }
+    const startTime = service.startTime?.trim() || cursor;
+    const endTime =
+      service.endTime?.trim() || addMinutesToTime(startTime, duration);
+    cursor = endTime;
+    return { ...service, startTime, endTime };
+  });
+}
+
 export function formatBookingServiceLineMeta(service: BookingServiceLineItem) {
   const parts: string[] = [`${service.durationMins} Mins`];
   parts.push(`€${getEffectiveServicePrice(service)}`);

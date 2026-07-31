@@ -9,12 +9,12 @@ import AppModal, {
 } from "../AppModal";
 
 export type ClientEbrActionKind = "accept" | "suggest" | "reject";
-export type ClientRequestActionContext = "ebr" | "br";
+export type ClientRequestActionContext = "ebr" | "br" | "er";
 
 type Props = {
   open: boolean;
   action: ClientEbrActionKind | null;
-  /** Same dialog shell; BR vs EBR copy only. */
+  /** Same dialog shell; BR / EBR / ER copy only. */
   context?: ClientRequestActionContext;
   onClose: () => void;
   onConfirm: () => void;
@@ -64,6 +64,28 @@ const BR_COPY: Record<
   },
 };
 
+const ER_COPY: Record<
+  ClientEbrActionKind,
+  { title: string; body: string; confirmLabel: string; showWarning?: boolean }
+> = {
+  accept: {
+    title: "Accept edit request",
+    body: "Confirm to accept this edit request. The professional can update the booking once.",
+    confirmLabel: "Accept",
+  },
+  suggest: {
+    title: "Suggest change",
+    body: "By choosing “Suggest Change”, you can communicate through the messaging tool.",
+    confirmLabel: "Suggest Change",
+  },
+  reject: {
+    title: "Reject edit request",
+    body: "Confirm to reject this edit request. Your booking stays confirmed.",
+    confirmLabel: "Reject",
+    showWarning: true,
+  },
+};
+
 export default function ClientEbrActionDialog({
   open,
   action,
@@ -74,7 +96,9 @@ export default function ClientEbrActionDialog({
   const m = useTheme().palette.mollure;
   if (!action) return null;
 
-  const copy = (context === "br" ? BR_COPY : EBR_COPY)[action];
+  const copy = (
+    context === "br" ? BR_COPY : context === "er" ? ER_COPY : EBR_COPY
+  )[action];
 
   return (
     <AppModal

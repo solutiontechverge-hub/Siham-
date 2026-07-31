@@ -6,7 +6,8 @@ import type {
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { CalendarBooking, CalendarEntry } from "../../../store/services/businessApi";
 import { wallClockDateFromDateTime, wallClockTimeFromDateTime } from "./calendar.utils";
-import { mainDrawerServicesFromClientSnapshot, parseCalendarEntryNotes, parseStoredEbrFromNotes } from "./bookingEventDetails";
+import { mainDrawerServicesFromClientSnapshot, parseCalendarEntryNotes, parseStoredEbrFromNotes, parseStoredErFromNotes, sanitizeInternalNoteText } from "./bookingEventDetails";
+import { syncEditRequestFromBookingApi } from "../client-booking/syncEditRequestFromApi";
 import { mapApiPrepaymentStatus } from "./prepaymentStatus";
 
 const statusFromApi: Record<string, CalendarBookingStatus> = {
@@ -103,6 +104,24 @@ export function mapCalendarBookingToEvent(
       ? String(booking.team_member_id)
       : fallbackResourceId || "unassigned";
   const ebrMeta = status === "Cancelled" ? null : parseStoredEbrFromNotes(booking.notes);
+  const apiEr = status === "Confirmed" ? booking.edit_request : null;
+  const notesEr = status === "Confirmed" ? parseStoredErFromNotes(booking.notes) : null;
+  const erMeta = apiEr
+    ? {
+        status: apiEr.status,
+        note: apiEr.note,
+        initiatedBy: apiEr.initiated_by,
+        requestedAt: apiEr.requested_at ?? undefined,
+        approvedAt:
+          apiEr.status === "approved" ? (apiEr.responded_at ?? undefined) : undefined,
+        editGrantActive: Boolean(apiEr.edit_grant_active),
+      }
+    : notesEr;
+  const isErPending = Boolean(erMeta && erMeta.status === "pending");
+  const bookingRef = booking.unique_code || String(booking.id);
+  if (status === "Confirmed") {
+    syncEditRequestFromBookingApi(bookingRef, apiEr ?? null);
+  }
   // Notes requestDirection is the source of truth (pro POV). Do not require
   // lastEditedBy — plain pro-sent BRs only store requestDirection: "outgoing".
   const isOutgoingRequest =
@@ -117,16 +136,76 @@ export function mapCalendarBookingToEvent(
     (ebrMeta!.lastEditedBy === "client" ||
       Boolean(ebrMeta!.clientNote) ||
       parsedNotes?.lastEditedBy === "client");
-  const clientNote = ebrMeta?.clientNote?.trim() || "";
-  const noteText = clientNote || parsedNotes?.internalNote?.trim() || "";
+  const clientNote = sanitizeInternalNoteText(ebrMeta?.clientNote);
+  const noteText =
+    clientNote ||
+    sanitizeInternalNoteText(erMeta?.note) ||
+    sanitizeInternalNoteText(parsedNotes?.internalNote) ||
+    "";
+  const erRequestDirection: "outgoing" | "incoming" | undefined = isErPending
+    ? erMeta?.initiatedBy === "professional"
+      ? "outgoing"
+      : "incoming"
+    : undefined;
   const resolvedRequestDirection: "outgoing" | "incoming" =
-    parsedNotes?.requestDirection === "outgoing"
+    erRequestDirection ??
+    (parsedNotes?.requestDirection === "outgoing"
       ? "outgoing"
       : parsedNotes?.requestDirection === "incoming"
         ? "incoming"
         : isOutgoingRequest
           ? "outgoing"
-          : "incoming";
+          : "incoming");
+
+  const locationDetails =
+    booking.location_details && typeof booking.location_details === "object"
+      ? (booking.location_details as {
+          desiredLocation?: {
+            street?: string;
+            number?: string;
+            postalCode?: string;
+            province?: string;
+            municipality?: string;
+          };
+        })
+      : null;
+  const desiredFromColumns =
+    booking.location_type === "desired" &&
+    (booking.street_address ||
+      booking.street_number ||
+      booking.postal_code ||
+      booking.province ||
+      booking.municipality)
+      ? {
+          street: String(booking.street_address ?? "").trim(),
+          number: String(booking.street_number ?? "").trim(),
+          postalCode: String(booking.postal_code ?? "").trim(),
+          province: String(booking.province ?? "").trim(),
+          municipality: String(booking.municipality ?? "").trim(),
+        }
+      : null;
+  const desiredFromDetails = locationDetails?.desiredLocation
+    ? {
+        street: String(locationDetails.desiredLocation.street ?? "").trim(),
+        number: String(locationDetails.desiredLocation.number ?? "").trim(),
+        postalCode: String(locationDetails.desiredLocation.postalCode ?? "").trim(),
+        province: String(locationDetails.desiredLocation.province ?? "").trim(),
+        municipality: String(
+          locationDetails.desiredLocation.municipality ?? "",
+        ).trim(),
+      }
+    : null;
+  const desiredFromNotes = parsedNotes?.desiredLocation
+    ? {
+        street: String(parsedNotes.desiredLocation.street ?? "").trim(),
+        number: String(parsedNotes.desiredLocation.number ?? "").trim(),
+        postalCode: String(parsedNotes.desiredLocation.postalCode ?? "").trim(),
+        province: String(parsedNotes.desiredLocation.province ?? "").trim(),
+        municipality: String(parsedNotes.desiredLocation.municipality ?? "").trim(),
+      }
+    : null;
+  const resolvedDesiredLocation =
+    desiredFromNotes ?? desiredFromDetails ?? desiredFromColumns;
 
   return {
     id: `b-${booking.id}`,
@@ -145,12 +224,28 @@ export function mapCalendarBookingToEvent(
       : booking.booking_type
         ? (bookingTypeFromApi[booking.booking_type] ?? "Online")
         : "Online",
-    bookingScenario: isIncomingClientEbr ? "EBR" : isRequestBooking ? "BR" : undefined,
+    // BR/EBR only while the request is still pending — hide after accept/reject.
+    bookingScenario: isIncomingClientEbr
+      ? "EBR"
+      : isErPending
+        ? "ER"
+        : isRequested
+          ? "BR"
+          : undefined,
     showClientName: clientName,
     notes: booking.notes ?? null,
+    updatedAt: booking.updated_at ?? booking.created_at ?? null,
     details: {
       clientEmail: booking.customer_email ?? "",
       requestDirection: resolvedRequestDirection,
+      ...(resolvedDesiredLocation &&
+      (resolvedDesiredLocation.street ||
+        resolvedDesiredLocation.number ||
+        resolvedDesiredLocation.postalCode ||
+        resolvedDesiredLocation.province ||
+        resolvedDesiredLocation.municipality)
+        ? { desiredLocation: resolvedDesiredLocation }
+        : {}),
       services: ebrServices ?? [
         {
           id: booking.service_id || `svc-b-${booking.id}`,
@@ -162,11 +257,20 @@ export function mapCalendarBookingToEvent(
       ...(parsedNotes?.products?.length ? { products: parsedNotes.products } : {}),
       ...(parsedNotes?.editedServiceIds?.length ? { editedServiceIds: parsedNotes.editedServiceIds } : {}),
       ...(parsedNotes?.editedProductIds?.length ? { editedProductIds: parsedNotes.editedProductIds } : {}),
+      ...(isIncomingClientEbr && ebrMeta?.editedServiceIds?.length
+        ? { clientEditedServiceIds: ebrMeta.editedServiceIds }
+        : parsedNotes?.clientEditedServiceIds?.length
+          ? { clientEditedServiceIds: parsedNotes.clientEditedServiceIds }
+          : {}),
+      // Do not invent lastEditedBy for a first-time BR — that falsely shows "Updated".
+      // Only surface it for real edits (EBR / ER / notes that already recorded an editor).
       ...(isIncomingClientEbr
         ? { lastEditedBy: "client" as const, responseStatus: "suggestion_for_change" as const }
-        : parsedNotes?.lastEditedBy
-          ? { lastEditedBy: parsedNotes.lastEditedBy }
-          : {}),
+        : isErPending && erMeta?.initiatedBy
+          ? { lastEditedBy: erMeta.initiatedBy }
+          : parsedNotes?.lastEditedBy
+            ? { lastEditedBy: parsedNotes.lastEditedBy }
+            : {}),
       ...(!isIncomingClientEbr && parsedNotes?.responseStatus
         ? { responseStatus: parsedNotes.responseStatus }
         : {}),
@@ -177,6 +281,12 @@ export function mapCalendarBookingToEvent(
         ? {
             internalNote: noteText,
             showInternalNote: true,
+          }
+        : {}),
+      ...(isErPending && erMeta?.note
+        ? {
+            editRequestNote: erMeta.note,
+            editRequestInitiatedBy: erMeta.initiatedBy,
           }
         : {}),
       ...(parsedNotes

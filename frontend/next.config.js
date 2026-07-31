@@ -6,12 +6,17 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   async rewrites() {
+    const apiOrigin = (
+      process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000"
+    ).replace(/\/$/, "");
     return [
       { source: "/client", destination: "/clients/listing" },
       { source: "/client/profile", destination: "/clients/profile" },
       { source: "/client/profile/:path*", destination: "/clients/profile/:path*" },
       { source: "/client/booking", destination: "/clients/booking" },
       { source: "/client/favourites", destination: "/clients/favourites" },
+      // Proxy local booking/messaging uploads so relative /uploads/* paths load.
+      { source: "/uploads/:path*", destination: `${apiOrigin}/uploads/:path*` },
     ];
   },
   // Required for MUI + Next.js webpack so client chunks resolve correctly

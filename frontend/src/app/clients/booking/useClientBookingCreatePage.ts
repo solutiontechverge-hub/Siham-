@@ -24,6 +24,7 @@ import { resolveCreateCheckoutPath } from "./resolveCreateBookingStatus";
 import { submitClientBookingRequest } from "./submitClientBookingRequest";
 import { useSnackbar } from "../../../components/common/AppSnackbar";
 import { getApiErrorMessage } from "../../../lib/api-error";
+import { resolveMediaUrl } from "../../../lib/resolveMediaUrl";
 import {
   getServicesForLocationMode,
   getTeamForLocationMode,
@@ -53,6 +54,8 @@ import {
   FIXED_LOCATION_MAX_GUESTS,
   UUID_RE,
   isAdditionalGuest,
+  servicesMissingTeamMember,
+  withTeamMemberProvidedByProNote,
   resolveRequesterDisplayName,
 } from "./booking.page.data";
 import type {
@@ -394,7 +397,7 @@ export function useClientBookingCreatePage() {
       isSameDayBookingTooSoon(selectedTime, new Date(nowTick)),
     [isSelectedToday, nowTick, selectedTime],
   );
-  const [combineServices, setCombineServices] = React.useState(true);
+  const combineServices = true;
   const [selectedPersonId, setSelectedPersonId] =
     React.useState<string>("p-requester");
   const [selectedTeamMemberId, setSelectedTeamMemberId] =
@@ -465,8 +468,10 @@ export function useClientBookingCreatePage() {
   }, [desiredVisitAddress, isDesiredLocation]);
   const getParticipantLabel = React.useCallback(
     (person: BookingPerson) => {
+      if (person.isRequester) return "Client";
       if (person.participantType === "planning" || person.name === "Planning")
         return "Planning";
+      if (person.participantType === "model") return "Model";
       if (person.participantType === "guest" || person.name === "Guest")
         return "Guest";
       return isDesiredLocation ? "Model" : "Guest";
@@ -537,6 +542,19 @@ export function useClientBookingCreatePage() {
     shopTeamMembers,
   ]);
 
+  /** Location catalog when the pro has no selectable team members for this mode. */
+  const locationServiceCatalog = React.useMemo<CatalogService[]>(() => {
+    if (!shop?.shopId || !profileHydrated || !businessProfile) return [];
+    return getServicesForLocationMode(businessProfile, locationMode).map(
+      (s) => ({
+        id: s.id,
+        name: s.name,
+        durationMins: s.durationMins,
+        price: s.priceValue,
+      }),
+    );
+  }, [businessProfile, locationMode, profileHydrated, shop?.shopId]);
+
   const isPlanningPerson = React.useCallback(
     (p: BookingPerson) =>
       p.participantType === "planning" || p.name === "Planning",
@@ -557,6 +575,20 @@ export function useClientBookingCreatePage() {
       shopTeamMembers.filter((tm) => tm.locationModes.includes(locationMode)),
     [locationMode, shopTeamMembers],
   );
+  /** Client can pick / assign staff only when the pro exposed team members for this mode. */
+  const hasAssignableTeamMembers = filteredTeamMembers.length > 0;
+
+  const addServiceCatalog = React.useMemo(() => {
+    if (hasAssignableTeamMembers) {
+      return catalogByTeamMemberId[selectedTeamMemberId] ?? [];
+    }
+    return locationServiceCatalog;
+  }, [
+    catalogByTeamMemberId,
+    hasAssignableTeamMembers,
+    locationServiceCatalog,
+    selectedTeamMemberId,
+  ]);
 
   const additionalGuests = React.useMemo(
     () => people.filter(isAdditionalGuest),
@@ -568,8 +600,8 @@ export function useClientBookingCreatePage() {
     // Jane / Model / Guest can all receive services; Planning cannot.
     return people.filter((p) => !isPlanningPerson(p));
   }, [isPlanningPerson, people]);
-  const canAddService =
-    serviceAssignees.length > 0 && Boolean(selectedTeamMemberId);
+  /** Add-to-list stays available even when the pro has no selectable team members. */
+  const canAddService = serviceAssignees.length > 0;
 
   const serviceCountLabel = React.useCallback(
     (personId: string) => {
@@ -580,19 +612,42 @@ export function useClientBookingCreatePage() {
   );
 
   const personCardSubtitle = React.useCallback(
-    (person: BookingPerson) => serviceCountLabel(person.id),
-    [serviceCountLabel],
+    (person: BookingPerson) => {
+      const role = getParticipantLabel(person);
+      const count = serviceCountLabel(person.id);
+      return `${role} · ${count}`;
+    },
+    [getParticipantLabel, serviceCountLabel],
   );
 
   const selectedServicesCount = React.useMemo(
     () => Object.values(selectedServiceIds).filter(Boolean).length,
     [selectedServiceIds],
   );
-  const allServicesAssigned = React.useMemo(
+
+  const requiresPersonAssignment = React.useMemo(() => {
+    const assignees = people.filter((p) => !isPlanningPerson(p));
+    return (
+      assignees.length > 1 || assignees.some((p) => !p.isRequester)
+    );
+  }, [isPlanningPerson, people]);
+
+  /**
+   * Multi-person / Model / Guest: every service needs a person.
+   * Solo requester with no staff pick: Continue can default person to requester.
+   */
+  const allServicesAssigned = React.useMemo(() => {
+    if (services.length === 0) return false;
+    if (requiresPersonAssignment || selectedTeamMemberId) {
+      return services.every((s) => Boolean(s.guestId));
+    }
+    return true;
+  }, [requiresPersonAssignment, selectedTeamMemberId, services]);
+  const needsTeamMemberProvidedByPro = React.useMemo(
     () =>
       services.length > 0 &&
-      services.every((s) => Boolean(s.guestId) && Boolean(s.teamMemberId)),
-    [services],
+      (!selectedTeamMemberId || servicesMissingTeamMember(services)),
+    [services, selectedTeamMemberId],
   );
 
   /** Services already given to the selected person (Jane / Model / Guest). */
@@ -644,8 +699,11 @@ export function useClientBookingCreatePage() {
     () => unassigned.filter((s) => selectedServiceIds[s.id]),
     [unassigned, selectedServiceIds],
   );
+  /** Assign selected unassigned rows to the current person (staff is optional). */
   const canDirectAssign =
-    Boolean(selectedTeamMemberId) && selectedUnassignedServices.length > 0;
+    !isPlanningCardSelected &&
+    Boolean(selectedPersonId) &&
+    selectedUnassignedServices.length > 0;
   const visible = serviceTab === "assigned" ? assigned : unassigned;
   const hasUnassigned = unassigned.length > 0;
 
@@ -725,6 +783,7 @@ export function useClientBookingCreatePage() {
     const sections: Array<{
       key: string;
       title: string;
+      roleLabel: string;
       items: Service[];
       planningItem?: { activity: string; duration: string };
       teamMemberLabel?: string;
@@ -742,17 +801,25 @@ export function useClientBookingCreatePage() {
         planningItem?.activity || planningItem?.duration,
       );
       if (!items.length && !hasPlanning) continue;
+      const roleLabel = getParticipantLabel(p);
       const teamMemberLabel = teamMemberChipLabelForItems(items);
       sections.push({
         key: p.id,
         title: p.name,
+        roleLabel,
         items,
         ...(hasPlanning ? { planningItem } : {}),
         ...(teamMemberLabel ? { teamMemberLabel } : {}),
       });
     }
     return sections;
-  }, [people, summaryGroups, isPlanningPerson, teamMemberChipLabelForItems]);
+  }, [
+    getParticipantLabel,
+    people,
+    summaryGroups,
+    isPlanningPerson,
+    teamMemberChipLabelForItems,
+  ]);
 
   React.useEffect(() => {
     // Safety: never allow a past date to remain selected.
@@ -871,9 +938,16 @@ export function useClientBookingCreatePage() {
         ReturnType<typeof loadPublicProfileBookingSelection>
       >,
     ) => {
-      if (profileSelection.teamMembers.length > 0) {
-        setShopTeamMembers(profileSelection.teamMembers);
-      }
+      setShopTeamMembers(profileSelection.teamMembers);
+
+      const noSelectableTeam =
+        profileSelection.teamMembers.length === 0 ||
+        !profileSelection.teamMembers.some((tm) =>
+          tm.locationModes.includes(profileSelection.locationMode),
+        );
+      // Desired, or no staff shown: keep rows in Unassigned (pro will provide).
+      const leaveUnassigned =
+        profileSelection.locationMode === "desired" || noSelectableTeam;
 
       const profileServices = profileSelection.services.map((row) => ({
         id: row.id,
@@ -882,11 +956,8 @@ export function useClientBookingCreatePage() {
         name: row.name,
         durationMins: row.durationMins,
         price: row.price,
-        // Desired: leave person + professional open so Model can pick services via Assign.
-        guestId:
-          profileSelection.locationMode === "desired" ? null : "p-requester",
-        teamMemberId:
-          profileSelection.locationMode === "desired" ? null : row.teamMemberId,
+        guestId: leaveUnassigned ? null : "p-requester",
+        teamMemberId: leaveUnassigned ? null : row.teamMemberId,
       }));
 
       setServices(profileServices);
@@ -908,7 +979,11 @@ export function useClientBookingCreatePage() {
         locationMode: profileSelection.locationMode,
       }));
 
-      if (profileSelection.teamMembers.length > 0) {
+      // Desired / no staff: leave TM empty so client can continue (pro will provide).
+      // Fixed with staff: pre-select first matching member for assign/catalog flows.
+      if (leaveUnassigned) {
+        setSelectedTeamMemberId("");
+      } else {
         const firstMember = profileSelection.teamMembers.find((tm) =>
           tm.locationModes.includes(profileSelection.locationMode),
         );
@@ -961,7 +1036,13 @@ export function useClientBookingCreatePage() {
         .map(
           (row) => `${row.id}:${row.guestId ?? ""}:${row.teamMemberId ?? ""}`,
         )
-        .join("|")}:${existing.draft.projectDetails?.description ?? ""}`;
+        .join("|")}:${existing.draft.projectDetails?.description ?? ""}:${[
+          existing.draft.desiredLocation?.street,
+          existing.draft.desiredLocation?.number,
+          existing.draft.desiredLocation?.postalCode,
+          existing.draft.desiredLocation?.province,
+          existing.draft.desiredLocation?.municipality,
+        ].join("|")}`;
       if (hydrationSignatureRef.current === signature) return;
       hydrationSignatureRef.current = signature;
 
@@ -1042,22 +1123,42 @@ export function useClientBookingCreatePage() {
       }
       if (existing.draft.selectedTime)
         setSelectedTime(existing.draft.selectedTime);
-      setCombineServices(Boolean(existing.draft.combineServices));
       if (existing.draft.projectDetails) {
         setProjectDescription(existing.draft.projectDetails.description ?? "");
         setProjectUploads(
           (existing.draft.projectDetails.uploads ?? []).map((u) => ({
             id: u.id,
             name: u.name,
-            previewUrl: u.previewUrl ?? "",
+            previewUrl:
+              resolveMediaUrl(u.previewUrl) ||
+              resolveMediaUrl(u.url) ||
+              u.previewUrl ||
+              "",
           })),
         );
       }
+      // Restore visit address the client already entered (Desired Location).
+      const savedVisit = existing.draft.desiredLocation;
+      if (
+        savedVisit &&
+        (savedVisit.street?.trim() ||
+          savedVisit.number?.trim() ||
+          savedVisit.postalCode?.trim() ||
+          savedVisit.province?.trim() ||
+          savedVisit.municipality?.trim())
+      ) {
+        setDesiredVisitAddress({
+          street: savedVisit.street ?? "",
+          number: savedVisit.number ?? "",
+          postalCode: savedVisit.postalCode ?? "",
+          province: savedVisit.province ?? "",
+          municipality: savedVisit.municipality ?? "",
+        });
+      }
+      // Only pre-select a TM the draft already assigned — never force roster[0].
       const firstTm =
-        draftServices.find((s) => s.teamMemberId)?.teamMemberId ??
-        existing.draft.teamMembers?.[0]?.id ??
-        "";
-      if (firstTm) setSelectedTeamMemberId(firstTm);
+        draftServices.find((s) => s.teamMemberId)?.teamMemberId ?? "";
+      setSelectedTeamMemberId(firstTm);
       setServiceTab(getPreferredServiceTab(draftServices));
       setProfileHydrated(true);
       return;
@@ -1098,6 +1199,7 @@ export function useClientBookingCreatePage() {
       : [];
 
     const mode = shop.locationMode ?? "fixed";
+    const leaveUnassigned = mode === "desired" || apiTeam.length === 0;
     const catalogServices = getServicesForLocationMode(
       businessProfile,
       mode,
@@ -1107,13 +1209,14 @@ export function useClientBookingCreatePage() {
       name: s.name,
       durationMins: s.durationMins,
       price: s.priceValue,
-      guestId: (mode === "desired" ? null : "p-requester") as string | null,
-      teamMemberId: mode === "desired" ? null : (apiTeam[0]?.id ?? null),
+      guestId: (leaveUnassigned ? null : "p-requester") as string | null,
+      teamMemberId: leaveUnassigned ? null : (apiTeam[0]?.id ?? null),
     }));
 
     setServices(catalogServices.slice(0, 3));
     setShopTeamMembers(apiTeam);
-    if (apiTeam[0]?.id) setSelectedTeamMemberId(apiTeam[0].id);
+    if (leaveUnassigned) setSelectedTeamMemberId("");
+    else if (apiTeam[0]?.id) setSelectedTeamMemberId(apiTeam[0].id);
     setServiceTab(getPreferredServiceTab(catalogServices.slice(0, 3)));
     setProfileHydrated(true);
   }, [
@@ -1137,9 +1240,10 @@ export function useClientBookingCreatePage() {
   React.useEffect(() => {
     if (filteredTeamMembers.some((tm) => tm.id === selectedTeamMemberId))
       return;
+    // Desired: empty selection is valid — professional will provide the team member.
+    if (isDesiredLocation && !selectedTeamMemberId) return;
     const fallbackId = filteredTeamMembers[0]?.id ?? "";
     setSelectedTeamMemberId(fallbackId);
-    // Desired: keep every service on the single active professional.
     if (isDesiredLocation && fallbackId) {
       setServices((prev) =>
         prev.map((s) => ({ ...s, teamMemberId: fallbackId })),
@@ -1201,6 +1305,34 @@ export function useClientBookingCreatePage() {
         planningDuration,
       );
     setPlanningPersonId(null);
+
+    const selectedIds = Object.entries(selectedServiceIds)
+      .filter(([, checked]) => checked)
+      .map(([id]) => id);
+    const selectedPending = services.filter(
+      (s) => !s.guestId && selectedIds.includes(s.id),
+    );
+
+    // Banner flow: select services in Unassigned, then tap a person to assign them.
+    if (selectedPending.length > 0) {
+      const idSet = new Set(selectedPending.map((s) => s.id));
+      setServices((prev) =>
+        prev.map((s) =>
+          idSet.has(s.id)
+            ? {
+                ...s,
+                guestId: personId,
+                teamMemberId: selectedTeamMemberId || s.teamMemberId || null,
+              }
+            : s,
+        ),
+      );
+      setSelectedServiceIds({});
+      setSelectedPersonId(personId);
+      setServiceTab("assigned");
+      return;
+    }
+
     setSelectedPersonId(personId);
     setSelectedServiceIds({});
     const person = people.find((p) => p.id === personId);
@@ -1320,7 +1452,7 @@ export function useClientBookingCreatePage() {
   };
 
   const assignSelectedDirect = () => {
-    if (!canDirectAssign || !selectedTeamMemberId) return;
+    if (!canDirectAssign) return;
     const ids = new Set(selectedUnassignedServices.map((s) => s.id));
     setServices((prev) =>
       prev.map((s) => {
@@ -1328,7 +1460,7 @@ export function useClientBookingCreatePage() {
         return {
           ...s,
           guestId: selectedPersonId,
-          teamMemberId: selectedTeamMemberId,
+          teamMemberId: selectedTeamMemberId || null,
         };
       }),
     );
@@ -1336,8 +1468,13 @@ export function useClientBookingCreatePage() {
   };
 
   const openAddServiceDialog = () => {
-    if (!selectedTeamMemberId && filteredTeamMembers[0]?.id) {
-      setSelectedTeamMemberId(filteredTeamMembers[0].id);
+    if (hasAssignableTeamMembers) {
+      const hasValidTeamMember = filteredTeamMembers.some(
+        (tm) => tm.id === selectedTeamMemberId,
+      );
+      if (!hasValidTeamMember && filteredTeamMembers[0]?.id) {
+        setSelectedTeamMemberId(filteredTeamMembers[0].id);
+      }
     }
     setAddServiceCatalogIds({});
     const preferredAssignee =
@@ -1350,12 +1487,12 @@ export function useClientBookingCreatePage() {
   };
 
   const confirmAddService = () => {
-    const catalog = catalogByTeamMemberId[selectedTeamMemberId] ?? [];
+    const catalog = addServiceCatalog;
     const selectedIds = Object.entries(addServiceCatalogIds)
       .filter(([, checked]) => checked)
       .map(([id]) => id);
-    if (!selectedIds.length || !addServiceGuestId || !selectedTeamMemberId)
-      return;
+    if (!selectedIds.length || !addServiceGuestId) return;
+    if (hasAssignableTeamMembers && !selectedTeamMemberId) return;
 
     const stamped: Service[] = [];
     for (const catalogId of selectedIds) {
@@ -1374,7 +1511,9 @@ export function useClientBookingCreatePage() {
         originalPrice: picked.originalPrice,
         discountPct: picked.discountPct,
         guestId: addServiceGuestId,
-        teamMemberId: selectedTeamMemberId,
+        teamMemberId: hasAssignableTeamMembers
+          ? selectedTeamMemberId || null
+          : null,
       });
     }
     if (!stamped.length) return;
@@ -1389,8 +1528,10 @@ export function useClientBookingCreatePage() {
   /** Desired: one professional for the whole booking. Fixed: only updates the picker for the next assign. */
   const applySharedTeamMember = (teamMemberId: string) => {
     setSelectedTeamMemberId(teamMemberId);
-    if (!teamMemberId || !isDesiredLocation) return;
-    setServices((prev) => prev.map((s) => ({ ...s, teamMemberId })));
+    if (!isDesiredLocation) return;
+    setServices((prev) =>
+      prev.map((s) => ({ ...s, teamMemberId: teamMemberId || null })),
+    );
   };
 
   const updateServiceTeamMember = (serviceId: string, teamMemberId: string) => {
@@ -1458,12 +1599,16 @@ export function useClientBookingCreatePage() {
       ...s,
       catalogServiceId: s.catalogServiceId ?? extractUuidFromSyntheticId(s.id),
       guestId: s.guestId ?? requesterId,
-      // Desired location: every service must use the single selected professional.
+      // Desired location: apply shared TM only when the client selected one.
       teamMemberId:
         isDesiredLocation && selectedTeamMemberId
           ? selectedTeamMemberId
           : s.teamMemberId,
     }));
+    const missingTeamMember = servicesMissingTeamMember(servicesForDraft);
+    const projectDescriptionForDraft = missingTeamMember
+      ? withTeamMemberProvidedByProNote(projectDescription)
+      : projectDescription.trim();
 
     const payload = {
       selectedDateISO: toISO(selectedDate),
@@ -1476,7 +1621,7 @@ export function useClientBookingCreatePage() {
       ...(isDesiredLocation
         ? {
             projectDetails: {
-              description: projectDescription,
+              description: projectDescriptionForDraft,
               uploads: projectUploads.map((u) => ({
                 id: u.id,
                 name: u.name,
@@ -1491,7 +1636,14 @@ export function useClientBookingCreatePage() {
               municipality: desiredVisitAddress.municipality.trim(),
             },
           }
-        : {}),
+        : missingTeamMember
+          ? {
+              projectDetails: {
+                description: projectDescriptionForDraft,
+                uploads: [],
+              },
+            }
+          : {}),
     };
 
     const prepaymentPercent = parsePrepaymentPercent(
@@ -1607,7 +1759,7 @@ export function useClientBookingCreatePage() {
         ...(isDesiredLocation
           ? {
               projectDetails: {
-                description: projectDescription,
+                description: projectDescriptionForDraft,
                 uploads: projectDetailsUploads,
               },
               desiredLocation: {
@@ -1618,7 +1770,14 @@ export function useClientBookingCreatePage() {
                 municipality: desiredVisitAddress.municipality.trim(),
               },
             }
-          : {}),
+          : missingTeamMember
+            ? {
+                projectDetails: {
+                  description: projectDescriptionForDraft,
+                  uploads: [],
+                },
+              }
+            : {}),
       };
 
       const shopForSession = shop
@@ -1778,8 +1937,6 @@ export function useClientBookingCreatePage() {
     timeValidationError,
     setTimeValidationError,
     selectedTimeTooSoon,
-    combineServices,
-    setCombineServices,
     selectedPersonId,
     setSelectedPersonId,
     selectedTeamMemberId,
@@ -1822,15 +1979,18 @@ export function useClientBookingCreatePage() {
     selectedPerson,
     isPlanningCardSelected,
     filteredTeamMembers,
+    hasAssignableTeamMembers,
     additionalGuests,
     canAddFixedLocationGuest,
     serviceAssignees,
     canAddService,
+    addServiceCatalog,
     serviceCountLabel,
     personCardSubtitle,
     updateGuestName,
     selectedServicesCount,
     allServicesAssigned,
+    needsTeamMemberProvidedByPro,
     assigned,
     unassigned,
     isModelOrGuestSelected,
