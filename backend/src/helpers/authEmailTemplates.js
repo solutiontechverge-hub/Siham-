@@ -21,11 +21,11 @@ export const buildSignupConfirmationEmail = ({ displayName }) =>
     bodyHtml: `
       <p style="margin:0 0 12px;">Hi ${escapeHtml(displayName || "there")},</p>
       <p style="margin:0;">
-        Thank you for signing up with Mollure. Your account has been created successfully.
-        Please check your inbox for a separate email to verify your email address and complete registration.
+        Your email has been verified and your Mollure account is ready.
+        Thank you for signing up — you can now log in and start using Mollure.
       </p>`,
     ctaLabel: "Go to Mollure",
-    ctaHref: getFrontendBaseUrl(),
+    ctaHref: buildLoginLink(),
   });
 
 export const buildVerifyEmailEmail = ({ token }) => {

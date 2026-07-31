@@ -26,6 +26,10 @@ export default function AccountNotApprovedPage() {
   const body =
     REASON_COPY[reason] ??
     "We are sorry to inform you but we found no record that you are a registered professional/salon.";
+  const title =
+    reason === "invalid" || reason === "missing_token" || reason === "error"
+      ? "Email verification failed"
+      : "Your Account is not Approved!";
 
   return (
     <AuthEmailScreen icon={<AuthEmailStatusIcon variant="error" />}>
@@ -37,7 +41,7 @@ export default function AccountNotApprovedPage() {
           lineHeight: 1.25,
         }}
       >
-        Your Account is not Approved!
+        {title}
       </Typography>
       <Typography
         sx={{
