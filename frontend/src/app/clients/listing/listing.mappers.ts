@@ -76,6 +76,24 @@ const parsePriceRangeMin = (priceRange: string | null | undefined): number | nul
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+/** Avoid broken labels like "From €€ EUR" when priceRange is symbols or tier text. */
+const formatPriceRangeFallbackLabel = (
+  priceRange: string | null | undefined,
+): string => {
+  const rangeMin = parsePriceRangeMin(priceRange);
+  if (rangeMin != null) return formatPriceLabel(rangeMin);
+
+  const trimmed = String(priceRange ?? "").trim();
+  if (!trimmed) return "Price on request";
+  // Currency symbols / empty junk only
+  if (!/[a-zA-Z0-9]/.test(trimmed)) return "Price on request";
+  // Qualitative tiers stored as "Low - High"
+  if (/low|medium|high/i.test(trimmed)) {
+    return trimmed.replace(/\s*-\s*/g, " – ");
+  }
+  return "Price on request";
+};
+
 const buildAddressLabel = (setup: BusinessSetupListing) => {
   const { fixedLocation, desiredLocation, locationMode } = setup;
   const fixedParts = [
@@ -120,7 +138,13 @@ const buildServices = (setup: BusinessSetupListing) => {
   const durationByServiceId = buildDurationByServiceId(setup);
 
   const fromDetails = (setup.serviceDetails ?? [])
-    .filter((detail) => detail.price != null && detail.serviceTitle)
+    .filter(
+      (detail) =>
+        detail.serviceTitle &&
+        detail.price != null &&
+        Number.isFinite(Number(detail.price)) &&
+        Number(detail.price) > 0,
+    )
     .sort((a, b) => Number(a.price) - Number(b.price))
     .slice(0, 3)
     .map((detail) => {
@@ -146,7 +170,7 @@ const buildServices = (setup: BusinessSetupListing) => {
     .slice(0, 3)
     .map((combo) => ({
       name: combo.serviceTitle as string,
-      priceLabel: setup.priceRange ? `From ${setup.priceRange} EUR` : "Price on request",
+      priceLabel: formatPriceRangeFallbackLabel(setup.priceRange),
     }));
 
   if (fromCombinations.length > 0) {
@@ -156,7 +180,7 @@ const buildServices = (setup: BusinessSetupListing) => {
   return [
     {
       name: "Services",
-      priceLabel: setup.priceRange ? `From ${setup.priceRange} EUR` : "Price on request",
+      priceLabel: formatPriceRangeFallbackLabel(setup.priceRange),
     },
   ];
 };

@@ -44,7 +44,7 @@ import { useSnackbar } from "../AppSnackbar";
 
 type Props = {
   profile: BusinessPublicProfileData;
-  member: BusinessPublicProfileTeamMember;
+  member?: BusinessPublicProfileTeamMember | null;
   locationMode: "fixed" | "desired";
   reviewerName: string;
   backHref?: string;
@@ -90,7 +90,7 @@ function toCardReview(review: ClientProfessionalReview): ProfessionalReviewItem 
 
 export default function ClientProfessionalReviewsView({
   profile,
-  member,
+  member = null,
   locationMode,
   reviewerName,
   backHref,
@@ -116,7 +116,7 @@ export default function ClientProfessionalReviewsView({
 
   const { data, isLoading, isError } = useGetReviewsQuery({
     businessSetupId: profile.shopId,
-    teamMemberId: member.id,
+    ...(member?.id ? { teamMemberId: member.id } : {}),
   });
   const [replyToReview] = useReplyToReviewMutation();
   const [deleteReviewReply] = useDeleteReviewReplyMutation();
@@ -133,7 +133,7 @@ export default function ClientProfessionalReviewsView({
 
   React.useEffect(() => {
     setFilters(buildClearedReviewFilters(filterGroups));
-  }, [filterGroups, member.id]);
+  }, [filterGroups, member?.id]);
 
   const filteredReviews = React.useMemo(
     () => filterClientReviews(reviews, filters, filterGroups),
@@ -147,6 +147,7 @@ export default function ClientProfessionalReviewsView({
   const maxDistribution = Math.max(...Object.values(allStats.distribution), 1);
   const categoryLabel =
     profile.specialties[0] ?? services[0]?.categoryTitle ?? "Beauty & Spa";
+  const scopeLabel = member?.name || profile.shopName;
 
   const handleSendReply = async (reviewId: string, message: string) => {
     if (!canReplyAsProfessional) return;
@@ -227,7 +228,7 @@ export default function ClientProfessionalReviewsView({
         <Typography
           sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.55) }}
         >
-          {categoryLabel} | {member.name}
+          {categoryLabel} | {scopeLabel}
         </Typography>
       </Stack>
 
@@ -390,7 +391,7 @@ export default function ClientProfessionalReviewsView({
                         color: alpha(m.navy, 0.45),
                       }}
                     >
-                      No reviews for {member.name} yet.
+                      No reviews for {scopeLabel} yet.
                     </Typography>
                   </Paper>
                 ) : filteredReviews.length === 0 && filtersActive ? (

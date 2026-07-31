@@ -1092,8 +1092,9 @@ export default function BusinessPublicProfile({
                       color: alpha(m.navy, 0.55),
                     }}
                   >
-                    {data.rating > 0 ? `${data.rating.toFixed(1)} · ` : ""}
-                    ({data.reviewsCount} Reviews)
+                    {data.reviewsCount > 0
+                      ? `${data.rating.toFixed(1)} · (${data.reviewsCount} Reviews)`
+                      : "No reviews yet"}
                   </Typography>
                 </Stack>
               </ButtonBase>
@@ -1689,7 +1690,9 @@ export default function BusinessPublicProfile({
                               color: alpha(m.navy, 0.5),
                             }}
                           >
-                            ({member.reviewsCount} Reviews)
+                            ({member.reviewsCount > 0
+                              ? `${member.reviewsCount} Reviews`
+                              : "No reviews"})
                           </Typography>
                         </Stack>
                       </ButtonBase>

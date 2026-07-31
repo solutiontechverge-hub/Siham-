@@ -3,6 +3,7 @@ import { body } from "express-validator";
 import {
   createReviewReply,
   getReviewInvite,
+  getBookingReviewInvite,
   listReviews,
   removeReviewReply,
   submitReviewInvite,
@@ -23,7 +24,14 @@ router.post(
   submitReviewInvite,
 );
 
-router.get("/", authenticateUser, listReviews);
+// Public read — clients browse ratings without being forced through login redirect
+router.get("/", listReviews);
+
+router.get(
+  "/booking/:bookingId/invite",
+  authenticateUser,
+  getBookingReviewInvite,
+);
 
 router.post(
   "/:id/reply",
