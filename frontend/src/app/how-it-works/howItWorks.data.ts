@@ -36,14 +36,14 @@ export const howItWorksData = {
       "Receive Invoices For Online Payment",
     ],
     businessPoints: [
-      "Register with business details",
+      "Register With Business Details",
       "Manage Profile",
-      "Project booking access",
-      "Book services for personal or Business needs",
-      "Receive tax-compliant invoices (online or offline)",
+      "Project Booking Access",
+      "Book Services For Personal Or Business Needs",
+      "Receive Tax-Compliant Invoices (Online Or Offline)",
     ],
     note:
-      "Client profile information is controlled by the client. Professional can view relevant details once a booking is confirmed and the client has been added to the client list of the professional, but professional cannot edit client user information.",
+      "Client Profile Information Is Controlled By The Client. Professional Can View Relevant Details Once A Booking Is Confirmed And The Client Has Been Added To The Client List Of The Professional, But Professional Cannot Edit Client User Information.",
   },
   professionalGettingStarted: {
     requirements: {

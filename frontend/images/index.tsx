@@ -40,3 +40,4 @@ export const HowItWorksBusinessClientIcon = require("./how-it-works/business-cli
 export const HowItWorksSuggestionForChangeIcon = require("./how-it-works/suggestion-for-change.svg");
 export const HowItWorksDesiredLocationClockIcon = require("./how-it-works/desired-location-clock.svg");
 export const HowItWorksBookingEditedBellIcon = require("./how-it-works/booking-edited-bell.svg");
+export const HowItWorksBookingCommunicationChatIcon = require("./how-it-works/booking-communication-chat.svg");
