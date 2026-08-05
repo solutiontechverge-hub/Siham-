@@ -48,7 +48,9 @@ export default function AboutFaqAccordion({
             textAlign: "center",
             color: "mollure.textcolorgrey700",
             mb: `${MOLLURE_HEADING_BODY_GAP_PX}px`,
-            fontSize: { xs: "1.5rem", sm: "1.75rem" },
+            fontSize: 30,
+            fontWeight: 700,
+            lineHeight: 1.2,
           }}
         >
           {title}

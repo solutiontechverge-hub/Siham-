@@ -8,7 +8,7 @@ import {
 export default function ProfessionalsAboutPage() {
   return (
     <MarketingShellLayout audience="professionals">
-      <AboutPageContent />
+      <AboutPageContent audience="professionals" />
     </MarketingShellLayout>
   );
 }

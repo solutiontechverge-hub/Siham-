@@ -2,8 +2,18 @@
 
 import { AboutFaqAccordion, AboutHero, AboutSplitSection } from "../about";
 import { aboutPageData } from "../../app/about/about.data";
+import type { MarketingAudience } from "./MarketingShellLayout";
 
-export function AboutPageContent() {
+export function AboutPageContent({
+  audience = "clients",
+}: {
+  audience?: MarketingAudience;
+}) {
+  const faqItems =
+    audience === "professionals"
+      ? aboutPageData.faq.professionalItems
+      : aboutPageData.faq.clientItems;
+
   return (
     <>
       <AboutHero
@@ -22,7 +32,7 @@ export function AboutPageContent() {
 
       <AboutFaqAccordion
         title={aboutPageData.faq.title}
-        items={aboutPageData.faq.items}
+        items={faqItems}
       />
     </>
   );

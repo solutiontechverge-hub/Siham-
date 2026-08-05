@@ -17,7 +17,9 @@ export const ListingImage6 = require("./Rectangle 109.svg");
 
 export const DD = require("./dd.svg");
 export const AboutHeroImage = require("./about/about-header.svg");
+export const AboutHeroPhoto = require("./about/about-hero-photo.jpg");
 export const AboutUsImage = require("./about/about-us.svg");
+export const AboutStarIcon = require("./about/about-star.svg");
 export const ContactUsImage = require("././contact-us.svg"); 
 export const ProfessionalsHeroImage = require("./profesional-landing.svg");
 

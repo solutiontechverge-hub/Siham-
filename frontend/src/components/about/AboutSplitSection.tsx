@@ -3,8 +3,7 @@
 import * as React from "react";
 import Image from "next/image";
 import { Box, Container, Stack } from "@mui/material";
-import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
-import { AboutUsImage } from "../../../images";
+import { AboutStarIcon, AboutUsImage } from "../../../images";
 import { BodyText, SubHeading } from "../ui/typography";
 import {
   MOLLURE_HEADING_BODY_GAP_PX,
@@ -18,7 +17,7 @@ type AboutSplitSectionProps = {
   paragraphs: readonly string[];
 };
 
-const GUTTER_PX = 2;
+const GAP_PX = 16;
 const OUTER_RADIUS = "32px";
 
 export default function AboutSplitSection({
@@ -38,16 +37,12 @@ export default function AboutSplitSection({
         <Box
           sx={{
             display: "grid",
-            gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-            gap: `${GUTTER_PX}px`,
-            // This gap becomes the vertical separator on desktop.
-            bgcolor: "#ffffff",
-            borderRadius: OUTER_RADIUS,
-            overflow: "hidden",
-            boxShadow: "0 16px 48px rgba(16, 35, 63, 0.08)",
+            gridTemplateColumns: { xs: "1fr", md: "35fr 65fr" },
+            gap: `${GAP_PX}px`,
+            alignItems: "stretch",
           }}
         >
-          {/* Photo column */}
+          {/* Photo column — 35% */}
           <Box
             sx={{
               position: "relative",
@@ -55,25 +50,30 @@ export default function AboutSplitSection({
               aspectRatio: { xs: "1 / 1", md: "unset" },
               minHeight: { md: 380 },
               height: { md: "100%" },
+              borderRadius: OUTER_RADIUS,
+              overflow: "hidden",
+              boxShadow: "0 16px 48px rgba(16, 35, 63, 0.08)",
             }}
           >
             <Image
               src={AboutUsImage}
               alt={imageAlt}
               fill
-              sizes="(max-width: 900px) 100vw, 50vw"
+              sizes="(max-width: 900px) 100vw, 35vw"
               style={{ objectFit: "cover", objectPosition: "center" }}
             />
           </Box>
 
-          {/* Teal copy column */}
+          {/* Teal copy column — 65% */}
           <Box
             sx={{
               bgcolor: "primary.main",
-              // color: "common.white",
               display: "flex",
               flexDirection: "column",
               minHeight: { md: "100%" },
+              borderRadius: OUTER_RADIUS,
+              overflow: "hidden",
+              boxShadow: "0 16px 48px rgba(16, 35, 63, 0.08)",
             }}
           >
             <Stack
@@ -102,14 +102,23 @@ export default function AboutSplitSection({
                 >
                   {panelTitle}
                 </SubHeading>
-                <AutoAwesomeIcon
-                  sx={{
-                    fontSize: { xs: 22, md: 26 },
-                    color: "common.white",
-                    opacity: 0.95,
-                  }}
+                <Box
+                  component="span"
                   aria-hidden
-                />
+                  sx={{
+                    width: { xs: 22, md: 26 },
+                    height: { xs: 22, md: 26 },
+                    display: "inline-flex",
+                    flexShrink: 0,
+                    "& img": {
+                      width: "100%",
+                      height: "100%",
+                      display: "block",
+                    },
+                  }}
+                >
+                  <Image src={AboutStarIcon} alt="" width={26} height={26} />
+                </Box>
               </Stack>
 
               <Stack
