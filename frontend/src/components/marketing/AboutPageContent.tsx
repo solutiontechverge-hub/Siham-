@@ -9,10 +9,13 @@ export function AboutPageContent({
 }: {
   audience?: MarketingAudience;
 }) {
-  const faqItems =
-    audience === "professionals"
-      ? aboutPageData.faq.professionalItems
-      : aboutPageData.faq.clientItems;
+  const isProfessionals = audience === "professionals";
+  const faqItems = isProfessionals
+    ? aboutPageData.faq.professionalItems
+    : aboutPageData.faq.clientItems;
+  const splitParagraphs = isProfessionals
+    ? aboutPageData.split.professionalParagraphs
+    : aboutPageData.split.clientParagraphs;
 
   return (
     <>
@@ -27,7 +30,7 @@ export function AboutPageContent({
         imageSrc={aboutPageData.split.imageSrc}
         imageAlt={aboutPageData.split.imageAlt}
         panelTitle={aboutPageData.split.panelTitle}
-        paragraphs={aboutPageData.split.paragraphs}
+        paragraphs={[...splitParagraphs]}
       />
 
       <AboutFaqAccordion

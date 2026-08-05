@@ -110,6 +110,7 @@ export default function AboutFaqAccordion({
                     pl: 4,
                     color: "text.secondary",
                     lineHeight: 1.75,
+                    whiteSpace: "pre-line",
                   }}
                 >
                   {item.answer}
