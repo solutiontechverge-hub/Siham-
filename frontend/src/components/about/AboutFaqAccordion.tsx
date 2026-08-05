@@ -35,9 +35,11 @@ export default function AboutFaqAccordion({
   return (
     <Box
       component="section"
+      id="faq"
       sx={{
         py: `${MOLLURE_SECTION_GAP_PX}px`,
         bgcolor: "mollure.surface",
+        scrollMarginTop: 96,
       }}
     >
       <Container maxWidth="md">

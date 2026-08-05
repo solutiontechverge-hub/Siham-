@@ -1,13 +1,13 @@
 "use client";
 
-import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import ArrowDropDownRoundedIcon from "@mui/icons-material/ArrowDropDownRounded";
-import CallRoundedIcon from "@mui/icons-material/CallRounded";
-import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
-import CreditCardRoundedIcon from "@mui/icons-material/CreditCardRounded";
-import FmdGoodOutlinedIcon from "@mui/icons-material/FmdGoodOutlined";
+import FmdGoodRoundedIcon from "@mui/icons-material/FmdGoodRounded";
+import ForumRoundedIcon from "@mui/icons-material/ForumRounded";
+import GppGoodRoundedIcon from "@mui/icons-material/GppGoodRounded";
+import SyncRoundedIcon from "@mui/icons-material/SyncRounded";
 import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
 import Box from "@mui/material/Box";
+import SvgIcon from "@mui/material/SvgIcon";
 import TextField from "@mui/material/TextField";
 import { useTheme } from "@mui/material/styles";
 import type { ClientFeatureIconKey } from "./clients.data";
@@ -129,20 +129,30 @@ export function FilterField({
   );
 }
 
+function PersonalBusinessIcon({ sx }: { sx?: { fontSize?: number } }) {
+  return (
+    <SvgIcon sx={sx} viewBox="0 0 24 24">
+      <path d="M3.5 21V6.75C3.5 5.78 4.28 5 5.25 5h7.5c.97 0 1.75.78 1.75 1.75V21H3.5zm3.25-11.5h2v2h-2v-2zm0 3.5h2v2h-2v-2zm0 3.5h2v2h-2v-2zm3.5-7h2v2h-2v-2zm0 3.5h2v2h-2v-2zm0 3.5h2v2h-2v-2z" />
+      <circle cx="17.75" cy="12.25" r="2.35" />
+      <path d="M17.75 15.2c-2.35 0-4.25 1.15-4.25 2.55V21h8.5v-3.25c0-1.4-1.9-2.55-4.25-2.55z" />
+    </SvgIcon>
+  );
+}
+
 export function getFeatureIcon(iconKey: ClientFeatureIconKey) {
   const iconStyles = { fontSize: 26 };
 
   switch (iconKey) {
     case "location":
-      return <FmdGoodOutlinedIcon sx={iconStyles} />;
+      return <FmdGoodRoundedIcon sx={iconStyles} />;
     case "booking":
-      return <AccessTimeRoundedIcon sx={iconStyles} />;
+      return <SyncRoundedIcon sx={iconStyles} />;
     case "communication":
-      return <CallRoundedIcon sx={iconStyles} />;
+      return <ForumRoundedIcon sx={iconStyles} />;
     case "personal":
-      return <CheckCircleRoundedIcon sx={iconStyles} />;
+      return <PersonalBusinessIcon sx={iconStyles} />;
     case "payment":
-      return <CreditCardRoundedIcon sx={iconStyles} />;
+      return <GppGoodRoundedIcon sx={iconStyles} />;
     case "verified":
       return <VerifiedRoundedIcon sx={iconStyles} />;
     default:

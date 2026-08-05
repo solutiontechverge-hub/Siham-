@@ -1,12 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { Box, Card, CardContent } from "@mui/material";
+import { Box, Card, CardContent, SvgIcon } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import BusinessRoundedIcon from "@mui/icons-material/BusinessRounded";
-import ChatBubbleRoundedIcon from "@mui/icons-material/ChatBubbleRounded";
-import PlaceRoundedIcon from "@mui/icons-material/PlaceRounded";
+import MoveToInboxRoundedIcon from "@mui/icons-material/MoveToInboxRounded";
 import SyncAltRoundedIcon from "@mui/icons-material/SyncAltRounded";
+import WifiTetheringRoundedIcon from "@mui/icons-material/WifiTetheringRounded";
 import { BodyText, CardTitle } from "../../ui/typography";
 
 export type MarketingFeatureCardIconKey =
@@ -18,19 +17,38 @@ export type MarketingFeatureCardProps = {
   description: string;
 };
 
+function LocationsNetworkIcon({ sx }: { sx?: { fontSize?: number } }) {
+  return (
+    <SvgIcon sx={sx} viewBox="0 0 24 24">
+      <path
+        fill="currentColor"
+        d="M12 3.2a1.35 1.35 0 1 1 0 2.7 1.35 1.35 0 0 1 0-2.7zm6.4 4.65a1.35 1.35 0 1 1 0 2.7 1.35 1.35 0 0 1 0-2.7zM18.4 14.9a1.35 1.35 0 1 1 0 2.7 1.35 1.35 0 0 1 0-2.7zM5.6 7.85a1.35 1.35 0 1 1 0 2.7 1.35 1.35 0 0 1 0-2.7zM5.6 14.9a1.35 1.35 0 1 1 0 2.7 1.35 1.35 0 0 1 0-2.7z"
+      />
+      <path
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        d="M12 5.7 17.2 9.1M17.2 10.7v3.9M16.9 16.4 13.1 18.6M10.9 18.6 7.1 16.4M6.8 14.6V10.7M6.8 9.1 12 5.7"
+      />
+      <circle cx="12" cy="19.15" r="1.35" fill="currentColor" />
+    </SvgIcon>
+  );
+}
+
 export function getMarketingFeatureIcon(iconKey: MarketingFeatureCardIconKey) {
   const sx = { fontSize: 18 };
   switch (iconKey) {
     case "locations":
-      return <PlaceRoundedIcon sx={sx} />;
+      return <LocationsNetworkIcon sx={sx} />;
     case "business":
-      return <BusinessRoundedIcon sx={sx} />;
+      return <MoveToInboxRoundedIcon sx={sx} />;
     case "chat":
-      return <ChatBubbleRoundedIcon sx={sx} />;
+      return <WifiTetheringRoundedIcon sx={sx} />;
     case "flow":
       return <SyncAltRoundedIcon sx={sx} />;
     default:
-      return <PlaceRoundedIcon sx={sx} />;
+      return <LocationsNetworkIcon sx={sx} />;
   }
 }
 

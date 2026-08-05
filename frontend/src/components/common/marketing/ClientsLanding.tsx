@@ -142,7 +142,7 @@ export default function ClientsLanding({
               sx={{
                 maxWidth: 900,
                 fontSize: { xs: "2.1rem", md: "3.2rem" },
-                lineHeight: 1.08,
+                lineHeight: 1.5,
                 fontWeight: 600,
                 color: tokens.textcolorgrey700,
                 letterSpacing: "-0.04em",
@@ -281,7 +281,10 @@ export default function ClientsLanding({
 
       <Box sx={{ bgcolor: tokens.surface, py: `${MOLLURE_SECTION_GAP_PX}px` }}>
         <Container maxWidth="lg">
-          <MarketingSectionHeading title={whyChooseSection.title} />
+          <MarketingSectionHeading
+            title={whyChooseSection.title}
+            titleSx={{ fontSize: 30 }}
+          />
           <Grid container spacing={2.5}>
             {whyChooseSection.items.map((item) => (
               <Grid item xs={12} md={6} lg={4} key={item.title}>
@@ -350,7 +353,10 @@ export default function ClientsLanding({
       </Box>
 
       <Container maxWidth="lg" sx={{ py: `${MOLLURE_SECTION_GAP_PX}px` }}>
-        <MarketingSectionHeading title={stepsSection.title} />
+        <MarketingSectionHeading
+          title={stepsSection.title}
+          titleSx={{ fontSize: 30, mt: 4 }}
+        />
         <Grid container spacing={2.5}>
           {stepsSection.items.map((step) => (
             <Grid item xs={12} sm={6} md={3} key={step.number}>
@@ -400,7 +406,10 @@ export default function ClientsLanding({
 
       <Box sx={{ bgcolor: tokens.surface, py: `${MOLLURE_SECTION_GAP_PX}px` }}>
         <Container maxWidth="lg">
-          <MarketingSectionHeading title={testimonialsSection.title} />
+          <MarketingSectionHeading
+            title={testimonialsSection.title}
+            titleSx={{ fontSize: 30 }}
+          />
           <TestimonialsCarousel items={[...testimonialsSection.items]} />
         </Container>
       </Box>

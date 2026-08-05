@@ -575,6 +575,7 @@ export default function ProfessionalLanding({
         <MarketingSectionHeading
           title={steps.title}
           subtitle={steps.subtitle}
+          titleSx={{ fontSize: 30, mt: 4 }}
         />
         <Grid container spacing={2.25}>
           {steps.items.map((s) => (
