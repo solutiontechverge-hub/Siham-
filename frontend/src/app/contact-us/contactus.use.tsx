@@ -18,6 +18,8 @@ export type ContactUsFieldErrors = Partial<
   Record<keyof ContactUsFormValues, string>
 >;
 
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+
 const initialValues: ContactUsFormValues = {
   persona: "Client",
   name: "",
@@ -69,6 +71,9 @@ export function useContactUsForm() {
   const [submitState, setSubmitState] = React.useState<
     "idle" | "submitting" | "success"
   >("idle");
+  const [attachmentError, setAttachmentError] = React.useState<
+    string | undefined
+  >();
 
   const setField = React.useCallback(
     <K extends keyof ContactUsFormValues>(
@@ -90,13 +95,23 @@ export function useContactUsForm() {
 
   const addFiles = React.useCallback((files: FileList | null) => {
     if (!files?.length) return;
+    const list = Array.from(files);
+    const tooLarge = list.find((file) => file.size > MAX_ATTACHMENT_BYTES);
+    if (tooLarge) {
+      setAttachmentError(
+        `"${tooLarge.name}" is too large. Maximum size is 10 MB.`,
+      );
+      return;
+    }
+    setAttachmentError(undefined);
     setValues((prev) => ({
       ...prev,
-      attachments: [...prev.attachments, ...Array.from(files)],
+      attachments: [...prev.attachments, ...list],
     }));
   }, []);
 
   const removeFile = React.useCallback((idx: number) => {
+    setAttachmentError(undefined);
     setValues((prev) => ({
       ...prev,
       attachments: prev.attachments.filter((_, i) => i !== idx),
@@ -147,6 +162,7 @@ export function useContactUsForm() {
     touch,
     addFiles,
     removeFile,
+    attachmentError,
     submit,
     submitState,
     showSignInGate,

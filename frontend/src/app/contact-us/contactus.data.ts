@@ -21,7 +21,7 @@ export const contactUsData = {
         "Partnership / Collaboration",
       ],
     },
-    message: { label: "Message", placeholder: "Sara" },
+    message: { label: "Message", placeholder: "write a message" },
     consent: {
       label:
         "I agree to the processing of my data for support pursuant to the Privacy Policy",
