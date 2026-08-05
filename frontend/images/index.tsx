@@ -22,6 +22,12 @@ export const AboutUsImage = require("./about/about-us.svg");
 export const AboutStarIcon = require("./about/about-star.svg");
 export const ContactUsImage = require("././contact-us.svg"); 
 export const ProfessionalsHeroImage = require("./profesional-landing.svg");
+export const CombinableServicesIcon = require("./professionals/combinable-services-icon.png");
+export const ProjectBookingsIcon = require("./professionals/project-bookings-icon.png");
+export const BookingRequestIcon = require("./professionals/booking-request-icon.png");
+export const EditedBookingIcon = require("./professionals/edited-booking-icon.png");
+export const EditConfirmedIcon = require("./professionals/edit-confirmed-icon.png");
+export const TaxCompliantInvoiceIcon = require("./professionals/tax-compliant-invoice-icon.png");
 
 export const SignupBg = require("./signup-bg.svg");
 export const SignupLs = require("./signup-ls.svg");
