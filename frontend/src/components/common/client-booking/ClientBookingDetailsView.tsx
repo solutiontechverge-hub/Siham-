@@ -1945,6 +1945,7 @@ export default function ClientBookingDetailsView({
         >
           <ClientBookingDetailsHeader
             bookingRef={bookingRef}
+            apiBookingId={activeBooking?.apiBookingId}
             bookedDateLabel={bookedDateLabel}
             bookedTimeLabel={bookedTimeLabel}
             bookingStatus={bookingStatus}

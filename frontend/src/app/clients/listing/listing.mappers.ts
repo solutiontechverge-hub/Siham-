@@ -84,6 +84,24 @@ const parsePriceRangeMin = (priceRange: string | null | undefined): number | nul
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 };
 
+/** Avoid broken labels like "From €€ EUR" when priceRange is symbols or tier text. */
+const formatPriceRangeFallbackLabel = (
+  priceRange: string | null | undefined,
+): string => {
+  const rangeMin = parsePriceRangeMin(priceRange);
+  if (rangeMin != null) return formatPriceLabel(rangeMin);
+
+  const trimmed = String(priceRange ?? "").trim();
+  if (!trimmed) return "Price on request";
+  // Currency symbols / empty junk only
+  if (!/[a-zA-Z0-9]/.test(trimmed)) return "Price on request";
+  // Qualitative tiers stored as "Low - High"
+  if (/low|medium|high/i.test(trimmed)) {
+    return trimmed.replace(/\s*-\s*/g, " – ");
+  }
+  return "Price on request";
+};
+
 const buildAddressLabel = (setup: BusinessSetupListing) => {
   const { fixedLocation, desiredLocation, locationMode } = setup;
   const fixedParts = [
@@ -202,10 +220,19 @@ const buildServices = (setup: BusinessSetupListing) => {
     .slice(0, 3)
     .map((combo) => ({
       name: combo.serviceTitle as string,
-      priceLabel: "Price on request",
+      priceLabel: formatPriceRangeFallbackLabel(setup.priceRange),
     }));
 
-  return fromCombinations;
+  if (fromCombinations.length > 0) {
+    return fromCombinations;
+  }
+
+  return [
+    {
+      name: "Services",
+      priceLabel: formatPriceRangeFallbackLabel(setup.priceRange),
+    },
+  ];
 };
 
 const resolveStartingFromLabel = (

@@ -422,7 +422,9 @@ export default function ClientListingCard({
               ))}
             </Box>
             <Typography sx={{ fontSize: 11, color: alpha(tokens.navy, 0.55) }}>
-              {item.reviewsCount} Reviews · {item.rating.toFixed(1)}
+              {item.reviewsCount > 0
+                ? `${item.reviewsCount} Review${item.reviewsCount === 1 ? "" : "s"} · ${item.rating.toFixed(1)}`
+                : "No reviews yet"}
             </Typography>
           </Box>
 

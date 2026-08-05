@@ -21,7 +21,8 @@ export default function VerifyEmailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [message, setMessage] = React.useState("Verifying your email…");
-  const token = searchParams.get("token");
+  const token = searchParams.get("token")?.trim() || "";
+  const startedRef = React.useRef(false);
 
   React.useEffect(() => {
     if (!token) {
@@ -29,12 +30,17 @@ export default function VerifyEmailPage() {
       return;
     }
 
+    // Prevent double-submit in React Strict Mode (dev) which would race the one-time token.
+    if (startedRef.current) return;
+    startedRef.current = true;
+
     const verify = async () => {
       try {
         const response = await fetch(
           apiUrl(`/api/auth/verify-email?token=${encodeURIComponent(token)}`),
           {
             method: "GET",
+            cache: "no-store",
           },
         );
         const payload = (await response.json()) as {

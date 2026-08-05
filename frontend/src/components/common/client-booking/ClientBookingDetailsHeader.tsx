@@ -27,6 +27,7 @@ import type {
   BookingRequestDirection,
   ClientBookingStatus,
 } from "../../../app/clients/booking/clientBookingRecords";
+import { useLazyGetBookingReviewInviteQuery } from "../../../store/services/reviewsApi";
 import BookingRequestStatusRow, {
   type BookingRequestRowMode,
 } from "./BookingRequestStatusRow";
@@ -36,9 +37,12 @@ import {
   professionalSuggestBookingChanges,
 } from "./bookingEditRequest";
 import { useBookingEditRequest } from "./useBookingEditRequest";
+import { useRouter } from "next/navigation";
 
 type Props = {
   bookingRef: string;
+  /** Backend booking UUID — required for in-app review invite. */
+  apiBookingId?: string;
   bookedDateLabel?: string;
   bookedTimeLabel?: string;
   bookingStatus?: ClientBookingStatus;
@@ -74,6 +78,7 @@ type Props = {
 
 export default function ClientBookingDetailsHeader({
   bookingRef,
+  apiBookingId,
   bookedDateLabel = "",
   bookedTimeLabel = "",
   bookingStatus = "confirmed",
@@ -96,7 +101,10 @@ export default function ClientBookingDetailsHeader({
   messagingHref,
 }: Props) {
   const m = useTheme().palette.mollure;
+  const router = useRouter();
   const { showSnackbar } = useSnackbar();
+  const [fetchReviewInvite] = useLazyGetBookingReviewInviteQuery();
+  const [reviewOpening, setReviewOpening] = React.useState(false);
   const messagingWidget = useMessagingWidgetOptional();
   const [openMessagingForBooking] = useOpenMessagingForBookingMutation();
   const [editAnchor, setEditAnchor] = React.useState<HTMLElement | null>(null);
@@ -216,6 +224,47 @@ export default function ClientBookingDetailsHeader({
     editRequest.isEditGrantActive &&
     Boolean(onEditDateTime || onEditBookingDetails || onEditProject);
   const [erNoteOpen, setErNoteOpen] = React.useState(false);
+
+  const handleWriteReview = async () => {
+    if (!apiBookingId) {
+      showSnackbar({
+        severity: "warning",
+        message: "This booking is not ready for a review yet.",
+      });
+      return;
+    }
+    setReviewOpening(true);
+    try {
+      const result = await fetchReviewInvite(apiBookingId).unwrap();
+      const invite = result.data;
+      if (invite.alreadySubmitted) {
+        showSnackbar({
+          severity: "info",
+          message: "You already submitted a review for this booking.",
+        });
+        return;
+      }
+      if (invite.expired) {
+        showSnackbar({
+          severity: "warning",
+          message: "This review invite has expired.",
+        });
+        return;
+      }
+      router.push(
+        `/reviews/write?token=${encodeURIComponent(invite.inviteToken)}`,
+      );
+    } catch (err) {
+      showSnackbar({
+        severity: "error",
+        message:
+          (err as { data?: { message?: string } })?.data?.message ||
+          "Could not open the review form.",
+      });
+    } finally {
+      setReviewOpening(false);
+    }
+  };
 
   const headerActionBtnSx = {
     borderRadius: "8px",
@@ -356,6 +405,16 @@ export default function ClientBookingDetailsHeader({
                   sx={headerActionBtnSx}
                 >
                   Discard
+                </AppButton>
+              ) : null}
+              {isCompleted && apiBookingId ? (
+                <AppButton
+                  tone="primary"
+                  onClick={() => void handleWriteReview()}
+                  disabled={reviewOpening}
+                  sx={headerActionBtnSx}
+                >
+                  {reviewOpening ? "Opening…" : "Write a review"}
                 </AppButton>
               ) : null}
               {canDelete ? (
