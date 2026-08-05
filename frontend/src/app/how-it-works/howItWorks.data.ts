@@ -72,6 +72,111 @@ export const howItWorksData = {
       ],
     },
   },
+  professionalBookingTypes: {
+    online: {
+      title: "Online Bookings",
+      intro:
+        "Online bookings can be created by the client or the professional.",
+      points: [
+        "Always include at least one Mollure client (a registered client with an active Mollure account).",
+        "Follow Mollure’s interactive booking process.",
+      ],
+    },
+    offline: {
+      title: "Offline Bookings",
+      intro:
+        "Offline bookings are created directly by the professional and are confirmed immediately. There are two types of offline bookings:",
+      nonMollure: {
+        title: "Offline booking with a non-Mollure client:",
+        points: [
+          "The professional creates and manages the client profile.",
+          "The client does not have a Mollure account.",
+        ],
+      },
+      guest: {
+        title: "Guest booking:",
+        points: ["No client profile is created."],
+      },
+    },
+  },
+  professionalServiceLocationSetup: {
+    title: "Service Location Setup",
+    subtitle:
+      "Each service location type comes with specific booking capabilities. Below is an overview of the key features available per location.",
+    fixedLocation: {
+      intro: "Bookings take place at the professional's location.",
+      features: [
+        {
+          title: "Flexible Client & Guest Setup",
+          sub: "Add a client with guests, or create a booking with guests only",
+        },
+        {
+          title: "Service Timing Logic",
+          sub: "Follow-up or sequential",
+        },
+        {
+          title: "Team Member Assignment",
+          sub: "Assign different team members per service",
+        },
+        {
+          title: "Scheduling Controls",
+          sub: "Override time interval between bookings if set",
+        },
+      ] satisfies readonly HowItWorksInfoRow[],
+    },
+    desiredLocation: {
+      intro: "Services take place at a location of the client’s choice.",
+      standard: [
+        {
+          title: "Client & Guest Setup",
+          sub: "Add a client with guests, or create a booking with guests only",
+        },
+        {
+          title: "Service Timing Logic",
+          sub: "Follow-up or sequential",
+        },
+        {
+          title: "Team Member Assignment",
+          sub: "Assign different team members per service",
+        },
+        {
+          title: "Scheduling Controls",
+          sub: "Override time interval set between bookings",
+        },
+        {
+          title: "Add Buffer",
+          sub: "Add internal buffer time if needed",
+        },
+      ] satisfies readonly HowItWorksInfoRow[],
+      project: [
+        {
+          title: "Client & Model Setup",
+          sub: "Add the client and as many model as needed",
+        },
+        {
+          title: "Service Timing Logic",
+          sub: "Follow-up or sequential",
+        },
+        {
+          title: "Team Member Assignment",
+          sub: "Assign different team members per service",
+        },
+        {
+          title: "Scheduling Controls",
+          sub: "Override time interval between bookings and minimum timeslot block if set",
+        },
+        {
+          title: "Add Buffer & Planning",
+          sub: "Add planning details and internal buffer time",
+        },
+        {
+          title: "Project Details & File Uploads",
+          sub: "Include comprehensive project information",
+        },
+      ] satisfies readonly HowItWorksInfoRow[],
+    },
+    note: "Fixed and desired location online bookings are always sent as a booking request when created by the professional.",
+  },
   keyPrinciples: [
     {
       title: "Client-Created Bookings",
