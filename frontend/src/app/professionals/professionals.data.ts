@@ -6,6 +6,11 @@ export type ProfessionalFeatureIconKey =
   | "chat"
   | "flow";
 
+export type ProfessionalResultIconKey =
+  | "moreBookings"
+  | "onePlace"
+  | "moreTime";
+
 export type ProfessionalFeature = {
   iconKey: ProfessionalFeatureIconKey;
   title: string;
@@ -13,7 +18,7 @@ export type ProfessionalFeature = {
 };
 
 export type ProfessionalResultCard = {
-  iconKey: ProfessionalFeatureIconKey;
+  iconKey: ProfessionalResultIconKey;
   title: string;
   description: string;
 };
@@ -31,13 +36,14 @@ export const professionalsPageData = {
     title: "Let Mollure Work\nFor You",
     description:
       "Manage Appointments, Payments And Customer\nCommunication, All In One Place.",
-    primaryAction: "Get started",
+    primaryAction: "Get Started",
+    primaryActionHref: "/auth/login",
     imageSrc: "/professionals/hero.png",
     heroCards: [
-      { title: "Built for", subtitle: "professionals" },
-      { title: "Structured", subtitle: "bookings" },
-      { title: "Direct", subtitle: "communication" },
-      { title: "Business", subtitle: "ready" },
+      { title: "Built for", subtitle: "Salons & Freelancers" },
+      { title: "Structured", subtitle: "Booking logic" },
+      { title: "Direct", subtitle: "Payouts" },
+      { title: "Business", subtitle: "Project support" },
     ],
   },
   whyChoose: {
@@ -46,22 +52,26 @@ export const professionalsPageData = {
       {
         iconKey: "locations",
         title: "Flexible Service Location",
-        description: "Offer salon, on-location, or client-requested bookings with clarity.",
+        description:
+          "Offer services at fixed locations and/or locations of your choice.",
       },
       {
         iconKey: "business",
         title: "Built For Individual & Company Clients",
-        description: "Handle both personal clients and business bookings in one flow.",
+        description:
+          "Support regular bookings and project bookings for company clients, with client-specific, tax-compliant invoices.",
       },
       {
         iconKey: "chat",
         title: "Built-in Communication",
-        description: "Keep every conversation connected to the booking—no lost context.",
+        description:
+          "Communicate with clients through in-platform conversations, with messages linked to bookings when relevant.",
       },
       {
         iconKey: "flow",
         title: "Interactive Booking Flow",
-        description: "Approve meaningful changes, confirm details, and stay in control.",
+        description:
+          "Professionals and clients can both create and confirm bookings, making complex requests easier to manage.",
       },
     ] satisfies readonly ProfessionalFeature[],
   },
@@ -71,19 +81,22 @@ export const professionalsPageData = {
       "Join thousands of salon owners and freelancers who are saving time and growing revenue.",
     items: [
       {
-        iconKey: "locations",
+        iconKey: "moreBookings",
         title: "More Bookings, Fewer Gaps",
-        description: "Stay discoverable and fill your calendar with better scheduling.",
+        description:
+          "Fill your agenda more consistently with a smoother booking flow and fewer back-and-forths.",
       },
       {
-        iconKey: "business",
+        iconKey: "onePlace",
         title: "Everything in One Place",
-        description: "Bookings, chat, changes, and payments—organized and searchable.",
+        description:
+          "See bookings, clients, payments, and messages at a glance, no switching between tools.",
       },
       {
-        iconKey: "chat",
+        iconKey: "moreTime",
         title: "More Time For What You Love",
-        description: "Reduce admin work so you can focus on clients and craft.",
+        description:
+          "Spend less time on admin and more time focusing on your clients and your work.",
       },
     ] satisfies readonly ProfessionalResultCard[],
   },
@@ -123,12 +136,30 @@ export const professionalsPageData = {
   },
   steps: {
     title: "Let’s Get Started",
-    subtitle: "Get started in three simple steps",
+    subtitle: "Get started in four simple steps",
     items: [
-      { number: "1", title: "Sign Up", description: "Create your professional account." },
-      { number: "2", title: "Find A Professional", description: "Set up your services and profile." },
-      { number: "3", title: "Set Up Your Booking", description: "Choose your booking types and availability." },
-      { number: "4", title: "Get Confirmation", description: "Start receiving bookings and confirmations." },
+      {
+        number: "1",
+        title: "Sign Up",
+        description: "Create a personal or business account.",
+      },
+      {
+        number: "2",
+        title: "Find A Professional",
+        description: "Browse verified beauty & grooming experts.",
+      },
+      {
+        number: "3",
+        title: "Set Up Your Booking",
+        description:
+          "Choose date, location, and services, instant or request-based.",
+      },
+      {
+        number: "4",
+        title: "Get Confirmation",
+        description:
+          "Confirm instantly or after review. Manage updates and payments in one place.",
+      },
     ] satisfies readonly ProfessionalStep[],
   },
   cta: {

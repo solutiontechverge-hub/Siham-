@@ -3,6 +3,7 @@
 import AppButton from "../AppButton";
 import * as React from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   Box,
   Card,
@@ -152,33 +153,57 @@ export default function ProfessionalLanding({
           <Grid container spacing={{ xs: 4, md: 2 }} alignItems="center">
             <Grid item xs={12} md={7}>
               <Stack
-                spacing={2.5}
-                sx={{ maxWidth: 600, pt: { md: 2.25 }, pb: { md: 10 } }}
+                spacing={0}
+                sx={{ maxWidth: 520, pt: { md: 1.5 }, pb: { md: 8 } }}
               >
                 <Chip
                   label={hero.eyebrow}
                   sx={{
                     alignSelf: "flex-start",
-                    bgcolor: "mollure.chipBg",
+                    bgcolor: "#FFFFFF",
                     color: "mollure.tealDark",
                     borderRadius: 999,
                     fontWeight: 500,
                     fontSize: 12,
-                    height: 24,
-                    px: 0.95,
+                    height: 28,
+                    px: 1.1,
+                    mb: 1.75,
+                    boxShadow: "0 1px 2px rgba(45, 67, 97, 0.06)",
                   }}
                 />
-                <MarketingHeroTitle>{hero.title}</MarketingHeroTitle>
-                <MarketingHeroDescription>
+                <MarketingHeroTitle
+                  sx={{
+                    fontSize: "40px",
+                    fontWeight: 700,
+                    lineHeight: 1.2,
+                    letterSpacing: "-0.02em",
+                    color: "#2D4361",
+                  }}
+                >
+                  {hero.title}
+                </MarketingHeroTitle>
+                <MarketingHeroDescription
+                  sx={{
+                    mt: "14px",
+                    maxWidth: 440,
+                    fontSize: 16,
+                    fontWeight: 400,
+                    lineHeight: 1.55,
+                    color: alpha(tokens.navy, 0.7),
+                  }}
+                >
                   {hero.description}
                 </MarketingHeroDescription>
                 <AppButton
+                  component={Link}
+                  href={hero.primaryActionHref ?? "/auth/login"}
                   variant="contained"
                   disableElevation
                   sx={{
                     width: "fit-content",
-                    px: 3.1,
-                    py: 1.1,
+                    mt: 3,
+                    px: 3.25,
+                    py: 1.15,
                     borderRadius: "10px",
                     textTransform: "none",
                     color: "common.white",
@@ -306,7 +331,10 @@ export default function ProfessionalLanding({
 
       {/* Why choose */}
       <Container maxWidth="lg" sx={{ py: `${MOLLURE_SECTION_GAP_PX}px` }}>
-        <MarketingSectionHeading title={whyChoose.title} />
+        <MarketingSectionHeading
+          title={whyChoose.title}
+          titleSx={{ fontSize: "30px", fontWeight: 700 }}
+        />
         <Grid container spacing={2.25}>
           {whyChoose.items.map((item) => (
             <Grid key={item.title} item xs={12} md={6}>
@@ -328,7 +356,9 @@ export default function ProfessionalLanding({
         }}
       >
         <Container maxWidth="lg">
-          <MarketingSectionTitle>{results.title}</MarketingSectionTitle>
+          <MarketingSectionTitle sx={{ fontSize: "30px", fontWeight: 700 }}>
+            {results.title}
+          </MarketingSectionTitle>
           <MarketingSectionSubtitle>
             {results.subtitle}
           </MarketingSectionSubtitle>

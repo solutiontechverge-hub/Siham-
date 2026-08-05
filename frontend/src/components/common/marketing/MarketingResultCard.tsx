@@ -1,16 +1,34 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import { Box, Card, CardContent } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import type { MarketingFeatureCardIconKey } from "./MarketingFeatureCard";
-import { getMarketingFeatureIcon } from "./MarketingFeatureCard";
+import type { ProfessionalResultIconKey } from "../../../app/professionals/professionals.data";
 import { BodyText, CardTitle } from "../../ui/typography";
 
 export type MarketingResultCardProps = {
-  iconKey: MarketingFeatureCardIconKey;
+  iconKey: ProfessionalResultIconKey;
   title: string;
   description: string;
+};
+
+const RESULT_ICONS: Record<
+  ProfessionalResultIconKey,
+  { src: string; alt: string }
+> = {
+  moreTime: {
+    src: "/professionals/results/more-time.png",
+    alt: "More time",
+  },
+  moreBookings: {
+    src: "/professionals/results/more-bookings.png",
+    alt: "More bookings",
+  },
+  onePlace: {
+    src: "/professionals/results/one-place.png",
+    alt: "Everything in one place",
+  },
 };
 
 export default function MarketingResultCard({
@@ -19,8 +37,7 @@ export default function MarketingResultCard({
   description,
 }: MarketingResultCardProps) {
   const m = useTheme().palette.mollure;
-
-  const icon = getMarketingFeatureIcon(iconKey);
+  const icon = RESULT_ICONS[iconKey];
 
   return (
     <Card
@@ -36,17 +53,20 @@ export default function MarketingResultCard({
       <CardContent sx={{ p: { xs: 2.5, md: 3 } }}>
         <Box
           sx={{
-            width: 36,
-            height: 36,
-            borderRadius: "50%",
-            bgcolor: alpha(m.teal, 0.1),
-            color: m.teal,
-            display: "grid",
-            placeItems: "center",
+            width: 40,
+            height: 40,
             mb: 1.4,
+            position: "relative",
+            flexShrink: 0,
           }}
         >
-          {icon}
+          <Image
+            src={icon.src}
+            alt={icon.alt}
+            fill
+            sizes="40px"
+            style={{ objectFit: "contain" }}
+          />
         </Box>
         <CardTitle
           sx={{
