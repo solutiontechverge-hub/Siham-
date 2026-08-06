@@ -658,7 +658,7 @@ export default function ProfessionalSignupPage() {
                             error={Boolean(errors.contactFirstName)}
                             helperText={errors.contactFirstName}
                             required
-                            placeholder="e.g. Jane"
+                            placeholder="Enter your first name"
                           />
                         </Grid>
                         <Grid item xs={12} sm={6}>
@@ -671,7 +671,7 @@ export default function ProfessionalSignupPage() {
                             error={Boolean(errors.contactLastName)}
                             helperText={errors.contactLastName}
                             required
-                            placeholder="e.g. Doe"
+                            placeholder="Enter your last name"
                           />
                         </Grid>
                         <Grid item xs={12}>
@@ -686,7 +686,7 @@ export default function ProfessionalSignupPage() {
                             helperText={errors.contactEmail}
                             required
                             autoComplete="email"
-                            placeholder="you@gmail.com"
+                            placeholder="Enter your email address"
                           />
                         </Grid>
                         <Grid item xs={12} sm={6}>
@@ -700,7 +700,7 @@ export default function ProfessionalSignupPage() {
                             helperText={errors.password}
                             required
                             autoComplete="new-password"
-                            placeholder="Enter password"
+                            placeholder="Create a password"
                           />
                         </Grid>
                         <Grid item xs={12} sm={6}>
@@ -714,7 +714,7 @@ export default function ProfessionalSignupPage() {
                             helperText={errors.confirmPassword}
                             required
                             autoComplete="new-password"
-                            placeholder="Confirm password"
+                            placeholder="Re-enter your password"
                           />
                         </Grid>
                         <Grid item xs={12}>
@@ -724,6 +724,12 @@ export default function ProfessionalSignupPage() {
                     </Box>
 
                     <FormControlLabel
+                      sx={{
+                        alignItems: "center",
+                        ml: 0,
+                        gap: 0.5,
+                        "& .MuiFormControlLabel-label": { mt: 0 },
+                      }}
                       control={
                         <Checkbox
                           size="small"
@@ -731,6 +737,7 @@ export default function ProfessionalSignupPage() {
                           onChange={handleChange}
                           name="acceptTerms"
                           sx={{
+                            p: 0.5,
                             color: alpha(m.navy, 0.35),
                             "&.Mui-checked": { color: m.teal },
                           }}
@@ -741,10 +748,11 @@ export default function ProfessionalSignupPage() {
                           component="span"
                           sx={{
                             fontSize: "0.875rem",
+                            lineHeight: 1.4,
                             color: alpha(m.navy, 0.55),
                           }}
                         >
-                          Accept our{" "}
+                          Accept{" "}
                           <Link
                             href="/terms-and-conditions"
                             style={{
@@ -753,7 +761,18 @@ export default function ProfessionalSignupPage() {
                               textDecoration: "underline",
                             }}
                           >
-                            Terms & Conditions
+                            terms and conditions
+                          </Link>
+                          {" & "}
+                          <Link
+                            href="/policies"
+                            style={{
+                              color: m.teal,
+                              fontWeight: 600,
+                              textDecoration: "underline",
+                            }}
+                          >
+                            Policies
                           </Link>
                           <Typography
                             component="span"

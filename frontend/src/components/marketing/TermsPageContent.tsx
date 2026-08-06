@@ -6,7 +6,18 @@ import { BodyText, MainHeading, SubHeading } from "../ui/typography";
 import { termsPageData } from "../../app/terms-and-conditions/terms.data";
 import { MOLLURE_SECTION_GAP_PX } from "../../theme/spacing";
 
-export function TermsPageContent() {
+export type LegalPageData = {
+  title: string;
+  lastUpdated: string;
+  intro: string;
+  sections: ReadonlyArray<{
+    id: string;
+    heading: string;
+    paragraphs: ReadonlyArray<string>;
+  }>;
+};
+
+export function LegalPageContent({ data }: { data: LegalPageData }) {
   const theme = useTheme();
   const m = theme.palette.mollure;
 
@@ -30,18 +41,18 @@ export function TermsPageContent() {
         >
           <Stack spacing={1.25} sx={{ mb: 3.5 }}>
             <MainHeading component="h1" sx={{ fontSize: { xs: 28, sm: 34 } }}>
-              {termsPageData.title}
+              {data.title}
             </MainHeading>
             <BodyText sx={{ color: alpha(m.navy, 0.55), fontSize: 14 }}>
-              Last updated: {termsPageData.lastUpdated}
+              Last updated: {data.lastUpdated}
             </BodyText>
             <BodyText sx={{ color: alpha(m.navy, 0.78), mt: 1 }}>
-              {termsPageData.intro}
+              {data.intro}
             </BodyText>
           </Stack>
 
           <Stack spacing={3.25}>
-            {termsPageData.sections.map((section) => (
+            {data.sections.map((section) => (
               <Box key={section.id} component="section">
                 <SubHeading
                   component="h2"
@@ -66,4 +77,8 @@ export function TermsPageContent() {
       </Container>
     </Box>
   );
+}
+
+export function TermsPageContent() {
+  return <LegalPageContent data={termsPageData} />;
 }

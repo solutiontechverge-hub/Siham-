@@ -58,7 +58,7 @@ function CountryCodeMenuItem({
       direction="row"
       spacing={1}
       alignItems="center"
-      sx={{ width: "100%", minWidth: 0 }}
+      sx={{ width: "100%", minWidth: 0, lineHeight: 1.2 }}
     >
       <Box
         component="span"
@@ -68,13 +68,23 @@ function CountryCodeMenuItem({
           width: 22,
           textAlign: "center",
           flexShrink: 0,
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
         }}
       >
         {countryFlagEmoji(iso)}
       </Box>
       <Typography
         component="span"
-        sx={{ fontWeight: 700, fontSize: 14, flexShrink: 0 }}
+        sx={{
+          fontWeight: 700,
+          fontSize: 14,
+          flexShrink: 0,
+          lineHeight: 1.2,
+          display: "inline-flex",
+          alignItems: "center",
+        }}
       >
         {dialCode}
       </Typography>
@@ -86,6 +96,9 @@ function CountryCodeMenuItem({
           overflow: "hidden",
           textOverflow: "ellipsis",
           whiteSpace: "nowrap",
+          lineHeight: 1.2,
+          display: "inline-flex",
+          alignItems: "center",
         }}
       >
         {name}
@@ -107,7 +120,12 @@ function CountryCodeSelectedValue({ value }: { value: string }) {
     >
       <Box
         component="span"
-        sx={{ fontSize: 16, lineHeight: 1, display: "inline-flex", alignItems: "center" }}
+        sx={{
+          fontSize: 16,
+          lineHeight: 1,
+          display: "inline-flex",
+          alignItems: "center",
+        }}
       >
         {countryFlagEmoji(entry.iso)}
       </Box>
@@ -130,11 +148,84 @@ export default function AppCountryCodeSelect({
   const selectValue = resolveCountrySelectValue(value);
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
+  const [highlightIndex, setHighlightIndex] = React.useState(0);
+  const itemRefs = React.useRef<Array<HTMLLIElement | null>>([]);
 
   const query = search.trim();
   const visibleCountries = COUNTRY_DIAL_CODES.filter((entry) =>
     matchesCountrySearch(entry, query),
   );
+
+  React.useEffect(() => {
+    setHighlightIndex(0);
+    itemRefs.current = [];
+  }, [query, menuOpen]);
+
+  React.useEffect(() => {
+    if (!menuOpen || visibleCountries.length === 0) return;
+    const el = itemRefs.current[highlightIndex];
+    el?.scrollIntoView({ block: "nearest" });
+  }, [highlightIndex, menuOpen, visibleCountries.length]);
+
+  const selectCountryAt = React.useCallback(
+    (index: number) => {
+      const entry = visibleCountries[index];
+      if (!entry) return;
+      onChange(dialCodeFromSelectValue(countryDialOptionValue(entry)));
+      setMenuOpen(false);
+      setSearch("");
+      setHighlightIndex(0);
+    },
+    [onChange, visibleCountries],
+  );
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Escape") return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      e.stopPropagation();
+      if (visibleCountries.length === 0) return;
+      setHighlightIndex((prev) =>
+        Math.min(prev + 1, visibleCountries.length - 1),
+      );
+      return;
+    }
+
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      e.stopPropagation();
+      if (visibleCountries.length === 0) return;
+      setHighlightIndex((prev) => Math.max(prev - 1, 0));
+      return;
+    }
+
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+      if (visibleCountries.length === 0) return;
+      selectCountryAt(highlightIndex);
+      return;
+    }
+
+    if (e.key === "Home") {
+      e.preventDefault();
+      e.stopPropagation();
+      if (visibleCountries.length === 0) return;
+      setHighlightIndex(0);
+      return;
+    }
+
+    if (e.key === "End") {
+      e.preventDefault();
+      e.stopPropagation();
+      if (visibleCountries.length === 0) return;
+      setHighlightIndex(visibleCountries.length - 1);
+      return;
+    }
+
+    e.stopPropagation();
+  };
 
   return (
     <AppTextField
@@ -151,9 +242,11 @@ export default function AppCountryCodeSelect({
         onClose: () => {
           setMenuOpen(false);
           setSearch("");
+          setHighlightIndex(0);
         },
         MenuProps: {
           autoFocus: false,
+          disableAutoFocusItem: true,
           PaperProps: { sx: { maxHeight: 360 } },
         },
         renderValue: (selected) => {
@@ -176,13 +269,19 @@ export default function AppCountryCodeSelect({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onClear={() => setSearch("")}
-          onKeyDown={(e) => {
-            if (e.key !== "Escape") e.stopPropagation();
-          }}
+          onKeyDown={handleSearchKeyDown}
           onClick={(e) => e.stopPropagation()}
         />
       </ListSubheader>
-      <MenuItem value="">
+      <MenuItem
+        value=""
+        sx={{
+          minHeight: 40,
+          py: 1,
+          alignItems: "center",
+          display: "flex",
+        }}
+      >
         <em>{placeholder}</em>
       </MenuItem>
       {visibleCountries.length === 0 ? (
@@ -202,10 +301,21 @@ export default function AppCountryCodeSelect({
           No countries found
         </ListSubheader>
       ) : (
-        visibleCountries.map((entry) => (
+        visibleCountries.map((entry, index) => (
           <MenuItem
             key={countryDialOptionValue(entry)}
             value={countryDialOptionValue(entry)}
+            selected={index === highlightIndex}
+            ref={(el) => {
+              itemRefs.current[index] = el;
+            }}
+            onMouseEnter={() => setHighlightIndex(index)}
+            sx={{
+              minHeight: 40,
+              py: 1,
+              alignItems: "center",
+              display: "flex",
+            }}
           >
             <CountryCodeMenuItem
               iso={entry.iso}

@@ -710,7 +710,7 @@ export default function ClientProfilePageView() {
                       <MollureLabeledField
                         name="phone"
                         fieldLabel="Phone"
-                        placeholder="Enter phone number"
+                        placeholder="Enter your phone number"
                         value={form.phone}
                         onChange={handleChange}
                         disabled={fieldsDisabled}
@@ -755,7 +755,7 @@ export default function ClientProfilePageView() {
                 </Grid>
               </Grid>
 
-              <Box sx={{ mt: 2 }}>
+              <Box sx={{ mt: 2, display: "flex", flexWrap: "wrap", gap: 2 }}>
                 <Typography
                   component={Link}
                   href={profilePageData.links.terms.href}
@@ -764,9 +764,23 @@ export default function ClientProfilePageView() {
                     fontWeight: 700,
                     fontSize: 14,
                     textDecoration: "none",
+                    "&:hover": { textDecoration: "underline" },
                   }}
                 >
                   {profilePageData.links.terms.label}
+                </Typography>
+                <Typography
+                  component={Link}
+                  href={profilePageData.links.policies.href}
+                  sx={{
+                    color: tokens.teal,
+                    fontWeight: 700,
+                    fontSize: 14,
+                    textDecoration: "none",
+                    "&:hover": { textDecoration: "underline" },
+                  }}
+                >
+                  {profilePageData.links.policies.label}
                 </Typography>
               </Box>
 

@@ -3770,7 +3770,7 @@ export default function ProfessionalFixedLocationSetup({
         </Grid>
       </Box>
 
-      <Box sx={{ mt: 0.5 }}>
+      <Box sx={{ mt: 0.5, display: "flex", flexWrap: "wrap", gap: 2 }}>
         <Link href="/terms-and-conditions" style={{ textDecoration: "none" }}>
           <Typography
             sx={{
@@ -3782,6 +3782,19 @@ export default function ProfessionalFixedLocationSetup({
             }}
           >
             Terms & Conditions
+          </Typography>
+        </Link>
+        <Link href="/policies" style={{ textDecoration: "none" }}>
+          <Typography
+            sx={{
+              color: "primary.main",
+              fontWeight: 700,
+              fontSize: 14,
+              textDecoration: "none",
+              "&:hover": { textDecoration: "underline" },
+            }}
+          >
+            Policies
           </Typography>
         </Link>
       </Box>

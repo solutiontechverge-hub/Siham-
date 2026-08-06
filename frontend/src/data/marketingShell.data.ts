@@ -121,6 +121,7 @@ export const marketingShellFooter = {
       items: [
         "Privacy",
         { label: "Terms", href: "/terms-and-conditions" },
+        { label: "Policies", href: "/policies" },
         "Security",
       ],
     },
@@ -159,6 +160,7 @@ export const professionalsMarketingFooter = {
       items: [
         "Privacy",
         { label: "Terms", href: "/terms-and-conditions" },
+        { label: "Policies", href: "/policies" },
         "Security",
       ],
     },
