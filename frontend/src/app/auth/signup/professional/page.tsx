@@ -437,19 +437,19 @@ export default function ProfessionalSignupPage() {
                 </Box>
 
                 <Box component="form" onSubmit={handleSubmit}>
-                  <Stack spacing={3}>
+                  <Stack spacing={2}>
                     <Box>
                       <Typography
                         sx={{
                           fontWeight: 700,
                           fontSize: "0.9375rem",
                           color: m.navy,
-                          mb: 1.5,
+                          mb: 1,
                         }}
                       >
                         Company Information
                       </Typography>
-                      <Grid container spacing={2}>
+                      <Grid container spacing={1.75}>
                         <Grid item xs={12}>
                           <MollureAuthLabeledField
                             fieldLabel="Legal Name"
@@ -491,107 +491,106 @@ export default function ProfessionalSignupPage() {
                           />
                         </Grid>
 
-                        <Grid item xs={12}>
+                        <Grid item xs={12} sx={{ pt: "4px !important" }}>
                           <Typography
                             sx={{
                               fontWeight: 600,
                               fontSize: "0.8125rem",
                               color: alpha(m.navy, 0.72),
-                              mb: 0.5,
-                              mt: 0.5,
+                              mb: 1,
                             }}
                           >
                             Business Address
                           </Typography>
-                        </Grid>
-                        <Grid item xs={12}>
-                          <MollureAuthLabeledField
-                            fieldLabel="Country"
-                            labelPlacement="inCell"
-                            value={PROFESSIONAL_COUNTRY}
-                            disabled
-                          />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <MollureAuthLabeledField
-                            fieldLabel="Street"
-                            labelPlacement="inCell"
-                            name="street"
-                            value={form.street}
-                            onChange={handleChange}
-                            placeholder="e.g. Damrak"
-                          />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <MollureAuthLabeledField
-                            fieldLabel="Number"
-                            labelPlacement="inCell"
-                            name="number"
-                            value={form.number}
-                            onChange={handleChange}
-                            placeholder="e.g. 1"
-                          />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <MollureAuthLabeledField
-                            fieldLabel="Postal Code"
-                            labelPlacement="inCell"
-                            name="postalCode"
-                            value={form.postalCode}
-                            onChange={handleChange}
-                            placeholder="e.g. 1012 LG"
-                          />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                          <MollureAuthLabeledField
-                            fieldLabel="Municipality"
-                            labelPlacement="inCell"
-                            select
-                            name="municipality"
-                            value={form.municipality}
-                            onChange={handleChange}
-                            SelectProps={{ displayEmpty: true }}
-                          >
-                            <MenuItem value="">
-                              <em>Select Municipality</em>
-                            </MenuItem>
-                            {MUNICIPALITY_OPTIONS.map((c) => (
-                              <MenuItem key={c} value={c}>
-                                {c}
-                              </MenuItem>
-                            ))}
-                          </MollureAuthLabeledField>
+                          <Grid container spacing={1.75}>
+                            <Grid item xs={12}>
+                              <MollureAuthLabeledField
+                                fieldLabel="Country"
+                                labelPlacement="inCell"
+                                value={PROFESSIONAL_COUNTRY}
+                                disabled
+                              />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                              <MollureAuthLabeledField
+                                fieldLabel="Street"
+                                labelPlacement="inCell"
+                                name="street"
+                                value={form.street}
+                                onChange={handleChange}
+                                placeholder="e.g. Damrak"
+                              />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                              <MollureAuthLabeledField
+                                fieldLabel="Number"
+                                labelPlacement="inCell"
+                                name="number"
+                                value={form.number}
+                                onChange={handleChange}
+                                placeholder="e.g. 1"
+                              />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                              <MollureAuthLabeledField
+                                fieldLabel="Postal Code"
+                                labelPlacement="inCell"
+                                name="postalCode"
+                                value={form.postalCode}
+                                onChange={handleChange}
+                                placeholder="e.g. 1012 LG"
+                              />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                              <MollureAuthLabeledField
+                                fieldLabel="Municipality"
+                                labelPlacement="inCell"
+                                select
+                                name="municipality"
+                                value={form.municipality}
+                                onChange={handleChange}
+                                SelectProps={{ displayEmpty: true }}
+                              >
+                                <MenuItem value="">
+                                  <em>Select Municipality</em>
+                                </MenuItem>
+                                {MUNICIPALITY_OPTIONS.map((c) => (
+                                  <MenuItem key={c} value={c}>
+                                    {c}
+                                  </MenuItem>
+                                ))}
+                              </MollureAuthLabeledField>
+                            </Grid>
+                            <Grid item xs={12}>
+                              <MollureAuthLabeledField
+                                fieldLabel="Select Business Type"
+                                labelPlacement="inCell"
+                                select
+                                name="businessType"
+                                value={form.businessType}
+                                onChange={handleChange}
+                                SelectProps={{ displayEmpty: true }}
+                              >
+                                <MenuItem value="">
+                                  <em>Select Business Type</em>
+                                </MenuItem>
+                                {BUSINESS_TYPE_OPTIONS.map((opt) => (
+                                  <MenuItem key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                  </MenuItem>
+                                ))}
+                              </MollureAuthLabeledField>
+                            </Grid>
+                          </Grid>
                         </Grid>
 
-                        <Grid item xs={12}>
-                          <MollureAuthLabeledField
-                            fieldLabel="Select Business Type"
-                            labelPlacement="inCell"
-                            select
-                            name="businessType"
-                            value={form.businessType}
-                            onChange={handleChange}
-                            SelectProps={{ displayEmpty: true }}
-                          >
-                            <MenuItem value="">
-                              <em>Select Business Type</em>
-                            </MenuItem>
-                            {BUSINESS_TYPE_OPTIONS.map((opt) => (
-                              <MenuItem key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </MenuItem>
-                            ))}
-                          </MollureAuthLabeledField>
-                        </Grid>
-
-                        <Grid item xs={12}>
+                        <Grid item xs={12} sx={{ pt: "4px !important" }}>
                           <Typography
                             sx={{
                               fontWeight: 600,
                               fontSize: "0.8125rem",
                               color: alpha(m.navy, 0.72),
-                              mb: 0.5,
-                              mt: 0.5,
+                              mb: 1,
                             }}
                           >
                             Portfolio links
@@ -601,37 +600,39 @@ export default function ProfessionalSignupPage() {
                               sx={{
                                 fontSize: 12,
                                 color: "error.main",
-                                mb: 0.5,
+                                mb: 0.75,
                               }}
                             >
                               {errors.website}
                             </Typography>
                           ) : null}
-                        </Grid>
-                        <Grid item xs={12} md={4}>
-                          <MollureAuthTextField
-                            name="website"
-                            placeholder="Website"
-                            value={form.website}
-                            onChange={handleChange}
-                            error={Boolean(errors.website)}
-                          />
-                        </Grid>
-                        <Grid item xs={12} md={4}>
-                          <MollureAuthTextField
-                            name="instagram"
-                            placeholder="Instagram"
-                            value={form.instagram}
-                            onChange={handleChange}
-                          />
-                        </Grid>
-                        <Grid item xs={12} md={4}>
-                          <MollureAuthTextField
-                            name="otherLink"
-                            placeholder="Other"
-                            value={form.otherLink}
-                            onChange={handleChange}
-                          />
+                          <Grid container spacing={1.75}>
+                            <Grid item xs={12} sm={4}>
+                              <MollureAuthTextField
+                                name="website"
+                                placeholder="Website"
+                                value={form.website}
+                                onChange={handleChange}
+                                error={Boolean(errors.website)}
+                              />
+                            </Grid>
+                            <Grid item xs={12} sm={4}>
+                              <MollureAuthTextField
+                                name="instagram"
+                                placeholder="Instagram"
+                                value={form.instagram}
+                                onChange={handleChange}
+                              />
+                            </Grid>
+                            <Grid item xs={12} sm={4}>
+                              <MollureAuthTextField
+                                name="otherLink"
+                                placeholder="Other"
+                                value={form.otherLink}
+                                onChange={handleChange}
+                              />
+                            </Grid>
+                          </Grid>
                         </Grid>
                       </Grid>
                     </Box>
@@ -642,12 +643,12 @@ export default function ProfessionalSignupPage() {
                           fontWeight: 700,
                           fontSize: "0.9375rem",
                           color: m.navy,
-                          mb: 1.5,
+                          mb: 1,
                         }}
                       >
                         Contact Person
                       </Typography>
-                      <Grid container spacing={2}>
+                      <Grid container spacing={1.75}>
                         <Grid item xs={12} sm={6}>
                           <MollureAuthLabeledField
                             fieldLabel="First Name"
@@ -717,7 +718,7 @@ export default function ProfessionalSignupPage() {
                             placeholder="Re-enter your password"
                           />
                         </Grid>
-                        <Grid item xs={12}>
+                        <Grid item xs={12} sx={{ pt: "0 !important" }}>
                           <PasswordStrengthBar password={form.password} />
                         </Grid>
                       </Grid>
