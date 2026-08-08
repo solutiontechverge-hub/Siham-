@@ -21,8 +21,8 @@ export const BUSINESS_SERVICE_CATEGORY_CATALOG = [
   { key: "lashes", label: "Wimpers", iconId: "lashes" },
   { key: "brows", label: "Wenkbrauwen", iconId: "brows" },
   { key: "facial", label: "Gezichtsbehandeling", iconId: "facial" },
-  { key: "nails", label: "Nagels", iconId: "nails" },
-  { key: "body", label: "Lichaamsbehandeling", iconId: "body" },
+  { key: "nails", label: "Nails", iconId: "nails" },
+  { key: "body", label: "Body treatment", iconId: "body" },
   { key: "waxing", label: "Ontharing", iconId: "waxing" },
 ] as const satisfies ReadonlyArray<{
   key: string;
@@ -95,7 +95,15 @@ export function resolveServiceCategorySliderIconId(title: string): ServiceCatego
   ) {
     return "facial";
   }
-  if (t.includes("lichaam") || t.includes("body") || t.includes("massage")) return "body";
+  if (
+    t.includes("lichaam") ||
+    t.includes("body treatment") ||
+    t.includes("bodytreat") ||
+    t.includes("body") ||
+    t.includes("massage")
+  ) {
+    return "body";
+  }
 
   return "generic";
 }
@@ -112,10 +120,14 @@ export function findBusinessCategoryForCatalogEntry(
 }
 
 export function buildCategoryTabFromRecord(category: BusinessCategoryLike): ServiceCategoryTab {
+  const iconId = resolveServiceCategorySliderIconId(category.title);
+  const catalogEntry = BUSINESS_SERVICE_CATEGORY_CATALOG.find(
+    (entry) => entry.iconId === iconId,
+  );
   return {
     id: String(category.id),
-    label: category.title,
-    iconId: resolveServiceCategorySliderIconId(category.title),
+    label: catalogEntry?.label ?? category.title,
+    iconId,
   };
 }
 

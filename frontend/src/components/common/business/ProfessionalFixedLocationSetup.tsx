@@ -38,6 +38,7 @@ import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
+import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 import type { FixedLocationPageData } from "../../../app/professionals/fixed-location/fixedLocation.data";
 import {
@@ -448,6 +449,8 @@ const setupSectionPaperSx = (m: Theme["palette"]["mollure"]) =>
     boxShadow: "0 10px 22px rgba(16, 35, 63, 0.05)",
     overflow: "hidden",
     bgcolor: "#fff",
+    minWidth: 0,
+    width: "100%",
   }) as const;
 
 function SectionShell({
@@ -465,27 +468,35 @@ function SectionShell({
     <Paper elevation={0} sx={setupSectionPaperSx(m)}>
       <Box
         sx={{
-          px: 2.25,
-          py: 1.6,
+          px: { xs: 1.75, sm: 2.25 },
+          py: { xs: 1.35, sm: 1.6 },
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          gap: 2,
+          gap: { xs: 1.25, sm: 2 },
+          flexWrap: "wrap",
+          minWidth: 0,
         }}
       >
-        {typeof title === "string" ? (
-          <Typography
-            sx={{ fontWeight: 800, color: alpha(m.navy, 0.85), fontSize: 14 }}
-          >
-            {title}
-          </Typography>
-        ) : (
-          title
-        )}
-        {action}
+        <Box sx={{ minWidth: 0, flex: "1 1 auto", maxWidth: "100%" }}>
+          {typeof title === "string" ? (
+            <Typography
+              sx={{ fontWeight: 800, color: alpha(m.navy, 0.85), fontSize: 14 }}
+            >
+              {title}
+            </Typography>
+          ) : (
+            title
+          )}
+        </Box>
+        {action ? (
+          <Box sx={{ flexShrink: 0, ml: "auto" }}>{action}</Box>
+        ) : null}
       </Box>
       <Divider />
-      <Box sx={{ px: 2.25, py: 2.1 }}>{children}</Box>
+      <Box sx={{ px: { xs: 1.75, sm: 2.25 }, py: { xs: 1.75, sm: 2.1 }, minWidth: 0 }}>
+        {children}
+      </Box>
     </Paper>
   );
 }
@@ -667,6 +678,7 @@ export default function ProfessionalFixedLocationSetup({
   const [mediaIdx, setMediaIdx] = React.useState(0);
   const [mediaDeleteConfirmOpen, setMediaDeleteConfirmOpen] =
     React.useState(false);
+  const [publishConfirmOpen, setPublishConfirmOpen] = React.useState(false);
 
   // ── Portfolio ─────────────────────────────────────────────────────────────
   const portfolioInputRef = React.useRef<HTMLInputElement | null>(null);
@@ -1194,6 +1206,8 @@ export default function ProfessionalFixedLocationSetup({
     );
   const [templateSyncDrawerOpen, setTemplateSyncDrawerOpen] =
     React.useState(false);
+  const [businessStatusMenuAnchor, setBusinessStatusMenuAnchor] =
+    React.useState<null | HTMLElement>(null);
   const [templateSyncModalOpen, setTemplateSyncModalOpen] =
     React.useState(false);
   const isBothOffering = businessOfferingSelect === "Both";
@@ -1569,8 +1583,9 @@ export default function ProfessionalFixedLocationSetup({
         <Typography
           sx={{
             fontWeight: 700,
-            fontSize: 13,
-            color: theme.palette.text.primary,
+            fontSize: { xs: 24, sm: 28, md: 30 },
+            color: alpha(m.navy, 0.9),
+            lineHeight: 1.2,
             mt: 0.5,
           }}
         >
@@ -1579,7 +1594,6 @@ export default function ProfessionalFixedLocationSetup({
       </Grid>
       <Grid item xs={12} sm={6}>
         <MollureFormField
-          label="Street Address"
           placeholder="Street Address"
           value={fixedBiz.streetAddress}
           onChange={(e) => setFixedBizField("streetAddress", e.target.value)}
@@ -1588,7 +1602,6 @@ export default function ProfessionalFixedLocationSetup({
       </Grid>
       <Grid item xs={12} sm={6}>
         <MollureFormField
-          label="Street Number"
           placeholder="Street Number"
           value={fixedBiz.streetNumber}
           onChange={(e) => setFixedBizField("streetNumber", e.target.value)}
@@ -1597,7 +1610,6 @@ export default function ProfessionalFixedLocationSetup({
       </Grid>
       <Grid item xs={12} sm={4}>
         <MollureFormField
-          label="Postal code"
           placeholder="Postal code"
           value={fixedBiz.postalCode}
           onChange={(e) => setFixedBizField("postalCode", e.target.value)}
@@ -1607,7 +1619,6 @@ export default function ProfessionalFixedLocationSetup({
       <Grid item xs={12} sm={4}>
         <MollureFormField
           select
-          label="Province"
           value={fixedBiz.province}
           onChange={(e) => {
             const province = e.target.value;
@@ -1623,7 +1634,23 @@ export default function ProfessionalFixedLocationSetup({
             );
           }}
           disabled={locationDisabled}
-          SelectProps={{ displayEmpty: true }}
+          SelectProps={{
+            displayEmpty: true,
+            renderValue: (selected) => {
+              const value = String(selected ?? "");
+              if (!value) {
+                return (
+                  <Box
+                    component="span"
+                    sx={{ color: (theme) => theme.palette.mollure.placeholder }}
+                  >
+                    Select province
+                  </Box>
+                );
+              }
+              return value;
+            },
+          }}
         >
           <MenuItem value="">
             <em>Select province</em>
@@ -1637,7 +1664,6 @@ export default function ProfessionalFixedLocationSetup({
       </Grid>
       <Grid item xs={12} sm={4}>
         <AppMultiSelect
-          label="Municipality"
           placeholder="Select municipalities"
           value={fixedBiz.municipalities}
           onChange={(municipalities) =>
@@ -1699,17 +1725,20 @@ export default function ProfessionalFixedLocationSetup({
 
       {desiredAreaMode === "Specific areas only" ? (
         <>
-          <Grid item xs={12} sm={6}>
+          <Grid item xs={12}>
             <Typography
               sx={{
-                fontSize: 11,
                 fontWeight: 700,
-                color: alpha(m.navy, 0.62),
-                mb: 0.6,
+                fontSize: { xs: 24, sm: 28, md: 30 },
+                color: alpha(m.navy, 0.9),
+                lineHeight: 1.2,
+                mt: 0.5,
               }}
             >
-              Province
+              Address
             </Typography>
+          </Grid>
+          <Grid item xs={12} sm={6}>
             <MollureFormField
               select
               value={desiredProvinceDraft}
@@ -1721,7 +1750,29 @@ export default function ProfessionalFixedLocationSetup({
               }}
               disabled={locationDisabled}
               sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+              SelectProps={{
+                displayEmpty: true,
+                renderValue: (selected) => {
+                  const value = String(selected ?? "");
+                  if (!value) {
+                    return (
+                      <Box
+                        component="span"
+                        sx={{
+                          color: (theme) => theme.palette.mollure.placeholder,
+                        }}
+                      >
+                        Select province
+                      </Box>
+                    );
+                  }
+                  return value;
+                },
+              }}
             >
+              <MenuItem value="">
+                <em>Select province</em>
+              </MenuItem>
               {desiredProvinceOptions.map((p) => (
                 <MenuItem key={p} value={p}>
                   {p}
@@ -1733,16 +1784,6 @@ export default function ProfessionalFixedLocationSetup({
           <Grid item xs={12} sm={6}>
             <Stack direction="row" spacing={1} alignItems="flex-end">
               <Box sx={{ flex: 1 }}>
-                <Typography
-                  sx={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    color: alpha(m.navy, 0.62),
-                    mb: 0.6,
-                  }}
-                >
-                  Municipality
-                </Typography>
                 <AppMultiSelect
                   placeholder="Select municipalities"
                   value={desiredMunicipalityDraft}
@@ -2177,6 +2218,7 @@ export default function ProfessionalFixedLocationSetup({
   const onPublishBusinessSetup = React.useCallback(async () => {
     if (!onSaveBusinessSetup) {
       setIsBusinessPublishEnabled(false);
+      setPublishConfirmOpen(false);
       return;
     }
 
@@ -2190,6 +2232,7 @@ export default function ProfessionalFixedLocationSetup({
       await updateBusinessSetupActive({ is_active: true }).unwrap();
       setIsBusinessPublishEnabled(false);
       setEditingBusinessSections(new Set());
+      setPublishConfirmOpen(false);
       showSnackbar({
         severity: "success",
         message: "Changes published and are now live.",
@@ -2550,11 +2593,16 @@ export default function ProfessionalFixedLocationSetup({
       const titleFromApi = businessCategories.find(
         (category) => String(category.id) === categoryId,
       )?.title;
-      const title =
+      const rawTitle =
         service.categoryTitle?.trim() ||
         titleFromApi ||
         `Category ${categoryId}`;
-      if (!isCategoryVisibleInServiceOrder(calendarServiceOrder, title))
+      const catalogEntry = BUSINESS_SERVICE_CATEGORY_CATALOG.find(
+        (entry) =>
+          resolveServiceCategorySliderIconId(rawTitle) === entry.iconId,
+      );
+      const title = catalogEntry?.label ?? rawTitle;
+      if (!isCategoryVisibleInServiceOrder(calendarServiceOrder, rawTitle))
         continue;
       seenIds.add(categoryId);
       orderedCategories.push({ id: categoryId, title });
@@ -2576,7 +2624,7 @@ export default function ProfessionalFixedLocationSetup({
       seenIds.add(id);
       orderedCategories.push({
         id,
-        title: apiCategory?.title ?? entry.label,
+        title: entry.label,
       });
     }
 
@@ -4323,194 +4371,280 @@ export default function ProfessionalFixedLocationSetup({
 
   const businessSetupContent = (
     <Stack spacing={2}>
-      <Stack
-        direction={{ xs: "column", md: "row" }}
-        spacing={2}
-        alignItems={{ md: "flex-end" }}
-        justifyContent={{ md: "space-between" }}
-        sx={{ width: "100%" }}
-      >
-        <Box
-          sx={{
-            flex: { xs: "1 1 auto", md: "1 1 auto" },
-            width: { xs: "100%", md: "auto" },
-            maxWidth: { xs: "100%", md: 520 },
-          }}
+      <Stack spacing={1.25} sx={{ width: "100%" }}>
+        <Stack
+          direction={{ xs: "column", md: "row" }}
+          spacing={2}
+          alignItems={{ xs: "stretch", md: "flex-end" }}
+          justifyContent="space-between"
+          sx={{ width: "100%", minWidth: 0 }}
         >
-          <Typography
+          <Box
             sx={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: theme.palette.text.secondary,
-              mb: 0.75,
+              flex: "1 1 auto",
+              minWidth: 0,
+              width: { xs: "100%", md: "auto" },
+              maxWidth: { xs: "100%", md: 520 },
             }}
           >
-            {data.offeringLabel}
-          </Typography>
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            spacing={1.5}
-            alignItems={{ xs: "stretch", sm: "center" }}
-            sx={{ width: "100%" }}
-          >
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <MollureFormField
-                select
-                value={businessOfferingSelect}
-                onChange={(e) => {
-                  const v = String(e.target.value) as OfferingSelectOption;
-                  if (v === "Both") {
-                    setTemplateSyncModalOpen(true);
-                    return;
-                  }
-                  setBusinessOfferingSelect(v);
-                  onSwitchActiveBusinessTemplate(v);
-                  setIsBusinessPublishEnabled(true);
-                }}
-                disabled={businessFormDisabled}
-                sx={{
-                  "& .MuiOutlinedInput-root": {
-                    bgcolor: "#fff",
-                  },
-                }}
-                SelectProps={{
-                  renderValue: (selected) => {
-                    if (selected === "Both")
-                      return "Fixed and Desired location";
-                    return String(selected);
-                  },
-                }}
-              >
-                {offeringSelectOptions.map((opt) => (
-                  <MenuItem key={opt} value={opt}>
-                    {opt === "Both" ? "Fixed and Desired location" : opt}
-                  </MenuItem>
-                ))}
-              </MollureFormField>
-            </Box>
-          </Stack>
-
-          {isBothOffering ? (
-            <Box
+            <Typography
               sx={{
-                mt: 1.25,
-                p: 0.5,
-                borderRadius: "12px",
-                bgcolor: alpha(m.navy, 0.06),
-                display: "flex",
-                gap: 0.5,
-                width: "100%",
+                fontSize: 11,
+                fontWeight: 600,
+                color: theme.palette.text.secondary,
+                mb: 0.75,
               }}
             >
-              {visibleLocationCards.map((opt) => {
-                const isActive = activeBusinessTemplate === opt;
+              {data.offeringLabel}
+            </Typography>
+            <MollureFormField
+              select
+              value={businessOfferingSelect}
+              onChange={(e) => {
+                const v = String(e.target.value) as OfferingSelectOption;
+                if (v === "Both") {
+                  setTemplateSyncModalOpen(true);
+                  return;
+                }
+                setBusinessOfferingSelect(v);
+                onSwitchActiveBusinessTemplate(v);
+                setIsBusinessPublishEnabled(true);
+              }}
+              disabled={businessFormDisabled}
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  bgcolor: "#fff",
+                },
+              }}
+              SelectProps={{
+                renderValue: (selected) => {
+                  if (selected === "Both")
+                    return "Fixed and Desired location";
+                  return String(selected);
+                },
+              }}
+            >
+              {offeringSelectOptions.map((opt) => (
+                <MenuItem key={opt} value={opt}>
+                  {opt === "Both" ? "Fixed and Desired location" : opt}
+                </MenuItem>
+              ))}
+            </MollureFormField>
+          </Box>
 
-                return (
-                  <Box
-                    key={opt}
-                    component="button"
-                    type="button"
-                    onClick={() => onSwitchActiveBusinessTemplate(opt)}
-                    disabled={businessFormDisabled}
-                    sx={{
-                      flex: 1,
-                      minWidth: 0,
-                      minHeight: 40,
-                      px: 2,
-                      py: 0.85,
-                      borderRadius: "10px",
-                      border: "none",
-                      bgcolor: isActive ? alpha(m.navy, 0.1) : "#fff",
-                      boxShadow: isActive
-                        ? "none"
-                        : "0 1px 2px rgba(16, 35, 63, 0.06)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      cursor: "pointer",
-                      transition:
-                        "background-color 0.18s ease, box-shadow 0.18s ease",
-                      outline: "none",
-                      font: "inherit",
-                      "&:hover": {
-                        bgcolor: isActive
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            sx={{
+              flexShrink: 0,
+              alignSelf: { xs: "flex-end", md: "flex-end" },
+              pb: { md: 0.15 },
+            }}
+          >
+            {isBothOffering ? (
+              <IconButton
+                size="small"
+                aria-label="Template sync settings"
+                disabled={businessFormDisabled}
+                onClick={() => {
+                  setTemplateSyncDraft(templateSyncSettings);
+                  setTemplateSyncDrawerOpen(true);
+                }}
+                sx={{
+                  width: 40,
+                  height: 40,
+                  flexShrink: 0,
+                  borderRadius: "8px",
+                  border: `1px solid ${alpha(m.navy, 0.12)}`,
+                  bgcolor: "#fff",
+                  color: "primary.main",
+                  "&:hover": { bgcolor: alpha(m.navy, 0.03) },
+                }}
+              >
+                <SettingsRoundedIcon sx={{ fontSize: 20 }} />
+              </IconButton>
+            ) : null}
+            <AppButton
+              variant="contained"
+              disableElevation
+              onClick={() => setPublishConfirmOpen(true)}
+              disabled={!isBusinessPublishEnabled || isBusinessSetupSaving}
+              sx={{
+                borderRadius: "6px",
+                textTransform: "none",
+                fontWeight: 700,
+                fontSize: 13,
+                minHeight: 40,
+                px: 2.5,
+                bgcolor: "primary.main",
+                "&:hover": { bgcolor: "mollure.tealDark" },
+              }}
+            >
+              {isBusinessSetupSaving ? "Saving..." : data.publishLabel}
+            </AppButton>
+          </Stack>
+        </Stack>
+
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={2}
+          alignItems={{ xs: "stretch", sm: "center" }}
+          justifyContent="space-between"
+          sx={{ width: "100%", minWidth: 0 }}
+        >
+          <Box
+            sx={{
+              flex: "1 1 auto",
+              minWidth: 0,
+              width: { xs: "100%", sm: "auto" },
+              maxWidth: { xs: "100%", md: 520 },
+              p: 0.5,
+              borderRadius: "12px",
+              bgcolor: alpha(m.navy, 0.06),
+              display: "flex",
+              gap: 0.5,
+              overflow: "hidden",
+            }}
+          >
+            {visibleLocationCards.map((opt) => {
+              const isActive = activeBusinessTemplate === opt;
+              const canSwitch = isBothOffering;
+
+              return (
+                <Box
+                  key={opt}
+                  component="button"
+                  type="button"
+                  onClick={() => {
+                    if (!canSwitch) return;
+                    onSwitchActiveBusinessTemplate(opt);
+                  }}
+                  disabled={businessFormDisabled || !canSwitch}
+                  sx={{
+                    flex: 1,
+                    minWidth: 0,
+                    minHeight: 40,
+                    px: { xs: 1.25, sm: 2 },
+                    py: 0.85,
+                    borderRadius: "10px",
+                    border: "none",
+                    bgcolor: isActive ? alpha(m.navy, 0.1) : "#fff",
+                    boxShadow: isActive
+                      ? "none"
+                      : "0 1px 2px rgba(16, 35, 63, 0.06)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    cursor: canSwitch ? "pointer" : "default",
+                    transition:
+                      "background-color 0.18s ease, box-shadow 0.18s ease",
+                    outline: "none",
+                    font: "inherit",
+                    "&:hover": {
+                      bgcolor: canSwitch
+                        ? isActive
                           ? alpha(m.navy, 0.12)
-                          : alpha(m.navy, 0.02),
-                      },
-                      "&:focus-visible": {
-                        boxShadow: `0 0 0 3px ${alpha(m.teal, 0.22)}`,
-                      },
+                          : alpha(m.navy, 0.02)
+                        : isActive
+                          ? alpha(m.navy, 0.1)
+                          : "#fff",
+                    },
+                    "&:focus-visible": {
+                      boxShadow: canSwitch
+                        ? `0 0 0 3px ${alpha(m.teal, 0.22)}`
+                        : undefined,
+                    },
+                    "&.Mui-disabled, &:disabled": {
+                      opacity: 1,
+                      color: "inherit",
+                    },
+                  }}
+                >
+                  <Typography
+                    noWrap
+                    sx={{
+                      fontSize: { xs: 13, sm: 14 },
+                      fontWeight: 700,
+                      color: isActive
+                        ? alpha(m.navy, 0.88)
+                        : alpha(m.navy, 0.55),
+                      lineHeight: 1.2,
+                      textAlign: "center",
+                      maxWidth: "100%",
                     }}
                   >
-                    <Typography
-                      sx={{
-                        fontSize: 14,
-                        fontWeight: 700,
-                        color: isActive
-                          ? alpha(m.navy, 0.88)
-                          : alpha(m.navy, 0.55),
-                        lineHeight: 1.2,
-                        textAlign: "center",
-                      }}
-                    >
-                      {opt}
-                    </Typography>
-                  </Box>
-                );
-              })}
-            </Box>
-          ) : null}
-        </Box>
-        <Stack
-          direction="row"
-          spacing={1}
-          alignItems="center"
-          sx={{
-            alignSelf: { xs: "flex-start", md: "flex-end" },
-            flexShrink: 0,
-          }}
-        >
-          {isBothOffering ? (
+                    {opt}
+                  </Typography>
+                </Box>
+              );
+            })}
+          </Box>
+
+          <Box
+            sx={{
+              flexShrink: 0,
+              alignSelf: { xs: "flex-end", md: "center" },
+            }}
+          >
             <IconButton
               size="small"
-              aria-label="Template sync settings"
-              disabled={businessFormDisabled}
-              onClick={() => {
-                setTemplateSyncDraft(templateSyncSettings);
-                setTemplateSyncDrawerOpen(true);
-              }}
+              aria-label="Business status options"
+              aria-haspopup="menu"
+              aria-expanded={Boolean(businessStatusMenuAnchor)}
+              disabled={isBusinessProfileStatusSaving}
+              onClick={(e) => setBusinessStatusMenuAnchor(e.currentTarget)}
               sx={{
                 width: 40,
                 height: 40,
-                flexShrink: 0,
                 borderRadius: "8px",
                 border: `1px solid ${alpha(m.navy, 0.12)}`,
                 bgcolor: "#fff",
-                color: "primary.main",
+                color: alpha(m.navy, 0.65),
                 "&:hover": { bgcolor: alpha(m.navy, 0.03) },
               }}
             >
-              <SettingsRoundedIcon sx={{ fontSize: 20 }} />
+              <MoreVertRoundedIcon sx={{ fontSize: 20 }} />
             </IconButton>
-          ) : null}
-          <AppButton
-            variant="contained"
-            disableElevation
-            onClick={onPublishBusinessSetup}
-            disabled={!isBusinessPublishEnabled || isBusinessSetupSaving}
-            sx={{
-              borderRadius: "6px",
-              textTransform: "none",
-              fontWeight: 700,
-              fontSize: 13,
-              minHeight: 40,
-              px: 2.5,
-              bgcolor: "primary.main",
-              "&:hover": { bgcolor: "mollure.tealDark" },
-            }}
-          >
-            {isBusinessSetupSaving ? "Saving..." : data.publishLabel}
-          </AppButton>
+            <Menu
+              anchorEl={businessStatusMenuAnchor}
+              open={Boolean(businessStatusMenuAnchor)}
+              onClose={() => setBusinessStatusMenuAnchor(null)}
+              anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+              transformOrigin={{ vertical: "top", horizontal: "right" }}
+              slotProps={{
+                paper: {
+                  sx: {
+                    mt: 0.75,
+                    minWidth: 140,
+                    borderRadius: "10px",
+                    border: `1px solid ${alpha(m.navy, 0.1)}`,
+                    boxShadow: "0 10px 24px rgba(16, 35, 63, 0.12)",
+                  },
+                },
+              }}
+            >
+              <MenuItem
+                disabled={isBusinessProfileStatusSaving}
+                onClick={() => {
+                  setBusinessStatusMenuAnchor(null);
+                  void setBusinessProfileActive(!isBusinessProfileActive);
+                }}
+                sx={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: alpha(m.navy, 0.82),
+                  py: 1,
+                }}
+              >
+                {isBusinessProfileStatusSaving
+                  ? "Saving..."
+                  : isBusinessProfileActive
+                    ? "Deactive"
+                    : "Active"}
+              </MenuItem>
+            </Menu>
+          </Box>
         </Stack>
       </Stack>
 
@@ -4576,6 +4710,36 @@ export default function ProfessionalFixedLocationSetup({
           </AppButton>
         </Paper>
       ) : null}
+
+      <AppModal
+        open={publishConfirmOpen}
+        onClose={() => {
+          if (isBusinessSetupSaving) return;
+          setPublishConfirmOpen(false);
+        }}
+        title="Publish changes?"
+        maxWidth="xs"
+        fullWidth
+        contentSx={{ px: 2.5, py: 1 }}
+        footerVariant="actions"
+        footer={
+          <>
+            <AppModalCancelButton
+              onClick={() => setPublishConfirmOpen(false)}
+              disabled={isBusinessSetupSaving}
+            />
+            <AppModalPrimaryButton
+              label={isBusinessSetupSaving ? "Publishing..." : data.publishLabel}
+              onClick={() => void onPublishBusinessSetup()}
+              disabled={isBusinessSetupSaving}
+            />
+          </>
+        }
+      >
+        <Typography sx={{ fontSize: 13, color: alpha(m.navy, 0.68) }}>
+          Your profile and business setup changes will go live for clients.
+        </Typography>
+      </AppModal>
 
       <AppModal
         open={mediaDeleteConfirmOpen}
@@ -4720,25 +4884,53 @@ export default function ProfessionalFixedLocationSetup({
       </AppDrawer>
 
       <SectionShell
-        title={data.profile.title}
+        title={
+          <Typography
+            sx={{
+              fontWeight: 700,
+              color: alpha(m.navy, 0.9),
+              fontSize: { xs: 24, sm: 28, md: 30 },
+              lineHeight: 1.2,
+              minWidth: 0,
+              pr: 1,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {data.profile.title}
+          </Typography>
+        }
         action={renderSectionEditAction("profile")}
       >
-        <Grid container spacing={2.25}>
-          <Grid item xs={12} md={6}>
+        <Grid
+          container
+          spacing={{ xs: 2, sm: 2.25 }}
+          alignItems="stretch"
+          sx={{ width: "100%", m: 0 }}
+        >
+          <Grid item xs={12} md={6} sx={{ minWidth: 0, maxWidth: "100%" }}>
             <Paper
               elevation={0}
               sx={{
                 borderRadius: "10px",
                 border: `1px solid ${alpha(m.navy, 0.08)}`,
                 overflow: "hidden",
+                height: "100%",
+                display: "flex",
+                flexDirection: "column",
+                minWidth: 0,
               }}
             >
               <Box
                 sx={{
                   position: "relative",
                   width: "100%",
-                  height: 210,
+                  height: { xs: 220, sm: 260, md: 310 },
+                  flexShrink: 0,
                   bgcolor: alpha(m.navy, 0.02),
+                  overflow: "hidden",
+                  isolation: "isolate",
                 }}
               >
                 <Fade in key={mediaIdx} timeout={180}>
@@ -4748,7 +4940,7 @@ export default function ProfessionalFixedLocationSetup({
                         src={mediaSlides[mediaIdx]}
                         alt=""
                         fill
-                        sizes="(max-width: 900px) 100vw, 520px"
+                        sizes="(max-width: 600px) 100vw, (max-width: 900px) 100vw, 520px"
                         unoptimized={
                           mediaSlides[mediaIdx]?.startsWith("blob:") ||
                           isPersistedMediaUrl(mediaSlides[mediaIdx] ?? "")
@@ -4761,109 +4953,124 @@ export default function ProfessionalFixedLocationSetup({
 
                 {mediaSlides.length > 0 ? (
                   <IconButton
-                  aria-label="Delete image"
-                  onClick={() => setMediaDeleteConfirmOpen(true)}
-                  disabled={profileDisabled || isBusinessMediaUploading}
-                  size="small"
-                  sx={{
-                    position: "absolute",
-                    top: 10,
-                    right: 10,
-                    zIndex: 2,
-                    width: 34,
-                    height: 34,
-                    bgcolor: alpha("#fff", 0.92),
-                    border: `1px solid ${alpha(m.navy, 0.1)}`,
-                    boxShadow: `0 2px 8px ${alpha("#000", 0.12)}`,
-                    "&:hover": { bgcolor: "#fff" },
-                    "&.Mui-disabled": {
-                      bgcolor: alpha("#fff", 0.7),
-                    },
-                  }}
-                >
-                  <DeleteOutlineRoundedIcon
-                    sx={{ fontSize: 18, color: alpha(m.navy, 0.55) }}
-                  />
-                </IconButton>
+                    aria-label="Delete image"
+                    onClick={() => setMediaDeleteConfirmOpen(true)}
+                    disabled={profileDisabled || isBusinessMediaUploading}
+                    size="small"
+                    sx={{
+                      position: "absolute",
+                      top: { xs: 8, sm: 10 },
+                      right: { xs: 8, sm: 10 },
+                      zIndex: 3,
+                      width: { xs: 32, sm: 34 },
+                      height: { xs: 32, sm: 34 },
+                      bgcolor: alpha("#fff", 0.92),
+                      border: `1px solid ${alpha(m.navy, 0.1)}`,
+                      boxShadow: `0 2px 8px ${alpha("#000", 0.12)}`,
+                      "&:hover": { bgcolor: "#fff" },
+                      "&.Mui-disabled": {
+                        bgcolor: alpha("#fff", 0.7),
+                      },
+                    }}
+                  >
+                    <DeleteOutlineRoundedIcon
+                      sx={{ fontSize: { xs: 16, sm: 18 }, color: alpha(m.navy, 0.55) }}
+                    />
+                  </IconButton>
                 ) : null}
 
                 {mediaSlides.length > 1 ? (
                   <>
-                <IconButton
-                  aria-label="Previous image"
-                  onClick={goPrevMedia}
-                  size="small"
-                  sx={{
-                    position: "absolute",
-                    left: 10,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    bgcolor: alpha("#fff", 0.85),
-                    border: `1px solid ${alpha(m.navy, 0.1)}`,
-                    "&:hover": { bgcolor: "#fff" },
-                  }}
-                >
-                  <ChevronLeftRoundedIcon fontSize="small" />
-                </IconButton>
-                <IconButton
-                  aria-label="Next image"
-                  onClick={goNextMedia}
-                  size="small"
-                  sx={{
-                    position: "absolute",
-                    right: 10,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    bgcolor: alpha("#fff", 0.85),
-                    border: `1px solid ${alpha(m.navy, 0.1)}`,
-                    "&:hover": { bgcolor: "#fff" },
-                  }}
-                >
-                  <ChevronRightRoundedIcon fontSize="small" />
-                </IconButton>
-
-                <Stack
-                  direction="row"
-                  spacing={0.6}
-                  sx={{
-                    position: "absolute",
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    bottom: 10,
-                    px: 1.2,
-                    py: 0.55,
-                    borderRadius: 999,
-                    bgcolor: alpha("#000", 0.3),
-                    backdropFilter: "blur(6px)",
-                  }}
-                >
-                  {mediaSlides.map((_, i) => (
-                    <Box
-                      key={i}
-                      onClick={() => setMediaIdx(i)}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") setMediaIdx(i);
-                      }}
+                    <IconButton
+                      aria-label="Previous image"
+                      onClick={goPrevMedia}
+                      size="small"
                       sx={{
-                        width: 7,
-                        height: 7,
-                        borderRadius: "50%",
-                        cursor: "pointer",
-                        bgcolor: i === mediaIdx ? "#fff" : alpha("#fff", 0.45),
-                        boxShadow:
-                          i === mediaIdx
-                            ? "0 0 0 2px rgba(255,255,255,0.22)"
-                            : "none",
+                        position: "absolute",
+                        left: { xs: 6, sm: 10 },
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        zIndex: 2,
+                        width: { xs: 30, sm: 34 },
+                        height: { xs: 30, sm: 34 },
+                        bgcolor: alpha("#fff", 0.85),
+                        border: `1px solid ${alpha(m.navy, 0.1)}`,
+                        "&:hover": { bgcolor: "#fff" },
                       }}
-                    />
-                  ))}
-                </Stack>
+                    >
+                      <ChevronLeftRoundedIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                      aria-label="Next image"
+                      onClick={goNextMedia}
+                      size="small"
+                      sx={{
+                        position: "absolute",
+                        right: { xs: 6, sm: 10 },
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        zIndex: 2,
+                        width: { xs: 30, sm: 34 },
+                        height: { xs: 30, sm: 34 },
+                        bgcolor: alpha("#fff", 0.85),
+                        border: `1px solid ${alpha(m.navy, 0.1)}`,
+                        "&:hover": { bgcolor: "#fff" },
+                      }}
+                    >
+                      <ChevronRightRoundedIcon fontSize="small" />
+                    </IconButton>
+
+                    <Stack
+                      direction="row"
+                      spacing={0.6}
+                      useFlexGap
+                      flexWrap="wrap"
+                      justifyContent="center"
+                      sx={{
+                        position: "absolute",
+                        left: "50%",
+                        transform: "translateX(-50%)",
+                        bottom: { xs: 8, sm: 10 },
+                        zIndex: 2,
+                        maxWidth: "calc(100% - 72px)",
+                        px: 1.2,
+                        py: 0.55,
+                        borderRadius: 999,
+                        bgcolor: alpha("#000", 0.3),
+                        backdropFilter: "blur(6px)",
+                        rowGap: 0.5,
+                      }}
+                    >
+                      {mediaSlides.map((_, i) => (
+                        <Box
+                          key={i}
+                          onClick={() => setMediaIdx(i)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ")
+                              setMediaIdx(i);
+                          }}
+                          sx={{
+                            width: 7,
+                            height: 7,
+                            flexShrink: 0,
+                            borderRadius: "50%",
+                            cursor: "pointer",
+                            bgcolor:
+                              i === mediaIdx ? "#fff" : alpha("#fff", 0.45),
+                            boxShadow:
+                              i === mediaIdx
+                                ? "0 0 0 2px rgba(255,255,255,0.22)"
+                                : "none",
+                          }}
+                        />
+                      ))}
+                    </Stack>
                   </>
                 ) : null}
               </Box>
-              <Box sx={{ p: 1.25 }}>
+              <Box sx={{ p: 1.25, flexShrink: 0, minWidth: 0 }}>
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -4893,8 +5100,15 @@ export default function ProfessionalFixedLocationSetup({
               </Box>
             </Paper>
           </Grid>
-          <Grid item xs={12} md={6}>
-            <Stack spacing={1.6}>
+          <Grid item xs={12} md={6} sx={{ minWidth: 0, maxWidth: "100%" }}>
+            <Stack
+              spacing={1.6}
+              sx={{
+                height: "100%",
+                minWidth: 0,
+                width: "100%",
+              }}
+            >
               <MollureFormField
                 label={data.profile.nameLabel}
                 value={biz.profileName}
@@ -4906,7 +5120,7 @@ export default function ProfessionalFixedLocationSetup({
                 value={biz.about}
                 onChange={(e) => setBizField("about", e.target.value)}
                 multiline
-                minRows={4}
+                minRows={3}
                 disabled={profileDisabled}
               />
               <MollureFormField
@@ -4926,7 +5140,13 @@ export default function ProfessionalFixedLocationSetup({
                 }}
                 disabled={profileDisabled || keywordsAtMax}
               />
-              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+              <Stack
+                direction="row"
+                spacing={1}
+                useFlexGap
+                flexWrap="wrap"
+                sx={{ minWidth: 0, width: "100%" }}
+              >
                 {biz.keywords.map((k) => (
                   <Chip
                     key={k}
@@ -4935,10 +5155,15 @@ export default function ProfessionalFixedLocationSetup({
                       profileDisabled ? undefined : () => removeBizKeyword(k)
                     }
                     sx={{
+                      maxWidth: "100%",
                       borderRadius: "8px",
                       bgcolor: alpha(m.navy, 0.06),
                       fontWeight: 700,
                       fontSize: 11.5,
+                      "& .MuiChip-label": {
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      },
                     }}
                   />
                 ))}
@@ -4957,7 +5182,22 @@ export default function ProfessionalFixedLocationSetup({
       </SectionShell>
 
       <SectionShell
-        title="Service For"
+        title={
+          <Typography
+            sx={{
+              fontWeight: 700,
+              color: alpha(m.navy, 0.9),
+              fontSize: { xs: 24, sm: 28, md: 30 },
+              lineHeight: 1.2,
+              minWidth: 0,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            Service For
+          </Typography>
+        }
         action={renderSectionEditAction("serviceFor")}
       >
         {(() => {
@@ -5094,7 +5334,24 @@ export default function ProfessionalFixedLocationSetup({
         })()}
       </SectionShell>
 
-      <SectionShell title={data.servicesDetails.title}>
+      <SectionShell
+        title={
+          <Typography
+            sx={{
+              fontWeight: 700,
+              color: alpha(m.navy, 0.9),
+              fontSize: { xs: 24, sm: 28, md: 30 },
+              lineHeight: 1.2,
+              minWidth: 0,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {data.servicesDetails.title}
+          </Typography>
+        }
+      >
         <Stack spacing={1.5}>
           <ServiceCategoryBar
             items={serviceCategoryTabs}
@@ -5324,7 +5581,22 @@ export default function ProfessionalFixedLocationSetup({
       </SectionShell>
 
       <SectionShell
-        title={data.manageTeam.title}
+        title={
+          <Typography
+            sx={{
+              fontWeight: 700,
+              color: alpha(m.navy, 0.9),
+              fontSize: { xs: 24, sm: 28, md: 30 },
+              lineHeight: 1.2,
+              minWidth: 0,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {data.manageTeam.title}
+          </Typography>
+        }
         action={
           <Stack direction="row" spacing={1} alignItems="center">
             <FormControlLabel
@@ -5423,8 +5695,8 @@ export default function ProfessionalFixedLocationSetup({
                   <Box sx={{ minWidth: 0 }}>
                     <Typography
                       sx={{
-                        fontWeight: 500,
-                        fontSize: 14,
+                        fontWeight: 700,
+                        fontSize: 20,
                         color: alpha(m.navy, 0.88),
                         lineHeight: 1.35,
                       }}
@@ -5804,7 +6076,22 @@ export default function ProfessionalFixedLocationSetup({
 
       <SetupSectionsGroup>
         <SetupSubSection
-          title={data.generalNotes.title}
+          title={
+            <Typography
+              sx={{
+                fontWeight: 700,
+                color: alpha(m.navy, 0.9),
+                fontSize: { xs: 24, sm: 28, md: 30 },
+                lineHeight: 1.2,
+                minWidth: 0,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {data.generalNotes.title}
+            </Typography>
+          }
           action={renderSectionEditAction("generalNotes")}
         >
           <Typography
@@ -5974,292 +6261,354 @@ export default function ProfessionalFixedLocationSetup({
           </Stack>
         </SetupSubSection>
 
-        <SetupSubSection title="Policy Section" toned>
-          <Stack spacing={1.6}>
-            <Box>
+        <Box
+          sx={{
+            mx: 2.25,
+            borderRadius: "10px",
+            bgcolor: "#F9FAFB",
+            overflow: "hidden",
+            pb: 2,
+          }}
+        >
+          <SetupSubSection
+            title={
               <Typography
                 sx={{
-                  fontSize: 11,
                   fontWeight: 700,
-                  color: alpha(m.navy, 0.62),
-                  mb: 0.75,
+                  color: alpha(m.navy, 0.9),
+                  fontSize: { xs: 24, sm: 28, md: 30 },
+                  lineHeight: 1.2,
                 }}
               >
-                Prepayment/Response Time
+                Policy Section
               </Typography>
-              <Grid container spacing={1.5}>
-                <Grid item xs={12} md={6}>
-                  <MollureFormField
-                    placeholder="Hour"
-                    value={values.policyResponseHours}
-                    onChange={(e) =>
-                      setField("policyResponseHours", e.target.value)
-                    }
-                    disabled={policyDisabled}
-                    sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                    InputProps={{
-                      endAdornment: (
-                        <InputAdornment position="end">H</InputAdornment>
-                      ),
-                      inputMode: "numeric",
-                    }}
-                  />
+            }
+          >
+            <Stack spacing={1.6}>
+              <Box>
+                <Typography
+                  sx={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.62),
+                    mb: 0.75,
+                  }}
+                >
+                  Prepayment/Response Time
+                </Typography>
+                <Grid container spacing={1.5}>
+                  <Grid item xs={12} md={6}>
+                    <MollureFormField
+                      placeholder="Hour"
+                      value={values.policyResponseHours}
+                      onChange={(e) =>
+                        setField("policyResponseHours", e.target.value)
+                      }
+                      disabled={policyDisabled}
+                      sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">H</InputAdornment>
+                        ),
+                        inputMode: "numeric",
+                      }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <MollureFormField
+                      placeholder="Minutes"
+                      value={values.policyResponseMinutes}
+                      onChange={(e) =>
+                        setField("policyResponseMinutes", e.target.value)
+                      }
+                      disabled={policyDisabled}
+                      sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">Min</InputAdornment>
+                        ),
+                        inputMode: "numeric",
+                      }}
+                    />
+                  </Grid>
                 </Grid>
-                <Grid item xs={12} md={6}>
-                  <MollureFormField
-                    placeholder="Minutes"
-                    value={values.policyResponseMinutes}
-                    onChange={(e) =>
-                      setField("policyResponseMinutes", e.target.value)
-                    }
-                    disabled={policyDisabled}
-                    sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                    InputProps={{
-                      endAdornment: (
-                        <InputAdornment position="end">Min</InputAdornment>
-                      ),
-                      inputMode: "numeric",
-                    }}
-                  />
-                </Grid>
-              </Grid>
-            </Box>
+              </Box>
 
-            <MollureFormField
-              placeholder="Custom instructions for Policy"
-              value={values.policyInstructions}
-              onChange={(e) => setField("policyInstructions", e.target.value)}
-              multiline
-              minRows={3}
-              disabled={policyDisabled}
-              sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-            />
-          </Stack>
-        </SetupSubSection>
-
-        <SetupSubSection title="Rescheduling Policy" toned>
-          <Stack spacing={1.6}>
-            <Box>
-              <Typography
-                sx={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: alpha(m.navy, 0.62),
-                  mb: 0.75,
-                }}
-              >
-                Minimum Time Before Appointment
-              </Typography>
-              <Grid container spacing={1.5}>
-                <Grid item xs={12} md={6}>
-                  <MollureFormField
-                    placeholder="Hour"
-                    value={values.rescheduleMinimumHours}
-                    onChange={(e) =>
-                      setField("rescheduleMinimumHours", e.target.value)
-                    }
-                    disabled={reschedulingPolicyDisabled}
-                    sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                    InputProps={{
-                      endAdornment: (
-                        <InputAdornment position="end">H</InputAdornment>
-                      ),
-                      inputMode: "numeric",
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <MollureFormField
-                    placeholder="Minutes"
-                    value={values.rescheduleMinimumMinutes}
-                    onChange={(e) =>
-                      setField("rescheduleMinimumMinutes", e.target.value)
-                    }
-                    disabled={reschedulingPolicyDisabled}
-                    sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                    InputProps={{
-                      endAdornment: (
-                        <InputAdornment position="end">Min</InputAdornment>
-                      ),
-                      inputMode: "numeric",
-                    }}
-                  />
-                </Grid>
-              </Grid>
-            </Box>
-
-            <Box>
-              <Typography
-                sx={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: alpha(m.navy, 0.62),
-                  mb: 0.75,
-                }}
-              >
-                Late Rescheduling Fee
-              </Typography>
               <MollureFormField
-                placeholder="0"
-                value={values.rescheduleLateFeePercent}
+                placeholder="Custom instructions for Policy"
+                value={values.policyInstructions}
+                onChange={(e) => setField("policyInstructions", e.target.value)}
+                multiline
+                minRows={3}
+                disabled={policyDisabled}
+                sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+              />
+            </Stack>
+          </SetupSubSection>
+
+          <SetupSubSection
+            title={
+              <Typography
+                sx={{
+                  fontWeight: 700,
+                  color: alpha(m.navy, 0.9),
+                  fontSize: { xs: 24, sm: 28, md: 30 },
+                  lineHeight: 1.2,
+                }}
+              >
+                Rescheduling
+              </Typography>
+            }
+          >
+            <Stack spacing={1.6}>
+              <Box>
+                <Typography
+                  sx={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.62),
+                    mb: 0.75,
+                  }}
+                >
+                  Minimum Time Before Appointment
+                </Typography>
+                <Grid container spacing={1.5}>
+                  <Grid item xs={12} md={6}>
+                    <MollureFormField
+                      placeholder="Hour"
+                      value={values.rescheduleMinimumHours}
+                      onChange={(e) =>
+                        setField("rescheduleMinimumHours", e.target.value)
+                      }
+                      disabled={reschedulingPolicyDisabled}
+                      sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">H</InputAdornment>
+                        ),
+                        inputMode: "numeric",
+                      }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <MollureFormField
+                      placeholder="Minutes"
+                      value={values.rescheduleMinimumMinutes}
+                      onChange={(e) =>
+                        setField("rescheduleMinimumMinutes", e.target.value)
+                      }
+                      disabled={reschedulingPolicyDisabled}
+                      sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">Min</InputAdornment>
+                        ),
+                        inputMode: "numeric",
+                      }}
+                    />
+                  </Grid>
+                </Grid>
+              </Box>
+
+              <Box>
+                <Typography
+                  sx={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.62),
+                    mb: 0.75,
+                  }}
+                >
+                  Late Rescheduling Fee
+                </Typography>
+                <MollureFormField
+                  placeholder="0"
+                  value={values.rescheduleLateFeePercent}
+                  onChange={(e) =>
+                    setField("rescheduleLateFeePercent", e.target.value)
+                  }
+                  disabled={reschedulingPolicyDisabled}
+                  sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">%</InputAdornment>
+                    ),
+                    inputMode: "numeric",
+                  }}
+                />
+              </Box>
+
+              <MollureFormField
+                placeholder="Custom instructions for rescheduling Policy"
+                value={values.rescheduleInstructions}
                 onChange={(e) =>
-                  setField("rescheduleLateFeePercent", e.target.value)
+                  setField("rescheduleInstructions", e.target.value)
                 }
+                multiline
+                minRows={3}
                 disabled={reschedulingPolicyDisabled}
                 sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">%</InputAdornment>
-                  ),
-                  inputMode: "numeric",
-                }}
               />
-            </Box>
+            </Stack>
+          </SetupSubSection>
 
-            <MollureFormField
-              placeholder="Custom instructions for rescheduling Policy"
-              value={values.rescheduleInstructions}
-              onChange={(e) =>
-                setField("rescheduleInstructions", e.target.value)
-              }
-              multiline
-              minRows={3}
-              disabled={reschedulingPolicyDisabled}
-              sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-            />
-          </Stack>
-        </SetupSubSection>
-
-        <SetupSubSection title="Cancellation Policy" toned>
-          <Stack spacing={1.6}>
-            <Box>
+          <SetupSubSection
+            title={
               <Typography
                 sx={{
-                  fontSize: 11,
                   fontWeight: 700,
-                  color: alpha(m.navy, 0.62),
-                  mb: 0.75,
+                  color: alpha(m.navy, 0.9),
+                  fontSize: { xs: 24, sm: 28, md: 30 },
+                  lineHeight: 1.2,
                 }}
               >
-                Minimum Time Before Appointment
+                Cancellation Policy
               </Typography>
-              <Grid container spacing={1.5}>
-                <Grid item xs={12} md={6}>
-                  <MollureFormField
-                    placeholder="Hour"
-                    value={values.cancelMinimumHours}
-                    onChange={(e) =>
-                      setField("cancelMinimumHours", e.target.value)
-                    }
-                    disabled={cancellationPolicyDisabled}
-                    sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                    InputProps={{
-                      endAdornment: (
-                        <InputAdornment position="end">H</InputAdornment>
-                      ),
-                      inputMode: "numeric",
-                    }}
-                  />
+            }
+          >
+            <Stack spacing={1.6}>
+              <Box>
+                <Typography
+                  sx={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.62),
+                    mb: 0.75,
+                  }}
+                >
+                  Minimum Time Before Appointment
+                </Typography>
+                <Grid container spacing={1.5}>
+                  <Grid item xs={12} md={6}>
+                    <MollureFormField
+                      placeholder="Hour"
+                      value={values.cancelMinimumHours}
+                      onChange={(e) =>
+                        setField("cancelMinimumHours", e.target.value)
+                      }
+                      disabled={cancellationPolicyDisabled}
+                      sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">H</InputAdornment>
+                        ),
+                        inputMode: "numeric",
+                      }}
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <MollureFormField
+                      placeholder="Minutes"
+                      value={values.cancelMinimumMinutes}
+                      onChange={(e) =>
+                        setField("cancelMinimumMinutes", e.target.value)
+                      }
+                      disabled={cancellationPolicyDisabled}
+                      sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">Min</InputAdornment>
+                        ),
+                        inputMode: "numeric",
+                      }}
+                    />
+                  </Grid>
                 </Grid>
-                <Grid item xs={12} md={6}>
-                  <MollureFormField
-                    placeholder="Minutes"
-                    value={values.cancelMinimumMinutes}
-                    onChange={(e) =>
-                      setField("cancelMinimumMinutes", e.target.value)
-                    }
-                    disabled={cancellationPolicyDisabled}
-                    sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                    InputProps={{
-                      endAdornment: (
-                        <InputAdornment position="end">Min</InputAdornment>
-                      ),
-                      inputMode: "numeric",
-                    }}
-                  />
-                </Grid>
-              </Grid>
-            </Box>
+              </Box>
 
-            <Box>
-              <Typography
-                sx={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: alpha(m.navy, 0.62),
-                  mb: 0.75,
-                }}
-              >
-                Late Cancellation Fee
-              </Typography>
+              <Box>
+                <Typography
+                  sx={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.62),
+                    mb: 0.75,
+                  }}
+                >
+                  Late Cancellation Fee
+                </Typography>
+                <MollureFormField
+                  placeholder="0"
+                  value={values.cancelLateFeePercent}
+                  onChange={(e) =>
+                    setField("cancelLateFeePercent", e.target.value)
+                  }
+                  disabled={cancellationPolicyDisabled}
+                  sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">%</InputAdornment>
+                    ),
+                    inputMode: "numeric",
+                  }}
+                />
+              </Box>
+
               <MollureFormField
-                placeholder="0"
-                value={values.cancelLateFeePercent}
-                onChange={(e) =>
-                  setField("cancelLateFeePercent", e.target.value)
-                }
+                placeholder="Custom instructions for cancellation Policy"
+                value={values.cancelInstructions}
+                onChange={(e) => setField("cancelInstructions", e.target.value)}
+                multiline
+                minRows={3}
                 disabled={cancellationPolicyDisabled}
                 sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">%</InputAdornment>
-                  ),
-                  inputMode: "numeric",
-                }}
               />
-            </Box>
+            </Stack>
+          </SetupSubSection>
 
-            <MollureFormField
-              placeholder="Custom instructions for cancellation Policy"
-              value={values.cancelInstructions}
-              onChange={(e) => setField("cancelInstructions", e.target.value)}
-              multiline
-              minRows={3}
-              disabled={cancellationPolicyDisabled}
-              sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-            />
-          </Stack>
-        </SetupSubSection>
-
-        <SetupSubSection title="No Show Policy" toned>
-          <Stack spacing={1.6}>
-            <Box>
+          <SetupSubSection
+            title={
               <Typography
                 sx={{
-                  fontSize: 11,
                   fontWeight: 700,
-                  color: alpha(m.navy, 0.62),
-                  mb: 0.75,
+                  color: alpha(m.navy, 0.9),
+                  fontSize: { xs: 24, sm: 28, md: 30 },
+                  lineHeight: 1.2,
                 }}
               >
-                No Show Fee
+                No show Policy
               </Typography>
+            }
+          >
+            <Stack spacing={1.6}>
+              <Box>
+                <Typography
+                  sx={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.62),
+                    mb: 0.75,
+                  }}
+                >
+                  No Show Fee
+                </Typography>
+                <MollureFormField
+                  placeholder="0"
+                  value={values.noShowFeePercent}
+                  onChange={(e) => setField("noShowFeePercent", e.target.value)}
+                  disabled={noShowPolicyDisabled}
+                  sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">%</InputAdornment>
+                    ),
+                    inputMode: "numeric",
+                  }}
+                />
+              </Box>
+
               <MollureFormField
-                placeholder="0"
-                value={values.noShowFeePercent}
-                onChange={(e) => setField("noShowFeePercent", e.target.value)}
+                placeholder="Custom instructions for no show Policy"
+                value={values.noShowInstructions}
+                onChange={(e) => setField("noShowInstructions", e.target.value)}
+                multiline
+                minRows={3}
                 disabled={noShowPolicyDisabled}
                 sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">%</InputAdornment>
-                  ),
-                  inputMode: "numeric",
-                }}
               />
-            </Box>
-
-            <MollureFormField
-              placeholder="Custom instructions for no show Policy"
-              value={values.noShowInstructions}
-              onChange={(e) => setField("noShowInstructions", e.target.value)}
-              multiline
-              minRows={3}
-              disabled={noShowPolicyDisabled}
-              sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
-            />
-          </Stack>
-        </SetupSubSection>
+            </Stack>
+          </SetupSubSection>
+        </Box>
       </SetupSectionsGroup>
 
       <SectionShell
@@ -6277,13 +6626,18 @@ export default function ProfessionalFixedLocationSetup({
                 width: 30,
                 height: 30,
                 borderRadius: "999px",
-                bgcolor: alpha(m.navy, 0.05),
-                "&:hover": { bgcolor: alpha(m.navy, 0.1) },
+                bgcolor: m.fxGrayF2F4F7,
+                color: alpha(m.navy, 0.55),
+                border: `1px solid ${alpha(m.navy, 0.08)}`,
+                "&:hover": { bgcolor: "#EEF2F6" },
+                "&.Mui-disabled": {
+                  bgcolor: m.fxGrayF2F4F7,
+                  color: alpha(m.navy, 0.35),
+                  opacity: 1,
+                },
               }}
             >
-              <DeleteOutlineRoundedIcon
-                sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }}
-              />
+              <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
             </IconButton>
             <IconButton
               size="small"
@@ -6293,13 +6647,18 @@ export default function ProfessionalFixedLocationSetup({
                 width: 30,
                 height: 30,
                 borderRadius: "999px",
-                bgcolor: alpha(m.navy, 0.05),
-                "&:hover": { bgcolor: alpha(m.navy, 0.1) },
+                bgcolor: m.fxGrayF2F4F7,
+                color: alpha(m.navy, 0.55),
+                border: `1px solid ${alpha(m.navy, 0.08)}`,
+                "&:hover": { bgcolor: "#EEF2F6" },
+                "&.Mui-disabled": {
+                  bgcolor: m.fxGrayF2F4F7,
+                  color: alpha(m.navy, 0.35),
+                  opacity: 1,
+                },
               }}
             >
-              <IosShareRoundedIcon
-                sx={{ fontSize: 16, color: alpha(m.navy, 0.55) }}
-              />
+              <IosShareRoundedIcon sx={{ fontSize: 16 }} />
             </IconButton>
             <input
               ref={portfolioInputRef}
@@ -6465,20 +6824,28 @@ export default function ProfessionalFixedLocationSetup({
       >
         <Box
           sx={{
-            px: 2.25,
-            py: 1.7,
+            px: { xs: 1.75, sm: 2.25 },
+            py: { xs: 1.4, sm: 1.7 },
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            gap: 2,
+            gap: { xs: 1.25, sm: 2 },
+            flexWrap: "wrap",
+            minWidth: 0,
           }}
         >
           <Typography
             sx={{
-              fontWeight: 500,
+              fontWeight: 700,
               color: alpha(m.navy, 0.9),
-              fontSize: 30,
+              fontSize: { xs: 24, sm: 28, md: 30 },
               lineHeight: 1.25,
+              minWidth: 0,
+              flex: "1 1 auto",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              pr: 1,
             }}
           >
             {activeSubTab === "Business Setup" ? data.title : "Professional"}
@@ -6491,7 +6858,7 @@ export default function ProfessionalFixedLocationSetup({
                 size="small"
                 color="warning"
                 variant="outlined"
-                sx={{ fontWeight: 600 }}
+                sx={{ fontWeight: 600, flexShrink: 0 }}
               />
             ) : null
           ) : (
@@ -6501,6 +6868,7 @@ export default function ProfessionalFixedLocationSetup({
               sx={{
                 width: 28,
                 height: 28,
+                flexShrink: 0,
                 borderRadius: "999px",
                 bgcolor: alpha(m.navy, 0.06),
                 "&:hover": { bgcolor: alpha(m.navy, 0.09) },

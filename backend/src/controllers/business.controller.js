@@ -718,16 +718,16 @@ export const uploadBusinessMedia = async (req, res) => {
     const existingSetup = await getBusinessSetupByUserId(req.user.id);
     const existingMedia = parseTextArray(existingSetup?.business_media).filter(isPersistedMediaUrl);
 
-    if (existingMedia.length + files.length > 4) {
+    if (existingMedia.length + files.length > 10) {
       return res.status(400).json({
         success: false,
-        message: `You can upload at most 4 images (${existingMedia.length} already saved).`,
+        message: `You can upload at most 10 images (${existingMedia.length} already saved).`,
         data: null,
       });
     }
 
     const uploadedUrls = await uploadBusinessMediaFilesToS3(req.user.id, files);
-    const nextMedia = [...existingMedia, ...uploadedUrls].slice(0, 4);
+    const nextMedia = [...existingMedia, ...uploadedUrls].slice(0, 10);
 
     let businessSetupId;
 

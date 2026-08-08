@@ -135,7 +135,11 @@ export function useBusinessTeamMemberModal({
       prev.filter((member) => member.id !== TEAM_MEMBER_DRAFT_PREVIEW_ID),
     );
     setEditingMemberId(null);
-    setDraft(createEmptyTeamMemberFormDraft());
+    setDraft({
+      ...createEmptyTeamMemberFormDraft(),
+      categoryId: "",
+      serviceId: "",
+    });
     setOpen(true);
   }, [setTeamMembers]);
 

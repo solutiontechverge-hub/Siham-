@@ -15,8 +15,8 @@ const CATEGORY_ALIAS_GROUPS: readonly (readonly string[])[] = [
   ["lashes", "wimpers", "eyelashes"],
   ["brows", "wenkbrauwen", "eyebrows"],
   ["facial", "gezichtsbehandeling", "face"],
-  ["nails", "nagels"],
-  ["body", "lichaamsbehandeling"],
+  ["nails", "nagels", "nail"],
+  ["body", "lichaamsbehandeling", "body treatment", "body treatments"],
   ["waxing", "ontharing", "hair removal"],
   ...BUSINESS_SERVICE_CATEGORY_CATALOG.map((entry) => [entry.key, normalizeToken(entry.label)] as const),
 ];

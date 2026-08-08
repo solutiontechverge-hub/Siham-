@@ -53,6 +53,7 @@ export const businessTeamMemberModalCopy = {
   updateLabel: "Update",
   profilePictureLabel: "Profile Picture",
   nameLabel: "Name",
+  namePlaceholder: "Enter team member name",
   selectCategoryLabel: "Select category",
   selectServicesLabel: "Select services",
   selectedHeading: "Selected Category & Services",

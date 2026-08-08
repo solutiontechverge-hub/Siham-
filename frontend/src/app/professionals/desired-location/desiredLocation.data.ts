@@ -217,8 +217,8 @@ export const desiredLocationPageData = {
   },
   generalNotes: {
     title: "General notes",
-    notesLabel: "Notes",
-    placeholder: "Add note...",
+    notesLabel: "Additional notes",
+    placeholder: "Any Technical note about Client",
   },
   price: {
     title: "Price",

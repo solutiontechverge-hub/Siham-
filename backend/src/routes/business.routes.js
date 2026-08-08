@@ -135,7 +135,7 @@ router.patch(
 router.post(
   "/setup/media",
   requireProfessional,
-  upload.array("business_media", 4),
+  upload.array("business_media", 10),
   uploadBusinessMedia,
 );
 
@@ -175,9 +175,9 @@ const businessSetupValidators = [
       .optional({ values: "falsy" })
       .custom((value) => {
         const parsed = parseArrayLike(value);
-        return Array.isArray(parsed) && parsed.length <= 4;
+        return Array.isArray(parsed) && parsed.length <= 10;
       })
-      .withMessage("business_media can contain up to 4 items."),
+      .withMessage("business_media can contain up to 10 items."),
     body("service_categories")
       .optional({ values: "falsy" })
       .custom((value) => Array.isArray(parseArrayLike(value)))

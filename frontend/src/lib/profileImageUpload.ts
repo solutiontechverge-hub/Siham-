@@ -7,7 +7,7 @@ const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "ima
 export const PROFILE_IMAGE_INVALID_MESSAGE =
   "Only JPG, JPEG, PNG, or WebP images are allowed (max 5 MB on upload).";
 
-export const BUSINESS_MEDIA_MAX_COUNT = 4;
+export const BUSINESS_MEDIA_MAX_COUNT = 10;
 
 export function isPersistedMediaUrl(url: string): boolean {
   return url.startsWith("http://") || url.startsWith("https://");
