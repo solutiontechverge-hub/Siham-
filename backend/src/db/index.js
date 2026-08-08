@@ -31,12 +31,21 @@ function getPool() {
   pool = new Pool({
     connectionString,
     ssl: shouldUseSsl ? { rejectUnauthorized: false } : undefined,
+    max: Number(process.env.DB_POOL_MAX || 10),
     idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT_MS || 30_000),
-    connectionTimeoutMillis: Number(process.env.DB_CONNECTION_TIMEOUT_MS || 10_000),
+    connectionTimeoutMillis: Number(process.env.DB_CONNECTION_TIMEOUT_MS || 15_000),
+    allowExitOnIdle: false,
   });
 
+  // Prevent transient Supabase/pooler drops from crashing the process via
+  // unhandled Client "error" events.
   pool.on("error", (error) => {
     console.error("[db] Idle pool connection error:", error.message || error);
+  });
+  pool.on("connect", (client) => {
+    client.on("error", (error) => {
+      console.error("[db] Client connection error:", error.message || error);
+    });
   });
 
   return pool;

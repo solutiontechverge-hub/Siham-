@@ -287,7 +287,6 @@ export type ProfessionalFixedLocationSetupProps = {
   onUploadBusinessMedia?: (files: File[]) => Promise<string[]>;
 };
 
-const PROFESSIONAL_COUNTRY = "Netherlands";
 const MAX_BUSINESS_KEYWORDS = 5;
 
 function parseFixedLocationMunicipalities(
@@ -329,6 +328,21 @@ const MUNICIPALITY_OPTIONS = [
   "Maastricht",
   "Leiden",
   "Dordrecht",
+] as const;
+
+const PROVINCE_OPTIONS = [
+  "Drenthe",
+  "Flevoland",
+  "Friesland",
+  "Gelderland",
+  "Groningen",
+  "Limburg",
+  "Noord-Brabant",
+  "Noord-Holland",
+  "Overijssel",
+  "Utrecht",
+  "Zeeland",
+  "Zuid-Holland",
 ] as const;
 
 const BUSINESS_TYPE_OPTIONS = [
@@ -3536,14 +3550,6 @@ export default function ProfessionalFixedLocationSetup({
               Business Address
             </Typography>
           </Grid>
-          <Grid item xs={12}>
-            <MollureLabeledField
-              fieldLabel="Country"
-              labelPlacement="inCell"
-              value={PROFESSIONAL_COUNTRY}
-              disabled
-            />
-          </Grid>
           <Grid item xs={12} md={6}>
             <MollureLabeledField
               fieldLabel="Street"
@@ -3576,6 +3582,26 @@ export default function ProfessionalFixedLocationSetup({
           </Grid>
           <Grid item xs={12} md={6}>
             <MollureLabeledField
+              fieldLabel="Province"
+              labelPlacement="inCell"
+              select
+              value={values.companyProvince}
+              onChange={(e) => setField("companyProvince", e.target.value)}
+              disabled={professionalFieldsDisabled}
+              SelectProps={{ displayEmpty: true }}
+            >
+              <MenuItem value="">
+                <em>Select Province</em>
+              </MenuItem>
+              {PROVINCE_OPTIONS.map((option) => (
+                <MenuItem key={option} value={option}>
+                  {option}
+                </MenuItem>
+              ))}
+            </MollureLabeledField>
+          </Grid>
+          <Grid item xs={12}>
+            <MollureLabeledField
               fieldLabel="Municipality"
               labelPlacement="inCell"
               select
@@ -3602,10 +3628,29 @@ export default function ProfessionalFixedLocationSetup({
               value={values.companyBusinessType}
               onChange={(e) => setField("companyBusinessType", e.target.value)}
               disabled={professionalFieldsDisabled}
-              SelectProps={{ displayEmpty: true }}
+              SelectProps={{
+                displayEmpty: true,
+                renderValue: (selected) => {
+                  const value = String(selected ?? "");
+                  if (!value) {
+                    return (
+                      <Box
+                        component="span"
+                        sx={{ color: (theme) => theme.palette.mollure.placeholder }}
+                      >
+                        Select business type
+                      </Box>
+                    );
+                  }
+                  const option = BUSINESS_TYPE_OPTIONS.find(
+                    (entry) => entry.value === value,
+                  );
+                  return option?.label ?? value;
+                },
+              }}
             >
               <MenuItem value="">
-                <em>Select Business Type</em>
+                <em>Select business type</em>
               </MenuItem>
               {BUSINESS_TYPE_OPTIONS.map((option) => (
                 <MenuItem key={option.value} value={option.value}>
@@ -3628,7 +3673,6 @@ export default function ProfessionalFixedLocationSetup({
         >
           Portfolio links
         </Typography>
-        <Divider sx={{ mb: 1.5, borderColor: alpha(m.navy, 0.1) }} />
         <Grid container spacing={1.5}>
           <Grid item xs={12} md={4}>
             <MollureTextField
@@ -3703,27 +3747,23 @@ export default function ProfessionalFixedLocationSetup({
               required
             />
           </Grid>
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12}>
             <MollureLabeledField
               fieldLabel="Email"
               labelPlacement="inCell"
               placeholder="you@gmail.com"
               value={values.contactEmail}
-              inputProps={{ readOnly: true }}
+              onChange={(e) => {
+                setField("contactEmail", e.target.value);
+                setProfileErrors((prev) =>
+                  prev.contactEmail
+                    ? { ...prev, contactEmail: undefined }
+                    : prev,
+                );
+              }}
               disabled={professionalFieldsDisabled}
               error={Boolean(profileErrors.contactEmail)}
               helperText={profileErrors.contactEmail}
-              required
-            />
-          </Grid>
-          <Grid item xs={12} md={6}>
-            <MollureLabeledField
-              fieldLabel="Phone number"
-              labelPlacement="inCell"
-              placeholder="Enter phone number"
-              value={values.contactPhone}
-              onChange={(e) => setField("contactPhone", e.target.value)}
-              disabled={professionalFieldsDisabled}
               required
             />
           </Grid>
@@ -4118,6 +4158,7 @@ export default function ProfessionalFixedLocationSetup({
                   street: values.companyStreet,
                   street_number: values.companyStreetNumber,
                   postal_code: values.companyPostalCode,
+                  province: values.companyProvince,
                   municipality: values.companyMunicipality,
                   business_type: values.companyBusinessType,
                   website: values.companyWebsite,
