@@ -1,7 +1,8 @@
 import type { CalendarBookingLocation } from "../../../app/professionals/fixed-location/calendar/calendar.data";
-import type { BlockTimeDraft } from "./calendar.utils";
+import { BUSINESS_SERVICE_CATEGORY_CATALOG } from "../../../data/businessServiceCategorySlider.data";
 import type { PublicBusinessHoursEntry } from "./CalendarPublicBusinessHoursModal";
 import type { CalendarDesignDraft } from "./CalendarDesignModal";
+import type { BlockTimeDraft } from "./calendar.utils";
 
 export type ScheduleShift = {
   start: string;
@@ -52,6 +53,83 @@ type RawServiceOrderSettings = Partial<ServiceOrderSettings> & {
   categoryKeys?: readonly string[];
 };
 
+function normalizeCategoryToken(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function serviceOrderCategoryLabelsMatch(a: string, b: string): boolean {
+  const left = normalizeCategoryToken(a);
+  const right = normalizeCategoryToken(b);
+  if (!left || !right) return false;
+  if (left === right || left.replace(/\s+/g, "") === right.replace(/\s+/g, "")) {
+    return true;
+  }
+
+  const resolveGroup = (token: string): string | null => {
+    const compact = token.replace(/\s+/g, "");
+    let best: { key: string; len: number } | null = null;
+    const groups: Array<{ key: string; aliases: string[] }> = [
+      { key: "waxing", aliases: ["waxing", "ontharing", "hair removal", "hairremoval"] },
+      { key: "facial", aliases: ["facial", "gezichtsbehandeling", "facial treatment", "facetreatment"] },
+      { key: "body", aliases: ["body", "lichaamsbehandeling", "body treatment", "bodytreatment"] },
+      { key: "makeup", aliases: ["makeup", "make-up", "make up"] },
+      { key: "lashes", aliases: ["lashes", "wimpers", "eyelashes"] },
+      { key: "brows", aliases: ["brows", "wenkbrauwen", "eyebrows"] },
+      { key: "nails", aliases: ["nails", "nagels", "nail"] },
+      { key: "hair", aliases: ["hair", "haar"] },
+    ];
+    for (const entry of BUSINESS_SERVICE_CATEGORY_CATALOG) {
+      groups.push({
+        key: entry.key,
+        aliases: [entry.key, normalizeCategoryToken(entry.label)],
+      });
+    }
+    for (const group of groups) {
+      for (const alias of group.aliases) {
+        const aliasToken = normalizeCategoryToken(alias);
+        const aliasCompact = aliasToken.replace(/\s+/g, "");
+        if (token === aliasToken || compact === aliasCompact) {
+          if (!best || aliasCompact.length > best.len) {
+            best = { key: group.key, len: aliasCompact.length };
+          }
+        }
+      }
+    }
+    return best?.key ?? null;
+  };
+
+  const leftGroup = resolveGroup(left);
+  const rightGroup = resolveGroup(right);
+  return Boolean(leftGroup && rightGroup && leftGroup === rightGroup);
+}
+
+function canonicalizeServiceOrderCategoryLabel(title: string): string {
+  const trimmed = String(title ?? "").trim();
+  if (!trimmed) return "";
+  const catalogEntry = BUSINESS_SERVICE_CATEGORY_CATALOG.find((entry) =>
+    serviceOrderCategoryLabelsMatch(entry.label, trimmed) ||
+    serviceOrderCategoryLabelsMatch(entry.key, trimmed),
+  );
+  return catalogEntry?.label ?? trimmed;
+}
+
+function dedupeServiceOrderCategoryList(titles: readonly string[]): string[] {
+  const result: string[] = [];
+  for (const title of titles) {
+    const canonical = canonicalizeServiceOrderCategoryLabel(title);
+    if (!canonical) continue;
+    if (result.some((entry) => serviceOrderCategoryLabelsMatch(entry, canonical))) {
+      continue;
+    }
+    result.push(canonical);
+  }
+  return result;
+}
+
 export function normalizeServiceOrderSettings(
   raw: RawServiceOrderSettings | null | undefined,
   fallback?: ServiceOrderSettings,
@@ -62,42 +140,86 @@ export function normalizeServiceOrderSettings(
     hiddenCategories: fallback?.hiddenCategories ?? [],
     hiddenServicesByCategory: fallback?.hiddenServicesByCategory ?? {},
   };
-  if (!raw) return base;
+  if (!raw) {
+    return {
+      ...base,
+      categories: dedupeServiceOrderCategoryList(base.categories),
+      hiddenCategories: dedupeServiceOrderCategoryList(base.hiddenCategories ?? []),
+    };
+  }
 
   const categories = raw.categories?.length
     ? [...raw.categories]
     : raw.categoryKeys?.length
       ? [...raw.categoryKeys]
-      : base.categories;
+      : [...base.categories];
 
-  // Keep any fallback categories/services that were added in setup but not yet in saved order.
+  // Keep fallback categories not already present (alias-aware — no Haar+Hair / Make-Up twice).
   for (const category of base.categories) {
-    if (!categories.some((entry) => entry.toLowerCase() === category.toLowerCase())) {
+    if (
+      !categories.some((entry) => serviceOrderCategoryLabelsMatch(entry, category))
+    ) {
       categories.push(category);
     }
   }
 
-  const servicesByCategory = { ...base.servicesByCategory, ...(raw.servicesByCategory ?? {}) };
-  for (const category of categories) {
-    const existing = servicesByCategory[category] ?? [];
-    const fallbackServices = base.servicesByCategory[category] ?? [];
-    const merged = [...existing];
-    for (const service of fallbackServices) {
-      if (!merged.some((entry) => entry.toLowerCase() === service.toLowerCase())) {
+  const dedupedCategories = dedupeServiceOrderCategoryList(categories);
+
+  const servicesByCategory: Record<string, string[]> = {};
+  const mergeServices = (key: string, services: readonly string[] | undefined) => {
+    const canonical = canonicalizeServiceOrderCategoryLabel(key);
+    if (!canonical) return;
+    const merged = servicesByCategory[canonical] ?? [];
+    for (const service of services ?? []) {
+      if (
+        !merged.some(
+          (entry) => entry.toLowerCase().trim() === service.toLowerCase().trim(),
+        )
+      ) {
         merged.push(service);
       }
     }
-    servicesByCategory[category] = merged;
+    servicesByCategory[canonical] = merged;
+  };
+
+  for (const [key, services] of Object.entries(base.servicesByCategory ?? {})) {
+    mergeServices(key, services);
+  }
+  for (const [key, services] of Object.entries(raw.servicesByCategory ?? {})) {
+    mergeServices(key, services);
+  }
+
+  const hiddenSource = raw.hiddenCategories
+    ? [...raw.hiddenCategories]
+    : [...(base.hiddenCategories ?? [])];
+  const hiddenCategories = dedupeServiceOrderCategoryList(hiddenSource);
+
+  const hiddenServicesByCategory: Record<string, string[]> = {
+    ...(base.hiddenServicesByCategory ?? {}),
+  };
+  for (const [key, services] of Object.entries(
+    raw.hiddenServicesByCategory ?? {},
+  )) {
+    const canonical = canonicalizeServiceOrderCategoryLabel(key);
+    if (!canonical) continue;
+    const merged = [...(hiddenServicesByCategory[canonical] ?? [])];
+    for (const service of services ?? []) {
+      if (
+        !merged.some(
+          (entry) => entry.toLowerCase().trim() === service.toLowerCase().trim(),
+        )
+      ) {
+        merged.push(service);
+      }
+    }
+    hiddenServicesByCategory[canonical] = merged;
   }
 
   return {
-    categories,
+    categories: dedupedCategories,
     servicesByCategory,
-    hiddenCategories: raw.hiddenCategories ? [...raw.hiddenCategories] : [...(base.hiddenCategories ?? [])],
-    hiddenServicesByCategory: {
-      ...(base.hiddenServicesByCategory ?? {}),
-      ...(raw.hiddenServicesByCategory ?? {}),
-    },
+    hiddenCategories,
+    hiddenServicesByCategory,
   };
 }
 

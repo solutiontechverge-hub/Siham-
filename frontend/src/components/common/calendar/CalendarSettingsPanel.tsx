@@ -618,7 +618,7 @@ export default function CalendarSettingsPanel({
                 {orderedCategories.map((category) => (
                   <CalendarServiceOrderCard
                     key={category.key}
-                    label={category.key === "hair" ? "Haar" : category.label}
+                    label={category.label}
                     iconId={category.iconId}
                     order={category.order}
                     draggable

@@ -66,6 +66,7 @@ import { getApiErrorMessage } from "../../../lib/api-error";
 import { parseCalendarSettings } from "../calendar/calendar-settings.types";
 import {
   isCategoryVisibleInServiceOrder,
+  resolveBusinessSetupServiceOrder,
   sortCategoriesByServiceOrder,
   sortServicesByServiceOrder,
   serviceOrderLabelsMatch,
@@ -624,11 +625,11 @@ export default function ProfessionalFixedLocationSetup({
   );
   const calendarServiceOrder = React.useMemo(() => {
     const settings = calendarOverviewData?.data?.settings;
-    if (!settings) return null;
-    return (
-      parseCalendarSettings(settings.availability, settings.design).availability
-        .serviceOrder ?? null
-    );
+    const saved = settings
+      ? parseCalendarSettings(settings.availability, settings.design).availability
+          .serviceOrder
+      : null;
+    return resolveBusinessSetupServiceOrder(saved);
   }, [calendarOverviewData]);
 
   const isBusinessProfileActive = businessSetupData?.is_active !== false;
@@ -2575,9 +2576,8 @@ export default function ProfessionalFixedLocationSetup({
       : mainServicesDesired;
 
   /**
-   * New professionals see all 8 platform categories by default.
-   * Calendar Service Order hide/unhide + order then control what remains visible.
-   * Custom categories that already have services are also included.
+   * Services Details category cards come from Calendar → Service Order Rules
+   * (order + hide/unhide). New accounts get the 8 platform defaults until saved.
    */
   const serviceCategoryTabs = React.useMemo(() => {
     const orderedCategories: Array<{ id: string; title: string }> = [];
@@ -2587,9 +2587,40 @@ export default function ProfessionalFixedLocationSetup({
         serviceOrderLabelsMatch(entry.title, title),
       );
 
+    const pushCategory = (id: string, title: string) => {
+      const trimmedId = String(id ?? "").trim();
+      const trimmedTitle = String(title ?? "").trim();
+      if (!trimmedId || !trimmedTitle) return;
+      if (seenIds.has(trimmedId) || hasTitle(trimmedTitle)) return;
+      if (!isCategoryVisibleInServiceOrder(calendarServiceOrder, trimmedTitle))
+        return;
+      seenIds.add(trimmedId);
+      orderedCategories.push({ id: trimmedId, title: trimmedTitle });
+    };
+
+    for (const title of calendarServiceOrder.categories) {
+      const catalogEntry = BUSINESS_SERVICE_CATEGORY_CATALOG.find(
+        (entry) =>
+          serviceOrderLabelsMatch(entry.label, title) ||
+          serviceOrderLabelsMatch(entry.key, title) ||
+          resolveServiceCategorySliderIconId(title) === entry.iconId,
+      );
+      const apiCategory = catalogEntry
+        ? findBusinessCategoryForCatalogEntry(businessCategories, catalogEntry)
+        : businessCategories.find((category) =>
+            serviceOrderLabelsMatch(category.title, title),
+          );
+      const id = apiCategory
+        ? String(apiCategory.id)
+        : (catalogEntry?.key ?? title);
+      const displayTitle = catalogEntry?.label ?? apiCategory?.title ?? title;
+      pushCategory(id, displayTitle);
+    }
+
+    // Keep custom categories that already have services (even if not yet in saved order).
     for (const service of activeServices) {
       const categoryId = String(service.categoryId ?? "").trim();
-      if (!categoryId || seenIds.has(categoryId)) continue;
+      if (!categoryId) continue;
       const titleFromApi = businessCategories.find(
         (category) => String(category.id) === categoryId,
       )?.title;
@@ -2601,42 +2632,16 @@ export default function ProfessionalFixedLocationSetup({
         (entry) =>
           resolveServiceCategorySliderIconId(rawTitle) === entry.iconId,
       );
-      const title = catalogEntry?.label ?? rawTitle;
-      if (!isCategoryVisibleInServiceOrder(calendarServiceOrder, rawTitle))
-        continue;
-      seenIds.add(categoryId);
-      orderedCategories.push({ id: categoryId, title });
-    }
-
-    for (const entry of BUSINESS_SERVICE_CATEGORY_CATALOG) {
-      if (
-        !isCategoryVisibleInServiceOrder(calendarServiceOrder, entry.label)
-      ) {
-        continue;
-      }
-      if (hasTitle(entry.label)) continue;
-      const apiCategory = findBusinessCategoryForCatalogEntry(
-        businessCategories,
-        entry,
-      );
-      const id = apiCategory ? String(apiCategory.id) : entry.key;
-      if (seenIds.has(id)) continue;
-      seenIds.add(id);
-      orderedCategories.push({
-        id,
-        title: entry.label,
-      });
+      pushCategory(categoryId, catalogEntry?.label ?? rawTitle);
     }
 
     if (!orderedCategories.length) {
       return [{ id: "all", label: "All", iconId: "all" as const }];
     }
 
-    const sorted = sortCategoriesByServiceOrder(
-      orderedCategories,
-      calendarServiceOrder,
+    return buildDynamicServiceCategoryTabs(
+      sortCategoriesByServiceOrder(orderedCategories, calendarServiceOrder),
     );
-    return buildDynamicServiceCategoryTabs(sorted);
   }, [activeServices, businessCategories, calendarServiceOrder]);
 
   const setActiveServices = React.useCallback(

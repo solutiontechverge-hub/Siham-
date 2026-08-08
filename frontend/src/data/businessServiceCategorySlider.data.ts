@@ -18,12 +18,12 @@ export type ServiceCategorySliderIconId =
 export const BUSINESS_SERVICE_CATEGORY_CATALOG = [
   { key: "hair", label: "Hair", iconId: "hair" },
   { key: "makeup", label: "Make-Up", iconId: "makeup" },
-  { key: "lashes", label: "Wimpers", iconId: "lashes" },
-  { key: "brows", label: "Wenkbrauwen", iconId: "brows" },
-  { key: "facial", label: "Gezichtsbehandeling", iconId: "facial" },
+  { key: "lashes", label: "Lashes", iconId: "lashes" },
+  { key: "brows", label: "Eyebrows", iconId: "brows" },
+  { key: "facial", label: "Facial treatment", iconId: "facial" },
   { key: "nails", label: "Nails", iconId: "nails" },
   { key: "body", label: "Body treatment", iconId: "body" },
-  { key: "waxing", label: "Ontharing", iconId: "waxing" },
+  { key: "waxing", label: "Hair Removal", iconId: "waxing" },
 ] as const satisfies ReadonlyArray<{
   key: string;
   label: string;

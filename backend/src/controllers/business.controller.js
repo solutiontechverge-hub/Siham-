@@ -53,6 +53,66 @@ const parseJsonValue = (value, fallback) => {
   }
 };
 
+/** Default Service Order Rules for new professionals (Business Setup Services Details). */
+const PLATFORM_DEFAULT_SERVICE_CATEGORY_LABELS = [
+  "Hair",
+  "Make-Up",
+  "Lashes",
+  "Eyebrows",
+  "Facial treatment",
+  "Nails",
+  "Body treatment",
+  "Hair Removal",
+];
+
+const buildPlatformDefaultServiceOrder = () => ({
+  categories: [...PLATFORM_DEFAULT_SERVICE_CATEGORY_LABELS],
+  servicesByCategory: Object.fromEntries(
+    PLATFORM_DEFAULT_SERVICE_CATEGORY_LABELS.map((label) => [label, []]),
+  ),
+  hiddenCategories: [],
+  hiddenServicesByCategory: {},
+});
+
+const ensureAvailabilityServiceOrder = (availability) => {
+  const base =
+    availability && typeof availability === "object" && !Array.isArray(availability)
+      ? { ...availability }
+      : {};
+  const saved = base.serviceOrder;
+  const hasCategories =
+    saved &&
+    typeof saved === "object" &&
+    Array.isArray(saved.categories) &&
+    saved.categories.length > 0;
+
+  if (hasCategories) {
+    return {
+      ...base,
+      serviceOrder: {
+        categories: saved.categories.map(String),
+        servicesByCategory:
+          saved.servicesByCategory && typeof saved.servicesByCategory === "object"
+            ? saved.servicesByCategory
+            : {},
+        hiddenCategories: Array.isArray(saved.hiddenCategories)
+          ? saved.hiddenCategories.map(String)
+          : [],
+        hiddenServicesByCategory:
+          saved.hiddenServicesByCategory &&
+          typeof saved.hiddenServicesByCategory === "object"
+            ? saved.hiddenServicesByCategory
+            : {},
+      },
+    };
+  }
+
+  return {
+    ...base,
+    serviceOrder: buildPlatformDefaultServiceOrder(),
+  };
+};
+
 const parseTextArray = (value) => {
   if (value === undefined || value === null || value === "") {
     return [];
@@ -1288,7 +1348,18 @@ export const getCalendarOverview = async (req, res) => {
             end: toTimeLabel(booking.end_time),
           };
         }),
-        settings: settingsResult.rows[0] || null,
+        settings: settingsResult.rows[0]
+          ? {
+              ...settingsResult.rows[0],
+              availability: ensureAvailabilityServiceOrder(
+                parseJsonValue(settingsResult.rows[0].availability, {}),
+              ),
+            }
+          : {
+              professional_profile_id: professionalProfile.id,
+              availability: ensureAvailabilityServiceOrder({}),
+              design: {},
+            },
       },
     });
   } catch (error) {
@@ -1322,7 +1393,9 @@ export const upsertCalendarSettings = async (req, res) => {
       });
     }
 
-    const availability = parseJsonValue(req.body.availability, {});
+    const availability = ensureAvailabilityServiceOrder(
+      parseJsonValue(req.body.availability, {}),
+    );
     const design = parseJsonValue(req.body.design, {});
 
     const result = await query(

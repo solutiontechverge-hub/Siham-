@@ -1,5 +1,9 @@
 import type { ServiceOrderSettings } from "./calendar-settings.types";
-import { BUSINESS_SERVICE_CATEGORY_CATALOG } from "../../../data/businessServiceCategorySlider.data";
+import { normalizeServiceOrderSettings } from "./calendar-settings.types";
+import {
+  BUSINESS_SERVICE_CATEGORY_CATALOG,
+  buildPlatformServiceOrderDefaults,
+} from "../../../data/businessServiceCategorySlider.data";
 
 function normalizeToken(value: string): string {
   return value
@@ -10,37 +14,154 @@ function normalizeToken(value: string): string {
 }
 
 const CATEGORY_ALIAS_GROUPS: readonly (readonly string[])[] = [
-  ["hair", "haar"],
+  // Longer / more specific aliases first within matching logic.
+  ["waxing", "ontharing", "hair removal", "hairremoval"],
+  ["facial", "gezichtsbehandeling", "facial treatment", "facetreatment"],
+  ["body", "lichaamsbehandeling", "body treatment", "body treatments", "bodytreatment"],
   ["makeup", "make-up", "make up", "makeup"],
   ["lashes", "wimpers", "eyelashes"],
   ["brows", "wenkbrauwen", "eyebrows"],
-  ["facial", "gezichtsbehandeling", "face"],
   ["nails", "nagels", "nail"],
-  ["body", "lichaamsbehandeling", "body treatment", "body treatments"],
-  ["waxing", "ontharing", "hair removal"],
-  ...BUSINESS_SERVICE_CATEGORY_CATALOG.map((entry) => [entry.key, normalizeToken(entry.label)] as const),
+  ["hair", "haar"],
+  ...BUSINESS_SERVICE_CATEGORY_CATALOG.map((entry) => [
+    entry.key,
+    normalizeToken(entry.label),
+  ] as const),
 ];
 
 function categoryAliasGroup(value: string): string | null {
   const token = normalizeToken(value);
   if (!token) return null;
+  const compact = token.replace(/\s+/g, "");
+
+  // Prefer the longest exact / whole-token alias so "hair removal" ≠ "hair".
+  let best: { key: string; len: number } | null = null;
   for (const group of CATEGORY_ALIAS_GROUPS) {
-    if (group.some((alias) => token === alias || token.includes(alias) || alias.includes(token))) {
-      return group[0];
+    for (const alias of group) {
+      if (!alias) continue;
+      const aliasToken = normalizeToken(alias);
+      const aliasCompact = aliasToken.replace(/\s+/g, "");
+      const exact =
+        token === aliasToken ||
+        compact === aliasCompact;
+      if (!exact) continue;
+      if (!best || aliasCompact.length > best.len) {
+        best = { key: group[0], len: aliasCompact.length };
+      }
     }
   }
-  return null;
+  return best?.key ?? null;
 }
 
 export function serviceOrderLabelsMatch(a: string, b: string): boolean {
   const left = normalizeToken(a);
   const right = normalizeToken(b);
   if (!left || !right) return false;
-  if (left === right) return true;
+  if (left === right || left.replace(/\s+/g, "") === right.replace(/\s+/g, "")) {
+    return true;
+  }
   const leftGroup = categoryAliasGroup(left);
   const rightGroup = categoryAliasGroup(right);
-  if (leftGroup && rightGroup && leftGroup === rightGroup) return true;
-  return left.includes(right) || right.includes(left);
+  return Boolean(leftGroup && rightGroup && leftGroup === rightGroup);
+}
+
+/** Prefer platform catalog English labels for known categories. */
+export function canonicalizeServiceCategoryLabel(title: string): string {
+  const trimmed = String(title ?? "").trim();
+  if (!trimmed) return "";
+  const catalogEntry = BUSINESS_SERVICE_CATEGORY_CATALOG.find(
+    (entry) =>
+      serviceOrderLabelsMatch(entry.label, trimmed) ||
+      serviceOrderLabelsMatch(entry.key, trimmed),
+  );
+  return catalogEntry?.label ?? trimmed;
+}
+
+/**
+ * Remove duplicate catalog/alias categories (e.g. Haar + Hair, Make-Up twice)
+ * and merge services/hidden flags onto the canonical label.
+ */
+export function dedupeServiceOrderSettings(
+  order: ServiceOrderSettings,
+): ServiceOrderSettings {
+  const categories: string[] = [];
+  const titleMap = new Map<string, string>(); // original -> canonical kept in list
+
+  for (const title of order.categories ?? []) {
+    const canonical = canonicalizeServiceCategoryLabel(title);
+    if (!canonical) continue;
+    const existing = categories.find((entry) =>
+      serviceOrderLabelsMatch(entry, canonical),
+    );
+    if (existing) {
+      titleMap.set(title, existing);
+      continue;
+    }
+    categories.push(canonical);
+    titleMap.set(title, canonical);
+  }
+
+  const resolveCanonical = (title: string) => {
+    const mapped = titleMap.get(title);
+    if (mapped) return mapped;
+    const canonical = canonicalizeServiceCategoryLabel(title);
+    const existing = categories.find((entry) =>
+      serviceOrderLabelsMatch(entry, canonical),
+    );
+    return existing ?? canonical;
+  };
+
+  const servicesByCategory: Record<string, string[]> = {};
+  for (const [key, services] of Object.entries(order.servicesByCategory ?? {})) {
+    const canonical = resolveCanonical(key);
+    if (!canonical) continue;
+    const merged = servicesByCategory[canonical] ?? [];
+    for (const service of services ?? []) {
+      if (
+        !merged.some((entry) => serviceOrderLabelsMatch(entry, service))
+      ) {
+        merged.push(service);
+      }
+    }
+    servicesByCategory[canonical] = merged;
+  }
+
+  const hiddenCategories: string[] = [];
+  for (const title of order.hiddenCategories ?? []) {
+    const canonical = resolveCanonical(title);
+    if (!canonical) continue;
+    if (
+      !hiddenCategories.some((entry) =>
+        serviceOrderLabelsMatch(entry, canonical),
+      )
+    ) {
+      hiddenCategories.push(canonical);
+    }
+  }
+
+  const hiddenServicesByCategory: Record<string, string[]> = {};
+  for (const [key, services] of Object.entries(
+    order.hiddenServicesByCategory ?? {},
+  )) {
+    const canonical = resolveCanonical(key);
+    if (!canonical) continue;
+    const merged = hiddenServicesByCategory[canonical] ?? [];
+    for (const service of services ?? []) {
+      if (
+        !merged.some((entry) => serviceOrderLabelsMatch(entry, service))
+      ) {
+        merged.push(service);
+      }
+    }
+    hiddenServicesByCategory[canonical] = merged;
+  }
+
+  return {
+    categories,
+    servicesByCategory,
+    hiddenCategories,
+    hiddenServicesByCategory,
+  };
 }
 
 export function isCategoryVisibleInServiceOrder(
@@ -236,5 +357,18 @@ export function sortServicesByServiceOrder(
   }
 
   return ordered;
+}
+
+/**
+ * Business Setup Services Details source of truth:
+ * Calendar Settings → Service Order Rules.
+ * New professionals (empty/missing order) get the 8 platform categories.
+ */
+export function resolveBusinessSetupServiceOrder(
+  saved: ServiceOrderSettings | null | undefined,
+): ServiceOrderSettings {
+  return dedupeServiceOrderSettings(
+    normalizeServiceOrderSettings(saved, buildPlatformServiceOrderDefaults()),
+  );
 }
 

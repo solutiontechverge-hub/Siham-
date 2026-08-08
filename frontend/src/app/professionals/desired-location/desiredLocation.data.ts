@@ -176,8 +176,8 @@ export const desiredLocationPageData = {
       { id: "all", label: "All", iconKey: "all" },
       { id: "hair", label: "Hair", iconKey: "hair" },
       { id: "makeup", label: "Make-Up", iconKey: "makeup" },
-      { id: "wimpers", label: "Wimpers", iconKey: "wimpers" },
-      { id: "wenbrauwen", label: "Wenkbrauwen", iconKey: "wenbrauwen" },
+      { id: "wimpers", label: "Lashes", iconKey: "wimpers" },
+      { id: "wenbrauwen", label: "Eyebrows", iconKey: "wenbrauwen" },
     ],
     items: [
       { id: "hair-1", categoryId: "hair", name: "Buzz Cut", durationLabel: "45 Min", priceLabel: "25 €" },
