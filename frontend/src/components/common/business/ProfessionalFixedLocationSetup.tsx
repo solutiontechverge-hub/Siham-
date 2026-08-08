@@ -1741,6 +1741,48 @@ export default function ProfessionalFixedLocationSetup({
           </Grid>
           <Grid item xs={12} sm={6}>
             <MollureFormField
+              placeholder="Street Address"
+              value={desiredBusiness.streetAddress}
+              onChange={(e) => {
+                setIsBusinessPublishEnabled(true);
+                setDesiredBusiness((prev) => ({
+                  ...prev,
+                  streetAddress: e.target.value,
+                }));
+              }}
+              disabled={locationDisabled}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <MollureFormField
+              placeholder="Street Number"
+              value={desiredBusiness.streetNumber}
+              onChange={(e) => {
+                setIsBusinessPublishEnabled(true);
+                setDesiredBusiness((prev) => ({
+                  ...prev,
+                  streetNumber: e.target.value,
+                }));
+              }}
+              disabled={locationDisabled}
+            />
+          </Grid>
+          <Grid item xs={12} sm={4}>
+            <MollureFormField
+              placeholder="Postal code"
+              value={desiredBusiness.postalCode}
+              onChange={(e) => {
+                setIsBusinessPublishEnabled(true);
+                setDesiredBusiness((prev) => ({
+                  ...prev,
+                  postalCode: e.target.value,
+                }));
+              }}
+              disabled={locationDisabled}
+            />
+          </Grid>
+          <Grid item xs={12} sm={4}>
+            <MollureFormField
               select
               value={desiredProvinceDraft}
               onChange={(e) => {
@@ -1782,7 +1824,7 @@ export default function ProfessionalFixedLocationSetup({
             </MollureFormField>
           </Grid>
 
-          <Grid item xs={12} sm={6}>
+          <Grid item xs={12} sm={4}>
             <Stack direction="row" spacing={1} alignItems="flex-end">
               <Box sx={{ flex: 1 }}>
                 <AppMultiSelect
@@ -2056,6 +2098,11 @@ export default function ProfessionalFixedLocationSetup({
               ),
             ).join(", ");
 
+      const addressSource =
+        businessOfferingSelect === "Desired Location"
+          ? desiredBusiness
+          : fixedBiz;
+
       return {
         location_mode: locationModeMap[businessOfferingSelect] ?? "fixed",
         business_name: sourceBiz.profileName,
@@ -2065,13 +2112,17 @@ export default function ProfessionalFixedLocationSetup({
           .filter(isPersistedMediaUrl)
           .slice(0, BUSINESS_MEDIA_MAX_COUNT),
         salon_name: fixedBiz.salonName,
-        fixed_location_address: fixedBiz.streetAddress,
-        fixed_location_street_number: fixedBiz.streetNumber,
-        fixed_location_postal_code: fixedBiz.postalCode,
-        fixed_location_province: fixedBiz.province,
-        fixed_location_municipality: formatFixedLocationMunicipalities(
-          fixedBiz.municipalities,
-        ),
+        fixed_location_address: addressSource.streetAddress,
+        fixed_location_street_number: addressSource.streetNumber,
+        fixed_location_postal_code: addressSource.postalCode,
+        fixed_location_province:
+          businessOfferingSelect === "Desired Location"
+            ? desiredProvinceText
+            : fixedBiz.province,
+        fixed_location_municipality:
+          businessOfferingSelect === "Desired Location"
+            ? desiredAreaText
+            : formatFixedLocationMunicipalities(fixedBiz.municipalities),
         service_for: Object.entries(sourceBiz.serviceFor)
           .filter(([, enabled]) => enabled)
           .map(([key]) => key),
