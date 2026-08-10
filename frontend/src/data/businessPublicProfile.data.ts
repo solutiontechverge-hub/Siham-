@@ -250,13 +250,13 @@ const defaultTeam: BusinessPublicProfileTeamMember[] = [
     serviceSlots: [
       {
         id: "slot-1",
-        label: "Wimpers(8)",
+        label: "Lashes(8)",
         options: wimpersCategoryOptions,
         defaultValue: "wimpers-1",
       },
       {
         id: "slot-2",
-        label: "Wimpers(8)",
+        label: "Lashes(8)",
         options: wimpersCategoryOptions,
         defaultValue: "wimpers-2",
       },

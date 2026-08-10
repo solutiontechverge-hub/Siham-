@@ -41,6 +41,7 @@ export const profilePageData = {
   genderOptions: [...GENDER_OPTIONS],
   links: {
     terms: { label: "Terms & Conditions", href: "/terms-and-conditions" },
+    policies: { label: "Policies", href: "/policies" },
   },
   actions: {
     update: "Update",

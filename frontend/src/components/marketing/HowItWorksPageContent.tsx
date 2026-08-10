@@ -12,10 +12,9 @@ import {
   Stack,
 } from "@mui/material";
 import { alpha, useTheme, type Theme } from "@mui/material/styles";
-import { AppCard, ContentCard } from "../common";
+import { AppCard, ContentCard, ServiceCategoryIcon } from "../common";
 import { HowItWorksSectionTitle } from "../howItWorks";
 import { howItWorksData } from "../../app/how-it-works/howItWorks.data";
-import type { HowItWorksServiceCategory } from "../../app/how-it-works/howItWorks.data";
 import type { MarketingAudience } from "./MarketingShellLayout";
 import {
   MOLLURE_HEADING_BODY_GAP_PX,
@@ -29,6 +28,10 @@ import {
   HowItWorksSuggestionForChangeIcon,
   HowItWorksDesiredLocationClockIcon,
   HowItWorksBookingEditedBellIcon,
+  HowItWorksBookingCommunicationChatIcon,
+  BookingRequestIcon,
+  EditedBookingIcon,
+  EditConfirmedIcon,
 } from "../../../images";
 import { Typography } from "../ui/typography";
 import {
@@ -37,24 +40,14 @@ import {
   CheckCircle,
   BoltOutlined,
   EventSeatOutlined,
-  NearMeOutlined,
   PersonPinCircleOutlined,
   EditOutlined,
-  EditNoteOutlined,
-  CloseOutlined,
+  Cancel,
   FormatListBulletedOutlined,
   CreditCard,
   Language,
   ReceiptLong,
-  ForumOutlined,
 } from "@mui/icons-material";
-import ContentCutRoundedIcon from "@mui/icons-material/ContentCutRounded";
-import BrushRoundedIcon from "@mui/icons-material/BrushRounded";
-import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
-import GestureRoundedIcon from "@mui/icons-material/GestureRounded";
-import FaceRetouchingNaturalOutlinedIcon from "@mui/icons-material/FaceRetouchingNaturalOutlined";
-import SpaOutlinedIcon from "@mui/icons-material/SpaOutlined";
-import WaterDropOutlinedIcon from "@mui/icons-material/WaterDropOutlined";
 
 /** Section headings: semibold (600); pair with `variant="h4"` */
 const sectionHeadingSx = {
@@ -91,30 +84,6 @@ const cardShadow = "0 10px 28px rgba(16, 35, 63, 0.10)";
 const sectionGapSx = { mt: `${MOLLURE_SECTION_GAP_PX}px` } as const;
 const headingBodyGapSx = { mb: `${MOLLURE_HEADING_BODY_GAP_PX}px` } as const;
 
-function HowItWorksCategoryIcon({
-  iconId,
-}: {
-  iconId: HowItWorksServiceCategory["iconId"];
-}) {
-  const sx = { fontSize: 26, color: "primary.main" };
-  switch (iconId) {
-    case "hair":
-      return <ContentCutRoundedIcon sx={sx} />;
-    case "makeup":
-      return <BrushRoundedIcon sx={sx} />;
-    case "lashes":
-      return <VisibilityRoundedIcon sx={sx} />;
-    case "brows":
-      return <GestureRoundedIcon sx={sx} />;
-    case "facial":
-      return <FaceRetouchingNaturalOutlinedIcon sx={sx} />;
-    case "body":
-      return <SpaOutlinedIcon sx={sx} />;
-    case "waxing":
-      return <WaterDropOutlinedIcon sx={sx} />;
-  }
-}
-
 function HowItWorksCheckList({ items }: { items: readonly string[] }) {
   return (
     <Stack spacing={1.2}>
@@ -145,11 +114,17 @@ const requestTypeIconSx = {
   width: 34,
   height: 34,
   borderRadius: 2,
-  bgcolor: "mollure.requestAccent",
-  color: "common.white",
+  bgcolor: "transparent",
   display: "grid",
   placeItems: "center",
   flexShrink: 0,
+  overflow: "hidden",
+  "& img": {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover",
+    display: "block",
+  },
 } as const;
 
 const requestTypeCardSx = {
@@ -205,9 +180,9 @@ const changesSubsectionIconSx = {
 const requestTypesCreamPanelSx = {
   bgcolor: "mollure.warmwarning",
   borderRadius: 3,
-  px: { xs: 0, sm: 0.5 },
-  pt: { xs: 0.5, sm: 1 },
-  pb: { xs: 1, sm: 1.5 },
+  px: { xs: 2, sm: 3 },
+  pt: { xs: 3, sm: 3.5 },
+  pb: { xs: 2.5, sm: 3 },
 } as const;
 
 function HowItWorksAcceptActionIcon() {
@@ -229,26 +204,40 @@ function HowItWorksAcceptActionIcon() {
   );
 }
 
+function HowItWorksRejectActionIcon() {
+  return (
+    <Cancel
+      sx={{
+        fontSize: 22,
+        color: "mollure.statusRedFg",
+        flexShrink: 0,
+      }}
+    />
+  );
+}
+
 type HowItWorksResponseActionKey = "accept" | "suggestion" | "reject";
 
 function HowItWorksResponseActions({
   actions,
   theme,
+  labels,
 }: {
   actions: HowItWorksResponseActionKey[];
   theme: Theme;
+  labels?: Partial<Record<HowItWorksResponseActionKey, string>>;
 }) {
   const actionMap: Record<
     HowItWorksResponseActionKey,
     { label: string; bg: string; icon: ReactNode }
   > = {
     accept: {
-      label: "Accept",
+      label: labels?.accept ?? "Accept",
       bg: theme.palette.mollure.mintSoft,
       icon: <HowItWorksAcceptActionIcon />,
     },
     suggestion: {
-      label: "Suggestion for change",
+      label: labels?.suggestion ?? "Suggestion for change",
       bg: alpha(theme.palette.mollure.border, 0.35),
       icon: (
         <Image
@@ -260,18 +249,20 @@ function HowItWorksResponseActions({
       ),
     },
     reject: {
-      label: "Reject",
-      bg: alpha("#E31B23", 0.1),
-      icon: <CloseOutlined sx={{ fontSize: 18, color: "#E31B23" }} />,
+      label: labels?.reject ?? "Reject",
+      bg: theme.palette.mollure.statusRedBg,
+      icon: <HowItWorksRejectActionIcon />,
     },
   };
+
+  const smCols = actions.length === 2 ? 6 : actions.length === 1 ? 12 : 4;
 
   return (
     <Grid container spacing={2} sx={{ mt: 1.5 }}>
       {actions.map((key) => {
         const action = actionMap[key];
         return (
-          <Grid item xs={12} sm={4} key={key}>
+          <Grid item xs={12} sm={smCols} key={key}>
             <Box
               sx={{
                 display: "flex",
@@ -282,6 +273,8 @@ function HowItWorksResponseActions({
                 borderRadius: 2,
                 bgcolor: action.bg,
                 minHeight: 46,
+                width: "100%",
+                height: "100%",
               }}
             >
               {action.icon}
@@ -336,7 +329,10 @@ export function HowItWorksPageContent({
             sx={{
               fontWeight: 600,
               color: "mollure.textcolorgrey700",
-              fontSize: { xs: "1.75rem", sm: "2.125rem" },
+              fontSize:
+                audience === "clients"
+                  ? "52px"
+                  : { xs: "1.75rem", sm: "2.125rem" },
             }}
           >
             {howItWorksData.hero.title}
@@ -360,8 +356,93 @@ export function HowItWorksPageContent({
           sx={{ bgcolor: cardbg, color: textcolorgrey700 }}
           withAccent={true}
           title="Interactive Booking Process"
+          titleSx={{ fontSize: 30, fontWeight: 700, lineHeight: 1.2 }}
           description="Mollure uses an interactive online booking process. This means bookings are not always instantly confirmed. Some bookings require review and approval before they are finalized. In certain situations, changes made before or after confirmation also require approval, ensuring both parties stay aligned throughout the booking process."
         />
+
+        {/* GETTING STARTED — clients only */}
+        {audience === "clients" && (
+          <Box sx={sectionGapSx}>
+            <HowItWorksSectionTitle
+              title="Getting Started"
+              sx={{ fontSize: 30, fontWeight: 700, lineHeight: 1.2 }}
+            />
+
+            <Grid container spacing={3}>
+              <Grid item xs={12} md={6}>
+                <ContentCard
+                  sx={{
+                    height: "100%",
+                    bgcolor: "background.paper",
+                    boxShadow: cardShadow,
+                  }}
+                >
+                  <Stack spacing={2}>
+                    <Box sx={{ width: 50, height: 49, flexShrink: 0 }}>
+                      <Image
+                        src={HowItWorksIndividualClientIcon}
+                        alt=""
+                        width={50}
+                        height={49}
+                      />
+                    </Box>
+
+                    <Typography variant="h6" fontWeight={600}>
+                      Individual Clients
+                    </Typography>
+
+                    <HowItWorksCheckList
+                      items={howItWorksData.gettingStarted.individualPoints}
+                    />
+                  </Stack>
+                </ContentCard>
+              </Grid>
+
+              <Grid item xs={12} md={6}>
+                <ContentCard
+                  sx={{
+                    height: "100%",
+                    bgcolor: "background.paper",
+                    boxShadow: cardShadow,
+                  }}
+                >
+                  <Stack spacing={2}>
+                    <Box sx={{ width: 50, height: 49, flexShrink: 0 }}>
+                      <Image
+                        src={HowItWorksBusinessClientIcon}
+                        alt=""
+                        width={50}
+                        height={49}
+                      />
+                    </Box>
+
+                    <Typography variant="h6" fontWeight={600}>
+                      Business Clients
+                    </Typography>
+
+                    <HowItWorksCheckList
+                      items={howItWorksData.gettingStarted.businessPoints}
+                    />
+                  </Stack>
+                </ContentCard>
+              </Grid>
+            </Grid>
+
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{
+                mt: 3,
+                textAlign: "center",
+                lineHeight: 1.7,
+                maxWidth: 920,
+                mx: "auto",
+              }}
+            >
+              {howItWorksData.gettingStarted.note}
+            </Typography>
+          </Box>
+        )}
 
         {/* KEY PRINCIPLES */}
         <Box
@@ -373,7 +454,10 @@ export function HowItWorksPageContent({
             py: { xs: 3.5, sm: 4.5 },
           }}
         >
-          <HowItWorksSectionTitle title="Key Principles of Mollure" />
+          <HowItWorksSectionTitle
+            title="Key Principles of Mollure"
+            sx={{ fontSize: 30, fontWeight: 700, lineHeight: 1.2 }}
+          />
 
           <Grid container spacing={3}>
             {howItWorksData.keyPrinciples.map(
@@ -411,7 +495,136 @@ export function HowItWorksPageContent({
           </Grid>
         </Box>
 
-        {/* BOOKING TYPES */}
+        {/* GETTING STARTED — professionals only; after Key Principles */}
+        {audience === "professionals" && (
+          <Box
+            sx={{
+              ...sectionGapSx,
+              bgcolor: "mollure.mintSoft",
+              borderRadius: 3,
+              px: { xs: 2.5, sm: 4 },
+              py: { xs: 3.5, sm: 4.5 },
+            }}
+          >
+            <HowItWorksSectionTitle
+              title="Getting Started"
+              sx={{ fontSize: 30, fontWeight: 700, lineHeight: 1.2 }}
+            />
+
+            <Stack spacing={3}>
+              <ContentCard
+                sx={{
+                  bgcolor: "background.paper",
+                  boxShadow: cardShadow,
+                }}
+              >
+                <Typography sx={{ ...cardTitleSx, mb: 1.5 }}>
+                  Requirements
+                </Typography>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 2, lineHeight: 1.65 }}
+                >
+                  {howItWorksData.professionalGettingStarted.requirements.intro}
+                </Typography>
+                <HowItWorksCheckList
+                  items={
+                    howItWorksData.professionalGettingStarted.requirements
+                      .points
+                  }
+                />
+
+                <Box
+                  sx={{
+                    mt: 3,
+                    display: "grid",
+                    gridTemplateColumns: {
+                      xs: "repeat(2, minmax(0, 1fr))",
+                      sm: "repeat(4, minmax(0, 1fr))",
+                      md: "repeat(7, minmax(0, 1fr))",
+                    },
+                    gap: 1.5,
+                  }}
+                >
+                  {howItWorksData.professionalGettingStarted.requirements.categories.map(
+                    (category) => (
+                      <AppCard
+                        key={category.label}
+                        sx={{
+                          width: "100%",
+                          minHeight: 96,
+                          py: 1.25,
+                          px: 1,
+                          borderRadius: "12px",
+                          boxShadow: "none",
+                          border: "1px solid",
+                          borderColor: (t) => alpha(t.palette.mollure.navy, 0.1),
+                          bgcolor: "mollure.white",
+                          textAlign: "center",
+                        }}
+                      >
+                        <Stack
+                          spacing={0.75}
+                          alignItems="center"
+                          justifyContent="center"
+                          sx={{ minHeight: 88 }}
+                        >
+                          <ServiceCategoryIcon
+                            iconId={category.iconId}
+                            fontSize={26}
+                          />
+                          <Typography
+                            sx={{
+                              fontSize: 11,
+                              fontWeight: 700,
+                              lineHeight: 1.25,
+                              color: "mollure.navy",
+                              px: 0.5,
+                              display: "-webkit-box",
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: "vertical",
+                              overflow: "hidden",
+                              wordBreak: "break-word",
+                            }}
+                          >
+                            {category.label}
+                          </Typography>
+                        </Stack>
+                      </AppCard>
+                    ),
+                  )}
+                </Box>
+              </ContentCard>
+
+              <ContentCard
+                sx={{
+                  bgcolor: "background.paper",
+                  boxShadow: cardShadow,
+                }}
+              >
+                <Typography sx={{ ...cardTitleSx, mb: 1.5 }}>
+                  Validation & Onboarding
+                </Typography>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 2, lineHeight: 1.65 }}
+                >
+                  {howItWorksData.professionalGettingStarted.validation.intro}
+                </Typography>
+                <HowItWorksCheckList
+                  items={
+                    howItWorksData.professionalGettingStarted.validation.points
+                  }
+                />
+              </ContentCard>
+            </Stack>
+          </Box>
+        )}
+
+        {/* BOOKING TYPES — clients only */}
+        {audience === "clients" && (
         <Box sx={sectionGapSx}>
           <AppCard
             sx={{
@@ -420,7 +633,10 @@ export function HowItWorksPageContent({
               borderRadius: "28px",
             }}
           >
-            <HowItWorksSectionTitle title="Booking Types and Setup" />
+            <HowItWorksSectionTitle
+              title="Booking Types and Setup"
+              sx={{ fontSize: 30, fontWeight: 700, lineHeight: 1.2 }}
+            />
 
             <Stack spacing={4}>
               {/* Fixed Location */}
@@ -517,13 +733,15 @@ export function HowItWorksPageContent({
                       mt: 3,
                       p: 2,
                       borderRadius: 1,
-                      bgcolor: "mollure.mintSoft",
+                      bgcolor: "mollure.statusGreenBg",
                       display: "flex",
                       alignItems: "center",
                       gap: 1.5,
                     }}
                   >
-                    <CheckCircle sx={{ color: "primary.main", fontSize: 24 }} />
+                    <CheckCircle
+                      sx={{ color: "mollure.statusGreenFg", fontSize: 24 }}
+                    />
                     <Typography
                       variant="body2"
                       sx={{ color: "text.primary", fontWeight: 600 }}
@@ -576,7 +794,7 @@ export function HowItWorksPageContent({
                     Services take place at a location of your choice.
                   </Typography>
 
-                  {/* Standard */}
+                  {/* Standard + Project — one dashed container */}
                   <Box
                     sx={(t) => ({
                       border: "2px dashed",
@@ -586,6 +804,7 @@ export function HowItWorksPageContent({
                       mb: 2.5,
                     })}
                   >
+                    {/* Standard */}
                     <Box
                       sx={{ display: "flex", justifyContent: "center", mb: 2 }}
                     >
@@ -646,20 +865,15 @@ export function HowItWorksPageContent({
                         ),
                       )}
                     </Grid>
-                  </Box>
 
-                  {/* Project */}
-                  <Box
-                    sx={(t) => ({
-                      border: "2px dashed",
-                      borderColor: alpha(t.palette.primary.main, 0.35),
-                      borderRadius: 2,
-                      p: 2.5,
-                      mb: 2.5,
-                    })}
-                  >
+                    {/* Project */}
                     <Box
-                      sx={{ display: "flex", justifyContent: "center", mb: 2 }}
+                      sx={{
+                        display: "flex",
+                        justifyContent: "center",
+                        mb: 2,
+                        mt: 3.5,
+                      }}
                     >
                       <Box
                         sx={{
@@ -759,25 +973,485 @@ export function HowItWorksPageContent({
             </Stack>
           </AppCard>
         </Box>
+        )}
+
+        {/* BOOKING TYPES — professionals only */}
+        {audience === "professionals" && (
+          <Box
+            sx={{
+              ...sectionGapSx,
+              bgcolor: "mollure.mintSoft",
+              borderRadius: 3,
+              px: { xs: 2.5, sm: 4 },
+              py: { xs: 3.5, sm: 4.5 },
+            }}
+          >
+            <HowItWorksSectionTitle
+              title="Booking Types"
+              sx={{ fontSize: 30, fontWeight: 700, lineHeight: 1.2 }}
+            />
+
+            <Stack spacing={3}>
+              <ContentCard
+                sx={{
+                  bgcolor: "background.paper",
+                  boxShadow: cardShadow,
+                }}
+              >
+                <Typography sx={{ ...cardTitleSx, mb: 1.5 }}>
+                  {howItWorksData.professionalBookingTypes.online.title}
+                </Typography>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 2, lineHeight: 1.65 }}
+                >
+                  {howItWorksData.professionalBookingTypes.online.intro}
+                </Typography>
+                <HowItWorksCheckList
+                  items={howItWorksData.professionalBookingTypes.online.points}
+                />
+              </ContentCard>
+
+              <ContentCard
+                sx={{
+                  bgcolor: "background.paper",
+                  boxShadow: cardShadow,
+                }}
+              >
+                <Typography sx={{ ...cardTitleSx, mb: 1.5 }}>
+                  {howItWorksData.professionalBookingTypes.offline.title}
+                </Typography>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ mb: 2, lineHeight: 1.65 }}
+                >
+                  {howItWorksData.professionalBookingTypes.offline.intro}
+                </Typography>
+
+                <Typography sx={{ ...cardTitleSx, mb: 1.5, fontSize: "1rem" }}>
+                  {
+                    howItWorksData.professionalBookingTypes.offline.nonMollure
+                      .title
+                  }
+                </Typography>
+                <HowItWorksCheckList
+                  items={
+                    howItWorksData.professionalBookingTypes.offline.nonMollure
+                      .points
+                  }
+                />
+
+                <Typography
+                  sx={{ ...cardTitleSx, mt: 2.5, mb: 1.5, fontSize: "1rem" }}
+                >
+                  {howItWorksData.professionalBookingTypes.offline.guest.title}
+                </Typography>
+                <HowItWorksCheckList
+                  items={
+                    howItWorksData.professionalBookingTypes.offline.guest.points
+                  }
+                />
+              </ContentCard>
+            </Stack>
+          </Box>
+        )}
+
+        {/* SERVICE LOCATION SETUP — professionals only */}
+        {audience === "professionals" && (
+          <Box
+            sx={{
+              ...sectionGapSx,
+              bgcolor: "mollure.mintSoft",
+              borderRadius: 3,
+              px: { xs: 2.5, sm: 4 },
+              py: { xs: 3.5, sm: 4.5 },
+            }}
+          >
+            <HowItWorksSectionTitle
+              title={howItWorksData.professionalServiceLocationSetup.title}
+              sx={{ fontSize: 30, fontWeight: 700, lineHeight: 1.2 }}
+            />
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              sx={{
+                mt: 1.5,
+                mb: 3,
+                textAlign: "center",
+                lineHeight: 1.65,
+                maxWidth: 720,
+                mx: "auto",
+              }}
+            >
+              {howItWorksData.professionalServiceLocationSetup.subtitle}
+            </Typography>
+
+            <AppCard
+              sx={{
+                p: { xs: 2.5, sm: 4 },
+                borderRadius: "28px",
+              }}
+            >
+              <Stack spacing={4}>
+                {/* Fixed Location */}
+                <Box
+                  sx={{
+                    borderRadius: 3,
+                    overflow: "hidden",
+                    border: "1px solid",
+                    borderColor: "mollure.cardBorder",
+                    bgcolor: "background.paper",
+                  }}
+                >
+                  <Box
+                    sx={{
+                      bgcolor: "primary.main",
+                      color: "common.white",
+                      px: 3,
+                      py: 2,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1.5,
+                    }}
+                  >
+                    <Image
+                      src={HowItWorksFixedLocationBookingIcon}
+                      alt=""
+                      width={40}
+                      height={40}
+                    />
+                    <Typography
+                      variant="h6"
+                      sx={{ fontWeight: 600, color: "common.white" }}
+                    >
+                      Fixed Location
+                    </Typography>
+                  </Box>
+                  <Box sx={{ p: 3 }}>
+                    <Typography
+                      variant="body2"
+                      sx={{ color: "mollure.bodyText", mb: 3 }}
+                    >
+                      {
+                        howItWorksData.professionalServiceLocationSetup
+                          .fixedLocation.intro
+                      }
+                    </Typography>
+
+                    <Grid container spacing={2.5}>
+                      {howItWorksData.professionalServiceLocationSetup.fixedLocation.features.map(
+                        (f) => (
+                          <Grid item xs={12} sm={6} key={f.title}>
+                            <Stack
+                              direction="row"
+                              spacing={1.5}
+                              alignItems="flex-start"
+                            >
+                              <CheckCircle
+                                sx={{
+                                  color: "primary.main",
+                                  fontSize: 22,
+                                  flexShrink: 0,
+                                  mt: 0.25,
+                                }}
+                              />
+                              <Box>
+                                <Typography
+                                  variant="subtitle2"
+                                  sx={{
+                                    fontWeight: 600,
+                                    color: "mollure.textcolorgrey700",
+                                    mb: 0.5,
+                                  }}
+                                >
+                                  {f.title}
+                                </Typography>
+                                <Typography
+                                  variant="body2"
+                                  color="text.secondary"
+                                >
+                                  {f.sub}
+                                </Typography>
+                              </Box>
+                            </Stack>
+                          </Grid>
+                        ),
+                      )}
+                    </Grid>
+                  </Box>
+                </Box>
+
+                {/* Desired Location */}
+                <Box
+                  sx={{
+                    borderRadius: 3,
+                    overflow: "hidden",
+                    border: "1px solid",
+                    borderColor: "mollure.cardBorder",
+                    bgcolor: "background.paper",
+                  }}
+                >
+                  <Box
+                    sx={{
+                      bgcolor: "primary.main",
+                      color: "common.white",
+                      px: 3,
+                      py: 2,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 1.5,
+                    }}
+                  >
+                    <Image
+                      src={HowItWorksDesiredLocationBookingIcon}
+                      alt=""
+                      width={40}
+                      height={40}
+                    />
+                    <Typography
+                      variant="h6"
+                      sx={{ fontWeight: 600, color: "common.white" }}
+                    >
+                      Desired Location Bookings
+                    </Typography>
+                  </Box>
+                  <Box sx={{ p: 3 }}>
+                    <Typography
+                      variant="body2"
+                      sx={{ color: "mollure.bodyText", mb: 3 }}
+                    >
+                      {
+                        howItWorksData.professionalServiceLocationSetup
+                          .desiredLocation.intro
+                      }
+                    </Typography>
+
+                    {/* Standard */}
+                    <Box
+                      sx={(t) => ({
+                        border: "2px dashed",
+                        borderColor: alpha(t.palette.primary.main, 0.35),
+                        borderRadius: 2,
+                        p: 2.5,
+                        mb: 2.5,
+                      })}
+                    >
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "center",
+                          mb: 2,
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            px: 2,
+                            py: 0.75,
+                            borderRadius: 1,
+                            bgcolor: "primary.main",
+                            color: "common.white",
+                          }}
+                        >
+                          <Typography
+                            variant="caption"
+                            sx={{ fontWeight: 600, letterSpacing: 0.2 }}
+                          >
+                            Standard
+                          </Typography>
+                        </Box>
+                      </Box>
+                      <Grid container spacing={2.5}>
+                        {howItWorksData.professionalServiceLocationSetup.desiredLocation.standard.map(
+                          (f) => (
+                            <Grid item xs={12} sm={6} key={f.title}>
+                              <Stack
+                                direction="row"
+                                spacing={1.5}
+                                alignItems="flex-start"
+                              >
+                                <CheckCircle
+                                  sx={{
+                                    color: "primary.main",
+                                    fontSize: 22,
+                                    flexShrink: 0,
+                                    mt: 0.25,
+                                  }}
+                                />
+                                <Box>
+                                  <Typography
+                                    variant="subtitle2"
+                                    sx={{
+                                      fontWeight: 600,
+                                      color: "mollure.textcolorgrey700",
+                                      mb: 0.5,
+                                    }}
+                                  >
+                                    {f.title}
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                  >
+                                    {f.sub}
+                                  </Typography>
+                                </Box>
+                              </Stack>
+                            </Grid>
+                          ),
+                        )}
+                      </Grid>
+                    </Box>
+
+                    {/* Project */}
+                    <Box
+                      sx={(t) => ({
+                        border: "2px dashed",
+                        borderColor: alpha(t.palette.primary.main, 0.35),
+                        borderRadius: 2,
+                        p: 2.5,
+                        mb: 2.5,
+                      })}
+                    >
+                      <Box
+                        sx={{
+                          display: "flex",
+                          justifyContent: "center",
+                          mb: 2,
+                        }}
+                      >
+                        <Box
+                          sx={{
+                            px: 2,
+                            py: 0.75,
+                            borderRadius: 1,
+                            bgcolor: "primary.main",
+                            color: "common.white",
+                          }}
+                        >
+                          <Typography
+                            variant="caption"
+                            sx={{ fontWeight: 600, letterSpacing: 0.2 }}
+                          >
+                            Project (only for business clients)
+                          </Typography>
+                        </Box>
+                      </Box>
+                      <Grid container spacing={2.5}>
+                        {howItWorksData.professionalServiceLocationSetup.desiredLocation.project.map(
+                          (f) => (
+                            <Grid item xs={12} sm={6} key={f.title}>
+                              <Stack
+                                direction="row"
+                                spacing={1.5}
+                                alignItems="flex-start"
+                              >
+                                <CheckCircle
+                                  sx={{
+                                    color: "primary.main",
+                                    fontSize: 22,
+                                    flexShrink: 0,
+                                    mt: 0.25,
+                                  }}
+                                />
+                                <Box>
+                                  <Typography
+                                    variant="subtitle2"
+                                    sx={{
+                                      fontWeight: 600,
+                                      color: "mollure.textcolorgrey700",
+                                      mb: 0.5,
+                                    }}
+                                  >
+                                    {f.title}
+                                  </Typography>
+                                  <Typography
+                                    variant="body2"
+                                    color="text.secondary"
+                                  >
+                                    {f.sub}
+                                  </Typography>
+                                </Box>
+                              </Stack>
+                            </Grid>
+                          ),
+                        )}
+                      </Grid>
+                    </Box>
+
+                    <Box
+                      sx={{
+                        p: 2,
+                        borderRadius: 2,
+                        bgcolor: "mollure.warmwarning",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1.5,
+                      }}
+                    >
+                      <Box
+                        sx={{
+                          width: 24,
+                          height: 24,
+                          flexShrink: 0,
+                          display: "grid",
+                          placeItems: "center",
+                        }}
+                      >
+                        <Image
+                          src={HowItWorksDesiredLocationClockIcon}
+                          alt=""
+                          width={24}
+                          height={24}
+                        />
+                      </Box>
+                      <Typography
+                        variant="body2"
+                        sx={{ color: "text.primary", fontWeight: 600 }}
+                      >
+                        {howItWorksData.professionalServiceLocationSetup.note}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Box>
+              </Stack>
+            </AppCard>
+          </Box>
+        )}
+
         {/* REQUEST TYPES */}
         <Box sx={{ ...sectionGapSx, pb: { xs: 4, sm: 5 } }}>
-          <HowItWorksSectionTitle title="Types of Requests" />
-
           <Box sx={requestTypesCreamPanelSx}>
+            <HowItWorksSectionTitle
+              title="Types of Requests"
+              sx={{
+                fontSize: "30px",
+                fontWeight: 700,
+                lineHeight: 1.2,
+                color: "mollure.textcolorgrey700",
+              }}
+            />
+
             <Stack spacing={3}>
               {/* Booking Request */}
               <AppCard sx={requestTypeCardSx}>
                 <Box
                   sx={{
                     p: { xs: 2.5, sm: 3 },
-                    bgcolor: theme.palette.mollure.warmwarning,
+                    bgcolor: "background.paper",
                   }}
                 >
                   <Stack direction="row" spacing={1.5} alignItems="center">
                     <Box sx={requestTypeIconSx}>
-                      <NearMeOutlined sx={{ fontSize: 18 }} />
+                      <Image
+                        src={BookingRequestIcon}
+                        alt=""
+                        width={34}
+                        height={34}
+                      />
                     </Box>
-                    <Typography sx={{ fontWeight: 600, color: "text.primary" }}>
+                    <Typography sx={{ fontWeight: 700, color: "text.primary" }}>
                       Booking Request
                     </Typography>
                   </Stack>
@@ -801,6 +1475,9 @@ export function HowItWorksPageContent({
                   <HowItWorksResponseActions
                     theme={theme}
                     actions={["accept", "suggestion", "reject"]}
+                    labels={{
+                      suggestion: "Suggest change via message",
+                    }}
                   />
                 </Box>
               </AppCard>
@@ -810,14 +1487,19 @@ export function HowItWorksPageContent({
                 <Box
                   sx={{
                     p: { xs: 2.5, sm: 3 },
-                    bgcolor: theme.palette.mollure.warmwarning,
+                    bgcolor: "background.paper",
                   }}
                 >
                   <Stack direction="row" spacing={1.5} alignItems="center">
                     <Box sx={requestTypeIconSx}>
-                      <EditNoteOutlined sx={{ fontSize: 18 }} />
+                      <Image
+                        src={EditedBookingIcon}
+                        alt=""
+                        width={34}
+                        height={34}
+                      />
                     </Box>
-                    <Typography sx={{ fontWeight: 600, color: "text.primary" }}>
+                    <Typography sx={{ fontWeight: 700, color: "text.primary" }}>
                       Edited Booking Request
                     </Typography>
                   </Stack>
@@ -842,6 +1524,9 @@ export function HowItWorksPageContent({
                   <HowItWorksResponseActions
                     theme={theme}
                     actions={["accept", "suggestion", "reject"]}
+                    labels={{
+                      suggestion: "Suggest change via message",
+                    }}
                   />
                 </Box>
               </AppCard>
@@ -851,14 +1536,19 @@ export function HowItWorksPageContent({
                 <Box
                   sx={{
                     p: { xs: 2.5, sm: 3 },
-                    bgcolor: theme.palette.mollure.warmwarning,
+                    bgcolor: "background.paper",
                   }}
                 >
                   <Stack direction="row" spacing={1.5} alignItems="center">
                     <Box sx={requestTypeIconSx}>
-                      <EditOutlined sx={{ fontSize: 18 }} />
+                      <Image
+                        src={EditConfirmedIcon}
+                        alt=""
+                        width={34}
+                        height={34}
+                      />
                     </Box>
-                    <Typography sx={{ fontWeight: 600, color: "text.primary" }}>
+                    <Typography sx={{ fontWeight: 700, color: "text.primary" }}>
                       Edit Request
                     </Typography>
                   </Stack>
@@ -913,6 +1603,19 @@ export function HowItWorksPageContent({
                   </Grid>
 
                   <Typography
+                    variant="body2"
+                    sx={{
+                      mt: 2,
+                      color: "text.secondary",
+                      lineHeight: 1.65,
+                    }}
+                  >
+                    Note: If the professional reassigns a team member without
+                    changing the price or duration, client approval is not
+                    required. The client will still be notified of the update.
+                  </Typography>
+
+                  <Typography
                     variant="caption"
                     sx={{ mt: 2.5, display: "block", color: "text.secondary" }}
                   >
@@ -947,7 +1650,10 @@ export function HowItWorksPageContent({
             py: { xs: 3.5, sm: 4.5 },
           }}
         >
-          <HowItWorksSectionTitle title="Changes Without Approval" />
+          <HowItWorksSectionTitle
+            title="Changes Without Approval"
+            sx={{ fontSize: 30, fontWeight: 700, lineHeight: 1.2 }}
+          />
 
           <Stack spacing={3}>
             {/* Detail Changes */}
@@ -968,7 +1674,7 @@ export function HowItWorksPageContent({
                   sx={{ lineHeight: 1.65 }}
                 >
                   Applied directly and shown as &apos;updated&apos;. No approval
-                  needed even when a booking is in requested state:
+                  needed
                 </Typography>
 
                 <Box sx={changesInnerCardSx}>
@@ -1098,9 +1804,7 @@ export function HowItWorksPageContent({
               variant="body2"
               color="text.secondary"
               sx={{
-                textAlign: "center",
-                maxWidth: 720,
-                mx: "auto",
+                textAlign: "left",
                 mb: `${MOLLURE_HEADING_BODY_GAP_PX}px`,
                 lineHeight: 1.7,
               }}
@@ -1205,7 +1909,7 @@ export function HowItWorksPageContent({
                       color: "error.main",
                     }}
                   >
-                    <CloseOutlined sx={{ fontSize: 28 }} />
+                    <Cancel sx={{ fontSize: 28 }} />
                   </Box>
                   <Box>
                     <Typography
@@ -1269,29 +1973,17 @@ export function HowItWorksPageContent({
               bgcolor: bgshadow,
               borderRadius: 3,
             }}
-          >
-            <Stack spacing={2} alignItems="flex-start" textAlign="left">
-              <Typography variant="h6" sx={{ ...cardTitleSx, width: "100%" }}>
-                Discarding Requests
-              </Typography>
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                sx={{ lineHeight: 1.7, maxWidth: 900 }}
-              >
-                Any Active Booking Request Or Edit Request Can Be Discarded By
-                The Party Who Sent It. Once Discarded, The Request Is Removed
-                And No Further Action Is Required From The Other Party.
-              </Typography>
-            </Stack>
-          </ContentCard>
+            title="Discarding Requests"
+            titleSx={{ fontSize: 30, fontWeight: 700, lineHeight: 1.2 }}
+            description="Any Active Booking Request Or Edit Request Can Be Discarded By The Party Who Sent It. Once Discarded, The Request Is Removed And No Further Action Is Required From The Other Party."
+          />
         </Box>
 
         {/* RESCHEDULING */}
         <Box
           sx={{
             ...sectionGapSx,
-            bgcolor: cardbg,
+            bgcolor: "mollure.bgshadow",
             borderRadius: 3,
             px: { xs: 2, sm: 3 },
             py: { xs: 3, sm: 4 },
@@ -1302,6 +1994,9 @@ export function HowItWorksPageContent({
             sx={{
               ...sectionHeadingSx,
               textAlign: "center",
+              fontSize: 30,
+              fontWeight: 700,
+              lineHeight: 1.2,
               ...headingBodyGapSx,
             }}
           >
@@ -1353,7 +2048,7 @@ export function HowItWorksPageContent({
                       sx={{
                         p: 1.75,
                         borderRadius: 2,
-                        bgcolor: "mollure.mintSoft",
+                        bgcolor: "mollure.statusGreenBg",
                         display: "flex",
                         alignItems: "center",
                         gap: 1.25,
@@ -1364,7 +2059,7 @@ export function HowItWorksPageContent({
                           width: 26,
                           height: 26,
                           borderRadius: "50%",
-                          bgcolor: "success.main",
+                          bgcolor: "mollure.statusGreenFg",
                           color: "common.white",
                           display: "grid",
                           placeItems: "center",
@@ -1377,7 +2072,7 @@ export function HowItWorksPageContent({
                         variant="body2"
                         sx={{
                           fontWeight: 600,
-                          color: "mollure.tealDark",
+                          color: "mollure.statusGreenFg",
                         }}
                       >
                         Instant Update
@@ -1483,6 +2178,9 @@ export function HowItWorksPageContent({
             sx={{
               ...sectionHeadingSx,
               textAlign: "center",
+              fontSize: 30,
+              fontWeight: 700,
+              lineHeight: 1.2,
               ...headingBodyGapSx,
             }}
           >
@@ -1525,47 +2223,127 @@ export function HowItWorksPageContent({
                       fontWeight: 400,
                     }}
                   >
-                    Prepayment May Be Required Before A Booking Is Confirmed.
+                    {audience === "professionals"
+                      ? "Professionals Can Require Prepayment For Online And Offline Bookings."
+                      : "Prepayment May Be Required Before A Booking Is Confirmed."}
                   </Typography>
                   <Stack spacing={1.5} sx={{ mt: 0.5 }}>
-                    {[
-                      <>
-                        Prepayment Is Completed{" "}
-                        <Box
-                          component="span"
-                          sx={{
-                            fontWeight: 700,
-                            color: "mollure.textcolorgrey700",
-                          }}
-                        >
-                          Online Within The Response Time.
-                        </Box>
-                      </>,
-                      <>
-                        Prepayment Is Completed{" "}
-                        <Box
-                          component="span"
-                          sx={{
-                            fontWeight: 700,
-                            color: "mollure.textcolorgrey700",
-                          }}
-                        >
-                          During Booking For Fixed Location.
-                        </Box>
-                      </>,
-                      <>
-                        Prepayment Is Completed{" "}
-                        <Box
-                          component="span"
-                          sx={{
-                            fontWeight: 700,
-                            color: "mollure.textcolorgrey700",
-                          }}
-                        >
-                          After Request Approval For Desired Location.
-                        </Box>
-                      </>,
-                    ].map((line, i) => (
+                    {(audience === "professionals"
+                      ? [
+                          <>
+                            <Box
+                              component="span"
+                              sx={{
+                                fontWeight: 700,
+                                color: "mollure.textcolorgrey700",
+                              }}
+                            >
+                              Online Bookings:
+                            </Box>{" "}
+                            Prepayment Is Always Completed Online{" "}
+                            <Box
+                              component="span"
+                              sx={{
+                                fontWeight: 700,
+                                color: "mollure.textcolorgrey700",
+                              }}
+                            >
+                              Within The Response Time.
+                            </Box>
+                          </>,
+                          <>
+                            <Box
+                              component="span"
+                              sx={{
+                                fontWeight: 700,
+                                color: "mollure.textcolorgrey700",
+                              }}
+                            >
+                              Offline Bookings:
+                            </Box>{" "}
+                            Prepayment Can Be Collected Online{" "}
+                            <Box
+                              component="span"
+                              sx={{
+                                fontWeight: 700,
+                                color: "mollure.textcolorgrey700",
+                              }}
+                            >
+                              Within 15 Minutes After Sending The Payment Link
+                            </Box>
+                            , Or{" "}
+                            <Box
+                              component="span"
+                              sx={{
+                                fontWeight: 700,
+                                color: "mollure.textcolorgrey700",
+                              }}
+                            >
+                              Offline Immediately After Checkout.
+                            </Box>
+                          </>,
+                          <>
+                            Prepayment Is Completed{" "}
+                            <Box
+                              component="span"
+                              sx={{
+                                fontWeight: 700,
+                                color: "mollure.textcolorgrey700",
+                              }}
+                            >
+                              During Booking For Fixed Location
+                            </Box>{" "}
+                            And{" "}
+                            <Box
+                              component="span"
+                              sx={{
+                                fontWeight: 700,
+                                color: "mollure.textcolorgrey700",
+                              }}
+                            >
+                              After Request Approval For Desired Location.
+                            </Box>
+                          </>,
+                        ]
+                      : [
+                          <>
+                            Prepayment Is Completed{" "}
+                            <Box
+                              component="span"
+                              sx={{
+                                fontWeight: 700,
+                                color: "mollure.textcolorgrey700",
+                              }}
+                            >
+                              Online Within The Response Time.
+                            </Box>
+                          </>,
+                          <>
+                            Prepayment Is Completed{" "}
+                            <Box
+                              component="span"
+                              sx={{
+                                fontWeight: 700,
+                                color: "mollure.textcolorgrey700",
+                              }}
+                            >
+                              During Booking For Fixed Location.
+                            </Box>
+                          </>,
+                          <>
+                            Prepayment Is Completed{" "}
+                            <Box
+                              component="span"
+                              sx={{
+                                fontWeight: 700,
+                                color: "mollure.textcolorgrey700",
+                              }}
+                            >
+                              After Request Approval For Desired Location.
+                            </Box>
+                          </>,
+                        ]
+                    ).map((line, i) => (
                       <Stack
                         direction="row"
                         spacing={1}
@@ -1574,7 +2352,7 @@ export function HowItWorksPageContent({
                       >
                         <CheckCircle
                           sx={{
-                            color: "primary.main",
+                            color: "mollure.statusGreenFg",
                             fontSize: 20,
                             flexShrink: 0,
                             mt: 0.15,
@@ -1629,47 +2407,101 @@ export function HowItWorksPageContent({
                       fontWeight: 400,
                     }}
                   >
-                    Payments Completed After The Service
+                    {audience === "professionals"
+                      ? "Professional Can Collect Payments After The Booking For Both Online And Offline Bookings."
+                      : "Payments Completed After The Service"}
                   </Typography>
                   <Stack spacing={1.5} sx={{ mt: 0.5 }}>
-                    {[
-                      <>
-                        Payments Can Be Completed{" "}
-                        <Box
-                          component="span"
-                          sx={{
-                            fontWeight: 700,
-                            color: "mollure.textcolorgrey700",
-                          }}
-                        >
-                          Online Using A Payment Link
-                        </Box>
-                      </>,
-                      <>
-                        <Box
-                          component="span"
-                          sx={{
-                            fontWeight: 700,
-                            color: "mollure.textcolorgrey700",
-                          }}
-                        >
-                          Immediate Payments
-                        </Box>{" "}
-                        (Within 15 Minutes After Receiving The Payment Link)
-                      </>,
-                      <>
-                        <Box
-                          component="span"
-                          sx={{
-                            fontWeight: 700,
-                            color: "mollure.textcolorgrey700",
-                          }}
-                        >
-                          Deadline-Based Payments
-                        </Box>{" "}
-                        (Paid Before The Invoice Due Date)
-                      </>,
-                    ].map((line, i) => (
+                    {(audience === "professionals"
+                      ? [
+                          <>
+                            <Box
+                              component="span"
+                              sx={{
+                                fontWeight: 700,
+                                color: "mollure.textcolorgrey700",
+                              }}
+                            >
+                              Online Or Offline Payments
+                            </Box>
+                          </>,
+                          <>
+                            <Box
+                              component="span"
+                              sx={{
+                                fontWeight: 700,
+                                color: "mollure.textcolorgrey700",
+                              }}
+                            >
+                              Immediate Payments
+                            </Box>{" "}
+                            (Within 15 Minutes After Receiving The Payment Link)
+                          </>,
+                          <>
+                            <Box
+                              component="span"
+                              sx={{
+                                fontWeight: 700,
+                                color: "mollure.textcolorgrey700",
+                              }}
+                            >
+                              Deadline-Based Payments
+                            </Box>{" "}
+                            (Paid Before The Invoice Due Date)
+                          </>,
+                          <>
+                            <Box
+                              component="span"
+                              sx={{
+                                fontWeight: 700,
+                                color: "mollure.textcolorgrey700",
+                              }}
+                            >
+                              Invoices With Due Date
+                            </Box>{" "}
+                            Are Used For Business Clients Or Fees As No-Show
+                            Charges For Individual Clients.
+                          </>,
+                        ]
+                      : [
+                          <>
+                            Payments Can Be Completed{" "}
+                            <Box
+                              component="span"
+                              sx={{
+                                fontWeight: 700,
+                                color: "mollure.textcolorgrey700",
+                              }}
+                            >
+                              Online Using A Payment Link
+                            </Box>
+                          </>,
+                          <>
+                            <Box
+                              component="span"
+                              sx={{
+                                fontWeight: 700,
+                                color: "mollure.textcolorgrey700",
+                              }}
+                            >
+                              Immediate Payments
+                            </Box>{" "}
+                            (Within 15 Minutes After Receiving The Payment Link)
+                          </>,
+                          <>
+                            <Box
+                              component="span"
+                              sx={{
+                                fontWeight: 700,
+                                color: "mollure.textcolorgrey700",
+                              }}
+                            >
+                              Deadline-Based Payments
+                            </Box>{" "}
+                            (Paid Before The Invoice Due Date)
+                          </>,
+                        ]
+                    ).map((line, i) => (
                       <Stack
                         direction="row"
                         spacing={1}
@@ -1678,7 +2510,7 @@ export function HowItWorksPageContent({
                       >
                         <CheckCircle
                           sx={{
-                            color: "primary.main",
+                            color: "mollure.statusGreenFg",
                             fontSize: 20,
                             flexShrink: 0,
                             mt: 0.15,
@@ -1813,7 +2645,7 @@ export function HowItWorksPageContent({
                       >
                         <CheckCircle
                           sx={{
-                            color: "primary.main",
+                            color: "mollure.statusGreenFg",
                             fontSize: 20,
                             flexShrink: 0,
                             mt: 0.15,
@@ -1834,200 +2666,6 @@ export function HowItWorksPageContent({
             </Grid>
           </Grid>
         </Box>
-
-        {/* WHO CAN BOOK */}
-        <Box sx={sectionGapSx}>
-          <HowItWorksSectionTitle title="Who Can Book On Mollure" />
-
-          <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
-              <ContentCard
-                sx={{
-                  height: "100%",
-                  bgcolor: "background.paper",
-                  boxShadow: cardShadow,
-                }}
-              >
-                <Stack spacing={2}>
-                  <Box sx={{ width: 50, height: 49, flexShrink: 0 }}>
-                    <Image
-                      src={HowItWorksIndividualClientIcon}
-                      alt=""
-                      width={50}
-                      height={49}
-                    />
-                  </Box>
-
-                  <Typography variant="h6" fontWeight={600}>
-                    Individual Clients
-                  </Typography>
-
-                  <HowItWorksCheckList
-                    items={howItWorksData.gettingStarted.individualPoints}
-                  />
-                </Stack>
-              </ContentCard>
-            </Grid>
-
-            <Grid item xs={12} md={6}>
-              <ContentCard
-                sx={{
-                  height: "100%",
-                  bgcolor: "background.paper",
-                  boxShadow: cardShadow,
-                }}
-              >
-                <Stack spacing={2}>
-                  <Box sx={{ width: 50, height: 49, flexShrink: 0 }}>
-                    <Image
-                      src={HowItWorksBusinessClientIcon}
-                      alt=""
-                      width={50}
-                      height={49}
-                    />
-                  </Box>
-
-                  <Typography variant="h6" fontWeight={600}>
-                    Business Clients
-                  </Typography>
-
-                  <HowItWorksCheckList
-                    items={howItWorksData.gettingStarted.businessPoints}
-                  />
-                </Stack>
-              </ContentCard>
-            </Grid>
-          </Grid>
-
-          <Typography
-            variant="body2"
-            color="text.secondary"
-            sx={{
-              mt: 3,
-              textAlign: "center",
-              lineHeight: 1.7,
-              maxWidth: 920,
-              mx: "auto",
-            }}
-          >
-            {howItWorksData.gettingStarted.note}
-          </Typography>
-        </Box>
-
-        {audience === "professionals" ? (
-          <Box
-            sx={{
-              ...sectionGapSx,
-              bgcolor: cardbg,
-              borderRadius: 3,
-              px: { xs: 2.5, sm: 4 },
-              py: { xs: 3.5, sm: 4.5 },
-            }}
-          >
-            <HowItWorksSectionTitle title="Getting Started" />
-
-            <Stack spacing={3}>
-              <ContentCard
-                sx={{
-                  bgcolor: "background.paper",
-                  boxShadow: cardShadow,
-                }}
-              >
-                <Typography sx={{ ...cardTitleSx, mb: 1.5 }}>
-                  Requirements
-                </Typography>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ mb: 2, lineHeight: 1.65 }}
-                >
-                  {howItWorksData.professionalGettingStarted.requirements.intro}
-                </Typography>
-                <HowItWorksCheckList
-                  items={
-                    howItWorksData.professionalGettingStarted.requirements
-                      .points
-                  }
-                />
-
-                <Box
-                  sx={{
-                    mt: 3,
-                    display: "grid",
-                    gridTemplateColumns: {
-                      xs: "repeat(2, minmax(0, 1fr))",
-                      sm: "repeat(4, minmax(0, 1fr))",
-                      md: "repeat(7, minmax(0, 1fr))",
-                    },
-                    gap: 1.5,
-                  }}
-                >
-                  {howItWorksData.professionalGettingStarted.requirements.categories.map(
-                    (category) => (
-                      <Box
-                        key={category.label}
-                        sx={{
-                          borderRadius: 2,
-                          border: "1px solid",
-                          borderColor: "mollure.cardBorder",
-                          bgcolor: "background.paper",
-                          px: 1,
-                          py: 1.5,
-                          textAlign: "center",
-                        }}
-                      >
-                        <Box
-                          sx={{
-                            display: "grid",
-                            placeItems: "center",
-                            minHeight: 40,
-                            mb: 0.75,
-                          }}
-                        >
-                          <HowItWorksCategoryIcon iconId={category.iconId} />
-                        </Box>
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            display: "block",
-                            fontWeight: 600,
-                            color: "mollure.textcolorgrey700",
-                            lineHeight: 1.25,
-                          }}
-                        >
-                          {category.label}
-                        </Typography>
-                      </Box>
-                    ),
-                  )}
-                </Box>
-              </ContentCard>
-
-              <ContentCard
-                sx={{
-                  bgcolor: "background.paper",
-                  boxShadow: cardShadow,
-                }}
-              >
-                <Typography sx={{ ...cardTitleSx, mb: 1.5 }}>
-                  Validation & Onboarding
-                </Typography>
-                <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ mb: 2, lineHeight: 1.65 }}
-                >
-                  {howItWorksData.professionalGettingStarted.validation.intro}
-                </Typography>
-                <HowItWorksCheckList
-                  items={
-                    howItWorksData.professionalGettingStarted.validation.points
-                  }
-                />
-              </ContentCard>
-            </Stack>
-          </Box>
-        ) : null}
 
         {/* GROUP PAYMENT */}
         <Box
@@ -2066,6 +2704,9 @@ export function HowItWorksPageContent({
               sx={{
                 ...sectionHeadingSx,
                 textAlign: "center",
+                fontSize: 30,
+                fontWeight: 700,
+                lineHeight: 1.2,
                 mb: 0,
               }}
             >
@@ -2151,13 +2792,21 @@ export function HowItWorksPageContent({
                 placeItems: "center",
               }}
             >
-              <ForumOutlined sx={{ fontSize: 30 }} />
+              <Image
+                src={HowItWorksBookingCommunicationChatIcon}
+                alt=""
+                width={28}
+                height={28}
+              />
             </Box>
             <Typography
               component="h2"
               variant="h4"
               sx={{
                 ...sectionHeadingSx,
+                fontSize: 30,
+                fontWeight: 700,
+                lineHeight: 1.2,
                 maxWidth: 640,
               }}
             >

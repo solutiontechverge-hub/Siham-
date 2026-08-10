@@ -18,7 +18,7 @@ export type FixedLocationService = {
 export type FixedLocationServiceCategory = {
   id: "all" | "hair" | "makeup" | "wimpers" | "wenbrauwen";
   label: string;
-  iconKey: "all" | "hair" | "makeup" | "wimpers" | "wenbrauwen";
+  iconKey: "all" | "hair" | "makeup" | "wimpers" | "wenbrauwen" | "nails" | "body" | "facial" | "waxing";
 };
 
 export type FixedLocationServiceDetailItem = FixedLocationService & {
@@ -176,8 +176,12 @@ export const fixedLocationPageData = {
       { id: "all", label: "All", iconKey: "all" },
       { id: "hair", label: "Hair", iconKey: "hair" },
       { id: "makeup", label: "Make-Up", iconKey: "makeup" },
-      { id: "wimpers", label: "Wimpers", iconKey: "wimpers" },
-      { id: "wenbrauwen", label: "Wenkbrauwen", iconKey: "wenbrauwen" },
+      { id: "wimpers", label: "Lashes", iconKey: "wimpers" },
+      { id: "wenbrauwen", label: "Eyebrows", iconKey: "wenbrauwen" },
+      { id: "facial", label: "Facial treatment", iconKey: "facial" },
+      { id: "nails", label: "Nails", iconKey: "nails" },
+      { id: "body", label: "Body treatment", iconKey: "body" },
+      { id: "waxing", label: "Hair Removal", iconKey: "waxing" },
     ],
     items: [
       { id: "hair-1", categoryId: "hair", name: "Buzz Cut", durationLabel: "45 Min", priceLabel: "25 €" },
@@ -217,8 +221,8 @@ export const fixedLocationPageData = {
   },
   generalNotes: {
     title: "General notes",
-    notesLabel: "Notes",
-    placeholder: "Add note...",
+    notesLabel: "Additional notes",
+    placeholder: "Any Technical note about Client",
   },
   price: {
     title: "Price",

@@ -36,6 +36,7 @@ export default function ContactUs({ illustrationSrc }: ContactUsProps) {
     touch,
     addFiles,
     removeFile,
+    attachmentError,
     submit,
     submitState,
     showSignInGate,
@@ -264,29 +265,51 @@ export default function ContactUs({ illustrationSrc }: ContactUsProps) {
                     helperText={touched.message ? errors.message : undefined}
                   />
 
-                  <Stack direction="row" alignItems="center" spacing={1.25}>
-                    <input
-                      id={fileInputId}
-                      type="file"
-                      hidden
-                      multiple
-                      onChange={(e) => addFiles(e.target.files)}
-                    />
-                    <AppButton
-                      component="label"
-                      htmlFor={fileInputId}
-                      variant="text"
-                      startIcon={<AttachFileRoundedIcon />}
-                      sx={{
-                        textTransform: "none",
-                        color: alpha(m.navy, 0.65),
-                        fontWeight: 600,
-                        px: 0,
-                        "&:hover": { bgcolor: "transparent", color: m.navy },
-                      }}
-                    >
-                      Attach File
-                    </AppButton>
+                  <Stack spacing={0.5}>
+                    <Stack direction="row" alignItems="center" spacing={1.25}>
+                      <input
+                        id={fileInputId}
+                        type="file"
+                        hidden
+                        multiple
+                        onChange={(e) => {
+                          addFiles(e.target.files);
+                          e.target.value = "";
+                        }}
+                      />
+                      <AppButton
+                        component="label"
+                        htmlFor={fileInputId}
+                        variant="text"
+                        startIcon={<AttachFileRoundedIcon />}
+                        sx={{
+                          textTransform: "none",
+                          color: alpha(m.navy, 0.65),
+                          fontWeight: 600,
+                          px: 0,
+                          "&:hover": { bgcolor: "transparent", color: m.navy },
+                        }}
+                      >
+                        Attach File
+                      </AppButton>
+                    </Stack>
+                    {attachmentError ? (
+                      <BodyText
+                        sx={{ fontSize: 11, color: "error.main", pl: 0.25 }}
+                      >
+                        {attachmentError}
+                      </BodyText>
+                    ) : (
+                      <BodyText
+                        sx={{
+                          fontSize: 11,
+                          color: alpha(m.navy, 0.45),
+                          pl: 0.25,
+                        }}
+                      >
+                        Max file size 10 MB
+                      </BodyText>
+                    )}
                   </Stack>
 
                   {values.attachments.length ? (

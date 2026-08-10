@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS business_setups (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CHECK (cardinality(business_keywords) <= 3),
-  CHECK (cardinality(business_media) <= 4),
+  CHECK (cardinality(business_media) <= 10),
   CHECK (prepayment_percentage IS NULL OR (prepayment_percentage >= 0 AND prepayment_percentage <= 100)),
   CHECK (late_reschedule_fee_percentage IS NULL OR (late_reschedule_fee_percentage >= 0 AND late_reschedule_fee_percentage <= 100)),
   CHECK (late_cancellation_fee_percentage IS NULL OR (late_cancellation_fee_percentage >= 0 AND late_cancellation_fee_percentage <= 100)),

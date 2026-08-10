@@ -33,7 +33,7 @@ export default function AppCountryPhoneFields({
   onCountryCodeChange,
   onPhoneChange,
   label = "Contact Number",
-  phonePlaceholder = "Phone number",
+  phonePlaceholder = "Enter your phone number",
   countryCodeError,
   phoneError,
   onClearErrors,

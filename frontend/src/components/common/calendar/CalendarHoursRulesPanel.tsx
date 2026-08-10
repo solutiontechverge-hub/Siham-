@@ -33,6 +33,7 @@ import { getCalendarDesignServiceLabel } from "./CalendarDesignModal";
 import type { PublicBusinessHoursEntry } from "./CalendarPublicBusinessHoursModal";
 import CalendarServiceOrderCard from "./CalendarServiceOrderCard";
 import {
+  dedupeServiceOrderSettings,
   isCategoryVisibleInServiceOrder,
   isServiceVisibleInServiceOrder,
   toggleHiddenCategory,
@@ -533,11 +534,12 @@ function resolveCategoryMeta(category: string): {
   const catalog = BUSINESS_SERVICE_CATEGORY_CATALOG.find(
     (entry) =>
       entry.key === category ||
-      entry.label.toLowerCase() === category.toLowerCase(),
+      entry.label.toLowerCase() === category.toLowerCase() ||
+      resolveServiceCategorySliderIconId(category) === entry.iconId,
   );
   if (catalog) {
     return {
-      label: catalog.key === "hair" ? "Haar" : catalog.label,
+      label: catalog.label,
       iconId: catalog.iconId,
     };
   }
@@ -622,7 +624,10 @@ export default function CalendarHoursRulesPanel({
     }
   }, [dlEntries, dlHoursId]);
 
-  const categories = serviceOrder.categories ?? [];
+  const categories = React.useMemo(
+    () => dedupeServiceOrderSettings(serviceOrder).categories,
+    [serviceOrder],
+  );
   const activeCategory =
     selectedCategory && categories.includes(selectedCategory)
       ? selectedCategory
