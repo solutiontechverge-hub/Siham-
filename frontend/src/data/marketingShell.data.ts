@@ -17,12 +17,12 @@ export const marketingPrimaryNavItems = [
   { label: "Contact Us", href: "/professionals/contact-us", match: "exact" as const },
 ] as const satisfies readonly MarketingNavItem[];
 
-/** Header preset for `/clients` and client-audience info pages (3 links + “for professional” on the right). */
+/** Header preset for `/clients` and client-audience info pages (3 links + “For Professional” on the right). */
 export const clientsShellHeader = {
   navItems: clientPrimaryNavItems,
   localeLabel: "EN",
   loginLabel: "login",
-  professionalLinkLabel: "for professional",
+  professionalLinkLabel: "For Professional",
   professionalHref: "/professionals",
 } as const;
 
@@ -52,23 +52,23 @@ export const authLoginHeaderProfessional: AuthStripHeaderConfig = {
   loginHref: "/auth/professional/login",
 };
 
-/** Client signup routes — “for professional” opens professional signup. */
+/** Client signup routes — “For Professional” opens professional signup. */
 export const authSignupHeaderClient: AuthStripHeaderConfig = {
   navItems: [] as MarketingNavItem[],
   localeLabel: "EN",
   loginLabel: "login",
   loginHref: "/auth/login",
-  professionalLinkLabel: "for professional",
+  professionalLinkLabel: "For Professional",
   professionalHref: "/auth/signup/professional",
 };
 
-/** `/auth/signup/professional` — “for clients” returns to the client signup chooser. */
+/** `/auth/signup/professional` — “For Clients” returns to the client signup chooser. */
 export const authSignupHeaderProfessional: AuthStripHeaderConfig = {
   navItems: [] as MarketingNavItem[],
   localeLabel: "EN",
   loginLabel: "login",
   loginHref: "/auth/professional/login",
-  professionalLinkLabel: "for clients",
+  professionalLinkLabel: "For Clients",
   professionalHref: "/auth/signup",
 };
 
@@ -85,7 +85,7 @@ export const professionalsMarketingHeader = {
   navItems: marketingPrimaryNavItems,
   localeLabel: "EN",
   loginLabel: "login",
-  professionalLinkLabel: "for clients",
+  professionalLinkLabel: "For Clients",
   /** Public client home (`/`), not `/clients` (AuthGuard). */
   professionalHref: "/",
 } as const;
