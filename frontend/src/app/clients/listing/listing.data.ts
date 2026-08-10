@@ -53,7 +53,7 @@ export const listingPageData = {
   header: {
     localeLabel: "EN",
     loginLabel: "Login",
-    professionalLinkLabel: "for professional",
+    professionalLinkLabel: "For Professional",
   },
   filters: {
     categoryOptions: clientHomeServiceCategories.map((category) => ({
