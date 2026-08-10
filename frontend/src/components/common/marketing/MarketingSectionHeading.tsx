@@ -39,7 +39,20 @@ export default function MarketingSectionHeading({
               : "flex-start",
       }}
     >
-      <MainHeading sx={[{ textAlign: align }, titleSx]}>{title}</MainHeading>
+      <MainHeading
+        sx={
+          [
+            { textAlign: align },
+            ...(titleSx
+              ? Array.isArray(titleSx)
+                ? titleSx
+                : [titleSx]
+              : []),
+          ] as SxProps<Theme>
+        }
+      >
+        {title}
+      </MainHeading>
       {subtitle ? (
         <Description
           sx={{

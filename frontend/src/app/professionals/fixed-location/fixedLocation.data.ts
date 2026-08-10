@@ -16,9 +16,27 @@ export type FixedLocationService = {
 };
 
 export type FixedLocationServiceCategory = {
-  id: "all" | "hair" | "makeup" | "wimpers" | "wenbrauwen";
+  id:
+    | "all"
+    | "hair"
+    | "makeup"
+    | "wimpers"
+    | "wenbrauwen"
+    | "nails"
+    | "body"
+    | "facial"
+    | "waxing";
   label: string;
-  iconKey: "all" | "hair" | "makeup" | "wimpers" | "wenbrauwen" | "nails" | "body" | "facial" | "waxing";
+  iconKey:
+    | "all"
+    | "hair"
+    | "makeup"
+    | "wimpers"
+    | "wenbrauwen"
+    | "nails"
+    | "body"
+    | "facial"
+    | "waxing";
 };
 
 export type FixedLocationServiceDetailItem = FixedLocationService & {
