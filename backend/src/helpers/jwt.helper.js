@@ -23,6 +23,10 @@ export const generateAccessToken = (user) =>
 export const generateRefreshToken = (user) =>
   jwt.sign(getPayload(user), refreshSecret, { expiresIn: "7d" });
 
+/** Longer refresh when the client opts into Remember Me. */
+export const generateRememberRefreshToken = (user) =>
+  jwt.sign(getPayload(user), refreshSecret, { expiresIn: "30d" });
+
 export const generateAdminAccessToken = (admin) =>
   jwt.sign(getAdminPayload(admin), jwtSecret, { expiresIn: "5h" });
 
@@ -30,3 +34,5 @@ export const generateAdminRefreshToken = (admin) =>
   jwt.sign(getAdminPayload(admin), refreshSecret, { expiresIn: "7d" });
 
 export const verifyAccessToken = (token) => jwt.verify(token, jwtSecret);
+
+export const verifyRefreshToken = (token) => jwt.verify(token, refreshSecret);

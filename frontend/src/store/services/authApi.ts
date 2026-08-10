@@ -10,6 +10,7 @@ type ApiEnvelope<T> = {
 type LoginRequest = {
   email: string;
   password: string;
+  remember?: boolean;
 };
 
 type GoogleLoginRequest = {
@@ -120,6 +121,7 @@ export const authApi = baseApi.injectEndpoints({
           body: {
             email: credentials.email.trim().toLowerCase(),
             password: credentials.password,
+            remember: Boolean(credentials.remember),
           },
         });
 
