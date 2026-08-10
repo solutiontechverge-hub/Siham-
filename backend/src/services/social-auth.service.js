@@ -129,7 +129,10 @@ export const findOrCreateOAuthUser = async ({
 
     await client.query("COMMIT");
 
-    void notifySignupConfirmation(user.id);
+    // OAuth accounts that already verified email can get the welcome confirmation immediately
+    if (emailVerified) {
+      void notifySignupConfirmation(user.id);
+    }
 
     return { user, isNewUser: true };
   } catch (error) {

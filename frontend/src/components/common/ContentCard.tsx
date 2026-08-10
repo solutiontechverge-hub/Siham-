@@ -2,13 +2,14 @@
 
 import * as React from "react";
 import { Box, Stack, type PaperProps } from "@mui/material";
-import { alpha } from "@mui/material/styles";
+import { alpha, type SxProps, type Theme } from "@mui/material/styles";
 import AppCard from "./AppCard";
 import { BodyText, SubHeading } from "../ui/typography";
 import { MOLLURE_HEADING_BODY_GAP_PX } from "../../theme/spacing";
 
 type ContentCardProps = Omit<PaperProps, "title"> & {
   title?: React.ReactNode;
+  titleSx?: SxProps<Theme>;
   description?: React.ReactNode;
   actions?: React.ReactNode;
   children?: React.ReactNode;
@@ -20,6 +21,7 @@ export default function ContentCard({
   children,
   description,
   title,
+  titleSx,
   withAccent = false, // default OFF
   ...props
 }: ContentCardProps) {
@@ -60,7 +62,16 @@ export default function ContentCard({
           }}
         >
           {title && (
-            <SubHeading sx={{ color: "mollure.textcolorgrey700" }}>
+            <SubHeading
+              sx={[
+                { color: "mollure.textcolorgrey700" },
+                ...(titleSx
+                  ? Array.isArray(titleSx)
+                    ? titleSx
+                    : [titleSx]
+                  : []),
+              ]}
+            >
               {title}
             </SubHeading>
           )}

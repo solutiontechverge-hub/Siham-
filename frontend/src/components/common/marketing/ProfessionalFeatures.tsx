@@ -387,21 +387,16 @@
 "use client";
 
 import * as React from "react";
-import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import FolderOutlinedIcon from "@mui/icons-material/FolderOutlined";
+import FormatListBulletedOutlinedIcon from "@mui/icons-material/FormatListBulletedOutlined";
+import PlaceOutlinedIcon from "@mui/icons-material/PlaceOutlined";
+import EuroOutlinedIcon from "@mui/icons-material/EuroOutlined";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
-import PlaceRoundedIcon from "@mui/icons-material/PlaceRounded";
-import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
-import EventNoteRoundedIcon from "@mui/icons-material/EventNoteRounded";
-import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
-import TimelineRoundedIcon from "@mui/icons-material/TimelineRounded";
-import TaskAltRoundedIcon from "@mui/icons-material/TaskAltRounded";
-import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
-import PublishedWithChangesRoundedIcon from "@mui/icons-material/PublishedWithChangesRounded";
+import EventSeatRoundedIcon from "@mui/icons-material/EventSeatRounded";
+import PersonPinCircleRoundedIcon from "@mui/icons-material/PersonPinCircleRounded";
 import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
-import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
 import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneRounded";
-import WidgetsRoundedIcon from "@mui/icons-material/WidgetsRounded";
-import WorkspacesRoundedIcon from "@mui/icons-material/WorkspacesRounded";
 import CreditCardRoundedIcon from "@mui/icons-material/CreditCardRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import NotificationsRoundedIcon from "@mui/icons-material/NotificationsRounded";
@@ -415,12 +410,21 @@ import {
   Grid,
   Paper,
   Stack,
+  SvgIcon,
   Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import Image from "next/image";
 import type { ProfessionalFeaturesPageData } from "../../../app/professionals/professionalFeatures.data";
-import { DD } from "../../../../images";
+import {
+  BookingRequestIcon,
+  CombinableServicesIcon,
+  DD,
+  EditConfirmedIcon,
+  EditedBookingIcon,
+  ProjectBookingsIcon,
+  TaxCompliantInvoiceIcon,
+} from "../../../../images";
 import MarketingSiteFooter from "./MarketingSiteFooter";
 import MollureMarketingHeader from "./MollureMarketingHeader";
 
@@ -478,10 +482,10 @@ function BulletList({ items }: { items: readonly string[] }) {
           key={text}
           direction="row"
           spacing={1.25}
-          alignItems="flex-start"
+          alignItems="center"
         >
-          <CheckCircleRoundedIcon
-            sx={{ mt: "2px", fontSize: 20, color: tokens.teal }}
+          <CheckCircleOutlineIcon
+            sx={{ fontSize: 20, color: tokens.teal, flexShrink: 0 }}
           />
           <Typography
             sx={{ color: tokens.slate, fontSize: 13.5, lineHeight: 1.7 }}
@@ -498,9 +502,9 @@ function BusinessSetupCard() {
   const tokens = useTheme().palette.mollure;
 
   const Bullet = ({ children }: { children: React.ReactNode }) => (
-    <Stack direction="row" spacing={1.25} alignItems="flex-start">
-      <CheckCircleRoundedIcon
-        sx={{ mt: "2px", fontSize: 18, color: tokens.teal }}
+    <Stack direction="row" spacing={1.25} alignItems="center">
+      <CheckCircleOutlineIcon
+        sx={{ fontSize: 18, color: tokens.teal, flexShrink: 0 }}
       />
       <Typography
         sx={{
@@ -518,10 +522,12 @@ function BusinessSetupCard() {
     icon,
     title,
     description,
+    filledIcon = false,
   }: {
     icon: React.ReactNode;
     title: string;
     description: string;
+    filledIcon?: boolean;
   }) => (
     <Paper
       elevation={0}
@@ -542,11 +548,15 @@ function BusinessSetupCard() {
           width: 34,
           height: 34,
           borderRadius: 1.4,
-          bgcolor: tokens.teal,
+          bgcolor: filledIcon ? "transparent" : tokens.teal,
           color: "#fff",
           display: "grid",
           placeItems: "center",
           flexShrink: 0,
+          overflow: "hidden",
+          "& img": filledIcon
+            ? { width: "100%", height: "100%", objectFit: "cover", display: "block" }
+            : undefined,
         }}
       >
         {icon}
@@ -656,14 +666,14 @@ function BusinessSetupCard() {
           <Grid container spacing={2} sx={{ mt: 1.6 }}>
             <Grid item xs={12} md={6}>
               <SmallCard
-                icon={<StorefrontRoundedIcon sx={{ fontSize: 18 }} />}
+                icon={<EventSeatRoundedIcon sx={{ fontSize: 18 }} />}
                 title="Fixed Location"
                 description="Provide Your Salon Or Workspace Address"
               />
             </Grid>
             <Grid item xs={12} md={6}>
               <SmallCard
-                icon={<PlaceRoundedIcon sx={{ fontSize: 18 }} />}
+                icon={<PersonPinCircleRoundedIcon sx={{ fontSize: 18 }} />}
                 title="Desired Location"
                 description="Define Your Operating Areas (Nationwide Or Selected Provinces/Municipalities)"
               />
@@ -695,14 +705,30 @@ function BusinessSetupCard() {
           <Grid container spacing={2} sx={{ mt: 1.6 }}>
             <Grid item xs={12} md={6}>
               <SmallCard
-                icon={<WorkspacesRoundedIcon sx={{ fontSize: 18 }} />}
+                filledIcon
+                icon={
+                  <Image
+                    src={CombinableServicesIcon}
+                    alt=""
+                    width={34}
+                    height={34}
+                  />
+                }
                 title="Combinable Services"
                 description="(Fixed Location Only)"
               />
             </Grid>
             <Grid item xs={12} md={6}>
               <SmallCard
-                icon={<WidgetsRoundedIcon sx={{ fontSize: 18 }} />}
+                filledIcon
+                icon={
+                  <Image
+                    src={ProjectBookingsIcon}
+                    alt=""
+                    width={34}
+                    height={34}
+                  />
+                }
                 title="Project Bookings"
                 description="(Desired Location Only, For Business Clients)"
               />
@@ -724,25 +750,33 @@ function BusinessSetupCard() {
         <Grid container spacing={1.5} sx={{ mt: 1.4, pl: 3.75 }}>
           <Grid item xs={12} md={6}>
             <Stack spacing={1.1}>
-              {[
-                "Price Range",
-                "Kilometer Allowance For On-Location Services",
-              ].map((t) => (
+              {(
+                [
+                  {
+                    label: "Price Range",
+                    icon: (
+                      <EuroOutlinedIcon
+                        sx={{ fontSize: 16, color: tokens.teal, flexShrink: 0 }}
+                      />
+                    ),
+                  },
+                  {
+                    label: "Kilometer Allowance For On-Location Services",
+                    icon: (
+                      <FormatListBulletedOutlinedIcon
+                        sx={{ fontSize: 16, color: tokens.teal, flexShrink: 0 }}
+                      />
+                    ),
+                  },
+                ] as const
+              ).map((item) => (
                 <Stack
-                  key={t}
+                  key={item.label}
                   direction="row"
                   spacing={1}
-                  alignItems="flex-start"
+                  alignItems="center"
                 >
-                  <Box
-                    sx={{
-                      mt: "7px",
-                      width: 4,
-                      height: 4,
-                      borderRadius: 99,
-                      bgcolor: alpha(tokens.navy, 0.35),
-                    }}
-                  />
+                  {item.icon}
                   <Typography
                     sx={{
                       color: alpha(tokens.navy, 0.6),
@@ -750,7 +784,7 @@ function BusinessSetupCard() {
                       lineHeight: 1.6,
                     }}
                   >
-                    {t}
+                    {item.label}
                   </Typography>
                 </Stack>
               ))}
@@ -758,25 +792,34 @@ function BusinessSetupCard() {
           </Grid>
           <Grid item xs={12} md={6}>
             <Stack spacing={1.1}>
-              {[
-                "Policies (Response Time, Cancellation, Rescheduling, No-Show)",
-                "Prepayment Requirements (If Applicable)",
-              ].map((t) => (
+              {(
+                [
+                  {
+                    label:
+                      "Policies (Response Time, Cancellation, Rescheduling, No-Show)",
+                    icon: (
+                      <PlaceOutlinedIcon
+                        sx={{ fontSize: 16, color: tokens.teal, flexShrink: 0 }}
+                      />
+                    ),
+                  },
+                  {
+                    label: "Prepayment Requirements (If Applicable)",
+                    icon: (
+                      <FolderOutlinedIcon
+                        sx={{ fontSize: 16, color: tokens.teal, flexShrink: 0 }}
+                      />
+                    ),
+                  },
+                ] as const
+              ).map((item) => (
                 <Stack
-                  key={t}
+                  key={item.label}
                   direction="row"
                   spacing={1}
-                  alignItems="flex-start"
+                  alignItems="center"
                 >
-                  <Box
-                    sx={{
-                      mt: "7px",
-                      width: 4,
-                      height: 4,
-                      borderRadius: 99,
-                      bgcolor: alpha(tokens.navy, 0.35),
-                    }}
-                  />
+                  {item.icon}
                   <Typography
                     sx={{
                       color: alpha(tokens.navy, 0.6),
@@ -784,7 +827,7 @@ function BusinessSetupCard() {
                       lineHeight: 1.6,
                     }}
                   >
-                    {t}
+                    {item.label}
                   </Typography>
                 </Stack>
               ))}
@@ -803,13 +846,59 @@ function BusinessSetupCard() {
   );
 }
 
+function BookingDetailsGlyph({ fontSize = 16 }: { fontSize?: number }) {
+  return (
+    <SvgIcon sx={{ fontSize }} viewBox="0 0 24 24">
+      <rect x="4" y="5" width="4" height="4" rx="1" fill="currentColor" />
+      <rect x="10" y="5.5" width="10" height="1.5" rx="0.75" fill="currentColor" />
+      <rect x="10" y="8" width="7" height="1.5" rx="0.75" fill="currentColor" />
+      <rect x="4" y="14" width="4" height="4" rx="1" fill="currentColor" />
+      <rect x="10" y="14.5" width="10" height="1.5" rx="0.75" fill="currentColor" />
+      <rect x="10" y="17" width="7" height="1.5" rx="0.75" fill="currentColor" />
+    </SvgIcon>
+  );
+}
+
+function LinkedSalesGlyph({ fontSize = 16 }: { fontSize?: number }) {
+  return (
+    <SvgIcon sx={{ fontSize }} viewBox="0 0 24 24">
+      <path
+        fill="currentColor"
+        fillRule="evenodd"
+        d="M12 3.2 18.8 7.2v9.6L12 20.8 5.2 16.8V7.2L12 3.2ZM8.2 13.2h1.8v3.2H8.2v-3.2Zm2.9-2.2h1.8v5.4h-1.8V11Zm2.9-2.4h1.8v7.8H14V8.6Z"
+      />
+    </SvgIcon>
+  );
+}
+
+function ActivityTimelineGlyph({ fontSize = 16 }: { fontSize?: number }) {
+  return (
+    <SvgIcon sx={{ fontSize }} viewBox="0 0 24 24">
+      <path
+        d="M5 14.5L9 8.5L13 13.5L19 6.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="5" cy="14.5" r="1.7" fill="currentColor" />
+      <circle cx="9" cy="8.5" r="1.7" fill="currentColor" />
+      <circle cx="13" cy="13.5" r="1.7" fill="currentColor" />
+      <circle cx="19" cy="6.5" r="1.7" fill="currentColor" />
+    </SvgIcon>
+  );
+}
+
 function CalendarSchedulingCard() {
   const tokens = useTheme().palette.mollure;
+  const greenBg = tokens.statusGreenBg;
+  const greenFg = tokens.statusGreenFg;
 
   const Bullet = ({ children }: { children: React.ReactNode }) => (
-    <Stack direction="row" spacing={1.25} alignItems="flex-start">
-      <CheckCircleRoundedIcon
-        sx={{ mt: "2px", fontSize: 18, color: tokens.teal }}
+    <Stack direction="row" spacing={1.25} alignItems="center">
+      <CheckCircleOutlineIcon
+        sx={{ fontSize: 18, color: greenFg, flexShrink: 0 }}
       />
       <Typography
         sx={{
@@ -844,8 +933,8 @@ function CalendarSchedulingCard() {
           width: 28,
           height: 28,
           borderRadius: 1.2,
-          bgcolor: "#0AA8A5",
-          color: "#fff",
+          bgcolor: greenBg,
+          color: greenFg,
           display: "grid",
           placeItems: "center",
           flexShrink: 0,
@@ -948,9 +1037,9 @@ function CalendarSchedulingCard() {
         <Box
           sx={{
             mt: 2.1,
-            border: `2px dashed ${alpha(tokens.teal, 0.55)}`,
+            border: `2px dashed ${alpha(greenFg, 0.45)}`,
             borderRadius: 2,
-            bgcolor: alpha(tokens.mintSoft, 0.55),
+            bgcolor: alpha(greenBg, 0.7),
             p: 2,
           }}
         >
@@ -963,19 +1052,19 @@ function CalendarSchedulingCard() {
           <Grid container spacing={2} sx={{ mt: 1.6 }}>
             <Grid item xs={12} md={4}>
               <Mini
-                icon={<EventNoteRoundedIcon sx={{ fontSize: 16 }} />}
+                icon={<BookingDetailsGlyph />}
                 text="Booking Details"
               />
             </Grid>
             <Grid item xs={12} md={4}>
               <Mini
-                icon={<LinkRoundedIcon sx={{ fontSize: 16 }} />}
+                icon={<LinkedSalesGlyph />}
                 text="Linked Sales And Payment Activity"
               />
             </Grid>
             <Grid item xs={12} md={4}>
               <Mini
-                icon={<TimelineRoundedIcon sx={{ fontSize: 16 }} />}
+                icon={<ActivityTimelineGlyph />}
                 text="Complete Activity Timeline With Date- And Time-Stamped Actions"
               />
             </Grid>
@@ -1000,8 +1089,10 @@ function InteractiveBookingFlowCard() {
   const orange = tokens.star; // theme-based orange/yellow accent
 
   const Bullet = ({ children }: { children: React.ReactNode }) => (
-    <Stack direction="row" spacing={1.25} alignItems="flex-start">
-      <CheckCircleRoundedIcon sx={{ mt: "2px", fontSize: 18, color: orange }} />
+    <Stack direction="row" spacing={1.25} alignItems="center">
+      <CheckCircleOutlineIcon
+        sx={{ fontSize: 18, color: orange, flexShrink: 0 }}
+      />
       <Typography
         sx={{
           color: alpha(tokens.navy, 0.72),
@@ -1014,7 +1105,15 @@ function InteractiveBookingFlowCard() {
     </Stack>
   );
 
-  const Mini = ({ icon, title }: { icon: React.ReactNode; title: string }) => (
+  const Mini = ({
+    icon,
+    title,
+    filledIcon = false,
+  }: {
+    icon: React.ReactNode;
+    title: string;
+    filledIcon?: boolean;
+  }) => (
     <Paper
       elevation={0}
       sx={{
@@ -1035,11 +1134,20 @@ function InteractiveBookingFlowCard() {
           width: 28,
           height: 28,
           borderRadius: 1.2,
-          bgcolor: orange,
+          bgcolor: filledIcon ? "transparent" : orange,
           color: "#fff",
           display: "grid",
           placeItems: "center",
           flexShrink: 0,
+          overflow: "hidden",
+          "& img": filledIcon
+            ? {
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                display: "block",
+              }
+            : undefined,
         }}
       >
         {icon}
@@ -1161,20 +1269,44 @@ function InteractiveBookingFlowCard() {
           <Grid container spacing={1.8} sx={{ mt: 1.5 }}>
             <Grid item xs={12} md={4}>
               <Mini
-                icon={<TaskAltRoundedIcon sx={{ fontSize: 16 }} />}
-                title="Booking Requests"
+                filledIcon
+                icon={
+                  <Image
+                    src={BookingRequestIcon}
+                    alt=""
+                    width={28}
+                    height={28}
+                  />
+                }
+                title="Booking Request"
               />
             </Grid>
             <Grid item xs={12} md={4}>
               <Mini
-                icon={<EditNoteRoundedIcon sx={{ fontSize: 16 }} />}
-                title="Edited Booking Requests"
+                filledIcon
+                icon={
+                  <Image
+                    src={EditedBookingIcon}
+                    alt=""
+                    width={28}
+                    height={28}
+                  />
+                }
+                title="Edited Booking"
               />
             </Grid>
             <Grid item xs={12} md={4}>
               <Mini
-                icon={<PublishedWithChangesRoundedIcon sx={{ fontSize: 16 }} />}
-                title="Edit Requests On Confirmed Bookings"
+                filledIcon
+                icon={
+                  <Image
+                    src={EditConfirmedIcon}
+                    alt=""
+                    width={28}
+                    height={28}
+                  />
+                }
+                title="Edit Confirmed"
               />
             </Grid>
           </Grid>
@@ -1198,9 +1330,9 @@ function ClientManagementInsightsCard() {
   const tokens = useTheme().palette.mollure;
 
   const Bullet = ({ children }: { children: React.ReactNode }) => (
-    <Stack direction="row" spacing={1.25} alignItems="flex-start">
-      <CheckCircleRoundedIcon
-        sx={{ mt: "2px", fontSize: 18, color: tokens.teal }}
+    <Stack direction="row" spacing={1.25} alignItems="center">
+      <CheckCircleOutlineIcon
+        sx={{ fontSize: 18, color: tokens.teal, flexShrink: 0 }}
       />
       <Typography
         sx={{
@@ -1270,9 +1402,9 @@ function PaymentsInvoicingFinancialControlCard() {
   const tokens = useTheme().palette.mollure;
 
   const Bullet = ({ children }: { children: React.ReactNode }) => (
-    <Stack direction="row" spacing={1.25} alignItems="flex-start">
-      <CheckCircleRoundedIcon
-        sx={{ mt: "2px", fontSize: 18, color: tokens.teal }}
+    <Stack direction="row" spacing={1.25} alignItems="center">
+      <CheckCircleOutlineIcon
+        sx={{ fontSize: 18, color: tokens.teal, flexShrink: 0 }}
       />
       <Typography
         sx={{
@@ -1286,7 +1418,17 @@ function PaymentsInvoicingFinancialControlCard() {
     </Stack>
   );
 
-  const Mini = ({ icon, title }: { icon: React.ReactNode; title: string }) => (
+  const invoiceIconBg = tokens.statusGreyFg; // matches tax-compliant icon slate
+
+  const Mini = ({
+    icon,
+    title,
+    filledIcon = false,
+  }: {
+    icon: React.ReactNode;
+    title: string;
+    filledIcon?: boolean;
+  }) => (
     <Paper
       elevation={0}
       sx={{
@@ -1308,10 +1450,20 @@ function PaymentsInvoicingFinancialControlCard() {
           width: 30,
           height: 30,
           borderRadius: 1.2,
-          bgcolor: alpha(tokens.navy, 0.12),
-          color: alpha(tokens.navy, 0.78),
+          bgcolor: filledIcon ? "transparent" : invoiceIconBg,
+          color: "#fff",
           display: "grid",
           placeItems: "center",
+          overflow: "hidden",
+          flexShrink: 0,
+          "& img": filledIcon
+            ? {
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                display: "block",
+              }
+            : undefined,
         }}
       >
         {icon}
@@ -1389,7 +1541,15 @@ function PaymentsInvoicingFinancialControlCard() {
           </Grid>
           <Grid item xs={12} md={4}>
             <Mini
-              icon={<ReceiptLongRoundedIcon sx={{ fontSize: 18 }} />}
+              filledIcon
+              icon={
+                <Image
+                  src={TaxCompliantInvoiceIcon}
+                  alt=""
+                  width={30}
+                  height={30}
+                />
+              }
               title="Tax-Compliant Business Invoices"
             />
           </Grid>
@@ -1415,9 +1575,9 @@ function AnalyticsPerformanceCard() {
   const tokens = useTheme().palette.mollure;
 
   const Bullet = ({ children }: { children: React.ReactNode }) => (
-    <Stack direction="row" spacing={1.25} alignItems="flex-start">
-      <CheckCircleRoundedIcon
-        sx={{ mt: "2px", fontSize: 18, color: tokens.teal }}
+    <Stack direction="row" spacing={1.25} alignItems="center">
+      <CheckCircleOutlineIcon
+        sx={{ fontSize: 18, color: tokens.teal, flexShrink: 0 }}
       />
       <Typography
         sx={{
@@ -1506,9 +1666,9 @@ function NotificationsCard() {
   const tokens = useTheme().palette.mollure;
 
   const Bullet = ({ children }: { children: React.ReactNode }) => (
-    <Stack direction="row" spacing={1.25} alignItems="flex-start">
-      <CheckCircleRoundedIcon
-        sx={{ mt: "2px", fontSize: 18, color: tokens.teal }}
+    <Stack direction="row" spacing={1.25} alignItems="center">
+      <CheckCircleOutlineIcon
+        sx={{ fontSize: 18, color: tokens.teal, flexShrink: 0 }}
       />
       <Typography
         sx={{

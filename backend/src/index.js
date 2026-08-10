@@ -20,9 +20,31 @@ const skipMigrations =
   process.env.SKIP_MIGRATIONS_ON_START === "true" ||
   onRailway;
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const waitForDatabase = async (attempts = 5) => {
+  let lastError;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      await query("SELECT 1");
+      return;
+    } catch (error) {
+      lastError = error;
+      const message = error?.message || String(error);
+      console.warn(
+        `[db] Startup check failed (attempt ${attempt}/${attempts}): ${message}`,
+      );
+      if (attempt < attempts) {
+        await sleep(1500 * attempt);
+      }
+    }
+  }
+  throw lastError;
+};
+
 const startServer = async () => {
   try {
-    await query("SELECT 1");
+    await waitForDatabase();
     if (!skipMigrations) {
       await runMigrations();
     } else if (onRailway) {

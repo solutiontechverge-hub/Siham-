@@ -49,15 +49,12 @@ export default function ClientProfessionalReviewsPage() {
     return profile.locationModeDefault;
   }, [profile]);
 
+  // Only scope to a team member when explicitly requested — otherwise show shop-level reviews
+  // matching the listing/shop aggregate rating.
   const member = React.useMemo(() => {
     if (!profile?.teamMembers.length) return null;
-    if (memberIdParam) {
-      return (
-        profile.teamMembers.find((m) => m.id === memberIdParam) ??
-        profile.teamMembers[0]
-      );
-    }
-    return profile.teamMembers[0];
+    if (!memberIdParam) return null;
+    return profile.teamMembers.find((m) => m.id === memberIdParam) ?? null;
   }, [memberIdParam, profile]);
 
   if (isLoading) {
@@ -72,7 +69,7 @@ export default function ClientProfessionalReviewsPage() {
     );
   }
 
-  if (isError || !profile || !member) {
+  if (isError || !profile) {
     return (
       <Box sx={{ minHeight: "100vh", bgcolor: "mollure.pageBg", py: 4 }}>
         <Container maxWidth="lg">
@@ -90,7 +87,7 @@ export default function ClientProfessionalReviewsPage() {
     <Box sx={{ minHeight: "100vh", bgcolor: "mollure.pageBg" }}>
       <MollureMarketingHeader
         navItems={[]}
-        isAuthed
+        isAuthed={Boolean(user)}
         userLabel={user?.email ?? ""}
         userName={displayName}
         homeHref="/"

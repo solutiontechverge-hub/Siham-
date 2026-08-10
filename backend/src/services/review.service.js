@@ -57,7 +57,8 @@ export async function createReviewInviteForBooking(bookingId) {
        b.status,
        COALESCE(
          NULLIF(TRIM(COALESCE(ip.display_name, CONCAT_WS(' ', ip.first_name, ip.last_name))), ''),
-         NULLIF(TRIM(COALESCE(cp.company_name, '')), ''),
+         NULLIF(TRIM(COALESCE(cp.legal_name, '')), ''),
+         NULLIF(TRIM(CONCAT_WS(' ', cp.contact_first_name, cp.contact_last_name)), ''),
          u.email
        ) AS reviewer_display_name
      FROM bookings b

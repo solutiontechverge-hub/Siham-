@@ -38,7 +38,10 @@ import {
 import type { BookingCatalogService } from "../../../../data/bookingServiceCatalog.data";
 import { buildPlatformServiceOrderDefaults } from "../../../../data/businessServiceCategorySlider.data";
 import { useBookingRealtimeSync } from "../../../../hooks/useBookingRealtimeSync";
-import { applyServiceOrderToServiceCategories } from "../../../../components/common/calendar/serviceOrder.utils";
+import {
+  applyServiceOrderToServiceCategories,
+  dedupeServiceOrderSettings,
+} from "../../../../components/common/calendar/serviceOrder.utils";
 import type { ServiceOrderSettings } from "../../../../components/common/calendar/calendar-settings.types";
 
 const DEFAULT_TIME_GRID = {
@@ -301,7 +304,12 @@ export function useFixedLocationCalendarPage() {
         servicesByCategory[category] ??
         [];
     }
-    return { categories, servicesByCategory };
+    return dedupeServiceOrderSettings({
+      categories,
+      servicesByCategory,
+      hiddenCategories: [],
+      hiddenServicesByCategory: {},
+    });
   }, [setupData]);
 
   const clientOptions = React.useMemo(

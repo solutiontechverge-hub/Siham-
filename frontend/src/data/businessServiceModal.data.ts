@@ -76,9 +76,10 @@ export const businessServiceModalCopy = {
   saveLabel: "Save",
   updateLabel: "Update",
   nameLabel: "Name",
+  namePlaceholder: "Enter service name",
   serviceInfoLabel: "Service Info",
   subserviceInfoLabel: "Service Info",
-  serviceInfoPlaceholder: "Enter a description...",
+  serviceInfoPlaceholder: "Enter service information",
   durationFromLabel: "Duration from",
   durationToLabel: "Duration to",
   durationHoursLabel: "Hours",
@@ -95,6 +96,8 @@ export const businessServiceModalCopy = {
   discountStartLabel: "Start Date",
   discountEndLabel: "End Date",
   discountDescriptionLabel: "Description",
+  discountDescriptionPlaceholder: "Enter description",
+  discountDescriptionOptionalHint: "Optional",
   currencyCode: "EUR",
 } as const;
 

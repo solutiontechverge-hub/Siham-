@@ -73,6 +73,17 @@ export const reviewsApi = baseApi.injectEndpoints({
         "Reviews",
       ],
     }),
+    getBookingReviewInvite: build.query<
+      ApiEnvelope<{
+        inviteToken: string;
+        alreadySubmitted: boolean;
+        expired: boolean;
+      }>,
+      string
+    >({
+      query: (bookingId) =>
+        `/api/reviews/booking/${encodeURIComponent(bookingId)}/invite`,
+    }),
     replyToReview: build.mutation<
       ApiEnvelope<ReviewItem>,
       { reviewId: string; message: string; authorName?: string }
@@ -98,6 +109,7 @@ export const {
   useGetReviewInviteQuery,
   useSubmitReviewInviteMutation,
   useGetReviewsQuery,
+  useLazyGetBookingReviewInviteQuery,
   useReplyToReviewMutation,
   useDeleteReviewReplyMutation,
 } = reviewsApi;

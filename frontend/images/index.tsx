@@ -17,9 +17,17 @@ export const ListingImage6 = require("./Rectangle 109.svg");
 
 export const DD = require("./dd.svg");
 export const AboutHeroImage = require("./about/about-header.svg");
+export const AboutHeroPhoto = require("./about/about-hero-photo.jpg");
 export const AboutUsImage = require("./about/about-us.svg");
+export const AboutStarIcon = require("./about/about-star.svg");
 export const ContactUsImage = require("././contact-us.svg"); 
 export const ProfessionalsHeroImage = require("./profesional-landing.svg");
+export const CombinableServicesIcon = require("./professionals/combinable-services-icon.png");
+export const ProjectBookingsIcon = require("./professionals/project-bookings-icon.png");
+export const BookingRequestIcon = require("./professionals/booking-request-icon.png");
+export const EditedBookingIcon = require("./professionals/edited-booking-icon.png");
+export const EditConfirmedIcon = require("./professionals/edit-confirmed-icon.png");
+export const TaxCompliantInvoiceIcon = require("./professionals/tax-compliant-invoice-icon.png");
 
 export const SignupBg = require("./signup-bg.svg");
 export const SignupLs = require("./signup-ls.svg");
@@ -40,3 +48,4 @@ export const HowItWorksBusinessClientIcon = require("./how-it-works/business-cli
 export const HowItWorksSuggestionForChangeIcon = require("./how-it-works/suggestion-for-change.svg");
 export const HowItWorksDesiredLocationClockIcon = require("./how-it-works/desired-location-clock.svg");
 export const HowItWorksBookingEditedBellIcon = require("./how-it-works/booking-edited-bell.svg");
+export const HowItWorksBookingCommunicationChatIcon = require("./how-it-works/booking-communication-chat.svg");

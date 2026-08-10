@@ -5,6 +5,7 @@ import { sendPasswordResetOtpEmail } from "../helpers/email.helper.js";
 import {
   notifyAccountUnderReview,
   notifyPostVerificationPro,
+  notifySignupConfirmation,
   sendSignupEmails,
 } from "../services/authEmail.service.js";
 import {
@@ -252,19 +253,14 @@ export const register = async (req, res) => {
     });
 
     const verificationEmailSent = emailResults.verification.sent;
-    const welcomeEmailSent = emailResults.welcome.sent;
 
     let message = "User registered successfully.";
-    if (verificationEmailSent && welcomeEmailSent) {
-      message = "User registered successfully. Verification and welcome emails sent.";
-    } else if (verificationEmailSent) {
-      message = "User registered successfully. Verification email sent.";
-    } else if (welcomeEmailSent) {
+    if (verificationEmailSent) {
       message =
-        "User registered successfully. Welcome email sent, but the verification email could not be sent.";
+        "User registered successfully. Please check your email to verify your account.";
     } else {
       message =
-        "User registered successfully, but signup emails could not be sent. Please contact support.";
+        "User registered successfully, but the verification email could not be sent. Please contact support.";
     }
 
     return res.status(201).json({
@@ -604,7 +600,7 @@ export const verifyEmail = async (req, res) => {
        WHERE token = $1
        ORDER BY created_at DESC
        LIMIT 1`,
-      [hashToken(token)],
+      [hashToken(String(token).trim())],
     );
 
     if (verificationResult.rowCount === 0) {
@@ -618,7 +614,35 @@ export const verifyEmail = async (req, res) => {
 
     const verification = verificationResult.rows[0];
 
+    const respondVerified = async (userId, { alreadyVerified = false } = {}) => {
+      await client.query("COMMIT");
+      const user = await getUserWithProfile(userId);
+
+      if (!alreadyVerified && user?.user_type === "professional") {
+        void notifyPostVerificationPro(userId);
+        void notifyAccountUnderReview(userId);
+      } else if (!alreadyVerified && user) {
+        void notifySignupConfirmation(userId);
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: alreadyVerified
+          ? "Email already verified."
+          : "Email verified successfully.",
+        data: user,
+      });
+    };
+
+    // Idempotent: email clients / React Strict Mode often hit the link twice.
     if (verification.is_used) {
+      const userState = await client.query(
+        `SELECT id, is_email_verified FROM users WHERE id = $1`,
+        [verification.user_id],
+      );
+      if (userState.rows[0]?.is_email_verified) {
+        return respondVerified(verification.user_id, { alreadyVerified: true });
+      }
       await client.query("ROLLBACK");
       return res.status(400).json({
         success: false,
@@ -636,12 +660,29 @@ export const verifyEmail = async (req, res) => {
       });
     }
 
-    await client.query(
+    const claimResult = await client.query(
       `UPDATE email_verifications
        SET is_used = true
-       WHERE id = $1`,
+       WHERE id = $1 AND is_used = false
+       RETURNING id`,
       [verification.id],
     );
+
+    if (claimResult.rowCount === 0) {
+      const userState = await client.query(
+        `SELECT id, is_email_verified FROM users WHERE id = $1`,
+        [verification.user_id],
+      );
+      if (userState.rows[0]?.is_email_verified) {
+        return respondVerified(verification.user_id, { alreadyVerified: true });
+      }
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        success: false,
+        message: "Verification token has already been used.",
+        data: null,
+      });
+    }
 
     await client.query(
       `UPDATE users
@@ -650,24 +691,7 @@ export const verifyEmail = async (req, res) => {
       [verification.user_id],
     );
 
-    const userResult = await client.query(
-      `SELECT id, user_type FROM users WHERE id = $1`,
-      [verification.user_id],
-    );
-    const verifiedUser = userResult.rows[0];
-
-    await client.query("COMMIT");
-
-    if (verifiedUser?.user_type === "professional") {
-      void notifyPostVerificationPro(verifiedUser.id);
-      void notifyAccountUnderReview(verifiedUser.id);
-    }
-
-    return res.status(200).json({
-      success: true,
-      message: "Email verified successfully.",
-      data: await getUserWithProfile(verification.user_id),
-    });
+    return respondVerified(verification.user_id);
   } catch (error) {
     await client.query("ROLLBACK");
     return res.status(500).json({

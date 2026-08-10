@@ -301,23 +301,24 @@ export default function AuthLoginShell({
                           display: "flex",
                           alignItems: "center",
                           gap: 1.5,
+                          width: "100%",
                           fontSize: "0.8125rem",
                           color: alpha(m.navy, 0.48),
                         }}
                       >
                         <Box
                           sx={{
-                            height: 1,
+                            height: "1px",
                             flex: 1,
-                            backgroundColor: alpha(m.navy, 0.12),
+                            backgroundColor: alpha(m.navy, 0.16),
                           }}
                         />
                         or continue with
                         <Box
                           sx={{
-                            height: 1,
+                            height: "1px",
                             flex: 1,
-                            backgroundColor: alpha(m.navy, 0.12),
+                            backgroundColor: alpha(m.navy, 0.16),
                           }}
                         />
                       </Box>

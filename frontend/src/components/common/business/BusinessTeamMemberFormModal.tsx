@@ -9,6 +9,7 @@ import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import { Box, IconButton, MenuItem, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import MollureFormField from "../MollureFormField";
+import { MollureLabeledSelect } from "../MollureLabeledFields";
 import AppDrawer from "../AppDrawer";
 import {
   addTeamMemberServiceSelection,
@@ -77,14 +78,21 @@ export default function BusinessTeamMemberFormModal({
   );
 
   const activeCategoryId = draft.categoryId;
+  const wasOpenRef = React.useRef(false);
+
+  // Add mode must always start with the category placeholder — never auto-pick.
+  React.useEffect(() => {
+    const justOpened = open && !wasOpenRef.current;
+    wasOpenRef.current = open;
+    if (!justOpened) return;
+    if (title !== businessTeamMemberModalCopy.addTitle) return;
+    onChange({ categoryId: "", serviceId: "" });
+  }, [open, title, onChange]);
 
   React.useEffect(() => {
-    if (!open || categoryOptions.length === 0) return;
-    if (
-      !draft.categoryId ||
-      !categoryOptions.some((option) => option.value === draft.categoryId)
-    ) {
-      onChange({ categoryId: categoryOptions[0].value, serviceId: "" });
+    if (!open || !draft.categoryId) return;
+    if (!categoryOptions.some((option) => option.value === draft.categoryId)) {
+      onChange({ categoryId: "", serviceId: "" });
     }
   }, [open, categoryOptions, draft.categoryId, onChange]);
 
@@ -241,6 +249,7 @@ export default function BusinessTeamMemberFormModal({
 
           <MollureFormField
             label={businessTeamMemberModalCopy.nameLabel}
+            placeholder={businessTeamMemberModalCopy.namePlaceholder}
             value={draft.name}
             onChange={(e) => onChange({ name: e.target.value })}
             disabled={disabled}
@@ -249,17 +258,41 @@ export default function BusinessTeamMemberFormModal({
           />
 
           {categoryOptions.length > 0 ? (
-            <MollureFormField
-              label={businessTeamMemberModalCopy.selectCategoryLabel}
-              select
-              value={draft.categoryId}
+            <MollureLabeledSelect
+              fieldLabel={businessTeamMemberModalCopy.selectCategoryLabel}
+              value={draft.categoryId || ""}
               onChange={(e) =>
-                onChange({ categoryId: e.target.value, serviceId: "" })
+                onChange({
+                  categoryId: String(e.target.value ?? ""),
+                  serviceId: "",
+                })
               }
               disabled={disabled}
-              fullWidth
-              sx={fieldInputSx}
-              SelectProps={{ displayEmpty: true }}
+              displayEmpty
+              renderValue={(selected) => {
+                const value = String(selected ?? "");
+                if (!value) {
+                  return (
+                    <Typography
+                      component="span"
+                      sx={{
+                        color: alpha(m.navy, 0.42),
+                        fontSize: "0.8125rem",
+                      }}
+                    >
+                      {businessTeamMemberModalCopy.selectCategoryPlaceholder}
+                    </Typography>
+                  );
+                }
+                return (
+                  categoryOptions.find((option) => option.value === value)
+                    ?.label ?? value
+                );
+              }}
+              sx={{
+                bgcolor: "#fff",
+                borderRadius: "10px",
+              }}
             >
               <MenuItem value="">
                 <em>{businessTeamMemberModalCopy.selectCategoryPlaceholder}</em>
@@ -269,7 +302,7 @@ export default function BusinessTeamMemberFormModal({
                   {option.label}
                 </MenuItem>
               ))}
-            </MollureFormField>
+            </MollureLabeledSelect>
           ) : (
             <Typography sx={{ fontSize: 13, color: alpha(m.navy, 0.5) }}>
               {businessTeamMemberModalCopy.noCategories}

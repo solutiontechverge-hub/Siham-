@@ -11,6 +11,7 @@ import {
   normalizeServiceOrderSettings,
   type ServiceOrderSettings,
 } from "./calendar-settings.types";
+import { dedupeServiceOrderSettings } from "./serviceOrder.utils";
 
 type CalendarServiceOrderModalProps = {
   draft: ServiceOrderSettings;
@@ -45,19 +46,22 @@ export default function CalendarServiceOrderModal({
   const servicesByCategory = draft.servicesByCategory ?? {};
 
   const moveCategory = (from: number, to: number) => {
-    setDraft((prev) => ({
-      ...normalizeServiceOrderSettings(prev),
-      categories: reorderList(
-        normalizeServiceOrderSettings(prev).categories,
-        from,
-        to,
-      ),
-    }));
+    setDraft((prev) => {
+      const normalized = dedupeServiceOrderSettings(
+        normalizeServiceOrderSettings(prev),
+      );
+      return {
+        ...normalized,
+        categories: reorderList(normalized.categories, from, to),
+      };
+    });
   };
 
   const moveService = (category: string, from: number, to: number) => {
     setDraft((prev) => {
-      const normalized = normalizeServiceOrderSettings(prev);
+      const normalized = dedupeServiceOrderSettings(
+        normalizeServiceOrderSettings(prev),
+      );
       return {
         ...normalized,
         servicesByCategory: {

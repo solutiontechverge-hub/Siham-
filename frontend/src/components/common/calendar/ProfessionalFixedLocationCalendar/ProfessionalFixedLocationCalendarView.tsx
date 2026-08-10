@@ -189,6 +189,7 @@ import {
   type ScheduleAvailabilityRow,
   type ServiceOrderSettings,
 } from "../calendar-settings.types";
+import { dedupeServiceOrderSettings } from "../serviceOrder.utils";
 import {
   addDaysIso,
   addMonthsIso,
@@ -1478,10 +1479,12 @@ export default function ProfessionalFixedLocationCalendar({
   >([]);
   const [serviceOrderDraft, setServiceOrderDraft] =
     React.useState<ServiceOrderSettings>(() =>
-      normalizeServiceOrderSettings(undefined, {
-        categories: serviceOrderDefaults?.categories ?? [],
-        servicesByCategory: serviceOrderDefaults?.servicesByCategory ?? {},
-      }),
+      dedupeServiceOrderSettings(
+        normalizeServiceOrderSettings(undefined, {
+          categories: serviceOrderDefaults?.categories ?? [],
+          servicesByCategory: serviceOrderDefaults?.servicesByCategory ?? {},
+        }),
+      ),
     );
   const selectableServiceCategories = React.useMemo(() => {
     const patchedServices = selectableServiceCatalog.map((service) => ({
@@ -1517,13 +1520,19 @@ export default function ProfessionalFixedLocationCalendar({
     setDesignDraft(calendarSettings.design);
     if (calendarSettings.availability.serviceOrder) {
       setServiceOrderDraft(
-        normalizeServiceOrderSettings(
-          calendarSettings.availability.serviceOrder,
-          serviceOrderDefaults,
+        dedupeServiceOrderSettings(
+          normalizeServiceOrderSettings(
+            calendarSettings.availability.serviceOrder,
+            serviceOrderDefaults,
+          ),
         ),
       );
     } else if (serviceOrderDefaults) {
-      setServiceOrderDraft(normalizeServiceOrderSettings(serviceOrderDefaults));
+      setServiceOrderDraft(
+        dedupeServiceOrderSettings(
+          normalizeServiceOrderSettings(serviceOrderDefaults),
+        ),
+      );
     }
   }, [calendarSettings, serviceOrderDefaults]);
 

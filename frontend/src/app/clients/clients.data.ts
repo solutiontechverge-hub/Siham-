@@ -91,49 +91,48 @@ export const clientsPageData = {
     searchAction: "Search",
   },
   whyChooseSection: {
-    title: "Why Choose Mollure?",
+    title: "Why choose MOLLURE?",
     items: [
       {
         iconKey: "location",
         title: "Flexible Service Locations",
-        body:
-          "Salon or on-location, done right.",
-          description:' Book at Mollure-listed shops or request a professional to come to your place.'
+        body: "Salon or on-location, done right.",
+        description:
+          "Book at a professional's place or request them to yours. Each option follows a clear booking flow.",
       },
       {
         iconKey: "booking",
         title: "Interactive Booking Flow",
-        body:
-          "Full confirmations for both sides ",
-        description:' Instant confirmations or review-first bookings — changes that matter always require approval.'
-        },
+        body: "Fair confirmations for both sides",
+        description:
+          "Instant confirmations or review-first bookings — changes that matter always require approval.",
+      },
       {
         iconKey: "communication",
         title: "Direct Communication",
-        body:
-          "Ask questions anytime. ",
-          description:' After booking confirmation, your chat and booking conversations stay active for appointment follow-up.'
+        body: "Ask questions anytime.",
+        description:
+          "Message professionals before or after booking. Conversations stay linked to your appointment.",
       },
       {
         iconKey: "personal",
         title: "Personal & Business Friendly",
-        body:
-          "From self-care to company projects,",
-          description:' book for personal needs or business use including photo shoots and campaigns.'
+        body: "From self-care to company projects",
+        description:
+          "Book for personal needs or business use, including photo shoots and corporate jobs.",
       },
       {
         iconKey: "payment",
         title: "Secure Payments & Invoicing",
-        body:
-          "Payments that work for real life",
-          description:'Pay online securely. Business clients receive tax-compliant invoices automatically.'
+        body: "Payments that work for real life",
+        description:
+          "Pay online securely. Business clients receive tax-compliant invoices automatically.",
       },
       {
         iconKey: "verified",
         title: "Verified Professionals",
-        body:
-          "Book with confidence. ",
-          description:' View verified profiles and real client reviews before choosing your beauty specialist.'
+        body: "Book with confidence",
+        description: "View verified profiles and real client reviews.",
       },
     ] satisfies ClientFeature[],
   },
@@ -149,7 +148,7 @@ export const clientsPageData = {
       {
         number: "3",
         title: "Set Up Your Booking",
-        body: "Choose date, location, and services — instant or request-based.",
+        body: "Choose date, location, and services instant or request-based.",
       },
       {
         number: "4",

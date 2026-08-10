@@ -138,6 +138,7 @@ export default function BusinessServiceFormModal({
 
           <MollureFormField
             label={businessServiceModalCopy.nameLabel}
+            placeholder={businessServiceModalCopy.namePlaceholder}
             value={draft.name}
             onChange={(e) => onChange({ name: e.target.value })}
             disabled={fieldsDisabled}
@@ -511,6 +512,7 @@ export default function BusinessServiceFormModal({
               <Box sx={twoColumnRowSx}>
                 <Box sx={twoColumnCellSx}>
                   <AppDatePicker
+                    label={businessServiceModalCopy.discountStartLabel}
                     value={draft.discountStartDate}
                     onChange={(iso) => onChange({ discountStartDate: iso })}
                     disabled={fieldsDisabled}
@@ -520,6 +522,7 @@ export default function BusinessServiceFormModal({
                 </Box>
                 <Box sx={twoColumnCellSx}>
                   <AppDatePicker
+                    label={businessServiceModalCopy.discountEndLabel}
                     value={draft.discountEndDate}
                     onChange={(iso) => onChange({ discountEndDate: iso })}
                     disabled={fieldsDisabled}
@@ -530,7 +533,10 @@ export default function BusinessServiceFormModal({
               </Box>
 
               <MollureFormField
-                label={businessServiceModalCopy.discountDescriptionLabel}
+                label={`${businessServiceModalCopy.discountDescriptionLabel} (${businessServiceModalCopy.discountDescriptionOptionalHint})`}
+                placeholder={
+                  businessServiceModalCopy.discountDescriptionPlaceholder
+                }
                 value={draft.discountDescription}
                 onChange={(e) =>
                   onChange({ discountDescription: e.target.value })

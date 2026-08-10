@@ -6,9 +6,9 @@ export const profilePageData = {
     userDisplayNameFallback: "Sara Johnson",
   },
   tabs: [
-    { id: "profile" as const, label: "Profile", href: "/client/profile" },
-    { id: "booking" as const, label: "Booking", href: "/client/booking" },
-    { id: "favourites" as const, label: "Favourites", href: "/client/favourites" },
+    { id: "profile" as const, label: "Profile", href: "/clients/profile" },
+    { id: "booking" as const, label: "Booking", href: "/clients/booking" },
+    { id: "favourites" as const, label: "Favourites", href: "/clients/favourites" },
   ],
   card: {
     title: "User Info",
@@ -41,6 +41,7 @@ export const profilePageData = {
   genderOptions: [...GENDER_OPTIONS],
   links: {
     terms: { label: "Terms & Conditions", href: "/terms-and-conditions" },
+    policies: { label: "Policies", href: "/policies" },
   },
   actions: {
     update: "Update",

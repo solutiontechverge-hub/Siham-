@@ -35,9 +35,11 @@ export default function AboutFaqAccordion({
   return (
     <Box
       component="section"
+      id="faq"
       sx={{
         py: `${MOLLURE_SECTION_GAP_PX}px`,
         bgcolor: "mollure.surface",
+        scrollMarginTop: 96,
       }}
     >
       <Container maxWidth="md">
@@ -46,7 +48,9 @@ export default function AboutFaqAccordion({
             textAlign: "center",
             color: "mollure.textcolorgrey700",
             mb: `${MOLLURE_HEADING_BODY_GAP_PX}px`,
-            fontSize: { xs: "1.5rem", sm: "1.75rem" },
+            fontSize: 30,
+            fontWeight: 700,
+            lineHeight: 1.2,
           }}
         >
           {title}
@@ -106,6 +110,7 @@ export default function AboutFaqAccordion({
                     pl: 4,
                     color: "text.secondary",
                     lineHeight: 1.75,
+                    whiteSpace: "pre-line",
                   }}
                 >
                   {item.answer}

@@ -86,7 +86,8 @@ export const professionalsMarketingHeader = {
   localeLabel: "EN",
   loginLabel: "login",
   professionalLinkLabel: "for clients",
-  professionalHref: "/clients",
+  /** Public client home (`/`), not `/clients` (AuthGuard). */
+  professionalHref: "/",
 } as const;
 
 export const marketingShellFooter = {
@@ -101,7 +102,7 @@ export const marketingShellFooter = {
       title: "Product",
       items: [
         { label: "How It Works", href: "/how-it-works" },
-        { label: "Browse Professionals", href: "/clients" },
+        { label: "Browse Professionals", href: "/" },
         { label: "Pricing", href: "/professionals/pricing" },
         "Integrations",
         "API",
@@ -111,7 +112,7 @@ export const marketingShellFooter = {
       title: "Company",
       items: [
         { label: "About", href: "/about" },
-        "FAQ",
+        { label: "FAQ", href: "/about#faq" },
         { label: "Contact", href: "/contact-us" },
       ],
     },
@@ -120,6 +121,7 @@ export const marketingShellFooter = {
       items: [
         "Privacy",
         { label: "Terms", href: "/terms-and-conditions" },
+        { label: "Policies", href: "/policies" },
         "Security",
       ],
     },
@@ -149,7 +151,7 @@ export const professionalsMarketingFooter = {
       title: "Company",
       items: [
         { label: "About", href: "/about" },
-        "FAQ",
+        { label: "FAQ", href: "/about#faq" },
         { label: "Contact", href: "/contact-us" },
       ],
     },
@@ -158,6 +160,7 @@ export const professionalsMarketingFooter = {
       items: [
         "Privacy",
         { label: "Terms", href: "/terms-and-conditions" },
+        { label: "Policies", href: "/policies" },
         "Security",
       ],
     },

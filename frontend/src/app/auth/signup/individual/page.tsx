@@ -448,6 +448,7 @@ export default function IndividualSignupPage() {
                             error={Boolean(errors.firstName)}
                             helperText={errors.firstName}
                             required
+                            placeholder="Enter your first name"
                           />
                         </Grid>
                         <Grid item xs={12} sm={6}>
@@ -459,6 +460,7 @@ export default function IndividualSignupPage() {
                             error={Boolean(errors.lastName)}
                             helperText={errors.lastName}
                             required
+                            placeholder="Enter your last name"
                           />
                         </Grid>
                         <Grid item xs={12}>
@@ -471,7 +473,7 @@ export default function IndividualSignupPage() {
                             SelectProps={{ displayEmpty: true }}
                           >
                             <MenuItem value="">
-                              <em>Select name for rating/review</em>
+                              <em>Choose a display name</em>
                             </MenuItem>
                             {reviewNameOptions.map((opt) => (
                               <MenuItem key={opt.value} value={opt.value}>
@@ -481,12 +483,14 @@ export default function IndividualSignupPage() {
                           </MollureAuthLabeledField>
                         </Grid>
                         <Grid item xs={12} sm={6}>
-                          <Stack spacing={0.75}>
+                          <Stack spacing={0.75} sx={{ height: "100%" }}>
                             <Typography
+                              component="label"
                               sx={{
-                                fontSize: 12,
-                                fontWeight: 700,
-                                color: "text.secondary",
+                                fontSize: "0.75rem",
+                                fontWeight: 500,
+                                color: alpha(m.navy, 0.9),
+                                lineHeight: 1.25,
                               }}
                             >
                               Birth date
@@ -511,9 +515,10 @@ export default function IndividualSignupPage() {
                             name="gender"
                             value={form.gender}
                             onChange={handleChange}
+                            SelectProps={{ displayEmpty: true }}
                           >
                             <MenuItem value="">
-                              <em>Select Gender</em>
+                              <em>Select your gender</em>
                             </MenuItem>
                             <MenuItem value="female">Female</MenuItem>
                             <MenuItem value="male">Male</MenuItem>
@@ -560,7 +565,7 @@ export default function IndividualSignupPage() {
                                 phone: undefined,
                               }))
                             }
-                            phonePlaceholder="Enter phone number"
+                            phonePlaceholder="Enter your phone number"
                             required={false}
                           />
                         </Grid>
@@ -575,6 +580,7 @@ export default function IndividualSignupPage() {
                             helperText={errors.email}
                             required
                             autoComplete="email"
+                            placeholder="Enter your email address"
                           />
                         </Grid>
                         <Grid item xs={12} sm={6}>
@@ -587,6 +593,7 @@ export default function IndividualSignupPage() {
                             helperText={errors.password}
                             required
                             autoComplete="new-password"
+                            placeholder="Create a password"
                           />
                         </Grid>
                         <Grid item xs={12} sm={6}>
@@ -599,6 +606,7 @@ export default function IndividualSignupPage() {
                             helperText={errors.confirmPassword}
                             required
                             autoComplete="new-password"
+                            placeholder="Re-enter your password"
                           />
                         </Grid>
                         <Grid item xs={12}>
@@ -608,6 +616,12 @@ export default function IndividualSignupPage() {
                     </Box>
 
                     <FormControlLabel
+                      sx={{
+                        alignItems: "center",
+                        ml: 0,
+                        gap: 0.5,
+                        "& .MuiFormControlLabel-label": { mt: 0 },
+                      }}
                       control={
                         <Checkbox
                           size="small"
@@ -615,6 +629,7 @@ export default function IndividualSignupPage() {
                           onChange={handleChange}
                           name="acceptTerms"
                           sx={{
+                            p: 0.5,
                             color: alpha(m.navy, 0.35),
                             "&.Mui-checked": { color: m.teal },
                           }}
@@ -625,6 +640,7 @@ export default function IndividualSignupPage() {
                           component="span"
                           sx={{
                             fontSize: "0.875rem",
+                            lineHeight: 1.4,
                             color: alpha(m.navy, 0.55),
                           }}
                         >

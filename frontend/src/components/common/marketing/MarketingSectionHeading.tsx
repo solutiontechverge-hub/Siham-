@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Stack } from "@mui/material";
+import type { SxProps, Theme } from "@mui/material/styles";
 import type { ResponsiveStyleValue } from "@mui/system";
 import { Description, MainHeading } from "../../ui/typography";
 import {
@@ -14,6 +15,7 @@ type MarketingSectionHeadingProps = {
   subtitle?: React.ReactNode;
   align?: "left" | "center" | "right";
   mb?: ResponsiveStyleValue<number | string>;
+  titleSx?: SxProps<Theme>;
 };
 
 export default function MarketingSectionHeading({
@@ -21,6 +23,7 @@ export default function MarketingSectionHeading({
   subtitle,
   align = "center",
   mb = MOLLURE_HEADING_BODY_GAP,
+  titleSx,
 }: MarketingSectionHeadingProps) {
   return (
     <Stack
@@ -36,7 +39,20 @@ export default function MarketingSectionHeading({
               : "flex-start",
       }}
     >
-      <MainHeading sx={{ textAlign: align }}>{title}</MainHeading>
+      <MainHeading
+        sx={
+          [
+            { textAlign: align },
+            ...(titleSx
+              ? Array.isArray(titleSx)
+                ? titleSx
+                : [titleSx]
+              : []),
+          ] as SxProps<Theme>
+        }
+      >
+        {title}
+      </MainHeading>
       {subtitle ? (
         <Description
           sx={{

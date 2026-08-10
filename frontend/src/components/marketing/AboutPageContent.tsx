@@ -2,8 +2,21 @@
 
 import { AboutFaqAccordion, AboutHero, AboutSplitSection } from "../about";
 import { aboutPageData } from "../../app/about/about.data";
+import type { MarketingAudience } from "./MarketingShellLayout";
 
-export function AboutPageContent() {
+export function AboutPageContent({
+  audience = "clients",
+}: {
+  audience?: MarketingAudience;
+}) {
+  const isProfessionals = audience === "professionals";
+  const faqItems = isProfessionals
+    ? aboutPageData.faq.professionalItems
+    : aboutPageData.faq.clientItems;
+  const splitParagraphs = isProfessionals
+    ? aboutPageData.split.professionalParagraphs
+    : aboutPageData.split.clientParagraphs;
+
   return (
     <>
       <AboutHero
@@ -17,12 +30,12 @@ export function AboutPageContent() {
         imageSrc={aboutPageData.split.imageSrc}
         imageAlt={aboutPageData.split.imageAlt}
         panelTitle={aboutPageData.split.panelTitle}
-        paragraphs={aboutPageData.split.paragraphs}
+        paragraphs={[...splitParagraphs]}
       />
 
       <AboutFaqAccordion
         title={aboutPageData.faq.title}
-        items={aboutPageData.faq.items}
+        items={faqItems}
       />
     </>
   );

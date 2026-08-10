@@ -36,7 +36,6 @@ export function getCalendarDesignServiceLabel(key: string): string {
     (item) => item.key === key,
   );
   if (!entry) return key;
-  if (entry.key === "hair") return "Haar";
   return entry.label;
 }
 
