@@ -235,6 +235,7 @@ export default function MollureMarketingHeader({
     overflow: "hidden",
     textOverflow: "ellipsis",
     textAlign: "center" as const,
+    textTransform: "none" as const,
   };
 
   return (
