@@ -3,6 +3,7 @@ import { body } from "express-validator";
 import {
   forgotPassword,
   login,
+  refreshSession,
   register,
   resetPassword,
   selectUserType,
@@ -61,9 +62,20 @@ router.post(
   [
     body("email").trim().isEmail().withMessage("A valid email is required.").normalizeEmail(),
     body("password").notEmpty().withMessage("Password is required."),
+    body("remember").optional().isBoolean().withMessage("remember must be a boolean."),
   ],
   validateRequest,
   login,
+);
+
+router.post(
+  "/refresh",
+  [
+    body("refresh_token").isString().notEmpty().withMessage("refresh_token is required."),
+    body("remember").optional().isBoolean().withMessage("remember must be a boolean."),
+  ],
+  validateRequest,
+  refreshSession,
 );
 
 router.post(
