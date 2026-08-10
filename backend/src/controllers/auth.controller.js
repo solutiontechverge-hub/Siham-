@@ -11,6 +11,8 @@ import {
 import {
   generateAccessToken,
   generateRefreshToken,
+  generateRememberRefreshToken,
+  verifyRefreshToken,
 } from "../helpers/jwt.helper.js";
 import {
   isS3UploadConfigured,
@@ -284,7 +286,7 @@ export const register = async (req, res) => {
 
 export const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, remember } = req.body;
     const result = await query(
       `SELECT id, user_type, email, password_hash, is_email_verified, is_active, created_at, updated_at
        FROM users
@@ -336,12 +338,16 @@ export const login = async (req, res) => {
       });
     }
 
+    const rememberMe = Boolean(remember);
+
     return res.status(200).json({
       success: true,
       message: "Login successful.",
       data: {
         access_token: generateAccessToken(user),
-        refresh_token: generateRefreshToken(user),
+        refresh_token: rememberMe
+          ? generateRememberRefreshToken(user)
+          : generateRefreshToken(user),
         user: {
           id: user.id,
           email: user.email,
@@ -355,6 +361,101 @@ export const login = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to login.",
+      data: {
+        error: error.message,
+      },
+    });
+  }
+};
+
+export const refreshSession = async (req, res) => {
+  try {
+    const { refresh_token: refreshToken, remember } = req.body ?? {};
+
+    if (!refreshToken || typeof refreshToken !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "refresh_token is required.",
+        data: null,
+      });
+    }
+
+    let payload;
+    try {
+      payload = verifyRefreshToken(refreshToken);
+    } catch {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid or expired refresh token.",
+        data: null,
+      });
+    }
+
+    if (payload?.token_kind === "admin") {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid refresh token for this endpoint.",
+        data: null,
+      });
+    }
+
+    const userId = payload?.id;
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid refresh token.",
+        data: null,
+      });
+    }
+
+    const result = await query(
+      `SELECT id, user_type, email, is_email_verified, is_active
+       FROM users
+       WHERE id = $1`,
+      [userId],
+    );
+
+    if (result.rowCount === 0) {
+      return res.status(401).json({
+        success: false,
+        message: "User not found.",
+        data: null,
+      });
+    }
+
+    const user = result.rows[0];
+
+    if (!user.is_active) {
+      return res.status(403).json({
+        success: false,
+        message: "User account is inactive.",
+        data: null,
+      });
+    }
+
+    const rememberMe = Boolean(remember);
+
+    return res.status(200).json({
+      success: true,
+      message: "Session refreshed.",
+      data: {
+        access_token: generateAccessToken(user),
+        refresh_token: rememberMe
+          ? generateRememberRefreshToken(user)
+          : generateRefreshToken(user),
+        user: {
+          id: user.id,
+          email: user.email,
+          user_type: user.user_type,
+          is_email_verified: user.is_email_verified,
+          is_active: user.is_active,
+        },
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to refresh session.",
       data: {
         error: error.message,
       },

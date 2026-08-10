@@ -37,6 +37,8 @@ export default function AdminAuthLoginShell() {
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
   const [remember, setRemember] = React.useState(false);
+  const rememberRef = React.useRef(remember);
+  rememberRef.current = remember;
   const [login, { isLoading }] = useAdminLoginMutation();
 
   const cardBorder = m.cardBorder ?? alpha(m.navy, 0.12);
@@ -45,12 +47,13 @@ export default function AdminAuthLoginShell() {
     event.preventDefault();
 
     try {
+      const rememberMe = rememberRef.current;
       const result = await login({
         email: email.trim().toLowerCase(),
         password,
       }).unwrap();
 
-      completeLogin(result.data, remember, redirectTo || "/admin/dashboard");
+      completeLogin(result.data, rememberMe, redirectTo || "/admin/dashboard");
     } catch (error) {
       showSnackbar({
         severity: "error",
@@ -215,13 +218,22 @@ export default function AdminAuthLoginShell() {
                       />
 
                       <FormControlLabel
+                        sx={{
+                          mr: 0,
+                          userSelect: "none",
+                          WebkitUserSelect: "none",
+                          WebkitTapHighlightColor: "transparent",
+                          "& .MuiCheckbox-root": { p: 0.75 },
+                        }}
                         control={
                           <Checkbox
                             size="small"
+                            name="remember"
                             checked={remember}
                             onChange={(event) =>
                               setRemember(event.target.checked)
                             }
+                            inputProps={{ "aria-label": "Remember Me" }}
                             sx={{
                               color: alpha(m.navy, 0.35),
                               "&.Mui-checked": { color: m.teal },
@@ -230,6 +242,7 @@ export default function AdminAuthLoginShell() {
                         }
                         label={
                           <BodyText
+                            component="span"
                             sx={{
                               fontSize: "0.8125rem",
                               color: alpha(m.navy, 0.52),
