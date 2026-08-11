@@ -49,13 +49,7 @@ function buildFallbackCreateBookingPayload(
     end_time: buildWallClockDateTimeIso(bookingDate, endMinutes),
     location_type: locationMode === "desired" ? "desired" : "fixed",
     status,
-    booking_type: asBookingRequest
-      ? locationMode === "desired"
-        ? "project"
-        : "request"
-      : locationMode === "desired"
-        ? "project"
-        : "online",
+    booking_type: locationMode === "desired" ? "project" : asBookingRequest ? "request" : "online",
     unique_code: bookingRef,
     total_price: draft.total,
     ...(locationMode === "desired" && draft.desiredLocation

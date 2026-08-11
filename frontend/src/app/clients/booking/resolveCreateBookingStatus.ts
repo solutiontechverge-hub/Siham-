@@ -1,4 +1,7 @@
-import type { BookingRequestDirection, ClientBookingStatus } from "./clientBookingRecords";
+import type { BookingRequestDirection } from "./clientBookingRecords";
+
+/** API create payload statuses returned by the client create flow. */
+export type CreateBookingResolvedStatus = "requested" | "confirmed";
 
 /**
  * Client create status matrix:
@@ -7,7 +10,10 @@ import type { BookingRequestDirection, ClientBookingStatus } from "./clientBooki
  */
 export function resolveCreateBookingStatus(input: {
   locationMode: "fixed" | "desired";
-}): { status: ClientBookingStatus; bookingRequestDirection?: BookingRequestDirection } {
+}): {
+  status: CreateBookingResolvedStatus;
+  bookingRequestDirection?: BookingRequestDirection;
+} {
   if (input.locationMode === "desired") {
     return { status: "requested", bookingRequestDirection: "outgoing" };
   }

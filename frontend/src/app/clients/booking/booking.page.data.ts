@@ -103,9 +103,18 @@ export function buildAddServiceCatalog(
     name: string;
     durationMins: number;
     price: number;
+    originalPrice?: number;
+    discountPct?: number;
   }>,
   memberItems?: Array<{ id: string; name: string }>,
-): Array<{ id: string; name: string; durationMins: number; price: number }> {
+): Array<{
+  id: string;
+  name: string;
+  durationMins: number;
+  price: number;
+  originalPrice?: number;
+  discountPct?: number;
+}> {
   if (!locationCatalog.length) return [];
   if (!memberItems?.length) return locationCatalog;
 
