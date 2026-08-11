@@ -40,10 +40,7 @@ import {
   AppDropdown,
   AppTextField,
 } from "../../../components/common";
-import AppModal, {
-  MessagingModalCancelButton,
-  MessagingModalPrimaryButton,
-} from "../../../components/common/AppModal";
+import AppModal from "../../../components/common/AppModal";
 import { ServiceSummaryMetaLine } from "../../../components/common/ServiceSummaryMetaLine";
 import {
   CLIENT_BOOKING_MIN_LEAD_ERROR,
@@ -124,7 +121,6 @@ export default function ClientBookingCreateView() {
     setShopTeamMembers,
     getPreferredServiceTab,
     services,
-    setServices,
     profileHydrated,
     setProfileHydrated,
     hydrationSignatureRef,
@@ -145,10 +141,6 @@ export default function ClientBookingCreateView() {
     setAddServiceDialogOpen,
     addServiceCatalogIds,
     setAddServiceCatalogIds,
-    addServiceGuestId,
-    setAddServiceGuestId,
-    servicePendingRemove,
-    setServicePendingRemove,
     ebrSuggestBaselineRef,
     projectDescription,
     setProjectDescription,
@@ -184,6 +176,7 @@ export default function ClientBookingCreateView() {
     personCardSubtitle,
     updateGuestName,
     selectedServicesCount,
+    requiresPersonAssignment,
     allServicesAssigned,
     needsTeamMemberProvidedByPro,
     assigned,
@@ -197,7 +190,8 @@ export default function ClientBookingCreateView() {
     confirmAddService,
     applySharedTeamMember,
     updateServiceTeamMember,
-    confirmRemoveService,
+    unassignService,
+    removeService,
     toggleServiceSelection,
     onContinue,
     continueLabel,
@@ -393,7 +387,6 @@ export default function ClientBookingCreateView() {
         <Tabs
           value={serviceTab}
           onChange={(_, v: "assigned" | "unassigned") => {
-            if (v === "assigned" && unassigned.length > 0) return;
             setServiceTab(v);
             setSelectedServiceIds({});
           }}
@@ -408,7 +401,6 @@ export default function ClientBookingCreateView() {
           <Tab
             value="assigned"
             label={`Assigned(${assigned.length})`}
-            disabled={unassigned.length > 0 && !isModelOrGuestSelected}
             sx={{
               minHeight: 28,
               textTransform: "none",
@@ -438,7 +430,7 @@ export default function ClientBookingCreateView() {
         </Tabs>
       </Stack>
 
-      {/* Desired: one shared professional for all. Fixed assigned: per-service dropdown on each card. */}
+      {/* Desired: one shared team member. Fixed: shared picker on Unassigned tab only. */}
       {filteredTeamMembers.length > 0 &&
       (isDesiredLocation || serviceTab === "unassigned") ? (
         <Box sx={{ mb: 1.25 }} onClick={(e) => e.stopPropagation()}>
@@ -520,12 +512,10 @@ export default function ClientBookingCreateView() {
 
       <Stack spacing={1}>
         {visible.map((s) => {
-          const showFixedAssignedCard =
-            !isDesiredLocation &&
-            serviceTab === "assigned" &&
-            Boolean(s.guestId);
+          const showAssignedServiceCard =
+            serviceTab === "assigned" && Boolean(s.guestId);
 
-          if (showFixedAssignedCard) {
+          if (showAssignedServiceCard) {
             return (
               <Paper
                 key={s.id}
@@ -560,46 +550,57 @@ export default function ClientBookingCreateView() {
                     >
                       {s.durationMins} Mins
                     </Typography>
-                    <Box
-                      sx={{ mt: "20px", maxWidth: 220 }}
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <AppDropdown
-                        value={s.teamMemberId ?? ""}
-                        onChange={(val) =>
-                          updateServiceTeamMember(s.id, String(val ?? ""))
-                        }
-                        options={filteredTeamMembers.map((tm) => ({
-                          value: tm.id,
-                          label: tm.name,
-                        }))}
-                        placeholder="Select team member (optional)"
-                        size="small"
-                        fullWidth
-                        InputProps={{
-                          startAdornment: (
-                            <PersonOutlineRoundedIcon
-                              sx={{
-                                fontSize: 18,
-                                color: alpha(m.navy, 0.45),
-                                ml: 0.5,
-                                mr: 0.25,
-                              }}
-                            />
-                          ),
-                        }}
-                        sx={{
-                          "& .MuiOutlinedInput-root": {
-                            borderRadius: "10px",
-                            bgcolor: "#fff",
-                            fontSize: 12,
-                            fontWeight: 700,
-                            color: alpha(m.navy, 0.72),
-                            minHeight: 36,
-                          },
-                        }}
-                      />
-                    </Box>
+                    {!isDesiredLocation ? (
+                      <Box
+                        sx={{ mt: 1.25, maxWidth: 200 }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <AppDropdown
+                          value={s.teamMemberId ?? ""}
+                          onChange={(val) =>
+                            updateServiceTeamMember(s.id, String(val ?? ""))
+                          }
+                          options={filteredTeamMembers.map((tm) => ({
+                            value: tm.id,
+                            label: tm.name,
+                          }))}
+                          placeholder="Team member"
+                          size="small"
+                          fullWidth
+                          InputProps={{
+                            startAdornment: (
+                              <PersonOutlineRoundedIcon
+                                sx={{
+                                  fontSize: 14,
+                                  color: alpha(m.navy, 0.45),
+                                  ml: 0.25,
+                                  mr: 0.15,
+                                }}
+                              />
+                            ),
+                          }}
+                          sx={{
+                            "& .MuiOutlinedInput-root": {
+                              borderRadius: "8px",
+                              bgcolor: "#fff",
+                              fontSize: 11,
+                              fontWeight: 700,
+                              color: alpha(m.navy, 0.72),
+                              minHeight: 28,
+                              height: 28,
+                            },
+                            "& .MuiOutlinedInput-input": {
+                              py: 0.35,
+                              px: 0.5,
+                            },
+                            "& .MuiSelect-icon": {
+                              fontSize: 18,
+                              right: 6,
+                            },
+                          }}
+                        />
+                      </Box>
+                    ) : null}
                   </Box>
 
                   <Stack
@@ -659,7 +660,7 @@ export default function ClientBookingCreateView() {
                         size="small"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setServicePendingRemove({ id: s.id, name: s.name });
+                          unassignService(s.id);
                         }}
                         sx={{
                           width: 26,
@@ -797,11 +798,11 @@ export default function ClientBookingCreateView() {
                     size="small"
                     onClick={(e) => {
                       e.stopPropagation();
-                      if (!isDesiredLocation) {
-                        setServicePendingRemove({ id: s.id, name: s.name });
+                      if (serviceTab === "assigned") {
+                        unassignService(s.id);
                         return;
                       }
-                      setServices((prev) => prev.filter((x) => x.id !== s.id));
+                      removeService(s.id);
                     }}
                     sx={{
                       width: 26,
@@ -947,9 +948,7 @@ export default function ClientBookingCreateView() {
                 tone="primary"
                 onClick={confirmAddService}
                 disabled={
-                  !Object.values(addServiceCatalogIds).some(Boolean) ||
-                  !addServiceGuestId ||
-                  (hasAssignableTeamMembers && !selectedTeamMemberId)
+                  !Object.values(addServiceCatalogIds).some(Boolean)
                 }
               >
                 Add service
@@ -957,59 +956,6 @@ export default function ClientBookingCreateView() {
             </Stack>
           }
         >
-          {hasAssignableTeamMembers ? (
-            <>
-              <Typography
-                sx={{
-                  fontSize: 12,
-                  fontWeight: 900,
-                  color: alpha(m.navy, 0.72),
-                  mb: 0.75,
-                }}
-              >
-                Professional
-              </Typography>
-              <AppDropdown
-                value={selectedTeamMemberId}
-                onChange={(val) => {
-                  const nextId = String(val ?? "");
-                  // Desired: one TM for the whole booking. Fixed: only for this add action.
-                  if (isDesiredLocation) applySharedTeamMember(nextId);
-                  else setSelectedTeamMemberId(nextId);
-                  setAddServiceCatalogIds({});
-                }}
-                options={filteredTeamMembers.map((tm) => ({
-                  value: tm.id,
-                  label: tm.name,
-                }))}
-                placeholder="Select team member (optional)"
-                size="small"
-                fullWidth
-                InputProps={{
-                  startAdornment: (
-                    <PersonOutlineRoundedIcon
-                      sx={{
-                        fontSize: 18,
-                        color: alpha(m.navy, 0.45),
-                        ml: 0.5,
-                        mr: 0.25,
-                      }}
-                    />
-                  ),
-                }}
-                sx={{
-                  mb: 1.5,
-                  "& .MuiOutlinedInput-root": {
-                    borderRadius: "10px",
-                    bgcolor: alpha(m.navy, 0.015),
-                    fontSize: 12,
-                    fontWeight: 700,
-                  },
-                }}
-              />
-            </>
-          ) : null}
-
           <Typography
             sx={{
               fontSize: 12,
@@ -1092,65 +1038,6 @@ export default function ClientBookingCreateView() {
             ))}
           </Stack>
 
-          <Typography
-            sx={{
-              fontSize: 12,
-              fontWeight: 900,
-              color: alpha(m.navy, 0.72),
-              mb: 0.75,
-            }}
-          >
-            Assign to
-          </Typography>
-          <AppDropdown
-            value={addServiceGuestId}
-            onChange={(val) => setAddServiceGuestId(String(val))}
-            options={serviceAssignees.map((p) => ({
-              value: p.id,
-              label: `${p.name} (${getParticipantLabel(p)})`,
-            }))}
-            placeholder="Select person"
-            size="small"
-            fullWidth
-            sx={{
-              "& .MuiOutlinedInput-root": {
-                borderRadius: "12px",
-                bgcolor: alpha(m.navy, 0.015),
-              },
-            }}
-          />
-        </AppModal>
-
-        <AppModal
-          contentSx={{ px: 2.5 }}
-          footerVariant="actions"
-          open={Boolean(servicePendingRemove)}
-          title="Remove service"
-          onClose={() => setServicePendingRemove(null)}
-          headerTone="danger"
-          footer={
-            <>
-              <MessagingModalCancelButton
-                onClick={() => setServicePendingRemove(null)}
-              />
-              <MessagingModalPrimaryButton
-                label="Confirm"
-                onClick={confirmRemoveService}
-              />
-            </>
-          }
-        >
-          <Box sx={{ py: 2, textAlign: "center" }}>
-            <Typography
-              sx={{ fontWeight: 900, fontSize: 14, color: alpha(m.navy, 0.85) }}
-            >
-              Do you want to remove this service
-              {servicePendingRemove?.name
-                ? ` (${servicePendingRemove.name})`
-                : ""}
-              ?
-            </Typography>
-          </Box>
         </AppModal>
 
         <Paper
@@ -1165,7 +1052,11 @@ export default function ClientBookingCreateView() {
         >
           <Box sx={{ px: { xs: 2, md: 2.5 }, py: 1.75 }}>
             <Typography
-              sx={{ fontWeight: 900, color: alpha(m.navy, 0.86), fontSize: 14 }}
+              sx={{
+                fontWeight: 700,
+                color: alpha(m.navy, 0.86),
+                fontSize: "30px",
+              }}
             >
               Booking Details
             </Typography>
@@ -1763,78 +1654,94 @@ export default function ClientBookingCreateView() {
                               Visit Address
                             </Typography>
                             <Stack spacing={1.25} sx={{ mb: 2 }}>
-                              <Stack direction="row" spacing={1}>
-                                <AppTextField
-                                  label="Street"
-                                  placeholder="Enter street"
-                                  value={desiredVisitAddress.street}
-                                  onChange={(e) =>
-                                    setDesiredVisitAddress((prev) => ({
-                                      ...prev,
-                                      street: e.target.value,
-                                    }))
-                                  }
-                                  fullWidth
-                                />
-                                <AppTextField
-                                  label="Number"
-                                  placeholder="Enter number"
-                                  value={desiredVisitAddress.number}
-                                  onChange={(e) =>
-                                    setDesiredVisitAddress((prev) => ({
-                                      ...prev,
-                                      number: e.target.value,
-                                    }))
-                                  }
-                                  fullWidth
-                                />
+                              <Stack
+                                direction="row"
+                                spacing={1}
+                                sx={{ alignItems: "flex-start" }}
+                              >
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                  <AppTextField
+                                    label="Street"
+                                    placeholder="Enter street"
+                                    value={desiredVisitAddress.street}
+                                    onChange={(e) =>
+                                      setDesiredVisitAddress((prev) => ({
+                                        ...prev,
+                                        street: e.target.value,
+                                      }))
+                                    }
+                                    fullWidth
+                                  />
+                                </Box>
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                  <AppTextField
+                                    label="Number"
+                                    placeholder="Enter number"
+                                    value={desiredVisitAddress.number}
+                                    onChange={(e) =>
+                                      setDesiredVisitAddress((prev) => ({
+                                        ...prev,
+                                        number: e.target.value,
+                                      }))
+                                    }
+                                    fullWidth
+                                  />
+                                </Box>
                               </Stack>
-                              <Stack direction="row" spacing={1}>
-                                <AppTextField
-                                  label="Postal Code"
-                                  placeholder="Enter postal code"
-                                  value={desiredVisitAddress.postalCode}
-                                  onChange={(e) =>
-                                    setDesiredVisitAddress((prev) => ({
-                                      ...prev,
-                                      postalCode: e.target.value,
-                                    }))
-                                  }
-                                  fullWidth
-                                />
-                                <AppDropdown
-                                  label="Province"
-                                  value={desiredVisitAddress.province}
-                                  onChange={(val) => {
-                                    const nextProvince = String(val);
-                                    const nextOptions =
-                                      resolveDesiredVisitAddressOptions(
-                                        businessProfile?.desiredLocation,
-                                        nextProvince,
-                                      );
-                                    setDesiredVisitAddress((prev) => ({
-                                      ...prev,
-                                      province: nextProvince,
-                                      municipality:
-                                        nextOptions.municipalityOptions.includes(
-                                          prev.municipality,
-                                        )
-                                          ? prev.municipality
-                                          : "",
-                                    }));
-                                  }}
-                                  options={[
-                                    { label: "Select province", value: "" },
-                                    ...visitAddressOptions.provinceOptions.map(
-                                      (province) => ({
-                                        label: province,
-                                        value: province,
-                                      }),
-                                    ),
-                                  ]}
-                                  fullWidth
-                                  placeholder="Select province"
-                                />
+                              <Stack
+                                direction="row"
+                                spacing={1}
+                                sx={{ alignItems: "flex-start" }}
+                              >
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                  <AppTextField
+                                    label="Postal Code"
+                                    placeholder="Enter postal code"
+                                    value={desiredVisitAddress.postalCode}
+                                    onChange={(e) =>
+                                      setDesiredVisitAddress((prev) => ({
+                                        ...prev,
+                                        postalCode: e.target.value,
+                                      }))
+                                    }
+                                    fullWidth
+                                  />
+                                </Box>
+                                <Box sx={{ flex: 1, minWidth: 0 }}>
+                                  <AppDropdown
+                                    label="Province"
+                                    value={desiredVisitAddress.province}
+                                    onChange={(val) => {
+                                      const nextProvince = String(val);
+                                      const nextOptions =
+                                        resolveDesiredVisitAddressOptions(
+                                          businessProfile?.desiredLocation,
+                                          nextProvince,
+                                        );
+                                      setDesiredVisitAddress((prev) => ({
+                                        ...prev,
+                                        province: nextProvince,
+                                        municipality:
+                                          nextOptions.municipalityOptions.includes(
+                                            prev.municipality,
+                                          )
+                                            ? prev.municipality
+                                            : "",
+                                      }));
+                                    }}
+                                    options={[
+                                      { label: "Select province", value: "" },
+                                      ...visitAddressOptions.provinceOptions.map(
+                                        (province) => ({
+                                          label: province,
+                                          value: province,
+                                        }),
+                                      ),
+                                    ]}
+                                    fullWidth
+                                    placeholder="Select province"
+                                  />
+                                </Box>
                               </Stack>
                               <AppDropdown
                                 label="Municipality"
@@ -2389,33 +2296,35 @@ export default function ClientBookingCreateView() {
                       })}
                     </Stack>
 
-                    <Box
-                      sx={{
-                        mt: 1.25,
-                        borderRadius: "10px",
-                        bgcolor: alpha(m.teal, 0.08),
-                        border: `1px solid ${alpha(m.teal, 0.18)}`,
-                        px: 1.25,
-                        py: 0.65,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 0.75,
-                      }}
-                    >
-                      <InfoOutlinedIcon
-                        sx={{ fontSize: 16, color: m.teal, flexShrink: 0 }}
-                      />
-                      <Typography
+                    {requiresPersonAssignment ? (
+                      <Box
                         sx={{
-                          fontSize: 11.5,
-                          fontWeight: 800,
-                          color: alpha(m.navy, 0.6),
-                          lineHeight: 1.2,
+                          mt: 1.25,
+                          borderRadius: "10px",
+                          bgcolor: alpha(m.teal, 0.08),
+                          border: `1px solid ${alpha(m.teal, 0.18)}`,
+                          px: 1.25,
+                          py: 0.65,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 0.75,
                         }}
                       >
-                        Assign Services By Selecting The Person
-                      </Typography>
-                    </Box>
+                        <InfoOutlinedIcon
+                          sx={{ fontSize: 16, color: m.teal, flexShrink: 0 }}
+                        />
+                        <Typography
+                          sx={{
+                            fontSize: 11.5,
+                            fontWeight: 800,
+                            color: alpha(m.navy, 0.6),
+                            lineHeight: 1.2,
+                          }}
+                        >
+                          Assign Services By Selecting The Person
+                        </Typography>
+                      </Box>
+                    ) : null}
                   </Box>
 
                   {isDesiredLocation && isPlanningCardSelected ? (
@@ -2806,6 +2715,22 @@ export default function ClientBookingCreateView() {
                           {unassigned.length > 0
                             ? `${unassigned.length} service${unassigned.length === 1 ? "" : "s"} still need a person.`
                             : "Every service needs a person before you can continue."}
+                        </Typography>
+                      ) : null}
+
+                      {allServicesAssigned &&
+                      isDesiredLocation &&
+                      !isDesiredVisitAddressComplete ? (
+                        <Typography
+                          sx={{
+                            mt: 1,
+                            fontSize: 11,
+                            fontWeight: 800,
+                            color: "#C67A00",
+                            lineHeight: 1.35,
+                          }}
+                        >
+                          Fill the full Visit Address to continue.
                         </Typography>
                       ) : null}
 

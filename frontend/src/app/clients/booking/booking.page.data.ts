@@ -61,3 +61,86 @@ export function resolveRequesterDisplayName(
 export function isAdditionalGuest(p: BookingPerson): boolean {
   return !p.isRequester && p.participantType === "guest";
 }
+
+export function resolveProfileCatalogService(
+  opt: { value: string; label: string },
+  locationCatalog: Array<{
+    id: string;
+    name: string;
+    durationMins: number;
+    priceValue: number;
+  }>,
+): (typeof locationCatalog)[number] | undefined {
+  const value = String(opt.value ?? "").trim();
+  const labelKey = String(opt.label ?? "").trim().toLowerCase();
+
+  if (value) {
+    const exact = locationCatalog.find((service) => String(service.id) === value);
+    if (exact) return exact;
+  }
+
+  if (labelKey) {
+    const byName = locationCatalog.find(
+      (service) => service.name.trim().toLowerCase() === labelKey,
+    );
+    if (byName) return byName;
+  }
+
+  if (value) {
+    return locationCatalog.find(
+      (service) =>
+        String(service.id).endsWith(value) || value.endsWith(String(service.id)),
+    );
+  }
+
+  return undefined;
+}
+
+/** Modal list: same prices as profile (`serviceDetails`), optionally filtered by team member. */
+export function buildAddServiceCatalog(
+  locationCatalog: Array<{
+    id: string;
+    name: string;
+    durationMins: number;
+    price: number;
+    originalPrice?: number;
+    discountPct?: number;
+  }>,
+  memberItems?: Array<{ id: string; name: string }>,
+): Array<{
+  id: string;
+  name: string;
+  durationMins: number;
+  price: number;
+  originalPrice?: number;
+  discountPct?: number;
+}> {
+  if (!locationCatalog.length) return [];
+  if (!memberItems?.length) return locationCatalog;
+
+  const byId = new Map(locationCatalog.map((service) => [service.id, service]));
+  const byName = new Map(
+    locationCatalog.map((service) => [service.name.trim().toLowerCase(), service]),
+  );
+
+  const matched: typeof locationCatalog = [];
+  const seen = new Set<string>();
+
+  for (const item of memberItems) {
+    const catalogEntry =
+      byId.get(item.id) ??
+      byName.get(item.name.trim().toLowerCase()) ??
+      locationCatalog.find(
+        (service) =>
+          String(service.id) === String(item.id) ||
+          String(service.id).endsWith(String(item.id)) ||
+          String(item.id).endsWith(String(service.id)),
+      );
+    if (!catalogEntry || seen.has(catalogEntry.id)) continue;
+    seen.add(catalogEntry.id);
+    matched.push(catalogEntry);
+  }
+
+  // Stale assignedServices (e.g. old "Color") with no catalog match → show full shop list.
+  return matched.length > 0 ? matched : locationCatalog;
+}

@@ -296,20 +296,35 @@ export const sendInAppNotificationEmail = async ({
 
 function mapNotificationTypeToEmailType(notificationType, isProfessional) {
   const type = String(notificationType || "");
-  if (type === "client.booking.confirmed") return BOOKING_EMAIL_TYPES.CONFIRMED;
-  if (type === "client.booking.cancelled") return BOOKING_EMAIL_TYPES.CANCELLED;
+
+  // Professional-only rich emails — never send client templates to pros.
+  if (isProfessional || type.startsWith("pro.")) {
+    if (type === "pro.br.incoming") return BOOKING_EMAIL_TYPES.NEW_BOOKING_REQUEST;
+    if (type === "pro.payment.prepayment_received") return BOOKING_EMAIL_TYPES.PREPAYMENT_RECEIVED;
+    if (type === "pro.reminder.respond_request") return BOOKING_EMAIL_TYPES.RESPOND_REQUEST_REMINDER;
+    return null; // companion email with pro CTA
+  }
+
+  // Client-only rich emails
+  if (type === "client.booking.confirmed" || type === "client.br.accepted") {
+    return BOOKING_EMAIL_TYPES.CONFIRMED;
+  }
+  if (type === "client.booking.cancelled") {
+    return BOOKING_EMAIL_TYPES.CANCELLED;
+  }
   if (type === "client.booking.completed") return BOOKING_EMAIL_TYPES.POST_TREATMENT_PAYMENT;
   if (type === "client.er.incoming" || type === "client.er.suggested") {
     return BOOKING_EMAIL_TYPES.INCOMING_ER;
   }
   if (type === "client.reminder.appointment") return BOOKING_EMAIL_TYPES.APPOINTMENT_REMINDER;
-  if (type === "client.booking.no_show") return BOOKING_EMAIL_TYPES.PROFESSIONAL_ACTION;
-  if (type === "client.br.incoming") return BOOKING_EMAIL_TYPES.PROFESSIONAL_ACTION;
-  if (type === "pro.br.incoming") return BOOKING_EMAIL_TYPES.NEW_BOOKING_REQUEST;
-  if (type === "pro.payment.prepayment_received") return BOOKING_EMAIL_TYPES.PREPAYMENT_RECEIVED;
-  if (type === "pro.reminder.respond_request") return BOOKING_EMAIL_TYPES.RESPOND_REQUEST_REMINDER;
-  if (isProfessional && type.startsWith("pro.")) return null;
-  if (!isProfessional && type.startsWith("client.booking.")) {
+  // All other client booking / BR / ER / payment updates → booking card email.
+  if (
+    type.startsWith("client.booking.") ||
+    type.startsWith("client.br.") ||
+    type.startsWith("client.er.") ||
+    type.startsWith("client.payment.") ||
+    type.startsWith("client.invoice.")
+  ) {
     return BOOKING_EMAIL_TYPES.PROFESSIONAL_ACTION;
   }
   return null;
@@ -448,10 +463,14 @@ export const notifyIncomingBookingRequest = async (bookingId) => {
       return { sent: false, reason: "professional_email_not_found" };
     }
 
-    const { html, text } = buildRespondToRequestReminderEmail(ctx);
+    const clientCtx = await loadBookingEmailContext(bookingId);
+    const { html, text } = buildNewBookingRequestEmail({
+      ...clientCtx,
+      clientName: ctx.clientName,
+    });
     await sendMail({
       to: ctx.professionalEmail,
-      subject: "Incoming booking request",
+      subject: "New booking request",
       html,
       text,
     });

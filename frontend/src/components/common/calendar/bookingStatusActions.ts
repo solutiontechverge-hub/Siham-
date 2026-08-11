@@ -5,11 +5,13 @@ import {
   canRespondToIncomingRequest,
   isOutgoingBookingRequest,
 } from "./bookingRequestNegotiation";
+import { isResponseWindowOverdue } from "./bookingResponseDeadline";
 import { canDiscardBookingRequest } from "./bookingStatus";
 
 export type ProfessionalBookingAction =
   | "edit"
   | "discard"
+  | "restart_response"
   | "accept"
   | "suggest_change"
   | "reject"
@@ -37,6 +39,7 @@ export type ClientActionFlags = Record<ClientBookingAction, boolean>;
 const falseProfessionalFlags = (): ProfessionalActionFlags => ({
   edit: false,
   discard: false,
+  restart_response: false,
   accept: false,
   suggest_change: false,
   reject: false,
@@ -115,6 +118,17 @@ export function resolveProfessionalBookingActions(
       flags.suggest_change = true;
       flags.reject = true;
     }
+    if (
+      erPending &&
+      isResponseWindowOverdue({
+        responseStatus: event.details?.responseStatus,
+        responseStartedAt: event.details?.responseStartedAt,
+        respondBy: event.details?.respondBy,
+        responseWindowMinutes: event.details?.responseWindowMinutes,
+      })
+    ) {
+      flags.restart_response = true;
+    }
     return flags;
   }
 
@@ -149,6 +163,23 @@ export function resolveProfessionalBookingActions(
       flags.discard = true;
     }
     if (canDiscardEbr(event)) {
+      flags.edit = true;
+      flags.discard = true;
+    }
+    const overdue = isResponseWindowOverdue({
+      responseStatus: event.details?.responseStatus,
+      responseStartedAt: event.details?.responseStartedAt,
+      respondBy: event.details?.respondBy,
+      responseWindowMinutes: event.details?.responseWindowMinutes,
+    });
+    if (
+      overdue &&
+      (canDiscardBookingRequest(event) ||
+        canDiscardEbr(event) ||
+        canRespondToIncomingRequest(event) ||
+        isOutgoingBookingRequest(event))
+    ) {
+      flags.restart_response = true;
       flags.edit = true;
       flags.discard = true;
     }

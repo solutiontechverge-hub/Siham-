@@ -165,6 +165,11 @@ export function resolveBookingScenario(event: Pick<CalendarEvent, "bookingType" 
     if (event.status !== "Requested") return undefined;
     return scenario;
   }
+  // Confirmed Edited (E) — client changed a confirmed booking.
+  if (scenario === "E") {
+    if (event.status !== "Confirmed") return undefined;
+    return scenario;
+  }
   // ER stays on Confirmed while the edit request is pending (incoming or outgoing).
   if (scenario) return scenario;
   if (event.status === "Requested") return "BR" as const;

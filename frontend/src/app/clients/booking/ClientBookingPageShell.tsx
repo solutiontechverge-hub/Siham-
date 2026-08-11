@@ -19,25 +19,35 @@ import { useBookingRealtimeSync } from "../../../hooks/useBookingRealtimeSync";
 type Props = {
   activeTab: BookingListTab;
   children: React.ReactNode;
+  /** Hide header, profile tabs, and Past/Ongoing/Upcoming pills (create flow). */
+  hideChrome?: boolean;
 };
 
-export default function ClientBookingPageShell({ activeTab, children }: Props) {
+export default function ClientBookingPageShell({
+  activeTab,
+  children,
+  hideChrome = false,
+}: Props) {
   const pathname = usePathname();
   const user = useAppSelector((s) => s.auth.user);
   useBookingRealtimeSync();
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: profilePageData.pageBg }}>
-      <MollureMarketingHeader
-        navItems={[]}
-        isAuthed
-        userLabel={user?.email ?? ""}
-        userName={user?.email ?? ""}
-        userAvatarSrc={undefined}
-        homeHref="/"
-      />
-      <ClientPageTabsBar activeLabel={clientTopTabsActiveLabel(pathname)} />
-      <ClientBookingPillTabsBar active={activeTab} />
+      {!hideChrome ? (
+        <>
+          <MollureMarketingHeader
+            navItems={[]}
+            isAuthed
+            userLabel={user?.email ?? ""}
+            userName={user?.email ?? ""}
+            userAvatarSrc={undefined}
+            homeHref="/"
+          />
+          <ClientPageTabsBar activeLabel={clientTopTabsActiveLabel(pathname)} />
+          <ClientBookingPillTabsBar active={activeTab} />
+        </>
+      ) : null}
       {children}
       <MarketingSiteFooter
         columns={marketingShellFooter.columns.map((col) => ({

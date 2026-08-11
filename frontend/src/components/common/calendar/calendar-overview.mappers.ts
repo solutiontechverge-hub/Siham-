@@ -225,13 +225,18 @@ export function mapCalendarBookingToEvent(
         ? (bookingTypeFromApi[booking.booking_type] ?? "Online")
         : "Online",
     // BR/EBR only while the request is still pending — hide after accept/reject.
+    // Scenario E = Confirmed Edited when client last changed a confirmed booking (no pending ER/EBR).
     bookingScenario: isIncomingClientEbr
       ? "EBR"
       : isErPending
         ? "ER"
         : isRequested
           ? "BR"
-          : undefined,
+          : status === "Confirmed" &&
+              parsedNotes?.lastEditedBy === "client" &&
+              !isErPending
+            ? "E"
+            : undefined,
     showClientName: clientName,
     notes: booking.notes ?? null,
     updatedAt: booking.updated_at ?? booking.created_at ?? null,

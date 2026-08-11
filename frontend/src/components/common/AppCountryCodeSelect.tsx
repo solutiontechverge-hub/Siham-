@@ -116,7 +116,12 @@ function CountryCodeSelectedValue({ value }: { value: string }) {
       spacing={0.75}
       alignItems="center"
       component="span"
-      sx={{ lineHeight: 1, width: "100%", minHeight: "100%" }}
+      sx={{
+        lineHeight: 1,
+        width: "100%",
+        minHeight: "100%",
+        display: "inline-flex",
+      }}
     >
       <Box
         component="span"
@@ -143,6 +148,7 @@ export default function AppCountryCodeSelect({
   value,
   onChange,
   placeholder = "Country Code",
+  sx,
   ...props
 }: AppCountryCodeSelectProps) {
   const selectValue = resolveCountrySelectValue(value);
@@ -234,6 +240,23 @@ export default function AppCountryCodeSelect({
       onChange={(event) =>
         onChange(dialCodeFromSelectValue(String(event.target.value)))
       }
+      sx={[
+        {
+          "& .MuiOutlinedInput-root": {
+            display: "flex",
+            alignItems: "center",
+          },
+          "& .MuiSelect-select": {
+            display: "flex",
+            alignItems: "center",
+            minHeight: 40,
+            height: 40,
+            py: 0,
+            boxSizing: "border-box",
+          },
+        },
+        ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
+      ]}
       SelectProps={{
         IconComponent: ExpandMoreRoundedIcon,
         displayEmpty: true,

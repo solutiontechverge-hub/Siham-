@@ -3,6 +3,7 @@ import type { ClientBookingRecord, ClientBookingStatus } from "./clientBookingRe
 import { fmtMinutesToTimeLabel, parseTimeLabelToMinutes, buildWallClockDateTimeIso } from "./booking-time";
 import { wallClockDateFromDateTime, wallClockTimeFromDateTime } from "../../../components/common/calendar/calendar.utils";
 import { parseCalendarEntryNotes, parseStoredEbrFromNotes, parseStoredErFromNotes } from "../../../components/common/calendar/bookingEventDetails";
+import { buildResponseDeadline } from "../../../components/common/calendar/bookingResponseDeadline";
 import { syncEditRequestFromBookingApi } from "../../../components/common/client-booking/syncEditRequestFromApi";
 import { resolveMediaUrl } from "../../../lib/resolveMediaUrl";
 import type { BusinessSetupListing, CalendarBooking, CreateBookingRequest } from "../../../store/services/businessApi";
@@ -116,6 +117,9 @@ export function buildClientBookingApiPayload(input: {
   total: number;
   /** When true, creates an incoming BR for the professional (not a direct online booking). */
   asBookingRequest?: boolean;
+  /** Fixed-location pay-before: persist prepayment requirement on create. */
+  requiresPrepayment?: boolean;
+  prepaymentPercent?: number;
 }): CreateBookingRequest | null {
   const dateIso = input.draft.selectedDateISO;
   const startMinutes = parseTimeLabelToMinutes(input.draft.selectedTime ?? "");
@@ -192,9 +196,33 @@ export function buildClientBookingApiPayload(input: {
     teamMembers: input.draft.teamMembers ?? [],
   };
 
+  const responseDeadline = input.asBookingRequest
+    ? buildResponseDeadline({
+        hours: input.setup.responseTime?.hours,
+        minutes: input.setup.responseTime?.minutes,
+      })
+    : null;
+
+  const prepaymentPercent = Math.max(0, Number(input.prepaymentPercent) || 0);
+  const showPrepayment =
+    Boolean(input.requiresPrepayment) && prepaymentPercent > 0;
+
   const notes = `${humanNotes}${humanNotes ? "\n" : ""}---mollure-meta---\n${JSON.stringify({
     requestDirection: input.asBookingRequest ? "incoming" : undefined,
     clientSnapshot,
+    ...(showPrepayment
+      ? {
+          showPrepayment: true,
+          prepaymentPercent,
+        }
+      : {}),
+    ...(responseDeadline
+      ? {
+          responseStartedAt: responseDeadline.responseStartedAt,
+          respondBy: responseDeadline.respondBy,
+          responseWindowMinutes: responseDeadline.responseWindowMinutes,
+        }
+      : {}),
   })}`;
 
   return {
@@ -212,6 +240,7 @@ export function buildClientBookingApiPayload(input: {
     unique_code: input.bookingRef,
     total_price: input.total,
     notes,
+    ...(showPrepayment ? { prepayment_status: "required" } : {}),
     ...(hasDesiredVisitAddress && desiredLocation
       ? {
           province: desiredLocation.province.trim() || null,

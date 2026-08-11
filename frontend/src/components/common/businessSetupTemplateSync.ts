@@ -27,11 +27,6 @@ export const TEMPLATE_SYNC_MODE_OPTIONS: ReadonlyArray<{
     label: "Sync and edit",
     description: "Copy once from Fixed (fields filled), then edit Desired independently (default)",
   },
-  {
-    value: "independent",
-    label: "Independent",
-    description: "Start blank — Desired fields are empty and completely separate from Fixed Location",
-  },
 ] as const;
 
 export const CONFIGURABLE_SYNC_SECTION_IDS = [
@@ -104,7 +99,8 @@ export function normalizeTemplateSyncSettings(raw: unknown): TemplateSyncSetting
   for (const sectionId of CONFIGURABLE_SYNC_SECTION_IDS) {
     const value = source[sectionId];
     if (isTemplateSyncMode(value)) {
-      next[sectionId] = value;
+      // Legacy "independent" is no longer offered; treat as syncAndEdit.
+      next[sectionId] = value === "independent" ? "syncAndEdit" : value;
     }
   }
 

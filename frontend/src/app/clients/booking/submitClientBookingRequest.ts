@@ -24,6 +24,8 @@ function buildFallbackCreateBookingPayload(
   const primaryService = draft?.services?.[0];
   if (!draft?.selectedDateISO || !shopId || !primaryService) return null;
 
+  const { status } = resolveCreateBookingStatus({ locationMode });
+  const asBookingRequest = locationMode === "desired";
   const bookingDate = draft.selectedDateISO;
   const startMinutes = parseTimeLabelToMinutes(draft.selectedTime ?? "12:00 AM");
   const endMinutes =
@@ -46,8 +48,8 @@ function buildFallbackCreateBookingPayload(
     start_time: buildWallClockDateTimeIso(bookingDate, startMinutes),
     end_time: buildWallClockDateTimeIso(bookingDate, endMinutes),
     location_type: locationMode === "desired" ? "desired" : "fixed",
-    status: "requested",
-    booking_type: locationMode === "desired" ? "project" : "request",
+    status,
+    booking_type: locationMode === "desired" ? "project" : asBookingRequest ? "request" : "online",
     unique_code: bookingRef,
     total_price: draft.total,
     ...(locationMode === "desired" && draft.desiredLocation
@@ -95,21 +97,45 @@ export function buildCreateBookingPayload(
   const shopId = record.shop?.shopId;
   const bookingRef = record.bookingRef ?? createBookingRef();
 
+  const { status } = resolveCreateBookingStatus({ locationMode });
+  const asBookingRequest = locationMode === "desired";
+  const requiresPrepayment = Boolean(record.requiresPrepayment);
+  const prepaymentPercent = Number(record.prepaymentPercent) || 0;
+
   if (setup && draft && shopId) {
     const payload = buildClientBookingApiPayload({
       setup,
       shopId,
       locationMode,
       draft,
-      status: "requested",
+      status,
       bookingRef,
       total: draft.total ?? 0,
-      asBookingRequest: true,
+      asBookingRequest,
+      requiresPrepayment,
+      prepaymentPercent,
     });
-    if (payload) return payload;
+    if (payload) {
+      return {
+        ...payload,
+        ...(record.contactPhone?.trim()
+          ? { contact_number: record.contactPhone.trim() }
+          : {}),
+      };
+    }
   }
 
-  return buildFallbackCreateBookingPayload(record, locationMode);
+  const fallback = buildFallbackCreateBookingPayload(record, locationMode);
+  if (!fallback) return null;
+  return {
+    ...fallback,
+    ...(requiresPrepayment && prepaymentPercent > 0
+      ? { prepayment_status: "required" }
+      : {}),
+    ...(record.contactPhone?.trim()
+      ? { contact_number: record.contactPhone.trim() }
+      : {}),
+  };
 }
 
 export async function submitClientBookingRequest(params: {

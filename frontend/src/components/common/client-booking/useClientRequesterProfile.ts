@@ -48,11 +48,19 @@ export function useClientRequesterProfile() {
     return individual?.profile_picture || undefined;
   }, [profileQueryData?.data?.profile]);
 
+  const requesterCountryCode = React.useMemo(() => {
+    const profile = profileQueryData?.data?.profile;
+    if (profile && "country_code" in profile && profile.country_code) {
+      return profile.country_code;
+    }
+    return "";
+  }, [profileQueryData?.data?.profile]);
+
   const requesterPhone = React.useMemo(() => {
     const profile = profileQueryData?.data?.profile;
     if (profile && "phone" in profile && profile.phone) return profile.phone;
     return "";
   }, [profileQueryData?.data?.profile]);
 
-  return { requesterName, requesterAvatarUrl, requesterPhone };
+  return { requesterName, requesterAvatarUrl, requesterCountryCode, requesterPhone };
 }

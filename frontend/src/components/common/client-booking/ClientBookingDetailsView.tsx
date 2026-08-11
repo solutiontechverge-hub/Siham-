@@ -37,6 +37,7 @@ import ClientBookingCancelDialog from "./ClientBookingCancelDialog";
 import ClientBookingCancelFeeDialog from "./ClientBookingCancelFeeDialog";
 import ClientBookingDeleteDialog from "./ClientBookingDeleteDialog";
 import ClientBookingDiscardDialog from "./ClientBookingDiscardDialog";
+import ClientEbrSuggestDrawer from "./ClientEbrSuggestDrawer";
 import { setBookingCancellationReason } from "./bookingCancellationReason";
 import { settleCancellationFee } from "./settleCancellationFee";
 import ClientBookingDetailsHeader from "./ClientBookingDetailsHeader";
@@ -79,6 +80,7 @@ import {
   resolveKilometerAllowanceAmount,
   serializeCalendarEntryNotes,
 } from "../calendar/bookingEventDetails";
+import { isResponseWindowOverdue } from "../calendar/bookingResponseDeadline";
 import {
   FinanceDocumentPreviewDrawer,
   buildClientBookingTransactionRow,
@@ -192,6 +194,7 @@ export default function ClientBookingDetailsView({
   const [isCancelProcessing, setIsCancelProcessing] = React.useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [discardDialogOpen, setDiscardDialogOpen] = React.useState(false);
+  const [ebrSuggestDrawerOpen, setEbrSuggestDrawerOpen] = React.useState(false);
   const [ebrAction, setEbrAction] = React.useState<ClientEbrActionKind | null>(
     null,
   );
@@ -1199,31 +1202,9 @@ export default function ClientBookingDetailsView({
   ]);
 
   const handleConfirmEbrSuggest = React.useCallback(async () => {
-    if (!bookingRef) {
-      showSnackbar({
-        severity: "error",
-        message: "Booking reference is missing.",
-      });
-      return;
-    }
-    try {
-      const result = await openMessagingForBooking({ bookingRef }).unwrap();
-      messagingWidget?.openMessaging({
-        threadId: result.threadId,
-        bookingRef: result.bookingRef,
-        businessSetupId: result.businessSetupId,
-        searchPrefill: result.thread?.name || undefined,
-      });
-    } catch (error) {
-      showSnackbar({
-        severity: "error",
-        message: getApiErrorMessage(
-          error,
-          "Unable to open chat for this booking.",
-        ),
-      });
-    }
-  }, [bookingRef, messagingWidget, openMessagingForBooking, showSnackbar]);
+    setEbrAction(null);
+    setEbrSuggestDrawerOpen(true);
+  }, []);
 
   const handleAcknowledgeRejected = React.useCallback(() => {
     returnToBookingDetailsStart("acknowledge_rejected");
@@ -1621,6 +1602,48 @@ export default function ClientBookingDetailsView({
     ],
   );
 
+  const handleEbrSuggestEditServices = React.useCallback(
+    (note: string) => {
+      if (typeof window !== "undefined") {
+        window.sessionStorage.setItem("mollure:ebr_suggest_note", note);
+      }
+      setEbrSuggestDrawerOpen(false);
+      if (activeBooking) {
+        setActiveBookingSession(enrichClientBookingRecord(activeBooking));
+        if (typeof window !== "undefined") {
+          window.sessionStorage.setItem(
+            "mollure:ebr_baseline_schedule",
+            JSON.stringify({
+              dateISO: activeBooking.draft?.selectedDateISO ?? "",
+              time: activeBooking.draft?.selectedTime ?? "",
+            }),
+          );
+        }
+      }
+      clearPublicProfileBookingSelection();
+      router.push("/clients/booking?mode=create&ebrSuggest=1&ebrFocus=services");
+    },
+    [activeBooking, router],
+  );
+
+  const handleEbrSuggestSend = React.useCallback(
+    async (note: string) => {
+      try {
+        await persistClientEbrSuggestion(note);
+        setEbrSuggestDrawerOpen(false);
+      } catch (error) {
+        showSnackbar({
+          severity: "error",
+          message: getApiErrorMessage(
+            error,
+            "Unable to send suggested changes.",
+          ),
+        });
+      }
+    },
+    [persistClientEbrSuggestion, showSnackbar],
+  );
+
   /** After Confirmed ER Accept: apply client edits directly (one save), then clear grant. */
   const persistConfirmedGrantEdit = React.useCallback(async () => {
     if (!bookingRef || !apiBookingId) return;
@@ -1996,6 +2019,12 @@ export default function ClientBookingDetailsView({
               editRequest.refresh();
             }}
             showUpdated={showStatusUpdated}
+            responseOverdue={isResponseWindowOverdue({
+              responseStatus: bookingNotesMeta?.responseStatus,
+              responseStartedAt: bookingNotesMeta?.responseStartedAt,
+              respondBy: bookingNotesMeta?.respondBy,
+              responseWindowMinutes: bookingNotesMeta?.responseWindowMinutes,
+            })}
           />
 
           <Box sx={{ px: { xs: 2, md: 2.5 }, pb: 2.5 }}>
@@ -2181,6 +2210,14 @@ export default function ClientBookingDetailsView({
           else if (ebrAction === "reject") void handleConfirmEbrReject();
           else if (ebrAction === "suggest") void handleConfirmEbrSuggest();
         }}
+      />
+
+      <ClientEbrSuggestDrawer
+        open={ebrSuggestDrawerOpen}
+        draft={draft}
+        onClose={() => setEbrSuggestDrawerOpen(false)}
+        onEditServices={handleEbrSuggestEditServices}
+        onSend={handleEbrSuggestSend}
       />
 
       <StripePrepaymentDialog

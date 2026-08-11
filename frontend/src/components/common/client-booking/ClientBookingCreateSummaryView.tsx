@@ -1,0 +1,1099 @@
+"use client";
+
+import * as React from "react";
+import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
+import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
+import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
+import {
+  Box,
+  Chip,
+  CircularProgress,
+  Container,
+  Divider,
+  Grid,
+  Paper,
+  Stack,
+  Typography,
+} from "@mui/material";
+import { alpha, useTheme } from "@mui/material/styles";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  fmtMinutesToTimeLabel,
+  parseTimeLabelToMinutes,
+  serviceTimeRangeLabel,
+} from "../../../app/clients/booking/booking-time";
+import { parseBookingListTab } from "../../../app/clients/booking/bookingPillTabs";
+import {
+  getActiveBookingSession,
+  setActiveBookingSession,
+} from "../../../app/clients/booking/clientBookingSession";
+import { submitClientBookingRequest } from "../../../app/clients/booking/submitClientBookingRequest";
+import { getApiErrorMessage } from "../../../lib/api-error";
+import {
+  useCreateBookingMutation,
+  useGetAllBusinessSetupsQuery,
+  useUpdateMyBookingMutation,
+} from "../../../store/services/businessApi";
+import { useSyncFinanceTransactionFromBookingMutation } from "../../../store/services/financeApi";
+import { useSnackbar } from "../AppSnackbar";
+import AppButton from "../AppButton";
+import AppCountryPhoneFields from "../AppCountryPhoneFields";
+import AppDropdown from "../AppDropdown";
+import AppTextField from "../AppTextField";
+import { resolveDesiredVisitAddressOptions } from "../../../data/businessPublicProfile.data";
+import {
+  formatContactPhone,
+  getPhoneValidationErrors,
+  splitContactPhone,
+} from "../../../lib/phone-validation";
+import { buildBookingSummarySections, resolveTeamMemberFirstName } from "./buildBookingSummarySections";
+import StripePrepaymentDialog from "./StripePrepaymentDialog";
+import { useActiveClientBooking } from "./useActiveClientBooking";
+import { useClientBookingDraft } from "./useClientBookingDraft";
+import { useClientRequesterProfile } from "./useClientRequesterProfile";
+import type { ClientBookingDesiredLocation } from "./types";
+
+function roleLabelForSection(section: {
+  isRequester?: boolean;
+  participantType?: string;
+}) {
+  if (section.participantType === "planning") return "PLANNING";
+  if (section.participantType === "model") return "MODEL";
+  if (section.participantType === "guest") return "GUEST";
+  if (section.isRequester) return "CLIENT";
+  return "CLIENT";
+}
+
+export default function ClientBookingCreateSummaryView() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const listTab = parseBookingListTab(searchParams?.get("tab"));
+  const m = useTheme().palette.mollure;
+  const { showSnackbar } = useSnackbar();
+  const {
+    draft,
+    shop,
+    requiresPrepayment,
+    prepaymentPercent: profilePrepaymentPercent,
+  } = useClientBookingDraft();
+  const { record: activeBooking, refresh: refreshActiveBooking } =
+    useActiveClientBooking();
+  const { requesterCountryCode, requesterPhone } = useClientRequesterProfile();
+  const { data: businessSetupsData } = useGetAllBusinessSetupsQuery();
+  const [createBooking] = useCreateBookingMutation();
+  const [updateMyBooking] = useUpdateMyBookingMutation();
+  const [syncFinanceFromBooking] =
+    useSyncFinanceTransactionFromBookingMutation();
+
+  const locationMode = shop?.locationMode ?? "fixed";
+  const isDesired = locationMode === "desired";
+  const bookingSetup = React.useMemo(
+    () =>
+      businessSetupsData?.data?.find((row) => row.id === shop?.shopId) ?? null,
+    [businessSetupsData?.data, shop?.shopId],
+  );
+
+  const profilePhone = React.useMemo(() => {
+    const preferredCode = requesterCountryCode.trim();
+    const fromProfile = requesterPhone.trim();
+    if (!fromProfile && !preferredCode) {
+      return { countryCode: "", phone: "" };
+    }
+    return splitContactPhone(fromProfile, preferredCode);
+  }, [requesterCountryCode, requesterPhone]);
+
+  const countryCode = profilePhone.countryCode;
+  const phone = profilePhone.phone;
+
+  const [address, setAddress] = React.useState<ClientBookingDesiredLocation>({
+    street: "",
+    number: "",
+    postalCode: "",
+    province: "",
+    municipality: "",
+  });
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isPaying, setIsPaying] = React.useState(false);
+  const [stripeDialogOpen, setStripeDialogOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    const visit = draft?.desiredLocation;
+    if (!visit) return;
+    setAddress({
+      street: visit.street ?? "",
+      number: visit.number ?? "",
+      postalCode: visit.postalCode ?? "",
+      province: visit.province ?? "",
+      municipality: visit.municipality ?? "",
+    });
+  }, [draft?.desiredLocation]);
+
+  const summarySections = React.useMemo(
+    () => buildBookingSummarySections(draft),
+    [draft],
+  );
+
+  const bookingStartMinutes = parseTimeLabelToMinutes(
+    draft?.selectedTime ?? "12:00 AM",
+  );
+  const bookingEndMinutes =
+    bookingStartMinutes +
+    (draft?.services ?? []).reduce((sum, s) => sum + s.durationMins, 0);
+
+  const dateLabel = React.useMemo(() => {
+    if (!draft?.selectedDateISO) return "";
+    const dt = new Date(`${draft.selectedDateISO}T00:00:00`);
+    if (Number.isNaN(dt.getTime())) return draft.selectedDateISO;
+    return dt.toLocaleDateString("en-US", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  }, [draft?.selectedDateISO]);
+
+  const addressLabel = React.useMemo(() => {
+    if (isDesired) {
+      const parts = [
+        address.number,
+        address.street,
+        address.postalCode,
+        address.municipality,
+        address.province,
+      ]
+        .map((p) => p.trim())
+        .filter(Boolean);
+      return parts.length ? parts.join(", ") : "Service at your location";
+    }
+    return (
+      shop?.addressLabel?.trim() ||
+      shop?.municipalityLabel?.trim() ||
+      "Studio location"
+    );
+  }, [address, isDesired, shop?.addressLabel, shop?.municipalityLabel]);
+
+  const total = draft?.total ?? 0;
+  const prepaymentPercent =
+    Number(activeBooking?.prepaymentPercent) > 0
+      ? Number(activeBooking?.prepaymentPercent)
+      : profilePrepaymentPercent;
+  const isPrepaymentPaid = Boolean(activeBooking?.prepaid);
+  const mustPayBeforeBooking = requiresPrepayment && !isPrepaymentPaid;
+  const showFixedPrepayRow =
+    !isDesired && requiresPrepayment && prepaymentPercent > 0 && total > 0;
+  const showDesiredPrepayNote =
+    isDesired && prepaymentPercent > 0 && total > 0;
+  const prepayAmount =
+    Math.round(((total * prepaymentPercent) / 100 + Number.EPSILON) * 100) /
+    100;
+  const contactPhoneValue = formatContactPhone(countryCode, phone);
+  const bookingRef = activeBooking?.bookingRef ?? "";
+
+  const validateBeforeAction = React.useCallback(() => {
+    const phoneErrors = getPhoneValidationErrors(countryCode, phone, {
+      required: true,
+    });
+    if (phoneErrors.countryCode || phoneErrors.phone) {
+      showSnackbar({
+        severity: "error",
+        message:
+          phoneErrors.phone ??
+          phoneErrors.countryCode ??
+          "Please add a contact number in your profile.",
+      });
+      return false;
+    }
+    if (isDesired) {
+      const incomplete =
+        !address.street.trim() ||
+        !address.number.trim() ||
+        !address.postalCode.trim() ||
+        !address.province.trim() ||
+        !address.municipality.trim();
+      if (incomplete) {
+        showSnackbar({
+          severity: "error",
+          message: "Please complete Contact & Address Details.",
+        });
+        return false;
+      }
+    }
+    return true;
+  }, [address, countryCode, isDesired, phone, showSnackbar]);
+
+  const persistDraftEdits = React.useCallback(() => {
+    const session = getActiveBookingSession() ?? activeBooking;
+    if (!session?.draft) return session;
+    const next = {
+      ...session,
+      draft: {
+        ...session.draft,
+        ...(isDesired
+          ? {
+              desiredLocation: {
+                street: address.street.trim(),
+                number: address.number.trim(),
+                postalCode: address.postalCode.trim(),
+                province: address.province.trim(),
+                municipality: address.municipality.trim(),
+              },
+            }
+          : {}),
+      },
+      shop: session.shop
+        ? {
+            ...session.shop,
+            ...(isDesired && addressLabel
+              ? {
+                  addressLabel,
+                  municipalityLabel:
+                    address.municipality.trim() || session.shop.municipalityLabel,
+                }
+              : {}),
+          }
+        : session.shop,
+      contactPhone: contactPhoneValue || session.contactPhone,
+    };
+    setActiveBookingSession(next);
+    return next;
+  }, [activeBooking, address, addressLabel, contactPhoneValue, isDesired]);
+
+  const ensureBookingCreated = React.useCallback(async () => {
+    const record = persistDraftEdits();
+    if (!record?.draft || !record.shop?.shopId) {
+      showSnackbar({
+        severity: "error",
+        message: "Booking draft not found. Please go back and try again.",
+      });
+      return null;
+    }
+    if (record.bookingRequestSent && record.apiBookingId) {
+      return record;
+    }
+
+    const result = await submitClientBookingRequest({
+      record: {
+        ...record,
+        contactPhone: contactPhoneValue,
+      },
+      locationMode,
+      setup: bookingSetup,
+      createBooking,
+    });
+    if (!result.ok) {
+      showSnackbar({ severity: "error", message: result.message });
+      return null;
+    }
+    setActiveBookingSession(result.record);
+    await refreshActiveBooking();
+    return result.record;
+  }, [
+    bookingSetup,
+    contactPhoneValue,
+    createBooking,
+    locationMode,
+    persistDraftEdits,
+    refreshActiveBooking,
+    showSnackbar,
+  ]);
+
+  const completePrepayment = React.useCallback(async () => {
+    const record = await ensureBookingCreated();
+    if (!record) return;
+
+    const bookingId =
+      record.apiBookingId ??
+      (record.id && !String(record.id).startsWith("bk_draft_")
+        ? record.id
+        : null);
+    if (!bookingId || String(bookingId).startsWith("bk_draft_")) {
+      showSnackbar({
+        severity: "error",
+        message: "Booking not found on server.",
+      });
+      return;
+    }
+
+    try {
+      await updateMyBooking({
+        id: bookingId,
+        prepayment_status: "paid",
+        status: "confirmed",
+      }).unwrap();
+
+      const paidSession = {
+        ...record,
+        prepaid: true,
+        requiresPrepayment: true,
+        prepaymentPercent,
+        status: "confirmed" as const,
+      };
+      setActiveBookingSession(paidSession);
+      await refreshActiveBooking();
+
+      void syncFinanceFromBooking({
+        bookingRef: record.bookingRef,
+        paymentPhase: "prepay",
+        paymentMethod: "Online (Direct)",
+        amount: prepayAmount,
+        status: "Prepaid",
+      });
+
+      setStripeDialogOpen(false);
+      showSnackbar({
+        severity: "success",
+        message: "Prepayment received. You can complete your booking.",
+      });
+    } catch (error) {
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Unable to record prepayment."),
+      });
+    }
+  }, [
+    ensureBookingCreated,
+    prepayAmount,
+    prepaymentPercent,
+    refreshActiveBooking,
+    showSnackbar,
+    syncFinanceFromBooking,
+    updateMyBooking,
+  ]);
+
+  const handlePayNow = React.useCallback(async () => {
+    if (isPaying || isPrepaymentPaid) return;
+    if (!validateBeforeAction()) return;
+    if (prepayAmount <= 0) {
+      showSnackbar({ severity: "error", message: "No prepayment amount due." });
+      return;
+    }
+
+    setIsPaying(true);
+    try {
+      const record = await ensureBookingCreated();
+      if (!record) return;
+      setStripeDialogOpen(true);
+    } finally {
+      setIsPaying(false);
+    }
+  }, [
+    ensureBookingCreated,
+    isPaying,
+    isPrepaymentPaid,
+    prepayAmount,
+    showSnackbar,
+    validateBeforeAction,
+  ]);
+
+  React.useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("payment") !== "success") return;
+    void completePrepayment();
+    const url = new URL(window.location.href);
+    url.searchParams.delete("payment");
+    url.searchParams.delete("ref");
+    window.history.replaceState({}, "", url.pathname + url.search);
+  }, [completePrepayment]);
+
+  const onSubmit = React.useCallback(async () => {
+    if (isSubmitting) return;
+    if (!validateBeforeAction()) return;
+
+    if (mustPayBeforeBooking) {
+      showSnackbar({
+        severity: "error",
+        message: "Please complete prepayment before booking.",
+      });
+      return;
+    }
+
+    const existing = getActiveBookingSession() ?? activeBooking;
+    // Pay Now already created + confirmed the booking — just finish the flow.
+    if (
+      requiresPrepayment &&
+      isPrepaymentPaid &&
+      existing?.bookingRequestSent &&
+      existing.apiBookingId
+    ) {
+      router.push(
+        `/clients/booking/completed?outcome=completed&tab=${encodeURIComponent(listTab)}`,
+      );
+      return;
+    }
+
+    const record = persistDraftEdits();
+    if (!record?.draft || !record.shop?.shopId) {
+      showSnackbar({
+        severity: "error",
+        message: "Booking draft not found. Please go back and try again.",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const result = await submitClientBookingRequest({
+        record: {
+          ...record,
+          contactPhone: contactPhoneValue,
+        },
+        locationMode,
+        setup: bookingSetup,
+        createBooking,
+      });
+      if (!result.ok) {
+        showSnackbar({ severity: "error", message: result.message });
+        return;
+      }
+      setActiveBookingSession(result.record);
+      await refreshActiveBooking();
+      const outcome = locationMode === "desired" ? "requested" : "completed";
+      router.push(
+        `/clients/booking/completed?outcome=${outcome}&tab=${encodeURIComponent(listTab)}`,
+      );
+    } catch (error) {
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(
+          error,
+          isDesired
+            ? "Unable to send booking request. Please try again."
+            : "Unable to complete booking. Please try again.",
+        ),
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [
+    activeBooking,
+    bookingSetup,
+    contactPhoneValue,
+    createBooking,
+    isDesired,
+    isPrepaymentPaid,
+    isSubmitting,
+    listTab,
+    locationMode,
+    mustPayBeforeBooking,
+    persistDraftEdits,
+    refreshActiveBooking,
+    requiresPrepayment,
+    router,
+    showSnackbar,
+    validateBeforeAction,
+  ]);
+
+  const visitAddressOptions = React.useMemo(
+    () => resolveDesiredVisitAddressOptions(null, address.province),
+    [address.province],
+  );
+
+  if (!draft || !shop) {
+    return (
+      <Box sx={{ minHeight: "60vh", display: "grid", placeItems: "center" }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  let serviceCursor = bookingStartMinutes;
+
+  return (
+    <Box sx={{ minHeight: "100vh", bgcolor: "mollure.pageBg", py: { xs: 2.5, md: 3.5 } }}>
+      <Container maxWidth="md">
+        <Typography
+          sx={{
+            fontSize: "30px",
+            fontWeight: 700,
+            color: alpha(m.navy, 0.86),
+            mb: 2,
+          }}
+        >
+          Booking Details
+        </Typography>
+
+        <Paper
+          elevation={0}
+          sx={{
+            borderRadius: "12px",
+            border: `1px solid ${alpha(m.navy, 0.08)}`,
+            bgcolor: "#fff",
+            overflow: "hidden",
+            boxShadow: "0 10px 22px rgba(16, 35, 63, 0.05)",
+          }}
+        >
+          <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 2, pb: 1.25 }}>
+            <Typography
+              sx={{
+                fontWeight: 900,
+                fontSize: 14,
+                color: alpha(m.navy, 0.72),
+                textAlign: "center",
+              }}
+            >
+              Service Summary
+            </Typography>
+
+            <Box sx={{ mt: 1 }}>
+              <Chip
+                label={isDesired ? "Desired Location" : "Fixed Location"}
+                size="small"
+                sx={{
+                  height: 20,
+                  borderRadius: "4px",
+                  bgcolor: alpha(m.teal, 0.12),
+                  color: m.teal,
+                  fontSize: 11,
+                  fontWeight: 900,
+                  "& .MuiChip-label": { px: 1 },
+                }}
+              />
+            </Box>
+
+            <Typography
+              sx={{
+                mt: 0.85,
+                fontWeight: 900,
+                fontSize: 18,
+                color: alpha(m.navy, 0.88),
+                lineHeight: 1.2,
+              }}
+            >
+              {shop.shopName}
+            </Typography>
+
+            <Stack
+              direction="row"
+              alignItems="center"
+              spacing={0.6}
+              sx={{ mt: 0.75, minWidth: 0 }}
+            >
+              <AccessTimeRoundedIcon
+                sx={{ fontSize: 16, color: m.teal, flexShrink: 0 }}
+              />
+              <Typography
+                sx={{
+                  fontWeight: 800,
+                  color: alpha(m.teal, 0.95),
+                  fontSize: 12.5,
+                }}
+              >
+                {dateLabel} ({fmtMinutesToTimeLabel(bookingStartMinutes)}-
+                {fmtMinutesToTimeLabel(bookingEndMinutes)})
+              </Typography>
+            </Stack>
+
+            {!isDesired ? (
+              <Stack
+                direction="row"
+                alignItems="center"
+                spacing={0.55}
+                sx={{ mt: 0.55, minWidth: 0 }}
+              >
+                <LocationOnOutlinedIcon
+                  sx={{ fontSize: 16, color: alpha(m.navy, 0.45), flexShrink: 0 }}
+                />
+                <Typography
+                  sx={{
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.55),
+                    fontSize: 12,
+                  }}
+                >
+                  {addressLabel}
+                </Typography>
+              </Stack>
+            ) : null}
+          </Box>
+
+          <Divider />
+
+          <Box sx={{ px: { xs: 2, md: 2.5 }, py: 1.75 }}>
+            <Stack spacing={1.5}>
+              {summarySections.map((section) => {
+                const roleLabel = roleLabelForSection(section);
+                return (
+                  <Box key={section.key}>
+                    <Stack
+                      direction="row"
+                      alignItems="baseline"
+                      spacing={0.75}
+                      sx={{ mb: 0.75 }}
+                    >
+                      <Typography
+                        sx={{
+                          fontWeight: 900,
+                          fontSize: 13,
+                          color: alpha(m.navy, 0.78),
+                        }}
+                      >
+                        {section.title}
+                      </Typography>
+                      <Typography
+                        sx={{
+                          fontWeight: 800,
+                          fontSize: 10.5,
+                          color: "primary.light",
+                          textTransform: "uppercase",
+                          letterSpacing: 0.3,
+                        }}
+                      >
+                        {roleLabel}
+                      </Typography>
+                    </Stack>
+
+                    <Stack spacing={0.85}>
+                      {section.items.map((item) => {
+                        const start = serviceCursor;
+                        serviceCursor += item.durationMins;
+                        const tmName =
+                          resolveTeamMemberFirstName(
+                            item.teamMemberId,
+                            draft.teamMembers,
+                          ) || section.teamMemberLabel;
+                        return (
+                          <Box
+                            key={item.id}
+                            sx={{
+                              borderRadius: "10px",
+                              border: `1px solid ${alpha(m.navy, 0.06)}`,
+                              px: 1.25,
+                              py: 1,
+                              bgcolor: alpha(m.navy, 0.015),
+                            }}
+                          >
+                            <Stack
+                              direction="row"
+                              alignItems="flex-start"
+                              justifyContent="space-between"
+                              spacing={1}
+                            >
+                              <Box sx={{ minWidth: 0, flex: 1 }}>
+                                <Typography
+                                  sx={{
+                                    fontSize: 13,
+                                    fontWeight: 900,
+                                    color: alpha(m.navy, 0.82),
+                                    lineHeight: 1.2,
+                                  }}
+                                >
+                                  {item.name}
+                                </Typography>
+                                <Typography
+                                  sx={{
+                                    mt: 0.3,
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    color: alpha(m.navy, 0.48),
+                                  }}
+                                >
+                                  {serviceTimeRangeLabel(start, item.durationMins)}{" "}
+                                  • {item.durationMins} Mins
+                                </Typography>
+                                {tmName ? (
+                                  <Stack
+                                    direction="row"
+                                    alignItems="center"
+                                    spacing={0.5}
+                                    sx={{ mt: 0.55 }}
+                                  >
+                                    <PersonOutlineRoundedIcon
+                                      sx={{
+                                        fontSize: 14,
+                                        color: alpha(m.navy, 0.4),
+                                      }}
+                                    />
+                                    <Typography
+                                      sx={{
+                                        fontSize: 11,
+                                        fontWeight: 700,
+                                        color: alpha(m.navy, 0.55),
+                                      }}
+                                    >
+                                      {tmName}
+                                    </Typography>
+                                  </Stack>
+                                ) : null}
+                              </Box>
+                              <Typography
+                                sx={{
+                                  fontSize: 13,
+                                  fontWeight: 900,
+                                  color: alpha(m.navy, 0.82),
+                                  flexShrink: 0,
+                                }}
+                              >
+                                €{item.price}
+                              </Typography>
+                            </Stack>
+                          </Box>
+                        );
+                      })}
+                    </Stack>
+                  </Box>
+                );
+              })}
+            </Stack>
+          </Box>
+
+          <Box
+            sx={{
+              px: { xs: 2, md: 2.5 },
+              py: 1.35,
+              bgcolor: alpha(m.navy, 0.035),
+              borderTop: `1px solid ${alpha(m.navy, 0.06)}`,
+            }}
+          >
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+            >
+              <Typography
+                sx={{ fontWeight: 800, fontSize: 13, color: alpha(m.navy, 0.7) }}
+              >
+                Total
+              </Typography>
+              <Typography
+                sx={{ fontWeight: 900, fontSize: 16, color: alpha(m.navy, 0.88) }}
+              >
+                €{total}
+              </Typography>
+            </Stack>
+
+            {showFixedPrepayRow ? (
+              <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                spacing={1}
+                sx={{ mt: 0.85 }}
+              >
+                <Typography
+                  sx={{
+                    fontWeight: 700,
+                    fontSize: 12,
+                    color: alpha(m.navy, 0.58),
+                    flex: 1,
+                    minWidth: 0,
+                  }}
+                >
+                  {isPrepaymentPaid
+                    ? `Prepaid (${prepaymentPercent}%)`
+                    : `Prepayment Required (${prepaymentPercent}%)`}
+                </Typography>
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  spacing={1.25}
+                  sx={{ flexShrink: 0 }}
+                >
+                  {!isPrepaymentPaid ? (
+                    <Typography
+                      component="button"
+                      type="button"
+                      onClick={() => void handlePayNow()}
+                      disabled={isPaying}
+                      sx={{
+                        border: 0,
+                        bgcolor: "transparent",
+                        p: 0,
+                        cursor: isPaying ? "wait" : "pointer",
+                        color: m.teal,
+                        fontWeight: 900,
+                        fontSize: 12.5,
+                        fontFamily: "inherit",
+                        opacity: isPaying ? 0.7 : 1,
+                        "&:hover": { color: m.tealDark },
+                      }}
+                    >
+                      {isPaying ? "Preparing…" : "Pay Now"}
+                    </Typography>
+                  ) : (
+                    <Typography
+                      sx={{
+                        fontWeight: 800,
+                        fontSize: 12,
+                        color: m.teal,
+                      }}
+                    >
+                      Paid
+                    </Typography>
+                  )}
+                  <Typography
+                    sx={{
+                      fontWeight: 800,
+                      fontSize: 13,
+                      color: alpha(m.navy, 0.78),
+                      minWidth: 56,
+                      textAlign: "right",
+                    }}
+                  >
+                    €{prepayAmount}
+                  </Typography>
+                </Stack>
+              </Stack>
+            ) : null}
+
+            {showDesiredPrepayNote ? (
+              <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                sx={{ mt: 0.75 }}
+              >
+                <Typography
+                  sx={{
+                    fontWeight: 700,
+                    fontSize: 11.5,
+                    color: alpha(m.navy, 0.55),
+                  }}
+                >
+                  Prepayment Required ({prepaymentPercent}%) After Acceptance
+                </Typography>
+                <Typography
+                  sx={{
+                    fontWeight: 800,
+                    fontSize: 13,
+                    color: alpha(m.navy, 0.78),
+                  }}
+                >
+                  €{prepayAmount}
+                </Typography>
+              </Stack>
+            ) : null}
+          </Box>
+        </Paper>
+
+        <Paper
+          elevation={0}
+          sx={{
+            mt: 2,
+            borderRadius: "12px",
+            border: `1px solid ${alpha(m.navy, 0.08)}`,
+            bgcolor: "#fff",
+            overflow: "hidden",
+            px: { xs: 2, md: 2.5 },
+            py: 2,
+          }}
+        >
+          <Typography
+            sx={{
+              fontWeight: 900,
+              fontSize: 14,
+              color: alpha(m.navy, 0.78),
+              mb: 1.5,
+            }}
+          >
+            {isDesired ? "Contact & Address Details" : "Contact"}
+          </Typography>
+
+          <Stack spacing={1.35}>
+            <AppCountryPhoneFields
+              countryCode={countryCode}
+              phone={phone}
+              onCountryCodeChange={() => {}}
+              onPhoneChange={() => {}}
+              label="Contact Number"
+              phonePlaceholder="Add phone in profile"
+              required
+              disabled
+              validateOnBlur={false}
+              countryCodeWidth={140}
+            />
+
+            {isDesired ? (
+              <Grid container spacing={1.25}>
+                <Grid item xs={12} sm={6}>
+                  <Typography
+                    sx={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: alpha(m.navy, 0.55),
+                      mb: 0.6,
+                    }}
+                  >
+                    Province
+                  </Typography>
+                  <AppDropdown
+                    value={address.province}
+                    onChange={(val) =>
+                      setAddress((prev) => ({
+                        ...prev,
+                        province: String(val ?? ""),
+                        municipality: "",
+                      }))
+                    }
+                    options={visitAddressOptions.provinceOptions.map((p) => ({
+                      value: p,
+                      label: p,
+                    }))}
+                    placeholder="Province"
+                    fullWidth
+                    size="small"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Typography
+                    sx={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: alpha(m.navy, 0.55),
+                      mb: 0.6,
+                    }}
+                  >
+                    Municipality
+                  </Typography>
+                  <AppDropdown
+                    value={address.municipality}
+                    onChange={(val) =>
+                      setAddress((prev) => ({
+                        ...prev,
+                        municipality: String(val ?? ""),
+                      }))
+                    }
+                    options={[
+                      ...(address.municipality &&
+                      !visitAddressOptions.municipalityOptions.includes(
+                        address.municipality,
+                      )
+                        ? [
+                            {
+                              value: address.municipality,
+                              label: address.municipality,
+                            },
+                          ]
+                        : []),
+                      ...visitAddressOptions.municipalityOptions.map((muni) => ({
+                        value: muni,
+                        label: muni,
+                      })),
+                    ]}
+                    placeholder="Municipality"
+                    fullWidth
+                    size="small"
+                    disabled={!address.province}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Typography
+                    sx={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: alpha(m.navy, 0.55),
+                      mb: 0.6,
+                    }}
+                  >
+                    Street Address
+                  </Typography>
+                  <AppTextField
+                    value={address.street}
+                    onChange={(e) =>
+                      setAddress((prev) => ({
+                        ...prev,
+                        street: e.target.value,
+                      }))
+                    }
+                    placeholder="Churchill-laan"
+                    fullWidth
+                    size="small"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Typography
+                    sx={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: alpha(m.navy, 0.55),
+                      mb: 0.6,
+                    }}
+                  >
+                    Street Number
+                  </Typography>
+                  <AppTextField
+                    value={address.number}
+                    onChange={(e) =>
+                      setAddress((prev) => ({
+                        ...prev,
+                        number: e.target.value,
+                      }))
+                    }
+                    placeholder="34234"
+                    fullWidth
+                    size="small"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <Typography
+                    sx={{
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: alpha(m.navy, 0.55),
+                      mb: 0.6,
+                    }}
+                  >
+                    Postal Code
+                  </Typography>
+                  <AppTextField
+                    value={address.postalCode}
+                    onChange={(e) =>
+                      setAddress((prev) => ({
+                        ...prev,
+                        postalCode: e.target.value,
+                      }))
+                    }
+                    placeholder="1234 AB"
+                    fullWidth
+                    size="small"
+                  />
+                </Grid>
+              </Grid>
+            ) : null}
+          </Stack>
+        </Paper>
+
+        <AppButton
+          tone="primary"
+          fullWidth
+          disabled={isSubmitting || mustPayBeforeBooking}
+          onClick={() => void onSubmit()}
+          sx={{ mt: 2, height: 44 }}
+        >
+          {isSubmitting ? (
+            <>
+              <CircularProgress size={18} sx={{ mr: 1, color: "inherit" }} />
+              {isDesired ? "Sending…" : "Booking…"}
+            </>
+          ) : isDesired ? (
+            "Send Booking Request"
+          ) : (
+            "Book Now"
+          )}
+        </AppButton>
+
+        {mustPayBeforeBooking ? (
+          <Typography
+            sx={{
+              mt: 1,
+              textAlign: "center",
+              fontSize: 12,
+              fontWeight: 700,
+              color: alpha(m.navy, 0.5),
+            }}
+          >
+            Complete prepayment with Pay Now to enable booking.
+          </Typography>
+        ) : null}
+      </Container>
+
+      <StripePrepaymentDialog
+        open={stripeDialogOpen}
+        amount={prepayAmount}
+        bookingRef={bookingRef}
+        onClose={() => setStripeDialogOpen(false)}
+        onSuccess={() => void completePrepayment()}
+      />
+    </Box>
+  );
+}

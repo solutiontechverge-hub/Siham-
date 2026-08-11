@@ -5,12 +5,31 @@ import * as React from "react";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import { Box, Container, Paper, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+
+const REDIRECT_SECONDS = 30;
 
 export default function BookingCompletedPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const theme = useTheme();
   const m = theme.palette.mollure;
+  const outcome = searchParams?.get("outcome") === "requested" ? "requested" : "completed";
+  const title =
+    outcome === "requested" ? "Booking Request sent" : "Booking Completed";
+  const [secondsLeft, setSecondsLeft] = React.useState(REDIRECT_SECONDS);
+
+  React.useEffect(() => {
+    const tick = window.setInterval(() => {
+      setSecondsLeft((prev) => Math.max(0, prev - 1));
+    }, 1000);
+    return () => window.clearInterval(tick);
+  }, []);
+
+  React.useEffect(() => {
+    if (secondsLeft > 0) return;
+    router.replace("/clients/booking");
+  }, [router, secondsLeft]);
 
   return (
     <Box
@@ -61,7 +80,16 @@ export default function BookingCompletedPage() {
                   fontSize: 16,
                 }}
               >
-                Booking Completed
+                {title}
+              </Typography>
+              <Typography
+                sx={{
+                  fontWeight: 700,
+                  color: alpha(m.navy, 0.45),
+                  fontSize: 12.5,
+                }}
+              >
+                Redirecting to bookings in {secondsLeft}s
               </Typography>
               <AppButton
                 tone="primary"
