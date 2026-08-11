@@ -17,12 +17,16 @@ export const NOTIFICATION_TYPES = {
   PRO_BOOKING_CANCELLED: "pro.booking.cancelled",
   PRO_BOOKING_CONFIRMED: "pro.booking.confirmed",
   PRO_BOOKING_COMPLETED: "pro.booking.completed",
+  PRO_BOOKING_IN_PROGRESS: "pro.booking.in_progress",
+  PRO_BOOKING_NO_SHOW: "pro.booking.no_show",
   PRO_BOOKING_DATE_CHANGED: "pro.booking.date_changed",
   PRO_BOOKING_TIME_CHANGED: "pro.booking.time_changed",
   PRO_BOOKING_SERVICE_EDITED: "pro.booking.service_edited",
   PRO_BOOKING_UNIQUE_ITEM_EDITED: "pro.booking.unique_item_edited",
   PRO_PREPAYMENT_RECEIVED: "pro.payment.prepayment_received",
   PRO_ER_INCOMING: "pro.er.incoming",
+  PRO_ER_ACCEPTED: "pro.er.accepted",
+  PRO_ER_REJECTED: "pro.er.rejected",
   PRO_REMINDER_RESPOND: "pro.reminder.respond_request",
   CLIENT_BR_ACCEPTED: "client.br.accepted",
   CLIENT_BR_REJECTED: "client.br.rejected",
@@ -31,6 +35,7 @@ export const NOTIFICATION_TYPES = {
   CLIENT_BOOKING_CONFIRMED: "client.booking.confirmed",
   CLIENT_BOOKING_CANCELLED: "client.booking.cancelled",
   CLIENT_BOOKING_COMPLETED: "client.booking.completed",
+  CLIENT_BOOKING_IN_PROGRESS: "client.booking.in_progress",
   CLIENT_BOOKING_NO_SHOW: "client.booking.no_show",
   CLIENT_BOOKING_DATE_CHANGED: "client.booking.date_changed",
   CLIENT_BOOKING_TIME_CHANGED: "client.booking.time_changed",
@@ -45,6 +50,8 @@ export const NOTIFICATION_TYPES = {
   CLIENT_INVOICE_REMINDER_2: "client.invoice.reminder_2",
   CLIENT_ER_INCOMING: "client.er.incoming",
   CLIENT_ER_SUGGESTED: "client.er.suggested",
+  CLIENT_ER_ACCEPTED: "client.er.accepted",
+  CLIENT_ER_REJECTED: "client.er.rejected",
   CLIENT_REMINDER_APPOINTMENT: "client.reminder.appointment",
 };
 
@@ -57,6 +64,8 @@ export const BOOKING_NOTIFICATION_EVENTS = {
   UNIQUE_ITEM_EDITED: "unique_item_edited",
   EBR_DISCARDED: "ebr_discarded",
   INCOMING_ER: "incoming_er",
+  ER_ACCEPTED: "er_accepted",
+  ER_REJECTED: "er_rejected",
   PAYMENT_DUE_SET: "payment_due_set",
 };
 
@@ -82,8 +91,18 @@ const NOTIFICATION_META = {
     audience: "professional",
   },
   [NOTIFICATION_TYPES.PRO_ER_INCOMING]: {
-    title: "Edit Request (Outgoing)",
+    title: "Incoming Edit Request",
     statusType: "pending",
+    audience: "professional",
+  },
+  [NOTIFICATION_TYPES.PRO_ER_ACCEPTED]: {
+    title: "Edit Request Accepted",
+    statusType: "accepted",
+    audience: "professional",
+  },
+  [NOTIFICATION_TYPES.PRO_ER_REJECTED]: {
+    title: "Edit Request Rejected",
+    statusType: "rejected",
     audience: "professional",
   },
   [NOTIFICATION_TYPES.PRO_BOOKING_DATE_CHANGED]: {
@@ -121,6 +140,16 @@ const NOTIFICATION_META = {
     statusType: "accepted",
     audience: "professional",
   },
+  [NOTIFICATION_TYPES.PRO_BOOKING_IN_PROGRESS]: {
+    title: "Booking In Progress",
+    statusType: "updated",
+    audience: "professional",
+  },
+  [NOTIFICATION_TYPES.PRO_BOOKING_NO_SHOW]: {
+    title: "No Show Marked",
+    statusType: "updated",
+    audience: "professional",
+  },
   [NOTIFICATION_TYPES.PRO_PREPAYMENT_RECEIVED]: {
     title: "Prepayment Received",
     statusType: "accepted",
@@ -154,6 +183,16 @@ const NOTIFICATION_META = {
   [NOTIFICATION_TYPES.CLIENT_ER_SUGGESTED]: {
     title: "Suggest for Change",
     statusType: "pending",
+    audience: "client",
+  },
+  [NOTIFICATION_TYPES.CLIENT_ER_ACCEPTED]: {
+    title: "Edit Request Accepted",
+    statusType: "accepted",
+    audience: "client",
+  },
+  [NOTIFICATION_TYPES.CLIENT_ER_REJECTED]: {
+    title: "Edit Request Rejected",
+    statusType: "rejected",
     audience: "client",
   },
   [NOTIFICATION_TYPES.CLIENT_BOOKING_DATE_CHANGED]: {
@@ -219,6 +258,11 @@ const NOTIFICATION_META = {
   [NOTIFICATION_TYPES.CLIENT_BOOKING_COMPLETED]: {
     title: "Booking Completed",
     statusType: "accepted",
+    audience: "client",
+  },
+  [NOTIFICATION_TYPES.CLIENT_BOOKING_IN_PROGRESS]: {
+    title: "Booking In Progress",
+    statusType: "updated",
     audience: "client",
   },
   [NOTIFICATION_TYPES.CLIENT_BOOKING_NO_SHOW]: {
@@ -384,12 +428,17 @@ async function notifyProfessionalInApp(ctx, notificationType, actorName, extras 
   });
 }
 
-const youCanceledWith = (otherName) =>
-  `You canceled booking with ${otherName || "them"}`;
-
 const resolveInitiatedBy = (initiatedBy, fallback = "professional") => {
   const value = String(initiatedBy ?? fallback).trim().toLowerCase();
   return value === "client" ? "client" : "professional";
+};
+
+/** Map auth user_type / query to in-app notification audience. */
+export const resolveNotificationAudience = (userTypeOrAudience) => {
+  const value = String(userTypeOrAudience ?? "").trim().toLowerCase();
+  if (value === "professional") return "professional";
+  if (value === "client" || value === "individual" || value === "company") return "client";
+  return null;
 };
 
 export async function dispatchBookingEventNotification(bookingId, event, options = {}) {
@@ -436,12 +485,48 @@ export async function dispatchBookingEventNotification(bookingId, event, options
       }
       break;
     case BOOKING_NOTIFICATION_EVENTS.EBR_DISCARDED:
-      await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_BR_EBR_DISCARDED, ctx.professional_name);
-      await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_BR_EBR_DISCARDED, ctx.client_name);
+      // Notify the other party only — initiator already knows they discarded.
+      if (initiatedBy === "client") {
+        await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_BR_EBR_DISCARDED, ctx.client_name, {
+          message: `${ctx.client_name} discarded the edit booking request.`,
+        });
+      } else {
+        await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_BR_EBR_DISCARDED, ctx.professional_name, {
+          message: `${ctx.professional_name} discarded the edit booking request.`,
+        });
+      }
       break;
     case BOOKING_NOTIFICATION_EVENTS.INCOMING_ER:
-      await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_ER_INCOMING, ctx.professional_name);
+      await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_ER_INCOMING, ctx.professional_name, {
+        message: `${ctx.professional_name} sent an edit request.`,
+      });
       break;
+    case BOOKING_NOTIFICATION_EVENTS.ER_ACCEPTED: {
+      // Notify the ER sender only — responder already accepted.
+      if (initiatedBy === "client") {
+        await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_ER_ACCEPTED, ctx.client_name, {
+          message: `${ctx.client_name} accepted your edit request.`,
+        });
+      } else {
+        await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_ER_ACCEPTED, ctx.professional_name, {
+          message: `${ctx.professional_name} accepted your edit request.`,
+        });
+      }
+      break;
+    }
+    case BOOKING_NOTIFICATION_EVENTS.ER_REJECTED: {
+      // Notify the ER sender only — responder already rejected.
+      if (initiatedBy === "client") {
+        await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_ER_REJECTED, ctx.client_name, {
+          message: `${ctx.client_name} rejected your edit request.`,
+        });
+      } else {
+        await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_ER_REJECTED, ctx.professional_name, {
+          message: `${ctx.professional_name} rejected your edit request.`,
+        });
+      }
+      break;
+    }
     case BOOKING_NOTIFICATION_EVENTS.PAYMENT_DUE_SET:
       if (ctx.customer_id) {
         await createInAppNotification({
@@ -468,16 +553,24 @@ export async function dispatchBookingCreatedNotifications(booking, options = {})
   if (booking.status === "requested") {
     // Professional → client BR (calendar "Add from Mollure platform")
     if (options.fromProfessional) {
-      await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_BR_INCOMING, ctx.professional_name);
+      await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_BR_INCOMING, ctx.professional_name, {
+        message: `${ctx.professional_name} sent you a booking request.`,
+      });
       return;
     }
     // Client → professional BR
-    await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_BR_INCOMING, ctx.client_name);
+    await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_BR_INCOMING, ctx.client_name, {
+      message: `${ctx.client_name} sent you a booking request.`,
+    });
   }
 
   if (booking.status === "confirmed") {
-    await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_BOOKING_CONFIRMED, ctx.professional_name);
-    await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_BOOKING_CONFIRMED, ctx.client_name);
+    await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_BOOKING_CONFIRMED, ctx.professional_name, {
+      message: `Your booking with ${ctx.professional_name} is confirmed.`,
+    });
+    await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_BOOKING_CONFIRMED, ctx.client_name, {
+      message: `Booking with ${ctx.client_name} is confirmed.`,
+    });
   }
 }
 
@@ -508,57 +601,84 @@ export async function dispatchBookingUpdatedNotifications(booking, previousStatu
     }
 
     if (booking.status === "confirmed") {
+      const initiatedBy = resolveInitiatedBy(options.initiatedBy);
       if (previousStatus === "requested") {
-        await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_BR_ACCEPTED, ctx.professional_name);
-        await notifyProfessionalInApp(
-          ctx,
-          NOTIFICATION_TYPES.PRO_BR_ACCEPTED,
-          `You accepted booking request from ${ctx.client_name}`,
-        );
+        // Notify the other party only — initiator already accepted.
+        if (initiatedBy === "client") {
+          await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_BR_ACCEPTED, ctx.client_name, {
+            message: `${ctx.client_name} accepted your booking request.`,
+          });
+          await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_BOOKING_CONFIRMED, ctx.client_name, {
+            skipEmail: true,
+          });
+        } else {
+          await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_BR_ACCEPTED, ctx.professional_name, {
+            message: `${ctx.professional_name} accepted your booking request.`,
+            skipEmail: true,
+          });
+          await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_BOOKING_CONFIRMED, ctx.professional_name);
+        }
+      } else {
+        await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_BOOKING_CONFIRMED, ctx.professional_name);
+        await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_BOOKING_CONFIRMED, ctx.client_name);
       }
-      await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_BOOKING_CONFIRMED, ctx.professional_name);
-      await notifyProfessionalInApp(
-        ctx,
-        NOTIFICATION_TYPES.PRO_BOOKING_CONFIRMED,
-        previousStatus === "requested"
-          ? `You confirmed booking with ${ctx.client_name}`
-          : ctx.client_name,
-      );
+      return;
+    }
+
+    // Professional (or client) reject of a pending BR sets status to `invalid`.
+    // Older flows used `cancelled` — keep both so reject always notifies + emails.
+    if (booking.status === "invalid") {
+      if (
+        previousStatus === "requested" &&
+        options.notificationEvent !== BOOKING_NOTIFICATION_EVENTS.EBR_DISCARDED
+      ) {
+        const initiatedBy = resolveInitiatedBy(options.initiatedBy);
+        // Notify the other party only — initiator already knows they rejected.
+        if (initiatedBy === "client") {
+          await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_BR_REJECTED, ctx.client_name, {
+            message: `${ctx.client_name} rejected your booking request.`,
+          });
+        } else {
+          await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_BR_REJECTED, ctx.professional_name, {
+            message: `${ctx.professional_name} rejected your booking request.`,
+          });
+        }
+      }
       return;
     }
 
     if (booking.status === "cancelled") {
       const initiatedBy = resolveInitiatedBy(options.initiatedBy);
       if (previousStatus === "requested" && options.notificationEvent !== BOOKING_NOTIFICATION_EVENTS.EBR_DISCARDED) {
-        // Professional rejected a booking request
-        await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_BR_REJECTED, ctx.professional_name);
-        await notifyProfessionalInApp(
-          ctx,
-          NOTIFICATION_TYPES.PRO_BR_REJECTED,
-          `You rejected booking request from ${ctx.client_name}`,
-        );
-      } else if (options.notificationEvent !== BOOKING_NOTIFICATION_EVENTS.EBR_DISCARDED) {
+        // Legacy reject path (requested → cancelled) — honor initiatedBy.
         if (initiatedBy === "client") {
-          await notifyClientInApp(
-            ctx,
-            NOTIFICATION_TYPES.CLIENT_BOOKING_CANCELLED,
-            youCanceledWith(ctx.professional_name),
-          );
+          await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_BR_REJECTED, ctx.client_name, {
+            message: `${ctx.client_name} rejected your booking request.`,
+          });
+        } else {
+          await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_BR_REJECTED, ctx.professional_name, {
+            message: `${ctx.professional_name} rejected your booking request.`,
+          });
+        }
+      } else if (options.notificationEvent !== BOOKING_NOTIFICATION_EVENTS.EBR_DISCARDED) {
+        // Notify the other party only — initiator already canceled.
+        if (initiatedBy === "client") {
           await notifyProfessionalInApp(
             ctx,
             NOTIFICATION_TYPES.PRO_BOOKING_CANCELLED,
             ctx.client_name,
+            {
+              message: `${ctx.client_name} canceled the booking.`,
+            },
           );
         } else {
           await notifyClientInApp(
             ctx,
             NOTIFICATION_TYPES.CLIENT_BOOKING_CANCELLED,
             ctx.professional_name,
-          );
-          await notifyProfessionalInApp(
-            ctx,
-            NOTIFICATION_TYPES.PRO_BOOKING_CANCELLED,
-            youCanceledWith(ctx.client_name),
+            {
+              message: `${ctx.professional_name} canceled the booking.`,
+            },
           );
         }
       }
@@ -566,8 +686,12 @@ export async function dispatchBookingUpdatedNotifications(booking, previousStatu
     }
 
     if (booking.status === "completed") {
-      await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_BOOKING_COMPLETED, ctx.professional_name);
-      await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_BOOKING_COMPLETED, ctx.client_name);
+      await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_BOOKING_COMPLETED, ctx.professional_name, {
+        message: `Your booking with ${ctx.professional_name} is completed.`,
+      });
+      await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_BOOKING_COMPLETED, ctx.client_name, {
+        message: `Booking with ${ctx.client_name} is completed.`,
+      });
       try {
         const { notifyReviewInvite } = await import("./bookingEmail.service.js");
         await notifyReviewInvite(booking.id);
@@ -577,13 +701,33 @@ export async function dispatchBookingUpdatedNotifications(booking, previousStatu
       return;
     }
 
+    if (booking.status === "in_progress") {
+      // Professional marks in-progress — notify client.
+      await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_BOOKING_IN_PROGRESS, ctx.professional_name, {
+        message: `Your booking with ${ctx.professional_name} is now in progress.`,
+      });
+      return;
+    }
+
     if (booking.status === "no_show") {
-      await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_BOOKING_NO_SHOW, ctx.professional_name);
+      // Professional marks no-show — notify client.
+      await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_BOOKING_NO_SHOW, ctx.professional_name, {
+        message: `${ctx.professional_name} marked your booking as no-show.`,
+      });
       return;
     }
 
     if (booking.status === "requested" && previousStatus !== "requested") {
-      await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_BR_INCOMING, ctx.client_name);
+      const initiatedBy = resolveInitiatedBy(options.initiatedBy);
+      if (initiatedBy === "professional") {
+        await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_BR_INCOMING, ctx.professional_name, {
+          message: `${ctx.professional_name} sent you a booking request.`,
+        });
+      } else {
+        await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_BR_INCOMING, ctx.client_name, {
+          message: `${ctx.client_name} sent you a booking request.`,
+        });
+      }
       return;
     }
   }
@@ -644,21 +788,63 @@ export async function processAppointmentReminderNotifications() {
 
 export async function processRespondRequestReminderNotifications() {
   const result = await query(
-    `SELECT b.id
+    `SELECT
+       b.id,
+       b.created_at,
+       b.notes,
+       bs.response_time_hours,
+       bs.response_time_minutes
      FROM bookings b
+     LEFT JOIN business_setups bs ON bs.id = b.business_setup_id
      WHERE b.status = 'requested'
-       AND b.created_at <= NOW() - ($1::int || ' hours')::interval
        AND NOT EXISTS (
          SELECT 1
          FROM booking_email_notifications n
          WHERE n.booking_id = b.id
-           AND n.email_type = $2
+           AND n.email_type = $1
        )`,
-    [RESPOND_REMINDER_HOURS, BOOKING_EMAIL_TYPES.RESPOND_REQUEST_REMINDER],
+    [BOOKING_EMAIL_TYPES.RESPOND_REQUEST_REMINDER],
   );
 
+  const now = Date.now();
   const outcomes = [];
   for (const row of result.rows) {
+    let dueMs = null;
+    const notes = String(row.notes ?? "");
+    const marker = notes.indexOf("---mollure-meta---");
+    if (marker !== -1) {
+      try {
+        const meta = JSON.parse(notes.slice(marker + "---mollure-meta---".length).trim() || "{}");
+        if (meta?.respondBy) {
+          const parsed = Date.parse(meta.respondBy);
+          if (Number.isFinite(parsed)) dueMs = parsed;
+        } else if (meta?.responseStartedAt && Number(meta.responseWindowMinutes) > 0) {
+          const start = Date.parse(meta.responseStartedAt);
+          if (Number.isFinite(start)) {
+            dueMs = start + Number(meta.responseWindowMinutes) * 60_000;
+          }
+        }
+      } catch {
+        // fall through to setup / env window
+      }
+    }
+
+    if (dueMs == null) {
+      const hours = Number(row.response_time_hours);
+      const minutes = Number(row.response_time_minutes);
+      const windowMinutes =
+        (Number.isFinite(hours) && hours > 0 ? hours * 60 : 0) +
+        (Number.isFinite(minutes) && minutes > 0 ? minutes : 0);
+      const effectiveMinutes =
+        windowMinutes > 0 ? windowMinutes : RESPOND_REMINDER_HOURS * 60;
+      const created = Date.parse(row.created_at);
+      if (!Number.isFinite(created)) continue;
+      dueMs = created + effectiveMinutes * 60_000;
+    }
+
+    // Fire reminder near the end of the window (same timing as overdue stamp).
+    if (now < dueMs) continue;
+
     const outcome = await dispatchRespondRequestReminderNotification(row.id);
     outcomes.push({ bookingId: row.id, ...outcome });
   }
@@ -868,25 +1054,57 @@ export async function processPaymentDueReminders() {
   return sent;
 }
 
-export const listNotificationsForUser = async (userId, { limit = 50, offset = 0 } = {}) => {
+export const listNotificationsForUser = async (
+  userId,
+  { limit = 50, offset = 0, audience = null } = {},
+) => {
+  const params = [userId];
+  let audienceClause = "";
+  if (audience === "client" || audience === "professional") {
+    params.push(audience);
+    audienceClause = ` AND audience = $${params.length}`;
+  }
+  params.push(limit, offset);
   const result = await query(
     `SELECT *
      FROM in_app_notifications
-     WHERE recipient_user_id = $1
+     WHERE recipient_user_id = $1${audienceClause}
      ORDER BY created_at DESC
-     LIMIT $2 OFFSET $3`,
-    [userId, limit, offset],
+     LIMIT $${params.length - 1} OFFSET $${params.length}`,
+    params,
   );
   return result.rows;
 };
 
-export const countUnreadNotifications = async (userId) => {
+export const countNotificationsForUser = async (userId, { audience = null } = {}) => {
+  const params = [userId];
+  let audienceClause = "";
+  if (audience === "client" || audience === "professional") {
+    params.push(audience);
+    audienceClause = ` AND audience = $${params.length}`;
+  }
+  const result = await query(
+    `SELECT COUNT(*)::int AS total
+     FROM in_app_notifications
+     WHERE recipient_user_id = $1${audienceClause}`,
+    params,
+  );
+  return result.rows[0]?.total ?? 0;
+};
+
+export const countUnreadNotifications = async (userId, { audience = null } = {}) => {
+  const params = [userId];
+  let audienceClause = "";
+  if (audience === "client" || audience === "professional") {
+    params.push(audience);
+    audienceClause = ` AND audience = $${params.length}`;
+  }
   const result = await query(
     `SELECT COUNT(*)::int AS count
      FROM in_app_notifications
      WHERE recipient_user_id = $1
-       AND read_at IS NULL`,
-    [userId],
+       AND read_at IS NULL${audienceClause}`,
+    params,
   );
   return result.rows[0]?.count ?? 0;
 };
@@ -917,13 +1135,19 @@ export const markNotificationRead = async (userId, notificationId) => {
   return existing.rows[0] ?? null;
 };
 
-export const markAllNotificationsRead = async (userId) => {
+export const markAllNotificationsRead = async (userId, { audience = null } = {}) => {
+  const params = [userId];
+  let audienceClause = "";
+  if (audience === "client" || audience === "professional") {
+    params.push(audience);
+    audienceClause = ` AND audience = $${params.length}`;
+  }
   await query(
     `UPDATE in_app_notifications
      SET read_at = NOW()
      WHERE recipient_user_id = $1
-       AND read_at IS NULL`,
-    [userId],
+       AND read_at IS NULL${audienceClause}`,
+    params,
   );
   emitNotificationChanged(userId);
 };

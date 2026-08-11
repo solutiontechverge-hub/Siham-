@@ -1,4 +1,5 @@
 export { default as ClientBookingDetailsView } from "./ClientBookingDetailsView";
+export { default as ClientBookingCreateSummaryView } from "./ClientBookingCreateSummaryView";
 export { default as ClientBookingDetailsHeader } from "./ClientBookingDetailsHeader";
 export { default as ClientBookingInfoBar } from "./ClientBookingInfoBar";
 export { default as ClientBookingPaymentDetailsCard } from "./ClientBookingPaymentDetailsCard";

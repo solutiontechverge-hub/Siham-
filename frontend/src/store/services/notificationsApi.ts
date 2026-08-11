@@ -7,10 +7,11 @@ import {
 } from "../../lib/listPagination";
 
 export type NotificationStatusType = "pending" | "accepted" | "rejected" | "updated";
+export type NotificationAudience = "client" | "professional";
 
 export type AppNotificationItem = {
   id: string;
-  audience: "client" | "professional";
+  audience: NotificationAudience;
   notificationType: string;
   title: string;
   message?: string | null;
@@ -25,6 +26,10 @@ export type AppNotificationItem = {
   timeLabel: string;
 };
 
+export type NotificationsQueryArg = ListPaginationParams & {
+  audience?: NotificationAudience;
+};
+
 type ApiEnvelope<T> = {
   success: boolean;
   message: string;
@@ -36,11 +41,14 @@ export const notificationsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     getMyNotifications: builder.query<
       ApiEnvelope<AppNotificationItem[]> & { pagination?: ListPagination },
-      ListPaginationParams | void
+      NotificationsQueryArg | void
     >({
       async queryFn(arg, _api, _extraOptions, fetchWithBQ) {
+        const audience = arg?.audience;
         const response = await fetchWithBQ({
-          url: buildListQuery("/api/notifications", arg ?? undefined),
+          url: buildListQuery("/api/notifications", arg ?? undefined, {
+            audience,
+          }),
           method: "GET",
         });
         if (response.error) return { error: response.error };
@@ -60,9 +68,17 @@ export const notificationsApi = baseApi.injectEndpoints({
       },
       providesTags: ["Notifications"],
     }),
-    getUnreadNotificationCount: builder.query<ApiEnvelope<{ count: number }>, void>({
-      async queryFn(_arg, _api, _extraOptions, fetchWithBQ) {
-        const response = await fetchWithBQ({ url: "/api/notifications/unread-count", method: "GET" });
+    getUnreadNotificationCount: builder.query<
+      ApiEnvelope<{ count: number }>,
+      { audience?: NotificationAudience } | void
+    >({
+      async queryFn(arg, _api, _extraOptions, fetchWithBQ) {
+        const audience = arg?.audience;
+        const qs = audience ? `?audience=${encodeURIComponent(audience)}` : "";
+        const response = await fetchWithBQ({
+          url: `/api/notifications/unread-count${qs}`,
+          method: "GET",
+        });
         if (response.error) return { error: response.error };
         return { data: response.data as ApiEnvelope<{ count: number }> };
       },
@@ -77,74 +93,21 @@ export const notificationsApi = baseApi.injectEndpoints({
         if (response.error) return { error: response.error };
         return { data: response.data as ApiEnvelope<AppNotificationItem> };
       },
-      async onQueryStarted(id, { dispatch, queryFulfilled }) {
-        const patchList = dispatch(
-          notificationsApi.util.updateQueryData(
-            "getMyNotifications",
-            undefined,
-            (draft) => {
-              const rows = draft.data ?? [];
-              const row = rows.find((item) => item.id === id);
-              if (row) row.read = true;
-            },
-          ),
-        );
-        const patchCount = dispatch(
-          notificationsApi.util.updateQueryData(
-            "getUnreadNotificationCount",
-            undefined,
-            (draft) => {
-              if (draft.data) {
-                draft.data.count = Math.max(0, (draft.data.count ?? 0) - 1);
-              }
-            },
-          ),
-        );
-        try {
-          await queryFulfilled;
-        } catch {
-          patchList.undo();
-          patchCount.undo();
-        }
-      },
       invalidatesTags: ["Notifications"],
     }),
-    markAllNotificationsRead: builder.mutation<ApiEnvelope<null>, void>({
-      async queryFn(_arg, _api, _extraOptions, fetchWithBQ) {
+    markAllNotificationsRead: builder.mutation<
+      ApiEnvelope<null>,
+      { audience?: NotificationAudience } | void
+    >({
+      async queryFn(arg, _api, _extraOptions, fetchWithBQ) {
+        const audience = arg?.audience;
+        const qs = audience ? `?audience=${encodeURIComponent(audience)}` : "";
         const response = await fetchWithBQ({
-          url: "/api/notifications/read-all",
+          url: `/api/notifications/read-all${qs}`,
           method: "PATCH",
         });
         if (response.error) return { error: response.error };
         return { data: response.data as ApiEnvelope<null> };
-      },
-      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
-        const patchList = dispatch(
-          notificationsApi.util.updateQueryData(
-            "getMyNotifications",
-            undefined,
-            (draft) => {
-              for (const row of draft.data ?? []) {
-                row.read = true;
-              }
-            },
-          ),
-        );
-        const patchCount = dispatch(
-          notificationsApi.util.updateQueryData(
-            "getUnreadNotificationCount",
-            undefined,
-            (draft) => {
-              if (draft.data) draft.data.count = 0;
-            },
-          ),
-        );
-        try {
-          await queryFulfilled;
-        } catch {
-          patchList.undo();
-          patchCount.undo();
-        }
       },
       invalidatesTags: ["Notifications"],
     }),

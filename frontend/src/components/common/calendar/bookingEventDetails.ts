@@ -86,6 +86,9 @@ type StoredBookingNoteMeta = Partial<
     | "kilometerAllowance"
     | "cancellationReason"
     | "responseStatus"
+    | "responseStartedAt"
+    | "respondBy"
+    | "responseWindowMinutes"
     | "requestDirection"
     | "editedServiceIds"
     | "editedProductIds"
@@ -144,6 +147,9 @@ export function serializeCalendarEntryNotes(
     kilometerAllowance: details?.kilometerAllowance,
     cancellationReason: details?.cancellationReason?.trim() || undefined,
     responseStatus: details?.responseStatus,
+    responseStartedAt: details?.responseStartedAt,
+    respondBy: details?.respondBy,
+    responseWindowMinutes: details?.responseWindowMinutes,
     requestDirection: details?.requestDirection,
     editedServiceIds: details?.editedServiceIds,
     editedProductIds: details?.editedProductIds,
@@ -395,6 +401,13 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
         ? { cancellationReason: meta.cancellationReason.trim() }
         : {}),
       ...(meta.responseStatus ? { responseStatus: meta.responseStatus } : {}),
+      ...(meta.responseStartedAt
+        ? { responseStartedAt: meta.responseStartedAt }
+        : {}),
+      ...(meta.respondBy ? { respondBy: meta.respondBy } : {}),
+      ...(typeof meta.responseWindowMinutes === "number"
+        ? { responseWindowMinutes: meta.responseWindowMinutes }
+        : {}),
       ...(meta.requestDirection ? { requestDirection: meta.requestDirection } : {}),
       ...(meta.editedServiceIds?.length ? { editedServiceIds: meta.editedServiceIds } : {}),
       ...(meta.editedProductIds?.length ? { editedProductIds: meta.editedProductIds } : {}),

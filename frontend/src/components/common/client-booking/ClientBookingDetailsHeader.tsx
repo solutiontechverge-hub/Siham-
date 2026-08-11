@@ -73,6 +73,8 @@ type Props = {
   onSendConfirmedEditRequest?: (note: string) => void | Promise<void>;
   /** Show Updated next to Confirmed after post-accept edits. */
   showUpdated?: boolean;
+  /** BR/EBR/ER response window elapsed. */
+  responseOverdue?: boolean;
   messagingHref?: string;
 };
 
@@ -98,6 +100,7 @@ export default function ClientBookingDetailsHeader({
   onDispatchBookingNotification,
   onSendConfirmedEditRequest,
   showUpdated = false,
+  responseOverdue = false,
   messagingHref,
 }: Props) {
   const m = useTheme().palette.mollure;
@@ -197,8 +200,13 @@ export default function ClientBookingDetailsHeader({
 
   const isOutgoingBookingRequest =
     bookingStatus === "requested" &&
+    bookingRequestDirection === "outgoing";
+  const isOutgoingPendingEbr =
     bookingRequestDirection === "outgoing" &&
-    locationMode === "desired";
+    (editRequest.isPending || editRequest.isSuggested) &&
+    !editRequest.isEditGrantActive;
+  const canDiscardOutgoingRequest =
+    isOutgoingBookingRequest || isOutgoingPendingEbr;
   const isCompleted = bookingStatus === "completed";
   const isConfirmed = bookingStatus === "confirmed";
   const isInvalid = bookingStatus === "invalid";
@@ -398,7 +406,7 @@ export default function ClientBookingDetailsHeader({
               >
                 Activity
               </AppButton>
-              {isOutgoingBookingRequest && onDiscardBookingRequest ? (
+              {canDiscardOutgoingRequest && onDiscardBookingRequest ? (
                 <AppButton
                   tone="secondary"
                   onClick={onDiscardBookingRequest}
@@ -445,6 +453,7 @@ export default function ClientBookingDetailsHeader({
               }
               rowMode={requestRowMode}
               showUpdated={showUpdated}
+              responseOverdue={responseOverdue}
             />
           </Stack>
         </Stack>

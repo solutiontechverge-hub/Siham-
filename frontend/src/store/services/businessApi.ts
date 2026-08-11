@@ -423,6 +423,8 @@ export type BookingNotificationEvent =
   | "unique_item_edited"
   | "ebr_discarded"
   | "incoming_er"
+  | "er_accepted"
+  | "er_rejected"
   | "payment_due_set";
 
 export type UpdateBookingStatusRequest = {
@@ -783,6 +785,69 @@ export const businessApi = baseApi.injectEndpoints({
           return {
             error: customError(
               data.message || "Unable to fetch public business hours.",
+            ),
+          };
+        }
+
+        return { data };
+      },
+      providesTags: ["Calendar"],
+    }),
+    getSetupAvailability: builder.query<
+      ApiEnvelope<{
+        date: string;
+        location: "FL" | "DL";
+        slotStepMinutes: number;
+        scheduleAvailability: Record<string, unknown>[];
+        dateOverrides: Record<string, unknown>[];
+        publicBusinessHours: Record<string, unknown>[];
+        teamMembers: Array<{
+          id: string;
+          name: string;
+          assignedServiceIds: string[];
+        }>;
+        busyByMember: Record<
+          string,
+          Array<{ startMin: number; endMin: number }>
+        >;
+      }>,
+      { setupId: string; date: string; location: "FL" | "DL" }
+    >({
+      async queryFn(arg, _api, _extraOptions, fetchWithBQ) {
+        const params = new URLSearchParams({
+          date: arg.date,
+          location: arg.location,
+        });
+        const response = await fetchWithBQ({
+          url: `/api/business-setups/${encodeURIComponent(arg.setupId)}/availability?${params.toString()}`,
+          method: "GET",
+        });
+
+        if (response.error) {
+          return { error: toMutationError(response.error) };
+        }
+
+        const data = response.data as ApiEnvelope<{
+          date: string;
+          location: "FL" | "DL";
+          slotStepMinutes: number;
+          scheduleAvailability: Record<string, unknown>[];
+          dateOverrides: Record<string, unknown>[];
+          publicBusinessHours: Record<string, unknown>[];
+          teamMembers: Array<{
+            id: string;
+            name: string;
+            assignedServiceIds: string[];
+          }>;
+          busyByMember: Record<
+            string,
+            Array<{ startMin: number; endMin: number }>
+          >;
+        }>;
+        if (!data.success || !data.data) {
+          return {
+            error: customError(
+              data.message || "Unable to fetch setup availability.",
             ),
           };
         }
@@ -1472,6 +1537,7 @@ export const {
   useGetBusinessCategoriesQuery,
   useGetAllBusinessSetupsQuery,
   useGetPublicBusinessHoursQuery,
+  useGetSetupAvailabilityQuery,
   useGetBusinessSetupQuery,
   useGetCalendarOverviewQuery,
   useCreateCalendarEntryMutation,

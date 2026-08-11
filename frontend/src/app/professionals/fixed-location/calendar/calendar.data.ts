@@ -102,6 +102,12 @@ export type CalendarBookingDetails = {
   showPrepayment?: boolean;
   prepaymentStatus?: "pending" | "confirmed" | "canceled" | "invalid";
   responseStatus?: "suggestion_for_change" | "overdue_response";
+  /** When the current negotiation response window started (ISO). */
+  responseStartedAt?: string;
+  /** Deadline for the counterparty to respond (ISO). */
+  respondBy?: string;
+  /** Response window length in minutes (from business setup at send time). */
+  responseWindowMinutes?: number;
   paymentMethod?: "online" | "offline";
   lateCancellationFeePercent?: string;
   showLateCancellation?: boolean;
