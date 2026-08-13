@@ -144,6 +144,7 @@ export type BusinessSetupListing = {
   about: string | null;
   rating: number;
   totalReviews: number;
+  rankingScore?: number | null;
   media: string[];
   locationMode: "fixed" | "desired" | "both" | null;
   salonName: string | null;

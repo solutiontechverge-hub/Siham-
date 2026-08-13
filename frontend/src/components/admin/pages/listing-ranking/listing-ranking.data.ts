@@ -2,7 +2,8 @@ import EventAvailableOutlinedIcon from "@mui/icons-material/EventAvailableOutlin
 import PaymentsOutlinedIcon from "@mui/icons-material/PaymentsOutlined";
 import StarOutlineOutlinedIcon from "@mui/icons-material/StarOutlineOutlined";
 import RateReviewOutlinedIcon from "@mui/icons-material/RateReviewOutlined";
-import ScheduleOutlinedIcon from "@mui/icons-material/ScheduleOutlined";
+import ShoppingCartOutlinedIcon from "@mui/icons-material/ShoppingCartOutlined";
+import PointOfSaleOutlinedIcon from "@mui/icons-material/PointOfSaleOutlined";
 import type { SvgIconComponent } from "@mui/icons-material";
 import {
   rankingFactors as liveRankingFactors,
@@ -33,10 +34,15 @@ export const FACTOR_ICONS: Record<
     bg: "rgba(33, 184, 191, 0.12)",
     color: "#149CA7",
   },
-  activity: {
-    icon: ScheduleOutlinedIcon,
+  totalSales: {
+    icon: ShoppingCartOutlinedIcon,
     bg: "rgba(59, 130, 246, 0.12)",
     color: "#2563EB",
+  },
+  onlineSales: {
+    icon: PointOfSaleOutlinedIcon,
+    bg: "rgba(127, 86, 217, 0.12)",
+    color: "#6941C6",
   },
 };
 

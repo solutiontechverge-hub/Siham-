@@ -141,8 +141,16 @@ export default function CalendarPopover({
   const isPresetActive = (preset: ListingTimePreset) =>
     !draft.timeFrom && !draft.timeTo && draft.timePreset === preset;
 
-  const calendarMin = draft.dateMode === "today" ? today : today;
-  const calendarMax = draft.dateMode === "today" ? today : undefined;
+  const todayDisplay = React.useMemo(() => {
+    const [y, m, d] = today.split("-").map(Number);
+    if (!y || !m || !d) return today;
+    return new Date(y, m - 1, d).toLocaleDateString(undefined, {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  }, [today]);
 
   return (
     <Popover
@@ -190,19 +198,39 @@ export default function CalendarPopover({
           ))}
         </Box>
 
-        <AppCalendarPanel
-          compact
-          value={draft.dateMode === "today" ? today : draft.date}
-          min={calendarMin}
-          max={calendarMax}
-          onChange={(iso) => {
-            if (draft.dateMode === "today") {
-              patchDraft({ date: today });
-              return;
-            }
-            patchDraft({ date: iso });
-          }}
-        />
+        {draft.dateMode === "today" ? (
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              minHeight: 44,
+              px: 1.5,
+              py: 1.25,
+              borderRadius: "10px",
+              border: `1px solid ${alpha(tokens.teal, 0.25)}`,
+              bgcolor: alpha(tokens.teal, 0.06),
+            }}
+          >
+            <Typography
+              sx={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: alpha(tokens.navy, 0.78),
+                textAlign: "center",
+              }}
+            >
+              {todayDisplay}
+            </Typography>
+          </Box>
+        ) : (
+          <AppCalendarPanel
+            compact
+            value={draft.date}
+            min={today}
+            onChange={(iso) => patchDraft({ date: iso })}
+          />
+        )}
       </Box>
 
       <Box

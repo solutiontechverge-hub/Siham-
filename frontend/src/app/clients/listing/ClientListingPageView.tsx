@@ -92,7 +92,7 @@ export default function ClientListingPageView() {
   }, [user?.email]);
 
   return (
-    <Box sx={{ bgcolor: "mollure.pageBg", minHeight: "100vh" }}>
+    <Box sx={{ bgcolor: "#fff", minHeight: "100vh" }}>
       <MollureMarketingHeader
         navItems={[]}
         isAuthed
@@ -116,7 +116,7 @@ export default function ClientListingPageView() {
           position: "relative",
           overflow: "hidden",
           pb: { xs: 4, md: 5 },
-          backgroundImage: `linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.30)), url("${toSrc(ListingBG)}")`,
+          backgroundImage: `url("${toSrc(ListingBG)}")`,
           backgroundSize: "cover",
           backgroundRepeat: "no-repeat",
           backgroundPosition: "center",
@@ -126,14 +126,7 @@ export default function ClientListingPageView() {
           sx={{
             position: "absolute",
             inset: 0,
-            background: "transparent",
-          }}
-        />
-        <Box
-          sx={{
-            position: "absolute",
-            inset: 0,
-            background: `linear-gradient(180deg, rgba(255,255,255,0.15), rgba(255,255,255,0.35))`,
+            background: `linear-gradient(180deg, ${alpha(tokens.teal, 0.14)}, ${alpha(tokens.teal, 0.26)})`,
           }}
         />
 
