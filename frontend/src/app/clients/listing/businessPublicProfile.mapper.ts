@@ -182,6 +182,29 @@ function splitCsv(value: string | null | undefined): string[] {
     .filter(Boolean);
 }
 
+const PROVINCE_MUNICIPALITIES: Record<string, readonly string[]> = {
+  Drenthe: ["Assen", "Emmen", "Hoogeveen", "Meppel", "Coevorden"],
+  "Zuid-Holland": ["Rotterdam", "Den Haag"],
+  Groningen: ["Groningen", "Veendam", "Stadskanaal", "Delfzijl", "Winschoten", "Haren", "Leek", "Appingedam"],
+  "Noord-Holland": ["Amsterdam", "Haarlem"],
+  Utrecht: ["Utrecht"],
+  "Noord-Brabant": ["Eindhoven"],
+};
+
+function municipalityBelongsToProvince(municipality: string, province: string): boolean {
+  const normalizedMunicipality = municipality.trim().toLowerCase();
+  const normalizedProvince = province.trim().toLowerCase();
+  if (!normalizedMunicipality || !normalizedProvince) return false;
+  if (normalizedMunicipality === normalizedProvince) return true;
+  if (normalizedProvince.includes(normalizedMunicipality)) return true;
+  if (normalizedMunicipality.includes(normalizedProvince)) return true;
+  return (
+    PROVINCE_MUNICIPALITIES[province]?.some(
+      (entry) => entry.toLowerCase() === normalizedMunicipality,
+    ) ?? false
+  );
+}
+
 function buildDesiredLocation(setup: BusinessSetupListing): BusinessPublicProfileDesiredLocation {
   const { desiredLocation } = setup;
   const area = desiredLocation.area?.trim() ?? "";
@@ -214,15 +237,61 @@ function buildDesiredLocation(setup: BusinessSetupListing): BusinessPublicProfil
   }
 
   if (provinces.length > 1) {
-    // Provinces + municipalities are stored as flat lists (pairing is lost).
-    // Keep each province selectable; municipalities stay available for any pick.
+    if (!municipalities.length) {
+      return {
+        areaMode: "Specific areas only",
+        areas: provinces.map((entry) => ({
+          province: entry,
+          municipalities: [],
+          allMunicipalities: true,
+        })),
+      };
+    }
+
+    const areas = provinces.map((entry) => ({
+      province: entry,
+      municipalities: [] as string[],
+      allMunicipalities: false,
+    }));
+    const unassigned: string[] = [];
+
+    for (const municipality of municipalities) {
+      const matchedArea = areas.find((area) =>
+        municipalityBelongsToProvince(municipality, area.province),
+      );
+      if (matchedArea) matchedArea.municipalities.push(municipality);
+      else unassigned.push(municipality);
+    }
+
+    if (unassigned.length > 0) {
+      const customProvinces = provinces.filter(
+        (entry) => !PROVINCE_MUNICIPALITIES[entry],
+      );
+      const fallbackProvince =
+        customProvinces[0] ?? areas[areas.length - 1]?.province;
+
+      for (const municipality of unassigned) {
+        const namedArea = areas.find(
+          (area) =>
+            municipalityBelongsToProvince(municipality, area.province) ||
+            municipality.toLowerCase().includes(area.province.toLowerCase()) ||
+            area.province.toLowerCase().includes(municipality.toLowerCase()),
+        );
+        if (namedArea) {
+          namedArea.municipalities.push(municipality);
+          continue;
+        }
+
+        const fallbackArea = areas.find(
+          (area) => area.province === fallbackProvince,
+        );
+        fallbackArea?.municipalities.push(municipality);
+      }
+    }
+
     return {
       areaMode: "Specific areas only",
-      areas: provinces.map((entry) => ({
-        province: entry,
-        municipalities,
-        allMunicipalities: municipalities.length === 0,
-      })),
+      areas,
     };
   }
 

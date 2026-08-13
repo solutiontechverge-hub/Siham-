@@ -7,9 +7,8 @@ import {
 import {
   listResponse,
   parseListPagination,
-  sqlLimitOffset,
-  withPaginationParams,
 } from "../utils/pagination.js";
+import { getRankedActiveBusinessSetups } from "../services/listing-ranking.service.js";
 import {
   getReviewAggregatesForSetups,
   getTeamMemberReviewAggregatesForSetups,
@@ -266,25 +265,40 @@ export const getPublicBusinessHoursForSetup = async (req, res) => {
 export const listAllBusinessSetups = async (req, res) => {
   try {
     const pagination = parseListPagination(req.query);
-    const { clause: limitClause } = sqlLimitOffset(1);
 
-    const countResult = await query(
-      `SELECT COUNT(*)::int AS total
-       FROM business_setups bs
-       WHERE bs.is_active = true`,
-    );
-    const total = countResult.rows[0]?.total ?? 0;
+    const rankedSetups = await getRankedActiveBusinessSetups();
+    const total = rankedSetups.length;
+    const paginatedRanked = pagination.paginate
+      ? rankedSetups.slice(pagination.offset, pagination.offset + pagination.limit)
+      : rankedSetups;
+    const setupIds = paginatedRanked.map((item) => item.businessSetupId);
+
+    if (!setupIds.length) {
+      return res.status(200).json(
+        listResponse({
+          message: "Business setups fetched successfully",
+          data: [],
+          page: pagination.page,
+          limit: pagination.limit,
+          total,
+          paginate: pagination.paginate,
+        }),
+      );
+    }
 
     const setupsResult = await query(
       `SELECT bs.*
        FROM business_setups bs
-       WHERE bs.is_active = true
-       ORDER BY bs.updated_at DESC, bs.id DESC
-       ${pagination.paginate ? limitClause : ""}`,
-      withPaginationParams([], pagination),
+       WHERE bs.id = ANY($1::uuid[])`,
+      [setupIds],
     );
 
-    const setupRows = setupsResult.rows;
+    const setupById = new Map(
+      setupsResult.rows.map((row) => [String(row.id), row]),
+    );
+    const setupRows = setupIds
+      .map((setupId) => setupById.get(String(setupId)))
+      .filter(Boolean);
 
     if (!setupRows.length) {
       return res.status(200).json(
@@ -298,8 +312,6 @@ export const listAllBusinessSetups = async (req, res) => {
         }),
       );
     }
-
-    const setupIds = setupRows.map((row) => row.id);
 
     const teamMembersResult = await query(
       `SELECT

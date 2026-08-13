@@ -14,6 +14,7 @@ import {
   draftFromSubservice,
   findSubcategoryIdByTitle,
   hasDuplicateServiceNameInCategory,
+  hasValidServicePrice,
   mainServiceFromDraft,
   resolveBusinessCategoryRecord,
   subserviceFromDraft,
@@ -189,8 +190,8 @@ export function useBusinessServiceModal({
   );
 
   const canSubmit = React.useMemo(
-    () => draft.name.trim().length > 0,
-    [draft.name],
+    () => draft.name.trim().length > 0 && hasValidServicePrice(draft),
+    [draft],
   );
 
   const resolveCustomServiceId = React.useCallback(
@@ -300,6 +301,14 @@ export function useBusinessServiceModal({
 
   const saveModal = React.useCallback(async () => {
     if (!target || !canSubmit || isSaving) return;
+
+    if (!hasValidServicePrice(draft)) {
+      showSnackbar({
+        severity: "error",
+        message: "Enter a price greater than 0 before saving this service.",
+      });
+      return;
+    }
 
     onPersistChange?.();
 

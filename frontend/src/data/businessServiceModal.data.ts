@@ -139,6 +139,11 @@ export function parseEuroAmountString(s: string): number | null {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
+export function hasValidServicePrice(draft: Pick<BusinessServiceFormDraft, "priceAmount">): boolean {
+  const price = parseEuroAmountString(draft.priceAmount);
+  return price !== null && price > 0;
+}
+
 export function normalizeBusinessServicePriceType(type: string | undefined): BusinessServicePriceType {
   return type === "from" ? "from" : "fixed";
 }

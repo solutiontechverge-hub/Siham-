@@ -16,6 +16,7 @@ import type { ServiceOrderSettings } from "../../../components/common/calendar/c
 import { resolveBusinessOffering } from "./businessPublicProfile.mapper";
 import { normalizeServiceDurationLabel } from "../../../utils/serviceDuration";
 import type { ListingCardData } from "./listing.data";
+import type { ListingCardServiceCatalogItem } from "./listing.cardPresentation";
 
 const FALLBACK_IMAGES = [
   ListingImage1,
@@ -30,6 +31,14 @@ const formatPriceLabel = (price: number) => {
   if (!Number.isFinite(price) || price <= 0) return "Price on request";
   return `Starting From ${Math.round(price)} EUR`;
 };
+
+const formatServiceName = (value: string) =>
+  String(value ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
 
 const slugifyCategoryKey = (value: string) =>
   value
@@ -136,10 +145,32 @@ const buildDurationByServiceId = (setup: BusinessSetupListing) => {
     const label = String(entry.duration_label ?? entry.durationLabel ?? "").trim();
     if (serviceId && label) {
       map.set(serviceId, label);
+      map.set(serviceId.toLowerCase(), label);
     }
   }
 
   return map;
+};
+
+const resolveServiceDurationLabel = (
+  detail: BusinessSetupListing["serviceDetails"][number],
+  durationByServiceId: Map<string, string>,
+) => {
+  const fromDetail = detail.durationLabel?.trim();
+  if (fromDetail) {
+    return normalizeServiceDurationLabel(fromDetail);
+  }
+
+  const serviceId = detail.serviceId != null ? String(detail.serviceId).trim() : "";
+  const fromCategories =
+    (serviceId ? durationByServiceId.get(serviceId) : undefined) ||
+    (serviceId ? durationByServiceId.get(serviceId.toLowerCase()) : undefined);
+
+  if (fromCategories) {
+    return normalizeServiceDurationLabel(fromCategories);
+  }
+
+  return undefined;
 };
 
 const getServiceOrder = (
@@ -169,10 +200,10 @@ const isSetupServicePubliclyVisible = (
   return isServiceVisibleInServiceOrder(serviceOrder, category, service);
 };
 
-const buildServices = (setup: BusinessSetupListing) => {
+const buildServiceCatalog = (setup: BusinessSetupListing): ListingCardServiceCatalogItem[] => {
   const durationByServiceId = buildDurationByServiceId(setup);
 
-  const fromDetails = (setup.serviceDetails ?? [])
+  return (setup.serviceDetails ?? [])
     .filter((detail) => Boolean(detail.serviceTitle?.trim()))
     .filter((detail) => detail.isVisible !== false)
     .filter((detail) =>
@@ -182,30 +213,39 @@ const buildServices = (setup: BusinessSetupListing) => {
         detail.serviceTitle,
       ),
     )
-    .sort((a, b) => {
-      const priceA = Number(a.price);
-      const priceB = Number(b.price);
-      const validA = Number.isFinite(priceA) && priceA > 0 ? priceA : Number.POSITIVE_INFINITY;
-      const validB = Number.isFinite(priceB) && priceB > 0 ? priceB : Number.POSITIVE_INFINITY;
-      return validA - validB;
-    })
-    .slice(0, 3)
     .map((detail) => {
-      const rawDuration =
-        (detail.serviceId != null ? durationByServiceId.get(String(detail.serviceId)) : undefined) ||
-        detail.durationLabel?.trim() ||
-        "";
-      return {
-        name: detail.serviceTitle as string,
-        durationLabel: rawDuration
-          ? normalizeServiceDurationLabel(rawDuration)
-          : undefined,
-        priceLabel: formatPriceLabel(Number(detail.price)),
-      };
-    });
+      const price = Number(detail.price);
+      const serviceTitle = String(detail.serviceTitle ?? "").trim();
+      const categoryTitle = String(detail.categoryTitle ?? "").trim();
+      const categoryId = detail.categoryId != null ? String(detail.categoryId).trim() : "";
 
-  if (fromDetails.length > 0) {
-    return fromDetails;
+      return {
+        name: formatServiceName(serviceTitle),
+        price,
+        durationLabel: resolveServiceDurationLabel(detail, durationByServiceId),
+        categoryId: categoryId || undefined,
+        categoryTitle: categoryTitle || undefined,
+        searchTokens: [serviceTitle, categoryTitle, categoryId].filter(Boolean),
+      };
+    })
+    .filter((item) => Number.isFinite(item.price) && item.price > 0);
+};
+
+const buildServices = (
+  setup: BusinessSetupListing,
+  catalog: ListingCardServiceCatalogItem[],
+) => {
+  const fromCatalog = [...catalog]
+    .sort((a, b) => a.price - b.price)
+    .slice(0, 3)
+    .map((item) => ({
+      name: item.name,
+      durationLabel: item.durationLabel,
+      priceLabel: formatPriceLabel(item.price),
+    }));
+
+  if (fromCatalog.length > 0) {
+    return fromCatalog;
   }
 
   const fromCombinations = (setup.bookServiceCombinations ?? [])
@@ -218,10 +258,20 @@ const buildServices = (setup: BusinessSetupListing) => {
       ),
     )
     .slice(0, 3)
-    .map((combo) => ({
-      name: combo.serviceTitle as string,
-      priceLabel: formatPriceRangeFallbackLabel(setup.priceRange),
-    }));
+    .map((combo) => {
+      const serviceId = String(combo.service_id ?? combo.serviceId ?? "").trim();
+      const durationFromCategories =
+        (serviceId ? durationByServiceId.get(serviceId) : undefined) ||
+        (serviceId ? durationByServiceId.get(serviceId.toLowerCase()) : undefined);
+
+      return {
+        name: formatServiceName(combo.serviceTitle as string),
+        durationLabel: durationFromCategories
+          ? normalizeServiceDurationLabel(durationFromCategories)
+          : undefined,
+        priceLabel: formatPriceRangeFallbackLabel(setup.priceRange),
+      };
+    });
 
   if (fromCombinations.length > 0) {
     return fromCombinations;
@@ -236,21 +286,16 @@ const buildServices = (setup: BusinessSetupListing) => {
 };
 
 const resolveStartingFromLabel = (
-  setup: BusinessSetupListing,
+  catalog: ListingCardServiceCatalogItem[],
   services: ListingCardData["services"],
 ) => {
-  const lowestDetailPrice = (setup.serviceDetails ?? [])
-    .map((detail) => Number(detail.price))
+  const lowestCatalogPrice = catalog
+    .map((item) => item.price)
     .filter((price) => Number.isFinite(price) && price > 0)
     .sort((a, b) => a - b)[0];
 
-  if (lowestDetailPrice != null) {
-    return formatPriceLabel(lowestDetailPrice);
-  }
-
-  const rangeMin = parsePriceRangeMin(setup.priceRange);
-  if (rangeMin != null) {
-    return formatPriceLabel(rangeMin);
+  if (lowestCatalogPrice != null) {
+    return formatPriceLabel(lowestCatalogPrice);
   }
 
   const firstRealPrice = services.find(
@@ -264,7 +309,8 @@ export const mapBusinessSetupToListingCard = (
   setup: BusinessSetupListing,
   index: number,
 ): ListingCardData => {
-  const services = buildServices(setup);
+  const serviceCatalog = buildServiceCatalog(setup);
+  const services = buildServices(setup, serviceCatalog);
   const municipalityLabel =
     setup.fixedLocation.municipality ||
     setup.fixedLocation.province ||
@@ -293,13 +339,13 @@ export const mapBusinessSetupToListingCard = (
   const fallbackImage = FALLBACK_IMAGES[index % FALLBACK_IMAGES.length];
   const image = media[0] ?? fallbackImage;
 
-  const lowestDetailPrice = (setup.serviceDetails ?? [])
-    .map((detail) => Number(detail.price))
-    .filter((price) => Number.isFinite(price) && price > 0)
-    .sort((a, b) => a - b)[0];
-
-  const rangeMin = parsePriceRangeMin(setup.priceRange);
-  const lowestPrice = lowestDetailPrice ?? rangeMin ?? 0;
+  const lowestPrice =
+    serviceCatalog
+      .map((item) => item.price)
+      .filter((price) => Number.isFinite(price) && price > 0)
+      .sort((a, b) => a - b)[0] ??
+    parsePriceRangeMin(setup.priceRange) ??
+    0;
 
   const categoryIds = new Set(
     (setup.serviceCategories ?? [])
@@ -315,10 +361,6 @@ export const mapBusinessSetupToListingCard = (
     categoryIds.size > 0 && [...categoryIds].every((id) => combinationCategoryIds.has(id));
 
   const appointmentBefore = setup.appointmentBefore;
-  const hasNoMinTimeslotDl =
-    setup.locationMode === "desired" || setup.locationMode === "both"
-      ? !appointmentBefore?.hours && !appointmentBefore?.minutes
-      : undefined;
 
   const hasDiscount = businessKeywords.some((keyword) =>
     /discount|promo|deal|offer|sale/i.test(keyword),
@@ -327,6 +369,10 @@ export const mapBusinessSetupToListingCard = (
   const categoryKeys = buildCategoryKeys(setup);
   const isFixedOrBoth = setup.locationMode === "fixed" || setup.locationMode === "both";
   const isDesiredOrBoth = setup.locationMode === "desired" || setup.locationMode === "both";
+
+  const hasNoKmAllowanceDl =
+    isDesiredOrBoth &&
+    (setup.kilometerAllowance == null || Number(setup.kilometerAllowance) <= 0);
 
   const filterMeta = {
     categoryKeys,
@@ -339,6 +385,7 @@ export const mapBusinessSetupToListingCard = (
     hasNoMinTimeslotDl: isDesiredOrBoth
       ? !appointmentBefore?.hours && !appointmentBefore?.minutes
       : false,
+    hasNoKmAllowanceDl,
     bookSameTimeFl: isFixedOrBoth && (setup.bookServiceCombinations?.length ?? 0) > 1,
   };
 
@@ -356,7 +403,8 @@ export const mapBusinessSetupToListingCard = (
     locationModeDefault: resolveLocationModeDefault(setup.locationMode),
     businessOffering: resolveBusinessOffering(setup.locationMode),
     services,
-    startingFromLabel: resolveStartingFromLabel(setup, services),
+    serviceCatalog,
+    startingFromLabel: resolveStartingFromLabel(serviceCatalog, services),
     searchText,
     ...filterMeta,
   };
