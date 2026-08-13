@@ -2,7 +2,6 @@
 
 import AppButton from "../../../components/common/AppButton";
 import * as React from "react";
-import SortRoundedIcon from "@mui/icons-material/SortRounded";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import SwapVertRoundedIcon from "@mui/icons-material/SwapVertRounded";
 import {
@@ -11,6 +10,7 @@ import {
   CircularProgress,
   Container,
   Grid,
+  Menu,
   MenuItem,
   Stack,
   Typography,
@@ -26,7 +26,6 @@ import {
   ClientListingCard,
   MarketingSiteFooter,
   MollureMarketingHeader,
-  MollureTextField,
 } from "../../../components/common";
 import { listingPageData } from "./listing.data";
 import { parseListingSearchParams } from "./listingSearchParams";
@@ -71,6 +70,31 @@ export default function ClientListingPageView() {
   );
   const [snackbarOpen, setSnackbarOpen] = React.useState(false);
   const [filtersDrawerOpen, setFiltersDrawerOpen] = React.useState(false);
+  const [sortMenuAnchor, setSortMenuAnchor] =
+    React.useState<null | HTMLElement>(null);
+  const sortMenuOpen = Boolean(sortMenuAnchor);
+
+  const toolbarButtonSx = {
+    height: 40,
+    minWidth: 104,
+    px: 1.5,
+    borderRadius: "6px",
+    textTransform: "none" as const,
+    fontWeight: 500,
+    fontSize: 13,
+    lineHeight: 1,
+    color: alpha(tokens.navy, 0.85),
+    bgcolor: "#fff",
+    borderColor: alpha(tokens.navy, 0.18),
+    "&:hover": {
+      bgcolor: "#fff",
+      borderColor: alpha(tokens.navy, 0.28),
+    },
+    "& .MuiButton-endIcon": {
+      ml: 1,
+      color: alpha(tokens.navy, 0.85),
+    },
+  };
 
   React.useEffect(() => {
     try {
@@ -168,82 +192,58 @@ export default function ClientListingPageView() {
             variant="outlined"
             endIcon={<TuneRoundedIcon />}
             onClick={() => setFiltersDrawerOpen(true)}
-            sx={{
-              height: 40,
-              minWidth: 104,
-              px: 1.5,
-              borderRadius: "6px",
-              textTransform: "none",
-              fontWeight: 500,
-              fontSize: 13,
-              lineHeight: 1,
-              color: alpha(tokens.navy, 0.85),
-              bgcolor: "#fff",
-              borderColor: alpha(tokens.navy, 0.18),
-              "&:hover": {
-                bgcolor: "#fff",
-                borderColor: alpha(tokens.navy, 0.28),
-              },
-              "& .MuiButton-endIcon": {
-                ml: 1,
-                color: alpha(tokens.navy, 0.85),
-              },
-            }}
+            sx={toolbarButtonSx}
           >
             {toolbar.filterLabel}
           </AppButton>
 
-          <MollureTextField
-            select
-            size="small"
-            value={state.sort}
-            onChange={(e) => {
-              state.setSort(e.target.value as ListingSortValue);
-              state.setPage(1);
-            }}
-            sx={{
-              width: 104,
-              "& .MuiOutlinedInput-root": {
-                height: 40,
-                bgcolor: "#fff",
-                borderRadius: "6px",
-                fontSize: 13,
-                fontWeight: 500,
-                color: alpha(tokens.navy, 0.85),
-                "& fieldset": { borderColor: alpha(tokens.navy, 0.18) },
-                "&:hover fieldset": { borderColor: alpha(tokens.navy, 0.28) },
-                "&.Mui-focused fieldset": {
-                  borderColor: alpha(tokens.navy, 0.28),
-                  borderWidth: 1,
+          <AppButton
+            variant="outlined"
+            endIcon={<SwapVertRoundedIcon />}
+            onClick={(event) => setSortMenuAnchor(event.currentTarget)}
+            aria-haspopup="listbox"
+            aria-expanded={sortMenuOpen ? "true" : "false"}
+            aria-controls={sortMenuOpen ? "listing-sort-menu" : undefined}
+            sx={toolbarButtonSx}
+          >
+            {toolbar.sortLabel}
+          </AppButton>
+          <Menu
+            id="listing-sort-menu"
+            anchorEl={sortMenuAnchor}
+            open={sortMenuOpen}
+            onClose={() => setSortMenuAnchor(null)}
+            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+            transformOrigin={{ vertical: "top", horizontal: "right" }}
+            slotProps={{
+              paper: {
+                sx: {
+                  mt: 0.75,
+                  minWidth: 240,
+                  borderRadius: "8px",
+                  boxShadow: "0 12px 28px rgba(16, 24, 40, 0.12)",
                 },
               },
-              "& .MuiSelect-select": {
-                fontSize: 13,
-                fontWeight: 500,
-                display: "flex",
-                alignItems: "center",
-              },
-            }}
-            InputProps={{
-              startAdornment: null,
-              endAdornment: (
-                <SwapVertRoundedIcon
-                  sx={{ color: alpha(tokens.navy, 0.8), mr: 0.25 }}
-                />
-              ),
-            }}
-            SelectProps={{
-              displayEmpty: true,
-              renderValue: () => "Sort By",
-              IconComponent: () => null,
             }}
           >
             {toolbar.sortOptions.map((opt) => (
-              <MenuItem key={opt.value} value={opt.value}>
+              <MenuItem
+                key={opt.value}
+                selected={state.sort === opt.value}
+                onClick={() => {
+                  state.setSort(opt.value as ListingSortValue);
+                  state.setPage(1);
+                  setSortMenuAnchor(null);
+                }}
+                sx={{
+                  fontSize: 13,
+                  fontWeight: state.sort === opt.value ? 600 : 400,
+                }}
+              >
                 {opt.label}
               </MenuItem>
             ))}
-          </MollureTextField>
+          </Menu>
         </Stack>
 
         {isLoading ? (

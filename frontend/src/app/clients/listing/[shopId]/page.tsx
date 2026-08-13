@@ -5,7 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import { Box, CircularProgress, Container, Typography } from "@mui/material";
 import {
   BusinessPublicProfile,
-  MarketingSiteFooter,
   MollureMarketingHeader,
 } from "../../../../components/common";
 import { resolveBusinessOfferingFlags } from "../../../../data/businessPublicProfile.data";
@@ -13,7 +12,6 @@ import {
   savePublicProfileBookingSelection,
   type PublicProfileBookingSelection,
 } from "../../../../data/publicProfileBookingSelection";
-import { marketingShellFooter } from "../../../../data/marketingShell.data";
 import { useBusinessPublicProfile } from "../../../../hooks/useBusinessPublicProfile";
 import { useAppSelector } from "../../../../store/hooks";
 
@@ -194,15 +192,6 @@ export default function ClientBusinessProfilePage() {
           onBookNow={onBookNow}
         />
       </Container>
-
-      <MarketingSiteFooter
-        columns={marketingShellFooter.columns.map((col) => ({
-          title: col.title,
-          items: [...col.items],
-        }))}
-        copyright={marketingShellFooter.copyright}
-        sx={{ mt: 2 }}
-      />
     </Box>
   );
 }

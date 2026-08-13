@@ -97,6 +97,7 @@ export type BusinessPublicProfileDesiredArea = {
 export type BusinessPublicProfileDesiredProvinceDisplay = {
   id: string;
   label: string;
+  province: string;
 };
 
 export type BusinessPublicProfileDesiredLocation = {
@@ -339,18 +340,40 @@ export function buildDesiredProvinceDisplays(
   desired: BusinessPublicProfileDesiredLocation,
 ): BusinessPublicProfileDesiredProvinceDisplay[] {
   if (desired.areaMode === "All Netherlands") {
-    return [{ id: "all-nl", label: "All Netherlands" }];
+    return [{ id: "all-nl", label: "All Netherlands", province: "All Netherlands" }];
   }
 
   return desired.areas.map((area, index) => {
+    const municipalities = area.municipalities.filter(Boolean);
     if (area.allMunicipalities) {
-      return { id: `${area.province}-all-${index}`, label: `${area.province}(All)` };
+      return {
+        id: `${area.province}-all-${index}`,
+        label: `${area.province}(All)`,
+        province: area.province,
+      };
     }
-    if (area.municipalities.length === 1) {
-      return { id: `${area.province}-${index}`, label: area.municipalities[0] };
-    }
-    return { id: `${area.province}-${index}`, label: `${area.province}(${area.municipalities.length})` };
+    const label =
+      municipalities.length <= 1
+        ? area.province
+        : `${area.province}(${municipalities.length})`;
+    return {
+      id: `${area.province}-${index}`,
+      label,
+      province: area.province,
+    };
   });
+}
+
+export function getDesiredMunicipalitiesForProvinceDisplay(
+  desired: BusinessPublicProfileDesiredLocation,
+  province: string,
+): string[] {
+  const area = desired.areas.find((entry) => entry.province === province);
+  if (!area) return [];
+  if (area.allMunicipalities) {
+    return [`${province} (All municipalities)`];
+  }
+  return area.municipalities.filter(Boolean);
 }
 
 export function buildDesiredMunicipalityList(desired: BusinessPublicProfileDesiredLocation): string[] {

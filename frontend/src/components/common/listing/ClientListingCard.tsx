@@ -15,6 +15,7 @@ import {
   Divider,
   IconButton,
   Stack,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
@@ -143,8 +144,8 @@ export default function ClientListingCard({
   };
 
   const serviceRows = React.useMemo(() => {
-    const rows = item.services.slice(0, 2);
-    while (rows.length < 2) {
+    const rows = item.services.slice(0, 3);
+    while (rows.length < 3) {
       rows.push({ name: "\u00a0", priceLabel: "\u00a0" });
     }
     return rows;
@@ -286,14 +287,11 @@ export default function ClientListingCard({
                     width: 8,
                     height: 8,
                     p: 0,
-                    border:
-                      i === safeSlideIndex
-                        ? "1px solid rgba(0,0,0,0.12)"
-                        : "1px solid rgba(0,0,0,0.08)",
-                    borderRadius: 999,
+                    border: "1.5px solid #fff",
+                    borderRadius: "50%",
                     cursor: "pointer",
-                    bgcolor:
-                      i === safeSlideIndex ? "#fff" : "rgba(255,255,255,0.55)",
+                    bgcolor: i === safeSlideIndex ? "#fff" : "transparent",
+                    transition: "background-color 150ms ease",
                   }}
                 />
               ))}
@@ -524,48 +522,85 @@ export default function ClientListingCard({
             )}
           </Box>
 
-          <Box sx={{ pt: 0.35, textAlign: "left", minHeight: 52 }}>
-            <Stack spacing={0.65}>
+          <Box sx={{ pt: 0.35, textAlign: "left", minHeight: 84 }}>
+            <Stack spacing={0.75}>
               {serviceRows.map((svc, idx) => {
                 const isPlaceholder = !item.services[idx];
                 return (
-                  <Stack
+                  <Box
                     key={`${svc.name}-${idx}`}
-                    direction="row"
-                    alignItems="baseline"
-                    justifyContent="space-between"
-                    spacing={1}
                     sx={{
-                      minHeight: 22,
+                      minHeight: 26,
                       visibility: isPlaceholder ? "hidden" : "visible",
                     }}
                     aria-hidden={isPlaceholder || undefined}
                   >
-                    <Box sx={{ minWidth: 0, flex: 1 }}>
-                      <Typography
-                        sx={{
-                          fontSize: 12.5,
-                          fontWeight: 800,
-                          color: alpha(tokens.navy, 0.9),
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                          whiteSpace: "nowrap",
+                    <Stack
+                      direction="row"
+                      alignItems="baseline"
+                      justifyContent="space-between"
+                      spacing={1}
+                      sx={{ minWidth: 0 }}
+                    >
+                      <Tooltip
+                        title={svc.name}
+                        placement="top"
+                        arrow
+                        enterTouchDelay={0}
+                        slotProps={{
+                          tooltip: {
+                            sx: {
+                              fontSize: 12,
+                              fontWeight: 600,
+                              maxWidth: 280,
+                            },
+                          },
                         }}
                       >
-                        {svc.name}
+                        <Box
+                          component="span"
+                          sx={{
+                            display: "block",
+                            minWidth: 0,
+                            flex: 1,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                            fontSize: 14,
+                            fontWeight: 700,
+                            color: alpha(tokens.navy, 0.9),
+                            cursor: "default",
+                          }}
+                        >
+                          {svc.name}
+                        </Box>
+                      </Tooltip>
+                      <Typography
+                        sx={{
+                          fontSize: 14,
+                          fontWeight: 700,
+                          color: alpha(tokens.navy, 0.78),
+                          whiteSpace: "nowrap",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {svc.priceLabel}
                       </Typography>
-                    </Box>
-                    <Typography
-                      sx={{
-                        fontSize: 11.5,
-                        color: alpha(tokens.navy, 0.65),
-                        whiteSpace: "nowrap",
-                        flexShrink: 0,
-                      }}
-                    >
-                      {svc.priceLabel}
-                    </Typography>
-                  </Stack>
+                    </Stack>
+                    {svc.durationLabel ? (
+                      <Typography
+                        sx={{
+                          fontSize: 12,
+                          fontWeight: 500,
+                          color: alpha(tokens.navy, 0.55),
+                          lineHeight: 1.3,
+                          mt: 0.15,
+                        }}
+                      >
+                        {svc.durationLabel}
+                      </Typography>
+                    ) : null}
+                  </Box>
                 );
               })}
             </Stack>

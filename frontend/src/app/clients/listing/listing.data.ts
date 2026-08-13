@@ -1,6 +1,7 @@
 import type { ListingFilterOption } from "../../../components/common";
 import { clientHomeServiceCategories, netherlandsProvinces } from "../clients.data";
 import type { ListingPriceTier } from "../../../components/common/listingDrawerFilters";
+import type { ListingCardServiceCatalogItem } from "./listing.cardPresentation";
 import {
   ListingImage1,
   ListingImage2,
@@ -33,6 +34,8 @@ export type ListingCardData = {
   /** Professional offering: Fixed Location, Desired Location, or Both */
   businessOffering: "fixed" | "desired" | "both";
   services: ListingCardService[];
+  /** Full priced service catalog used for filter-aware card presentation */
+  serviceCatalog?: ListingCardServiceCatalogItem[];
   startingFromLabel: string;
   /** Used for client-side keyword filtering */
   searchText?: string;
@@ -46,6 +49,7 @@ export type ListingCardData = {
   coversAllSelectedCategories?: boolean;
   hasNoPrepayment?: boolean;
   hasNoMinTimeslotDl?: boolean;
+  hasNoKmAllowanceDl?: boolean;
   bookSameTimeFl?: boolean;
 };
 

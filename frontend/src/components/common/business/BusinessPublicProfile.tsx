@@ -14,10 +14,8 @@ import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
-import EventSeatRoundedIcon from "@mui/icons-material/EventSeatRounded";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
-import PersonPinCircleRoundedIcon from "@mui/icons-material/PersonPinCircleRounded";
 import RemoveRoundedIcon from "@mui/icons-material/RemoveRounded";
 import FemaleRoundedIcon from "@mui/icons-material/FemaleRounded";
 import MaleRoundedIcon from "@mui/icons-material/MaleRounded";
@@ -43,6 +41,7 @@ import type {
 import {
   buildDesiredMunicipalityList,
   buildDesiredProvinceDisplays,
+  getDesiredMunicipalitiesForProvinceDisplay,
   getServicesForLocationMode,
   getTeamForLocationMode,
 } from "../../../data/businessPublicProfile.data";
@@ -54,7 +53,7 @@ import ServiceCategoryBar from "../ServiceCategoryBar";
 import AppDropdown from "../AppDropdown";
 import { serviceMatchesCategoryTab } from "../../../data/businessServiceCategorySlider.data";
 import { clientReviewsHref } from "../../../data/clientProfessionalReviews";
-import { KidsIcon } from "../../../../images";
+import { DesiredLocationIcon, FixedLocationIcon, KidsIcon } from "../../../../images";
 
 function toImageSrc(img: unknown) {
   if (!img) return "";
@@ -138,16 +137,58 @@ function ProjectReadOnlyField({ value }: { value: string }) {
   );
 }
 
-function MutedInstructionBox({ children }: { children: React.ReactNode }) {
+function ProfileDetailsSubSection({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
   const m = useTheme().palette.mollure;
   return (
     <Box
       sx={{
-        mt: 1,
+        borderRadius: "10px",
+        bgcolor: m.sectionSurface,
+        p: { xs: 1.5, md: 2 },
+      }}
+    >
+      <Typography
+        sx={{
+          fontSize: 12.5,
+          fontWeight: 800,
+          color: alpha(m.navy, 0.78),
+          mb: 1.25,
+          lineHeight: 1.2,
+        }}
+      >
+        {title}
+      </Typography>
+      {children}
+    </Box>
+  );
+}
+
+function ProfileDetailsContentBox({
+  children,
+  sx,
+  multiline = false,
+}: {
+  children: React.ReactNode;
+  sx?: Record<string, unknown>;
+  multiline?: boolean;
+}) {
+  const m = useTheme().palette.mollure;
+  return (
+    <Box
+      sx={{
         px: 1.5,
         py: 1.15,
         borderRadius: "8px",
-        bgcolor: m.fxGrayF2F4F7,
+        bgcolor: "#fff",
+        border: `1px solid ${alpha(m.navy, 0.08)}`,
+        ...(multiline ? { minHeight: 88 } : null),
+        ...sx,
       }}
     >
       <Typography
@@ -156,6 +197,7 @@ function MutedInstructionBox({ children }: { children: React.ReactNode }) {
           fontWeight: 500,
           color: alpha(m.navy, 0.42),
           lineHeight: 1.55,
+          ...(multiline ? { whiteSpace: "pre-wrap" } : null),
         }}
       >
         {children}
@@ -164,33 +206,98 @@ function MutedInstructionBox({ children }: { children: React.ReactNode }) {
   );
 }
 
-function PolicyFieldRow({ label, value }: { label: string; value: string }) {
+function displayProfileValue(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : "N/A";
+}
+
+function ProfileDetailsFieldLine({
+  label,
+  value,
+  labelWeight = 800,
+  mutedLabel = false,
+  valueWeight = 600,
+}: {
+  label: string;
+  value: string | null | undefined;
+  labelWeight?: number;
+  mutedLabel?: boolean;
+  valueWeight?: number;
+}) {
   const m = useTheme().palette.mollure;
+  const display = displayProfileValue(value);
   return (
-    <Stack
-      direction="row"
-      alignItems="baseline"
-      justifyContent="space-between"
-      spacing={2}
-      sx={{ py: 0.25 }}
+    <Typography
+      sx={{
+        fontSize: mutedLabel ? 12 : 12.5,
+        color: alpha(m.navy, 0.78),
+        lineHeight: 1.5,
+      }}
     >
-      <Typography
-        sx={{ fontSize: 12, fontWeight: 600, color: alpha(m.navy, 0.55) }}
-      >
-        {label}
-      </Typography>
-      <Typography
+      <Box
+        component="span"
         sx={{
-          fontSize: 12,
-          fontWeight: 800,
-          color: alpha(m.navy, 0.78),
-          whiteSpace: "nowrap",
+          fontWeight: labelWeight,
+          color: alpha(m.navy, mutedLabel ? 0.55 : 0.78),
         }}
       >
-        {value}
-      </Typography>
-    </Stack>
+        {label}
+      </Box>{" "}
+      <Box
+        component="span"
+        sx={{
+          fontWeight: valueWeight,
+          color: alpha(
+            m.navy,
+            display === "N/A" ? 0.45 : mutedLabel ? 0.78 : 0.5,
+          ),
+        }}
+      >
+        {display}
+      </Box>
+    </Typography>
   );
+}
+
+const POLICY_SECTION_TEMPLATES = [
+  {
+    title: "Prepayment/Response Time",
+    fields: [{ label: "Response Time" }, { label: "Prepayment" }],
+  },
+  {
+    title: "Reschedule",
+    fields: [
+      { label: "Min. Time Before Appointment" },
+      { label: "Late Reschedule Fee" },
+    ],
+  },
+  {
+    title: "Cancellation",
+    fields: [
+      { label: "Min. Time Before Appointment" },
+      { label: "Late Cancellation Fee" },
+    ],
+  },
+  {
+    title: "No show",
+    fields: [{ label: "No show Fee" }],
+  },
+] as const;
+
+function resolvePolicyFieldValue(
+  sections: BusinessPublicProfileData["policySections"],
+  sectionTitle: string,
+  fieldLabel: string,
+) {
+  const section = sections.find((item) => item.title === sectionTitle);
+  return section?.fields?.find((field) => field.label === fieldLabel)?.value;
+}
+
+function resolvePolicyDescription(
+  sections: BusinessPublicProfileData["policySections"],
+  sectionTitle: string,
+) {
+  return sections.find((item) => item.title === sectionTitle)?.description;
 }
 
 const SERVICE_FOR_ICONS = {
@@ -367,11 +474,10 @@ function ProfileHeroSwiper({ images, alt }: { images: string[]; alt: string }) {
                   width: 8,
                   height: 8,
                   p: 0,
-                  border: 0,
-                  borderRadius: "999px",
+                  border: "1.5px solid #fff",
+                  borderRadius: "50%",
                   cursor: "pointer",
-                  bgcolor:
-                    index === activeIndex ? "#fff" : "rgba(255,255,255,0.55)",
+                  bgcolor: index === activeIndex ? "#fff" : "transparent",
                   transition: "background-color 150ms ease",
                 }}
               />
@@ -392,7 +498,175 @@ export type BusinessPublicProfileProps = {
   publicProfileTitle?: string;
 };
 
-type DesiredLocationView = "areas" | "municipalities";
+
+function ProfileDesiredLocationDisplayChip({ label }: { label: string }) {
+  const m = useTheme().palette.mollure;
+  return (
+    <Box
+      sx={{
+        width: "100%",
+        minWidth: 0,
+        display: "flex",
+        alignItems: "center",
+        minHeight: 36,
+        px: 1.25,
+        py: 0.5,
+        borderRadius: "10px",
+        bgcolor: "#fff",
+        border: `1px solid ${alpha(m.navy, 0.12)}`,
+      }}
+    >
+      <Typography
+        noWrap
+        sx={{
+          fontSize: 13,
+          fontWeight: 500,
+          color: alpha(m.navy, label === "N/A" ? 0.45 : 0.88),
+        }}
+      >
+        {label}
+      </Typography>
+    </Box>
+  );
+}
+
+function ProfileDesiredLocationGrid({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <Box
+      sx={{
+        display: "grid",
+        gridTemplateColumns: {
+          xs: "1fr",
+          sm: "repeat(2, 1fr)",
+          md: "repeat(4, 1fr)",
+        },
+        gap: 1.1,
+        width: "100%",
+      }}
+    >
+      {children}
+    </Box>
+  );
+}
+
+function ProfileDesiredProvinceChip({
+  label,
+  municipalities,
+}: {
+  label: string;
+  municipalities: string[];
+}) {
+  const m = useTheme().palette.mollure;
+  const [open, setOpen] = React.useState(false);
+  const anchorRef = React.useRef<HTMLButtonElement>(null);
+  const hasList = municipalities.length > 0;
+
+  return (
+    <>
+      <ButtonBase
+        ref={anchorRef}
+        onClick={() => {
+          if (hasList) setOpen((value) => !value);
+        }}
+        sx={{
+          width: "100%",
+          minWidth: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 1,
+          minHeight: 36,
+          px: 1.25,
+          py: 0.5,
+          borderRadius: "10px",
+          bgcolor: "#fff",
+          border: `1px solid ${alpha(m.navy, 0.12)}`,
+          textAlign: "left",
+          cursor: hasList ? "pointer" : "default",
+        }}
+      >
+        <Typography
+          noWrap
+          sx={{
+            fontSize: 13,
+            fontWeight: 500,
+            color: alpha(m.navy, label === "N/A" ? 0.45 : 0.88),
+          }}
+        >
+          {label}
+        </Typography>
+        {hasList ? (
+          <KeyboardArrowDownRoundedIcon
+            sx={{
+              fontSize: 20,
+              color: alpha(m.navy, 0.38),
+              flexShrink: 0,
+              transform: open ? "rotate(180deg)" : "rotate(0deg)",
+              transition: "transform 150ms ease",
+            }}
+          />
+        ) : null}
+      </ButtonBase>
+
+      {hasList ? (
+        <Popper
+          open={open}
+          anchorEl={anchorRef.current}
+          placement="bottom-start"
+          modifiers={[{ name: "offset", options: { offset: [0, 6] } }]}
+          sx={{
+            zIndex: (theme) => theme.zIndex.modal,
+            width: anchorRef.current?.offsetWidth,
+          }}
+        >
+          <ClickAwayListener onClickAway={() => setOpen(false)}>
+            <Paper
+              elevation={0}
+              sx={{
+                mt: 0.25,
+                width: "100%",
+                maxHeight: 220,
+                overflowY: "auto",
+                borderRadius: "10px",
+                border: `1px solid ${alpha(m.navy, 0.1)}`,
+                boxShadow: "0 12px 28px rgba(16, 24, 40, 0.12)",
+                p: 0.75,
+              }}
+            >
+              <Stack spacing={0.5}>
+                {municipalities.map((entry) => (
+                  <Box
+                    key={entry}
+                    sx={{
+                      px: 1.1,
+                      py: 0.85,
+                      borderRadius: "8px",
+                      bgcolor: alpha(m.navy, 0.02),
+                    }}
+                  >
+                    <Typography
+                      sx={{
+                        fontSize: 12.5,
+                        fontWeight: 600,
+                        color: alpha(m.navy, 0.78),
+                      }}
+                    >
+                      {entry}
+                    </Typography>
+                  </Box>
+                ))}
+              </Stack>
+            </Paper>
+          </ClickAwayListener>
+        </Popper>
+      ) : null}
+    </>
+  );
+}
 
 function ProfileLocationSection({
   data,
@@ -410,27 +684,15 @@ function ProfileLocationSection({
   const showDesired =
     supportsDesired && (!supportsFixed || locationMode === "desired");
   const m = useTheme().palette.mollure;
-  const [viewMode, setViewMode] = React.useState<DesiredLocationView>("areas");
-  const [listOpen, setListOpen] = React.useState(false);
-  const listAnchorRef = React.useRef<HTMLButtonElement>(null);
 
   const provinceDisplays = React.useMemo(
     () => buildDesiredProvinceDisplays(data.desiredLocation),
     [data.desiredLocation],
   );
-  const municipalityList = React.useMemo(
+  const municipalityDisplays = React.useMemo(
     () => buildDesiredMunicipalityList(data.desiredLocation),
     [data.desiredLocation],
   );
-
-  const activeItems =
-    viewMode === "areas"
-      ? provinceDisplays.map((item) => item.label)
-      : municipalityList;
-  const dropdownLabel =
-    viewMode === "areas"
-      ? `Service areas(${provinceDisplays.length})`
-      : `Municipalities(${municipalityList.length})`;
 
   return (
     <Stack spacing={2}>
@@ -479,145 +741,56 @@ function ProfileLocationSection({
           </Typography>
 
           {data.desiredLocation.areaMode === "All Netherlands" ? (
-            <Typography
-              sx={{
-                fontSize: 12.5,
-                fontWeight: 600,
-                color: alpha(m.navy, 0.55),
-              }}
-            >
-              Services available across the Netherlands.
-            </Typography>
+            <ProfileDesiredLocationGrid>
+              <ProfileDesiredProvinceChip
+                label="All Netherlands"
+                municipalities={["All Netherlands"]}
+              />
+            </ProfileDesiredLocationGrid>
           ) : (
-            <>
-              <Box
-                sx={{ display: "flex", flexWrap: "wrap", gap: 0.75, mb: 1.25 }}
-              >
-                {(
-                  [
-                    { label: "Service areas", value: "areas" },
-                    { label: "Municipalities", value: "municipalities" },
-                  ] as const
-                ).map((option) => {
-                  const active = viewMode === option.value;
-                  return (
-                    <ButtonBase
-                      key={option.value}
-                      onClick={() => {
-                        setViewMode(option.value);
-                        setListOpen(false);
-                      }}
-                      sx={{
-                        textTransform: "none",
-                        fontWeight: 700,
-                        fontSize: 12,
-                        borderRadius: "999px",
-                        px: 1.75,
-                        py: 0.75,
-                        color: active ? "#fff" : alpha(m.navy, 0.72),
-                        bgcolor: active ? m.teal : alpha(m.navy, 0.06),
-                        border: `1px solid ${active ? m.teal : alpha(m.navy, 0.08)}`,
-                        "&:hover": {
-                          bgcolor: active ? m.tealDark : alpha(m.teal, 0.1),
-                        },
-                      }}
-                    >
-                      {option.label}
-                    </ButtonBase>
-                  );
-                })}
-              </Box>
+            <Stack spacing={1.5}>
+              <ProfileDesiredLocationGrid>
+                {provinceDisplays.length > 0 ? (
+                  provinceDisplays.map((item) => (
+                    <ProfileDesiredProvinceChip
+                      key={item.id}
+                      label={item.label}
+                      municipalities={getDesiredMunicipalitiesForProvinceDisplay(
+                        data.desiredLocation,
+                        item.province,
+                      )}
+                    />
+                  ))
+                ) : (
+                  <ProfileDesiredLocationDisplayChip label="N/A" />
+                )}
+              </ProfileDesiredLocationGrid>
 
-              <ButtonBase
-                ref={listAnchorRef}
-                onClick={() => setListOpen((open) => !open)}
-                sx={{
-                  width: "100%",
-                  maxWidth: 360,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 1,
-                  minHeight: 40,
-                  px: 1.25,
-                  py: 0.75,
-                  borderRadius: "10px",
-                  bgcolor: "#fff",
-                  border: `1px solid ${alpha(m.navy, 0.12)}`,
-                  textAlign: "left",
-                }}
-              >
+              <Box>
                 <Typography
                   sx={{
-                    fontSize: 12.5,
-                    fontWeight: 500,
-                    color: alpha(m.navy, 0.78),
+                    fontSize: 12,
+                    fontWeight: 800,
+                    color: alpha(m.navy, 0.62),
+                    mb: 1,
                   }}
                 >
-                  {dropdownLabel}
+                  Municipalities
                 </Typography>
-                <KeyboardArrowDownRoundedIcon
-                  sx={{
-                    fontSize: 18,
-                    color: alpha(m.navy, 0.35),
-                    flexShrink: 0,
-                    transform: listOpen ? "rotate(180deg)" : "rotate(0deg)",
-                    transition: "transform 150ms ease",
-                  }}
-                />
-              </ButtonBase>
-
-              <Popper
-                open={listOpen}
-                anchorEl={listAnchorRef.current}
-                placement="bottom-start"
-                modifiers={[{ name: "offset", options: { offset: [0, 6] } }]}
-                sx={{
-                  zIndex: (theme) => theme.zIndex.modal,
-                  width: listAnchorRef.current?.offsetWidth,
-                }}
-              >
-                <ClickAwayListener onClickAway={() => setListOpen(false)}>
-                  <Paper
-                    elevation={0}
-                    sx={{
-                      mt: 0.25,
-                      width: "100%",
-                      maxHeight: 220,
-                      overflowY: "auto",
-                      borderRadius: "10px",
-                      border: `1px solid ${alpha(m.navy, 0.1)}`,
-                      boxShadow: "0 12px 28px rgba(16, 24, 40, 0.12)",
-                      p: 0.75,
-                    }}
-                  >
-                    <Stack spacing={0.5}>
-                      {activeItems.map((label) => (
-                        <Box
-                          key={label}
-                          sx={{
-                            px: 1.1,
-                            py: 0.85,
-                            borderRadius: "8px",
-                            bgcolor: alpha(m.navy, 0.02),
-                          }}
-                        >
-                          <Typography
-                            sx={{
-                              fontSize: 12.5,
-                              fontWeight: 600,
-                              color: alpha(m.navy, 0.78),
-                            }}
-                          >
-                            {label}
-                          </Typography>
-                        </Box>
-                      ))}
-                    </Stack>
-                  </Paper>
-                </ClickAwayListener>
-              </Popper>
-            </>
+                <ProfileDesiredLocationGrid>
+                  {municipalityDisplays.length > 0 ? (
+                    municipalityDisplays.map((label) => (
+                      <ProfileDesiredLocationDisplayChip
+                        key={label}
+                        label={label}
+                      />
+                    ))
+                  ) : (
+                    <ProfileDesiredLocationDisplayChip label="N/A" />
+                  )}
+                </ProfileDesiredLocationGrid>
+              </Box>
+            </Stack>
           )}
         </Box>
       ) : null}
@@ -639,25 +812,6 @@ function PublicProfilePageShell({ children }: { children: React.ReactNode }) {
     >
       {children}
     </Paper>
-  );
-}
-
-function PublicProfileDetailsGroup({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const m = useTheme().palette.mollure;
-  return (
-    <Box
-      sx={{
-        borderRadius: "10px",
-        bgcolor: m.fxGrayF2F4F7,
-        p: { xs: 1.25, md: 1.5 },
-      }}
-    >
-      <Stack spacing={2}>{children}</Stack>
-    </Box>
   );
 }
 
@@ -699,71 +853,76 @@ function PublicProfileTopBar({ title }: { title: string }) {
   );
 }
 
-function ProfileLocationChoiceCard({
+function ProfileLocationSegmentButton({
   mode,
   active,
-  canSwitch,
-  onSelect,
+  onClick,
 }: {
   mode: "fixed" | "desired";
   active: boolean;
-  canSwitch: boolean;
-  onSelect?: () => void;
+  onClick: () => void;
 }) {
   const m = useTheme().palette.mollure;
-  const Icon =
-    mode === "fixed" ? EventSeatRoundedIcon : PersonPinCircleRoundedIcon;
+  const icon = mode === "fixed" ? FixedLocationIcon : DesiredLocationIcon;
   const label = mode === "fixed" ? "Fixed Location" : "Desired Location";
 
   return (
-    <ButtonBase
-      onClick={() => {
-        if (canSwitch) onSelect?.();
-      }}
+    <AppButton
+      onClick={onClick}
       sx={{
-        flex: "1 1 0",
+        flex: 1,
         minWidth: 0,
+        height: 38,
+        minHeight: 38,
+        py: 0.75,
+        px: 0.75,
+        textTransform: "none",
+        fontWeight: 700,
+        fontSize: 13,
+        lineHeight: 1,
+        borderRadius: 0,
+        color: active ? "#fff" : m.slate,
+        bgcolor: active ? m.teal : "transparent",
         display: "flex",
         alignItems: "center",
-        justifyContent: "space-between",
-        gap: 1,
-        px: 1.5,
-        py: 1.15,
-        borderRadius: "10px",
-        bgcolor: m.fxGrayF2F4F7,
-        border: `1px solid ${active ? alpha(m.teal, 0.35) : alpha(m.navy, 0.08)}`,
-        textAlign: "left",
-        cursor: canSwitch ? "pointer" : "default",
+        justifyContent: "center",
+        gap: 0.5,
+        "&:hover": {
+          bgcolor: active ? m.tealDark : alpha(m.teal, 0.08),
+        },
       }}
     >
-      <Stack
-        direction="row"
-        alignItems="center"
-        spacing={1}
-        sx={{ minWidth: 0 }}
-      >
-        <Icon
-          sx={{ fontSize: 20, color: alpha(m.navy, 0.55), flexShrink: 0 }}
-        />
-        <Typography
-          sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.78) }}
-          noWrap
-        >
-          {label}
-        </Typography>
-      </Stack>
-      <Checkbox
-        checked={active}
-        size="small"
-        tabIndex={-1}
-        disableRipple
+      <Box
+        component="span"
         sx={{
-          p: 0.25,
-          color: alpha(m.navy, 0.28),
-          "&.Mui-checked": { color: m.teal },
+          width: 16,
+          height: 16,
+          display: "grid",
+          placeItems: "center",
+          flexShrink: 0,
         }}
-      />
-    </ButtonBase>
+      >
+        <Image
+          src={icon}
+          alt=""
+          width={16}
+          height={16}
+          style={{
+            filter: active ? "brightness(0) invert(1)" : "none",
+          }}
+        />
+      </Box>
+      <Box
+        component="span"
+        sx={{
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {label}
+      </Box>
+    </AppButton>
   );
 }
 
@@ -778,39 +937,73 @@ function ProfileLocationChoiceCards({
   supportsDesired: boolean;
   onChange?: (mode: "fixed" | "desired") => void;
 }) {
+  const m = useTheme().palette.mollure;
   const canSwitch = supportsFixed && supportsDesired;
 
   if (!supportsFixed && !supportsDesired) return null;
+
+  if (!canSwitch) {
+    const mode = supportsDesired ? "desired" : "fixed";
+    const icon = mode === "fixed" ? FixedLocationIcon : DesiredLocationIcon;
+    const label = mode === "fixed" ? "Fixed Location" : "Desired Location";
+
+    return (
+      <Box
+        sx={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 0.5,
+          height: 38,
+          minHeight: 38,
+          py: 0.75,
+          px: 1.25,
+          borderRadius: "8px",
+          bgcolor: alpha(m.teal, 0.1),
+          border: `1px solid ${alpha(m.teal, 0.25)}`,
+          minWidth: 180,
+        }}
+      >
+        <Image src={icon} alt="" width={16} height={16} />
+        <Typography sx={{ fontSize: 13, fontWeight: 800, color: m.teal, lineHeight: 1 }}>
+          {label}
+        </Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box
       sx={{
         display: "flex",
-        flexDirection: { xs: "column", sm: "row" },
-        gap: 1,
+        alignItems: "stretch",
+        minHeight: 38,
         width: { xs: "100%", sm: "auto" },
-        minWidth: { sm: canSwitch ? 420 : 210 },
+        minWidth: { sm: 420 },
         maxWidth: "100%",
+        border: `1px solid ${alpha(m.navy, 0.12)}`,
+        borderRadius: "8px",
+        overflow: "hidden",
+        bgcolor: "#fff",
       }}
       role="group"
       aria-label="Location type"
     >
-      {supportsFixed ? (
-        <ProfileLocationChoiceCard
-          mode="fixed"
-          active={locationMode === "fixed"}
-          canSwitch={canSwitch}
-          onSelect={() => onChange?.("fixed")}
-        />
-      ) : null}
-      {supportsDesired ? (
-        <ProfileLocationChoiceCard
-          mode="desired"
-          active={locationMode === "desired"}
-          canSwitch={canSwitch}
-          onSelect={() => onChange?.("desired")}
-        />
-      ) : null}
+      <ProfileLocationSegmentButton
+        mode="fixed"
+        active={locationMode === "fixed"}
+        onClick={() => onChange?.("fixed")}
+      />
+      <Divider
+        orientation="vertical"
+        flexItem
+        sx={{ borderColor: alpha(m.navy, 0.12) }}
+      />
+      <ProfileLocationSegmentButton
+        mode="desired"
+        active={locationMode === "desired"}
+        onClick={() => onChange?.("desired")}
+      />
     </Box>
   );
 }
@@ -1496,7 +1689,7 @@ export default function BusinessPublicProfile({
             sx={{
               borderRadius: "10px",
               border: `1px solid ${alpha(m.navy, 0.08)}`,
-              bgcolor: m.fxGrayF2F4F7,
+              bgcolor: m.sectionSurface,
               overflow: "hidden",
             }}
           >
@@ -1724,169 +1917,94 @@ export default function BusinessPublicProfile({
           </Stack>
         </SectionCard>
 
-        <PublicProfileDetailsGroup>
-          <SectionCard title="General Note">
-            <Box sx={{ borderRadius: "10px", bgcolor: m.fxGrayF2F4F7, p: 1.5 }}>
-              <Typography
-                sx={{
-                  fontSize: 11,
-                  fontWeight: 800,
-                  color: alpha(m.navy, 0.72),
-                  mb: 0.75,
-                }}
-              >
-                {data.generalNoteLabel}
-              </Typography>
-              <Box
-                sx={{
-                  borderRadius: "8px",
-                  bgcolor: "#fff",
-                  border: `1px solid ${alpha(m.navy, 0.08)}`,
-                  px: 1.25,
-                  py: 1,
-                }}
-              >
-                <Typography
-                  sx={{
-                    fontSize: 12.5,
-                    fontWeight: 600,
-                    color: alpha(m.navy, 0.62),
-                    lineHeight: 1.55,
-                  }}
-                >
-                  Additional Notes: {data.generalNote}
-                </Typography>
-              </Box>
-            </Box>
-          </SectionCard>
+        <SectionCard title="General Note">
+          <Stack spacing={1.5}>
+            <ProfileDetailsSubSection title={data.generalNoteLabel}>
+              <ProfileDetailsContentBox multiline>
+                {data.generalNote
+                  ? `Additional Notes: ${data.generalNote}`
+                  : "Additional Notes:"}
+              </ProfileDetailsContentBox>
+            </ProfileDetailsSubSection>
 
-          <SectionCard title="Price">
-            <Stack spacing={1.5}>
-              <Box>
-                <Typography
-                  sx={{
-                    fontSize: 12.5,
-                    color: alpha(m.navy, 0.78),
-                    lineHeight: 1.5,
-                  }}
-                >
-                  <Box component="span" sx={{ fontWeight: 800 }}>
-                    Price Range:
-                  </Box>{" "}
-                  <Box
-                    component="span"
-                    sx={{ fontWeight: 600, color: alpha(m.navy, 0.5) }}
-                  >
-                    {data.priceRangeLabel}
+            <ProfileDetailsSubSection title="Price">
+              <Stack spacing={1.5}>
+                <ProfileDetailsFieldLine
+                  label="Price Range:"
+                  value={data.priceRangeLabel}
+                />
+
+                <Box>
+                  <ProfileDetailsFieldLine
+                    label="Prepayment"
+                    value={data.prepaymentLabel}
+                    labelWeight={900}
+                  />
+                  <ProfileDetailsContentBox sx={{ mt: 1 }}>
+                    {displayProfileValue(data.prepaymentInstructions)}
+                  </ProfileDetailsContentBox>
+                </Box>
+
+                {showKilometerAllowance ? (
+                  <Box>
+                    <ProfileDetailsFieldLine
+                      label="Kilometer Allowance"
+                      value={data.kilometerAllowanceLabel}
+                      labelWeight={900}
+                    />
+                    <ProfileDetailsContentBox sx={{ mt: 1 }}>
+                      {displayProfileValue(data.kilometerAllowanceInstructions)}
+                    </ProfileDetailsContentBox>
                   </Box>
-                </Typography>
-              </Box>
-              <Box>
-                <Typography
-                  sx={{
-                    fontSize: 12.5,
-                    color: alpha(m.navy, 0.78),
-                    lineHeight: 1.5,
-                  }}
-                >
-                  <Box component="span" sx={{ fontWeight: 900 }}>
-                    Prepayment
-                  </Box>{" "}
-                  {data.prepaymentLabel}
-                </Typography>
-              </Box>
-              {showKilometerAllowance ? (
-                <Typography
-                  sx={{
-                    fontSize: 12.5,
-                    fontWeight: 900,
-                    color: alpha(m.navy, 0.78),
-                  }}
-                >
-                  Kilometer allowance: {data.kilometerAllowanceLabel}
-                </Typography>
-              ) : null}
-              {data.priceDescription ? (
-                <MutedInstructionBox>
-                  {data.priceDescription}
-                </MutedInstructionBox>
-              ) : null}
-              {showKilometerAllowance && data.kilometerAllowanceInstructions ? (
-                <MutedInstructionBox>
-                  {data.kilometerAllowanceInstructions}
-                </MutedInstructionBox>
-              ) : null}
-            </Stack>
-          </SectionCard>
+                ) : null}
+              </Stack>
+            </ProfileDetailsSubSection>
 
-          <SectionCard title="Policy">
-            <Stack spacing={2}>
-              {data.policySections.map((section) => (
-                <Box key={section.title}>
-                  {section.fields?.length === 1 &&
-                  section.fields[0].label === section.title ? (
-                    <Stack
-                      direction="row"
-                      alignItems="baseline"
-                      justifyContent="space-between"
-                      spacing={2}
-                      sx={{ mb: 0.25 }}
-                    >
-                      <Typography
-                        sx={{
-                          fontSize: 12.5,
-                          fontWeight: 900,
-                          color: alpha(m.navy, 0.78),
-                        }}
-                      >
-                        {section.title}
-                      </Typography>
-                      <Typography
-                        sx={{
-                          fontSize: 12,
-                          fontWeight: 800,
-                          color: alpha(m.navy, 0.78),
-                        }}
-                      >
-                        {section.fields[0].value}
-                      </Typography>
-                    </Stack>
-                  ) : (
+            <ProfileDetailsSubSection title="Policy">
+              <Stack spacing={2}>
+                {POLICY_SECTION_TEMPLATES.map((template) => (
+                  <Box key={template.title}>
                     <Typography
                       sx={{
                         fontSize: 12.5,
                         fontWeight: 900,
                         color: alpha(m.navy, 0.78),
                         mb: 0.5,
+                        lineHeight: 1.5,
                       }}
                     >
-                      {section.title}
+                      {template.title}
                     </Typography>
-                  )}
-                  {section.fields &&
-                  section.fields.length > 0 &&
-                  !(
-                    section.fields.length === 1 &&
-                    section.fields[0].label === section.title
-                  )
-                    ? section.fields.map((field) => (
-                        <PolicyFieldRow
-                          key={`${section.title}-${field.label}`}
+                    <Stack spacing={0.25}>
+                      {template.fields.map((field) => (
+                        <ProfileDetailsFieldLine
+                          key={`${template.title}-${field.label}`}
                           label={field.label}
-                          value={field.value}
+                          value={resolvePolicyFieldValue(
+                            data.policySections,
+                            template.title,
+                            field.label,
+                          )}
+                          labelWeight={600}
+                          valueWeight={800}
+                          mutedLabel
                         />
-                      ))
-                    : null}
-                  {section.description ? (
-                    <MutedInstructionBox>
-                      {section.description}
-                    </MutedInstructionBox>
-                  ) : null}
-                </Box>
-              ))}
-            </Stack>
-          </SectionCard>
-        </PublicProfileDetailsGroup>
+                      ))}
+                    </Stack>
+                    <ProfileDetailsContentBox multiline sx={{ mt: 1 }}>
+                      {displayProfileValue(
+                        resolvePolicyDescription(
+                          data.policySections,
+                          template.title,
+                        ),
+                      )}
+                    </ProfileDetailsContentBox>
+                  </Box>
+                ))}
+              </Stack>
+            </ProfileDetailsSubSection>
+          </Stack>
+        </SectionCard>
 
         <SectionCard title="Portfolio">
           <Grid container spacing={1.25}>
