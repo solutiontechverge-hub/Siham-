@@ -272,6 +272,9 @@ export const listAllBusinessSetups = async (req, res) => {
       ? rankedSetups.slice(pagination.offset, pagination.offset + pagination.limit)
       : rankedSetups;
     const setupIds = paginatedRanked.map((item) => item.businessSetupId);
+    const rankingBySetupId = new Map(
+      paginatedRanked.map((item) => [item.businessSetupId, item]),
+    );
 
     if (!setupIds.length) {
       return res.status(200).json(
@@ -376,6 +379,7 @@ export const listAllBusinessSetups = async (req, res) => {
           null,
         teamMemberRatingStats:
           teamMemberReviewAggregates.get(String(row.id)) ?? null,
+        rankingStats: rankingBySetupId.get(String(row.id)) ?? null,
       }),
     );
 

@@ -19,6 +19,10 @@ const toNumber = (value) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
+/**
+ * Normalize a metric to 0–1 using min-max across the cohort.
+ * When all values are equal, every profile gets a neutral 0.5 contribution.
+ */
 export const normalizeMetric = (value, min, max) => {
   if (max === min) {
     return 0.5;
@@ -26,6 +30,19 @@ export const normalizeMetric = (value, min, max) => {
   return (value - min) / (max - min);
 };
 
+/**
+ * Compute weighted ranking scores from raw metrics.
+ *
+ * @param {Array<{
+ *   businessSetupId: string,
+ *   rating?: number,
+ *   reviewCount?: number,
+ *   totalSales?: number,
+ *   onlineSales?: number,
+ *   onlineTransactionCount?: number,
+ *   completedOnlineBookings?: number,
+ * }>} metricsList
+ */
 export const computeRankingScores = (metricsList = []) => {
   if (!metricsList.length) {
     return [];
@@ -61,6 +78,9 @@ export const computeRankingScores = (metricsList = []) => {
   });
 };
 
+/**
+ * Fetch raw ranking metrics for all active business setups.
+ */
 export const getRankingMetricsForActiveSetups = async () => {
   const result = await query(
     `SELECT
@@ -122,6 +142,9 @@ export const getRankingMetricsForActiveSetups = async () => {
   }));
 };
 
+/**
+ * Return active business setups sorted by listing ranking score (desc).
+ */
 export const getRankedActiveBusinessSetups = async () => {
   const metrics = await getRankingMetricsForActiveSetups();
   const scored = computeRankingScores(metrics);
