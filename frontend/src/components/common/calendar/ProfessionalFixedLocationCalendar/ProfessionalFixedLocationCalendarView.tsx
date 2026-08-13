@@ -78,7 +78,12 @@ import {
   parseStoredErFromNotes,
   resolveKilometerAllowanceAmount,
   serializeCalendarEntryNotes,
+  parseCalendarEntryNotes,
 } from "../bookingEventDetails";
+import {
+  restartResponseDeadline,
+  buildResponseDeadline,
+} from "../bookingResponseDeadline";
 import {
   canDiscardEbr,
   canRespondToConfirmedEr,
@@ -3634,6 +3639,58 @@ export default function ProfessionalFixedLocationCalendar({
     });
   }, [editingEventId, persistEventStatus, showSnackbar]);
 
+  const handleRestartResponseTime = React.useCallback(async () => {
+    if (!editingEventId || !viewingBookingEvent) return;
+    const details = viewingBookingEvent.details ?? {};
+    const deadline = restartResponseDeadline(details);
+    const nextDetails = {
+      ...details,
+      ...deadline,
+      responseStatus: undefined,
+    };
+    const nextNotes = serializeCalendarEntryNotes(
+      details.internalNote ?? "",
+      nextDetails,
+      parseStoredEbrFromNotes(viewingBookingEvent.notes),
+      parseStoredErFromNotes(viewingBookingEvent.notes),
+    );
+    try {
+      await persistEventStatus(editingEventId, viewingBookingEvent.status, {
+        notes: nextNotes,
+      });
+    } catch {
+      showSnackbar({
+        severity: "error",
+        message: "Unable to restart response time.",
+      });
+      return;
+    }
+    setEvents((prev) =>
+      prev.map((event) =>
+        event.id === editingEventId
+          ? {
+              ...event,
+              notes: nextNotes,
+              details: {
+                ...(event.details ?? {}),
+                ...deadline,
+                responseStatus: undefined,
+              },
+            }
+          : event,
+      ),
+    );
+    showSnackbar({
+      severity: "success",
+      message: "Response time restarted.",
+    });
+  }, [
+    editingEventId,
+    persistEventStatus,
+    showSnackbar,
+    viewingBookingEvent,
+  ]);
+
   const handleAcknowledgeAcceptedBr = React.useCallback(() => {
     if (!editingEventId) return;
     setEvents((prev) =>
@@ -4733,6 +4790,7 @@ export default function ProfessionalFixedLocationCalendar({
           lastEditedBy: "professional",
         });
         nextDetails.responseStatus = "suggestion_for_change";
+        Object.assign(nextDetails, buildResponseDeadline());
         // Keep client project/people snapshot so client EBR view stays on Continue layout.
         if (existingEvent.details?.clientSnapshot) {
           nextDetails.clientSnapshot = existingEvent.details.clientSnapshot;
@@ -10836,6 +10894,43 @@ export default function ProfessionalFixedLocationCalendar({
                               }}
                             >
                               Discard BR
+                            </BodyText>
+                          </ButtonBase>
+                        ) : null}
+
+                        {isViewingBooking &&
+                        viewingBookingEvent &&
+                        resolveProfessionalBookingActions(viewingBookingEvent)
+                          .restart_response ? (
+                          <ButtonBase
+                            onClick={() => void handleRestartResponseTime()}
+                            sx={{
+                              width: "100%",
+                              borderRadius: "10px",
+                              border: `1px solid ${alpha(m.teal, 0.35)}`,
+                              bgcolor: alpha(m.teal, 0.06),
+                              minHeight: 44,
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              gap: 0.75,
+                              color: m.tealDark ?? m.teal,
+                              transition:
+                                "background-color 0.15s, border-color 0.15s",
+                              "&:hover": {
+                                bgcolor: alpha(m.teal, 0.12),
+                                borderColor: m.teal,
+                              },
+                            }}
+                          >
+                            <BodyText
+                              sx={{
+                                fontSize: 13,
+                                fontWeight: 800,
+                                color: "inherit",
+                              }}
+                            >
+                              Restart response time
                             </BodyText>
                           </ButtonBase>
                         ) : null}

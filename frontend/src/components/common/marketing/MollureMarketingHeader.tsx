@@ -166,20 +166,32 @@ export default function MollureMarketingHeader({
   const userType = user?.user_type ?? persisted?.user?.user_type ?? null;
   const isProfessionalContext =
     userType === "professional" || isProfessionalsRoute;
+  const notificationAudience = isProfessionalContext
+    ? ("professional" as const)
+    : ("client" as const);
   const resolvedHomeHref =
     homeHref === "/" && isProfessionalContext ? "/professionals" : homeHref;
   const showNotifications = Boolean(isAuthed);
-  const { data: notificationsData } = useGetMyNotificationsQuery(undefined, {
-    skip: !showNotifications,
-  });
-  const { data: unreadData } = useGetUnreadNotificationCountQuery(undefined, {
-    skip: !showNotifications,
-  });
+  const { data: notificationsData } = useGetMyNotificationsQuery(
+    { audience: notificationAudience },
+    {
+      skip: !showNotifications,
+    },
+  );
+  const { data: unreadData } = useGetUnreadNotificationCountQuery(
+    { audience: notificationAudience },
+    {
+      skip: !showNotifications,
+    },
+  );
   const [markNotificationRead] = useMarkNotificationReadMutation();
   const [markAllNotificationsRead] = useMarkAllNotificationsReadMutation();
   const notificationItems = React.useMemo(
-    () => (notificationsData?.data ?? []).map(mapNotificationToDrawerItem),
-    [notificationsData?.data],
+    () =>
+      (notificationsData?.data ?? [])
+        .filter((item) => item.audience === notificationAudience)
+        .map(mapNotificationToDrawerItem),
+    [notificationsData?.data, notificationAudience],
   );
   const unreadCount = unreadData?.data?.count ?? 0;
   const [mounted, setMounted] = React.useState(false);
@@ -202,7 +214,7 @@ export default function MollureMarketingHeader({
   };
 
   const handleMarkAllNotificationsRead = () => {
-    void markAllNotificationsRead();
+    void markAllNotificationsRead({ audience: notificationAudience });
   };
 
   React.useEffect(() => {

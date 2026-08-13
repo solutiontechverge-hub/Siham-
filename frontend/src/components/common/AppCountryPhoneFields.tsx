@@ -23,8 +23,11 @@ export type AppCountryPhoneFieldsProps = {
   onClearErrors?: () => void;
   required?: boolean;
   disabled?: boolean;
+  /** When true, phone input is read-only (country code still follows `disabled`). */
+  phoneReadOnly?: boolean;
   validateOnBlur?: boolean;
   countryCodeWidth?: number;
+  size?: "small" | "medium";
 };
 
 export default function AppCountryPhoneFields({
@@ -39,8 +42,10 @@ export default function AppCountryPhoneFields({
   onClearErrors,
   required = true,
   disabled = false,
+  phoneReadOnly = false,
   validateOnBlur = true,
   countryCodeWidth = 150,
+  size = "small",
 }: AppCountryPhoneFieldsProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -63,9 +68,10 @@ export default function AppCountryPhoneFields({
 
   const displayCountryCodeError = countryCodeError || localErrors.countryCode;
   const displayPhoneError = phoneError || localErrors.phone;
+  const phoneLocked = disabled || phoneReadOnly;
 
   return (
-    <Box>
+    <Box sx={{ width: "100%" }}>
       {label ? (
         <BodyText
           sx={{
@@ -78,8 +84,21 @@ export default function AppCountryPhoneFields({
           {label}
         </BodyText>
       ) : null}
-      <Stack direction="row" spacing={1.25}>
-        <Box sx={{ width: countryCodeWidth, flexShrink: 0 }}>
+      <Stack
+        direction="row"
+        spacing={1.25}
+        alignItems="center"
+        sx={{ width: "100%", flexWrap: "nowrap" }}
+      >
+        <Box
+          sx={{
+            width: countryCodeWidth,
+            maxWidth: "42%",
+            flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+          }}
+        >
           <AppCountryCodeSelect
             value={countryCode}
             onChange={(dialCode) => {
@@ -94,6 +113,8 @@ export default function AppCountryPhoneFields({
               }
             }}
             disabled={disabled}
+            fullWidth
+            size={size}
             error={Boolean(displayCountryCodeError)}
             helperText={displayCountryCodeError}
             onBlur={() => {
@@ -107,27 +128,35 @@ export default function AppCountryPhoneFields({
             }}
           />
         </Box>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Box sx={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center" }}>
           <AppTextField
             value={phone}
             onChange={(e) => {
+              if (phoneLocked) return;
               onPhoneChange(sanitizePhoneInput(e.target.value));
               onClearErrors?.();
               setLocalErrors((prev) => ({ ...prev, phone: undefined }));
             }}
             onBlur={() => {
-              if (!validateOnBlur) return;
+              if (!validateOnBlur || phoneLocked) return;
               runValidation();
             }}
             placeholder={phonePlaceholder}
             fullWidth
+            size={size}
             disabled={disabled}
+            InputProps={phoneReadOnly && !disabled ? { readOnly: true } : undefined}
             error={Boolean(displayPhoneError)}
             helperText={displayPhoneError}
-            inputProps={{ inputMode: "tel", autoComplete: "tel-national" }}
+            inputProps={{
+              inputMode: "tel",
+              autoComplete: "tel-national",
+              readOnly: phoneLocked || undefined,
+            }}
             sx={{
               "& .MuiOutlinedInput-root": {
-                bgcolor: disabled ? alpha(m.navy, 0.04) : "#fff",
+                bgcolor:
+                  disabled || phoneReadOnly ? alpha(m.navy, 0.04) : "#fff",
               },
             }}
           />

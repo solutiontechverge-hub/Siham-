@@ -34,6 +34,182 @@ function normalizePublicBusinessHours(raw) {
   return [];
 }
 
+function parseAssignedServiceIds(raw) {
+  const items = Array.isArray(raw) ? raw : [];
+  return items
+    .map((item) => {
+      if (item == null) return "";
+      if (typeof item === "object") {
+        return String(item.service_id ?? item.serviceId ?? "").trim();
+      }
+      return String(item).trim();
+    })
+    .filter(Boolean);
+}
+
+function wallClockTimeToMinutes(value) {
+  if (!value) return null;
+  const text = String(value);
+  const wallClock = text.match(/T(\d{2}):(\d{2})/);
+  const hhmm = wallClock ? wallClock[1] : /^\d{2}:\d{2}/.test(text) ? text.slice(0, 5) : null;
+  if (!hhmm) return null;
+  const [h, m] = hhmm.split(":").map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+  return h * 60 + m;
+}
+
+function wallClockDateFromValue(value) {
+  if (!value) return null;
+  const match = String(value).match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : null;
+}
+
+function pushBusyInterval(map, memberId, startMin, endMin) {
+  if (!memberId || startMin == null || endMin == null || endMin <= startMin) return;
+  const key = String(memberId);
+  if (!map[key]) map[key] = [];
+  map[key].push({ startMin, endMin });
+}
+
+export const getSetupAvailabilityForDate = async (req, res) => {
+  try {
+    const setupId = req.params.setupId;
+    const date = String(req.query.date ?? "").trim();
+    const location = String(req.query.location ?? "FL").trim().toUpperCase() === "DL" ? "DL" : "FL";
+
+    if (!setupId) {
+      return res.status(400).json({
+        success: false,
+        message: "Business setup id is required.",
+        data: null,
+      });
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({
+        success: false,
+        message: "A valid date query parameter (YYYY-MM-DD) is required.",
+        data: null,
+      });
+    }
+
+    const setupResult = await query(
+      `SELECT id, professional_profile_id
+       FROM business_setups
+       WHERE id = $1 AND is_active = true
+       LIMIT 1`,
+      [setupId],
+    );
+    const setup = setupResult.rows[0];
+    if (!setup?.professional_profile_id) {
+      return res.status(404).json({
+        success: false,
+        message: "Business setup not found.",
+        data: null,
+      });
+    }
+
+    const [teamMembersResult, settingsResult, bookingsResult, entriesResult] =
+      await Promise.all([
+        query(
+          `SELECT id, full_name, assigned_services
+           FROM business_team_members
+           WHERE business_setup_id = $1
+           ORDER BY display_order ASC, id ASC`,
+          [setupId],
+        ),
+        query(
+          `SELECT availability
+           FROM calendar_settings
+           WHERE professional_profile_id = $1
+           LIMIT 1`,
+          [setup.professional_profile_id],
+        ),
+        query(
+          `SELECT team_member_id, start_time, end_time, status
+           FROM bookings
+           WHERE business_setup_id = $1
+             AND substring(COALESCE(booking_date::text, start_time::text) from 1 for 10)::date = $2::date
+             AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'invalid')
+             AND team_member_id IS NOT NULL`,
+          [setupId, date],
+        ),
+        query(
+          `SELECT team_member_id, start_time, end_time, blocked_time_start, blocked_time_end, status
+           FROM calendar_entries
+           WHERE professional_profile_id = $1
+             AND substring(COALESCE(start_time::text, blocked_time_start::text, start_date::text) from 1 for 10)::date = $2::date
+             AND team_member_id IS NOT NULL
+             AND LOWER(COALESCE(status, '')) NOT IN ('cancelled', 'invalid')`,
+          [setup.professional_profile_id, date],
+        ),
+      ]);
+
+    const availability = parseJsonField(settingsResult.rows[0]?.availability, {});
+    const bookingRules = availability?.bookingRules ?? {};
+    const slotStepMinutes =
+      location === "DL"
+        ? Number(bookingRules.dlIntervalMinutes) || 15
+        : Number(bookingRules.flIntervalMinutes) || 30;
+
+    const busyByMember = {};
+
+    for (const booking of bookingsResult.rows) {
+      const startMin = wallClockTimeToMinutes(booking.start_time);
+      const endMin = wallClockTimeToMinutes(booking.end_time);
+      pushBusyInterval(busyByMember, booking.team_member_id, startMin, endMin);
+    }
+
+    for (const entry of entriesResult.rows) {
+      const status = String(entry.status ?? "").toLowerCase();
+      if (status === "cancelled" || status === "invalid") continue;
+      const startValue = entry.blocked_time_start ?? entry.start_time;
+      const endValue = entry.blocked_time_end ?? entry.end_time;
+      const entryDate =
+        wallClockDateFromValue(startValue) ?? wallClockDateFromValue(endValue);
+      if (entryDate && entryDate !== date) continue;
+      const startMin = wallClockTimeToMinutes(startValue);
+      const endMin = wallClockTimeToMinutes(endValue);
+      pushBusyInterval(busyByMember, entry.team_member_id, startMin, endMin);
+    }
+
+    const teamMembers = teamMembersResult.rows.map((member) => ({
+      id: String(member.id),
+      name: member.full_name?.trim() || "Team member",
+      assignedServiceIds: parseAssignedServiceIds(
+        parseJsonField(member.assigned_services, []),
+      ),
+    }));
+
+    return res.status(200).json({
+      success: true,
+      message: "Setup availability fetched successfully.",
+      data: {
+        date,
+        location,
+        slotStepMinutes,
+        scheduleAvailability: Array.isArray(availability?.scheduleAvailability)
+          ? availability.scheduleAvailability
+          : [],
+        dateOverrides: Array.isArray(availability?.dateOverrides)
+          ? availability.dateOverrides
+          : [],
+        publicBusinessHours: normalizePublicBusinessHours(
+          availability?.publicBusinessHours,
+        ),
+        teamMembers,
+        busyByMember,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch setup availability.",
+      data: { error: error.message },
+    });
+  }
+};
+
 export const getPublicBusinessHoursForSetup = async (req, res) => {
   try {
     const setupId = req.params.setupId;

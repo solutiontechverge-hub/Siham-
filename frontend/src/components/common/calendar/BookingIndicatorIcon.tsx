@@ -17,7 +17,7 @@ export type BookingIndicatorVariant =
 
 const VARIANT_MAP: Record<BookingIndicatorVariant, BookingGuidelineIconVariant> = {
   suggestion_for_change: "suggestion_for_change",
-  waiting_for_prepayment: "response_time_active",
+  waiting_for_prepayment: "waiting_for_prepayment",
   overdue_response: "overdue_response",
   waiting_for_payment: "waiting_for_payment",
   overdue_payment: "overdue_payment",
@@ -28,7 +28,7 @@ const VARIANT_MAP: Record<BookingIndicatorVariant, BookingGuidelineIconVariant> 
 
 export const BOOKING_INDICATOR_LABELS: Record<BookingIndicatorVariant, string> = {
   suggestion_for_change: BOOKING_GUIDELINE_ICON_LABELS.suggestion_for_change,
-  waiting_for_prepayment: BOOKING_GUIDELINE_ICON_LABELS.response_time_active,
+  waiting_for_prepayment: BOOKING_GUIDELINE_ICON_LABELS.waiting_for_prepayment,
   overdue_response: BOOKING_GUIDELINE_ICON_LABELS.overdue_response,
   waiting_for_payment: BOOKING_GUIDELINE_ICON_LABELS.waiting_for_payment,
   overdue_payment: BOOKING_GUIDELINE_ICON_LABELS.overdue_payment,

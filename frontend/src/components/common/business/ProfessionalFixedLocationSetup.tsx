@@ -82,6 +82,10 @@ import AppModal, {
 import AppDrawer from "../AppDrawer";
 import TemplateSyncSettingsForm from "./TemplateSyncSettingsForm";
 import {
+  formatBusinessSetupValidationMessage,
+  validateBusinessSetupForPublish,
+} from "../businessSetupPublishValidation";
+import {
   blankSectionFields,
   createDefaultTemplateSyncSettings,
   normalizeTemplateSyncSettings,
@@ -2267,45 +2271,6 @@ export default function ProfessionalFixedLocationSetup({
     teamMembersFixed,
   ]);
 
-  const onPublishBusinessSetup = React.useCallback(async () => {
-    if (!onSaveBusinessSetup) {
-      setIsBusinessPublishEnabled(false);
-      setPublishConfirmOpen(false);
-      return;
-    }
-
-    try {
-      const teamForSave =
-        businessOfferingSelect === "Desired Location"
-          ? teamMembersDesired
-          : teamMembersFixed;
-      await onSaveBusinessSetup(buildBusinessSetupSaveBody(teamForSave));
-      clearPendingTeamMemberPhotos();
-      await updateBusinessSetupActive({ is_active: true }).unwrap();
-      setIsBusinessPublishEnabled(false);
-      setEditingBusinessSections(new Set());
-      setPublishConfirmOpen(false);
-      showSnackbar({
-        severity: "success",
-        message: "Changes published and are now live.",
-      });
-    } catch (error) {
-      showSnackbar({
-        severity: "error",
-        message: getApiErrorMessage(error, "Unable to publish changes."),
-      });
-    }
-  }, [
-    buildBusinessSetupSaveBody,
-    businessOfferingSelect,
-    clearPendingTeamMemberPhotos,
-    onSaveBusinessSetup,
-    showSnackbar,
-    teamMembersDesired,
-    teamMembersFixed,
-    updateBusinessSetupActive,
-  ]);
-
   const saveBusinessSection = React.useCallback(
     async (sectionId: BusinessSetupSectionId) => {
       if (!onSaveBusinessSetup) {
@@ -2613,6 +2578,151 @@ export default function ProfessionalFixedLocationSetup({
     values.depositValue,
     values.discountEnabled,
     values.discountValue,
+  ]);
+
+  const getBusinessSetupPublishValidation = React.useCallback(() => {
+    const profileSource =
+      businessOfferingSelect === "Desired Location"
+        ? desiredBusiness
+        : fixedBiz;
+
+    return validateBusinessSetupForPublish({
+      offering: businessOfferingSelect,
+      profileName: profileSource.profileName,
+      about: profileSource.about,
+      keywords: profileSource.keywords,
+      mediaCount: mediaSlides.length,
+      fixedLocation: {
+        salonName: fixedBiz.salonName,
+        streetAddress: fixedBiz.streetAddress,
+        streetNumber: fixedBiz.streetNumber,
+        postalCode: fixedBiz.postalCode,
+        province: fixedBiz.province,
+        municipalities: fixedBiz.municipalities,
+      },
+      desiredLocation: {
+        areaMode: desiredAreaMode,
+        areasCount: desiredAreas.length,
+      },
+      serviceFor: profileSource.serviceFor,
+      servicesFixedCount: servicesFixed.length,
+      servicesDesiredCount: servicesDesired.length,
+      servicesDetailsSync:
+        isBothOffering && templateSyncSettings.servicesDetails === "sync",
+      manageTeamSync:
+        isBothOffering && templateSyncSettings.manageTeam === "sync",
+      portfolioSync:
+        isBothOffering && templateSyncSettings.portfolio === "sync",
+      teamMembersFixed: teamMembersFixed.map((member) => ({
+        name: member.name,
+        role: member.role,
+      })),
+      teamMembersDesired: teamMembersDesired.map((member) => ({
+        name: member.name,
+        role: member.role,
+      })),
+      portfolioFixedCount: portfolioItemsFixed.length,
+      portfolioDesiredCount: portfolioItemsDesired.length,
+      notes: profileSource.notes,
+      policyResponseHours: values.policyResponseHours,
+      policyResponseMinutes: values.policyResponseMinutes,
+      policyInstructions: values.policyInstructions,
+      rescheduleMinimumHours: values.rescheduleMinimumHours,
+      rescheduleMinimumMinutes: values.rescheduleMinimumMinutes,
+      rescheduleLateFeePercent: values.rescheduleLateFeePercent,
+      rescheduleInstructions: values.rescheduleInstructions,
+      cancelMinimumHours: values.cancelMinimumHours,
+      cancelMinimumMinutes: values.cancelMinimumMinutes,
+      cancelLateFeePercent: values.cancelLateFeePercent,
+      cancelInstructions: values.cancelInstructions,
+      noShowFeePercent: values.noShowFeePercent,
+      noShowInstructions: values.noShowInstructions,
+    });
+  }, [
+    businessOfferingSelect,
+    desiredAreaMode,
+    desiredAreas.length,
+    desiredBusiness,
+    fixedBiz,
+    isBothOffering,
+    mediaSlides.length,
+    portfolioItemsDesired.length,
+    portfolioItemsFixed.length,
+    servicesDesired.length,
+    servicesFixed.length,
+    teamMembersDesired,
+    teamMembersFixed,
+    templateSyncSettings.manageTeam,
+    templateSyncSettings.portfolio,
+    templateSyncSettings.servicesDetails,
+    values,
+  ]);
+
+  const businessSetupPublishValidation = React.useMemo(
+    () => getBusinessSetupPublishValidation(),
+    [getBusinessSetupPublishValidation],
+  );
+
+  const onAttemptPublishBusinessSetup = React.useCallback(() => {
+    const { valid, missingFields } = getBusinessSetupPublishValidation();
+    if (!valid) {
+      showSnackbar({
+        severity: "error",
+        message: formatBusinessSetupValidationMessage(missingFields),
+      });
+      return;
+    }
+    setPublishConfirmOpen(true);
+  }, [getBusinessSetupPublishValidation, showSnackbar]);
+
+  const onPublishBusinessSetup = React.useCallback(async () => {
+    if (!onSaveBusinessSetup) {
+      setIsBusinessPublishEnabled(false);
+      setPublishConfirmOpen(false);
+      return;
+    }
+
+    const { valid, missingFields } = getBusinessSetupPublishValidation();
+    if (!valid) {
+      showSnackbar({
+        severity: "error",
+        message: formatBusinessSetupValidationMessage(missingFields),
+      });
+      setPublishConfirmOpen(false);
+      return;
+    }
+
+    try {
+      const teamForSave =
+        businessOfferingSelect === "Desired Location"
+          ? teamMembersDesired
+          : teamMembersFixed;
+      await onSaveBusinessSetup(buildBusinessSetupSaveBody(teamForSave));
+      clearPendingTeamMemberPhotos();
+      await updateBusinessSetupActive({ is_active: true }).unwrap();
+      setIsBusinessPublishEnabled(false);
+      setEditingBusinessSections(new Set());
+      setPublishConfirmOpen(false);
+      showSnackbar({
+        severity: "success",
+        message: "Changes published and are now live.",
+      });
+    } catch (error) {
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(error, "Unable to publish changes."),
+      });
+    }
+  }, [
+    buildBusinessSetupSaveBody,
+    businessOfferingSelect,
+    clearPendingTeamMemberPhotos,
+    getBusinessSetupPublishValidation,
+    onSaveBusinessSetup,
+    showSnackbar,
+    teamMembersDesired,
+    teamMembersFixed,
+    updateBusinessSetupActive,
   ]);
 
   const activeServices =
@@ -4504,7 +4614,9 @@ export default function ProfessionalFixedLocationSetup({
                 aria-label="Template sync settings"
                 disabled={businessFormDisabled}
                 onClick={() => {
-                  setTemplateSyncDraft(templateSyncSettings);
+                  setTemplateSyncDraft(
+                    normalizeTemplateSyncSettings(templateSyncSettings),
+                  );
                   setTemplateSyncDrawerOpen(true);
                 }}
                 sx={{
@@ -4524,8 +4636,20 @@ export default function ProfessionalFixedLocationSetup({
             <AppButton
               variant="contained"
               disableElevation
-              onClick={() => setPublishConfirmOpen(true)}
-              disabled={!isBusinessPublishEnabled || isBusinessSetupSaving}
+              onClick={onAttemptPublishBusinessSetup}
+              disabled={
+                !isBusinessPublishEnabled ||
+                isBusinessSetupSaving ||
+                !businessSetupPublishValidation.valid
+              }
+              title={
+                isBusinessPublishEnabled &&
+                !businessSetupPublishValidation.valid
+                  ? formatBusinessSetupValidationMessage(
+                      businessSetupPublishValidation.missingFields,
+                    )
+                  : undefined
+              }
               sx={{
                 borderRadius: "6px",
                 textTransform: "none",
@@ -4787,7 +4911,9 @@ export default function ProfessionalFixedLocationSetup({
             <AppModalPrimaryButton
               label={isBusinessSetupSaving ? "Publishing..." : data.publishLabel}
               onClick={() => void onPublishBusinessSetup()}
-              disabled={isBusinessSetupSaving}
+              disabled={
+                isBusinessSetupSaving || !businessSetupPublishValidation.valid
+              }
             />
           </>
         }

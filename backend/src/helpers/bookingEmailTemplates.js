@@ -46,7 +46,18 @@ const formatStatusLabel = (status) => {
   return labels[status] || String(status ?? "—");
 };
 
-const bookingCardEmail = ({ title, salonName, professionalName, startTime, uniqueCode, iconType, ctaLabel, status, ctaUrl }) => {
+const bookingCardEmail = ({
+  title,
+  salonName,
+  professionalName,
+  startTime,
+  uniqueCode,
+  iconType,
+  ctaLabel,
+  status,
+  ctaUrl,
+  message,
+}) => {
   const detailsUrl = ctaUrl || buildBookingDetailsUrl(uniqueCode);
   const rows = [
     { label: "Professional", value: professionalName },
@@ -57,15 +68,20 @@ const bookingCardEmail = ({ title, salonName, professionalName, startTime, uniqu
     rows.push({ label: "Status", value: formatStatusLabel(status) });
   }
 
+  const messageHtml = message
+    ? `<p style="margin:0 0 16px;font-size:15px;color:#5c6778;line-height:1.5;">${escapeHtml(message)}</p>`
+    : "";
+
   const html = wrapEmail(`
     ${statusIcon(iconType)}
     <h1 style="margin:0 0 8px;font-size:24px;color:#1a2b42;">${escapeHtml(title)}</h1>
     <p style="margin:0 0 4px;font-size:16px;color:#5c6778;font-weight:600;">${escapeHtml(salonName)}</p>
+    ${messageHtml}
     ${detailsBox(rows)}
     ${primaryButton(ctaLabel || "View Booking Details", detailsUrl)}
   `);
 
-  const text = `${title}\n${salonName}\nProfessional: ${professionalName}\nStart: ${formatStartTime(startTime)}\nBooking ID: ${formatBookingId(uniqueCode)}${status ? `\nStatus: ${formatStatusLabel(status)}` : ""}\n${detailsUrl}`;
+  const text = `${title}\n${salonName}${message ? `\n${message}` : ""}\nProfessional: ${professionalName}\nStart: ${formatStartTime(startTime)}\nBooking ID: ${formatBookingId(uniqueCode)}${status ? `\nStatus: ${formatStatusLabel(status)}` : ""}\n${detailsUrl}`;
   return { html, text };
 };
 
@@ -124,6 +140,7 @@ export const buildProfessionalActionEmail = (ctx) =>
     iconType: "info",
     status: ctx.status,
     ctaLabel: "View booking section",
+    message: ctx.message || null,
   });
 
 export const buildReviewInviteEmail = (ctx) => {

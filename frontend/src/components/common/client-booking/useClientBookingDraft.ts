@@ -56,12 +56,28 @@ export function useClientBookingDraft() {
     [businessProfile?.prepaymentLabel],
   );
 
+  const requiresPrepayment = React.useMemo(() => {
+    if (activeBooking?.requiresPrepayment != null) {
+      return Boolean(activeBooking.requiresPrepayment);
+    }
+    // Desired: prepayment is after acceptance — never gate create summary.
+    if ((shop?.locationMode ?? "fixed") === "desired") return false;
+    return prepaymentPercent > 0;
+  }, [
+    activeBooking?.requiresPrepayment,
+    prepaymentPercent,
+    shop?.locationMode,
+  ]);
+
   return {
     draft,
     shop,
     businessProfile,
-    prepaymentPercent,
-    requiresPrepayment: prepaymentPercent > 0 || Boolean(activeBooking?.requiresPrepayment),
+    prepaymentPercent:
+      Number(activeBooking?.prepaymentPercent) > 0
+        ? Number(activeBooking?.prepaymentPercent)
+        : prepaymentPercent,
+    requiresPrepayment,
     isBusinessProfileLoading,
   };
 }

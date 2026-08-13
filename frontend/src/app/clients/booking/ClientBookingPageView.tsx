@@ -18,7 +18,7 @@ export default function ClientBookingPageView() {
 
   if (showCreate) {
     return (
-      <ClientBookingPageShell activeTab="upcoming">
+      <ClientBookingPageShell activeTab="upcoming" hideChrome>
         <ClientBookingCreateView />
       </ClientBookingPageShell>
     );

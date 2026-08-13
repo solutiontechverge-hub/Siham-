@@ -21,7 +21,6 @@ import {
   setActiveBookingSession,
 } from "./clientBookingSession";
 import { resolveCreateCheckoutPath } from "./resolveCreateBookingStatus";
-import { submitClientBookingRequest } from "./submitClientBookingRequest";
 import { useSnackbar } from "../../../components/common/AppSnackbar";
 import { getApiErrorMessage } from "../../../lib/api-error";
 import { resolveMediaUrl } from "../../../lib/resolveMediaUrl";
@@ -41,6 +40,7 @@ import {
 import {
   useCreateBookingMutation,
   useGetPublicBusinessHoursQuery,
+  useGetSetupAvailabilityQuery,
   useUploadBookingAttachmentsMutation,
 } from "../../../store/services/businessApi";
 import {
@@ -49,11 +49,22 @@ import {
   resolvePublicBusinessHoursDay,
   type PublicBusinessHoursLike,
 } from "../../../components/common/calendar/calendar.utils";
+import type {
+  ScheduleAvailabilityRow,
+  ScheduleDateOverride,
+} from "../../../components/common/calendar/calendar-settings.types";
+import {
+  autoAssignServicesByAvailability,
+  computeUnionBookableSlots,
+  type SetupAvailabilitySnapshot,
+} from "./clientAvailability.utils";
 
 import {
   FIXED_LOCATION_MAX_GUESTS,
   UUID_RE,
   isAdditionalGuest,
+  buildAddServiceCatalog,
+  resolveProfileCatalogService,
   servicesMissingTeamMember,
   withTeamMemberProvidedByProNote,
   resolveRequesterDisplayName,
@@ -327,7 +338,7 @@ export function useClientBookingCreatePage() {
 
   const times = allDayTimes;
 
-  const availableTimes = React.useMemo(() => {
+  const baseAvailableTimes = React.useMemo(() => {
     if (!isSelectedToday) return times;
     return times.filter((t) => parseTimeLabelToMinutes(t) > minBookableMinutes);
   }, [isSelectedToday, minBookableMinutes, times]);
@@ -413,12 +424,6 @@ export function useClientBookingCreatePage() {
   const [addServiceCatalogIds, setAddServiceCatalogIds] = React.useState<
     Record<string, boolean>
   >({});
-  const [addServiceGuestId, setAddServiceGuestId] = React.useState("");
-  /** Fixed location: confirm before removing a service card. */
-  const [servicePendingRemove, setServicePendingRemove] = React.useState<{
-    id: string;
-    name: string;
-  } | null>(null);
   /** Baseline services when opening EBR suggest-edit — used to mark Edited lines. */
   const ebrSuggestBaselineRef = React.useRef<Service[] | null>(null);
   const [projectDescription, setProjectDescription] = React.useState("");
@@ -494,9 +499,8 @@ export function useClientBookingCreatePage() {
       durationMins: s.durationMins,
       price: s.priceValue,
     }));
-    const byId = new Map(locationCatalog.map((s) => [s.id, s]));
-    const byName = new Map(
-      locationCatalog.map((s) => [s.name.trim().toLowerCase(), s]),
+    const fallbackByName = new Map(
+      fallbackItems.map((item) => [item.name.trim().toLowerCase(), item]),
     );
     const profileTeam = getTeamForLocationMode(businessProfile, locationMode);
 
@@ -513,21 +517,24 @@ export function useClientBookingCreatePage() {
       const items: CatalogService[] = [];
       for (const slot of slots) {
         for (const opt of slot.options) {
-          const matched =
-            byId.get(opt.value) ??
-            byName.get(
-              String(opt.label ?? "")
-                .trim()
-                .toLowerCase(),
-            );
-          const id = matched?.id ?? opt.value;
+          const matched = resolveProfileCatalogService(opt, locationCatalog);
+          const id = matched?.id ?? String(opt.value ?? "").trim();
           if (!id || seen.has(id)) continue;
           seen.add(id);
+          const fallbackMatch = fallbackByName.get(
+            String(opt.label ?? "")
+              .trim()
+              .toLowerCase(),
+          );
           items.push({
             id,
-            name: matched?.name ?? opt.label,
-            durationMins: matched?.durationMins ?? 30,
-            price: matched?.priceValue ?? 0,
+            name: matched?.name ?? fallbackMatch?.name ?? opt.label,
+            durationMins:
+              matched?.durationMins ?? fallbackMatch?.durationMins ?? 30,
+            price:
+              matched?.priceValue ??
+              fallbackMatch?.price ??
+              0,
           });
         }
       }
@@ -578,16 +585,192 @@ export function useClientBookingCreatePage() {
   /** Client can pick / assign staff only when the pro exposed team members for this mode. */
   const hasAssignableTeamMembers = filteredTeamMembers.length > 0;
 
-  const addServiceCatalog = React.useMemo(() => {
-    if (hasAssignableTeamMembers) {
-      return catalogByTeamMemberId[selectedTeamMemberId] ?? [];
-    }
-    return locationServiceCatalog;
+  const { data: setupAvailabilityResponse } = useGetSetupAvailabilityQuery(
+    {
+      setupId: setupIdForHours,
+      date: toISO(selectedDate),
+      location: bookingLocationCode as "FL" | "DL",
+    },
+    {
+      skip: !setupIdForHours || !hasAssignableTeamMembers || !profileHydrated,
+    },
+  );
+
+  const availabilitySnapshot = React.useMemo((): SetupAvailabilitySnapshot | null => {
+    const raw = setupAvailabilityResponse?.data;
+    if (!raw) return null;
+    return {
+      date: raw.date,
+      location: raw.location,
+      slotStepMinutes: raw.slotStepMinutes,
+      scheduleAvailability: raw.scheduleAvailability as ScheduleAvailabilityRow[],
+      dateOverrides: raw.dateOverrides as ScheduleDateOverride[],
+      publicBusinessHours: raw.publicBusinessHours as PublicBusinessHoursLike[],
+      teamMembers: raw.teamMembers,
+      busyByMember: raw.busyByMember,
+    };
+  }, [setupAvailabilityResponse?.data]);
+
+  const candidateMemberIds = React.useMemo(
+    () => filteredTeamMembers.map((member) => member.id),
+    [filteredTeamMembers],
+  );
+
+  const availabilityBookableTimes = React.useMemo(() => {
+    if (!availabilitySnapshot || !hasAssignableTeamMembers) return null;
+    const duration =
+      services.reduce((sum, service) => sum + service.durationMins, 0) ||
+      availabilitySnapshot.slotStepMinutes;
+    const minStart = isSelectedToday ? minBookableMinutes : undefined;
+    return computeUnionBookableSlots(
+      availabilitySnapshot,
+      candidateMemberIds,
+      duration,
+      minStart,
+    );
   }, [
+    availabilitySnapshot,
+    candidateMemberIds,
+    hasAssignableTeamMembers,
+    isSelectedToday,
+    minBookableMinutes,
+    services,
+  ]);
+
+  const availableTimes = React.useMemo(() => {
+    if (!availabilityBookableTimes?.length) return baseAvailableTimes;
+    const allowed = new Set(availabilityBookableTimes);
+    const filtered = baseAvailableTimes.filter((time) => allowed.has(time));
+    return filtered.length > 0 ? filtered : baseAvailableTimes;
+  }, [availabilityBookableTimes, baseAvailableTimes]);
+
+  const lastAutoAssignRef = React.useRef("");
+
+  React.useEffect(() => {
+    if (
+      !availabilitySnapshot ||
+      !hasAssignableTeamMembers ||
+      !selectedTime ||
+      services.length === 0
+    ) {
+      return;
+    }
+
+    const startMin = parseTimeLabelToMinutes(selectedTime);
+    if (!startMin) return;
+
+    const contextKey = [
+      toISO(selectedDate),
+      selectedTime,
+      services.map((service) => `${service.id}:${service.durationMins}`).join(","),
+    ].join("|");
+
+    const assignments = autoAssignServicesByAvailability({
+      snapshot: availabilitySnapshot,
+      services: services.map((service) => ({
+        id: service.id,
+        catalogServiceId:
+          service.catalogServiceId ?? extractUuidFromSyntheticId(service.id),
+        durationMins: service.durationMins,
+        teamMemberId: service.teamMemberId,
+      })),
+      candidateMemberIds,
+      fallbackCatalogIds: locationServiceCatalog.map((service) => service.id),
+      startMin,
+      assignOneMemberForAll: isDesiredLocation,
+    });
+
+    const assignKey = `${contextKey}|${assignments
+      .map((row) => `${row.id}:${row.teamMemberId ?? ""}`)
+      .join(",")}`;
+    if (lastAutoAssignRef.current === assignKey) return;
+    lastAutoAssignRef.current = assignKey;
+
+    setServices((prev) => {
+      let changed = false;
+      const next = prev.map((service) => {
+        const assignment = assignments.find((row) => row.id === service.id);
+        if (
+          !assignment ||
+          (assignment.teamMemberId ?? null) === (service.teamMemberId ?? null)
+        ) {
+          return service;
+        }
+        changed = true;
+        return { ...service, teamMemberId: assignment.teamMemberId };
+      });
+      return changed ? next : prev;
+    });
+
+    if (isDesiredLocation) {
+      const sharedMember =
+        assignments.find((row) => row.teamMemberId)?.teamMemberId ?? "";
+      if (sharedMember && sharedMember !== selectedTeamMemberId) {
+        setSelectedTeamMemberId(sharedMember);
+      }
+    }
+  }, [
+    availabilitySnapshot,
+    candidateMemberIds,
+    hasAssignableTeamMembers,
+    isDesiredLocation,
+    locationServiceCatalog,
+    selectedDate,
+    selectedTeamMemberId,
+    selectedTime,
+    services,
+  ]);
+
+  const addServiceTeamMemberId = React.useMemo(() => {
+    if (!hasAssignableTeamMembers) return "";
+
+    const isValidMember = (id: string | null | undefined) =>
+      Boolean(id && filteredTeamMembers.some((tm) => tm.id === id));
+
+    const personAssigned = services.filter(
+      (s) => s.guestId === selectedPersonId && s.teamMemberId,
+    );
+    if (personAssigned.length > 0) {
+      const counts = new Map<string, number>();
+      for (const row of personAssigned) {
+        const id = row.teamMemberId!;
+        counts.set(id, (counts.get(id) ?? 0) + 1);
+      }
+      let bestId = "";
+      let bestCount = 0;
+      for (const [id, count] of counts) {
+        if (count > bestCount) {
+          bestId = id;
+          bestCount = count;
+        }
+      }
+      if (isValidMember(bestId)) return bestId;
+    }
+
+    if (isValidMember(selectedTeamMemberId)) return selectedTeamMemberId;
+
+    const bookingAssigned = services.find((s) => isValidMember(s.teamMemberId));
+    if (bookingAssigned?.teamMemberId) return bookingAssigned.teamMemberId;
+
+    return filteredTeamMembers[0]?.id ?? "";
+  }, [
+    filteredTeamMembers,
+    hasAssignableTeamMembers,
+    selectedPersonId,
+    selectedTeamMemberId,
+    services,
+  ]);
+
+  const addServiceCatalog = React.useMemo(() => {
+    const memberItems = hasAssignableTeamMembers
+      ? catalogByTeamMemberId[addServiceTeamMemberId]
+      : undefined;
+    return buildAddServiceCatalog(locationServiceCatalog, memberItems);
+  }, [
+    addServiceTeamMemberId,
     catalogByTeamMemberId,
     hasAssignableTeamMembers,
     locationServiceCatalog,
-    selectedTeamMemberId,
   ]);
 
   const additionalGuests = React.useMemo(
@@ -672,14 +855,7 @@ export function useClientBookingCreatePage() {
 
   React.useEffect(() => {
     if (!profileHydrated && fromProfile) return;
-    // Model/Guest: stay on Assigned — add services via Service to assignment list.
-    if (isModelOrGuestSelected) {
-      if (serviceTab !== "assigned") setServiceTab("assigned");
-      return;
-    }
-    if (unassigned.length > 0 && serviceTab === "assigned") {
-      setServiceTab("unassigned");
-    } else if (
+    if (
       unassigned.length === 0 &&
       assigned.length > 0 &&
       serviceTab === "unassigned"
@@ -689,7 +865,6 @@ export function useClientBookingCreatePage() {
   }, [
     assigned.length,
     fromProfile,
-    isModelOrGuestSelected,
     profileHydrated,
     serviceTab,
     unassigned.length,
@@ -940,14 +1115,15 @@ export function useClientBookingCreatePage() {
     ) => {
       setShopTeamMembers(profileSelection.teamMembers);
 
-      const noSelectableTeam =
-        profileSelection.teamMembers.length === 0 ||
-        !profileSelection.teamMembers.some((tm) =>
-          tm.locationModes.includes(profileSelection.locationMode),
-        );
-      // Desired, or no staff shown: keep rows in Unassigned (pro will provide).
-      const leaveUnassigned =
-        profileSelection.locationMode === "desired" || noSelectableTeam;
+      const isDesired = profileSelection.locationMode === "desired";
+      const firstMember = profileSelection.teamMembers.find((tm) =>
+        tm.locationModes.includes(profileSelection.locationMode),
+      );
+      const noSelectableTeam = !firstMember;
+      // Desired: always start in Unassigned — client assigns from that tab.
+      // Fixed with no staff: Unassigned (pro will provide). Fixed with staff: Assigned.
+      const leaveUnassigned = isDesired || noSelectableTeam;
+      const defaultTeamMemberId = firstMember?.id ?? null;
 
       const profileServices = profileSelection.services.map((row) => ({
         id: row.id,
@@ -957,17 +1133,17 @@ export function useClientBookingCreatePage() {
         durationMins: row.durationMins,
         price: row.price,
         guestId: leaveUnassigned ? null : "p-requester",
-        teamMemberId: leaveUnassigned ? null : row.teamMemberId,
+        // Desired keeps backend/default TM even while Unassigned so assign stamps it.
+        teamMemberId: noSelectableTeam
+          ? null
+          : (row.teamMemberId || defaultTeamMemberId),
       }));
 
       setServices(profileServices);
       setServiceTab(getPreferredServiceTab(profileServices));
       setSelectedServiceIds({});
 
-      if (
-        profileSelection.locationMode === "desired" &&
-        profileSelection.projectEnabled
-      ) {
+      if (isDesired && profileSelection.projectEnabled) {
         setProjectDescription(profileSelection.projectInstructions);
       }
 
@@ -979,15 +1155,13 @@ export function useClientBookingCreatePage() {
         locationMode: profileSelection.locationMode,
       }));
 
-      // Desired / no staff: leave TM empty so client can continue (pro will provide).
-      // Fixed with staff: pre-select first matching member for assign/catalog flows.
-      if (leaveUnassigned) {
+      // First load: pre-select team member from backend roster when available.
+      if (noSelectableTeam) {
         setSelectedTeamMemberId("");
       } else {
-        const firstMember = profileSelection.teamMembers.find((tm) =>
-          tm.locationModes.includes(profileSelection.locationMode),
-        );
-        if (firstMember) setSelectedTeamMemberId(firstMember.id);
+        const fromServices =
+          profileServices.find((s) => s.teamMemberId)?.teamMemberId ?? null;
+        setSelectedTeamMemberId(fromServices || defaultTeamMemberId || "");
       }
 
       setProfileHydrated(true);
@@ -1053,11 +1227,7 @@ export function useClientBookingCreatePage() {
         durationMins: row.durationMins,
         price: row.price,
         guestId:
-          row.guestId != null && row.guestId !== ""
-            ? row.guestId
-            : locationMode === "desired"
-              ? null
-              : "p-requester",
+          row.guestId != null && row.guestId !== "" ? row.guestId : "p-requester",
         teamMemberId: row.teamMemberId ?? null,
       }));
 
@@ -1199,7 +1369,10 @@ export function useClientBookingCreatePage() {
       : [];
 
     const mode = shop.locationMode ?? "fixed";
-    const leaveUnassigned = mode === "desired" || apiTeam.length === 0;
+    const isDesired = mode === "desired";
+    const defaultTeamMemberId = apiTeam[0]?.id ?? null;
+    // Desired: Unassigned until client assigns. Fixed: Unassigned only when no staff.
+    const leaveUnassigned = isDesired || !defaultTeamMemberId;
     const catalogServices = getServicesForLocationMode(
       businessProfile,
       mode,
@@ -1210,13 +1383,13 @@ export function useClientBookingCreatePage() {
       durationMins: s.durationMins,
       price: s.priceValue,
       guestId: (leaveUnassigned ? null : "p-requester") as string | null,
-      teamMemberId: leaveUnassigned ? null : (apiTeam[0]?.id ?? null),
+      teamMemberId: defaultTeamMemberId,
     }));
 
     setServices(catalogServices.slice(0, 3));
     setShopTeamMembers(apiTeam);
-    if (leaveUnassigned) setSelectedTeamMemberId("");
-    else if (apiTeam[0]?.id) setSelectedTeamMemberId(apiTeam[0].id);
+    // First load: team member comes from backend roster when present.
+    setSelectedTeamMemberId(defaultTeamMemberId ?? "");
     setServiceTab(getPreferredServiceTab(catalogServices.slice(0, 3)));
     setProfileHydrated(true);
   }, [
@@ -1240,13 +1413,20 @@ export function useClientBookingCreatePage() {
   React.useEffect(() => {
     if (filteredTeamMembers.some((tm) => tm.id === selectedTeamMemberId))
       return;
-    // Desired: empty selection is valid — professional will provide the team member.
-    if (isDesiredLocation && !selectedTeamMemberId) return;
+    // First load / roster ready: pick backend team member (Desired + Fixed).
     const fallbackId = filteredTeamMembers[0]?.id ?? "";
+    if (!fallbackId) {
+      if (selectedTeamMemberId) setSelectedTeamMemberId("");
+      return;
+    }
     setSelectedTeamMemberId(fallbackId);
-    if (isDesiredLocation && fallbackId) {
+    if (isDesiredLocation) {
       setServices((prev) =>
-        prev.map((s) => ({ ...s, teamMemberId: fallbackId })),
+        prev.map((s) => ({
+          ...s,
+          // Stamp TM without moving Unassigned → Assigned.
+          teamMemberId: s.teamMemberId || fallbackId,
+        })),
       );
     }
   }, [filteredTeamMembers, isDesiredLocation, selectedTeamMemberId]);
@@ -1340,7 +1520,11 @@ export function useClientBookingCreatePage() {
       person && !person.isRequester && !isPlanningPerson(person),
     );
     if (isModelOrGuest) {
-      setServiceTab("assigned");
+      const hasPending = services.some((s) => !s.guestId);
+      const personHasAssigned = services.some((s) => s.guestId === personId);
+      setServiceTab(
+        hasPending && !personHasAssigned ? "unassigned" : "assigned",
+      );
       return;
     }
     const personHasAssigned = services.some((s) => s.guestId === personId);
@@ -1374,6 +1558,7 @@ export function useClientBookingCreatePage() {
       selectPlanningCard(nextPerson);
     } else {
       selectNonPlanningPerson(id);
+      if (isModel || isGuest) setServiceTab("unassigned");
     }
   };
 
@@ -1460,29 +1645,39 @@ export function useClientBookingCreatePage() {
         return {
           ...s,
           guestId: selectedPersonId,
-          teamMemberId: selectedTeamMemberId || null,
+          teamMemberId: selectedTeamMemberId || s.teamMemberId || null,
         };
       }),
     );
     setSelectedServiceIds({});
+    setServiceTab("assigned");
+  };
+
+  const unassignService = (serviceId: string) => {
+    setServices((prev) =>
+      prev.map((s) => (s.id === serviceId ? { ...s, guestId: null } : s)),
+    );
+    setSelectedServiceIds((prev) => {
+      if (!prev[serviceId]) return prev;
+      const next = { ...prev };
+      delete next[serviceId];
+      return next;
+    });
+    setServiceTab("unassigned");
+  };
+
+  const removeService = (serviceId: string) => {
+    setServices((prev) => prev.filter((s) => s.id !== serviceId));
+    setSelectedServiceIds((prev) => {
+      if (!prev[serviceId]) return prev;
+      const next = { ...prev };
+      delete next[serviceId];
+      return next;
+    });
   };
 
   const openAddServiceDialog = () => {
-    if (hasAssignableTeamMembers) {
-      const hasValidTeamMember = filteredTeamMembers.some(
-        (tm) => tm.id === selectedTeamMemberId,
-      );
-      if (!hasValidTeamMember && filteredTeamMembers[0]?.id) {
-        setSelectedTeamMemberId(filteredTeamMembers[0].id);
-      }
-    }
     setAddServiceCatalogIds({});
-    const preferredAssignee =
-      serviceAssignees.find((p) => p.id === selectedPersonId)?.id ??
-      serviceAssignees[0]?.id ??
-      people[0]?.id ??
-      "";
-    setAddServiceGuestId(preferredAssignee);
     setAddServiceDialogOpen(true);
   };
 
@@ -1491,8 +1686,7 @@ export function useClientBookingCreatePage() {
     const selectedIds = Object.entries(addServiceCatalogIds)
       .filter(([, checked]) => checked)
       .map(([id]) => id);
-    if (!selectedIds.length || !addServiceGuestId) return;
-    if (hasAssignableTeamMembers && !selectedTeamMemberId) return;
+    if (!selectedIds.length) return;
 
     const stamped: Service[] = [];
     for (const catalogId of selectedIds) {
@@ -1510,22 +1704,23 @@ export function useClientBookingCreatePage() {
         price: picked.price,
         originalPrice: picked.originalPrice,
         discountPct: picked.discountPct,
-        guestId: addServiceGuestId,
+        guestId: null,
         teamMemberId: hasAssignableTeamMembers
-          ? selectedTeamMemberId || null
+          ? (isDesiredLocation
+              ? selectedTeamMemberId || addServiceTeamMemberId
+              : addServiceTeamMemberId) || null
           : null,
       });
     }
     if (!stamped.length) return;
 
     setServices((prev) => [...prev, ...stamped]);
-    setSelectedPersonId(addServiceGuestId);
-    setServiceTab("assigned");
+    setServiceTab("unassigned");
     setAddServiceDialogOpen(false);
     setAddServiceCatalogIds({});
   };
 
-  /** Desired: one professional for the whole booking. Fixed: only updates the picker for the next assign. */
+  /** Desired: one team member for the whole booking. Fixed: picker for Unassigned assign only. */
   const applySharedTeamMember = (teamMemberId: string) => {
     setSelectedTeamMemberId(teamMemberId);
     if (!isDesiredLocation) return;
@@ -1536,15 +1731,14 @@ export function useClientBookingCreatePage() {
 
   const updateServiceTeamMember = (serviceId: string, teamMemberId: string) => {
     if (!teamMemberId) return;
+    if (isDesiredLocation) {
+      setSelectedTeamMemberId(teamMemberId);
+      setServices((prev) => prev.map((s) => ({ ...s, teamMemberId })));
+      return;
+    }
     setServices((prev) =>
       prev.map((s) => (s.id === serviceId ? { ...s, teamMemberId } : s)),
     );
-  };
-
-  const confirmRemoveService = () => {
-    if (!servicePendingRemove) return;
-    setServices((prev) => prev.filter((x) => x.id !== servicePendingRemove.id));
-    setServicePendingRemove(null);
   };
 
   const toggleServiceSelection = (serviceId: string, checked: boolean) => {
@@ -1599,7 +1793,6 @@ export function useClientBookingCreatePage() {
       ...s,
       catalogServiceId: s.catalogServiceId ?? extractUuidFromSyntheticId(s.id),
       guestId: s.guestId ?? requesterId,
-      // Desired location: apply shared TM only when the client selected one.
       teamMemberId:
         isDesiredLocation && selectedTeamMemberId
           ? selectedTeamMemberId
@@ -1649,6 +1842,8 @@ export function useClientBookingCreatePage() {
     const prepaymentPercent = parsePrepaymentPercent(
       businessProfile?.prepaymentLabel,
     );
+    // Fixed location: client must prepay before booking when the pro requires it.
+    // Desired location: % is shown as "after acceptance" (pay after pro accepts).
     const requiresPrepayment = !isDesiredLocation && prepaymentPercent > 0;
 
     // EBR suggest-edit: update existing booking draft and return to details (no new booking).
@@ -1694,7 +1889,7 @@ export function useClientBookingCreatePage() {
           requiresPrepayment: existing.requiresPrepayment ?? requiresPrepayment,
           prepaymentPercent:
             existing.prepaymentPercent ??
-            (requiresPrepayment ? prepaymentPercent : 0),
+            (prepaymentPercent > 0 ? prepaymentPercent : 0),
         });
         if (typeof window !== "undefined") {
           window.sessionStorage.setItem("mollure:ebr_suggest_return", "1");
@@ -1801,25 +1996,12 @@ export function useClientBookingCreatePage() {
         draft: payload,
         createdAt: new Date().toISOString(),
         requiresPrepayment,
-        prepaymentPercent: requiresPrepayment ? prepaymentPercent : 0,
+        // Keep % for desired "after acceptance" note even when pay-before is off.
+        prepaymentPercent: prepaymentPercent > 0 ? prepaymentPercent : 0,
         prepaid: false,
+        bookingRequestSent: false,
       };
       setActiveBookingSession(draftRecord);
-
-      const result = await submitClientBookingRequest({
-        record: draftRecord,
-        locationMode,
-        setup: bookingSetup,
-        createBooking,
-      });
-
-      if (!result.ok) {
-        showSnackbar({ severity: "error", message: result.message });
-        return;
-      }
-
-      setActiveBookingSession(result.record);
-      showSnackbar({ severity: "success", message: "Booking request created" });
 
       const listTab = parseBookingListTab(searchParams?.get("tab"));
       const checkoutPath = resolveCreateCheckoutPath({
@@ -1949,10 +2131,6 @@ export function useClientBookingCreatePage() {
     setAddServiceDialogOpen,
     addServiceCatalogIds,
     setAddServiceCatalogIds,
-    addServiceGuestId,
-    setAddServiceGuestId,
-    servicePendingRemove,
-    setServicePendingRemove,
     ebrSuggestBaselineRef,
     projectDescription,
     setProjectDescription,
@@ -1989,6 +2167,7 @@ export function useClientBookingCreatePage() {
     personCardSubtitle,
     updateGuestName,
     selectedServicesCount,
+    requiresPersonAssignment,
     allServicesAssigned,
     needsTeamMemberProvidedByPro,
     assigned,
@@ -2002,7 +2181,8 @@ export function useClientBookingCreatePage() {
     confirmAddService,
     applySharedTeamMember,
     updateServiceTeamMember,
-    confirmRemoveService,
+    unassignService,
+    removeService,
     toggleServiceSelection,
     onContinue,
     continueLabel,

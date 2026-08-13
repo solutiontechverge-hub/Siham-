@@ -1,29 +1,32 @@
 import { parseUuid } from "../utils/uuid.js";
 import {
+  countNotificationsForUser,
   countUnreadNotifications,
   listNotificationsForUser,
   mapNotificationRow,
   markAllNotificationsRead,
   markNotificationRead,
+  resolveNotificationAudience,
 } from "../services/bookingNotification.service.js";
 import { listResponse, parseListPagination } from "../utils/pagination.js";
-import { query } from "../db/index.js";
+
+const audienceFromRequest = (req) => {
+  const fromQuery = resolveNotificationAudience(req.query?.audience);
+  if (fromQuery) return fromQuery;
+  return resolveNotificationAudience(req.user?.user_type) ?? "client";
+};
 
 export const listMyNotifications = async (req, res) => {
   try {
     const pagination = parseListPagination(req.query, { defaultLimit: 50 });
+    const audience = audienceFromRequest(req);
 
-    const countResult = await query(
-      `SELECT COUNT(*)::int AS total
-       FROM in_app_notifications
-       WHERE recipient_user_id = $1`,
-      [req.user.id],
-    );
-    const total = countResult.rows[0]?.total ?? 0;
+    const total = await countNotificationsForUser(req.user.id, { audience });
 
     const rows = await listNotificationsForUser(req.user.id, {
       limit: pagination.paginate ? pagination.limit : Math.max(total, 50),
       offset: pagination.paginate ? pagination.offset : 0,
+      audience,
     });
 
     return res.status(200).json(
@@ -47,7 +50,8 @@ export const listMyNotifications = async (req, res) => {
 
 export const getUnreadNotificationCount = async (req, res) => {
   try {
-    const count = await countUnreadNotifications(req.user.id);
+    const audience = audienceFromRequest(req);
+    const count = await countUnreadNotifications(req.user.id, { audience });
     return res.status(200).json({
       success: true,
       message: "Unread count fetched successfully.",
@@ -98,7 +102,8 @@ export const markNotificationAsRead = async (req, res) => {
 
 export const markAllMyNotificationsRead = async (req, res) => {
   try {
-    await markAllNotificationsRead(req.user.id);
+    const audience = audienceFromRequest(req);
+    await markAllNotificationsRead(req.user.id, { audience });
     return res.status(200).json({
       success: true,
       message: "All notifications marked as read.",

@@ -1,6 +1,5 @@
 import { query } from "../db/index.js";
 import { syncBookingToFinanceTransaction } from "../services/finance-sync.service.js";
-import { notifyBookingStatusChange } from "../services/bookingEmail.service.js";
 import { emitBookingChanged } from "../messaging/messagingSocket.js";
 import { dispatchBookingUpdatedNotifications } from "../services/bookingNotification.service.js";
 
@@ -52,7 +51,7 @@ const runAutoCompleteCycle = async () => {
       } catch {
         // best-effort finance sync
       }
-      void notifyBookingStatusChange(booking.id, booking.prev_status, "completed");
+      // In-app + companion emails (client post-treatment / review; pro completed).
       void dispatchBookingUpdatedNotifications(booking, booking.prev_status, booking.prepayment_status);
       emitBookingChanged(booking, "updated");
     }

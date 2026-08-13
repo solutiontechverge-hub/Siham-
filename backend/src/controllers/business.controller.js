@@ -2938,6 +2938,7 @@ export const manageBookingEditRequest = async (req, res) => {
       }
       nextEditRequest = built.value;
       message = "Edit request accepted.";
+      notificationEvent = BOOKING_NOTIFICATION_EVENTS.ER_ACCEPTED;
     } else {
       if (!existingEr || existingEr.status !== "pending") {
         return res.status(400).json({
@@ -2955,6 +2956,7 @@ export const manageBookingEditRequest = async (req, res) => {
       }
       nextEditRequest = buildRejectedClear().value;
       message = "Edit request rejected.";
+      notificationEvent = BOOKING_NOTIFICATION_EVENTS.ER_REJECTED;
     }
 
     const result = await query(

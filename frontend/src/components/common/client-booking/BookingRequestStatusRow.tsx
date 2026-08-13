@@ -34,6 +34,8 @@ type Props = {
   paymentDue?: boolean;
   /** Invoice due date has passed. */
   paymentOverdue?: boolean;
+  /** BR/EBR/ER response window has elapsed. */
+  responseOverdue?: boolean;
   bookingRequestDirection?: BookingRequestDirection;
   rowMode?: BookingRequestRowMode;
   /** Post-accept edit from the other party — show next to Confirmed status. */
@@ -87,6 +89,7 @@ export default function BookingRequestStatusRow({
   prepaymentPaid = false,
   paymentDue = false,
   paymentOverdue = false,
+  responseOverdue = false,
   bookingRequestDirection = "outgoing",
   rowMode = "default",
   showUpdated = false,
@@ -206,6 +209,16 @@ export default function BookingRequestStatusRow({
           state="sent"
           direction={bookingRequestDirection}
         />
+      ) : null}
+
+      {responseOverdue && !isTerminal && !isCompleted ? (
+        <Box
+          title="Overdue response"
+          aria-label="Overdue response"
+          sx={{ display: "grid", placeItems: "center" }}
+        >
+          <BookingIndicatorIcon variant="overdue_response" size={16} />
+        </Box>
       ) : null}
 
       {waitingForPrepayment ? (

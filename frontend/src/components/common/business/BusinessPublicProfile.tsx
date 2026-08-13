@@ -19,7 +19,6 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import PersonPinCircleRoundedIcon from "@mui/icons-material/PersonPinCircleRounded";
 import RemoveRoundedIcon from "@mui/icons-material/RemoveRounded";
-import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import FemaleRoundedIcon from "@mui/icons-material/FemaleRounded";
 import MaleRoundedIcon from "@mui/icons-material/MaleRounded";
 import StarRoundedIcon from "@mui/icons-material/StarRounded";
@@ -35,7 +34,6 @@ import {
   Paper,
   Popper,
   Stack,
-  TextField,
   Typography,
 } from "@mui/material";
 import type {
@@ -859,7 +857,6 @@ export default function BusinessPublicProfile({
     number | null
   >(null);
   const [activeCategory, setActiveCategory] = React.useState("all");
-  const [search, setSearch] = React.useState("");
   const [scheduleOpen, setScheduleOpen] = React.useState(false);
   const scheduleAnchorRef = React.useRef<HTMLButtonElement>(null);
   const [selectedScheduleId, setSelectedScheduleId] = React.useState(
@@ -897,7 +894,6 @@ export default function BusinessPublicProfile({
 
   React.useEffect(() => {
     setActiveCategory("all");
-    setSearch("");
     setSelectedServiceIds({});
     setServiceQty({});
   }, [locationMode]);
@@ -932,27 +928,15 @@ export default function BusinessPublicProfile({
   );
 
   const filteredServices = React.useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return activeServices.filter((s) => {
-      if (
-        !serviceMatchesCategoryTab(
-          s,
-          activeCategory,
-          data.categories,
-          categoryRecords,
-        )
-      )
-        return false;
-      if (!q) return true;
-      return s.name.toLowerCase().includes(q);
-    });
-  }, [
-    activeCategory,
-    activeServices,
-    categoryRecords,
-    data.categories,
-    search,
-  ]);
+    return activeServices.filter((s) =>
+      serviceMatchesCategoryTab(
+        s,
+        activeCategory,
+        data.categories,
+        categoryRecords,
+      ),
+    );
+  }, [activeCategory, activeServices, categoryRecords, data.categories]);
 
   const selectedServices = React.useMemo(
     () => activeServices.filter((s) => selectedServiceIds[s.id]),
@@ -998,6 +982,7 @@ export default function BusinessPublicProfile({
   };
 
   return (
+    <>
     <PublicProfilePageShell>
       <PublicProfileTopBar title={publicProfileTitle} />
 
@@ -1412,49 +1397,6 @@ export default function BusinessPublicProfile({
               onSelect={setActiveCategory}
             />
           </Box>
-          <Stack
-            direction="row"
-            spacing={1}
-            alignItems="center"
-            sx={{ mb: 1.5 }}
-          >
-            <TextField
-              size="small"
-              placeholder="Search services"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              fullWidth
-              InputProps={{
-                startAdornment: (
-                  <SearchRoundedIcon
-                    sx={{ fontSize: 18, color: alpha(m.navy, 0.4), mr: 0.5 }}
-                  />
-                ),
-              }}
-              sx={{
-                "& .MuiOutlinedInput-root": {
-                  borderRadius: "10px",
-                  bgcolor: alpha(m.navy, 0.02),
-                  fontSize: 12.5,
-                },
-              }}
-            />
-            <IconButton
-              sx={{
-                width: 40,
-                height: 40,
-                flexShrink: 0,
-                borderRadius: "10px",
-                bgcolor: m.addSoftBg,
-                color: m.addSoftFg,
-                border: `1px solid ${m.addSoftBorder}`,
-                "&:hover": { bgcolor: m.addSoftBgHover },
-              }}
-              aria-label="Add service"
-            >
-              <AddRoundedIcon />
-            </IconButton>
-          </Stack>
           <Stack spacing={1}>
             {filteredServices.map((service) => {
               const checked = Boolean(selectedServiceIds[service.id]);
@@ -2111,14 +2053,28 @@ export default function BusinessPublicProfile({
           </Box>
         </Dialog>
 
+        {/* Spacer so last content isn’t covered by the sticky banner */}
+        {selectionSummary.count > 0 ? <Box sx={{ height: 76 }} /> : null}
+      </Stack>
+    </PublicProfilePageShell>
+
+      {selectionSummary.count > 0 ? (
         <Paper
           elevation={0}
           sx={{
-            mt: 2,
+            position: "fixed",
+            left: { xs: 12, sm: 16, md: "50%" },
+            right: { xs: 12, sm: 16, md: "auto" },
+            bottom: { xs: 12, sm: 16 },
+            zIndex: 1300,
+            width: {
+              md: "min(960px, calc(100% - 48px))",
+            },
+            transform: { md: "translateX(-50%)" },
             borderRadius: "12px",
             border: `1px solid ${alpha(m.navy, 0.08)}`,
             bgcolor: "#fff",
-            boxShadow: "0 8px 28px rgba(16,35,63,0.08)",
+            boxShadow: "0 8px 28px rgba(16,35,63,0.14)",
             px: { xs: 2, sm: 2.5 },
             py: 1.35,
           }}
@@ -2130,15 +2086,17 @@ export default function BusinessPublicProfile({
             spacing={2}
           >
             <Typography
-              sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.55) }}
+              sx={{
+                fontSize: { xs: 12, sm: 13 },
+                fontWeight: 700,
+                color: alpha(m.navy, 0.55),
+                lineHeight: 1.35,
+              }}
             >
-              {selectionSummary.count > 0
-                ? `${selectionSummary.count} service${selectionSummary.count > 1 ? "s" : ""} selected - Total: ${selectionSummary.durationLabel} for ${selectionSummary.totalPrice} EUR`
-                : "Select services to continue"}
+              {`${selectionSummary.count} service${selectionSummary.count > 1 ? "s" : ""} selected - Total: ${selectionSummary.durationLabel} for ${selectionSummary.totalPrice} EUR`}
             </Typography>
             <AppButton
               tone="primary"
-              disabled={selectionSummary.count === 0}
               onClick={() => {
                 onBookNow(
                   buildPublicProfileBookingSelection({
@@ -2156,6 +2114,7 @@ export default function BusinessPublicProfile({
                 minWidth: 132,
                 height: 40,
                 px: 2.5,
+                flexShrink: 0,
                 boxShadow: "none",
               }}
             >
@@ -2163,7 +2122,7 @@ export default function BusinessPublicProfile({
             </AppButton>
           </Stack>
         </Paper>
-      </Stack>
-    </PublicProfilePageShell>
+      ) : null}
+    </>
   );
 }
