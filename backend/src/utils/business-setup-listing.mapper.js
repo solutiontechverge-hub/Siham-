@@ -89,6 +89,7 @@ export const transformBusinessSetupForListing = (
     ratingStats = null,
     serviceOrder = null,
     teamMemberRatingStats = null,
+    rankingStats = null,
   } = {},
 ) => {
   if (!row) {
@@ -116,6 +117,10 @@ export const transformBusinessSetupForListing = (
     about: toNullableString(row.business_about),
     rating,
     totalReviews,
+    rankingScore:
+      rankingStats && Number.isFinite(Number(rankingStats.rankingScore))
+        ? Number(rankingStats.rankingScore)
+        : null,
     media: parseTextArray(row.business_media),
     locationMode: row.location_mode ?? null,
     salonName: toNullableString(row.salon_name),
