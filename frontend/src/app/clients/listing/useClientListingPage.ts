@@ -8,6 +8,7 @@ import {
   type ListingDrawerFilters,
 } from "../../../components/common/listingDrawerFilters";
 import { cardMatchesListingFilters } from "./listing.filters";
+import { presentListingCards } from "./listing.cardPresentation";
 import { hasListingSearchParams } from "./listingSearchParams";
 import type { ListingCardData } from "./listing.data";
 
@@ -140,6 +141,21 @@ export function useClientListingState(
     return sorted.slice(start, start + pageSize);
   }, [page, sorted]);
 
+  const items = React.useMemo(
+    () =>
+      presentListingCards(paged, {
+        category: appliedFilters.category,
+        categories: appliedFilters.categories,
+        keywords: appliedFilters.keywords,
+      }),
+    [
+      appliedFilters.categories,
+      appliedFilters.category,
+      appliedFilters.keywords,
+      paged,
+    ],
+  );
+
   const applyFilters = React.useCallback(() => {
     setAppliedFilters(draftFilters);
     setPage(1);
@@ -171,7 +187,7 @@ export function useClientListingState(
     totalPages,
     favorites,
     toggleFavorite,
-    items: paged,
+    items,
     totalCount: sorted.length,
   };
 }

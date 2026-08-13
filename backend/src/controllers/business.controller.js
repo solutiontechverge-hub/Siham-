@@ -295,7 +295,7 @@ const normalizeServiceCategories = (value) => {
       const parentServiceId =
         String(item.parent_service_id ?? item.parentServiceId ?? "").trim() || null;
 
-      if (!categoryId || !serviceId) {
+      if (!categoryId || !serviceId || amount == null || amount <= 0) {
         return null;
       }
 
@@ -304,7 +304,7 @@ const normalizeServiceCategories = (value) => {
         service_id: serviceId,
         category_title: categoryTitle,
         service_title: serviceTitle,
-        amount: amount ?? 0,
+        amount,
         duration_label: durationLabel,
         parent_service_id: parentServiceId,
         is_visible: item.is_visible === false || item.isVisible === false ? false : true,

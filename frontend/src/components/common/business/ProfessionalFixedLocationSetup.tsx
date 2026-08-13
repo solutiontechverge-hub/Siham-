@@ -163,21 +163,22 @@ const mapServiceItemsToCategories = (
     .filter((item) => item.serviceId && item.categoryId)
     .map((item) => {
       const parentId = String(item.parentServiceId ?? "").trim();
+      const amount =
+        parseEuroAmountString(item.priceAmount ?? "") ??
+        Number(String(item.priceLabel).replace(/[^0-9.]/g, ""));
       return {
         category_id: String(item.categoryId),
         service_id: String(item.serviceId),
         category_title: item.categoryTitle?.trim() || null,
         service_title: item.name?.trim() || null,
-        amount:
-          (parseEuroAmountString(item.priceAmount ?? "") ??
-            Number(String(item.priceLabel).replace(/[^0-9.]/g, ""))) ||
-          0,
+        amount: Number.isFinite(amount) && amount > 0 ? amount : 0,
         duration_label: (item.durationLabel ?? "").trim() || null,
         parent_service_id:
           parentId && !parentId.startsWith("main-") ? parentId : null,
         is_visible: true,
       };
-    });
+    })
+    .filter((entry) => entry.amount > 0);
 
   const visibleIds = new Set(visible.map((entry) => String(entry.service_id)));
   const hidden = hiddenExtras
@@ -2012,6 +2013,7 @@ export default function ProfessionalFixedLocationSetup({
 
   const servicesFixedRef = React.useRef<ServiceDetailUiItem[]>([]);
   const servicesDesiredRef = React.useRef<ServiceDetailUiItem[]>([]);
+  const businessSetupSaveChainRef = React.useRef<Promise<void>>(Promise.resolve());
 
   const setBusinessProfileActive = React.useCallback(
     async (nextActive: boolean, successMessage?: string) => {
@@ -2256,12 +2258,20 @@ export default function ProfessionalFixedLocationSetup({
 
   const saveBusinessSetupData = React.useCallback(async () => {
     if (!onSaveBusinessSetup) return;
-    const teamForSave =
-      businessOfferingSelect === "Desired Location"
-        ? teamMembersDesired
-        : teamMembersFixed;
-    await onSaveBusinessSetup(buildBusinessSetupSaveBody(teamForSave));
-    clearPendingTeamMemberPhotos();
+
+    const runSave = async () => {
+      const teamForSave =
+        businessOfferingSelect === "Desired Location"
+          ? teamMembersDesired
+          : teamMembersFixed;
+      await onSaveBusinessSetup(buildBusinessSetupSaveBody(teamForSave));
+      clearPendingTeamMemberPhotos();
+    };
+
+    businessSetupSaveChainRef.current = businessSetupSaveChainRef.current
+      .catch(() => undefined)
+      .then(runSave);
+    await businessSetupSaveChainRef.current;
   }, [
     buildBusinessSetupSaveBody,
     businessOfferingSelect,
@@ -2546,6 +2556,8 @@ export default function ProfessionalFixedLocationSetup({
     setMainServicesDesired(hydratedServices.mains);
     setServicesFixed(hydratedServices.subs);
     setServicesDesired(hydratedServices.subs);
+    servicesFixedRef.current = hydratedServices.subs;
+    servicesDesiredRef.current = hydratedServices.subs;
 
     if (businessSetupData.team_members.length > 0) {
       const hydratedTeam = businessSetupData.team_members.map((member) => ({
@@ -2811,25 +2823,23 @@ export default function ProfessionalFixedLocationSetup({
       const liveSync =
         isBothOffering && templateSyncSettings.servicesDetails === "sync";
       if (activeBusinessTemplate === "Fixed Location") {
-        setServicesFixed((prev) => {
-          const next = typeof value === "function" ? value(prev) : value;
-          servicesFixedRef.current = next;
-          if (liveSync) {
-            servicesDesiredRef.current = next;
-            setServicesDesired(next);
-          }
-          return next;
-        });
-      } else {
-        setServicesDesired((prev) => {
-          const next = typeof value === "function" ? value(prev) : value;
+        const prev = servicesFixedRef.current;
+        const next = typeof value === "function" ? value(prev) : value;
+        servicesFixedRef.current = next;
+        if (liveSync) {
           servicesDesiredRef.current = next;
-          if (liveSync) {
-            servicesFixedRef.current = next;
-            setServicesFixed(next);
-          }
-          return next;
-        });
+          setServicesDesired(next);
+        }
+        setServicesFixed(next);
+      } else {
+        const prev = servicesDesiredRef.current;
+        const next = typeof value === "function" ? value(prev) : value;
+        servicesDesiredRef.current = next;
+        if (liveSync) {
+          servicesFixedRef.current = next;
+          setServicesFixed(next);
+        }
+        setServicesDesired(next);
       }
     },
     [

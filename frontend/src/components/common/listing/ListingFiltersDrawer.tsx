@@ -9,9 +9,10 @@ import MessagingFilterCheckboxList from "../messaging/MessagingFilterCheckboxLis
 import {
   defaultListingDrawerFilters,
   listingDrawerFilterSections,
+  toggleListingSearchFor,
   type ListingDrawerFilters,
   type ListingPriceTier,
-  type ListingSearchFor,
+  type ListingSearchForKey,
 } from "./listingDrawerFilters";
 
 export type { ListingDrawerFilters };
@@ -40,14 +41,6 @@ export default function ListingFiltersDrawer({
     if (open) setDraft(filters);
   }, [open, filters]);
 
-  const searchChecked = listingDrawerFilterSections.searchFor.reduce(
-    (acc, opt) => {
-      acc[opt.key] = draft.searchFor === opt.key;
-      return acc;
-    },
-    {} as Record<string, boolean>,
-  );
-
   const outlinedActionSx = {
     textTransform: "none",
     fontWeight: 700,
@@ -57,10 +50,6 @@ export default function ListingFiltersDrawer({
     color: alpha(m.navy, 0.75),
     bgcolor: "#fff",
   } as const;
-
-  const resetToDefaults = () => {
-    setDraft(defaultListingDrawerFilters());
-  };
 
   const footer = (
     <Box sx={{ px: 2.5, py: 2 }}>
@@ -79,7 +68,7 @@ export default function ListingFiltersDrawer({
         <AppButton
           fullWidth
           variant="outlined"
-          onClick={resetToDefaults}
+          onClick={() => setDraft(defaultListingDrawerFilters())}
           sx={outlinedActionSx}
         >
           Reset
@@ -106,21 +95,24 @@ export default function ListingFiltersDrawer({
       anchor="right"
       open={open}
       onClose={onClose}
-      title="Filter listings"
+      title="Filters"
       contentSx={{ px: 2.5, py: 1 }}
       footer={footer}
     >
       <MessagingFilterCheckboxList
         title="Search for"
         options={listingDrawerFilterSections.searchFor}
-        checked={searchChecked}
-        onToggle={(key, value) => {
-          if (!value) {
-            setDraft((prev) => ({ ...prev, searchFor: null }));
-            return;
-          }
-          setDraft((prev) => ({ ...prev, searchFor: key as ListingSearchFor }));
-        }}
+        checked={draft.searchFor}
+        onToggle={(key, value) =>
+          setDraft((prev) => ({
+            ...prev,
+            searchFor: toggleListingSearchFor(
+              prev.searchFor,
+              key as ListingSearchForKey,
+              value,
+            ),
+          }))
+        }
       />
 
       <Box sx={{ mt: 2.5 }}>
@@ -149,6 +141,7 @@ export default function ListingFiltersDrawer({
             allSelectedCategories: draft.allSelectedCategories,
             noPrepayment: draft.noPrepayment,
             noMinTimeslotDl: draft.noMinTimeslotDl,
+            noKmAllowanceDl: draft.noKmAllowanceDl,
             bookSameTimeFl: draft.bookSameTimeFl,
           }}
           onToggle={(key, value) =>
