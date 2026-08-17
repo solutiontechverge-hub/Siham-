@@ -23,6 +23,8 @@ import {
   MollureSnackbar,
   MarketingSiteFooter,
   MollureMarketingHeader,
+  stickyFooterAnchorSx,
+  stickyFooterPageSx,
 } from "../../../components/common";
 import { favouritesPageData } from "./favourites.data";
 import { useClientFavouritesPage } from "./useClientFavouritesPage";
@@ -85,7 +87,7 @@ export default function ClientFavouritesPageView() {
   }, [fallbackDisplayName]);
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: profilePageData.pageBg }}>
+    <Box sx={{ ...stickyFooterPageSx, bgcolor: profilePageData.pageBg }}>
       <MollureMarketingHeader
         navItems={[]}
         isAuthed
@@ -198,7 +200,7 @@ export default function ClientFavouritesPageView() {
           items: [...col.items],
         }))}
         copyright={marketingShellFooter.copyright}
-        sx={{ mt: 2 }}
+        sx={stickyFooterAnchorSx}
       />
     </Box>
   );

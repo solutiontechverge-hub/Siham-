@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Box } from "@mui/material";
 import MarketingSiteFooter from "../common/MarketingSiteFooter";
+import { stickyFooterAnchorSx, stickyFooterPageSx } from "../common/StickyFooterPageShell";
 import MollureMarketingHeader from "../common/MollureMarketingHeader";
 import {
   clientsShellHeader,
@@ -39,6 +40,7 @@ export function MarketingShellLayout({
         items: [...col.items],
       }))}
       copyright={footerData.copyright}
+      sx={stickyFooterAnchorSx}
     />
   );
 
@@ -47,8 +49,8 @@ export function MarketingShellLayout({
     return (
       <Box
         sx={{
+          ...stickyFooterPageSx,
           bgcolor: "background.default",
-          minHeight: "100vh",
           ...(contentSx ?? {}),
         }}
       >
@@ -70,8 +72,8 @@ export function MarketingShellLayout({
   return (
     <Box
       sx={{
+        ...stickyFooterPageSx,
         bgcolor: "background.default",
-        minHeight: "100vh",
         ...(contentSx ?? {}),
       }}
     >

@@ -6,6 +6,10 @@ import FixedLocationTopTabs, {
   type FixedLocationTopTab,
 } from "./FixedLocationTopTabs";
 import MarketingSiteFooter from "./MarketingSiteFooter";
+import {
+  stickyFooterAnchorSx,
+  stickyFooterGrowSx,
+} from "./StickyFooterPageShell";
 import { professionalsMarketingFooter } from "../../data/marketingShell.data";
 
 export type FixedLocationPageScaffoldProps = {
@@ -20,13 +24,15 @@ export default function FixedLocationPageScaffold({
   children,
 }: FixedLocationPageScaffoldProps) {
   return (
-    <Box sx={{ bgcolor: "mollure.pageBg", minHeight: "100vh" }}>
-      <Container maxWidth="lg" sx={{ py: 2.5 }}>
-        <Stack spacing={2}>
-          <FixedLocationTopTabs tabs={topTabs} activeLabel={activeTopTab} />
-          {children}
-        </Stack>
-      </Container>
+    <Box sx={{ ...stickyFooterGrowSx, bgcolor: "mollure.pageBg" }}>
+      <Box sx={{ flex: 1 }}>
+        <Container maxWidth="lg" sx={{ py: 2.5 }}>
+          <Stack spacing={2}>
+            <FixedLocationTopTabs tabs={topTabs} activeLabel={activeTopTab} />
+            {children}
+          </Stack>
+        </Container>
+      </Box>
 
       <MarketingSiteFooter
         columns={professionalsMarketingFooter.columns.map((col) => ({
@@ -34,7 +40,7 @@ export default function FixedLocationPageScaffold({
           items: [...col.items],
         }))}
         copyright={professionalsMarketingFooter.copyright}
-        sx={{ mt: 2 }}
+        sx={stickyFooterAnchorSx}
       />
     </Box>
   );

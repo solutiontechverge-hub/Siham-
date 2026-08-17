@@ -426,6 +426,10 @@ import {
   TaxCompliantInvoiceIcon,
 } from "../../../../images";
 import MarketingSiteFooter from "./MarketingSiteFooter";
+import {
+  stickyFooterAnchorSx,
+  stickyFooterPageSx,
+} from "../StickyFooterPageShell";
 import MollureMarketingHeader from "./MollureMarketingHeader";
 
 export type ProfessionalFeaturesProps = {
@@ -1877,7 +1881,11 @@ export default function ProfessionalFeatures({
 
   return (
     <Box
-      sx={{ bgcolor: tokens.surface, color: tokens.navy, minHeight: "100vh" }}
+      sx={{
+        ...stickyFooterPageSx,
+        bgcolor: tokens.surface,
+        color: tokens.navy,
+      }}
     >
       <MollureMarketingHeader
         navItems={[...header.navItems]}
@@ -1947,7 +1955,7 @@ export default function ProfessionalFeatures({
           items: [...col.items],
         }))}
         copyright={footer.copyright}
-        sx={{ mt: 2 }}
+        sx={stickyFooterAnchorSx}
       />
     </Box>
   );
