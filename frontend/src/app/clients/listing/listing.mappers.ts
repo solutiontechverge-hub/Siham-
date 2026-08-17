@@ -235,6 +235,8 @@ const buildServices = (
   setup: BusinessSetupListing,
   catalog: ListingCardServiceCatalogItem[],
 ) => {
+  const durationByServiceId = buildDurationByServiceId(setup);
+
   const fromCatalog = [...catalog]
     .sort((a, b) => a.price - b.price)
     .slice(0, 3)
