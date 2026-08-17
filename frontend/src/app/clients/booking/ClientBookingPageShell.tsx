@@ -8,6 +8,8 @@ import {
   clientTopTabsActiveLabel,
   MarketingSiteFooter,
   MollureMarketingHeader,
+  stickyFooterAnchorSx,
+  stickyFooterPageSx,
 } from "../../../components/common";
 import { marketingShellFooter } from "../../../data/marketingShell.data";
 import { profilePageData } from "../profile/profile.data";
@@ -33,7 +35,7 @@ export default function ClientBookingPageShell({
   useBookingRealtimeSync();
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: profilePageData.pageBg }}>
+    <Box sx={{ ...stickyFooterPageSx, bgcolor: profilePageData.pageBg }}>
       {!hideChrome ? (
         <>
           <MollureMarketingHeader
@@ -55,7 +57,7 @@ export default function ClientBookingPageShell({
           items: [...col.items],
         }))}
         copyright={marketingShellFooter.copyright}
-        sx={{ mt: 2 }}
+        sx={stickyFooterAnchorSx}
       />
     </Box>
   );

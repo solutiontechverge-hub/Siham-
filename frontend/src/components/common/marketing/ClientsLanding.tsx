@@ -27,6 +27,10 @@ import {
 import { MOLLURE_SECTION_GAP_PX } from "../../../theme/spacing";
 import MarketingSectionHeading from "./MarketingSectionHeading";
 import MarketingSiteFooter from "./MarketingSiteFooter";
+import {
+  stickyFooterAnchorSx,
+  stickyFooterPageSx,
+} from "../StickyFooterPageShell";
 import MollureMarketingHeader from "./MollureMarketingHeader";
 import { BodyText as Typography } from "../../ui/typography";
 import AppMultiSelect from "../AppMultiSelect";
@@ -97,7 +101,7 @@ export default function ClientsLanding({
   };
 
   return (
-    <Box sx={{ bgcolor: "background.default", color: tokens.navy }}>
+    <Box sx={{ ...stickyFooterPageSx, bgcolor: "background.default", color: tokens.navy }}>
       <MollureMarketingHeader
         navItems={[...header.navItems]}
         localeLabel={header.localeLabel}
@@ -474,6 +478,7 @@ export default function ClientsLanding({
       <MarketingSiteFooter
         columns={[...footer.columns]}
         copyright={footer.copyright}
+        sx={stickyFooterAnchorSx}
       />
     </Box>
   );

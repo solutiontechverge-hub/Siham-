@@ -10,6 +10,11 @@ import {
   MollureMarketingHeader,
 } from "..";
 import {
+  stickyFooterAnchorSx,
+  stickyFooterGrowSx,
+  stickyFooterPageSx,
+} from "../StickyFooterPageShell";
+import {
   marketingShellFooter,
   professionalsMarketingFooter,
 } from "../../../data/marketingShell.data";
@@ -45,6 +50,7 @@ export default function MessagingPageShell({
           items: [...col.items],
         }))}
         copyright={marketingShellFooter.copyright}
+        sx={stickyFooterAnchorSx}
       />
     ) : (
       <MarketingSiteFooter
@@ -53,12 +59,12 @@ export default function MessagingPageShell({
           items: [...col.items],
         }))}
         copyright={professionalsMarketingFooter.copyright}
-        sx={{ mt: 2 }}
+        sx={stickyFooterAnchorSx}
       />
     );
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: pageBg }}>
+    <Box sx={{ ...stickyFooterPageSx, bgcolor: pageBg }}>
       {audience === "client" ? (
         <MollureMarketingHeader
           navItems={[]}
@@ -78,16 +84,18 @@ export default function MessagingPageShell({
         />
       )}
 
-      <Container
-        maxWidth="lg"
-        sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 2, md: 3 } }}
-      >
-        <MessagingPageView
-          audience={audience}
-          currentUserName={userName}
-          currentUserAvatarSrc={avatarUrl}
-        />
-      </Container>
+      <Box sx={{ ...stickyFooterGrowSx, flex: 1 }}>
+        <Container
+          maxWidth="lg"
+          sx={{ px: { xs: 2, sm: 3, md: 4 }, py: { xs: 2, md: 3 }, flex: 1 }}
+        >
+          <MessagingPageView
+            audience={audience}
+            currentUserName={userName}
+            currentUserAvatarSrc={avatarUrl}
+          />
+        </Container>
+      </Box>
 
       {footer}
     </Box>

@@ -26,6 +26,8 @@ import {
   ClientListingCard,
   MarketingSiteFooter,
   MollureMarketingHeader,
+  stickyFooterAnchorSx,
+  stickyFooterPageSx,
 } from "../../../components/common";
 import { listingPageData } from "./listing.data";
 import { parseListingSearchParams } from "./listingSearchParams";
@@ -116,7 +118,7 @@ export default function ClientListingPageView() {
   }, [user?.email]);
 
   return (
-    <Box sx={{ bgcolor: "#fff", minHeight: "100vh" }}>
+    <Box sx={{ ...stickyFooterPageSx, bgcolor: "#fff" }}>
       <MollureMarketingHeader
         navItems={[]}
         isAuthed
@@ -329,7 +331,7 @@ export default function ClientListingPageView() {
           items: [...col.items],
         }))}
         copyright={marketingShellFooter.copyright}
-        sx={{ mt: 2 }}
+        sx={stickyFooterAnchorSx}
       />
     </Box>
   );

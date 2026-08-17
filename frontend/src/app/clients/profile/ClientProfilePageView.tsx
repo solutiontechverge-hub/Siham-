@@ -44,6 +44,10 @@ import {
   MollureMarketingHeader,
 } from "../../../components/common";
 import { MarketingSiteFooter } from "../../../components/common";
+import {
+  stickyFooterAnchorSx,
+  stickyFooterPageSx,
+} from "../../../components/common/StickyFooterPageShell";
 import { marketingShellFooter } from "../../../data/marketingShell.data";
 import {
   AppCountryPhoneFields,
@@ -147,7 +151,7 @@ export default function ClientProfilePageView() {
   }
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: pageBg }}>
+    <Box sx={{ ...stickyFooterPageSx, bgcolor: pageBg }}>
       <MollureMarketingHeader
         navItems={[]}
         isAuthed
@@ -825,7 +829,7 @@ export default function ClientProfilePageView() {
           items: [...col.items],
         }))}
         copyright={marketingShellFooter.copyright}
-        sx={{ mt: 2 }}
+        sx={stickyFooterAnchorSx}
       />
     </Box>
   );

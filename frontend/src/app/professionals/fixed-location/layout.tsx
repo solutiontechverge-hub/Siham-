@@ -1,4 +1,6 @@
+import { Box } from "@mui/material";
 import { ProfessionalMarketingHeader } from "../../../components/common";
+import { stickyFooterPageSx } from "../../../components/common/StickyFooterPageShell";
 import AuthGuard from "../../../components/common/auth/AuthGuard";
 
 export default function FixedLocationLayout({
@@ -8,14 +10,16 @@ export default function FixedLocationLayout({
 }) {
   return (
     <AuthGuard allowedRoles={["professional"]}>
-      <ProfessionalMarketingHeader
-        navItems={[]}
-        primaryActionLabel="signup"
-        primaryActionHref="/auth/signup"
-        professionalLinkLabel=""
-        withDivider
-      />
-      {children}
+      <Box sx={stickyFooterPageSx}>
+        <ProfessionalMarketingHeader
+          navItems={[]}
+          primaryActionLabel="signup"
+          primaryActionHref="/auth/signup"
+          professionalLinkLabel=""
+          withDivider
+        />
+        {children}
+      </Box>
     </AuthGuard>
   );
 }

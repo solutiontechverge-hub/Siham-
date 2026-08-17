@@ -7,6 +7,10 @@ import DesiredLocationTopTabs, {
   type DesiredLocationTopTab,
 } from "./DesiredLocationTopTabs";
 import MarketingSiteFooter from "./MarketingSiteFooter";
+import {
+  stickyFooterAnchorSx,
+  stickyFooterGrowSx,
+} from "./StickyFooterPageShell";
 import { professionalsMarketingFooter } from "../../data/marketingShell.data";
 
 export type DesiredLocationPageScaffoldProps = {
@@ -24,13 +28,15 @@ export default function DesiredLocationPageScaffold({
   const m = theme.palette.mollure;
 
   return (
-    <Box sx={{ bgcolor: m.pageBg, minHeight: "100vh" }}>
-      <Container maxWidth="lg" sx={{ py: 2.5 }}>
-        <Stack spacing={2}>
-          <DesiredLocationTopTabs tabs={topTabs} activeLabel={activeTopTab} />
-          {children}
-        </Stack>
-      </Container>
+    <Box sx={{ ...stickyFooterGrowSx, bgcolor: m.pageBg }}>
+      <Box sx={{ flex: 1 }}>
+        <Container maxWidth="lg" sx={{ py: 2.5 }}>
+          <Stack spacing={2}>
+            <DesiredLocationTopTabs tabs={topTabs} activeLabel={activeTopTab} />
+            {children}
+          </Stack>
+        </Container>
+      </Box>
 
       <MarketingSiteFooter
         columns={professionalsMarketingFooter.columns.map((col) => ({
@@ -38,7 +44,7 @@ export default function DesiredLocationPageScaffold({
           items: [...col.items],
         }))}
         copyright={professionalsMarketingFooter.copyright}
-        sx={{ mt: 2 }}
+        sx={stickyFooterAnchorSx}
       />
     </Box>
   );
