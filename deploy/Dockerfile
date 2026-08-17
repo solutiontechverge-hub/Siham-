@@ -1,4 +1,5 @@
-FROM node:20-alpine AS frontend-builder
+# Northflank: Dockerfile path `/deploy/Dockerfile`, build context `/` (repository root).
+FROM node:20-bookworm-slim AS frontend-builder
 
 WORKDIR /app/frontend
 
@@ -16,10 +17,12 @@ ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=$NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
 ENV NEXT_PUBLIC_GOOGLE_CLIENT_ID=$NEXT_PUBLIC_GOOGLE_CLIENT_ID
 ENV NEXT_PUBLIC_APPLE_CLIENT_ID=$NEXT_PUBLIC_APPLE_CLIENT_ID
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_OPTIONS=--max-old-space-size=2048
 
 RUN npm run build
 
-FROM node:20-alpine AS runner
+FROM node:20-bookworm-slim AS runner
 
 WORKDIR /app
 
@@ -39,6 +42,7 @@ COPY deploy/start-fullstack.sh /app/start-fullstack.sh
 RUN chmod +x /app/start-fullstack.sh
 
 ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 
 EXPOSE 3000 5000
 
