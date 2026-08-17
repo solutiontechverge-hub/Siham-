@@ -6,6 +6,8 @@ import { Box, CircularProgress, Container, Typography } from "@mui/material";
 import {
   MarketingSiteFooter,
   MollureMarketingHeader,
+  stickyFooterAnchorSx,
+  stickyFooterPageSx,
 } from "../../../../../components/common";
 import ClientProfessionalReviewsView from "../../../../../components/common/client-reviews/ClientProfessionalReviewsView";
 import { marketingShellFooter } from "../../../../../data/marketingShell.data";
@@ -84,7 +86,7 @@ export default function ClientProfessionalReviewsPage() {
   }
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "mollure.pageBg" }}>
+    <Box sx={{ ...stickyFooterPageSx, bgcolor: "mollure.pageBg" }}>
       <MollureMarketingHeader
         navItems={[]}
         isAuthed={Boolean(user)}
@@ -109,7 +111,7 @@ export default function ClientProfessionalReviewsPage() {
           items: [...col.items],
         }))}
         copyright={marketingShellFooter.copyright}
-        sx={{ mt: 2 }}
+        sx={stickyFooterAnchorSx}
       />
     </Box>
   );

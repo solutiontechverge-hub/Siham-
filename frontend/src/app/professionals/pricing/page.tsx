@@ -15,6 +15,8 @@ import Link from "next/link";
 import {
   MollureMarketingHeader,
   MarketingSiteFooter,
+  stickyFooterAnchorSx,
+  stickyFooterPageSx,
 } from "../../../components/common";
 import {
   professionalsMarketingFooter,
@@ -104,7 +106,11 @@ export default function PricingPage() {
 
   return (
     <Box
-      sx={{ bgcolor: tokens.surface, color: tokens.navy, minHeight: "100vh" }}
+      sx={{
+        ...stickyFooterPageSx,
+        bgcolor: tokens.surface,
+        color: tokens.navy,
+      }}
     >
       <MollureMarketingHeader
         navItems={[...professionalsMarketingHeader.navItems]}
@@ -634,7 +640,7 @@ export default function PricingPage() {
           items: [...col.items],
         }))}
         copyright={professionalsMarketingFooter.copyright}
-        sx={{ mt: 2 }}
+        sx={stickyFooterAnchorSx}
       />
     </Box>
   );

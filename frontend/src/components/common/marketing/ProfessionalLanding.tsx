@@ -24,6 +24,10 @@ import {
 } from "../../../theme/spacing";
 import MarketingSectionHeading from "./MarketingSectionHeading";
 import MarketingSiteFooter from "./MarketingSiteFooter";
+import {
+  stickyFooterAnchorSx,
+  stickyFooterPageSx,
+} from "../StickyFooterPageShell";
 import MollureMarketingHeader from "./MollureMarketingHeader";
 import MarketingFeatureCard from "./MarketingFeatureCard";
 import MarketingResultCard from "./MarketingResultCard";
@@ -55,7 +59,7 @@ export default function ProfessionalLanding({
     data;
 
   return (
-    <Box sx={{ bgcolor: "background.default" }}>
+    <Box sx={{ ...stickyFooterPageSx, bgcolor: "background.default" }}>
       <MollureMarketingHeader
         navItems={[...header.navItems]}
         localeLabel={header.localeLabel}
@@ -713,6 +717,7 @@ export default function ProfessionalLanding({
       <MarketingSiteFooter
         columns={[...footer.columns]}
         copyright={footer.copyright}
+        sx={stickyFooterAnchorSx}
       />
     </Box>
   );

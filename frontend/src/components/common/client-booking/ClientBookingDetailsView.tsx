@@ -10,6 +10,8 @@ import {
   ClientPageTabsBar,
   MarketingSiteFooter,
   MollureMarketingHeader,
+  stickyFooterAnchorSx,
+  stickyFooterPageSx,
 } from "..";
 import { marketingShellFooter } from "../../../data/marketingShell.data";
 import { useAppSelector } from "../../../store/hooks";
@@ -1931,7 +1933,7 @@ export default function ClientBookingDetailsView({
     (prepaymentState === "paid" || isCompleted || isPaymentDue);
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: pageBackground }}>
+    <Box sx={{ ...stickyFooterPageSx, bgcolor: pageBackground }}>
       <MollureMarketingHeader
         navItems={[]}
         isAuthed
@@ -2263,7 +2265,7 @@ export default function ClientBookingDetailsView({
           items: [...col.items],
         }))}
         copyright={marketingShellFooter.copyright}
-        sx={{ mt: 2 }}
+        sx={stickyFooterAnchorSx}
       />
     </Box>
   );

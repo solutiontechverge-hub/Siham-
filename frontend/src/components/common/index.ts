@@ -107,6 +107,12 @@ export { default as MarketingSiteHeader } from "./MarketingSiteHeader";
 export { default as ProfessionalMarketingHeader } from "./ProfessionalMarketingHeader";
 export { default as MollureMarketingHeader } from "./MollureMarketingHeader";
 export { default as MarketingSiteFooter } from "./MarketingSiteFooter";
+export {
+  default as StickyFooterPageShell,
+  stickyFooterAnchorSx,
+  stickyFooterGrowSx,
+  stickyFooterPageSx,
+} from "./StickyFooterPageShell";
 export { default as MarketingSectionHeading } from "./MarketingSectionHeading";
 export { default as MarketingSection } from "./MarketingSection";
 export { default as MarketingFeatureCard } from "./MarketingFeatureCard";

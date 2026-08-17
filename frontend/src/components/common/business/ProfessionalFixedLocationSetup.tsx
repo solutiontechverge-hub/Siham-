@@ -2281,6 +2281,26 @@ export default function ProfessionalFixedLocationSetup({
     teamMembersFixed,
   ]);
 
+  const notifyBusinessSetupPersisted = React.useCallback(
+    (savedMessage = "Changes saved.") => {
+      if (isBusinessProfileActive) {
+        setIsBusinessPublishEnabled(false);
+        showSnackbar({
+          severity: "success",
+          message: "Changes saved and are now live.",
+        });
+        return;
+      }
+
+      setIsBusinessPublishEnabled(true);
+      showSnackbar({
+        severity: "success",
+        message: savedMessage,
+      });
+    },
+    [isBusinessProfileActive, showSnackbar],
+  );
+
   const saveBusinessSection = React.useCallback(
     async (sectionId: BusinessSetupSectionId) => {
       if (!onSaveBusinessSetup) {
@@ -2299,8 +2319,7 @@ export default function ProfessionalFixedLocationSetup({
           next.delete(sectionId);
           return next;
         });
-        setIsBusinessPublishEnabled(true);
-        showSnackbar({ severity: "success", message: "Changes saved." });
+        notifyBusinessSetupPersisted();
       } catch (error) {
         showSnackbar({
           severity: "error",
@@ -2308,7 +2327,7 @@ export default function ProfessionalFixedLocationSetup({
         });
       }
     },
-    [onSaveBusinessSetup, saveBusinessSetupData, showSnackbar],
+    [notifyBusinessSetupPersisted, onSaveBusinessSetup, saveBusinessSetupData, showSnackbar],
   );
 
   const onSwitchActiveBusinessTemplate = React.useCallback(
@@ -2675,17 +2694,29 @@ export default function ProfessionalFixedLocationSetup({
     [getBusinessSetupPublishValidation],
   );
 
+  const publishBlockedByValidation = React.useMemo(
+    () =>
+      !isBusinessProfileActive && !businessSetupPublishValidation.valid,
+    [businessSetupPublishValidation.valid, isBusinessProfileActive],
+  );
+
   const onAttemptPublishBusinessSetup = React.useCallback(() => {
-    const { valid, missingFields } = getBusinessSetupPublishValidation();
-    if (!valid) {
-      showSnackbar({
-        severity: "error",
-        message: formatBusinessSetupValidationMessage(missingFields),
-      });
-      return;
+    if (!isBusinessProfileActive) {
+      const { valid, missingFields } = getBusinessSetupPublishValidation();
+      if (!valid) {
+        showSnackbar({
+          severity: "error",
+          message: formatBusinessSetupValidationMessage(missingFields),
+        });
+        return;
+      }
     }
     setPublishConfirmOpen(true);
-  }, [getBusinessSetupPublishValidation, showSnackbar]);
+  }, [
+    getBusinessSetupPublishValidation,
+    isBusinessProfileActive,
+    showSnackbar,
+  ]);
 
   const onPublishBusinessSetup = React.useCallback(async () => {
     if (!onSaveBusinessSetup) {
@@ -2694,14 +2725,16 @@ export default function ProfessionalFixedLocationSetup({
       return;
     }
 
-    const { valid, missingFields } = getBusinessSetupPublishValidation();
-    if (!valid) {
-      showSnackbar({
-        severity: "error",
-        message: formatBusinessSetupValidationMessage(missingFields),
-      });
-      setPublishConfirmOpen(false);
-      return;
+    if (!isBusinessProfileActive) {
+      const { valid, missingFields } = getBusinessSetupPublishValidation();
+      if (!valid) {
+        showSnackbar({
+          severity: "error",
+          message: formatBusinessSetupValidationMessage(missingFields),
+        });
+        setPublishConfirmOpen(false);
+        return;
+      }
     }
 
     try {
@@ -2730,6 +2763,7 @@ export default function ProfessionalFixedLocationSetup({
     businessOfferingSelect,
     clearPendingTeamMemberPhotos,
     getBusinessSetupPublishValidation,
+    isBusinessProfileActive,
     onSaveBusinessSetup,
     showSnackbar,
     teamMembersDesired,
@@ -4469,15 +4503,19 @@ export default function ProfessionalFixedLocationSetup({
 
     try {
       await saveBusinessSetupData();
-      setIsBusinessPublishEnabled(true);
-      showSnackbar({ severity: "success", message: "Services saved." });
+      notifyBusinessSetupPersisted("Services saved.");
     } catch (error) {
       showSnackbar({
         severity: "error",
         message: getApiErrorMessage(error, "Unable to save services."),
       });
     }
-  }, [onSaveBusinessSetup, saveBusinessSetupData, showSnackbar]);
+  }, [
+    notifyBusinessSetupPersisted,
+    onSaveBusinessSetup,
+    saveBusinessSetupData,
+    showSnackbar,
+  ]);
 
   const serviceFormModal = (
     <BusinessServiceFormModal
@@ -4650,11 +4688,10 @@ export default function ProfessionalFixedLocationSetup({
               disabled={
                 !isBusinessPublishEnabled ||
                 isBusinessSetupSaving ||
-                !businessSetupPublishValidation.valid
+                publishBlockedByValidation
               }
               title={
-                isBusinessPublishEnabled &&
-                !businessSetupPublishValidation.valid
+                isBusinessPublishEnabled && publishBlockedByValidation
                   ? formatBusinessSetupValidationMessage(
                       businessSetupPublishValidation.missingFields,
                     )
@@ -4922,7 +4959,7 @@ export default function ProfessionalFixedLocationSetup({
               label={isBusinessSetupSaving ? "Publishing..." : data.publishLabel}
               onClick={() => void onPublishBusinessSetup()}
               disabled={
-                isBusinessSetupSaving || !businessSetupPublishValidation.valid
+                isBusinessSetupSaving || publishBlockedByValidation
               }
             />
           </>
