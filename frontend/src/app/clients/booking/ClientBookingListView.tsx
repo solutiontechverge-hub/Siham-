@@ -223,8 +223,7 @@ export default function ClientBookingListView({ listTab }: Props) {
                 const bookingIdLabel = formatBookingIdLabel(b.bookingRef);
                 const status = (b.status ?? "confirmed") as ClientBookingStatus;
                 const paymentDue = isClientBookingPaymentDue(b);
-                const displayStatus: ClientBookingStatus =
-                  status === "waiting_for_prepayment" ? "confirmed" : status;
+                const displayStatus: ClientBookingStatus = status;
                 // BR only while pending — hide once accepted (confirmed) or rejected.
                 const showBrBadge =
                   status === "requested" ||
@@ -408,6 +407,23 @@ export default function ClientBookingListView({ listTab }: Props) {
                             {showUpdated ? (
                               <Chip
                                 label="Updated"
+                                size="small"
+                                sx={{
+                                  height: 22,
+                                  fontWeight: 900,
+                                  bgcolor: alpha(m.teal, 0.12),
+                                  color: m.teal,
+                                  border: `1px solid ${alpha(m.teal, 0.4)}`,
+                                }}
+                              />
+                            ) : null}
+                            {displayStatus === "confirmed" &&
+                            !pendingEr &&
+                            (b.lastEditedBy ||
+                              Boolean(b.editedServiceIds?.length) ||
+                              b.incomingEditRequest?.status === "accepted") ? (
+                              <Chip
+                                label="Edit"
                                 size="small"
                                 sx={{
                                   height: 22,

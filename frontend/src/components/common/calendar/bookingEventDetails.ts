@@ -4,6 +4,7 @@ import type {
   CalendarEvent,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import { ensureServiceStartEndTimes } from "../../../data/bookingServiceEdit.data";
+import { splitContactPhone } from "../../../lib/phone-validation";
 import type { ManualEntryDiscount } from "../../sections/finance/manualEntry.data";
 
 const NOTES_META_PREFIX = "---mollure-meta---";
@@ -103,6 +104,17 @@ type StoredBookingNoteMeta = Partial<
     | "desiredLocation"
     | "totalDiscount"
     | "originalServices"
+    | "needsOk"
+    | "ackScenario"
+    | "hiddenForProfessional"
+    | "hiddenForCustomer"
+    | "addedServiceIds"
+    | "cancelledServiceIds"
+    | "silentUpdated"
+    | "refunded"
+    | "waitingForPayment"
+    | "invoiceDueDate"
+    | "splitBill"
   >
 > & {
   ebr?: StoredEbrNotePayload;
@@ -164,6 +176,19 @@ export function serializeCalendarEntryNotes(
     ...(details?.desiredLocation ? { desiredLocation: details.desiredLocation } : {}),
     ...(details?.totalDiscount ? { totalDiscount: details.totalDiscount } : {}),
     ...(details?.originalServices?.length ? { originalServices: details.originalServices } : {}),
+    ...(details?.needsOk ? { needsOk: true } : {}),
+    ...(details?.ackScenario ? { ackScenario: details.ackScenario } : {}),
+    ...(details?.hiddenForProfessional ? { hiddenForProfessional: true } : {}),
+    ...(details?.hiddenForCustomer ? { hiddenForCustomer: true } : {}),
+    ...(details?.addedServiceIds?.length ? { addedServiceIds: details.addedServiceIds } : {}),
+    ...(details?.cancelledServiceIds?.length
+      ? { cancelledServiceIds: details.cancelledServiceIds }
+      : {}),
+    ...(details?.silentUpdated ? { silentUpdated: true } : {}),
+    ...(details?.refunded ? { refunded: true } : {}),
+    ...(details?.waitingForPayment ? { waitingForPayment: true } : {}),
+    ...(details?.invoiceDueDate ? { invoiceDueDate: details.invoiceDueDate } : {}),
+    ...(details?.splitBill ? { splitBill: details.splitBill } : {}),
     ...(ebr ? { ebr } : {}),
     ...(er ? { er } : {}),
   };
@@ -284,6 +309,13 @@ export function markClientEbrAcceptedInNotes(
       cancellationReason: details?.cancellationReason,
       requestDirection: details?.requestDirection,
       clientSnapshot: nextSnapshot,
+      lastEditedBy:
+        applied?.lastEditedBy ?? ebr.lastEditedBy ?? details?.lastEditedBy,
+      editedServiceIds: applied?.editedServiceIds ?? ebr.editedServiceIds,
+      editedProductIds: applied?.editedProductIds ?? ebr.editedProductIds,
+      addedServiceIds: applied?.addedServiceIds,
+      cancelledServiceIds: applied?.cancelledServiceIds,
+      originalServices: applied?.originalServices ?? details?.originalServices,
       ...(applied?.services ? { services: applied.services } : {}),
       ...(applied?.products ? { products: applied.products } : {}),
     },
@@ -437,6 +469,19 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
       ...(meta.desiredLocation ? { desiredLocation: meta.desiredLocation } : {}),
       ...(meta.totalDiscount ? { totalDiscount: meta.totalDiscount } : {}),
       ...(meta.originalServices?.length ? { originalServices: meta.originalServices } : {}),
+      ...(meta.needsOk ? { needsOk: true } : {}),
+      ...(meta.ackScenario ? { ackScenario: meta.ackScenario } : {}),
+      ...(meta.hiddenForProfessional ? { hiddenForProfessional: true } : {}),
+      ...(meta.hiddenForCustomer ? { hiddenForCustomer: true } : {}),
+      ...(meta.addedServiceIds?.length ? { addedServiceIds: meta.addedServiceIds } : {}),
+      ...(meta.cancelledServiceIds?.length
+        ? { cancelledServiceIds: meta.cancelledServiceIds }
+        : {}),
+      ...(meta.silentUpdated ? { silentUpdated: true } : {}),
+      ...(meta.refunded ? { refunded: true } : {}),
+      ...(meta.waitingForPayment ? { waitingForPayment: true } : {}),
+      ...(meta.invoiceDueDate ? { invoiceDueDate: meta.invoiceDueDate } : {}),
+      ...(meta.splitBill ? { splitBill: meta.splitBill } : {}),
       ...(ebr?.status !== "rejected" && ebr?.editedServiceIds?.length && !meta.editedServiceIds?.length
         ? { editedServiceIds: ebr.editedServiceIds }
         : {}),
@@ -528,13 +573,18 @@ export function hydrateBookingDrawerFromEvent(ev: CalendarEvent): BookingDrawerH
       : (mainDrawerServicesFromClientSnapshot(details.clientSnapshot) ?? []);
   const services = ensureServiceStartEndTimes(rawServices, ev.start);
 
+  const splitPhone = splitContactPhone(
+    details.phoneNumber ?? "",
+    details.phoneCode,
+  );
+
   return {
     clientEmail: details.clientEmail ?? "",
     services,
     products: details.products ?? [],
     guests: details.guests ?? [],
-    phoneCode: details.phoneCode ?? "",
-    phoneNumber: details.phoneNumber ?? "",
+    phoneCode: splitPhone.countryCode,
+    phoneNumber: splitPhone.phone,
     desiredLocation: details.desiredLocation ?? emptyDesiredLocation(),
     showPrepayment: Boolean(details.showPrepayment),
     prepaymentPercent: details.prepaymentPercent ?? "",

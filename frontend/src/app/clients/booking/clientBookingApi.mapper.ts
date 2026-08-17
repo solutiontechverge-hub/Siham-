@@ -95,7 +95,6 @@ function mapApiStatus(status: ClientBookingStatus): CreateBookingRequest["status
   if (status === "no_show") return "no_show";
   if (status === "invalid") return "invalid";
   if (status === "in_progress") return "in_progress";
-  if (status === "waiting_for_prepayment") return "confirmed";
   return "requested";
 }
 
@@ -534,8 +533,11 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
       locationMode: booking.location_type === "desired" ? "desired" : "fixed",
     },
     draft: {
-      selectedDateISO: dateIso,
-      selectedTime: startLabel,
+      selectedDateISO: activeEbr?.suggestedDateISO || dateIso,
+      selectedTime:
+        activeEbr?.suggestedTime ||
+        hhmmToTimeLabel(activeEbr?.suggestedStart) ||
+        startLabel,
       combineServices: names.length > 1,
       people: clientSnapshot?.people?.map((p) => ({
         id: p.id,
@@ -582,8 +584,8 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
           }));
         }
 
-        // Prefer pro-updated notes lines; merge guest/model lines from snapshot/guests
-        // so FL + DL both show the full booking on the client.
+        // Notes.services is canonical after ER/EBR accept + save. Do not re-append
+        // stale snapshot lines — that hid price/duration edits and resurrected removed items.
         const merged: Array<{
           id: string;
           name: string;
@@ -615,28 +617,34 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
           });
         };
 
-        for (const service of noteServices) {
-          pushUnique({
-            id: service.id,
-            name: service.name,
-            durationMins: service.durationMins,
-            price: service.price,
-            guestId: resolveGuestId(service.id, service.name, service.guestId ?? null),
-            teamMemberId: service.staffResourceId ?? service.teamMemberId ?? null,
-          });
-        }
-        for (const service of snapshotServices) {
-          pushUnique({
-            id: service.id,
-            name: service.name,
-            durationMins: service.durationMins,
-            price: service.price,
-            guestId: service.guestId ?? null,
-            teamMemberId: service.teamMemberId ?? null,
-          });
-        }
-        for (const service of guestNestedServices) {
-          pushUnique(service);
+        if (noteServices.length) {
+          for (const service of noteServices) {
+            pushUnique({
+              id: service.id,
+              name: service.name,
+              durationMins: service.durationMins,
+              price: service.price,
+              guestId: resolveGuestId(service.id, service.name, service.guestId ?? null),
+              teamMemberId: service.staffResourceId ?? service.teamMemberId ?? null,
+            });
+          }
+          for (const service of guestNestedServices) {
+            pushUnique(service);
+          }
+        } else {
+          for (const service of snapshotServices) {
+            pushUnique({
+              id: service.id,
+              name: service.name,
+              durationMins: service.durationMins,
+              price: service.price,
+              guestId: service.guestId ?? null,
+              teamMemberId: service.teamMemberId ?? null,
+            });
+          }
+          for (const service of guestNestedServices) {
+            pushUnique(service);
+          }
         }
 
         if (merged.length) return merged;
@@ -786,5 +794,6 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
           ? ebr.editedProductIds
           : undefined,
     incomingEditRequest,
+    hiddenForCustomer: Boolean(notesDetails?.hiddenForCustomer),
   };
 }

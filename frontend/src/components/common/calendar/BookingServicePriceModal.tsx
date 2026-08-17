@@ -6,6 +6,7 @@ import { InputAdornment, MenuItem, Stack } from "@mui/material";
 import MollureFormField from "../MollureFormField";
 import AppModal from "../AppModal";
 import type { BookingServicePriceType } from "../../../data/bookingServiceEdit.data";
+import { sanitizeDecimalInput } from "../../../lib/field-input";
 
 export type BookingServicePriceValue = {
   priceType: BookingServicePriceType;
@@ -100,7 +101,7 @@ export default function BookingServicePriceModal({
         <MollureFormField
           label="Price"
           value={amount}
-          onChange={(e) => setAmount(e.target.value)}
+          onChange={(e) => setAmount(sanitizeDecimalInput(e.target.value))}
           fullWidth
           sx={{
             "& .MuiOutlinedInput-root": {

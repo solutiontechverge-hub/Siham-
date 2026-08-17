@@ -111,36 +111,43 @@ function CountryCodeSelectedValue({ value }: { value: string }) {
   const entry = findCountryDialCode(value);
   if (!entry) return <>{value}</>;
   return (
-    <Stack
-      direction="row"
-      spacing={0.75}
-      alignItems="center"
+    <Box
       component="span"
       sx={{
-        lineHeight: 1,
-        width: "100%",
-        minHeight: "100%",
         display: "inline-flex",
+        flexDirection: "row",
+        flexWrap: "nowrap",
+        alignItems: "center",
+        justifyContent: "flex-start",
+        gap: 0.75,
+        height: "100%",
+        minHeight: 24,
+        lineHeight: 1,
+        whiteSpace: "nowrap",
       }}
     >
       <Box
         component="span"
         sx={{
-          fontSize: 16,
+          fontSize: 13,
+          fontWeight: 800,
           lineHeight: 1,
-          display: "inline-flex",
-          alignItems: "center",
+          letterSpacing: 0.2,
         }}
       >
-        {countryFlagEmoji(entry.iso)}
+        {entry.iso}
       </Box>
       <Box
         component="span"
-        sx={{ lineHeight: 1, display: "inline-flex", alignItems: "center" }}
+        sx={{
+          fontSize: 13,
+          fontWeight: 800,
+          lineHeight: 1,
+        }}
       >
         {entry.dialCode}
       </Box>
-    </Stack>
+    </Box>
   );
 }
 
@@ -247,12 +254,19 @@ export default function AppCountryCodeSelect({
             alignItems: "center",
           },
           "& .MuiSelect-select": {
-            display: "flex",
+            display: "flex !important",
             alignItems: "center",
+            justifyContent: "flex-start",
             minHeight: 40,
             height: 40,
             py: 0,
             boxSizing: "border-box",
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+          },
+          "& .MuiSelect-select.MuiInputBase-input": {
+            display: "flex",
+            alignItems: "center",
           },
         },
         ...(Array.isArray(sx) ? sx : sx ? [sx] : []),

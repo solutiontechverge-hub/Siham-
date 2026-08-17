@@ -1,12 +1,22 @@
 import * as React from "react";
 import type {
   CalendarBookingLocation,
+  CalendarBookingStatus,
   CalendarBookingType,
   CalendarResource,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { CalendarFilters } from "./calendar.utils";
 
 const bookingTypes: readonly CalendarBookingType[] = ["Online", "Offline", "Project", "Requests"];
+const bookingStatuses: readonly CalendarBookingStatus[] = [
+  "Confirmed",
+  "Completed",
+  "Cancelled",
+  "Invalid",
+  "No Show",
+  "Requested",
+  "In Progress",
+];
 const allLocations: readonly CalendarBookingLocation[] = ["FL", "DL"];
 
 export function useCalendarFilters(
@@ -25,6 +35,16 @@ export function useCalendarFilters(
       },
       bookingAll: true,
       booking: { Online: false, Offline: false, Project: false, Requests: false },
+      statusAll: true,
+      statuses: {
+        Confirmed: false,
+        Completed: false,
+        Cancelled: false,
+        Invalid: false,
+        "No Show": false,
+        Requested: false,
+        "In Progress": false,
+      },
     }),
     [locations, resources],
   );
@@ -64,6 +84,7 @@ export function useCalendarFilters(
   return {
     appliedFilters,
     bookingTypes,
+    bookingStatuses,
     draftFilters,
     filteredResources,
     initialFilters,

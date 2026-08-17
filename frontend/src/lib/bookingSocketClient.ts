@@ -2,7 +2,7 @@
 
 import { getMessagingSocket, joinMessagingUserRoom } from "../components/common/messaging/messagingSocketClient";
 
-let joinedBusinessSetupId: string | null = null;
+let joinedBusinessSetupIds: string[] = [];
 
 export type BookingChangedPayload = {
   action: "created" | "updated" | string;
@@ -13,15 +13,25 @@ export type BookingChangedPayload = {
 
 export function joinBookingBusinessRoom(businessSetupId: string) {
   if (!businessSetupId) return;
-  joinedBusinessSetupId = businessSetupId;
+  if (!joinedBusinessSetupIds.includes(businessSetupId)) {
+    joinedBusinessSetupIds.push(businessSetupId);
+  }
   const client = getMessagingSocket();
   if (!client) return;
   client.emit("bookings:join-business", { businessSetupId });
 }
 
-export function ensureBookingRealtimeRooms(input: { userId?: string; businessSetupId?: string }) {
+export function ensureBookingRealtimeRooms(input: {
+  userId?: string;
+  businessSetupId?: string;
+  businessSetupIds?: readonly string[];
+}) {
   if (input.userId) joinMessagingUserRoom(input.userId);
-  if (input.businessSetupId) joinBookingBusinessRoom(input.businessSetupId);
+  const ids = [
+    ...(input.businessSetupId ? [input.businessSetupId] : []),
+    ...(input.businessSetupIds ?? []),
+  ].filter(Boolean);
+  for (const id of ids) joinBookingBusinessRoom(id);
 }
 
 export function onBookingChanged(handler: (payload: BookingChangedPayload) => void) {
@@ -29,8 +39,8 @@ export function onBookingChanged(handler: (payload: BookingChangedPayload) => vo
   if (!client) return () => {};
 
   const rejoin = () => {
-    if (joinedBusinessSetupId) {
-      client.emit("bookings:join-business", { businessSetupId: joinedBusinessSetupId });
+    for (const businessSetupId of joinedBusinessSetupIds) {
+      client.emit("bookings:join-business", { businessSetupId });
     }
   };
 

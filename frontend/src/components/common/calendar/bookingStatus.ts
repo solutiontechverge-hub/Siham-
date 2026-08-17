@@ -39,8 +39,16 @@ export const BOOKING_SCENARIO_LABELS: Record<BookingScenarioIndicator, string> =
   BR: "Booking Request",
   EBR: "Edited Booking request",
   ER: "Edit Request",
-  E: "Edited",
+  E: "Edit",
 };
+
+/** Visible badge text — keep BR/EBR/ER abbreviated, spell out Edit. */
+export function scenarioIndicatorDisplayLabel(
+  indicator: BookingScenarioIndicator,
+): string {
+  if (indicator === "E") return "Edit";
+  return indicator;
+}
 
 type StatusTheme = {
   accent: string;
@@ -157,15 +165,21 @@ export function statusAccentColor(status: CalendarBookingStatus) {
   return (BOOKING_STATUS_THEME[status] ?? BOOKING_STATUS_THEME["No Show"]).accent;
 }
 
-export function resolveBookingScenario(event: Pick<CalendarEvent, "bookingType" | "status" | "bookingScenario">) {
+export function resolveBookingScenario(
+  event: Pick<CalendarEvent, "bookingType" | "status" | "bookingScenario" | "details">,
+) {
   if (!supportsBookingRequestScenario(event.bookingType)) return undefined;
+  if (event.details?.needsOk && event.details.ackScenario) {
+    return event.details.ackScenario;
+  }
   const scenario = event.bookingScenario;
-  // BR / EBR are pending-request markers only — clear once accepted or rejected.
+  // BR / EBR are pending-request markers only — clear once accepted or rejected
+  // unless an OK acknowledgement is still outstanding.
   if (scenario === "BR" || scenario === "EBR") {
     if (event.status !== "Requested") return undefined;
     return scenario;
   }
-  // Confirmed Edited (E) — client changed a confirmed booking.
+  // Confirmed Edit (E) — booking changed after ER/EBR accept.
   if (scenario === "E") {
     if (event.status !== "Confirmed") return undefined;
     return scenario;

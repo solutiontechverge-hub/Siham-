@@ -40,7 +40,9 @@ const ProfessionalDesiredLocationSetup = dynamic(
 export default function DesiredLocationProfilePage() {
   const { data } = useGetProfileQuery();
   const { data: businessCategoriesData } = useGetBusinessCategoriesQuery();
-  const { data: businessSetupData } = useGetBusinessSetupQuery();
+  const { data: businessSetupData } = useGetBusinessSetupQuery({
+    includeDraft: true,
+  });
   const [updateProfile, { isLoading: isProfileSaving }] =
     useUpdateProfileMutation();
   const [upsertBusinessSetup, { isLoading: isBusinessSetupSaving }] =

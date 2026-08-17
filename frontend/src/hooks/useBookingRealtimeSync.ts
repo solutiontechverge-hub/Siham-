@@ -12,6 +12,9 @@ import {
 
 type Options = {
   businessSetupId?: string;
+  businessSetupIds?: readonly string[];
+  /** Called after Calendar/Bookings tags are invalidated (e.g. calendar overview refetch). */
+  onChanged?: (payload: BookingChangedPayload) => void;
 };
 
 export function useBookingRealtimeSync(options?: Options) {
@@ -27,21 +30,23 @@ export function useBookingRealtimeSync(options?: Options) {
   const isAuthed = Boolean(accessToken || persistedToken);
   const userId = user?.id ?? "";
   const businessSetupId = options?.businessSetupId ?? "";
+  const businessSetupIds = options?.businessSetupIds;
+  const onChangedRef = React.useRef(options?.onChanged);
+  onChangedRef.current = options?.onChanged;
 
   React.useEffect(() => {
     if (!isAuthed) return;
     ensureBookingRealtimeRooms({
       userId: userId || undefined,
       businessSetupId: businessSetupId || undefined,
+      businessSetupIds,
     });
-  }, [businessSetupId, isAuthed, userId]);
+  }, [businessSetupId, businessSetupIds, isAuthed, userId]);
 
   React.useEffect(() => {
     if (!isAuthed) return;
 
     const handleBookingChanged = (payload: BookingChangedPayload) => {
-      if (businessSetupId && payload.business_setup_id !== businessSetupId) return;
-      // Client details page stays open — force Bookings + Calendar refetch immediately.
       dispatch(businessApi.util.invalidateTags(["Calendar", "Bookings"]));
       void dispatch(
         businessApi.endpoints.getMyBookings.initiate(undefined, {
@@ -49,8 +54,9 @@ export function useBookingRealtimeSync(options?: Options) {
           subscribe: false,
         }),
       );
+      onChangedRef.current?.(payload);
     };
 
     return onBookingChanged(handleBookingChanged);
-  }, [businessSetupId, dispatch, isAuthed]);
+  }, [dispatch, isAuthed]);
 }

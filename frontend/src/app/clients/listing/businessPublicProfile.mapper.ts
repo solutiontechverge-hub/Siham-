@@ -759,6 +759,8 @@ export function mapBusinessSetupToPublicProfile(setup: BusinessSetupListing): Bu
       setup.prepaymentPercentage != null ? formatPercent(setup.prepaymentPercentage) : "",
     prepaymentInstructions: setup.prepaymentInstruction?.trim() || "",
     cancellationFeePercent: Number(setup.cancellationPolicy?.feePercentage) || 0,
+    cancellationNoticeHours: Number(setup.cancellationPolicy?.beforeHours) || 0,
+    cancellationNoticeMinutes: Number(setup.cancellationPolicy?.beforeMinutes) || 0,
     cancellationPolicyInstruction: setup.cancellationPolicy?.instruction?.trim() || "",
     kilometerAllowanceLabel:
       setup.kilometerAllowance != null ? `${setup.kilometerAllowance} EUR / km` : "",

@@ -24,6 +24,8 @@ export type CalendarFilters = {
   locations: Record<CalendarBookingLocation, boolean>;
   bookingAll: boolean;
   booking: Record<CalendarBookingType, boolean>;
+  statusAll: boolean;
+  statuses: Record<CalendarBookingStatus, boolean>;
 };
 
 export type BlockTimeDraft = {

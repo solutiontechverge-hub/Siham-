@@ -152,6 +152,39 @@ export function computeUnionBookableSlots(
   );
 }
 
+export function memberOccupancyRatio(
+  snapshot: SetupAvailabilitySnapshot,
+  memberId: string,
+) {
+  const working = getMemberWorkingIntervals(
+    memberId,
+    snapshot.date,
+    snapshot.location,
+    snapshot,
+  );
+  const availableMins = working.reduce(
+    (sum, window) => sum + Math.max(0, window.endMin - window.startMin),
+    0,
+  );
+  const busyMins = (snapshot.busyByMember[memberId] ?? []).reduce(
+    (sum, window) => sum + Math.max(0, window.endMin - window.startMin),
+    0,
+  );
+  if (availableMins <= 0) return 1;
+  return Math.min(1, busyMins / availableMins);
+}
+
+export function sortMembersByLowestOccupancy(
+  snapshot: SetupAvailabilitySnapshot,
+  memberIds: readonly string[],
+) {
+  return [...memberIds].sort((a, b) => {
+    const diff = memberOccupancyRatio(snapshot, a) - memberOccupancyRatio(snapshot, b);
+    if (diff !== 0) return diff;
+    return a.localeCompare(b);
+  });
+}
+
 export function findAvailableMemberForService(
   snapshot: SetupAvailabilitySnapshot,
   candidateMemberIds: string[],
@@ -160,7 +193,7 @@ export function findAvailableMemberForService(
   startMin: number,
   durationMins: number,
 ) {
-  for (const memberId of candidateMemberIds) {
+  for (const memberId of sortMembersByLowestOccupancy(snapshot, candidateMemberIds)) {
     const member = snapshot.teamMembers.find((row) => row.id === memberId);
     if (!member) continue;
     if (
@@ -195,7 +228,7 @@ export function findAvailableMemberForAllServices(
   );
   if (totalDuration <= 0) return null;
 
-  for (const memberId of candidateMemberIds) {
+  for (const memberId of sortMembersByLowestOccupancy(snapshot, candidateMemberIds)) {
     const member = snapshot.teamMembers.find((row) => row.id === memberId);
     if (!member) continue;
     const canPerformAll = services.every((service) =>

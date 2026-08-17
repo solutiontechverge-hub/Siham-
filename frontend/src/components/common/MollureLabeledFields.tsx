@@ -29,6 +29,9 @@ function useMollureFieldSx() {
         bgcolor: m.white ?? "#fff",
         minHeight: 40,
         alignItems: "center",
+        "&:not(.MuiInputBase-multiline)": {
+          height: 40,
+        },
         "& fieldset": {
           borderColor: m.inputBorder,
         },
@@ -47,6 +50,7 @@ function useMollureFieldSx() {
         borderRadius: "6px",
         bgcolor: m.white ?? "#fff",
         minHeight: 40,
+        height: 40,
         alignItems: "center",
         "& fieldset": {
           borderColor: m.inputBorder,
@@ -63,16 +67,22 @@ function useMollureFieldSx() {
       },
       "& .MuiOutlinedInput-input": {
         fontSize: "0.8125rem",
-        paddingTop: "10px",
-        paddingBottom: "10px",
+      },
+      "& .MuiOutlinedInput-root:not(.MuiInputBase-multiline) .MuiOutlinedInput-input": {
+        paddingTop: 0,
+        paddingBottom: 0,
+        height: "100%",
+        boxSizing: "border-box",
+        display: "flex",
+        alignItems: "center",
       },
       "& .MuiSelect-select.MuiOutlinedInput-input": {
         display: "flex",
         alignItems: "center",
         alignSelf: "stretch",
         boxSizing: "border-box",
-        minHeight: 40,
-        height: 40,
+        minHeight: "100%",
+        height: "100%",
         paddingTop: 0,
         paddingBottom: 0,
         lineHeight: 1.25,
@@ -80,10 +90,16 @@ function useMollureFieldSx() {
       "& .MuiInputBase-inputSizeSmall.MuiSelect-select": {
         display: "flex",
         alignItems: "center",
-        minHeight: 40,
-        height: 40,
+        minHeight: "100%",
+        height: "100%",
         paddingTop: 0,
         paddingBottom: 0,
+      },
+      "& .MuiInputAdornment-root": {
+        height: "100%",
+        maxHeight: "none",
+        marginTop: 0,
+        marginBottom: 0,
       },
       "& .MuiSelect-icon": {
         top: "50%",

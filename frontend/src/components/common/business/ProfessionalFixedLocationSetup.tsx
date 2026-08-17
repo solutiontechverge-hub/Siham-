@@ -1172,7 +1172,7 @@ export default function ProfessionalFixedLocationSetup({
     [allSubcategoryOptions],
   );
   const [isBusinessPublishEnabled, setIsBusinessPublishEnabled] =
-    React.useState(false);
+    React.useState(() => Boolean(businessSetupData?.has_unpublished_changes));
   const [editingBusinessSections, setEditingBusinessSections] = React.useState<
     Set<BusinessSetupSectionId>
   >(() => new Set());
@@ -1973,6 +1973,17 @@ export default function ProfessionalFixedLocationSetup({
     [activeBusinessTemplate, setField, shouldMirrorSyncField],
   );
 
+  const setPublishableFormField = React.useCallback(
+    <K extends keyof FixedLocationFormState>(
+      key: K,
+      value: FixedLocationFormState[K],
+    ) => {
+      setIsBusinessPublishEnabled(true);
+      setField(key, value);
+    },
+    [setField],
+  );
+
   const addBizKeyword = React.useCallback(() => {
     if (biz.keywords.length >= MAX_BUSINESS_KEYWORDS) return;
     const next = biz.keywordDraft.trim();
@@ -2132,7 +2143,17 @@ export default function ProfessionalFixedLocationSetup({
         service_for: Object.entries(sourceBiz.serviceFor)
           .filter(([, enabled]) => enabled)
           .map(([key]) => key),
-        service_categories: mapServiceItemsToCategories(serviceItems),
+        service_categories: (() => {
+          const mapped = mapServiceItemsToCategories(
+            serviceItems,
+            (businessSetupData?.service_categories ?? []) as Array<
+              Record<string, unknown>
+            >,
+          );
+          return mapped.length
+            ? mapped
+            : businessSetupData?.service_categories ?? [];
+        })(),
         project: (() => {
           const projectSource =
             businessOfferingSelect === "Fixed Location"
@@ -2218,6 +2239,7 @@ export default function ProfessionalFixedLocationSetup({
     [
       businessOfferingSelect,
       businessCategories,
+      businessSetupData?.service_categories,
       desiredAreaMode,
       desiredAreas,
       desiredBusiness,
@@ -2231,8 +2253,15 @@ export default function ProfessionalFixedLocationSetup({
   );
 
   const buildBusinessSetupSaveBody = React.useCallback(
-    (members: TeamMemberUi[]): UpsertBusinessSetupPayload => {
-      const payload = buildBusinessSetupPayload(members);
+    (
+      members: TeamMemberUi[],
+      options?: { publish?: boolean; section?: UpsertBusinessSetupRequest["section"] },
+    ): UpsertBusinessSetupPayload => {
+      const payload: UpsertBusinessSetupRequest = {
+        ...buildBusinessSetupPayload(members),
+        publish: options?.publish === true,
+        ...(options?.section ? { section: options.section } : {}),
+      };
       const teamPhotoFiles = members
         .filter((member): member is TeamMemberUi & { pendingPhotoFile: File } =>
           Boolean(member.pendingPhotoFile),
@@ -2256,7 +2285,11 @@ export default function ProfessionalFixedLocationSetup({
     );
   }, []);
 
-  const saveBusinessSetupData = React.useCallback(async () => {
+  const saveBusinessSetupData = React.useCallback(
+    async (options?: {
+      publish?: boolean;
+      section?: UpsertBusinessSetupRequest["section"];
+    }) => {
     if (!onSaveBusinessSetup) return;
 
     const runSave = async () => {
@@ -2264,7 +2297,7 @@ export default function ProfessionalFixedLocationSetup({
         businessOfferingSelect === "Desired Location"
           ? teamMembersDesired
           : teamMembersFixed;
-      await onSaveBusinessSetup(buildBusinessSetupSaveBody(teamForSave));
+      await onSaveBusinessSetup(buildBusinessSetupSaveBody(teamForSave, options));
       clearPendingTeamMemberPhotos();
     };
 
@@ -2282,23 +2315,14 @@ export default function ProfessionalFixedLocationSetup({
   ]);
 
   const notifyBusinessSetupPersisted = React.useCallback(
-    (savedMessage = "Changes saved.") => {
-      if (isBusinessProfileActive) {
-        setIsBusinessPublishEnabled(false);
-        showSnackbar({
-          severity: "success",
-          message: "Changes saved and are now live.",
-        });
-        return;
-      }
-
+    (savedMessage = "Saved. Publish to show these changes to clients.") => {
       setIsBusinessPublishEnabled(true);
       showSnackbar({
         severity: "success",
         message: savedMessage,
       });
     },
-    [isBusinessProfileActive, showSnackbar],
+    [showSnackbar],
   );
 
   const saveBusinessSection = React.useCallback(
@@ -2313,7 +2337,7 @@ export default function ProfessionalFixedLocationSetup({
       }
 
       try {
-        await saveBusinessSetupData();
+        await saveBusinessSetupData({ section: sectionId });
         setEditingBusinessSections((prev) => {
           const next = new Set(prev);
           next.delete(sectionId);
@@ -2359,10 +2383,6 @@ export default function ProfessionalFixedLocationSetup({
   >([]);
   servicesFixedRef.current = servicesFixed;
   servicesDesiredRef.current = servicesDesired;
-  React.useEffect(() => {
-    setServicesFixed(initialServiceItems);
-    setServicesDesired(initialServiceItems);
-  }, [initialServiceItems]);
 
   const hydratedBusinessRef = React.useRef<string | null>(null);
 
@@ -2371,7 +2391,14 @@ export default function ProfessionalFixedLocationSetup({
       return;
     }
 
-    const hydrationKey = `${businessSetupData.id}:${businessSetupData.updated_at}`;
+    const hydrationKey = [
+      businessSetupData.id,
+      businessSetupData.updated_at,
+      businessSetupData.has_unpublished_changes ? "draft" : "live",
+      businessSetupData.additional_notes ?? "",
+      businessSetupData.price_range ?? "",
+      businessSetupData.cancellation_policy_instruction ?? "",
+    ].join(":");
     if (hydratedBusinessRef.current === hydrationKey) {
       return;
     }
@@ -2563,10 +2590,26 @@ export default function ProfessionalFixedLocationSetup({
       };
     };
 
-    const savedServices: BusinessSubserviceUi[] =
-      businessSetupData.service_details
-        .filter((item) => item.is_visible !== false)
-        .map(mapDetailToSubservice);
+    const detailsForHydration =
+      businessSetupData.service_details?.length
+        ? businessSetupData.service_details
+        : (businessSetupData.service_categories ?? []).map((entry) => ({
+            id: String(entry.service_id),
+            business_setup_id: businessSetupData.id,
+            service_id: String(entry.service_id),
+            price: entry.amount,
+            duration_label: entry.duration_label ?? null,
+            parent_service_id: entry.parent_service_id ?? null,
+            created_at: "",
+            service_title: entry.service_title || "",
+            category_id: String(entry.category_id),
+            category_title: entry.category_title || "",
+            is_visible: entry.is_visible !== false,
+          }));
+
+    const savedServices: BusinessSubserviceUi[] = detailsForHydration
+      .filter((item) => item.is_visible !== false)
+      .map(mapDetailToSubservice);
     const hydratedServices = hydrateMainAndSubservicesFromDetails(
       savedServices,
       categoryTitleById,
@@ -2610,6 +2653,12 @@ export default function ProfessionalFixedLocationSetup({
     values.discountEnabled,
     values.discountValue,
   ]);
+
+  React.useEffect(() => {
+    if (businessSetupData?.has_unpublished_changes) {
+      setIsBusinessPublishEnabled(true);
+    }
+  }, [businessSetupData?.has_unpublished_changes, businessSetupData?.id]);
 
   const getBusinessSetupPublishValidation = React.useCallback(() => {
     const profileSource =
@@ -2738,11 +2787,22 @@ export default function ProfessionalFixedLocationSetup({
     }
 
     try {
-      const teamForSave =
-        businessOfferingSelect === "Desired Location"
-          ? teamMembersDesired
-          : teamMembersFixed;
-      await onSaveBusinessSetup(buildBusinessSetupSaveBody(teamForSave));
+      const openSections = [...editingBusinessSections];
+      for (const sectionId of openSections) {
+        await saveBusinessSetupData({ section: sectionId });
+      }
+      const locationModeMap: Record<
+        OfferingSelectOption,
+        UpsertBusinessSetupRequest["location_mode"]
+      > = {
+        "Fixed Location": "fixed",
+        "Desired Location": "desired",
+        Both: "both",
+      };
+      await onSaveBusinessSetup({
+        publish: true,
+        location_mode: locationModeMap[businessOfferingSelect] ?? "fixed",
+      });
       clearPendingTeamMemberPhotos();
       await updateBusinessSetupActive({ is_active: true }).unwrap();
       setIsBusinessPublishEnabled(false);
@@ -2759,15 +2819,14 @@ export default function ProfessionalFixedLocationSetup({
       });
     }
   }, [
-    buildBusinessSetupSaveBody,
     businessOfferingSelect,
     clearPendingTeamMemberPhotos,
+    editingBusinessSections,
     getBusinessSetupPublishValidation,
     isBusinessProfileActive,
     onSaveBusinessSetup,
+    saveBusinessSetupData,
     showSnackbar,
-    teamMembersDesired,
-    teamMembersFixed,
     updateBusinessSetupActive,
   ]);
 
@@ -3111,7 +3170,9 @@ export default function ProfessionalFixedLocationSetup({
     onMarkUnpublished: () => setIsBusinessPublishEnabled(true),
     onSaveBusinessSetup: onSaveBusinessSetup
       ? async (members) => {
-          await onSaveBusinessSetup(buildBusinessSetupSaveBody(members));
+          await onSaveBusinessSetup(
+            buildBusinessSetupSaveBody(members, { section: "team" }),
+          );
           setTeamMembers((prev) =>
             prev.map((member) => ({
               ...member,
@@ -3141,7 +3202,7 @@ export default function ProfessionalFixedLocationSetup({
     },
     onSaveBusinessSetup: onSaveBusinessSetup
       ? async () => {
-          await saveBusinessSetupData();
+          await saveBusinessSetupData({ section: "services" });
         }
       : undefined,
   });
@@ -4502,8 +4563,10 @@ export default function ProfessionalFixedLocationSetup({
     if (!onSaveBusinessSetup) return;
 
     try {
-      await saveBusinessSetupData();
-      notifyBusinessSetupPersisted("Services saved.");
+      await saveBusinessSetupData({ section: "services" });
+      notifyBusinessSetupPersisted(
+        "Services saved. Publish to make them live.",
+      );
     } catch (error) {
       showSnackbar({
         severity: "error",
@@ -6455,7 +6518,10 @@ export default function ProfessionalFixedLocationSetup({
                 <MollureFormField
                   value={values.kilometerAllowance}
                   onChange={(e) =>
-                    setField("kilometerAllowance", e.target.value)
+                    setPublishableFormField(
+                      "kilometerAllowance",
+                      e.target.value,
+                    )
                   }
                   placeholder="€ 0"
                   disabled={priceDisabled}
@@ -6477,7 +6543,10 @@ export default function ProfessionalFixedLocationSetup({
                     placeholder="Custom instructions for Kilometer Allowance"
                     value={values.kilometerAllowanceInstructions}
                     onChange={(e) =>
-                      setField("kilometerAllowanceInstructions", e.target.value)
+                      setPublishableFormField(
+                        "kilometerAllowanceInstructions",
+                        e.target.value,
+                      )
                     }
                     multiline
                     minRows={3}
@@ -6531,7 +6600,7 @@ export default function ProfessionalFixedLocationSetup({
                       placeholder="Hour"
                       value={values.policyResponseHours}
                       onChange={(e) =>
-                        setField("policyResponseHours", e.target.value)
+                        setPublishableFormField("policyResponseHours", e.target.value)
                       }
                       disabled={policyDisabled}
                       sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
@@ -6548,7 +6617,7 @@ export default function ProfessionalFixedLocationSetup({
                       placeholder="Minutes"
                       value={values.policyResponseMinutes}
                       onChange={(e) =>
-                        setField("policyResponseMinutes", e.target.value)
+                        setPublishableFormField("policyResponseMinutes", e.target.value)
                       }
                       disabled={policyDisabled}
                       sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
@@ -6566,7 +6635,9 @@ export default function ProfessionalFixedLocationSetup({
               <MollureFormField
                 placeholder="Custom instructions for Policy"
                 value={values.policyInstructions}
-                onChange={(e) => setField("policyInstructions", e.target.value)}
+                onChange={(e) =>
+                  setPublishableFormField("policyInstructions", e.target.value)
+                }
                 multiline
                 minRows={3}
                 disabled={policyDisabled}
@@ -6607,7 +6678,7 @@ export default function ProfessionalFixedLocationSetup({
                       placeholder="Hour"
                       value={values.rescheduleMinimumHours}
                       onChange={(e) =>
-                        setField("rescheduleMinimumHours", e.target.value)
+                        setPublishableFormField("rescheduleMinimumHours", e.target.value)
                       }
                       disabled={reschedulingPolicyDisabled}
                       sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
@@ -6624,7 +6695,7 @@ export default function ProfessionalFixedLocationSetup({
                       placeholder="Minutes"
                       value={values.rescheduleMinimumMinutes}
                       onChange={(e) =>
-                        setField("rescheduleMinimumMinutes", e.target.value)
+                        setPublishableFormField("rescheduleMinimumMinutes", e.target.value)
                       }
                       disabled={reschedulingPolicyDisabled}
                       sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
@@ -6654,7 +6725,7 @@ export default function ProfessionalFixedLocationSetup({
                   placeholder="0"
                   value={values.rescheduleLateFeePercent}
                   onChange={(e) =>
-                    setField("rescheduleLateFeePercent", e.target.value)
+                    setPublishableFormField("rescheduleLateFeePercent", e.target.value)
                   }
                   disabled={reschedulingPolicyDisabled}
                   sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
@@ -6671,7 +6742,7 @@ export default function ProfessionalFixedLocationSetup({
                 placeholder="Custom instructions for rescheduling Policy"
                 value={values.rescheduleInstructions}
                 onChange={(e) =>
-                  setField("rescheduleInstructions", e.target.value)
+                  setPublishableFormField("rescheduleInstructions", e.target.value)
                 }
                 multiline
                 minRows={3}
@@ -6713,7 +6784,7 @@ export default function ProfessionalFixedLocationSetup({
                       placeholder="Hour"
                       value={values.cancelMinimumHours}
                       onChange={(e) =>
-                        setField("cancelMinimumHours", e.target.value)
+                        setPublishableFormField("cancelMinimumHours", e.target.value)
                       }
                       disabled={cancellationPolicyDisabled}
                       sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
@@ -6730,7 +6801,7 @@ export default function ProfessionalFixedLocationSetup({
                       placeholder="Minutes"
                       value={values.cancelMinimumMinutes}
                       onChange={(e) =>
-                        setField("cancelMinimumMinutes", e.target.value)
+                        setPublishableFormField("cancelMinimumMinutes", e.target.value)
                       }
                       disabled={cancellationPolicyDisabled}
                       sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
@@ -6760,7 +6831,7 @@ export default function ProfessionalFixedLocationSetup({
                   placeholder="0"
                   value={values.cancelLateFeePercent}
                   onChange={(e) =>
-                    setField("cancelLateFeePercent", e.target.value)
+                    setPublishableFormField("cancelLateFeePercent", e.target.value)
                   }
                   disabled={cancellationPolicyDisabled}
                   sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
@@ -6776,7 +6847,9 @@ export default function ProfessionalFixedLocationSetup({
               <MollureFormField
                 placeholder="Custom instructions for cancellation Policy"
                 value={values.cancelInstructions}
-                onChange={(e) => setField("cancelInstructions", e.target.value)}
+                onChange={(e) =>
+                  setPublishableFormField("cancelInstructions", e.target.value)
+                }
                 multiline
                 minRows={3}
                 disabled={cancellationPolicyDisabled}
@@ -6814,7 +6887,9 @@ export default function ProfessionalFixedLocationSetup({
                 <MollureFormField
                   placeholder="0"
                   value={values.noShowFeePercent}
-                  onChange={(e) => setField("noShowFeePercent", e.target.value)}
+                  onChange={(e) =>
+                    setPublishableFormField("noShowFeePercent", e.target.value)
+                  }
                   disabled={noShowPolicyDisabled}
                   sx={{ "& .MuiOutlinedInput-root": { bgcolor: "#fff" } }}
                   InputProps={{
@@ -6829,7 +6904,9 @@ export default function ProfessionalFixedLocationSetup({
               <MollureFormField
                 placeholder="Custom instructions for no show Policy"
                 value={values.noShowInstructions}
-                onChange={(e) => setField("noShowInstructions", e.target.value)}
+                onChange={(e) =>
+                  setPublishableFormField("noShowInstructions", e.target.value)
+                }
                 multiline
                 minRows={3}
                 disabled={noShowPolicyDisabled}
@@ -7083,7 +7160,7 @@ export default function ProfessionalFixedLocationSetup({
           {activeSubTab === "Business Setup" ? (
             isBusinessPublishEnabled ? (
               <Chip
-                label="Unsaved changes"
+                label="Unpublished changes"
                 size="small"
                 color="warning"
                 variant="outlined"

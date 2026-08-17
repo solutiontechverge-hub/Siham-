@@ -32,10 +32,6 @@ import BookingRequestStatusRow, {
   type BookingRequestRowMode,
 } from "./BookingRequestStatusRow";
 import EditRequestNoteDialog from "./EditRequestNoteDialog";
-import {
-  professionalRejectEditRequest,
-  professionalSuggestBookingChanges,
-} from "./bookingEditRequest";
 import { useBookingEditRequest } from "./useBookingEditRequest";
 import { useRouter } from "next/navigation";
 
@@ -69,10 +65,13 @@ type Props = {
       | "service_edited"
       | "unique_item_edited",
   ) => void | Promise<void>;
+  onOpenActivity?: () => void;
   /** Persist Confirmed ER note to API (client → professional). */
   onSendConfirmedEditRequest?: (note: string) => void | Promise<void>;
   /** Show Updated next to Confirmed after post-accept edits. */
   showUpdated?: boolean;
+  /** Confirmed booking was edited after ER/EBR accept. */
+  showEditScenario?: boolean;
   /** BR/EBR/ER response window elapsed. */
   responseOverdue?: boolean;
   messagingHref?: string;
@@ -98,8 +97,10 @@ export default function ClientBookingDetailsHeader({
   onDeleteBooking,
   onDiscardBookingRequest,
   onDispatchBookingNotification,
+  onOpenActivity,
   onSendConfirmedEditRequest,
   showUpdated = false,
+  showEditScenario = false,
   responseOverdue = false,
   messagingHref,
 }: Props) {
@@ -111,8 +112,6 @@ export default function ClientBookingDetailsHeader({
   const messagingWidget = useMessagingWidgetOptional();
   const [openMessagingForBooking] = useOpenMessagingForBookingMutation();
   const [editAnchor, setEditAnchor] = React.useState<HTMLElement | null>(null);
-  const [activityAnchor, setActivityAnchor] =
-    React.useState<HTMLElement | null>(null);
   const unreadFromProfessional = useClientMessagingUnread(bookingRef);
   const editRequest = useBookingEditRequest(bookingRef);
 
@@ -402,7 +401,7 @@ export default function ClientBookingDetailsHeader({
                 tone="secondary"
                 sx={headerActionBtnSx}
                 disabled={isCancelled}
-                onClick={(e) => setActivityAnchor(e.currentTarget)}
+                onClick={() => onOpenActivity?.()}
               >
                 Activity
               </AppButton>
@@ -453,50 +452,13 @@ export default function ClientBookingDetailsHeader({
               }
               rowMode={requestRowMode}
               showUpdated={showUpdated}
+              showEditScenario={showEditScenario}
               responseOverdue={responseOverdue}
             />
           </Stack>
         </Stack>
       </Box>
       <Divider />
-
-      <Menu
-        anchorEl={activityAnchor}
-        open={Boolean(activityAnchor)}
-        onClose={() => setActivityAnchor(null)}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-        transformOrigin={{ vertical: "top", horizontal: "right" }}
-        PaperProps={{ sx: { borderRadius: "10px", minWidth: 240, mt: 0.5 } }}
-      >
-        <MenuItem
-          onClick={() => {
-            setActivityAnchor(null);
-            professionalSuggestBookingChanges(bookingRef);
-            editRequest.refresh();
-            showSnackbar({
-              severity: "info",
-              message: "Professional suggested changes (demo).",
-            });
-          }}
-          sx={menuItemSx}
-        >
-          Professional suggests changes
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            setActivityAnchor(null);
-            professionalRejectEditRequest(bookingRef);
-            editRequest.refresh();
-            showSnackbar({
-              severity: "info",
-              message: "Professional rejected edit request (demo).",
-            });
-          }}
-          sx={menuItemSx}
-        >
-          Professional rejects edit
-        </MenuItem>
-      </Menu>
 
       <Menu
         anchorEl={editAnchor}

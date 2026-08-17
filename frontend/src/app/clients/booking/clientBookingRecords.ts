@@ -10,8 +10,7 @@ export type ClientBookingStatus =
   | "completed"
   | "cancelled"
   | "no_show"
-  | "invalid"
-  | "waiting_for_prepayment";
+  | "invalid";
 
 export type BookingRequestDirection = "outgoing" | "incoming";
 
@@ -52,6 +51,8 @@ export type ClientBookingRecord = {
   editedProductIds?: string[];
   /** Incoming EBR from professional, parsed from booking notes. */
   incomingEditRequest?: BookingEditRequestRecord | null;
+  /** Soft-delete from client list without changing status. */
+  hiddenForCustomer?: boolean;
 };
 
 export type BookingListTab = "past" | "ongoing" | "upcoming";
@@ -70,8 +71,7 @@ export function isClientListVisibleBooking(record: ClientBookingRecord): boolean
 
 function isWaitingForPrepayment(record: ClientBookingRecord): boolean {
   if (!record.requiresPrepayment || record.prepaid) return false;
-  const status = record.status;
-  return status === "requested" || status === "confirmed" || status === "waiting_for_prepayment";
+  return record.status === "requested" || record.status === "confirmed";
 }
 
 function normalizeStatus(record: ClientBookingRecord): ClientBookingStatus {
@@ -81,9 +81,6 @@ function normalizeStatus(record: ClientBookingRecord): ClientBookingStatus {
   if (record.status === "invalid") return "invalid";
   if (record.status === "completed") return "completed";
   if (record.status === "in_progress") return "in_progress";
-  if (record.status === "waiting_for_prepayment" || isWaitingForPrepayment(record)) {
-    return "waiting_for_prepayment";
-  }
   if (record.status === "requested") return "requested";
   if (record.status === "confirmed") return "confirmed";
   return "confirmed";
@@ -97,6 +94,13 @@ export function isClientBookingPaymentDue(record: ClientBookingRecord): boolean 
   return record.paid === false;
 }
 
+export function listTabForClientBooking(record: ClientBookingRecord): BookingListTab {
+  const status = normalizeStatus(record);
+  if (status === "cancelled" || status === "no_show" || status === "completed") return "past";
+  if (status === "in_progress") return "ongoing";
+  return "upcoming";
+}
+
 /**
  * Upcoming = not started (requested / confirmed / invalid / waiting for prepayment).
  * Ongoing  = in progress only.
@@ -104,6 +108,7 @@ export function isClientBookingPaymentDue(record: ClientBookingRecord): boolean 
  */
 export function filterBookingsByTab(bookings: ClientBookingRecord[], tab: BookingListTab): ClientBookingRecord[] {
   const filtered = bookings.filter((b) => {
+    if (b.hiddenForCustomer) return false;
     const status = normalizeStatus(b);
     if (status === "cancelled" || status === "no_show" || status === "completed") {
       return tab === "past";
@@ -112,8 +117,7 @@ export function filterBookingsByTab(bookings: ClientBookingRecord[], tab: Bookin
     if (
       status === "requested" ||
       status === "confirmed" ||
-      status === "invalid" ||
-      status === "waiting_for_prepayment"
+      status === "invalid"
     ) {
       return tab === "upcoming";
     }
@@ -131,3 +135,4 @@ export function filterBookingsByTab(bookings: ClientBookingRecord[], tab: Bookin
 }
 
 export { bookingStatusLabel as statusChipLabel } from "./clientBookingStatus";
+export { isWaitingForPrepayment };

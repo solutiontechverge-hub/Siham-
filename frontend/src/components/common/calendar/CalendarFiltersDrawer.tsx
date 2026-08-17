@@ -7,6 +7,7 @@ import { alpha, useTheme } from "@mui/material/styles";
 import AppDrawer from "../AppDrawer";
 import type {
   CalendarBookingLocation,
+  CalendarBookingStatus,
   CalendarBookingType,
   CalendarResource,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
@@ -15,6 +16,7 @@ import type { CalendarFilters } from "./calendar.utils";
 type CalendarFiltersDrawerProps = {
   appliedFilters: CalendarFilters;
   bookingTypes: readonly CalendarBookingType[];
+  bookingStatuses?: readonly CalendarBookingStatus[];
   draftFilters: CalendarFilters;
   initialFilters: CalendarFilters;
   locations: readonly CalendarBookingLocation[];
@@ -103,6 +105,7 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 export default function CalendarFiltersDrawer({
   appliedFilters,
   bookingTypes,
+  bookingStatuses = ["Confirmed", "Completed", "Cancelled", "Invalid", "No Show"],
   draftFilters,
   initialFilters,
   locations,
@@ -245,6 +248,18 @@ export default function CalendarFiltersDrawer({
                       Project: false,
                       Requests: false,
                     },
+                    statusAll: checked ? true : p.statusAll,
+                    statuses: checked
+                      ? {
+                          Confirmed: false,
+                          Completed: false,
+                          Cancelled: false,
+                          Invalid: false,
+                          "No Show": false,
+                          Requested: false,
+                          "In Progress": false,
+                        }
+                      : p.statuses,
                   }))
                 }
               />
@@ -260,6 +275,48 @@ export default function CalendarFiltersDrawer({
                       ...p,
                       bookingAll: false,
                       booking: { ...p.booking, [bt]: checked },
+                    }))
+                  }
+                />
+              ))}
+            </Stack>
+          </Box>
+
+          <Box>
+            <SectionHeading>Status</SectionHeading>
+            <Stack spacing={0.75}>
+              <FilterRow
+                label="All"
+                checked={draftFilters.statusAll !== false}
+                onChange={(checked) =>
+                  setDraftFilters((p) => ({
+                    ...p,
+                    statusAll: checked,
+                    statuses: {
+                      Confirmed: false,
+                      Completed: false,
+                      Cancelled: false,
+                      Invalid: false,
+                      "No Show": false,
+                      Requested: false,
+                      "In Progress": false,
+                    },
+                  }))
+                }
+              />
+              {bookingStatuses.map((st) => (
+                <FilterRow
+                  key={st}
+                  label={st}
+                  checked={
+                    draftFilters.statusAll === false &&
+                    Boolean(draftFilters.statuses?.[st])
+                  }
+                  onChange={(checked) =>
+                    setDraftFilters((p) => ({
+                      ...p,
+                      statusAll: false,
+                      statuses: { ...p.statuses, [st]: checked },
                     }))
                   }
                 />
