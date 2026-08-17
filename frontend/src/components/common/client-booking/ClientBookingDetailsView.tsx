@@ -6,6 +6,7 @@ import { Box, Container, Paper } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import {
   AppButton,
+  AppDrawer,
   AppPillTabs,
   ClientPageTabsBar,
   MarketingSiteFooter,
@@ -28,6 +29,7 @@ import {
   clearActiveBookingSession,
   getActiveBookingSession,
   setActiveBookingSession,
+  unlockEbrDraft,
 } from "../../../app/clients/booking/clientBookingSession";
 import {
   hasUnseenBookingUpdate,
@@ -43,6 +45,9 @@ import ClientEbrSuggestDrawer from "./ClientEbrSuggestDrawer";
 import { setBookingCancellationReason } from "./bookingCancellationReason";
 import { settleCancellationFee } from "./settleCancellationFee";
 import ClientBookingDetailsHeader from "./ClientBookingDetailsHeader";
+import BookingActivityOverview from "../calendar/BookingActivityOverview";
+import { buildBookingActivityTimeline } from "../calendar/buildBookingActivityTimeline";
+import type { BookingActivityItem } from "../calendar/bookingActivity.types";
 import ClientBookingInfoBar from "./ClientBookingInfoBar";
 import ClientBookingPaymentDetailsCard from "./ClientBookingPaymentDetailsCard";
 import ClientBookingPaymentSummary from "./ClientBookingPaymentSummary";
@@ -68,6 +73,7 @@ import {
   clearBookingEditRequest,
   consumeConfirmedEditGrant,
   getBookingEditRequest,
+  isConfirmedEditGrantActive,
   professionalRejectEditRequest,
   professionalSuggestBookingChanges,
   professionalAcceptClientEditRequest,
@@ -81,7 +87,12 @@ import {
   parseStoredErFromNotes,
   resolveKilometerAllowanceAmount,
   serializeCalendarEntryNotes,
+  markClientEbrAcceptedInNotes,
 } from "../calendar/bookingEventDetails";
+import {
+  detectEditedServiceIds,
+  detectServiceLineChanges,
+} from "../calendar/bookingRequestNegotiation";
 import { isResponseWindowOverdue } from "../calendar/bookingResponseDeadline";
 import {
   FinanceDocumentPreviewDrawer,
@@ -169,7 +180,7 @@ export default function ClientBookingDetailsView({
   const isPrepaid = variant === "prepaid";
   const locationMode = shop?.locationMode ?? "fixed";
   const checkoutBookingRef = useCheckoutBookingRef();
-  const { record: activeBooking, refresh: refreshActiveBooking } =
+  const { record: activeBooking, apiBookings, refresh: refreshActiveBooking } =
     useActiveClientBooking();
   const bookingRef = activeBooking?.bookingRef ?? checkoutBookingRef;
   const editRequest = useBookingEditRequest(bookingRef);
@@ -188,6 +199,35 @@ export default function ClientBookingDetailsView({
       : ("required" as const);
   const apiBookingId = activeBooking?.apiBookingId ?? activeBooking?.id ?? null;
 
+  const activityTimelineItems = React.useMemo(
+    () =>
+      buildBookingActivityTimeline({
+        bookings: apiBookings,
+        clientEmail: user?.email ?? null,
+        clientName: requesterName,
+        currentBookingId: apiBookingId,
+        currentBookingCode: bookingRef,
+        currentScenario: activeBooking?.incomingEditRequest
+          ? "EBR"
+          : bookingStatus === "requested"
+            ? "BR"
+            : null,
+        currentStatus: bookingStatus,
+        currentProfessionalName: resolvePrimaryProfessional(draft).name,
+        mode: "activity",
+      }),
+    [
+      activeBooking?.incomingEditRequest,
+      apiBookingId,
+      apiBookings,
+      bookingRef,
+      bookingStatus,
+      draft,
+      requesterName,
+      user?.email,
+    ],
+  );
+
   const [phone, setPhone] = React.useState("");
   const [cancelDialogOpen, setCancelDialogOpen] = React.useState(false);
   const [cancelFeeDialogOpen, setCancelFeeDialogOpen] = React.useState(false);
@@ -196,6 +236,9 @@ export default function ClientBookingDetailsView({
   const [isCancelProcessing, setIsCancelProcessing] = React.useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = React.useState(false);
   const [discardDialogOpen, setDiscardDialogOpen] = React.useState(false);
+  const [activityOpen, setActivityOpen] = React.useState(false);
+  const [activityDetailItem, setActivityDetailItem] =
+    React.useState<BookingActivityItem | null>(null);
   const [ebrSuggestDrawerOpen, setEbrSuggestDrawerOpen] = React.useState(false);
   const [ebrAction, setEbrAction] = React.useState<ClientEbrActionKind | null>(
     null,
@@ -312,7 +355,7 @@ export default function ClientBookingDetailsView({
       isEbrIncoming ||
       editRequest.isPending ||
       (bookingStatus !== "confirmed" &&
-        bookingStatus !== "waiting_for_prepayment")
+        bookingStatus !== "requested")
     ) {
       return;
     }
@@ -513,15 +556,31 @@ export default function ClientBookingDetailsView({
     );
   }, [draft?.total, prepaymentPercent]);
 
+  const appointmentStartMs = React.useMemo(() => {
+    if (!draft?.selectedDateISO) return null;
+    const iso = buildWallClockDateTimeIso(
+      draft.selectedDateISO,
+      parseTimeLabelToMinutes(draft.selectedTime ?? ""),
+    );
+    const ms = new Date(iso).getTime();
+    return Number.isFinite(ms) ? ms : null;
+  }, [draft?.selectedDateISO, draft?.selectedTime]);
+
   const cancellationSettlement = React.useMemo(
     () =>
       settleCancellationFee({
         bookingTotal: draft?.total ?? 0,
         feePercent: Number(businessProfile?.cancellationFeePercent) || 0,
         prepaidPaid: isPrepaymentPaid ? prepaidAmount : 0,
+        appointmentStartMs,
+        noticeHours: businessProfile?.cancellationNoticeHours,
+        noticeMinutes: businessProfile?.cancellationNoticeMinutes,
       }),
     [
+      appointmentStartMs,
       businessProfile?.cancellationFeePercent,
+      businessProfile?.cancellationNoticeHours,
+      businessProfile?.cancellationNoticeMinutes,
       draft?.total,
       isPrepaymentPaid,
       prepaidAmount,
@@ -672,12 +731,19 @@ export default function ClientBookingDetailsView({
     (reason: string) => {
       setPendingCancelReason(reason);
       setCancelDialogOpen(false);
-      // Unpaid booking requests — no cancellation fee / prepayment charges.
-      if (bookingStatus === "requested" && !isPrepaymentPaid) {
+      const skipFeeDialog =
+        (bookingStatus === "requested" && !isPrepaymentPaid) ||
+        (!cancellationSettlement.isLateCancellation &&
+          cancellationSettlement.amountDueNow < 0.5 &&
+          cancellationSettlement.refundAmount <= 0);
+      // Unpaid requests, or cancels outside the notice window with nothing to settle.
+      if (skipFeeDialog) {
         void (async () => {
           setIsCancelProcessing(true);
           try {
-            await finalizeBookingCancellation(0);
+            await finalizeBookingCancellation(
+              cancellationSettlement.refundAmount,
+            );
           } catch (error) {
             showSnackbar({
               severity: "error",
@@ -693,6 +759,7 @@ export default function ClientBookingDetailsView({
     },
     [
       bookingStatus,
+      cancellationSettlement,
       finalizeBookingCancellation,
       isPrepaymentPaid,
       showSnackbar,
@@ -727,14 +794,25 @@ export default function ClientBookingDetailsView({
       return;
     }
     try {
-      await updateMyBooking({ id: apiBookingId, status: "cancelled" }).unwrap();
+      const currentNotes = activeBooking?.notes ?? null;
+      const details = {
+        ...(parseCalendarEntryNotes(currentNotes) ?? {}),
+        hiddenForCustomer: true,
+      };
+      const nextNotes = serializeCalendarEntryNotes(
+        details.internalNote ?? "",
+        details,
+        parseStoredEbrFromNotes(currentNotes),
+        parseStoredErFromNotes(currentNotes),
+      );
+      await updateMyBooking({ id: apiBookingId, notes: nextNotes }).unwrap();
       clearActiveBookingSessionLocal();
-      showSnackbar({ severity: "success", message: "Booking cancelled" });
+      showSnackbar({ severity: "success", message: "Booking removed from your list" });
       router.push("/clients/booking?tab=upcoming");
     } catch (error) {
       showSnackbar({
         severity: "error",
-        message: getApiErrorMessage(error, "Unable to cancel booking."),
+        message: getApiErrorMessage(error, "Unable to remove booking."),
       });
     }
   };
@@ -1025,13 +1103,106 @@ export default function ClientBookingDetailsView({
 
       if (apiBookingId) {
         try {
-          await updateMyBooking({
-            id: apiBookingId,
-            status: "confirmed",
-            ...(shouldRequirePrepay
-              ? { prepayment_status: "required" as const }
-              : {}),
-          }).unwrap();
+          if (mode === "accept_suggested") {
+            const ebr = parseStoredEbrFromNotes(activeBooking?.notes);
+            const priorNotes = parseCalendarEntryNotes(activeBooking?.notes);
+            const suggestedServices =
+              ebr?.suggestedServices?.length
+                ? ebr.suggestedServices
+                : editRequest.suggestedServices?.map((service) => ({
+                    id: service.id,
+                    name: service.name,
+                    durationMins: service.durationMins,
+                    price: service.price,
+                    guestId: service.guestId ?? null,
+                    teamMemberId: service.teamMemberId ?? null,
+                  }));
+            const suggestedProducts =
+              ebr?.suggestedProducts?.length
+                ? ebr.suggestedProducts
+                : editRequest.suggestedProducts?.map((product) => ({
+                    id: product.id,
+                    name: product.name,
+                    price: product.price,
+                    quantity: product.quantity || 1,
+                    unitPrice: product.price,
+                  }));
+            const appliedNotes = markClientEbrAcceptedInNotes(
+              activeBooking?.notes,
+              {
+                internalNote: priorNotes?.internalNote ?? "",
+                services: suggestedServices,
+                products: suggestedProducts,
+                lastEditedBy: ebr?.lastEditedBy ?? "professional",
+                editedServiceIds:
+                  ebr?.editedServiceIds ?? editRequest.editedServiceIds,
+                editedProductIds:
+                  ebr?.editedProductIds ?? editRequest.editedProductIds,
+                clientSnapshot: {
+                  ...(priorNotes?.clientSnapshot ?? {}),
+                  ...(suggestedServices?.length
+                    ? {
+                        services: suggestedServices.map((service) => ({
+                          id: service.id,
+                          name: service.name,
+                          price: service.price,
+                          durationMins: service.durationMins,
+                          guestId: service.guestId ?? null,
+                          teamMemberId: service.teamMemberId ?? null,
+                        })),
+                      }
+                    : {}),
+                  ...(ebr?.suggestedProjectDetails
+                    ? { projectDetails: ebr.suggestedProjectDetails }
+                    : {}),
+                },
+              },
+            );
+            const suggestedTotal =
+              ebr?.suggestedTotalPrice ??
+              (suggestedServices ?? []).reduce(
+                (sum, service) => sum + (Number(service.price) || 0),
+                0,
+              ) +
+                (suggestedProducts ?? []).reduce(
+                  (sum, product) =>
+                    sum + (Number(product.price) || 0) * (product.quantity || 1),
+                  0,
+                );
+            const suggestedStart = ebr?.suggestedStart;
+            const suggestedEnd = ebr?.suggestedEnd;
+            const suggestedDate = ebr?.suggestedDateISO;
+            await updateMyBooking({
+              id: apiBookingId,
+              status: "confirmed",
+              notes: appliedNotes,
+              ...(Number.isFinite(suggestedTotal) && suggestedTotal > 0
+                ? { total_price: suggestedTotal }
+                : {}),
+              ...(suggestedDate &&
+              suggestedStart &&
+              suggestedEnd &&
+              /^\d{2}:\d{2}$/.test(suggestedStart) &&
+              /^\d{2}:\d{2}$/.test(suggestedEnd)
+                ? {
+                    booking_date: suggestedDate,
+                    start_time: `${suggestedDate}T${suggestedStart}:00`,
+                    end_time: `${suggestedDate}T${suggestedEnd}:00`,
+                  }
+                : {}),
+              ...(shouldRequirePrepay
+                ? { prepayment_status: "required" as const }
+                : {}),
+            }).unwrap();
+          } else {
+            await updateMyBooking({
+              id: apiBookingId,
+              status: "confirmed",
+              ...(shouldRequirePrepay
+                ? { prepayment_status: "required" as const }
+                : {}),
+            }).unwrap();
+          }
           await refreshActiveBooking();
         } catch (error) {
           showSnackbar({
@@ -1071,6 +1242,7 @@ export default function ClientBookingDetailsView({
       }
     },
     [
+      activeBooking?.notes,
       activeBooking?.prepaid,
       activeBooking?.prepaymentPercent,
       activeBooking?.requiresPrepayment,
@@ -1353,6 +1525,9 @@ export default function ClientBookingDetailsView({
 
     return {
       ...draft,
+      selectedDateISO:
+        editRequest.suggestedDateISO || draft.selectedDateISO,
+      selectedTime: editRequest.suggestedTime || draft.selectedTime,
       // Preserve people + projectDetails via spread — EBR only updates service lines/totals.
       services,
       teamMembers,
@@ -1362,6 +1537,8 @@ export default function ClientBookingDetailsView({
     draft,
     editRequest.isPending,
     editRequest.isSuggested,
+    editRequest.suggestedDateISO,
+    editRequest.suggestedTime,
     editRequest.suggestedProducts,
     editRequest.suggestedServices,
   ]);
@@ -1577,6 +1754,7 @@ export default function ClientBookingDetailsView({
         }
         await refreshActiveBooking();
       }
+      unlockEbrDraft();
       editRequest.refresh();
       showSnackbar({
         severity: "success",
@@ -1652,6 +1830,7 @@ export default function ClientBookingDetailsView({
     const sessionRecord = getActiveBookingSession();
     const sessionDraft = sessionRecord?.draft;
     if (!sessionDraft?.selectedDateISO) {
+      unlockEbrDraft();
       showSnackbar({
         severity: "error",
         message: "Booking date is missing.",
@@ -1660,6 +1839,7 @@ export default function ClientBookingDetailsView({
     }
 
     const services = sessionDraft.services ?? [];
+    const products = sessionDraft.products ?? [];
     const durationMins = services.reduce(
       (sum, service) => sum + (service.durationMins || 0),
       0,
@@ -1671,6 +1851,38 @@ export default function ClientBookingDetailsView({
     const priorNotes = parseCalendarEntryNotes(
       sessionRecord?.notes ?? activeBooking?.notes,
     );
+    let cursor = startMinutes;
+    const serviceLines = services.map((s) => {
+      const duration = Math.max(15, s.durationMins || 15);
+      const startHhmm = `${String(Math.floor(cursor / 60)).padStart(2, "0")}:${String(cursor % 60).padStart(2, "0")}`;
+      cursor += duration;
+      const endHhmm = `${String(Math.floor(cursor / 60)).padStart(2, "0")}:${String(cursor % 60).padStart(2, "0")}`;
+      return {
+        id: s.id,
+        name: s.name,
+        price: s.price,
+        durationMins: s.durationMins,
+        guestId: s.guestId ?? null,
+        teamMemberId: s.teamMemberId ?? null,
+        startTime: startHhmm,
+        endTime: endHhmm,
+      };
+    });
+    const productLines = products.map((product) => ({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      quantity: product.quantity || 1,
+      unitPrice: product.unitPrice ?? product.price,
+    }));
+    const originalServices =
+      priorNotes?.originalServices?.length
+        ? priorNotes.originalServices
+        : (priorNotes?.services ?? []);
+    const lineChanges = detectServiceLineChanges(
+      originalServices,
+      serviceLines,
+    );
     const clientSnapshot = {
       people: (sessionDraft.people ?? []).map((p) => ({
         id: p.id,
@@ -1681,14 +1893,7 @@ export default function ClientBookingDetailsView({
         planningDuration: p.planningDuration,
         planningIsLocked: p.planningIsLocked,
       })),
-      services: services.map((s) => ({
-        id: s.id,
-        name: s.name,
-        price: s.price,
-        durationMins: s.durationMins,
-        guestId: s.guestId ?? null,
-        teamMemberId: s.teamMemberId ?? null,
-      })),
+      services: serviceLines,
       projectDetails: sessionDraft.projectDetails
         ? {
             description: sessionDraft.projectDetails.description ?? "",
@@ -1706,8 +1911,18 @@ export default function ClientBookingDetailsView({
       {
         ...priorNotes,
         clientSnapshot,
+        services: serviceLines,
+        products: productLines,
         lastEditedBy: "client",
-        requestDirection: priorNotes?.requestDirection,
+        originalServices: originalServices.length
+          ? originalServices
+          : serviceLines,
+        editedServiceIds: detectEditedServiceIds(
+          originalServices,
+          serviceLines,
+        ),
+        addedServiceIds: lineChanges.added,
+        cancelledServiceIds: lineChanges.cancelled,
       },
       null,
       null,
@@ -1730,6 +1945,7 @@ export default function ClientBookingDetailsView({
     }).unwrap();
 
     consumeConfirmedEditGrant(bookingRef);
+    unlockEbrDraft();
     if (sessionRecord) {
       setActiveBookingSession({
         ...sessionRecord,
@@ -1759,18 +1975,24 @@ export default function ClientBookingDetailsView({
     const { note, editedIds } = pendingEbrSuggestSend;
     setPendingEbrSuggestSend(null);
     void (async () => {
+      const grantActive =
+        isConfirmedEditGrantActive(bookingRef, "client") ||
+        (activeBooking?.editRequest?.status === "approved" &&
+          Boolean(activeBooking.editRequest.edit_grant_active) &&
+          activeBooking.editRequest.initiated_by === "client");
       try {
-        if (editRequest.isEditGrantActive) {
+        if (grantActive) {
           await persistConfirmedGrantEdit();
           return;
         }
         await persistClientEbrSuggestion(note, editedIds);
       } catch (error) {
+        unlockEbrDraft();
         showSnackbar({
           severity: "error",
           message: getApiErrorMessage(
             error,
-            editRequest.isEditGrantActive
+            grantActive
               ? "Unable to update booking."
               : "Unable to send EBR to the professional.",
           ),
@@ -1778,8 +2000,10 @@ export default function ClientBookingDetailsView({
       }
     })();
   }, [
+    activeBooking?.editRequest?.edit_grant_active,
+    activeBooking?.editRequest?.initiated_by,
+    activeBooking?.editRequest?.status,
     bookingRef,
-    editRequest.isEditGrantActive,
     pendingEbrSuggestSend,
     persistClientEbrSuggestion,
     persistConfirmedGrantEdit,
@@ -2003,6 +2227,7 @@ export default function ClientBookingDetailsView({
             }
             onDeleteBooking={() => setDeleteDialogOpen(true)}
             onDiscardBookingRequest={() => setDiscardDialogOpen(true)}
+            onOpenActivity={() => setActivityOpen(true)}
             onDispatchBookingNotification={dispatchClientBookingNotification}
             onSendConfirmedEditRequest={async (note) => {
               if (!apiBookingId || !bookingRef) {
@@ -2021,6 +2246,15 @@ export default function ClientBookingDetailsView({
               editRequest.refresh();
             }}
             showUpdated={showStatusUpdated}
+            showEditScenario={
+              bookingStatus === "confirmed" &&
+              !editRequest.isPending &&
+              !isEbrIncoming &&
+              (Boolean(bookingNotesMeta?.lastEditedBy) ||
+                Boolean(activeBooking?.editedServiceIds?.length) ||
+                Boolean(activeBooking?.editedProductIds?.length) ||
+                isClientChangeAccepted)
+            }
             responseOverdue={isResponseWindowOverdue({
               responseStatus: bookingNotesMeta?.responseStatus,
               responseStartedAt: bookingNotesMeta?.responseStartedAt,
@@ -2199,6 +2433,26 @@ export default function ClientBookingDetailsView({
         onClose={() => setDiscardDialogOpen(false)}
         onConfirm={handleDiscardBookingRequest}
       />
+
+      <AppDrawer
+        open={activityOpen}
+        onClose={() => {
+          setActivityOpen(false);
+          setActivityDetailItem(null);
+        }}
+        title="Activity"
+        panelWidth={420}
+      >
+        <Box sx={{ px: 2, pb: 2 }}>
+          <BookingActivityOverview
+            title="Activity Overview"
+            items={activityTimelineItems}
+            emptyMessage="No activity for this booking yet."
+            selectedDetail={activityDetailItem}
+            onSelectedDetailChange={setActivityDetailItem}
+          />
+        </Box>
+      </AppDrawer>
 
       <ClientEbrActionDialog
         open={Boolean(ebrAction)}

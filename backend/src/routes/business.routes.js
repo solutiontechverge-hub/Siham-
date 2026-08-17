@@ -154,6 +154,9 @@ const parseBusinessSetupBody = (req, res, next) => {
     }
   }
 
+  if (req.body?.publish === "true") req.body.publish = true;
+  if (req.body?.publish === "false") req.body.publish = false;
+
   return next();
 };
 
@@ -438,8 +441,8 @@ router.patch(
     body("status")
       .optional({ values: "falsy" })
       .trim()
-      .isIn(["cancelled", "confirmed", "requested"])
-      .withMessage("status must be cancelled, confirmed, or requested."),
+      .isIn(["cancelled", "confirmed", "requested", "invalid"])
+      .withMessage("status must be cancelled, confirmed, requested, or invalid."),
     body("prepayment_status")
       .optional({ values: "falsy" })
       .trim()

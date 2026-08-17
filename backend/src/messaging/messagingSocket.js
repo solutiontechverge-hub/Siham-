@@ -1,4 +1,5 @@
 import { Server } from "socket.io";
+import { query } from "../db/index.js";
 import {
   appendThreadMessageLegacy,
   deleteMessage,
@@ -52,6 +53,30 @@ export function emitBookingChanged(booking, action = "updated") {
   if (booking.customer_id) {
     messagingIo.to(`user:${booking.customer_id}`).emit("bookings:changed", payload);
   }
+  // Professional calendar stays open — also notify the owner user room so FL/DL
+  // updates appear without a manual reload (not only the one joined setup).
+  void query(
+    `SELECT pp.user_id
+     FROM business_setups bs
+     INNER JOIN professional_profiles pp ON pp.id = bs.professional_profile_id
+     WHERE bs.id = $1
+     LIMIT 1`,
+    [booking.business_setup_id],
+  )
+    .then((result) => {
+      const professionalUserId = result.rows[0]?.user_id;
+      if (
+        professionalUserId &&
+        String(professionalUserId) !== String(booking.customer_id ?? "")
+      ) {
+        messagingIo
+          .to(`user:${professionalUserId}`)
+          .emit("bookings:changed", payload);
+      }
+    })
+    .catch(() => {
+      // best-effort live update
+    });
 }
 
 export function emitReviewChanged(payload = {}) {

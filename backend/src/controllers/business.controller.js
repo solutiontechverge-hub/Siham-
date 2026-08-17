@@ -5,6 +5,17 @@ import {
   uploadTeamMemberPhotoFileToS3,
 } from "../services/s3-upload.service.js";
 import { buildServiceDetailsFromCategories } from "../utils/business-service-categories.js";
+import {
+  applyUnpublishedDraftToSetup,
+  buildUnpublishedDraftPayload,
+  firstNonEmptyArray,
+  getDraftLiveColumnUpdates,
+  isDraftSetupRequest,
+  isPublishSetupRequest,
+  mergeUnpublishedDraft,
+  omitEmptyCollections,
+  pickSectionDraft,
+} from "../utils/business-setup-draft.js";
 import { syncBookingToFinanceTransaction } from "../services/finance-sync.service.js";
 import {
   BOOKING_NOTIFICATION_EVENTS,
@@ -418,7 +429,11 @@ const getBusinessSetupByUserId = async (userId, preferredLocationType = null) =>
   return modeMatch || rows[0];
 };
 
-const getBusinessSetupDetailById = async (setupId, client = { query }) => {
+const getBusinessSetupDetailById = async (
+  setupId,
+  client = { query },
+  options = {},
+) => {
   const setupResult = await client.query(
     `SELECT bs.*
      FROM business_setups bs
@@ -462,7 +477,7 @@ const getBusinessSetupDetailById = async (setupId, client = { query }) => {
     { teamMembers, useTeamAssignmentsFallback: false },
   );
 
-  return {
+  const detail = {
     ...businessSetup,
     service_categories: serviceCategories,
     book_service_combinations: parseJsonArray(businessSetup.book_service_combinations),
@@ -470,16 +485,30 @@ const getBusinessSetupDetailById = async (setupId, client = { query }) => {
     team_members: teamMembers,
     service_details: serviceDetails,
   };
+
+  if (options.includeDraft) {
+    return applyUnpublishedDraftToSetup(detail, client.query.bind(client));
+  }
+
+  const { unpublished_draft: _unpublishedDraft, ...liveDetail } = detail;
+  return {
+    ...liveDetail,
+    has_unpublished_changes: businessSetup.has_unpublished_changes === true,
+  };
 };
 
-const getBusinessSetupDetailByUserId = async (userId, client = { query }) => {
+const getBusinessSetupDetailByUserId = async (
+  userId,
+  client = { query },
+  options = {},
+) => {
   const businessSetup = await getBusinessSetupByUserId(userId);
 
   if (!businessSetup) {
     return null;
   }
 
-  return getBusinessSetupDetailById(businessSetup.id, client);
+  return getBusinessSetupDetailById(businessSetup.id, client, options);
 };
 
 export const listCategories = async (req, res) => {
@@ -606,7 +635,17 @@ export const getBusinessSetup = async (req, res) => {
       });
     }
 
-    const businessSetup = await getBusinessSetupDetailByUserId(req.user.id);
+    const liveOnly =
+      req.query.include_draft === "0" ||
+      req.query.include_draft === "false" ||
+      req.query.live === "1" ||
+      req.query.live === "true";
+    const includeDraft = !liveOnly;
+    const businessSetup = await getBusinessSetupDetailByUserId(
+      req.user.id,
+      { query },
+      { includeDraft },
+    );
 
     return res.status(200).json({
       success: true,
@@ -862,6 +901,18 @@ export const upsertBusinessSetup = async (req, res) => {
     teamMembers = await applyTeamMemberPhotoUploads(teamMembers, req.files, req.user.id);
     teamMembers = teamMembers.map(({ photo_upload_key: _photoUploadKey, ...member }) => member);
 
+    const existingSetup = await getBusinessSetupByUserId(req.user.id);
+    const existingDraft = parseJsonValue(existingSetup?.unpublished_draft, {});
+    const resolvedServiceCategories = firstNonEmptyArray(
+      serviceCategories,
+      existingDraft?.service_categories,
+      existingSetup?.service_categories,
+    );
+    const resolvedTeamMembers = firstNonEmptyArray(
+      teamMembers,
+      existingDraft?.team_members,
+    );
+
     const payload = {
       location_mode: req.body.location_mode,
       business_name: req.body.business_name ?? null,
@@ -875,7 +926,7 @@ export const upsertBusinessSetup = async (req, res) => {
       fixed_location_province: req.body.fixed_location_province ?? null,
       fixed_location_municipality: req.body.fixed_location_municipality ?? null,
       service_for: parseTextArray(req.body.service_for),
-      service_categories: JSON.stringify(serviceCategories),
+      service_categories: JSON.stringify(resolvedServiceCategories),
       project: req.body.project ?? null,
       book_service_notes: req.body.book_service_notes ?? null,
       book_service_combinations: JSON.stringify(bookServiceCombinations),
@@ -906,6 +957,199 @@ export const upsertBusinessSetup = async (req, res) => {
         parseJsonValue(req.body.section_sync_settings, {}),
       ),
     };
+
+    if (isDraftSetupRequest(req.body)) {
+      const fullDraft = buildUnpublishedDraftPayload({
+        payload,
+        serviceCategories,
+        bookServiceCombinations,
+        sectionSyncSettings: parseJsonValue(req.body.section_sync_settings, {}),
+        teamMembers,
+      });
+      const section = String(req.body.section ?? "").trim();
+      const patch = section
+        ? pickSectionDraft(section, fullDraft)
+        : omitEmptyCollections(fullDraft);
+      const mergedDraft = mergeUnpublishedDraft(existingDraft, patch);
+
+      const draftResult = await query(
+        `INSERT INTO business_setups (
+           professional_profile_id,
+           location_mode,
+           unpublished_draft,
+           has_unpublished_changes,
+           is_active
+         )
+         VALUES ($1, $2, $3::jsonb, true, false)
+         ON CONFLICT (professional_profile_id)
+         DO UPDATE SET
+           unpublished_draft = EXCLUDED.unpublished_draft,
+           has_unpublished_changes = true,
+           updated_at = NOW()
+         RETURNING id`,
+        [
+          professionalProfile.id,
+          payload.location_mode || "fixed",
+          JSON.stringify(mergedDraft),
+        ],
+      );
+
+      const savedBusinessSetup = await getBusinessSetupDetailById(
+        draftResult.rows[0].id,
+        { query },
+        { includeDraft: true },
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "Business setup saved. Publish to make changes live.",
+        data: savedBusinessSetup,
+      });
+    }
+
+    if (isPublishSetupRequest(req.body)) {
+      const incomingDraft = buildUnpublishedDraftPayload({
+        payload,
+        serviceCategories,
+        bookServiceCombinations,
+        sectionSyncSettings: parseJsonValue(req.body.section_sync_settings, {}),
+        teamMembers,
+      });
+      const section = String(req.body.section ?? "").trim();
+      const publishDraft = section
+        ? mergeUnpublishedDraft(existingDraft, pickSectionDraft(section, incomingDraft))
+        : existingDraft && typeof existingDraft === "object"
+          ? existingDraft
+          : {};
+
+      const client = await getClient();
+      try {
+        await client.query("BEGIN");
+
+        let setupId = existingSetup?.id;
+        if (!setupId) {
+          const inserted = await client.query(
+            `INSERT INTO business_setups (professional_profile_id, location_mode, is_active)
+             VALUES ($1, $2, true)
+             RETURNING id`,
+            [professionalProfile.id, payload.location_mode || "fixed"],
+          );
+          setupId = inserted.rows[0].id;
+        }
+
+        const columnUpdates = getDraftLiveColumnUpdates(publishDraft);
+        if (columnUpdates.length) {
+          const assignments = columnUpdates
+            .map((col, index) => `${col.field} = $${index + 2}${col.jsonb ? "::jsonb" : ""}`)
+            .concat(
+              "unpublished_draft = NULL",
+              "has_unpublished_changes = false",
+              "updated_at = NOW()",
+            )
+            .join(", ");
+          await client.query(
+            `UPDATE business_setups SET ${assignments} WHERE id = $1`,
+            [setupId, ...columnUpdates.map((col) => col.value)],
+          );
+        } else {
+          await client.query(
+            `UPDATE business_setups
+             SET unpublished_draft = NULL,
+                 has_unpublished_changes = false,
+                 updated_at = NOW()
+             WHERE id = $1`,
+            [setupId],
+          );
+        }
+
+        if (Object.prototype.hasOwnProperty.call(publishDraft, "team_members")) {
+          const draftTeamMembers = parseJsonArray(publishDraft.team_members);
+          const syncedTeamMemberIds = [];
+          const existingMembersResult = await client.query(
+            `SELECT id FROM business_team_members WHERE business_setup_id = $1`,
+            [setupId],
+          );
+          const existingMemberIds = new Set(
+            existingMembersResult.rows.map((row) => row.id),
+          );
+
+          for (const member of draftTeamMembers) {
+            if (member.id && existingMemberIds.has(member.id)) {
+              const updatedMemberResult = await client.query(
+                `UPDATE business_team_members
+                 SET
+                   full_name = $2,
+                   role = $3,
+                   profile_photo = $4,
+                   assigned_services = $5::jsonb,
+                   display_order = $6,
+                   updated_at = NOW()
+                 WHERE id = $1
+                 RETURNING id`,
+                [
+                  member.id,
+                  member.full_name,
+                  member.role,
+                  member.profile_photo,
+                  JSON.stringify(member.assigned_services ?? []),
+                  member.display_order,
+                ],
+              );
+              if (updatedMemberResult.rows[0]?.id) {
+                syncedTeamMemberIds.push(updatedMemberResult.rows[0].id);
+              }
+            } else {
+              const insertedMemberResult = await client.query(
+                `INSERT INTO business_team_members (
+                   business_setup_id, full_name, role, profile_photo, assigned_services, display_order
+                 )
+                 VALUES ($1, $2, $3, $4, $5::jsonb, $6)
+                 RETURNING id`,
+                [
+                  setupId,
+                  member.full_name,
+                  member.role,
+                  member.profile_photo,
+                  JSON.stringify(member.assigned_services ?? []),
+                  member.display_order,
+                ],
+              );
+              if (insertedMemberResult.rows[0]?.id) {
+                syncedTeamMemberIds.push(insertedMemberResult.rows[0].id);
+              }
+            }
+          }
+
+          await client.query(
+            `DELETE FROM business_team_members
+             WHERE business_setup_id = $1
+               AND NOT (id = ANY($2::uuid[]))`,
+            [setupId, syncedTeamMemberIds],
+          );
+          await client.query(
+            `UPDATE business_setups
+             SET team_member_ids = $2::uuid[], updated_at = NOW()
+             WHERE id = $1`,
+            [setupId, syncedTeamMemberIds],
+          );
+        }
+
+        await client.query("COMMIT");
+
+        const savedBusinessSetup = await getBusinessSetupDetailById(setupId);
+
+        return res.status(200).json({
+          success: true,
+          message: "Business setup published successfully.",
+          data: savedBusinessSetup,
+        });
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    }
 
     const jsonbFields = new Set([
       "service_categories",
@@ -954,8 +1198,9 @@ export const upsertBusinessSetup = async (req, res) => {
       const businessSetup = result.rows[0];
 
       const syncedTeamMemberIds = [];
+      const membersToSync = teamMembers.length > 0 ? teamMembers : resolvedTeamMembers;
 
-      if (teamMembers.length > 0) {
+      if (membersToSync.length > 0) {
         const existingMembersResult = await client.query(
           `SELECT id
            FROM business_team_members
@@ -965,7 +1210,7 @@ export const upsertBusinessSetup = async (req, res) => {
 
         const existingMemberIds = new Set(existingMembersResult.rows.map((row) => row.id));
 
-        for (const member of teamMembers) {
+        for (const member of membersToSync) {
           if (member.id && existingMemberIds.has(member.id)) {
             const updatedMemberResult = await client.query(
               `UPDATE business_team_members
@@ -1026,10 +1271,15 @@ export const upsertBusinessSetup = async (req, res) => {
           [businessSetup.id, syncedTeamMemberIds],
         );
       } else {
-        await client.query(
-          `DELETE FROM business_team_members
-           WHERE business_setup_id = $1`,
+        const existingMembersResult = await client.query(
+          `SELECT id
+           FROM business_team_members
+           WHERE business_setup_id = $1
+           ORDER BY display_order ASC, id ASC`,
           [businessSetup.id],
+        );
+        syncedTeamMemberIds.push(
+          ...existingMembersResult.rows.map((row) => row.id).filter(Boolean),
         );
       }
       await client.query(
@@ -1041,13 +1291,29 @@ export const upsertBusinessSetup = async (req, res) => {
         [businessSetup.id, syncedTeamMemberIds],
       );
 
-      const savedBusinessSetup = await getBusinessSetupDetailById(businessSetup.id, client);
+      if (isPublishSetupRequest(req.body)) {
+        await client.query(
+          `UPDATE business_setups
+           SET unpublished_draft = NULL,
+               has_unpublished_changes = false,
+               updated_at = NOW()
+           WHERE id = $1`,
+          [businessSetup.id],
+        );
+      }
+
+      const savedBusinessSetup = await getBusinessSetupDetailById(
+        businessSetup.id,
+        client,
+      );
 
       await client.query("COMMIT");
 
       return res.status(200).json({
         success: true,
-        message: "Business setup saved successfully.",
+        message: isPublishSetupRequest(req.body)
+          ? "Business setup published successfully."
+          : "Business setup saved successfully.",
         data: savedBusinessSetup,
       });
     } catch (error) {
@@ -2511,9 +2777,11 @@ export const updateMyBooking = async (req, res) => {
           `UPDATE calendar_entries
            SET status = $1,
                notes = $2,
+               start_time = COALESCE($3, start_time),
+               end_time = COALESCE($4, end_time),
                updated_at = NOW()
-           WHERE unique_code = $3`,
-          [booking.status, booking.notes, booking.unique_code],
+           WHERE unique_code = $5`,
+          [booking.status, booking.notes, booking.start_time, booking.end_time, booking.unique_code],
         );
       } catch {
         // best-effort — booking update still succeeds

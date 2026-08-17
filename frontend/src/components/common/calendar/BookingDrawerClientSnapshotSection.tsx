@@ -8,10 +8,13 @@ import { ServiceSummaryMetaLine } from "../ServiceSummaryMetaLine";
 
 type Props = {
   snapshot?: CalendarBookingClientSnapshot | null;
+  /** Guest/model blocks already shown in the drawer editor — skip to avoid a duplicate heading. */
+  hiddenPersonIds?: readonly string[];
 };
 
 export default function BookingDrawerClientSnapshotSection({
   snapshot,
+  hiddenPersonIds,
 }: Props) {
   const m = useTheme().palette.mollure;
   if (!snapshot) return null;
@@ -29,7 +32,21 @@ export default function BookingDrawerClientSnapshotSection({
     return map;
   }, [snapshot.teamMembers]);
 
-  const nonRequesterPeople = people.filter((p) => !p.isRequester);
+  const hiddenIds = React.useMemo(
+    () => new Set((hiddenPersonIds ?? []).map(String)),
+    [hiddenPersonIds],
+  );
+  const hideGuestBlocks = hiddenIds.size > 0;
+  const nonRequesterPeople = people.filter((p) => {
+    if (p.isRequester) return false;
+    if (hiddenIds.has(String(p.id))) return false;
+    if (!hideGuestBlocks) return true;
+    const isPlanning =
+      p.participantType === "planning" || p.name === "Planning";
+    const isBuffer = p.participantType === "buffer";
+    // Guest / model already appear in the booking guests editor below.
+    return isPlanning || isBuffer;
+  });
   if (!hasProject && nonRequesterPeople.length === 0) return null;
 
   let modelOrdinal = 0;

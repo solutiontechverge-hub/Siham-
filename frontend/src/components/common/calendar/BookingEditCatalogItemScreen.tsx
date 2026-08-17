@@ -7,6 +7,7 @@ import AppSelect from "../AppSelect";
 import AppTextField from "../AppTextField";
 import { BodyText } from "../../ui/typography";
 import type { BookingUniqueItemDraft } from "../../../data/bookingUniqueItem.data";
+import { sanitizeDecimalInput } from "../../../lib/field-input";
 
 type BookingEditCatalogItemScreenProps = {
   draft: BookingUniqueItemDraft;
@@ -77,7 +78,7 @@ export default function BookingEditCatalogItemScreen({
           label="Price"
           placeholder="0"
           value={draft.price}
-          onChange={(e) => onChange({ price: e.target.value })}
+          onChange={(e) => onChange({ price: sanitizeDecimalInput(e.target.value) })}
           fullWidth
           disabled={disabled}
           error={Boolean(errors.price)}
@@ -131,7 +132,9 @@ export default function BookingEditCatalogItemScreen({
             label="Discount Amount"
             placeholder="0"
             value={draft.discountAmount === "0" ? "" : draft.discountAmount}
-            onChange={(e) => onChange({ discountAmount: e.target.value })}
+            onChange={(e) =>
+              onChange({ discountAmount: sanitizeDecimalInput(e.target.value) })
+            }
             fullWidth
             disabled={disabled}
             inputProps={{ inputMode: "decimal" }}

@@ -141,6 +141,22 @@ export type CalendarBookingDetails = {
   /** Incoming Confirmed ER note (receiver UI). */
   editRequestNote?: string;
   editRequestInitiatedBy?: "professional" | "client";
+  /** Keep BR/EBR/ER/E visible until the counterparty taps OK. */
+  needsOk?: boolean;
+  /** Scenario to show while needsOk is true (status may already be Confirmed). */
+  ackScenario?: CalendarBookingScenario;
+  /** Soft-delete: hide from professional calendar without changing status. */
+  hiddenForProfessional?: boolean;
+  /** Soft-delete: hide from client booking list without changing status. */
+  hiddenForCustomer?: boolean;
+  addedServiceIds?: string[];
+  cancelledServiceIds?: string[];
+  /** Guest name / contact-only change — tag Updated, do not start ER. */
+  silentUpdated?: boolean;
+  refunded?: boolean;
+  waitingForPayment?: boolean;
+  invoiceDueDate?: string;
+  splitBill?: Record<string, unknown>;
 };
 
 export type CalendarResource = {

@@ -11,7 +11,7 @@ export type PhoneValidationResult = {
 };
 
 export function sanitizePhoneInput(value: string): string {
-  return value.replace(/[^\d\s\-()]/g, "");
+  return value.replace(/\D/g, "");
 }
 
 export function normalizeDialCode(value: string): string {
@@ -26,6 +26,25 @@ export function formatContactPhone(dialCode: string, phoneNumber: string): strin
   if (!code) return digits;
   if (!digits) return code;
   return `${code}${digits}`;
+}
+
+const EMPTY_STORED_PHONE = new Set(["", "—", "-", "–"]);
+
+/** Normalize a stored contact string into the booking phone draft fields. */
+export function phoneDraftFromStoredContact(
+  phone?: string | null,
+  countryCode?: string | null,
+): { phoneCode: string; phoneNumber: string } {
+  const raw = (phone ?? "").trim();
+  const preferred = (countryCode ?? "").trim();
+  if (EMPTY_STORED_PHONE.has(raw)) {
+    return { phoneCode: preferred, phoneNumber: "" };
+  }
+  const split = splitContactPhone(raw, preferred || undefined);
+  return {
+    phoneCode: split.countryCode,
+    phoneNumber: split.phone.trim(),
+  };
 }
 
 /** Split a stored phone into country dial code + national number when possible. */

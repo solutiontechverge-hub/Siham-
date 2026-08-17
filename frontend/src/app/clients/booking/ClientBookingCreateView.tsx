@@ -17,6 +17,7 @@ import {
   MenuItem,
   Paper,
   Stack,
+  Switch,
   Tab,
   Tabs,
   TextField,
@@ -27,6 +28,7 @@ import { alpha, useTheme } from "@mui/material/styles";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import RemoveRoundedIcon from "@mui/icons-material/RemoveRounded";
 import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
@@ -129,6 +131,9 @@ export default function ClientBookingCreateView() {
     timeValidationError,
     setTimeValidationError,
     selectedTimeTooSoon,
+    combineServices,
+    setCombineServices,
+    bookServicesAtSameTime,
     selectedPersonId,
     setSelectedPersonId,
     selectedTeamMemberId,
@@ -140,7 +145,9 @@ export default function ClientBookingCreateView() {
     addServiceDialogOpen,
     setAddServiceDialogOpen,
     addServiceCatalogIds,
-    setAddServiceCatalogIds,
+    addServiceCatalogQty,
+    toggleAddServiceCatalog,
+    adjustAddServiceCatalogQty,
     ebrSuggestBaselineRef,
     projectDescription,
     setProjectDescription,
@@ -437,11 +444,14 @@ export default function ClientBookingCreateView() {
           <AppDropdown
             value={selectedTeamMemberId}
             onChange={(val) => applySharedTeamMember(String(val ?? ""))}
-            options={filteredTeamMembers.map((tm) => ({
-              value: tm.id,
-              label: tm.name,
-            }))}
-            placeholder="Select team member (optional)"
+            options={[
+              { value: "", label: "Any team member" },
+              ...filteredTeamMembers.map((tm) => ({
+                value: tm.id,
+                label: tm.name,
+              })),
+            ]}
+            placeholder="Any team member"
             size="small"
             fullWidth
             InputProps={{
@@ -452,6 +462,8 @@ export default function ClientBookingCreateView() {
                     color: alpha(m.navy, 0.45),
                     ml: 0.5,
                     mr: 0.25,
+                    display: "block",
+                    alignSelf: "center",
                   }}
                 />
               ),
@@ -463,10 +475,45 @@ export default function ClientBookingCreateView() {
                 fontSize: 12,
                 fontWeight: 700,
                 color: alpha(m.navy, 0.62),
+                alignItems: "center",
+              },
+              "& .MuiSelect-select": {
+                display: "flex",
+                alignItems: "center",
               },
             }}
           />
         </Box>
+      ) : null}
+
+      {!isDesiredLocation && services.length > 1 ? (
+        <FormControlLabel
+          sx={{ mb: 1.25, ml: 0, alignItems: "flex-start" }}
+          control={
+            <Switch
+              size="small"
+              checked={bookServicesAtSameTime}
+              onChange={(e) => setCombineServices(e.target.checked)}
+              sx={{
+                mt: 0.15,
+                "& .MuiSwitch-switchBase.Mui-checked": { color: m.teal },
+                "& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track": {
+                  bgcolor: m.teal,
+                },
+              }}
+            />
+          }
+          label={
+            <Stack spacing={0.15}>
+              <Typography sx={{ fontSize: 12, fontWeight: 800, color: alpha(m.navy, 0.72) }}>
+                Book services at the same time
+              </Typography>
+              <Typography sx={{ fontSize: 11, color: alpha(m.navy, 0.48) }}>
+                Duration uses the longest service instead of adding them sequentially.
+              </Typography>
+            </Stack>
+          }
+        />
       ) : null}
 
       {hasUnassigned && serviceTab === "unassigned" ? (
@@ -575,6 +622,8 @@ export default function ClientBookingCreateView() {
                                   color: alpha(m.navy, 0.45),
                                   ml: 0.25,
                                   mr: 0.15,
+                                  display: "block",
+                                  alignSelf: "center",
                                 }}
                               />
                             ),
@@ -588,14 +637,29 @@ export default function ClientBookingCreateView() {
                               color: alpha(m.navy, 0.72),
                               minHeight: 28,
                               height: 28,
+                              alignItems: "center",
                             },
                             "& .MuiOutlinedInput-input": {
-                              py: 0.35,
+                              py: 0,
                               px: 0.5,
+                              display: "flex",
+                              alignItems: "center",
+                              height: 28,
+                              lineHeight: "28px",
+                            },
+                            "& .MuiSelect-select": {
+                              display: "flex",
+                              alignItems: "center",
+                              minHeight: 28,
+                              height: 28,
+                              py: 0,
+                              lineHeight: "28px",
                             },
                             "& .MuiSelect-icon": {
                               fontSize: 18,
                               right: 6,
+                              top: "50%",
+                              transform: "translateY(-50%)",
                             },
                           }}
                         />
@@ -967,32 +1031,22 @@ export default function ClientBookingCreateView() {
             Services
           </Typography>
           <Stack spacing={0.5} sx={{ mb: 1.5 }}>
-            {addServiceCatalog.map((item) => (
-              <FormControlLabel
-                key={item.id}
-                control={
-                  <Checkbox
-                    size="small"
-                    checked={Boolean(addServiceCatalogIds[item.id])}
-                    onChange={(e) =>
-                      setAddServiceCatalogIds((prev) => ({
-                        ...prev,
-                        [item.id]: e.target.checked,
-                      }))
-                    }
-                    sx={{
-                      "&.Mui-checked": { color: m.teal },
-                      color: alpha(m.navy, 0.35),
-                    }}
-                  />
-                }
-                label={
-                  <Stack
-                    direction="row"
-                    justifyContent="space-between"
-                    sx={{ width: "100%", pr: 1 }}
-                  >
-                    <Box>
+            {addServiceCatalog.map((item) => {
+              const checked = Boolean(addServiceCatalogIds[item.id]);
+              const qty = addServiceCatalogQty[item.id] ?? 1;
+              return (
+                <Box
+                  key={item.id}
+                  sx={{
+                    borderRadius: "10px",
+                    border: `1px solid ${alpha(m.navy, 0.08)}`,
+                    px: 1.25,
+                    py: 1,
+                    bgcolor: alpha(m.navy, 0.015),
+                  }}
+                >
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
                       <Typography
                         sx={{
                           fontSize: 12.5,
@@ -1006,7 +1060,7 @@ export default function ClientBookingCreateView() {
                         sx={{
                           fontSize: 11,
                           fontWeight: 700,
-                          color: alpha(m.navy, 0.48),
+                          color: m.teal,
                         }}
                       >
                         {item.durationMins} Mins
@@ -1017,25 +1071,76 @@ export default function ClientBookingCreateView() {
                         fontSize: 12.5,
                         fontWeight: 900,
                         color: alpha(m.navy, 0.78),
+                        mr: 0.5,
                       }}
                     >
                       {item.price} €
                     </Typography>
+                    <Stack
+                      direction="row"
+                      alignItems="center"
+                      sx={{
+                        border: `1px solid ${alpha(m.navy, 0.12)}`,
+                        borderRadius: "8px",
+                        overflow: "hidden",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <IconButton
+                        size="small"
+                        onClick={() => adjustAddServiceCatalogQty(item.id, -1)}
+                        disabled={!checked || qty <= 1}
+                        sx={{
+                          width: 30,
+                          height: 30,
+                          borderRadius: 0,
+                          color: alpha(m.navy, 0.55),
+                        }}
+                      >
+                        <RemoveRoundedIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                      <Typography
+                        sx={{
+                          width: 22,
+                          textAlign: "center",
+                          fontSize: 12,
+                          fontWeight: 900,
+                          color: alpha(m.navy, 0.78),
+                        }}
+                      >
+                        {qty}
+                      </Typography>
+                      <IconButton
+                        size="small"
+                        onClick={() => adjustAddServiceCatalogQty(item.id, 1)}
+                        disabled={!checked}
+                        sx={{
+                          width: 30,
+                          height: 30,
+                          borderRadius: 0,
+                          color: alpha(m.navy, 0.55),
+                          "&:hover": { bgcolor: m.addSoftBgHover },
+                          "&.Mui-disabled": { color: alpha(m.navy, 0.35) },
+                        }}
+                      >
+                        <AddRoundedIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </Stack>
+                    <Checkbox
+                      checked={checked}
+                      onChange={(e) =>
+                        toggleAddServiceCatalog(item.id, e.target.checked)
+                      }
+                      sx={{
+                        p: 0.25,
+                        color: alpha(m.navy, 0.35),
+                        "&.Mui-checked": { color: m.teal },
+                      }}
+                    />
                   </Stack>
-                }
-                sx={{
-                  m: 0,
-                  px: 0.75,
-                  py: 0.5,
-                  borderRadius: "10px",
-                  border: `1px solid ${alpha(m.navy, 0.08)}`,
-                  bgcolor: alpha(m.navy, 0.015),
-                  alignItems: "flex-start",
-                  width: "100%",
-                  "& .MuiFormControlLabel-label": { flex: 1, minWidth: 0 },
-                }}
-              />
-            ))}
+                </Box>
+              );
+            })}
           </Stack>
 
         </AppModal>
@@ -1974,7 +2079,18 @@ export default function ClientBookingCreateView() {
                     </Paper>
 
                     {!isDesiredLocation && canAddFixedLocationGuest ? (
-                      <Stack alignItems="flex-end" sx={{ mt: 1 }}>
+                      <Stack
+                        direction="row"
+                        alignItems="center"
+                        justifyContent="flex-end"
+                        spacing={0.5}
+                        sx={{ mt: 1 }}
+                      >
+                        <Tooltip title="Fixed location bookings include the client plus one guest (max 2 people), starting at the same time.">
+                          <InfoOutlinedIcon
+                            sx={{ fontSize: 16, color: alpha(m.navy, 0.38) }}
+                          />
+                        </Tooltip>
                         <Chip
                           icon={<AddRoundedIcon sx={{ fontSize: 16 }} />}
                           label="Guest"

@@ -40,6 +40,8 @@ type Props = {
   rowMode?: BookingRequestRowMode;
   /** Post-accept edit from the other party — show next to Confirmed status. */
   showUpdated?: boolean;
+  /** Confirmed booking was edited after ER/EBR accept. */
+  showEditScenario?: boolean;
 };
 
 function ScenarioPill({
@@ -93,6 +95,7 @@ export default function BookingRequestStatusRow({
   bookingRequestDirection = "outgoing",
   rowMode = "default",
   showUpdated = false,
+  showEditScenario = false,
 }: Props) {
   const m = useTheme().palette.mollure;
   const isEbrIncoming = rowMode === "professional_suggested";
@@ -117,9 +120,7 @@ export default function BookingRequestStatusRow({
 
   const chipStatus: ClientBookingStatus = isEbrRejected
     ? "invalid"
-    : bookingStatus === "waiting_for_prepayment"
-      ? "confirmed"
-      : bookingStatus;
+    : bookingStatus;
 
   const chipColors = bookingStatusChipColors(chipStatus);
   const chipLabel = isEbrRejected ? "Invalid" : bookingStatusLabel(chipStatus);
@@ -134,7 +135,6 @@ export default function BookingRequestStatusRow({
     !showErPill &&
     rowMode === "default" &&
     bookingStatus !== "confirmed" &&
-    bookingStatus !== "waiting_for_prepayment" &&
     bookingStatus !== "in_progress" &&
     (isDraft
       ? bookingRequestSent
@@ -181,6 +181,14 @@ export default function BookingRequestStatusRow({
             border: `1px solid ${alpha(m.teal, 0.4)}`,
           }}
         />
+      ) : null}
+
+      {showEditScenario &&
+      !isEbrIncoming &&
+      !showErPill &&
+      !isTerminal &&
+      !isCompleted ? (
+        <ScenarioPill label="Edit" />
       ) : null}
 
       {isEbrIncoming ? (

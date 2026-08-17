@@ -162,3 +162,82 @@ export function splitScheduleRowForDate(
 
   return [updatedOriginal, overrideRow];
 }
+
+function shiftToInterval(shift: { start: string; end: string }): Interval {
+  return {
+    startMin: minutesSinceMidnight(shift.start),
+    endMin: minutesSinceMidnight(shift.end),
+  };
+}
+
+export function scheduleShiftsOverlap(
+  a: readonly { start: string; end: string }[],
+  b: readonly { start: string; end: string }[],
+) {
+  for (const left of a) {
+    const ia = shiftToInterval(left);
+    for (const right of b) {
+      const ib = shiftToInterval(right);
+      if (ia.startMin < ib.endMin && ib.startMin < ia.endMin) return true;
+    }
+  }
+  return false;
+}
+
+export function findConflictingAvailabilityRow(
+  rows: readonly ScheduleAvailabilityRow[],
+  candidate: Pick<
+    ScheduleAvailabilityRow,
+    "resourceIds" | "locations" | "dateFrom" | "dateTo" | "dayFrom" | "dayTo" | "shifts"
+  >,
+  excludeId?: string | null,
+): ScheduleAvailabilityRow | null {
+  const candidateDates = expandRowDates({
+    ...candidate,
+    id: "tmp",
+    archived: false,
+  } as ScheduleAvailabilityRow);
+
+  for (const row of rows) {
+    if (row.archived || row.id === excludeId) continue;
+    const sharesTeam = row.resourceIds.some((id) => candidate.resourceIds.includes(id));
+    const sharesLocation = row.locations.some((location) =>
+      candidate.locations.includes(location),
+    );
+    if (!sharesTeam || !sharesLocation) continue;
+    const dates = expandRowDates(row);
+    if (!dates.some((iso) => candidateDates.includes(iso))) continue;
+    if (scheduleShiftsOverlap(row.shifts, candidate.shifts)) return row;
+  }
+  return null;
+}
+
+export type ScheduleActiveBooking = {
+  id: string;
+  resourceId: string;
+  date: string;
+  start: string;
+  end: string;
+  prepaid?: boolean;
+  status: string;
+};
+
+export function findBookingsInTimeslot(
+  bookings: readonly ScheduleActiveBooking[],
+  teamIds: readonly string[],
+  dateFrom: string,
+  dateTo: string,
+  startTime: string,
+  endTime: string,
+) {
+  const startMin = minutesSinceMidnight(startTime);
+  const endMin = minutesSinceMidnight(endTime);
+  return bookings.filter((booking) => {
+    if (booking.status === "Cancelled" || booking.status === "Invalid") return false;
+    if (!teamIds.includes(booking.resourceId)) return false;
+    if (booking.date < dateFrom || booking.date > dateTo) return false;
+    const bookingStart = minutesSinceMidnight(booking.start);
+    const bookingEnd = minutesSinceMidnight(booking.end);
+    return bookingStart < endMin && startMin < bookingEnd;
+  });
+}

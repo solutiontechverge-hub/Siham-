@@ -5,6 +5,24 @@ import { cacheClientBookingDraftSnapshot } from "./clientBookingDraftCache";
 export const CHECKOUT_REF_KEY = "mollure:checkout_booking_ref";
 export const ACTIVE_BOOKING_ID_KEY = "mollure:active_booking_id";
 export const ACTIVE_BOOKING_RECORD_KEY = "mollure:active_booking_record";
+export const ACTIVE_BOOKING_CHANGED_EVENT = "mollure:active-booking-changed";
+/** Keep the editor draft until EBR/ER grant persist finishes (API must not overwrite it). */
+export const EBR_DRAFT_LOCK_KEY = "mollure:ebr_draft_lock";
+
+export function isEbrDraftLocked() {
+  if (typeof window === "undefined") return false;
+  return window.sessionStorage.getItem(EBR_DRAFT_LOCK_KEY) === "1";
+}
+
+export function lockEbrDraft() {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(EBR_DRAFT_LOCK_KEY, "1");
+}
+
+export function unlockEbrDraft() {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.removeItem(EBR_DRAFT_LOCK_KEY);
+}
 
 export function createBookingRef() {
   const suffix = Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -46,6 +64,11 @@ export function setActiveBookingSession(record: ClientBookingRecord) {
     };
     window.sessionStorage.setItem("mollure:selected_shop", JSON.stringify(payload));
   }
+}
+
+export function notifyActiveBookingChanged() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(ACTIVE_BOOKING_CHANGED_EVENT));
 }
 
 export function getCheckoutPath(record: ClientBookingRecord, listTab?: string) {

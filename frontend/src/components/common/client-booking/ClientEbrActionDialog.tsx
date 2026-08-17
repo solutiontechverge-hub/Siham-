@@ -58,7 +58,7 @@ const BR_COPY: Record<
   },
   reject: {
     title: "Reject request",
-    body: "Confirm to reject this booking request. The booking will be cancelled with no charges.",
+    body: "Confirm to reject this booking request. The booking will be marked Invalid.",
     confirmLabel: "Reject",
     showWarning: true,
   },

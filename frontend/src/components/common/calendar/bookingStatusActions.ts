@@ -103,6 +103,9 @@ export function resolveProfessionalBookingActions(
   if (status === "Confirmed") {
     const erPending = event.bookingScenario === "ER";
     flags.edit = true;
+    if (event.details?.needsOk) {
+      flags.ok = true;
+    }
     // While ER is pending, lock Cancel / In Progress / No Show.
     if (!erPending) {
       flags.cancel = true;
@@ -142,6 +145,7 @@ export function resolveProfessionalBookingActions(
     flags.delete = true;
     flags.rebook = true;
     flags.refund = refundOk;
+    if (event.details?.needsOk) flags.ok = true;
     return flags;
   }
 
@@ -222,9 +226,8 @@ export function resolveClientBookingActions(input: {
     return flags;
   }
 
-  if (status === "requested" || status === "waiting_for_prepayment") {
+  if (status === "requested") {
     const isIncomingBr =
-      status === "requested" &&
       input.bookingRequestDirection === "incoming" &&
       !input.isEbrIncoming;
     if (input.isEbrIncoming || isIncomingBr) {
@@ -233,15 +236,10 @@ export function resolveClientBookingActions(input: {
       flags.reject = true;
     }
     const isOutgoingDesired =
-      status === "requested" &&
       input.bookingRequestDirection === "outgoing" &&
       input.locationMode === "desired";
     if (isOutgoingDesired) {
       flags.discard = true;
-    }
-    // Waiting for prepayment after accept: no cancel/edit required by guideline for client BR→ flow.
-    if (status === "waiting_for_prepayment") {
-      flags.edit = true;
     }
     return flags;
   }

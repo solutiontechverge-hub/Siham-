@@ -33,6 +33,20 @@ export function resolveBookingResponseIndicators(
     indicators.push("refund_pending");
   }
 
+  if (details?.refunded) {
+    indicators.push("refund_completed");
+  }
+
+  if (event.status === "Completed" && details?.waitingForPayment && !details?.refunded) {
+    const due = details.invoiceDueDate?.trim();
+    const overdue =
+      Boolean(due) &&
+      !Number.isNaN(new Date(`${due}T00:00:00`).getTime()) &&
+      new Date(`${due}T00:00:00`).getTime() <
+        new Date(new Date().toISOString().slice(0, 10) + "T00:00:00").getTime();
+    indicators.push(overdue ? "overdue_payment" : "waiting_for_payment");
+  }
+
   if (
     pendingNegotiation &&
     isResponseWindowOverdue({

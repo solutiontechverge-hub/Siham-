@@ -48,7 +48,9 @@ export default function SalesAddOnCheckout({
 }: SalesAddOnCheckoutProps) {
   const m = useTheme().palette.mollure;
   const { settings, setSettings } = useFinanceInvoiceSettings();
-  const { data: businessSetupResponse } = useGetBusinessSetupQuery();
+  const { data: businessSetupResponse } = useGetBusinessSetupQuery({
+    includeDraft: false,
+  });
   const businessSetup = businessSetupResponse?.data ?? null;
 
   const [step, setStep] = React.useState<Step>("items");
