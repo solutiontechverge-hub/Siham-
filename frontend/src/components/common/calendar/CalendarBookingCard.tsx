@@ -10,6 +10,7 @@ import type { CalendarEvent } from "../../../app/professionals/fixed-location/ca
 import { extractBookingId } from "./calendar.utils";
 import {
   getBookingScenarioIndicators,
+  scenarioIndicatorDisplayLabel,
   statusCardAccent,
   statusChipSxWithOverride,
   isBookingRequestAccepted,
@@ -204,35 +205,45 @@ export default function CalendarBookingCard({
           isIncomingEr ? alpha(m.teal, 0.14) : backgroundColor
         }
         pattern={cardPattern}
-        scenarioBadges={scenarioIndicators.map((label) => ({
-          label,
-          showRequestSentIcon: label === "BR",
+        scenarioBadges={scenarioIndicators.map((indicator) => ({
+          label: scenarioIndicatorDisplayLabel(indicator),
+          showRequestSentIcon: indicator === "BR",
           requestDirection:
-            label === "BR" || label === "ER"
+            indicator === "BR" || indicator === "ER"
               ? resolveProfessionalBookingRequestDirection(event)
               : undefined,
-          requestAccepted: label === "BR" && isBookingRequestAccepted(event),
-          requestRejected: label === "BR" && isBookingRequestRejected(event),
+          requestAccepted: indicator === "BR" && isBookingRequestAccepted(event),
+          requestRejected: indicator === "BR" && isBookingRequestRejected(event),
           responseIndicators:
-            label === "EBR"
-              ? scenarioBadgeResponseIndicators(label, responseIndicators)
+            indicator === "EBR"
+              ? scenarioBadgeResponseIndicators(indicator, responseIndicators)
               : [],
           prepaymentStatus:
-            label === "EBR"
+            indicator === "EBR"
               ? prepaymentIconVariant === "pending"
                 ? undefined
                 : prepaymentIconVariant
               : undefined,
           showExternalLink: false,
-          bold: label === "EBR" || label === "BR" || label === "ER",
+          bold:
+            indicator === "EBR" ||
+            indicator === "BR" ||
+            indicator === "ER" ||
+            indicator === "E",
           sx:
-            label === "ER" && isIncomingEr
+            indicator === "ER" && isIncomingEr
               ? {
                   border: `1px solid ${alpha(m.teal, 0.45)}`,
                   bgcolor: alpha(m.teal, 0.12),
                   color: m.teal,
                 }
-              : undefined,
+              : indicator === "E"
+                ? {
+                    border: `1px solid ${alpha(m.teal, 0.45)}`,
+                    bgcolor: alpha(m.teal, 0.12),
+                    color: m.teal,
+                  }
+                : undefined,
         }))}
         prepaymentStatus={prepaymentIconVariant}
         paymentDue={

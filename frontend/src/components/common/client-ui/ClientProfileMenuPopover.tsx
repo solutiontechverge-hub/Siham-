@@ -3,13 +3,17 @@
 import AppButton from "../AppButton";
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Avatar, Box, Popover, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { clearAuthSessionState } from "../../../lib/clearAuthSessionState";
 import { useAppDispatch } from "../../../store/hooks";
 import { useSnackbar } from "../AppSnackbar";
 import { queueSnackbarFlash } from "../../../lib/snackbarFlash";
+
+function isMenuPathActive(pathname: string, match: string) {
+  return pathname === match || pathname.startsWith(`${match}/`);
+}
 
 function getInitials(emailOrName?: string) {
   const base = (emailOrName ?? "").trim();
@@ -40,6 +44,7 @@ export default function ClientProfileMenuPopover({
 }: ClientProfileMenuPopoverProps) {
   const theme = useTheme();
   const tokens = theme.palette.mollure;
+  const pathname = usePathname() ?? "";
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { showSnackbar } = useSnackbar();
@@ -65,6 +70,24 @@ export default function ClientProfileMenuPopover({
       bgcolor: "rgba(52, 74, 102, 0.03)",
     },
   } as const;
+
+  const activeBtnSx = {
+    ...outlinedBtnSx,
+    fontWeight: 800,
+    color: tokens.tealDark,
+    borderColor: tokens.teal,
+    bgcolor: alpha(tokens.teal, 0.12),
+    "&:hover": {
+      borderColor: tokens.tealDark,
+      bgcolor: alpha(tokens.teal, 0.18),
+    },
+  } as const;
+
+  const menuItems = [
+    { label: "Booking", href: "/clients/booking", match: "/clients/booking" },
+    { label: "Favorites", href: "/clients/favourites", match: "/clients/favourites" },
+    { label: "Profile", href: "/clients/profile", match: "/clients/profile" },
+  ] as const;
 
   return (
     <Popover
@@ -116,36 +139,22 @@ export default function ClientProfileMenuPopover({
           </Box>
         </Stack>
 
-        <AppButton
-          component={Link}
-          href="/clients/booking"
-          variant="outlined"
-          fullWidth
-          sx={outlinedBtnSx}
-          onClick={onClose}
-        >
-          Booking
-        </AppButton>
-        <AppButton
-          component={Link}
-          href="/clients/favourites"
-          variant="outlined"
-          fullWidth
-          sx={outlinedBtnSx}
-          onClick={onClose}
-        >
-          Favorites
-        </AppButton>
-        <AppButton
-          component={Link}
-          href="/clients/profile"
-          variant="outlined"
-          fullWidth
-          sx={outlinedBtnSx}
-          onClick={onClose}
-        >
-          Profile
-        </AppButton>
+        {menuItems.map((item) => {
+          const active = isMenuPathActive(pathname, item.match);
+          return (
+            <AppButton
+              key={item.href}
+              component={Link}
+              href={item.href}
+              variant="outlined"
+              fullWidth
+              sx={active ? activeBtnSx : outlinedBtnSx}
+              onClick={onClose}
+            >
+              {item.label}
+            </AppButton>
+          );
+        })}
 
         <Box sx={{ pt: 0.5 }}>
           <AppButton
@@ -153,7 +162,11 @@ export default function ClientProfileMenuPopover({
             href="/clients/listing"
             variant="outlined"
             fullWidth
-            sx={outlinedBtnSx}
+            sx={
+              isMenuPathActive(pathname, "/clients/listing")
+                ? activeBtnSx
+                : outlinedBtnSx
+            }
             onClick={onClose}
           >
             Go to listing page

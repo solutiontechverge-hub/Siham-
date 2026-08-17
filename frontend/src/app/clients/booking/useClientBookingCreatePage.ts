@@ -18,6 +18,7 @@ import {
   CHECKOUT_REF_KEY,
   createBookingRef,
   getActiveBookingSession,
+  lockEbrDraft,
   setActiveBookingSession,
 } from "./clientBookingSession";
 import { resolveCreateCheckoutPath } from "./resolveCreateBookingStatus";
@@ -27,6 +28,7 @@ import { resolveMediaUrl } from "../../../lib/resolveMediaUrl";
 import {
   getServicesForLocationMode,
   getTeamForLocationMode,
+  isAddressInOperatingArea,
 } from "../../../data/businessPublicProfile.data";
 import { useBusinessPublicProfile } from "../../../hooks/useBusinessPublicProfile";
 import { extractUuidFromSyntheticId } from "./clientBookingApi.mapper";
@@ -408,7 +410,7 @@ export function useClientBookingCreatePage() {
       isSameDayBookingTooSoon(selectedTime, new Date(nowTick)),
     [isSelectedToday, nowTick, selectedTime],
   );
-  const combineServices = true;
+  const [combineServices, setCombineServices] = React.useState(true);
   const [selectedPersonId, setSelectedPersonId] =
     React.useState<string>("p-requester");
   const [selectedTeamMemberId, setSelectedTeamMemberId] =
@@ -423,6 +425,9 @@ export function useClientBookingCreatePage() {
   const [addServiceDialogOpen, setAddServiceDialogOpen] = React.useState(false);
   const [addServiceCatalogIds, setAddServiceCatalogIds] = React.useState<
     Record<string, boolean>
+  >({});
+  const [addServiceCatalogQty, setAddServiceCatalogQty] = React.useState<
+    Record<string, number>
   >({});
   /** Baseline services when opening EBR suggest-edit — used to mark Edited lines. */
   const ebrSuggestBaselineRef = React.useRef<Service[] | null>(null);
@@ -448,6 +453,14 @@ export function useClientBookingCreatePage() {
 
   const locationMode = shop?.locationMode ?? "fixed";
   const isDesiredLocation = locationMode === "desired";
+  const bookServicesAtSameTime = !isDesiredLocation && combineServices;
+  const servicesDurationMins = React.useMemo(() => {
+    if (!services.length) return 0;
+    if (bookServicesAtSameTime) {
+      return Math.max(...services.map((service) => service.durationMins), 0);
+    }
+    return services.reduce((sum, service) => sum + service.durationMins, 0);
+  }, [bookServicesAtSameTime, services]);
   const isDesiredVisitAddressComplete = React.useMemo(() => {
     if (!isDesiredLocation) return true;
     return Boolean(
@@ -619,7 +632,7 @@ export function useClientBookingCreatePage() {
   const availabilityBookableTimes = React.useMemo(() => {
     if (!availabilitySnapshot || !hasAssignableTeamMembers) return null;
     const duration =
-      services.reduce((sum, service) => sum + service.durationMins, 0) ||
+      servicesDurationMins ||
       availabilitySnapshot.slotStepMinutes;
     const minStart = isSelectedToday ? minBookableMinutes : undefined;
     return computeUnionBookableSlots(
@@ -634,7 +647,7 @@ export function useClientBookingCreatePage() {
     hasAssignableTeamMembers,
     isSelectedToday,
     minBookableMinutes,
-    services,
+    servicesDurationMins,
   ]);
 
   const availableTimes = React.useMemo(() => {
@@ -897,8 +910,8 @@ export function useClientBookingCreatePage() {
     [selectedTime],
   );
   const bookingDurationMinutes = React.useMemo(
-    () => services.reduce((sum, s) => sum + s.durationMins, 0),
-    [services],
+    () => servicesDurationMins,
+    [servicesDurationMins],
   );
   const bookingEndMinutes = bookingStartMinutes + bookingDurationMinutes;
 
@@ -1678,7 +1691,22 @@ export function useClientBookingCreatePage() {
 
   const openAddServiceDialog = () => {
     setAddServiceCatalogIds({});
+    setAddServiceCatalogQty({});
     setAddServiceDialogOpen(true);
+  };
+
+  const toggleAddServiceCatalog = (id: string, checked: boolean) => {
+    setAddServiceCatalogIds((prev) => ({ ...prev, [id]: checked }));
+    if (checked) {
+      setAddServiceCatalogQty((prev) => ({ ...prev, [id]: prev[id] ?? 1 }));
+    }
+  };
+
+  const adjustAddServiceCatalogQty = (id: string, delta: number) => {
+    setAddServiceCatalogQty((prev) => ({
+      ...prev,
+      [id]: Math.max(1, (prev[id] ?? 1) + delta),
+    }));
   };
 
   const confirmAddService = () => {
@@ -1692,25 +1720,28 @@ export function useClientBookingCreatePage() {
     for (const catalogId of selectedIds) {
       const picked = catalog.find((c) => c.id === catalogId);
       if (!picked) continue;
-      stamped.push({
-        id: UUID_RE.test(picked.id)
-          ? `${picked.id}-${Date.now()}-${stamped.length}`
-          : `svc-${Date.now()}-${stamped.length}`,
-        catalogServiceId: UUID_RE.test(picked.id)
-          ? picked.id
-          : extractUuidFromSyntheticId(picked.id),
-        name: picked.name,
-        durationMins: picked.durationMins,
-        price: picked.price,
-        originalPrice: picked.originalPrice,
-        discountPct: picked.discountPct,
-        guestId: null,
-        teamMemberId: hasAssignableTeamMembers
-          ? (isDesiredLocation
-              ? selectedTeamMemberId || addServiceTeamMemberId
-              : addServiceTeamMemberId) || null
-          : null,
-      });
+      const quantity = Math.max(1, addServiceCatalogQty[catalogId] ?? 1);
+      for (let index = 0; index < quantity; index += 1) {
+        stamped.push({
+          id: UUID_RE.test(picked.id)
+            ? `${picked.id}-${Date.now()}-${stamped.length}`
+            : `svc-${Date.now()}-${stamped.length}`,
+          catalogServiceId: UUID_RE.test(picked.id)
+            ? picked.id
+            : extractUuidFromSyntheticId(picked.id),
+          name: picked.name,
+          durationMins: picked.durationMins,
+          price: picked.price,
+          originalPrice: picked.originalPrice,
+          discountPct: picked.discountPct,
+          guestId: null,
+          teamMemberId: hasAssignableTeamMembers
+            ? (isDesiredLocation
+                ? selectedTeamMemberId || addServiceTeamMemberId
+                : addServiceTeamMemberId) || null
+            : null,
+        });
+      }
     }
     if (!stamped.length) return;
 
@@ -1718,6 +1749,7 @@ export function useClientBookingCreatePage() {
     setServiceTab("unassigned");
     setAddServiceDialogOpen(false);
     setAddServiceCatalogIds({});
+    setAddServiceCatalogQty({});
   };
 
   /** Desired: one team member for the whole booking. Fixed: picker for Unassigned assign only. */
@@ -1758,6 +1790,22 @@ export function useClientBookingCreatePage() {
       showSnackbar({
         severity: "error",
         message: "Please enter the full visit address for this Desired Location booking.",
+      });
+      return;
+    }
+
+    if (
+      isDesiredLocation &&
+      !isAddressInOperatingArea(
+        businessProfile?.desiredLocation,
+        desiredVisitAddress.province,
+        desiredVisitAddress.municipality,
+      )
+    ) {
+      showSnackbar({
+        severity: "error",
+        message:
+          "This address is outside the professional’s operating area and cannot be booked.",
       });
       return;
     }
@@ -1892,6 +1940,7 @@ export function useClientBookingCreatePage() {
             (prepaymentPercent > 0 ? prepaymentPercent : 0),
         });
         if (typeof window !== "undefined") {
+          lockEbrDraft();
           window.sessionStorage.setItem("mollure:ebr_suggest_return", "1");
           window.sessionStorage.setItem(
             "mollure:ebr_suggest_edited_ids",
@@ -2119,6 +2168,9 @@ export function useClientBookingCreatePage() {
     timeValidationError,
     setTimeValidationError,
     selectedTimeTooSoon,
+    combineServices,
+    setCombineServices,
+    bookServicesAtSameTime,
     selectedPersonId,
     setSelectedPersonId,
     selectedTeamMemberId,
@@ -2131,6 +2183,9 @@ export function useClientBookingCreatePage() {
     setAddServiceDialogOpen,
     addServiceCatalogIds,
     setAddServiceCatalogIds,
+    addServiceCatalogQty,
+    toggleAddServiceCatalog,
+    adjustAddServiceCatalogQty,
     ebrSuggestBaselineRef,
     projectDescription,
     setProjectDescription,

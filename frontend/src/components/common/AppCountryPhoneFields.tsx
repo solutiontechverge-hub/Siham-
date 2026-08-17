@@ -69,6 +69,11 @@ export default function AppCountryPhoneFields({
   const displayCountryCodeError = countryCodeError || localErrors.countryCode;
   const displayPhoneError = phoneError || localErrors.phone;
   const phoneLocked = disabled || phoneReadOnly;
+  const inputBoxSx = {
+    height: 40,
+    minHeight: 40,
+    alignItems: "center",
+  } as const;
 
   return (
     <Box sx={{ width: "100%" }}>
@@ -87,7 +92,7 @@ export default function AppCountryPhoneFields({
       <Stack
         direction="row"
         spacing={1.25}
-        alignItems="center"
+        alignItems="flex-start"
         sx={{ width: "100%", flexWrap: "nowrap" }}
       >
         <Box
@@ -95,8 +100,6 @@ export default function AppCountryPhoneFields({
             width: countryCodeWidth,
             maxWidth: "42%",
             flexShrink: 0,
-            display: "flex",
-            alignItems: "center",
           }}
         >
           <AppCountryCodeSelect
@@ -123,12 +126,13 @@ export default function AppCountryPhoneFields({
             }}
             sx={{
               "& .MuiOutlinedInput-root": {
+                ...inputBoxSx,
                 bgcolor: disabled ? alpha(m.navy, 0.04) : "#fff",
               },
             }}
           />
         </Box>
-        <Box sx={{ flex: 1, minWidth: 0, display: "flex", alignItems: "center" }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
           <AppTextField
             value={phone}
             onChange={(e) => {
@@ -155,6 +159,7 @@ export default function AppCountryPhoneFields({
             }}
             sx={{
               "& .MuiOutlinedInput-root": {
+                ...inputBoxSx,
                 bgcolor:
                   disabled || phoneReadOnly ? alpha(m.navy, 0.04) : "#fff",
               },

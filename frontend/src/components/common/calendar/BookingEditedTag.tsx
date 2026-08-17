@@ -7,6 +7,9 @@ import type { BookingEditTagVariant } from "./bookingRequestNegotiation";
 const TAG_LABELS: Record<BookingEditTagVariant, string> = {
   edited: "Edited",
   client_edited: "Client edited",
+  added: "Added",
+  cancelled: "Cancelled",
+  updated: "Updated",
 };
 
 type BookingEditedTagProps = {

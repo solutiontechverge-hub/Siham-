@@ -8,7 +8,9 @@ import {
 } from "./bookingEditRequest";
 
 export function useBookingEditRequest(bookingRef: string) {
-  const [record, setRecord] = React.useState<BookingEditRequestRecord>({ status: "none" });
+  const [record, setRecord] = React.useState<BookingEditRequestRecord>(() =>
+    bookingRef ? getBookingEditRequest(bookingRef) : { status: "none" },
+  );
 
   const refresh = React.useCallback(() => {
     if (!bookingRef) return;

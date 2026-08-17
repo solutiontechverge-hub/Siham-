@@ -41,7 +41,16 @@ import {
   type BlockTimeDraft,
 } from "./calendar.utils";
 import type { ScheduleAvailabilityRow } from "./calendar-settings.types";
-import { makeScheduleRowId } from "./calendar-schedule.utils";
+import {
+  findBookingsInTimeslot,
+  findConflictingAvailabilityRow,
+  makeScheduleRowId,
+  splitScheduleRowForDate,
+  type ScheduleActiveBooking,
+} from "./calendar-schedule.utils";
+import CalendarScheduleConflictDialog, {
+  type CalendarScheduleConflictKind,
+} from "./CalendarScheduleConflictDialog";
 
 type CalendarSchedulePanelProps = {
   activeDateIso: string;
@@ -56,6 +65,8 @@ type CalendarSchedulePanelProps = {
   scheduleRows: readonly ScheduleAvailabilityRow[];
   selectedResourceIds: string[];
   onSelectedResourceIdsChange: (ids: string[]) => void;
+  activeBookings?: readonly ScheduleActiveBooking[];
+  onCancelBookingsInSlot?: (bookingIds: string[]) => Promise<void>;
 };
 
 type ScheduleStatusTab = "active" | "archived";
@@ -281,6 +292,9 @@ export default function CalendarSchedulePanel({
   resources,
   scheduleRows,
   selectedResourceIds,
+  onSelectedResourceIdsChange,
+  activeBookings = [],
+  onCancelBookingsInSlot,
 }: CalendarSchedulePanelProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -304,6 +318,11 @@ export default function CalendarSchedulePanel({
     BlockTimeDraft & { activity?: string }
   >(() => defaultBlockDraft(resources, availableLocations, activeDateIso));
   const [deleteTarget, setDeleteTarget] = React.useState<DeleteTarget>(null);
+  const [conflictKind, setConflictKind] =
+    React.useState<CalendarScheduleConflictKind | null>(null);
+  const pendingBlockRef = React.useRef<
+    (BlockTimeDraft & { activity?: string }) | null
+  >(null);
 
   const teamLabelById = React.useMemo(() => {
     const map = new Map<string, string>();
@@ -410,12 +429,85 @@ export default function CalendarSchedulePanel({
       shifts: availabilityDraft.shifts,
       archived: false,
     };
-    const nextRows =
+    const conflict = findConflictingAvailabilityRow(
+      scheduleRows,
+      nextRow,
+      availabilityMode === "edit" ? editingRowId : null,
+    );
+    if (conflict) {
+      setConflictKind("availability_set");
+      return;
+    }
+
+    let nextRows: ScheduleAvailabilityRow[];
+    const original =
       availabilityMode === "edit" && editingRowId
-        ? scheduleRows.map((row) => (row.id === editingRowId ? nextRow : row))
-        : [...scheduleRows, nextRow];
+        ? scheduleRows.find((row) => row.id === editingRowId)
+        : null;
+    const isSingleDaySplit =
+      original &&
+      original.dateFrom !== original.dateTo &&
+      nextRow.dateFrom === nextRow.dateTo &&
+      nextRow.dateFrom === activeDateIso;
+
+    if (isSingleDaySplit && original) {
+      const split = splitScheduleRowForDate(original, activeDateIso, {
+        resourceIds: nextRow.resourceIds,
+        locations: nextRow.locations,
+        shifts: nextRow.shifts,
+      });
+      nextRows = scheduleRows.flatMap((row) =>
+        row.id === original.id ? split : [row],
+      );
+    } else if (availabilityMode === "edit" && editingRowId) {
+      nextRows = scheduleRows.map((row) =>
+        row.id === editingRowId ? nextRow : row,
+      );
+    } else {
+      nextRows = [...scheduleRows, nextRow];
+    }
     await onSaveScheduleRows(nextRows);
     setAvailabilityOpen(false);
+  };
+
+  const commitBlocked = async (
+    draft: BlockTimeDraft & { activity?: string },
+  ) => {
+    await onCreateBlockedTime(draft);
+    setBlockOpen(false);
+  };
+
+  const applyBlocked = async () => {
+    if (!blockDraft.teamIds.length) return;
+    const overlappingBlock = blocks.some((block) => {
+      if (!blockDraft.teamIds.includes(block.resourceId)) return false;
+      if (block.date < blockDraft.dateFrom || block.date > (blockDraft.dateTo || blockDraft.dateFrom)) {
+        return false;
+      }
+      const startMin = Number(block.start.replace(":", ""));
+      const endMin = Number(block.end.replace(":", ""));
+      const draftStart = Number(blockDraft.startTime.replace(":", ""));
+      const draftEnd = Number(blockDraft.endTime.replace(":", ""));
+      return startMin < draftEnd && draftStart < endMin;
+    });
+    if (overlappingBlock) {
+      setConflictKind("timeslot_blocked");
+      return;
+    }
+    const colliding = findBookingsInTimeslot(
+      activeBookings,
+      blockDraft.teamIds,
+      blockDraft.dateFrom,
+      blockDraft.dateTo || blockDraft.dateFrom,
+      blockDraft.startTime,
+      blockDraft.endTime,
+    );
+    if (colliding.length) {
+      pendingBlockRef.current = blockDraft;
+      setConflictKind("cancel_bookings");
+      return;
+    }
+    await commitBlocked(blockDraft);
   };
 
   const openAddBlocked = () => {
@@ -425,10 +517,8 @@ export default function CalendarSchedulePanel({
     setBlockOpen(true);
   };
 
-  const applyBlocked = async () => {
-    if (!blockDraft.teamIds.length) return;
-    await onCreateBlockedTime(blockDraft);
-    setBlockOpen(false);
+  const deleteAllArchived = async () => {
+    await onSaveScheduleRows(scheduleRows.filter((row) => !row.archived));
   };
 
   const confirmDelete = async () => {
@@ -511,7 +601,7 @@ export default function CalendarSchedulePanel({
             <Stack
               direction="row"
               alignItems="center"
-              justifyContent={isArchived ? "flex-start" : "space-between"}
+              justifyContent="space-between"
               flexWrap="wrap"
               useFlexGap
               spacing={1}
@@ -551,7 +641,18 @@ export default function CalendarSchedulePanel({
                 >
                   Add
                 </AppButton>
-              ) : null}
+              ) : (
+                <AppButton
+                  tone="danger"
+                  disabled={isSaving || !scheduleRows.some((row) => row.archived)}
+                  onClick={() => {
+                    void deleteAllArchived();
+                  }}
+                  sx={{ fontSize: 11, height: 28, px: 1.25 }}
+                >
+                  Delete All
+                </AppButton>
+              )}
 
               <Popover
                 open={Boolean(datePickerAnchor)}
@@ -766,6 +867,34 @@ export default function CalendarSchedulePanel({
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => {
           void confirmDelete();
+        }}
+      />
+
+      <CalendarScheduleConflictDialog
+        open={Boolean(conflictKind)}
+        kind={conflictKind}
+        onClose={() => {
+          setConflictKind(null);
+          pendingBlockRef.current = null;
+        }}
+        onConfirm={() => {
+          const draft = pendingBlockRef.current;
+          pendingBlockRef.current = null;
+          if (!draft) return;
+          const colliding = findBookingsInTimeslot(
+            activeBookings,
+            draft.teamIds,
+            draft.dateFrom,
+            draft.dateTo || draft.dateFrom,
+            draft.startTime,
+            draft.endTime,
+          );
+          void (async () => {
+            if (colliding.length && onCancelBookingsInSlot) {
+              await onCancelBookingsInSlot(colliding.map((booking) => booking.id));
+            }
+            await commitBlocked(draft);
+          })();
         }}
       />
     </>

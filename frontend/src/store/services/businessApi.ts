@@ -260,6 +260,7 @@ export type BusinessSetup = {
   updated_at: string;
   team_members: BusinessTeamMember[];
   service_details: BusinessServiceDetail[];
+  has_unpublished_changes?: boolean;
 };
 
 export type CalendarEntry = {
@@ -558,6 +559,15 @@ export type UpsertBusinessSetupRequest = {
       photo_upload_key?: string;
     }
   >;
+  publish?: boolean;
+  section?:
+    | "profile"
+    | "location"
+    | "serviceFor"
+    | "generalNotes"
+    | "portfolio"
+    | "services"
+    | "team";
 };
 
 export type UpsertBusinessSetupPayload = UpsertBusinessSetupRequest | FormData;
@@ -609,6 +619,8 @@ export type MollureClientLookupEntry = {
   id: string;
   name: string;
   email: string;
+  phone?: string | null;
+  country_code?: string | null;
 };
 
 export type CreateProfessionalClientRequest =
@@ -857,10 +869,20 @@ export const businessApi = baseApi.injectEndpoints({
       },
       providesTags: ["Calendar"],
     }),
-    getBusinessSetup: builder.query<ApiEnvelope<BusinessSetup | null>, void>({
-      async queryFn(_arg, _api, _extraOptions, fetchWithBQ) {
+    getBusinessSetup: builder.query<
+      ApiEnvelope<BusinessSetup | null>,
+      { includeDraft?: boolean } | void
+    >({
+      async queryFn(arg, _api, _extraOptions, fetchWithBQ) {
+        const includeDraft = !(
+          arg &&
+          typeof arg === "object" &&
+          arg.includeDraft === false
+        );
         const response = await fetchWithBQ({
-          url: "/api/business/setup",
+          url: includeDraft
+            ? "/api/business/setup?include_draft=1"
+            : "/api/business/setup?include_draft=0",
           method: "GET",
         });
 
@@ -1328,6 +1350,26 @@ export const businessApi = baseApi.injectEndpoints({
         }
 
         return { data };
+      },
+      async onQueryStarted(_arg, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (!data?.data) return;
+          const patchSetupCache = baseApi.util.updateQueryData as unknown as (
+            endpointName: "getBusinessSetup",
+            arg: { includeDraft?: boolean } | void,
+            updateRecipe: (draft: ApiEnvelope<BusinessSetup | null>) => void,
+          ) => ReturnType<typeof baseApi.util.updateQueryData>;
+          dispatch(
+            patchSetupCache("getBusinessSetup", { includeDraft: true }, (draft) => {
+              draft.data = data.data;
+              draft.message = data.message;
+              draft.success = data.success;
+            }),
+          );
+        } catch {
+          // Keep existing cache if save failed.
+        }
       },
       invalidatesTags: ["BusinessSetup"],
     }),

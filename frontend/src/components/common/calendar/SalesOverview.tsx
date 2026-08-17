@@ -9,7 +9,13 @@ import {
   useUpdateBookingStatusMutation,
 } from "../../../store/services/businessApi";
 import { useReissueFinanceInvoiceMutation } from "../../../store/services/financeApi";
-import type { CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
+import {
+  parseStoredEbrFromNotes,
+  parseStoredErFromNotes,
+  serializeCalendarEntryNotes,
+} from "./bookingEventDetails";
+import { buildSplitBillNotesPatch, resolveSalesPayerShares } from "./salesSplitBill";
+import type { CalendarBookingDetails, CalendarEvent } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import type { TransactionRow } from "../../../app/professionals/fixed-location/finance/data/transactions";
 import { useSnackbar } from "../AppSnackbar";
 import {
@@ -52,6 +58,7 @@ type SalesOverviewProps = {
   clientPhone?: string;
   fallbackResourceId?: string;
   onBookingCancelled?: () => void;
+  onBookingCompleted?: (bookingId: string) => void;
 };
 
 function cardToDraft(card: SalesOverviewCardData): ClientBookingDraft {
@@ -89,6 +96,7 @@ export default function SalesOverview({
   clientPhone = "",
   fallbackResourceId = "unassigned",
   onBookingCancelled,
+  onBookingCompleted,
 }: SalesOverviewProps) {
   const m = useTheme().palette.mollure;
   const { showSnackbar } = useSnackbar();
@@ -441,6 +449,61 @@ export default function SalesOverview({
     setEditingCard(null);
     bump();
     showSnackbar({ severity: "success", message: "Sale updated." });
+
+    if (payload.dueDate) {
+      const shares = currentEvent
+        ? resolveSalesPayerShares({
+            event: currentEvent,
+            allLines: payload.lines.map((line) => ({
+              id: line.id,
+              label: line.name,
+              amount: line.quantity * line.unitPrice,
+            })),
+            mainClientName: editingCard.clientName,
+            mainClientEmail: editingCard.clientEmail,
+            mainClientPhone: editingCard.clientPhone,
+          })
+        : [];
+      const nextDetails = {
+        ...(currentEvent?.details ?? {}),
+        waitingForPayment: true,
+        invoiceDueDate: payload.dueDate,
+      } as CalendarBookingDetails;
+      if (shares.length > 1) {
+        Object.assign(
+          nextDetails,
+          buildSplitBillNotesPatch(
+            currentEvent?.details,
+            shares.map((share) => ({
+              ...share,
+              paymentAmount: share.subtotal,
+            })),
+            0,
+          ),
+        );
+      }
+      const nextNotes = currentEvent
+        ? serializeCalendarEntryNotes(
+            nextDetails.internalNote ?? "",
+            nextDetails,
+            parseStoredEbrFromNotes(currentEvent.notes),
+            parseStoredErFromNotes(currentEvent.notes),
+          )
+        : undefined;
+      try {
+        await updateBookingStatus({
+          id: editingCard.bookingId,
+          status: "completed",
+          ...(nextNotes != null ? { notes: nextNotes } : {}),
+        }).unwrap();
+        onBookingCompleted?.(editingCard.bookingId);
+      } catch {
+        showSnackbar({
+          severity: "warning",
+          message: "Invoice saved, but the booking could not be marked Completed.",
+        });
+      }
+    }
 
     if (isReissue && payload.dueDate) {
       await notifyClientInvoiceReissue({

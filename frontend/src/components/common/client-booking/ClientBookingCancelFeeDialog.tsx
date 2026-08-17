@@ -39,6 +39,7 @@ export default function ClientBookingCancelFeeDialog({
   const cancellationSections = policySections.filter((section) =>
     /cancel/i.test(section.title),
   );
+  const feeApplies = settlement.isLateCancellation && settlement.cancellationFee > 0;
   const primaryLabel =
     settlement.amountDueNow >= 0.5
       ? `Pay now ${money(settlement.amountDueNow)}`
@@ -76,7 +77,9 @@ export default function ClientBookingCancelFeeDialog({
             lineHeight: 1.55,
           }}
         >
-          Review the professional&apos;s cancellation policy before confirming.
+          {feeApplies
+            ? "This cancellation is inside the professional's minimum notice window, so a fee applies."
+            : "This cancellation is outside the professional's minimum notice window, so no fee is charged."}
         </Typography>
 
         <Stack spacing={1.25} sx={{ mt: 1.75 }}>
@@ -156,8 +159,9 @@ export default function ClientBookingCancelFeeDialog({
                 lineHeight: 1.55,
               }}
             >
-              A cancellation fee of {settlement.feePercent}% of the booking
-              total may apply.
+              {feeApplies
+                ? `A cancellation fee of ${settlement.feePercent}% of the booking total applies.`
+                : "No cancellation fee applies for this booking."}
             </Typography>
           )}
         </Stack>
@@ -175,7 +179,11 @@ export default function ClientBookingCancelFeeDialog({
           <Stack spacing={0.65}>
             <Row label="Booking total" value={money(settlement.bookingTotal)} />
             <Row
-              label={`Cancellation fee (${settlement.feePercent}%)`}
+              label={
+                feeApplies
+                  ? `Cancellation fee (${settlement.feePercent}%)`
+                  : "Cancellation fee"
+              }
               value={money(settlement.cancellationFee)}
               emphasize
             />
@@ -212,8 +220,12 @@ export default function ClientBookingCancelFeeDialog({
             lineHeight: 1.5,
           }}
         >
-          Keep booking leaves this booking unchanged. Confirming pays any
-          remaining fee and cancels the booking.
+          Keep booking leaves this booking unchanged. Confirming cancels the
+          booking
+          {settlement.amountDueNow >= 0.5
+            ? " and charges any remaining fee"
+            : ""}
+          .
           {settlement.refundAmount > 0
             ? ` Any unused prepayment (${money(settlement.refundAmount)}) will be refunded.`
             : ""}

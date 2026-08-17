@@ -4,12 +4,13 @@ import type {
   CalendarEvent,
 } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 
-export type BookingEditTagVariant = "edited" | "client_edited";
+export type BookingEditTagVariant = "edited" | "client_edited" | "added" | "cancelled" | "updated";
 
 export function isOutgoingBookingRequest(
   event: Pick<CalendarEvent, "status" | "bookingScenario" | "details"> | null | undefined,
 ) {
-  if (!event || event.status !== "Requested" || event.bookingScenario !== "BR") return false;
+  if (!event || event.status !== "Requested") return false;
+  if (event.bookingScenario !== "BR" && event.bookingScenario !== "EBR") return false;
   return event.details?.requestDirection === "outgoing";
 }
 
@@ -54,10 +55,12 @@ type EditTagEbrSource = {
   editedServiceIds?: string[];
   editedProductIds?: string[];
   clientEditedServiceIds?: string[];
+  addedServiceIds?: string[];
+  cancelledServiceIds?: string[];
 } | null;
 
 /**
- * Professional drawer: show Edited only for client-originated line edits.
+ * Professional drawer: show Edited/Added/Cancelled for client-originated line edits.
  * (Never show the professional's own edits back to themselves.)
  */
 export function getServiceEditTag(
@@ -65,6 +68,21 @@ export function getServiceEditTag(
   details?: CalendarBookingDetails | null,
   ebr?: EditTagEbrSource,
 ): BookingEditTagVariant | null {
+  const clientOrigin =
+    details?.lastEditedBy === "client" || ebr?.lastEditedBy === "client";
+  if (
+    clientOrigin &&
+    (details?.addedServiceIds?.includes(serviceId) || ebr?.addedServiceIds?.includes(serviceId))
+  ) {
+    return "added";
+  }
+  if (
+    clientOrigin &&
+    (details?.cancelledServiceIds?.includes(serviceId) ||
+      ebr?.cancelledServiceIds?.includes(serviceId))
+  ) {
+    return "cancelled";
+  }
   if (details?.clientEditedServiceIds?.includes(serviceId)) return "edited";
   if (ebr?.clientEditedServiceIds?.includes(serviceId)) return "edited";
   if (ebr?.lastEditedBy === "client" && ebr.editedServiceIds?.includes(serviceId)) {
@@ -108,27 +126,41 @@ function serviceSignature(service: CalendarBookingServiceItem) {
   });
 }
 
-export function detectEditedServiceIds(
+export function detectServiceLineChanges(
   originalServices: readonly CalendarBookingServiceItem[],
   currentServices: readonly CalendarBookingServiceItem[],
 ) {
   const originalById = new Map(originalServices.map((service) => [service.id, service]));
-  const editedIds: string[] = [];
+  const currentIds = new Set(currentServices.map((service) => service.id));
+  const added: string[] = [];
+  const edited: string[] = [];
+  const cancelled: string[] = [];
 
   for (const service of currentServices) {
     const original = originalById.get(service.id);
-    if (!original || serviceSignature(original) !== serviceSignature(service)) {
-      editedIds.push(service.id);
+    if (!original) added.push(service.id);
+    else if (serviceSignature(original) !== serviceSignature(service)) {
+      edited.push(service.id);
     }
   }
 
   for (const original of originalServices) {
-    if (!currentServices.some((service) => service.id === original.id)) {
-      editedIds.push(original.id);
-    }
+    if (!currentIds.has(original.id)) cancelled.push(original.id);
   }
 
-  return [...new Set(editedIds)];
+  return {
+    added: [...new Set(added)],
+    edited: [...new Set(edited)],
+    cancelled: [...new Set(cancelled)],
+  };
+}
+
+export function detectEditedServiceIds(
+  originalServices: readonly CalendarBookingServiceItem[],
+  currentServices: readonly CalendarBookingServiceItem[],
+) {
+  const changes = detectServiceLineChanges(originalServices, currentServices);
+  return [...new Set([...changes.added, ...changes.edited, ...changes.cancelled])];
 }
 
 function productSignature(product: {

@@ -14,10 +14,17 @@ import { useGetMyBookingsQuery } from "../../store/services/businessApi";
 import { mapApiBookingToClientRecord } from "../../app/clients/booking/clientBookingApi.mapper";
 import { enrichClientBookingRecord } from "../../app/clients/booking/clientBookingDraftCache";
 import {
+  listTabForClientBooking,
   statusChipLabel,
   type ClientBookingRecord,
 } from "../../app/clients/booking/clientBookingRecords";
 import { bookingStatusChipColors } from "../../app/clients/booking/clientBookingStatus";
+import {
+  getCheckoutPath,
+  notifyActiveBookingChanged,
+  setActiveBookingSession,
+} from "../../app/clients/booking/clientBookingSession";
+import { markBookingUpdateSeen } from "./calendar/bookingUpdateSeen";
 import { buildBookingSummarySections } from "./client-booking/buildBookingSummarySections";
 
 export const FOCUS_BOOKING_REF_KEY = "mollure:focus_booking_ref";
@@ -180,12 +187,20 @@ export default function NotificationBookingSummaryModal({
     ? bookingStatusChipColors(record.status)
     : null;
 
-  // Client: always OK. Professional: View only when booking is found (drawer can open).
   const handleOk = () => {
     onClose();
   };
 
-  const handleView = () => {
+  const handleViewClient = () => {
+    if (!record) return;
+    markBookingUpdateSeen("client", record.bookingRef, record.updatedAt);
+    setActiveBookingSession(record);
+    notifyActiveBookingChanged();
+    onClose();
+    router.push(getCheckoutPath(record, listTabForClientBooking(record)));
+  };
+
+  const handleViewProfessional = () => {
     if (!notification || !record) return;
 
     const resolvedRef = bookingRef || record.bookingRef || "";
@@ -214,6 +229,14 @@ export default function NotificationBookingSummaryModal({
 
   const footer = (() => {
     if (!isProfessional) {
+      if (record) {
+        return (
+          <>
+            <AppModalCancelButton onClick={handleOk} label="OK" />
+            <AppModalPrimaryButton onClick={handleViewClient} label="View Booking" />
+          </>
+        );
+      }
       return <AppModalPrimaryButton onClick={handleOk} label="OK" />;
     }
     if (loading) {
@@ -223,7 +246,7 @@ export default function NotificationBookingSummaryModal({
       return (
         <>
           <AppModalCancelButton onClick={onClose} label="Close" />
-          <AppModalPrimaryButton onClick={handleView} label="View" />
+          <AppModalPrimaryButton onClick={handleViewProfessional} label="View" />
         </>
       );
     }

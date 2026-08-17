@@ -293,6 +293,35 @@ export function buildBookingActivityTimeline(input: BookingActivityBuildInput): 
     }
 
     if (effectiveStatus === "completed" || prepay === "paid") {
+      const notesDetails = parseCalendarEntryNotes(booking.notes);
+      if (notesDetails?.refunded) {
+        pushItem(items, {
+          id: `${bookingId}-refunded`,
+          bookingId,
+          bookingCode: code,
+          kind: "post_booking_paid",
+          actor: "professional",
+          actorLabel: "Professional",
+          title: "Refund completed",
+          occurredAt: updated.toISOString(),
+          hasDetailArrow: false,
+        });
+      }
+      if (notesDetails?.waitingForPayment) {
+        pushItem(items, {
+          id: `${bookingId}-waiting-payment`,
+          bookingId,
+          bookingCode: code,
+          kind: "fee_paid",
+          actor: "system",
+          actorLabel: "System",
+          title: notesDetails.invoiceDueDate
+            ? `Invoice due ${notesDetails.invoiceDueDate}`
+            : "Waiting for payment",
+          occurredAt: updated.toISOString(),
+          hasDetailArrow: false,
+        });
+      }
       pushItem(items, {
         id: `${bookingId}-paid`,
         bookingId,

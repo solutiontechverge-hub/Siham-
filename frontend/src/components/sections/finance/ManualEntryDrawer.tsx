@@ -56,9 +56,12 @@ export default function ManualEntryDrawer({
   const m = useTheme().palette.mollure;
   const rootRef = React.useRef<HTMLDivElement | null>(null);
   const { settings, setSettings } = useFinanceInvoiceSettings();
-  const { data: businessSetupResponse } = useGetBusinessSetupQuery(undefined, {
-    skip: !open,
-  });
+  const { data: businessSetupResponse } = useGetBusinessSetupQuery(
+    { includeDraft: false },
+    {
+      skip: !open,
+    },
+  );
   const businessSetup = businessSetupResponse?.data ?? null;
 
   const [clientOpen, setClientOpen] = React.useState(false);

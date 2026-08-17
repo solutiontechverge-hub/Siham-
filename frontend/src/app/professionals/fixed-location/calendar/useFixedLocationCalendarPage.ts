@@ -147,9 +147,8 @@ function buildUpsertPayloadFromSetup(
 }
 
 export function useFixedLocationCalendarPage() {
-  const { data: setupData } = useGetBusinessSetupQuery();
+  const { data: setupData } = useGetBusinessSetupQuery({ includeDraft: false });
   const businessSetupId = setupData?.data?.id ?? "";
-  useBookingRealtimeSync({ businessSetupId: businessSetupId || undefined });
   const [overviewQuery, setOverviewQuery] =
     React.useState<CalendarOverviewQuery>(() =>
       getCalendarQueryDateRange(toIsoLocalDate(new Date()), "day"),
@@ -164,14 +163,21 @@ export function useFixedLocationCalendarPage() {
     },
     [],
   );
-  const { data: calendarOverviewData } = useGetCalendarOverviewQuery(
-    overviewQuery,
-    {
+  const { data: calendarOverviewData, refetch: refetchCalendarOverview } =
+    useGetCalendarOverviewQuery(overviewQuery, {
       refetchOnMountOrArgChange: true,
       refetchOnFocus: true,
       refetchOnReconnect: true,
-    },
-  );
+      // Safety net if a socket event is missed while the calendar stays open.
+      pollingInterval: 12000,
+    });
+  const handleRealtimeBookingChanged = React.useCallback(() => {
+    void refetchCalendarOverview();
+  }, [refetchCalendarOverview]);
+  useBookingRealtimeSync({
+    businessSetupId: businessSetupId || undefined,
+    onChanged: handleRealtimeBookingChanged,
+  });
   const { data: professionalClientsData } = useGetProfessionalClientsQuery();
   const [createCalendarEntry, { isLoading: isCreatingCalendarEntry }] =
     useCreateCalendarEntryMutation();
@@ -318,6 +324,7 @@ export function useFixedLocationCalendarPage() {
         name: client.display_name,
         email: client.email,
         mollureUserId: client.mollure_user_id,
+        phone: client.phone ?? "",
       })),
     [professionalClientsData],
   );
@@ -483,6 +490,8 @@ export function useFixedLocationCalendarPage() {
     clientOptions,
     fixedLocationAddress,
     lateRescheduleFeePercentDefault,
+    cancellationBeforeHours: setupData?.data?.cancellation_before_hours ?? null,
+    cancellationBeforeMinutes: setupData?.data?.cancellation_before_minutes ?? null,
     isSaving,
     onCreateCalendarEntry,
     onUpdateCalendarEntry,

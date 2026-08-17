@@ -3,9 +3,11 @@
 import * as React from "react";
 import { mapApiBookingToClientRecord } from "../../../app/clients/booking/clientBookingApi.mapper";
 import {
+  ACTIVE_BOOKING_CHANGED_EVENT,
   ACTIVE_BOOKING_ID_KEY,
   CHECKOUT_REF_KEY,
   getActiveBookingSession,
+  isEbrDraftLocked,
   setActiveBookingSession,
 } from "../../../app/clients/booking/clientBookingSession";
 import {
@@ -73,21 +75,26 @@ export function useActiveClientBooking() {
 
   React.useEffect(() => {
     syncSessionKeys();
+    const onSessionChanged = () => {
+      syncSessionKeys();
+      setSessionTick((n) => n + 1);
+    };
     const onStorage = (event: StorageEvent) => {
       if (
         event.key === ACTIVE_BOOKING_ID_KEY ||
         event.key === CHECKOUT_REF_KEY ||
         event.key === null
       ) {
-        syncSessionKeys();
-        setSessionTick((n) => n + 1);
+        onSessionChanged();
       }
     };
     window.addEventListener("storage", onStorage);
     window.addEventListener("focus", syncSessionKeys);
+    window.addEventListener(ACTIVE_BOOKING_CHANGED_EVENT, onSessionChanged);
     return () => {
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("focus", syncSessionKeys);
+      window.removeEventListener(ACTIVE_BOOKING_CHANGED_EVENT, onSessionChanged);
     };
   }, [syncSessionKeys]);
 
@@ -100,6 +107,19 @@ export function useActiveClientBooking() {
     void sessionTick;
     const fromApi = matchActiveBooking(bookings, activeId, bookingRef);
     const sessionRecord = getActiveBookingSession();
+    const draftLocked = isEbrDraftLocked();
+
+    // Editor just returned with new time/services — do not let stale API win.
+    if (draftLocked && sessionRecord?.draft) {
+      if (fromApi && sameBooking(fromApi, sessionRecord)) {
+        return enrichClientBookingRecord({
+          ...fromApi,
+          draft: sessionRecord.draft,
+          notes: sessionRecord.notes ?? fromApi.notes,
+        });
+      }
+      return enrichClientBookingRecord(sessionRecord);
+    }
 
     if (fromApi && sessionRecord && sameBooking(fromApi, sessionRecord) && sessionRecord.draft && fromApi.draft) {
       // API is source of truth for pro BR updates; session only fills missing guest/project richness.
@@ -136,6 +156,7 @@ export function useActiveClientBooking() {
     }
 
     const sessionRecord = getActiveBookingSession();
+    if (isEbrDraftLocked()) return;
     if (!sessionRecord || !sameBooking(record, sessionRecord)) {
       setActiveBookingSession(record);
       return;
@@ -147,6 +168,7 @@ export function useActiveClientBooking() {
 
   return {
     record,
+    apiBookings: data?.data ?? [],
     refresh: refetch,
     isLoading: isLoading || isFetching,
   };

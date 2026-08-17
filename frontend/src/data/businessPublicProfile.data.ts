@@ -138,6 +138,10 @@ export type BusinessPublicProfileData = {
   prepaymentInstructions: string;
   /** Cancellation fee % from professional business settings (`late_cancellation_fee_percentage`). */
   cancellationFeePercent: number;
+  /** Minimum notice window from `cancellation_before_hours`. */
+  cancellationNoticeHours: number;
+  /** Minimum notice window from `cancellation_before_minutes`. */
+  cancellationNoticeMinutes: number;
   cancellationPolicyInstruction: string;
   kilometerAllowanceLabel: string;
   kilometerAllowanceInstructions: string;
@@ -364,6 +368,26 @@ export function buildDesiredProvinceDisplays(
   });
 }
 
+export function isAddressInOperatingArea(
+  desired: BusinessPublicProfileDesiredLocation | null | undefined,
+  province: string,
+  municipality: string,
+) {
+  if (!desired || desired.areaMode === "All Netherlands" || desired.areas.length === 0) {
+    return true;
+  }
+  const provinceKey = province.trim().toLowerCase();
+  const municipalityKey = municipality.trim().toLowerCase();
+  if (!provinceKey || !municipalityKey) return false;
+  return desired.areas.some((area) => {
+    if (area.province.trim().toLowerCase() !== provinceKey) return false;
+    if (area.allMunicipalities || area.municipalities.length === 0) return true;
+    return area.municipalities.some(
+      (entry) => entry.trim().toLowerCase() === municipalityKey,
+    );
+  });
+}
+
 export function getDesiredMunicipalitiesForProvinceDisplay(
   desired: BusinessPublicProfileDesiredLocation,
   province: string,
@@ -546,6 +570,8 @@ export function mapListingCardToPublicProfile(card: ListingCardData): BusinessPu
     prepaymentInstructions:
       "Rejuvenate your hair with our luxury spa treatment followed by a professional styling session.",
     cancellationFeePercent: 2,
+    cancellationNoticeHours: 2,
+    cancellationNoticeMinutes: 0,
     cancellationPolicyInstruction:
       "Cancellations may be subject to a fee of 2% of the service cost per the professional's policy.",
     kilometerAllowanceLabel: "10 EUR / km",

@@ -6,6 +6,7 @@ import {
   Avatar,
   Box,
   ButtonBase,
+  ClickAwayListener,
   InputAdornment,
   Stack,
 } from "@mui/material";
@@ -19,6 +20,10 @@ import {
   buildBookingTimeOptions,
   type BookingServiceEditDraft,
 } from "../../../data/bookingServiceEdit.data";
+import {
+  sanitizeDecimalInput,
+  sanitizeDigitsInput,
+} from "../../../lib/field-input";
 
 export type BookingEditServiceStaffOption = {
   id: string;
@@ -75,8 +80,13 @@ export default function BookingEditServiceScreen({
   const theme = useTheme();
   const m = theme.palette.mollure;
   const [staffQuery, setStaffQuery] = React.useState("");
+  const [staffMenuOpen, setStaffMenuOpen] = React.useState(false);
   const timeOptions = React.useMemo(() => buildBookingTimeOptions(), []);
   const hasStaffSelected = Boolean(draft.staffResourceId);
+  const selectedStaff = React.useMemo(
+    () => staffOptions.find((staff) => staff.id === draft.staffResourceId),
+    [staffOptions, draft.staffResourceId],
+  );
 
   const filteredStaff = React.useMemo(() => {
     const q = staffQuery.trim().toLowerCase();
@@ -86,9 +96,19 @@ export default function BookingEditServiceScreen({
     );
   }, [staffOptions, staffQuery]);
 
+  const closeStaffMenu = () => setStaffMenuOpen(false);
+  const openStaffMenu = () => setStaffMenuOpen(true);
+
+  const handleSelectStaff = (staffId: string) => {
+    onChange({ staffResourceId: staffId });
+    setStaffQuery("");
+    setStaffMenuOpen(false);
+  };
+
   const handleDurationChange = (value: string) => {
-    const duration = Number.parseInt(value, 10);
-    const next: Partial<BookingServiceEditDraft> = { durationMins: value };
+    const durationValue = sanitizeDigitsInput(value);
+    const duration = Number.parseInt(durationValue, 10);
+    const next: Partial<BookingServiceEditDraft> = { durationMins: durationValue };
     if (draft.startTime && Number.isFinite(duration) && duration > 0) {
       next.endTime = addMinutesToTime(draft.startTime, duration);
     }
@@ -221,40 +241,42 @@ export default function BookingEditServiceScreen({
         />
       ) : null}
 
-      <Stack direction="row" spacing={1} alignItems="flex-start">
-          <AppSelect
-            label="Price type"
-            placeholder="Select price type"
-            value={draft.priceType || "fixed"}
-            onChange={(e) =>
-              onChange({
-                priceType: String(
-                  e.target.value,
-                ) as BookingServiceEditDraft["priceType"],
-              })
-            }
-            options={priceTypeOptions}
-            fullWidth
-            disabled={disabled}
-            sx={{ flex: 1 }}
-          />
-          <AppTextField
-            label="Price"
-            placeholder="0"
-            value={draft.price}
-            onChange={(e) => onChange({ price: e.target.value })}
-            fullWidth
-            disabled={disabled}
-            error={Boolean(errors.price)}
-            helperText={errors.price}
-            inputProps={{ inputMode: "decimal" }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">€</InputAdornment>
-              ),
-            }}
-            sx={{ flex: 1 }}
-          />
+      <Stack direction="row" spacing={1} alignItems="center">
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <AppSelect
+              label="Price type"
+              placeholder="Select price type"
+              value={draft.priceType || "fixed"}
+              onChange={(e) =>
+                onChange({
+                  priceType: String(
+                    e.target.value,
+                  ) as BookingServiceEditDraft["priceType"],
+                })
+              }
+              options={priceTypeOptions}
+              fullWidth
+              disabled={disabled}
+            />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <AppTextField
+              label="Price"
+              placeholder="0"
+              value={draft.price}
+              onChange={(e) => onChange({ price: sanitizeDecimalInput(e.target.value) })}
+              fullWidth
+              disabled={disabled}
+              error={Boolean(errors.price)}
+              helperText={errors.price}
+              inputProps={{ inputMode: "decimal" }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">€</InputAdornment>
+                ),
+              }}
+            />
+          </Box>
       </Stack>
 
       <Box
@@ -275,49 +297,54 @@ export default function BookingEditServiceScreen({
         >
           Discount (Optional)
         </BodyText>
-        <Stack direction="row" spacing={1}>
-          <AppSelect
-            label="Discount type"
-            value={draft.discountType}
-            onChange={(e) =>
-              onChange({
-                discountType: String(
-                  e.target.value,
-                ) as BookingServiceEditDraft["discountType"],
-              })
-            }
-            options={discountTypeOptions}
-            fullWidth
-            disabled={disabled}
-            sx={{ flex: 1 }}
-          />
-          <AppTextField
-            label="Discount Amount"
-            placeholder="0"
-            value={draft.discountAmount}
-            onChange={(e) => onChange({ discountAmount: e.target.value })}
-            fullWidth
-            disabled={disabled}
-            inputProps={{ inputMode: "decimal" }}
-            InputProps={
-              draft.discountType === "percentage"
-                ? {
-                    endAdornment: (
-                      <InputAdornment position="end">%</InputAdornment>
-                    ),
-                  }
-                : {
-                    startAdornment: (
-                      <InputAdornment position="start">€</InputAdornment>
-                    ),
-                  }
-            }
-            sx={{ flex: 1 }}
-          />
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <AppSelect
+              label="Discount type"
+              value={draft.discountType}
+              onChange={(e) =>
+                onChange({
+                  discountType: String(
+                    e.target.value,
+                  ) as BookingServiceEditDraft["discountType"],
+                })
+              }
+              options={discountTypeOptions}
+              fullWidth
+              disabled={disabled}
+            />
+          </Box>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <AppTextField
+              label="Discount Amount"
+              placeholder="0"
+              value={draft.discountAmount}
+              onChange={(e) =>
+                onChange({ discountAmount: sanitizeDecimalInput(e.target.value) })
+              }
+              fullWidth
+              disabled={disabled}
+              inputProps={{ inputMode: "decimal" }}
+              InputProps={
+                draft.discountType === "percentage"
+                  ? {
+                      endAdornment: (
+                        <InputAdornment position="end">%</InputAdornment>
+                      ),
+                    }
+                  : {
+                      startAdornment: (
+                        <InputAdornment position="start">€</InputAdornment>
+                      ),
+                    }
+              }
+            />
+          </Box>
         </Stack>
       </Box>
 
       {showStaffAssign ? (
+        <ClickAwayListener onClickAway={closeStaffMenu}>
         <Stack spacing={0.85}>
           {!hasStaffSelected ? (
             <Stack
@@ -349,9 +376,21 @@ export default function BookingEditServiceScreen({
           <AppSearchField
             fullWidth
             placeholder="Select Team Member"
-            value={staffQuery}
-            onChange={(e) => setStaffQuery(e.target.value)}
-            onClear={() => setStaffQuery("")}
+            value={staffMenuOpen ? staffQuery : selectedStaff?.name ?? ""}
+            onChange={(e) => {
+              setStaffQuery(e.target.value);
+              openStaffMenu();
+            }}
+            onFocus={openStaffMenu}
+            onClick={openStaffMenu}
+            onClear={() => {
+              setStaffQuery("");
+              if (!staffMenuOpen) {
+                onChange({ staffResourceId: "" });
+              }
+              openStaffMenu();
+            }}
+            disabled={disabled}
             sx={{
               "& .MuiOutlinedInput-root": {
                 bgcolor: "#fff",
@@ -359,7 +398,7 @@ export default function BookingEditServiceScreen({
             }}
           />
 
-          {filteredStaff.length > 0 ? (
+          {staffMenuOpen && filteredStaff.length > 0 ? (
             <Box
               sx={{
                 borderRadius: "10px",
@@ -378,7 +417,7 @@ export default function BookingEditServiceScreen({
                   <ButtonBase
                     key={staff.id}
                     disabled={disabled}
-                    onClick={() => onChange({ staffResourceId: staff.id })}
+                    onClick={() => handleSelectStaff(staff.id)}
                     sx={{
                       width: "100%",
                       display: "flex",
@@ -460,6 +499,7 @@ export default function BookingEditServiceScreen({
             </Box>
           ) : null}
         </Stack>
+        </ClickAwayListener>
       ) : null}
     </Stack>
   );

@@ -3,7 +3,7 @@
 import AppButton from "./AppButton";
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import ReportProblemRoundedIcon from "@mui/icons-material/ReportProblemRounded";
 import { Avatar, Box, Popover, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
@@ -12,6 +12,12 @@ import { useAppDispatch } from "../../store/hooks";
 import { useSnackbar } from "./AppSnackbar";
 import { queueSnackbarFlash } from "../../lib/snackbarFlash";
 import AppModal from "./AppModal";
+
+function isMenuPathActive(pathname: string, matches: readonly string[]) {
+  return matches.some(
+    (match) => pathname === match || pathname.startsWith(`${match}/`),
+  );
+}
 
 function getInitials(emailOrName?: string) {
   const base = (emailOrName ?? "").trim();
@@ -42,6 +48,7 @@ export default function ProfessionalProfileMenuPopover({
 }: ProfessionalProfileMenuPopoverProps) {
   const theme = useTheme();
   const tokens = theme.palette.mollure;
+  const pathname = usePathname() ?? "";
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { showSnackbar } = useSnackbar();
@@ -86,6 +93,18 @@ export default function ProfessionalProfileMenuPopover({
     },
   } as const;
 
+  const activeBtnSx = {
+    ...outlinedBtnSx,
+    fontWeight: 800,
+    color: tokens.tealDark,
+    borderColor: tokens.teal,
+    bgcolor: alpha(tokens.teal, 0.12),
+    "&:hover": {
+      borderColor: tokens.tealDark,
+      bgcolor: alpha(tokens.teal, 0.18),
+    },
+  } as const;
+
   const deleteBtnSx = {
     borderRadius: "8px",
     textTransform: "none",
@@ -101,12 +120,40 @@ export default function ProfessionalProfileMenuPopover({
   } as const;
 
   const menuItems = [
-    { label: "Calendar", href: "/professionals/calendar" },
-    { label: "Client", href: "/professionals/client" },
-    { label: "Finance", href: "/professionals/finance/overview" },
-    { label: "Analytics", href: "/professionals/analytics" },
-    { label: "Profile", href: "/professionals/profile" },
-    { label: "Go to listing", href: "/clients/listing" },
+    {
+      label: "Calendar",
+      href: "/professionals/calendar",
+      matches: ["/professionals/calendar", "/professionals/fixed-location/calendar"],
+    },
+    {
+      label: "Client",
+      href: "/professionals/client",
+      matches: ["/professionals/client", "/professionals/fixed-location/client"],
+    },
+    {
+      label: "Finance",
+      href: "/professionals/finance/overview",
+      matches: ["/professionals/finance", "/professionals/fixed-location/finance"],
+    },
+    {
+      label: "Analytics",
+      href: "/professionals/analytics",
+      matches: ["/professionals/analytics", "/professionals/fixed-location/analytics"],
+    },
+    {
+      label: "Profile",
+      href: "/professionals/profile",
+      matches: [
+        "/professionals/profile",
+        "/professionals/fixed-location/profile",
+        "/professionals/desired-location/profile",
+      ],
+    },
+    {
+      label: "Go to listing",
+      href: "/clients/listing",
+      matches: ["/clients/listing"],
+    },
   ] as const;
 
   const deleteDialogFooter = (
@@ -206,19 +253,22 @@ export default function ProfessionalProfileMenuPopover({
             </Box>
           </Stack>
 
-          {menuItems.map((item) => (
-            <AppButton
-              key={item.href}
-              component={Link}
-              href={item.href}
-              variant="outlined"
-              fullWidth
-              sx={outlinedBtnSx}
-              onClick={onClose}
-            >
-              {item.label}
-            </AppButton>
-          ))}
+          {menuItems.map((item) => {
+            const active = isMenuPathActive(pathname, item.matches);
+            return (
+              <AppButton
+                key={item.href}
+                component={Link}
+                href={item.href}
+                variant="outlined"
+                fullWidth
+                sx={active ? activeBtnSx : outlinedBtnSx}
+                onClick={onClose}
+              >
+                {item.label}
+              </AppButton>
+            );
+          })}
 
           <AppButton
             variant="outlined"

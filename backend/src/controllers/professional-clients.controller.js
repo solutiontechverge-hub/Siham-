@@ -164,7 +164,9 @@ export const lookupMollureClientByEmail = async (req, res) => {
            NULLIF(TRIM(cp.legal_name), ''),
            NULLIF(TRIM(CONCAT(cp.contact_first_name, ' ', cp.contact_last_name)), ''),
            u.email
-         ) AS name
+         ) AS name,
+         COALESCE(NULLIF(TRIM(ip.phone), ''), NULLIF(TRIM(cp.phone), '')) AS phone,
+         NULLIF(TRIM(ip.country_code), '') AS country_code
        FROM users u
        LEFT JOIN individual_profiles ip ON ip.user_id = u.id
        LEFT JOIN company_profiles cp ON cp.user_id = u.id
@@ -191,6 +193,8 @@ export const lookupMollureClientByEmail = async (req, res) => {
         id: row.id,
         name: row.name,
         email: row.email,
+        phone: row.phone || null,
+        country_code: row.country_code || null,
       },
     });
   } catch (error) {

@@ -39,7 +39,9 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({
   const theme = useTheme();
   const m = theme.palette.mollure;
   const router = useRouter();
-  const { data: businessSetupResponse } = useGetBusinessSetupQuery();
+  const { data: businessSetupResponse } = useGetBusinessSetupQuery({
+    includeDraft: false,
+  });
   const shopId = businessSetupResponse?.data?.id
     ? String(businessSetupResponse.data.id)
     : "";
