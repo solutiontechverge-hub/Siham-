@@ -36,6 +36,56 @@ const locationFromApi: Record<string, CalendarBookingLocation> = {
   desired: "DL",
 };
 
+function resolveEventClientKind(input: {
+  apiClientKind?: string | null;
+  notesClientKind?: "individual" | "company";
+  locationDetailsKind?: unknown;
+}): CalendarEvent["clientKind"] {
+  const fromLocation =
+    input.locationDetailsKind === "company" || input.locationDetailsKind === "individual"
+      ? input.locationDetailsKind
+      : undefined;
+  if (
+    input.apiClientKind === "company" ||
+    input.notesClientKind === "company" ||
+    fromLocation === "company"
+  ) {
+    return "company";
+  }
+  if (
+    input.apiClientKind === "individual" ||
+    input.notesClientKind === "individual" ||
+    fromLocation === "individual"
+  ) {
+    return "individual";
+  }
+  return undefined;
+}
+
+export function applyProfessionalClientKind(
+  event: CalendarEvent,
+  clients: readonly { email: string; client_kind?: "individual" | "company" }[],
+): CalendarEvent {
+  if (event.clientKind === "company" || event.details?.clientKind === "company") {
+    return {
+      ...event,
+      clientKind: "company",
+      details: { ...event.details, clientKind: "company" },
+    };
+  }
+  const email = event.details?.clientEmail?.trim().toLowerCase();
+  if (!email) return event;
+  const match = clients.find(
+    (client) => client.email.trim().toLowerCase() === email,
+  );
+  if (match?.client_kind !== "company") return event;
+  return {
+    ...event,
+    clientKind: "company",
+    details: { ...event.details, clientKind: "company" },
+  };
+}
+
 const timeFromIso = (value?: string | null) => {
   return wallClockTimeFromDateTime(value) ?? "08:00";
 };
@@ -56,6 +106,10 @@ export function mapCalendarEntryToOverviewEvent(
 ): CalendarEvent {
   const status = statusFromApi[entry.status] ?? "Confirmed";
   const isRequested = status === "Requested";
+  const details = parseCalendarEntryNotes(entry.notes);
+  const clientKind = resolveEventClientKind({
+    notesClientKind: details?.clientKind,
+  });
 
   return {
     id: `ce-${entry.id}`,
@@ -74,7 +128,10 @@ export function mapCalendarEntryToOverviewEvent(
         : "Offline",
     bookingScenario: isRequested ? "BR" : undefined,
     showClientName: entry.client_name ?? undefined,
-    details: parseCalendarEntryNotes(entry.notes),
+    details: clientKind
+      ? { ...details, clientKind }
+      : details,
+    clientKind,
   };
 }
 
@@ -186,6 +243,7 @@ export function mapCalendarBookingToEvent(
   const locationDetails =
     booking.location_details && typeof booking.location_details === "object"
       ? (booking.location_details as {
+          clientKind?: "individual" | "company";
           desiredLocation?: {
             street?: string;
             number?: string;
@@ -232,6 +290,11 @@ export function mapCalendarBookingToEvent(
     : null;
   const resolvedDesiredLocation =
     desiredFromNotes ?? desiredFromDetails ?? desiredFromColumns;
+  const clientKind = resolveEventClientKind({
+    apiClientKind: booking.client_kind,
+    notesClientKind: parsedNotes?.clientKind,
+    locationDetailsKind: locationDetails?.clientKind,
+  });
 
   return {
     id: `b-${booking.id}`,
@@ -278,8 +341,10 @@ export function mapCalendarBookingToEvent(
     showClientName: clientName,
     notes: booking.notes ?? null,
     updatedAt: booking.updated_at ?? booking.created_at ?? null,
+    clientKind,
     details: {
       clientEmail: booking.customer_email ?? "",
+      ...(clientKind ? { clientKind } : {}),
       requestDirection: resolvedRequestDirection,
       ...(resolvedDesiredLocation &&
       (resolvedDesiredLocation.street ||

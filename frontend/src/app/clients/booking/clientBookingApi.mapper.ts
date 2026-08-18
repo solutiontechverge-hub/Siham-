@@ -98,12 +98,28 @@ function mapApiStatus(status: ClientBookingStatus): CreateBookingRequest["status
   return "requested";
 }
 
-function mapApiBookingType(locationMode: "fixed" | "desired"): CreateBookingRequest["booking_type"] {
-  return locationMode === "desired" ? "project" : "online";
+export function hasProjectBookingContent(draft: {
+  projectDetails?: { description?: string; uploads?: unknown[] } | null;
+}): boolean {
+  const description = draft.projectDetails?.description?.trim() ?? "";
+  const uploads = draft.projectDetails?.uploads?.length ?? 0;
+  return Boolean(description || uploads);
 }
 
-function mapClientBookingRequestType(locationMode: "fixed" | "desired"): CreateBookingRequest["booking_type"] {
-  return locationMode === "desired" ? "project" : "request";
+function mapApiBookingType(
+  locationMode: "fixed" | "desired",
+  hasProject = false,
+): CreateBookingRequest["booking_type"] {
+  if (locationMode === "desired") return hasProject ? "project" : "request";
+  return "online";
+}
+
+function mapClientBookingRequestType(
+  locationMode: "fixed" | "desired",
+  hasProject = false,
+): CreateBookingRequest["booking_type"] {
+  if (locationMode === "desired") return hasProject ? "project" : "request";
+  return "request";
 }
 
 export function buildClientBookingApiPayload(input: {
@@ -158,8 +174,8 @@ export function buildClientBookingApiPayload(input: {
   const imageUrls = projectUploads.filter((u) => u.url && isImageUpload(u)).map((u) => u.url as string);
   const documentUrls = projectUploads.filter((u) => u.url && !isImageUpload(u)).map((u) => u.url as string);
 
-  // Keep human notes blank — services/project live in clientSnapshot, not Internal Note.
-  const humanNotes = "";
+  // IC client notes become the professional Internal Note; project/services stay in meta.
+  const humanNotes = (input.draft.clientNote ?? "").trim();
 
   const clientSnapshot = {
     people: (input.draft.people ?? []).map((p) => ({
@@ -234,8 +250,14 @@ export function buildClientBookingApiPayload(input: {
     location_type: input.locationMode === "desired" ? "desired" : "fixed",
     status: mapApiStatus(input.status),
     booking_type: input.asBookingRequest
-      ? mapClientBookingRequestType(input.locationMode)
-      : mapApiBookingType(input.locationMode),
+      ? mapClientBookingRequestType(
+          input.locationMode,
+          hasProjectBookingContent(input.draft),
+        )
+      : mapApiBookingType(
+          input.locationMode,
+          hasProjectBookingContent(input.draft),
+        ),
     unique_code: input.bookingRef,
     total_price: input.total,
     notes,
@@ -721,6 +743,9 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
         desiredLocation.province ||
         desiredLocation.municipality)
         ? { desiredLocation }
+        : {}),
+      ...(notesDetails?.internalNote?.trim()
+        ? { clientNote: notesDetails.internalNote.trim() }
         : {}),
       total: (() => {
         if (activeEbr?.suggestedServices?.length) {

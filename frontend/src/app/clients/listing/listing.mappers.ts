@@ -17,6 +17,10 @@ import { resolveBusinessOffering } from "./businessPublicProfile.mapper";
 import { normalizeServiceDurationLabel } from "../../../utils/serviceDuration";
 import type { ListingCardData } from "./listing.data";
 import type { ListingCardServiceCatalogItem } from "./listing.cardPresentation";
+import {
+  applyBusinessServiceDiscount,
+  isBusinessServiceDiscountActive,
+} from "../../../data/businessServiceModal.data";
 
 const FALLBACK_IMAGES = [
   ListingImage1,
@@ -218,10 +222,14 @@ const buildServiceCatalog = (setup: BusinessSetupListing): ListingCardServiceCat
       const serviceTitle = String(detail.serviceTitle ?? "").trim();
       const categoryTitle = String(detail.categoryTitle ?? "").trim();
       const categoryId = detail.categoryId != null ? String(detail.categoryId).trim() : "";
+      const priced = applyBusinessServiceDiscount(
+        Number.isFinite(price) ? price : 0,
+        detail,
+      );
 
       return {
         name: formatServiceName(serviceTitle),
-        price,
+        price: priced.amount,
         durationLabel: resolveServiceDurationLabel(detail, durationByServiceId),
         categoryId: categoryId || undefined,
         categoryTitle: categoryTitle || undefined,
@@ -364,9 +372,19 @@ export const mapBusinessSetupToListingCard = (
 
   const appointmentBefore = setup.appointmentBefore;
 
-  const hasDiscount = businessKeywords.some((keyword) =>
-    /discount|promo|deal|offer|sale/i.test(keyword),
-  );
+  const hasActiveServiceDiscount =
+    (setup.serviceDetails ?? []).some((detail) =>
+      isBusinessServiceDiscountActive(detail),
+    ) ||
+    (setup.serviceCategories ?? []).some((entry) =>
+      isBusinessServiceDiscountActive(entry),
+    );
+
+  const hasDiscount =
+    hasActiveServiceDiscount ||
+    businessKeywords.some((keyword) =>
+      /discount|promo|deal|offer|sale/i.test(keyword),
+    );
 
   const categoryKeys = buildCategoryKeys(setup);
   const isFixedOrBoth = setup.locationMode === "fixed" || setup.locationMode === "both";

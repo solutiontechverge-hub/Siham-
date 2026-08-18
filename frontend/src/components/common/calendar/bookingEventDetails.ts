@@ -115,6 +115,7 @@ type StoredBookingNoteMeta = Partial<
     | "waitingForPayment"
     | "invoiceDueDate"
     | "splitBill"
+    | "clientKind"
   >
 > & {
   ebr?: StoredEbrNotePayload;
@@ -189,6 +190,7 @@ export function serializeCalendarEntryNotes(
     ...(details?.waitingForPayment ? { waitingForPayment: true } : {}),
     ...(details?.invoiceDueDate ? { invoiceDueDate: details.invoiceDueDate } : {}),
     ...(details?.splitBill ? { splitBill: details.splitBill } : {}),
+    ...(details?.clientKind ? { clientKind: details.clientKind } : {}),
     ...(ebr ? { ebr } : {}),
     ...(er ? { er } : {}),
   };
@@ -482,6 +484,7 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
       ...(meta.waitingForPayment ? { waitingForPayment: true } : {}),
       ...(meta.invoiceDueDate ? { invoiceDueDate: meta.invoiceDueDate } : {}),
       ...(meta.splitBill ? { splitBill: meta.splitBill } : {}),
+      ...(meta.clientKind ? { clientKind: meta.clientKind } : {}),
       ...(ebr?.status !== "rejected" && ebr?.editedServiceIds?.length && !meta.editedServiceIds?.length
         ? { editedServiceIds: ebr.editedServiceIds }
         : {}),
@@ -602,7 +605,11 @@ export function hydrateBookingDrawerFromEvent(ev: CalendarEvent): BookingDrawerH
 }
 
 export function buildBookingDetailsSnapshot(input: {
-  selectedClient: { name: string; email: string } | null;
+  selectedClient: {
+    name: string;
+    email: string;
+    clientKind?: "individual" | "company";
+  } | null;
   selectedServices: BookingDrawerHydration["services"];
   selectedProducts: BookingDrawerHydration["products"];
   bookingGuests: BookingDrawerHydration["guests"];
@@ -628,6 +635,9 @@ export function buildBookingDetailsSnapshot(input: {
 }): CalendarBookingDetails {
   return {
     clientEmail: input.selectedClient?.email ?? "",
+    ...(input.selectedClient?.clientKind
+      ? { clientKind: input.selectedClient.clientKind }
+      : {}),
     services: input.selectedServices,
     products: input.selectedProducts,
     guests: input.bookingGuests,

@@ -5,6 +5,7 @@ import type { BusinessSetupListing } from "../store/services/businessApi";
 import { fixedLocationPageData } from "../app/professionals/fixed-location/fixedLocation.data";
 import type { ServiceCategorySliderIconId } from "./businessServiceCategorySlider.data";
 import { resolveServiceCategorySliderIconId } from "./businessServiceCategorySlider.data";
+import { applyBusinessServiceDiscount } from "./businessServiceModal.data";
 
 export type BusinessPublicProfileService = {
   id: string;
@@ -15,7 +16,47 @@ export type BusinessPublicProfileService = {
   priceLabel: string;
   priceValue: number;
   durationMins: number;
+  originalPriceValue?: number;
+  originalPriceLabel?: string;
+  discountPct?: number;
+  discountType?: string;
+  discountAmount?: number;
+  discountStartDate?: string;
+  discountEndDate?: string;
 };
+
+export function pricePublicProfileServiceOnDate(
+  service: Pick<
+    BusinessPublicProfileService,
+    | "priceValue"
+    | "originalPriceValue"
+    | "discountType"
+    | "discountAmount"
+    | "discountStartDate"
+    | "discountEndDate"
+  >,
+  onDateIso?: string,
+): { price: number; originalPrice?: number; discountPct?: number } {
+  const base =
+    service.originalPriceValue && service.originalPriceValue > 0
+      ? service.originalPriceValue
+      : service.priceValue;
+  const priced = applyBusinessServiceDiscount(
+    base,
+    {
+      discountType: service.discountType,
+      discountAmount: service.discountAmount,
+      discountStartDate: service.discountStartDate,
+      discountEndDate: service.discountEndDate,
+    },
+    onDateIso,
+  );
+  return {
+    price: priced.amount,
+    originalPrice: priced.active ? base : undefined,
+    discountPct: priced.percentOff ?? undefined,
+  };
+}
 
 export type BusinessPublicProfileCategory = {
   id: string;

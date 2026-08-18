@@ -28,7 +28,7 @@ import { resolveMediaUrl } from "../../../lib/resolveMediaUrl";
 import {
   getServicesForLocationMode,
   getTeamForLocationMode,
-  isAddressInOperatingArea,
+  pricePublicProfileServiceOnDate,
 } from "../../../data/businessPublicProfile.data";
 import { useBusinessPublicProfile } from "../../../hooks/useBusinessPublicProfile";
 import { extractUuidFromSyntheticId } from "./clientBookingApi.mapper";
@@ -449,10 +449,15 @@ export function useClientBookingCreatePage() {
   );
   const [planningActivity, setPlanningActivity] = React.useState("");
   const [planningDuration, setPlanningDuration] = React.useState("");
+  const [clientNote, setClientNote] = React.useState("");
   const projectFileInputRef = React.useRef<HTMLInputElement>(null);
 
   const locationMode = shop?.locationMode ?? "fixed";
   const isDesiredLocation = locationMode === "desired";
+  const isCompanyClient =
+    user?.user_type === "company" ||
+    profileQueryData?.data?.user_type === "company";
+  const showProjectDetails = isDesiredLocation && isCompanyClient;
   const bookServicesAtSameTime = !isDesiredLocation && combineServices;
   const servicesDurationMins = React.useMemo(() => {
     if (!services.length) return 0;
@@ -461,16 +466,6 @@ export function useClientBookingCreatePage() {
     }
     return services.reduce((sum, service) => sum + service.durationMins, 0);
   }, [bookServicesAtSameTime, services]);
-  const isDesiredVisitAddressComplete = React.useMemo(() => {
-    if (!isDesiredLocation) return true;
-    return Boolean(
-      desiredVisitAddress.street.trim() &&
-        desiredVisitAddress.number.trim() &&
-        desiredVisitAddress.postalCode.trim() &&
-        desiredVisitAddress.province.trim() &&
-        desiredVisitAddress.municipality.trim(),
-    );
-  }, [desiredVisitAddress, isDesiredLocation]);
   const desiredVisitAddressLabel = React.useMemo(() => {
     if (!isDesiredLocation) return "";
     return [
@@ -502,6 +497,7 @@ export function useClientBookingCreatePage() {
   >(() => {
     if (!shop?.shopId || !profileHydrated || !businessProfile) return {};
 
+    const bookingDateIso = toISO(selectedDate);
     const locationCatalog = getServicesForLocationMode(
       businessProfile,
       locationMode,
@@ -510,7 +506,7 @@ export function useClientBookingCreatePage() {
       id: s.id,
       name: s.name,
       durationMins: s.durationMins,
-      price: s.priceValue,
+      ...pricePublicProfileServiceOnDate(s, bookingDateIso),
     }));
     const fallbackByName = new Map(
       fallbackItems.map((item) => [item.name.trim().toLowerCase(), item]),
@@ -539,15 +535,19 @@ export function useClientBookingCreatePage() {
               .trim()
               .toLowerCase(),
           );
+          const priced = matched
+            ? pricePublicProfileServiceOnDate(matched, bookingDateIso)
+            : {
+                price: fallbackMatch?.price ?? 0,
+                originalPrice: fallbackMatch?.originalPrice,
+                discountPct: fallbackMatch?.discountPct,
+              };
           items.push({
             id,
             name: matched?.name ?? fallbackMatch?.name ?? opt.label,
             durationMins:
               matched?.durationMins ?? fallbackMatch?.durationMins ?? 30,
-            price:
-              matched?.priceValue ??
-              fallbackMatch?.price ??
-              0,
+            ...priced,
           });
         }
       }
@@ -560,6 +560,7 @@ export function useClientBookingCreatePage() {
     profileHydrated,
     shop?.shopId,
     shopTeamMembers,
+    selectedDate,
   ]);
 
   /** Location catalog when the pro has no selectable team members for this mode. */
@@ -570,10 +571,44 @@ export function useClientBookingCreatePage() {
         id: s.id,
         name: s.name,
         durationMins: s.durationMins,
-        price: s.priceValue,
+        ...pricePublicProfileServiceOnDate(s, toISO(selectedDate)),
       }),
     );
-  }, [businessProfile, locationMode, profileHydrated, shop?.shopId]);
+  }, [businessProfile, locationMode, profileHydrated, selectedDate, shop?.shopId]);
+
+  React.useEffect(() => {
+    if (!locationServiceCatalog.length) return;
+    setServices((prev) => {
+      if (!prev.length) return prev;
+      let changed = false;
+      const next = prev.map((service) => {
+        const catalogId =
+          service.catalogServiceId ||
+          extractUuidFromSyntheticId(service.id) ||
+          service.id;
+        const catalog =
+          locationServiceCatalog.find((item) => item.id === catalogId) ||
+          locationServiceCatalog.find((item) => item.id === service.id) ||
+          locationServiceCatalog.find((item) => item.name === service.name);
+        if (!catalog) return service;
+        if (
+          catalog.price === service.price &&
+          catalog.originalPrice === service.originalPrice &&
+          catalog.discountPct === service.discountPct
+        ) {
+          return service;
+        }
+        changed = true;
+        return {
+          ...service,
+          price: catalog.price,
+          originalPrice: catalog.originalPrice,
+          discountPct: catalog.discountPct,
+        };
+      });
+      return changed ? next : prev;
+    });
+  }, [locationServiceCatalog]);
 
   const isPlanningPerson = React.useCallback(
     (p: BookingPerson) =>
@@ -1156,7 +1191,7 @@ export function useClientBookingCreatePage() {
       setServiceTab(getPreferredServiceTab(profileServices));
       setSelectedServiceIds({});
 
-      if (isDesired && profileSelection.projectEnabled) {
+      if (isDesired && profileSelection.projectEnabled && isCompanyClient) {
         setProjectDescription(profileSelection.projectInstructions);
       }
 
@@ -1179,7 +1214,7 @@ export function useClientBookingCreatePage() {
 
       setProfileHydrated(true);
     },
-    [getPreferredServiceTab],
+    [getPreferredServiceTab, isCompanyClient],
   );
 
   React.useEffect(() => {
@@ -1320,6 +1355,9 @@ export function useClientBookingCreatePage() {
           })),
         );
       }
+      if (existing.draft.clientNote) {
+        setClientNote(existing.draft.clientNote);
+      }
       // Restore visit address the client already entered (Desired Location).
       const savedVisit = existing.draft.desiredLocation;
       if (
@@ -1389,15 +1427,20 @@ export function useClientBookingCreatePage() {
     const catalogServices = getServicesForLocationMode(
       businessProfile,
       mode,
-    ).map((s) => ({
-      id: s.id,
-      catalogServiceId: s.id,
-      name: s.name,
-      durationMins: s.durationMins,
-      price: s.priceValue,
-      guestId: (leaveUnassigned ? null : "p-requester") as string | null,
-      teamMemberId: defaultTeamMemberId,
-    }));
+    ).map((s) => {
+      const priced = pricePublicProfileServiceOnDate(s, toISO(selectedDate));
+      return {
+        id: s.id,
+        catalogServiceId: s.id,
+        name: s.name,
+        durationMins: s.durationMins,
+        price: priced.price,
+        originalPrice: priced.originalPrice,
+        discountPct: priced.discountPct,
+        guestId: (leaveUnassigned ? null : "p-requester") as string | null,
+        teamMemberId: defaultTeamMemberId,
+      };
+    });
 
     setServices(catalogServices.slice(0, 3));
     setShopTeamMembers(apiTeam);
@@ -1549,6 +1592,9 @@ export function useClientBookingCreatePage() {
     const isPlanning = cardName === "Planning";
     const isModel = cardName === "Model";
     const isGuest = cardName === "Guest";
+
+    if (isModel && !isCompanyClient) return;
+    if (isPlanning && !isCompanyClient) return;
 
     if (
       !isDesiredLocation &&
@@ -1786,30 +1832,6 @@ export function useClientBookingCreatePage() {
     )
       return;
 
-    if (isDesiredLocation && !isDesiredVisitAddressComplete) {
-      showSnackbar({
-        severity: "error",
-        message: "Please enter the full visit address for this Desired Location booking.",
-      });
-      return;
-    }
-
-    if (
-      isDesiredLocation &&
-      !isAddressInOperatingArea(
-        businessProfile?.desiredLocation,
-        desiredVisitAddress.province,
-        desiredVisitAddress.municipality,
-      )
-    ) {
-      showSnackbar({
-        severity: "error",
-        message:
-          "This address is outside the professional’s operating area and cannot be booked.",
-      });
-      return;
-    }
-
     if (isSelectedToday && isSameDayBookingTooSoon(selectedTime)) {
       setTimeValidationError(CLIENT_BOOKING_MIN_LEAD_ERROR);
       showSnackbar({
@@ -1859,16 +1881,21 @@ export function useClientBookingCreatePage() {
       services: servicesForDraft,
       teamMembers: shopTeamMembers.map(({ id, name }) => ({ id, name })),
       total,
+      ...(clientNote.trim() ? { clientNote: clientNote.trim() } : {}),
       ...(isDesiredLocation
         ? {
-            projectDetails: {
-              description: projectDescriptionForDraft,
-              uploads: projectUploads.map((u) => ({
-                id: u.id,
-                name: u.name,
-                previewUrl: u.previewUrl,
-              })),
-            },
+            ...(isCompanyClient
+              ? {
+                  projectDetails: {
+                    description: projectDescriptionForDraft,
+                    uploads: projectUploads.map((u) => ({
+                      id: u.id,
+                      name: u.name,
+                      previewUrl: u.previewUrl,
+                    })),
+                  },
+                }
+              : {}),
             desiredLocation: {
               street: desiredVisitAddress.street.trim(),
               number: desiredVisitAddress.number.trim(),
@@ -1980,7 +2007,7 @@ export function useClientBookingCreatePage() {
       const filesToUpload = projectUploads
         .map((u) => u.file)
         .filter((file): file is File => Boolean(file));
-      if (isDesiredLocation && filesToUpload.length > 0) {
+      if (isDesiredLocation && isCompanyClient && filesToUpload.length > 0) {
         const uploaded = await uploadBookingAttachments(filesToUpload).unwrap();
         const attachments = uploaded.data?.attachments ?? [];
         projectDetailsUploads = attachments.map((att) => ({
@@ -2000,12 +2027,17 @@ export function useClientBookingCreatePage() {
         services: servicesForDraft,
         teamMembers: shopTeamMembers.map(({ id, name }) => ({ id, name })),
         total,
+        ...(clientNote.trim() ? { clientNote: clientNote.trim() } : {}),
         ...(isDesiredLocation
           ? {
-              projectDetails: {
-                description: projectDescriptionForDraft,
-                uploads: projectDetailsUploads,
-              },
+              ...(isCompanyClient
+                ? {
+                    projectDetails: {
+                      description: projectDescriptionForDraft,
+                      uploads: projectDetailsUploads,
+                    },
+                  }
+                : {}),
               desiredLocation: {
                 street: desiredVisitAddress.street.trim(),
                 number: desiredVisitAddress.number.trim(),
@@ -2191,9 +2223,6 @@ export function useClientBookingCreatePage() {
     setProjectDescription,
     projectUploads,
     setProjectUploads,
-    desiredVisitAddress,
-    setDesiredVisitAddress,
-    isDesiredVisitAddressComplete,
     desiredVisitAddressLabel,
     participantMenuAnchor,
     setParticipantMenuAnchor,
@@ -2203,9 +2232,13 @@ export function useClientBookingCreatePage() {
     setPlanningActivity,
     planningDuration,
     setPlanningDuration,
+    clientNote,
+    setClientNote,
     projectFileInputRef,
     locationMode,
     isDesiredLocation,
+    isCompanyClient,
+    showProjectDetails,
     getParticipantLabel,
     catalogByTeamMemberId,
     isPlanningPerson,

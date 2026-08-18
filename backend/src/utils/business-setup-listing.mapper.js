@@ -79,6 +79,13 @@ const mapServiceDetail = (detail, durationByServiceId = new Map()) => ({
   categoryTitle: toNullableString(detail.category_title),
   isVisible: detail.is_visible === false || detail.isVisible === false ? false : true,
   createdAt: toIsoTimestamp(detail.created_at),
+  discountType: toNullableString(detail.discount_type ?? detail.discountType),
+  discountAmount: toNullableNumber(detail.discount_amount ?? detail.discountAmount),
+  discountStartDate: toNullableString(detail.discount_start_date ?? detail.discountStartDate),
+  discountEndDate: toNullableString(detail.discount_end_date ?? detail.discountEndDate),
+  discountDescription: toNullableString(
+    detail.discount_description ?? detail.discountDescription,
+  ),
 });
 
 export const transformBusinessSetupForListing = (
