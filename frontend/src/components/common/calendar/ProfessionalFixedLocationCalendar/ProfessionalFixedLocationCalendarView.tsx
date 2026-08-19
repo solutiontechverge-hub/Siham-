@@ -140,6 +140,7 @@ import BookingRequestConfirmDialog from "../BookingRequestConfirmDialog";
 import BookingRequestResponseActions from "../BookingRequestResponseActions";
 import BookingDrawerSelectedItemsSection from "../BookingDrawerSelectedItemsSection";
 import BookingDrawerClientSnapshotSection from "../BookingDrawerClientSnapshotSection";
+import CompanyClientTag from "../CompanyClientTag";
 import BookingActivityOverview from "../BookingActivityOverview";
 import { buildBookingActivityTimeline } from "../buildBookingActivityTimeline";
 import type { BookingActivityItem } from "../bookingActivity.types";
@@ -316,6 +317,7 @@ export type ProfessionalFixedLocationCalendarProps = {
     mollureUserId?: string | null;
     phone?: string | null;
     countryCode?: string | null;
+    clientKind?: "individual" | "company";
   }[];
   isSaving?: boolean;
   onCreateCalendarEntry?: (
@@ -773,6 +775,7 @@ export default function ProfessionalFixedLocationCalendar({
     name: string;
     email: string;
     mollureUserId?: string | null;
+    clientKind?: "individual" | "company";
   }>(null);
   const [addClientSource, setAddClientSource] = React.useState<
     "" | "client-list" | "mollure-platform" | "non-mollure" | "guest"
@@ -786,6 +789,7 @@ export default function ProfessionalFixedLocationCalendar({
     email: string;
     phone?: string | null;
     countryCode?: string | null;
+    userType?: string | null;
   }>(null);
   const [platformLookupStatus, setPlatformLookupStatus] = React.useState<
     "idle" | "loading" | "found" | "not_found"
@@ -838,6 +842,7 @@ export default function ProfessionalFixedLocationCalendar({
           email: client.email,
           phone: client.phone,
           countryCode: client.country_code,
+          userType: client.user_type ?? null,
         });
         setPlatformLookupStatus("found");
       } catch {
@@ -1316,6 +1321,15 @@ export default function ProfessionalFixedLocationCalendar({
     isCompletedBooking ||
     isCancelledOrInvalidBooking ||
     (Boolean(editingEventId) && !isEditingExisting);
+  const isSelectedCompanyClient = selectedClient?.clientKind === "company";
+  const canUseBookingProject =
+    slotLocation === "DL" && slotClientAdded && isSelectedCompanyClient;
+
+  React.useEffect(() => {
+    if (!isSelectedCompanyClient && !isViewingExisting) {
+      setBookingProjectEnabled(false);
+    }
+  }, [isSelectedCompanyClient, isViewingExisting]);
 
   const bookingEditSignature = React.useMemo(
     () =>
@@ -3486,6 +3500,7 @@ export default function ProfessionalFixedLocationCalendar({
     setSelectedClient({
       name: ev.showClientName ?? "Client",
       email: hydration.clientEmail,
+      clientKind: ev.clientKind ?? ev.details?.clientKind,
     });
     setSelectedServices(hydration.services);
     setSelectedProducts(
@@ -5456,7 +5471,7 @@ export default function ProfessionalFixedLocationCalendar({
               : upload.previewUrl,
         }));
 
-        if (slotLocation === "DL" && bookingProjectEnabled) {
+        if (canUseBookingProject && bookingProjectEnabled) {
           const filesToUpload = bookingProjectUploads
             .map((upload) => upload.file)
             .filter((file): file is File => Boolean(file));
@@ -5556,7 +5571,7 @@ export default function ProfessionalFixedLocationCalendar({
             guestId: service.guestId ?? null,
             teamMemberId: service.staffResourceId ?? service.teamMemberId ?? null,
           })),
-          ...(slotLocation === "DL" && bookingProjectEnabled
+          ...(canUseBookingProject && bookingProjectEnabled
             ? {
                 projectDetails: {
                   description: bookingProjectDescription,
@@ -5661,9 +5676,11 @@ export default function ProfessionalFixedLocationCalendar({
       const resolvedBookingType =
         existingEvent?.bookingType ??
         (isNewManualBooking
-          ? isOfflineManualBooking
-            ? "Offline"
-            : "Requests"
+          ? canUseBookingProject && bookingProjectEnabled
+            ? "Project"
+            : isOfflineManualBooking
+              ? "Offline"
+              : "Requests"
           : slotBookingType);
 
       const buildLocalEvent = (
@@ -5685,6 +5702,7 @@ export default function ProfessionalFixedLocationCalendar({
             ? (existingEvent?.bookingScenario ?? "BR")
             : undefined,
         showClientName: clientName,
+        clientKind: selectedClient?.clientKind,
         details,
       });
 
@@ -5949,6 +5967,7 @@ export default function ProfessionalFixedLocationCalendar({
       slotBookingType,
       slotLocation,
       slotStatus,
+      canUseBookingProject,
       resourceNameById,
     ]);
 
@@ -7774,6 +7793,10 @@ export default function ProfessionalFixedLocationCalendar({
                               "Client",
                             email: nonMollureDraft.email.trim(),
                             mollureUserId: null,
+                            clientKind:
+                              slotBookingScreen === "non-mollure-company"
+                                ? "company"
+                                : "individual",
                           });
                           setBookingPhoneDraft({
                             phoneCode: nonMollureDraft.phoneCode,
@@ -7796,6 +7819,7 @@ export default function ProfessionalFixedLocationCalendar({
                               "Guest",
                             email: "",
                             mollureUserId: null,
+                            clientKind: "individual",
                           });
                           setBookingPhoneDraft({
                             phoneCode: guestDraft.phoneCode,
@@ -8168,6 +8192,7 @@ export default function ProfessionalFixedLocationCalendar({
                                 name: c.name,
                                 email: c.email,
                                 mollureUserId: c.mollureUserId ?? null,
+                                clientKind: c.clientKind,
                               });
                               setBookingPhoneDraft(
                                 phoneDraftFromStoredContact(
@@ -8212,6 +8237,18 @@ export default function ProfessionalFixedLocationCalendar({
                                     name: platformEmailMatch.name,
                                     email: platformEmailMatch.email,
                                     mollureUserId: platformEmailMatch.id ?? "platform",
+                                    clientKind:
+                                      platformEmailMatch.userType === "company" ||
+                                      clientList.find(
+                                        (x) =>
+                                          x.email.toLowerCase() ===
+                                            platformEmailMatch.email.toLowerCase() ||
+                                          (platformEmailMatch.id &&
+                                            x.mollureUserId ===
+                                              platformEmailMatch.id),
+                                      )?.clientKind === "company"
+                                        ? "company"
+                                        : "individual",
                                   });
                                   {
                                     const listed = clientList.find(
@@ -9779,7 +9816,7 @@ export default function ProfessionalFixedLocationCalendar({
                       ) : null}
                     </Box>
 
-                    {slotLocation === "DL" && slotClientAdded ? (
+                    {canUseBookingProject ? (
                       <Box>
                         <FormControlLabel
                           control={
@@ -10064,16 +10101,26 @@ export default function ProfessionalFixedLocationCalendar({
                                       .toUpperCase()}
                               </Avatar>
                               <Box sx={{ flex: 1, minWidth: 0 }}>
-                                <BodyText
-                                  sx={{
-                                    fontSize: 12.5,
-                                    fontWeight: 900,
-                                    color: alpha(m.navy, 0.78),
-                                    lineHeight: 1.2,
-                                  }}
+                                <Stack
+                                  direction="row"
+                                  alignItems="center"
+                                  spacing={0.75}
+                                  sx={{ minWidth: 0 }}
                                 >
-                                  {selectedClient?.name ?? "Client"}
-                                </BodyText>
+                                  <BodyText
+                                    sx={{
+                                      fontSize: 12.5,
+                                      fontWeight: 900,
+                                      color: alpha(m.navy, 0.78),
+                                      lineHeight: 1.2,
+                                    }}
+                                  >
+                                    {selectedClient?.name ?? "Client"}
+                                  </BodyText>
+                                  {isSelectedCompanyClient ? (
+                                    <CompanyClientTag variant="dot" />
+                                  ) : null}
+                                </Stack>
                                 <BodyText
                                   sx={{
                                     fontSize: 11.5,

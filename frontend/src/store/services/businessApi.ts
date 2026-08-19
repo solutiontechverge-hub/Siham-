@@ -36,6 +36,14 @@ export type BusinessCategory = {
   subcategories: BusinessSubcategory[];
 };
 
+export type BusinessServiceDiscountFields = {
+  discount_type?: "fixed" | "percent" | null;
+  discount_amount?: number | null;
+  discount_start_date?: string | null;
+  discount_end_date?: string | null;
+  discount_description?: string | null;
+};
+
 export type BusinessServiceDetail = {
   id: string;
   business_setup_id: string;
@@ -51,7 +59,7 @@ export type BusinessServiceDetail = {
   category_title: string;
   /** When false, hidden from business setup UI and public listing (data kept). */
   is_visible?: boolean;
-};
+} & BusinessServiceDiscountFields;
 
 export type BusinessTeamMember = {
   id?: string;
@@ -118,6 +126,11 @@ export type BusinessSetupListingServiceDetail = {
   categoryTitle: string | null;
   isVisible?: boolean;
   createdAt: string | null;
+  discountType?: string | null;
+  discountAmount?: number | null;
+  discountStartDate?: string | null;
+  discountEndDate?: string | null;
+  discountDescription?: string | null;
 };
 
 export type BusinessSetupListingTeamMember = {
@@ -162,6 +175,16 @@ export type BusinessSetupListing = {
     amount?: number;
     duration_label?: string | null;
     durationLabel?: string | null;
+    discount_type?: string | null;
+    discountType?: string | null;
+    discount_amount?: number | null;
+    discountAmount?: number | null;
+    discount_start_date?: string | null;
+    discountStartDate?: string | null;
+    discount_end_date?: string | null;
+    discountEndDate?: string | null;
+    discount_description?: string | null;
+    discountDescription?: string | null;
   }>;
   serviceFor: string[];
   bookServiceCombinations: Array<{
@@ -228,6 +251,11 @@ export type BusinessSetup = {
     category_title?: string | null;
     service_title?: string | null;
     is_visible?: boolean;
+    discount_type?: "fixed" | "percent" | null;
+    discount_amount?: number | null;
+    discount_start_date?: string | null;
+    discount_end_date?: string | null;
+    discount_description?: string | null;
   }>;
   project: string | null;
   book_service_notes: string | null;
@@ -335,6 +363,7 @@ export type CalendarBooking = {
   team_member_name?: string | null;
   customer_name?: string | null;
   customer_email?: string | null;
+  client_kind?: "individual" | "company" | null;
   client_name?: string | null;
   business_name?: string | null;
   fixed_location_municipality?: string | null;
@@ -527,6 +556,11 @@ export type UpsertBusinessSetupRequest = {
     category_title?: string | null;
     service_title?: string | null;
     is_visible?: boolean;
+    discount_type?: "fixed" | "percent" | null;
+    discount_amount?: number | null;
+    discount_start_date?: string | null;
+    discount_end_date?: string | null;
+    discount_description?: string | null;
   }>;
   project?: string;
   book_service_notes?: string;
@@ -621,6 +655,7 @@ export type MollureClientLookupEntry = {
   email: string;
   phone?: string | null;
   country_code?: string | null;
+  user_type?: "individual" | "company" | string | null;
 };
 
 export type CreateProfessionalClientRequest =

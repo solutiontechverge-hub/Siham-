@@ -54,6 +54,7 @@ import AppDropdown from "../AppDropdown";
 import { serviceMatchesCategoryTab } from "../../../data/businessServiceCategorySlider.data";
 import { clientReviewsHref } from "../../../data/clientProfessionalReviews";
 import { DesiredLocationIcon, FixedLocationIcon, KidsIcon } from "../../../../images";
+import { useAppSelector } from "../../../store/hooks";
 
 function toImageSrc(img: unknown) {
   if (!img) return "";
@@ -1019,6 +1020,8 @@ export default function BusinessPublicProfile({
   const theme = useTheme();
   const m = theme.palette.mollure;
   const router = useRouter();
+  const isCompanyClient =
+    useAppSelector((s) => s.auth.user?.user_type) === "company";
   const heroSlides = React.useMemo(() => {
     if (data.heroImages.length > 0) {
       return data.heroImages.map((img) => toImageSrc(img)).filter(Boolean);
@@ -1039,12 +1042,13 @@ export default function BusinessPublicProfile({
     data.supportsDesiredLocation &&
     (!data.supportsFixedLocation || isDesiredLocation);
   const showKilometerAllowance = showDesiredOfferingContent;
-  const showProjectHeader = showDesiredOfferingContent;
+  const showProjectHeader = showDesiredOfferingContent && isCompanyClient;
 
   const [projectEnabled, setProjectEnabled] = React.useState(
-    data.projectEnabled,
+    Boolean(data.projectEnabled && isCompanyClient),
   );
-  const showProjectSection = showDesiredOfferingContent && projectEnabled;
+  const showProjectSection =
+    showDesiredOfferingContent && isCompanyClient && projectEnabled;
 
   const [portfolioLightboxIndex, setPortfolioLightboxIndex] = React.useState<
     number | null
@@ -1076,14 +1080,14 @@ export default function BusinessPublicProfile({
   );
 
   React.useEffect(() => {
-    setProjectEnabled(data.projectEnabled);
-  }, [data.projectEnabled, data.shopId]);
+    setProjectEnabled(Boolean(data.projectEnabled && isCompanyClient));
+  }, [data.projectEnabled, data.shopId, isCompanyClient]);
 
   React.useEffect(() => {
-    if (!showDesiredOfferingContent) {
+    if (!showDesiredOfferingContent || !isCompanyClient) {
       setProjectEnabled(false);
     }
-  }, [showDesiredOfferingContent]);
+  }, [showDesiredOfferingContent, isCompanyClient]);
 
   React.useEffect(() => {
     setActiveCategory("all");
@@ -1622,16 +1626,30 @@ export default function BusinessPublicProfile({
                         {service.durationLabel}
                       </Typography>
                     </Box>
-                    <Typography
-                      sx={{
-                        fontSize: 12.5,
-                        fontWeight: 900,
-                        color: alpha(m.navy, 0.78),
-                        mr: 0.5,
-                      }}
-                    >
-                      {service.priceLabel}
-                    </Typography>
+                    <Stack alignItems="flex-end" spacing={0.1} sx={{ mr: 0.5 }}>
+                      {service.originalPriceLabel ? (
+                        <Typography
+                          sx={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: alpha(m.navy, 0.42),
+                            textDecoration: "line-through",
+                            lineHeight: 1.15,
+                          }}
+                        >
+                          {service.originalPriceLabel}
+                        </Typography>
+                      ) : null}
+                      <Typography
+                        sx={{
+                          fontSize: 12.5,
+                          fontWeight: 900,
+                          color: alpha(m.navy, 0.78),
+                        }}
+                      >
+                        {service.priceLabel}
+                      </Typography>
+                    </Stack>
                     <Stack
                       direction="row"
                       alignItems="center"

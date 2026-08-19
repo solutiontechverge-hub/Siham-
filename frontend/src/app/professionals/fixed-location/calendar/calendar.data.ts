@@ -149,6 +149,8 @@ export type CalendarBookingDetails = {
   hiddenForProfessional?: boolean;
   /** Soft-delete: hide from client booking list without changing status. */
   hiddenForCustomer?: boolean;
+  /** Company client (CC) vs individual — used for professional-end CC tag. */
+  clientKind?: "individual" | "company";
   addedServiceIds?: string[];
   cancelledServiceIds?: string[];
   /** Guest name / contact-only change — tag Updated, do not start ER. */
@@ -184,6 +186,8 @@ export type CalendarEvent = {
   updatedAt?: string | null;
   showClientName?: string;
   details?: CalendarBookingDetails;
+  /** Company client (CC) vs individual — shown as CC tag on professional calendar. */
+  clientKind?: "individual" | "company";
 };
 
 export type CalendarBlock = {

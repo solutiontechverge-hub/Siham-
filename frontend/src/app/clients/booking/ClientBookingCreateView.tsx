@@ -38,20 +38,15 @@ import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
 import ModeEditOutlineRoundedIcon from "@mui/icons-material/ModeEditOutlineRounded";
-import {
-  AppDropdown,
-  AppTextField,
-} from "../../../components/common";
+import { AppDropdown } from "../../../components/common";
 import AppModal from "../../../components/common/AppModal";
+import EditRequestNoteDialog from "../../../components/common/client-booking/EditRequestNoteDialog";
 import { ServiceSummaryMetaLine } from "../../../components/common/ServiceSummaryMetaLine";
 import {
   CLIENT_BOOKING_MIN_LEAD_ERROR,
   fmtMinutesToTimeLabel,
   serviceTimeRangeLabel,
 } from "./booking-time";
-import {
-  resolveDesiredVisitAddressOptions,
-} from "../../../data/businessPublicProfile.data";
 
 import { useClientBookingCreatePage } from "./useClientBookingCreatePage";
 import type { BookingPerson } from "./booking.page.types";
@@ -74,7 +69,6 @@ export default function ClientBookingCreateView() {
     requesterDisplayName,
     shop,
     setShop,
-    businessProfile,
     businessSetups,
     bookingSetup,
     createBooking,
@@ -153,9 +147,6 @@ export default function ClientBookingCreateView() {
     setProjectDescription,
     projectUploads,
     setProjectUploads,
-    desiredVisitAddress,
-    setDesiredVisitAddress,
-    isDesiredVisitAddressComplete,
     desiredVisitAddressLabel,
     participantMenuAnchor,
     setParticipantMenuAnchor,
@@ -165,9 +156,13 @@ export default function ClientBookingCreateView() {
     setPlanningActivity,
     planningDuration,
     setPlanningDuration,
+    clientNote,
+    setClientNote,
     projectFileInputRef,
     locationMode,
     isDesiredLocation,
+    isCompanyClient,
+    showProjectDetails,
     getParticipantLabel,
     isPlanningPerson,
     selectedPerson,
@@ -228,15 +223,7 @@ export default function ClientBookingCreateView() {
     deleteProjectUpload,
     deleteGuest,
   } = useClientBookingCreatePage();
-
-  const visitAddressOptions = React.useMemo(
-    () =>
-      resolveDesiredVisitAddressOptions(
-        businessProfile?.desiredLocation,
-        desiredVisitAddress.province,
-      ),
-    [businessProfile?.desiredLocation, desiredVisitAddress.province],
-  );
+  const [noteDialogOpen, setNoteDialogOpen] = React.useState(false);
 
   const planningCardDetails = (person: BookingPerson) => {
     if (!person.planningIsLocked) return { duration: "" };
@@ -1743,144 +1730,11 @@ export default function ClientBookingCreateView() {
                         </Typography>
                       )}
 
-                      {isDesiredLocation ? (
+                      {showProjectDetails ? (
                           <Box
                             id="booking-project-section"
                             sx={{ width: "100%", mt: 1.25, textAlign: "left" }}
                           >
-                            <Typography
-                              sx={{
-                                fontSize: 12,
-                                fontWeight: 900,
-                                color: alpha(m.navy, 0.78),
-                                mb: 1.25,
-                              }}
-                            >
-                              Visit Address
-                            </Typography>
-                            <Stack spacing={1.25} sx={{ mb: 2 }}>
-                              <Stack
-                                direction="row"
-                                spacing={1}
-                                sx={{ alignItems: "flex-start" }}
-                              >
-                                <Box sx={{ flex: 1, minWidth: 0 }}>
-                                  <AppTextField
-                                    label="Street"
-                                    placeholder="Enter street"
-                                    value={desiredVisitAddress.street}
-                                    onChange={(e) =>
-                                      setDesiredVisitAddress((prev) => ({
-                                        ...prev,
-                                        street: e.target.value,
-                                      }))
-                                    }
-                                    fullWidth
-                                  />
-                                </Box>
-                                <Box sx={{ flex: 1, minWidth: 0 }}>
-                                  <AppTextField
-                                    label="Number"
-                                    placeholder="Enter number"
-                                    value={desiredVisitAddress.number}
-                                    onChange={(e) =>
-                                      setDesiredVisitAddress((prev) => ({
-                                        ...prev,
-                                        number: e.target.value,
-                                      }))
-                                    }
-                                    fullWidth
-                                  />
-                                </Box>
-                              </Stack>
-                              <Stack
-                                direction="row"
-                                spacing={1}
-                                sx={{ alignItems: "flex-start" }}
-                              >
-                                <Box sx={{ flex: 1, minWidth: 0 }}>
-                                  <AppTextField
-                                    label="Postal Code"
-                                    placeholder="Enter postal code"
-                                    value={desiredVisitAddress.postalCode}
-                                    onChange={(e) =>
-                                      setDesiredVisitAddress((prev) => ({
-                                        ...prev,
-                                        postalCode: e.target.value,
-                                      }))
-                                    }
-                                    fullWidth
-                                  />
-                                </Box>
-                                <Box sx={{ flex: 1, minWidth: 0 }}>
-                                  <AppDropdown
-                                    label="Province"
-                                    value={desiredVisitAddress.province}
-                                    onChange={(val) => {
-                                      const nextProvince = String(val);
-                                      const nextOptions =
-                                        resolveDesiredVisitAddressOptions(
-                                          businessProfile?.desiredLocation,
-                                          nextProvince,
-                                        );
-                                      setDesiredVisitAddress((prev) => ({
-                                        ...prev,
-                                        province: nextProvince,
-                                        municipality:
-                                          nextOptions.municipalityOptions.includes(
-                                            prev.municipality,
-                                          )
-                                            ? prev.municipality
-                                            : "",
-                                      }));
-                                    }}
-                                    options={[
-                                      { label: "Select province", value: "" },
-                                      ...visitAddressOptions.provinceOptions.map(
-                                        (province) => ({
-                                          label: province,
-                                          value: province,
-                                        }),
-                                      ),
-                                    ]}
-                                    fullWidth
-                                    placeholder="Select province"
-                                  />
-                                </Box>
-                              </Stack>
-                              <AppDropdown
-                                label="Municipality"
-                                value={desiredVisitAddress.municipality}
-                                onChange={(val) =>
-                                  setDesiredVisitAddress((prev) => ({
-                                    ...prev,
-                                    municipality: String(val),
-                                  }))
-                                }
-                                options={[
-                                  {
-                                    label: desiredVisitAddress.province
-                                      ? "Select municipality"
-                                      : "Select province first",
-                                    value: "",
-                                  },
-                                  ...visitAddressOptions.municipalityOptions.map(
-                                    (municipality) => ({
-                                      label: municipality,
-                                      value: municipality,
-                                    }),
-                                  ),
-                                ]}
-                                fullWidth
-                                placeholder={
-                                  desiredVisitAddress.province
-                                    ? "Select municipality"
-                                    : "Select province first"
-                                }
-                                disabled={!desiredVisitAddress.province}
-                              />
-                            </Stack>
-
                             <Typography
                               sx={{
                                 fontSize: 12,
@@ -2220,26 +2074,44 @@ export default function ClientBookingCreateView() {
                           >
                             Guest
                           </MenuItem>
-                          <MenuItem
-                            onClick={() => addParticipant("Model")}
-                            sx={{
-                              fontSize: 12,
-                              fontWeight: 900,
-                              color: alpha(m.navy, 0.78),
-                            }}
-                          >
-                            Model
-                          </MenuItem>
-                          <MenuItem
-                            onClick={() => addParticipant("Planning")}
-                            sx={{
-                              fontSize: 12,
-                              fontWeight: 900,
-                              color: alpha(m.navy, 0.78),
-                            }}
-                          >
-                            Planning
-                          </MenuItem>
+                          {isCompanyClient ? (
+                            <MenuItem
+                              onClick={() => addParticipant("Model")}
+                              sx={{
+                                fontSize: 12,
+                                fontWeight: 900,
+                                color: alpha(m.navy, 0.78),
+                              }}
+                            >
+                              Model
+                            </MenuItem>
+                          ) : (
+                            <MenuItem
+                              onClick={() => {
+                                setParticipantMenuAnchor(null);
+                                setNoteDialogOpen(true);
+                              }}
+                              sx={{
+                                fontSize: 12,
+                                fontWeight: 900,
+                                color: alpha(m.navy, 0.78),
+                              }}
+                            >
+                              Notes
+                            </MenuItem>
+                          )}
+                          {isCompanyClient ? (
+                            <MenuItem
+                              onClick={() => addParticipant("Planning")}
+                              sx={{
+                                fontSize: 12,
+                                fontWeight: 900,
+                                color: alpha(m.navy, 0.78),
+                              }}
+                            >
+                              Planning
+                            </MenuItem>
+                          ) : null}
                         </Menu>
                       </Stack>
                     ) : null}
@@ -2835,22 +2707,6 @@ export default function ClientBookingCreateView() {
                       ) : null}
 
                       {allServicesAssigned &&
-                      isDesiredLocation &&
-                      !isDesiredVisitAddressComplete ? (
-                        <Typography
-                          sx={{
-                            mt: 1,
-                            fontSize: 11,
-                            fontWeight: 800,
-                            color: "#C67A00",
-                            lineHeight: 1.35,
-                          }}
-                        >
-                          Fill the full Visit Address to continue.
-                        </Typography>
-                      ) : null}
-
-                      {allServicesAssigned &&
                       needsTeamMemberProvidedByPro &&
                       !selectedTeamMemberId &&
                       services.length > 0 ? (
@@ -2887,8 +2743,7 @@ export default function ClientBookingCreateView() {
                         disabled={
                           !allServicesAssigned ||
                           isContinuing ||
-                          selectedTimeTooSoon ||
-                          !isDesiredVisitAddressComplete
+                          selectedTimeTooSoon
                         }
                         onClick={() => void onContinue()}
                         sx={{
@@ -2896,8 +2751,7 @@ export default function ClientBookingCreateView() {
                           height: 40,
                           ...(allServicesAssigned &&
                           !isContinuing &&
-                          !selectedTimeTooSoon &&
-                          isDesiredVisitAddressComplete
+                          !selectedTimeTooSoon
                             ? null
                             : {
                                 color: alpha(m.navy, 0.45),
@@ -2924,6 +2778,16 @@ export default function ClientBookingCreateView() {
           </Box>
         </Paper>
       </Container>
+      <EditRequestNoteDialog
+        open={noteDialogOpen}
+        onClose={() => setNoteDialogOpen(false)}
+        onConfirm={(note) => setClientNote(note)}
+        title="Notes"
+        description="Write a note for the professional. It will be sent with this booking."
+        placeholder="Add a note…"
+        confirmLabel="Save"
+        initialValue={clientNote}
+      />
     </Box>
   );
 }

@@ -2,8 +2,71 @@ import { entityIdKey, normalizeEntityId, parseJsonArray } from "./business-setup
 
 /**
  * Service pricing and duration live on business_setups.service_categories (JSONB).
- * Each entry: { category_id, service_id, amount, duration_label }
+ * Each entry: { category_id, service_id, amount, duration_label, discount_* }
  */
+
+const toFiniteNumber = (value) => {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+/** Calendar date only. Prefix match avoids UTC off-by-one from Date.parse. */
+export const normalizeIsoDateOnly = (value) => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : null;
+};
+
+export const normalizeServiceDiscountFields = (item) => {
+  const empty = {
+    discount_type: null,
+    discount_amount: null,
+    discount_start_date: null,
+    discount_end_date: null,
+    discount_description: null,
+  };
+
+  if (!item || typeof item !== "object") {
+    return empty;
+  }
+
+  const typeRaw = String(item.discount_type ?? item.discountType ?? "")
+    .trim()
+    .toLowerCase();
+  const type = typeRaw === "percent" || typeRaw === "percentage" ? "percent" : "fixed";
+  const amount = toFiniteNumber(item.discount_amount ?? item.discountAmount);
+  let start = normalizeIsoDateOnly(item.discount_start_date ?? item.discountStartDate);
+  let end = normalizeIsoDateOnly(item.discount_end_date ?? item.discountEndDate);
+  const description =
+    String(item.discount_description ?? item.discountDescription ?? "").trim() || null;
+
+  if (amount == null || amount <= 0) {
+    return empty;
+  }
+
+  if (type === "percent" && amount > 100) {
+    return empty;
+  }
+
+  if (start && end && start > end) {
+    const swap = start;
+    start = end;
+    end = swap;
+  }
+
+  return {
+    discount_type: type,
+    discount_amount: amount,
+    discount_start_date: start,
+    discount_end_date: end,
+    discount_description: description,
+  };
+};
 
 export const buildDurationByServiceId = (serviceCategories) => {
   const durationByServiceId = new Map();
@@ -50,6 +113,7 @@ const mapCategoryItemToServiceDetail = (item, metaByServiceId, businessSetupId) 
   const parentServiceId = String(item?.parent_service_id ?? item?.parentServiceId ?? "").trim() || null;
   const resolvedServiceId = serviceId ?? rawServiceId;
   const resolvedCategoryId = categoryId ?? (rawCategoryId || null);
+  const discount = normalizeServiceDiscountFields(item);
 
   if (meta) {
     return {
@@ -64,6 +128,7 @@ const mapCategoryItemToServiceDetail = (item, metaByServiceId, businessSetupId) 
       parent_service_id: parentServiceId,
       is_visible: item?.is_visible === false || item?.isVisible === false ? false : true,
       created_at: null,
+      ...discount,
     };
   }
 
@@ -79,6 +144,7 @@ const mapCategoryItemToServiceDetail = (item, metaByServiceId, businessSetupId) 
     parent_service_id: parentServiceId,
     is_visible: item?.is_visible === false || item?.isVisible === false ? false : true,
     created_at: null,
+    ...discount,
   };
 };
 

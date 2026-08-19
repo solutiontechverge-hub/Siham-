@@ -17,6 +17,7 @@ type Props = {
   description?: string;
   placeholder?: string;
   confirmLabel?: string;
+  initialValue?: string;
 };
 
 /** Required notepad before sending a Confirmed booking Edit Request (ER). */
@@ -28,13 +29,14 @@ export default function EditRequestNoteDialog({
   description = "Write a short note explaining why you want to edit this booking. The other party will receive this request.",
   placeholder = "I want to edit this booking because…",
   confirmLabel = "Send request",
+  initialValue = "",
 }: Props) {
   const m = useTheme().palette.mollure;
-  const [note, setNote] = React.useState("");
+  const [note, setNote] = React.useState(initialValue);
 
   React.useEffect(() => {
-    if (open) setNote("");
-  }, [open]);
+    if (open) setNote(initialValue);
+  }, [open, initialValue]);
 
   return (
     <AppModal

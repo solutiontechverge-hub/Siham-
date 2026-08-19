@@ -149,7 +149,150 @@ export function normalizeBusinessServicePriceType(type: string | undefined): Bus
 }
 
 export function normalizeBusinessServiceDiscountType(t: string | undefined): BusinessServiceDiscountType {
-  return t === "percent" ? "percent" : "fixed";
+  const raw = String(t ?? "").trim().toLowerCase();
+  return raw === "percent" || raw === "percentage" ? "percent" : "fixed";
+}
+
+export type BusinessServiceDiscountFields = {
+  discountType: BusinessServiceDiscountType;
+  discountAmount: string;
+  discountStartDate: string;
+  discountEndDate: string;
+  discountDescription: string;
+};
+
+export type BusinessServiceDiscountSource = {
+  discountType?: unknown;
+  discount_type?: unknown;
+  discountAmount?: unknown;
+  discount_amount?: unknown;
+  discountStartDate?: unknown;
+  discount_start_date?: unknown;
+  discountEndDate?: unknown;
+  discount_end_date?: unknown;
+  discountDescription?: unknown;
+  discount_description?: unknown;
+};
+
+/** Local calendar day as YYYY-MM-DD — avoids UTC off-by-one. */
+export function businessServiceLocalTodayIso(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/** Keep only the calendar date. Never Date.parse — that shifts timezone. */
+export function normalizeBusinessServiceDiscountDate(raw: unknown): string {
+  const value = String(raw ?? "").trim();
+  if (!value) return "";
+  const match = value.match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : "";
+}
+
+export function readBusinessServiceDiscountFields(
+  source?: BusinessServiceDiscountSource | null,
+): BusinessServiceDiscountFields {
+  const amountRaw = source?.discountAmount ?? source?.discount_amount ?? "";
+  const amount =
+    amountRaw === null || amountRaw === undefined || amountRaw === ""
+      ? ""
+      : String(amountRaw);
+  let start = normalizeBusinessServiceDiscountDate(
+    source?.discountStartDate ?? source?.discount_start_date,
+  );
+  let end = normalizeBusinessServiceDiscountDate(
+    source?.discountEndDate ?? source?.discount_end_date,
+  );
+  if (start && end && start > end) {
+    const swap = start;
+    start = end;
+    end = swap;
+  }
+  return {
+    discountType: normalizeBusinessServiceDiscountType(
+      String(source?.discountType ?? source?.discount_type ?? ""),
+    ),
+    discountAmount: amount,
+    discountStartDate: start,
+    discountEndDate: end,
+    discountDescription: String(
+      source?.discountDescription ?? source?.discount_description ?? "",
+    ).trim(),
+  };
+}
+
+export function toBusinessServiceDiscountPayload(
+  source?: BusinessServiceDiscountSource | null,
+): {
+  discount_type: BusinessServiceDiscountType | null;
+  discount_amount: number | null;
+  discount_start_date: string | null;
+  discount_end_date: string | null;
+  discount_description: string | null;
+} {
+  const fields = readBusinessServiceDiscountFields(source);
+  const amount = parseEuroAmountString(fields.discountAmount);
+  if (amount === null || amount <= 0) {
+    return {
+      discount_type: null,
+      discount_amount: null,
+      discount_start_date: null,
+      discount_end_date: null,
+      discount_description: null,
+    };
+  }
+  if (fields.discountType === "percent" && amount > 100) {
+    return {
+      discount_type: null,
+      discount_amount: null,
+      discount_start_date: null,
+      discount_end_date: null,
+      discount_description: null,
+    };
+  }
+  return {
+    discount_type: fields.discountType,
+    discount_amount: amount,
+    discount_start_date: fields.discountStartDate || null,
+    discount_end_date: fields.discountEndDate || null,
+    discount_description: fields.discountDescription || null,
+  };
+}
+
+export function isBusinessServiceDiscountActive(
+  source?: BusinessServiceDiscountSource | null,
+  onDateIso?: string,
+): boolean {
+  const fields = readBusinessServiceDiscountFields(source);
+  const amount = parseEuroAmountString(fields.discountAmount);
+  if (amount === null || amount <= 0) return false;
+  if (fields.discountType === "percent" && amount > 100) return false;
+  const day =
+    normalizeBusinessServiceDiscountDate(onDateIso) || businessServiceLocalTodayIso();
+  if (fields.discountStartDate && day < fields.discountStartDate) return false;
+  if (fields.discountEndDate && day > fields.discountEndDate) return false;
+  return true;
+}
+
+export function applyBusinessServiceDiscount(
+  base: number,
+  source?: BusinessServiceDiscountSource | null,
+  onDateIso?: string,
+): { amount: number; active: boolean; percentOff: number | null } {
+  const safeBase = Number.isFinite(base) ? Math.max(0, base) : 0;
+  if (!isBusinessServiceDiscountActive(source, onDateIso)) {
+    return { amount: safeBase, active: false, percentOff: null };
+  }
+  const fields = readBusinessServiceDiscountFields(source);
+  const discVal = parseEuroAmountString(fields.discountAmount) ?? 0;
+  const final =
+    fields.discountType === "percent"
+      ? Math.max(0, safeBase * (1 - Math.min(100, discVal) / 100))
+      : Math.max(0, safeBase - discVal);
+  return {
+    amount: Math.round(final * 100) / 100,
+    active: true,
+    percentOff: fields.discountType === "percent" ? discVal : null,
+  };
 }
 
 export function sanitizeDurationHours(value: string): string {

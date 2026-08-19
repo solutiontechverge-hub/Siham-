@@ -40,7 +40,10 @@ import AppButton from "../AppButton";
 import AppCountryPhoneFields from "../AppCountryPhoneFields";
 import AppDropdown from "../AppDropdown";
 import AppTextField from "../AppTextField";
-import { resolveDesiredVisitAddressOptions } from "../../../data/businessPublicProfile.data";
+import {
+  isAddressInOperatingArea,
+  resolveDesiredVisitAddressOptions,
+} from "../../../data/businessPublicProfile.data";
 import {
   formatContactPhone,
   getPhoneValidationErrors,
@@ -73,6 +76,7 @@ export default function ClientBookingCreateSummaryView() {
   const {
     draft,
     shop,
+    businessProfile,
     requiresPrepayment,
     prepaymentPercent: profilePrepaymentPercent,
   } = useClientBookingDraft();
@@ -217,9 +221,30 @@ export default function ClientBookingCreateSummaryView() {
         });
         return false;
       }
+      if (
+        !isAddressInOperatingArea(
+          businessProfile?.desiredLocation,
+          address.province,
+          address.municipality,
+        )
+      ) {
+        showSnackbar({
+          severity: "error",
+          message:
+            "This address is outside the professional’s operating area and cannot be booked.",
+        });
+        return false;
+      }
     }
     return true;
-  }, [address, countryCode, isDesired, phone, showSnackbar]);
+  }, [
+    address,
+    businessProfile?.desiredLocation,
+    countryCode,
+    isDesired,
+    phone,
+    showSnackbar,
+  ]);
 
   const persistDraftEdits = React.useCallback(() => {
     const session = getActiveBookingSession() ?? activeBooking;
@@ -485,8 +510,12 @@ export default function ClientBookingCreateSummaryView() {
   ]);
 
   const visitAddressOptions = React.useMemo(
-    () => resolveDesiredVisitAddressOptions(null, address.province),
-    [address.province],
+    () =>
+      resolveDesiredVisitAddressOptions(
+        businessProfile?.desiredLocation,
+        address.province,
+      ),
+    [address.province, businessProfile?.desiredLocation],
   );
 
   if (!draft || !shop) {
