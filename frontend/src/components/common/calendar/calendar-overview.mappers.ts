@@ -372,7 +372,6 @@ export function mapCalendarBookingToEvent(
             lateRescheduleFeePercent: parsedNotes.lateRescheduleFeePercent,
             showLateCancellation: parsedNotes.showLateCancellation,
             lateCancellationFeePercent: parsedNotes.lateCancellationFeePercent,
-            showPrepayment: Boolean(parsedNotes.showPrepayment) || showPrepaymentFromApi,
             prepaymentPercent: parsedNotes.prepaymentPercent,
             ...(mappedPrepayStatus
               ? { prepaymentStatus: mappedPrepayStatus }
