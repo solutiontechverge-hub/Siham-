@@ -13,6 +13,7 @@ type DraftSnapshot = {
   selectedDateISO?: string;
   selectedTime?: string;
   combineServices?: boolean;
+  clientNote?: string;
 };
 
 type SnapshotStore = Record<string, DraftSnapshot>;
@@ -65,6 +66,7 @@ function toSnapshot(draft: ClientBookingDraft): DraftSnapshot {
     selectedDateISO: draft.selectedDateISO,
     selectedTime: draft.selectedTime,
     combineServices: draft.combineServices,
+    clientNote: draft.clientNote,
   };
 }
 
@@ -191,6 +193,7 @@ export function mergeClientBookingDraftRichness(
     services,
     products,
     total: primaryTotal ?? fallbackTotal ?? primary.total,
+    clientNote: primary.clientNote?.trim() || fallback.clientNote || primary.clientNote,
   };
 }
 

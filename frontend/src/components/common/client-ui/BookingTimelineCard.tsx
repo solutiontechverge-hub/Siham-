@@ -74,6 +74,7 @@ export type BookingTimelineCardAction = {
   icon?: React.ReactNode;
   tooltip?: React.ReactNode;
   onClick?: React.MouseEventHandler<HTMLElement>;
+  count?: number;
 };
 
 export type BookingTimelineCardProfileAction = BookingTimelineCardAction & {
@@ -313,6 +314,7 @@ function renderIconAction(
         size="small"
         onClick={stopCardClick(action.onClick)}
         sx={(theme) => ({
+          position: "relative",
           p: 0.05,
           borderRadius: "5px",
           color: alpha(theme.palette.mollure.navy, 0.58),
@@ -323,6 +325,29 @@ function renderIconAction(
         })}
       >
         {action.icon ?? fallbackIcon}
+        {action.count ? (
+          <Box
+            sx={{
+              position: "absolute",
+              top: -2,
+              right: -2,
+              minWidth: 12,
+              height: 12,
+              px: 0.25,
+              borderRadius: "999px",
+              bgcolor: "#EF4444",
+              color: "#fff",
+              display: "grid",
+              placeItems: "center",
+              fontSize: 7,
+              fontWeight: 900,
+              lineHeight: 1,
+              border: `1px solid ${alpha("#fff", 0.9)}`,
+            }}
+          >
+            {action.count}
+          </Box>
+        ) : null}
       </IconButton>
     </Tooltip>
   );

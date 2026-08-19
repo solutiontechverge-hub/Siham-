@@ -28,7 +28,7 @@ import { resolveMediaUrl } from "../../../lib/resolveMediaUrl";
 import {
   getServicesForLocationMode,
   getTeamForLocationMode,
-  isAddressInOperatingArea,
+  pricePublicProfileServiceOnDate,
 } from "../../../data/businessPublicProfile.data";
 import { useBusinessPublicProfile } from "../../../hooks/useBusinessPublicProfile";
 import { extractUuidFromSyntheticId } from "./clientBookingApi.mapper";
@@ -64,7 +64,9 @@ import {
 import {
   FIXED_LOCATION_MAX_GUESTS,
   UUID_RE,
+  createNotesPerson,
   isAdditionalGuest,
+  isNotesPerson,
   buildAddServiceCatalog,
   resolveProfileCatalogService,
   servicesMissingTeamMember,
@@ -449,10 +451,15 @@ export function useClientBookingCreatePage() {
   );
   const [planningActivity, setPlanningActivity] = React.useState("");
   const [planningDuration, setPlanningDuration] = React.useState("");
+  const [clientNote, setClientNote] = React.useState("");
   const projectFileInputRef = React.useRef<HTMLInputElement>(null);
 
   const locationMode = shop?.locationMode ?? "fixed";
   const isDesiredLocation = locationMode === "desired";
+  const isCompanyClient =
+    user?.user_type === "company" ||
+    profileQueryData?.data?.user_type === "company";
+  const showProjectDetails = isDesiredLocation && isCompanyClient;
   const bookServicesAtSameTime = !isDesiredLocation && combineServices;
   const servicesDurationMins = React.useMemo(() => {
     if (!services.length) return 0;
@@ -461,16 +468,6 @@ export function useClientBookingCreatePage() {
     }
     return services.reduce((sum, service) => sum + service.durationMins, 0);
   }, [bookServicesAtSameTime, services]);
-  const isDesiredVisitAddressComplete = React.useMemo(() => {
-    if (!isDesiredLocation) return true;
-    return Boolean(
-      desiredVisitAddress.street.trim() &&
-        desiredVisitAddress.number.trim() &&
-        desiredVisitAddress.postalCode.trim() &&
-        desiredVisitAddress.province.trim() &&
-        desiredVisitAddress.municipality.trim(),
-    );
-  }, [desiredVisitAddress, isDesiredLocation]);
   const desiredVisitAddressLabel = React.useMemo(() => {
     if (!isDesiredLocation) return "";
     return [
@@ -489,6 +486,7 @@ export function useClientBookingCreatePage() {
       if (person.isRequester) return "Client";
       if (person.participantType === "planning" || person.name === "Planning")
         return "Planning";
+      if (isNotesPerson(person)) return "Note";
       if (person.participantType === "model") return "Model";
       if (person.participantType === "guest" || person.name === "Guest")
         return "Guest";
@@ -502,6 +500,7 @@ export function useClientBookingCreatePage() {
   >(() => {
     if (!shop?.shopId || !profileHydrated || !businessProfile) return {};
 
+    const bookingDateIso = toISO(selectedDate);
     const locationCatalog = getServicesForLocationMode(
       businessProfile,
       locationMode,
@@ -510,7 +509,7 @@ export function useClientBookingCreatePage() {
       id: s.id,
       name: s.name,
       durationMins: s.durationMins,
-      price: s.priceValue,
+      ...pricePublicProfileServiceOnDate(s, bookingDateIso),
     }));
     const fallbackByName = new Map(
       fallbackItems.map((item) => [item.name.trim().toLowerCase(), item]),
@@ -539,15 +538,19 @@ export function useClientBookingCreatePage() {
               .trim()
               .toLowerCase(),
           );
+          const priced = matched
+            ? pricePublicProfileServiceOnDate(matched, bookingDateIso)
+            : {
+                price: fallbackMatch?.price ?? 0,
+                originalPrice: fallbackMatch?.originalPrice,
+                discountPct: fallbackMatch?.discountPct,
+              };
           items.push({
             id,
             name: matched?.name ?? fallbackMatch?.name ?? opt.label,
             durationMins:
               matched?.durationMins ?? fallbackMatch?.durationMins ?? 30,
-            price:
-              matched?.priceValue ??
-              fallbackMatch?.price ??
-              0,
+            ...priced,
           });
         }
       }
@@ -560,6 +563,7 @@ export function useClientBookingCreatePage() {
     profileHydrated,
     shop?.shopId,
     shopTeamMembers,
+    selectedDate,
   ]);
 
   /** Location catalog when the pro has no selectable team members for this mode. */
@@ -570,15 +574,54 @@ export function useClientBookingCreatePage() {
         id: s.id,
         name: s.name,
         durationMins: s.durationMins,
-        price: s.priceValue,
+        ...pricePublicProfileServiceOnDate(s, toISO(selectedDate)),
       }),
     );
-  }, [businessProfile, locationMode, profileHydrated, shop?.shopId]);
+  }, [businessProfile, locationMode, profileHydrated, selectedDate, shop?.shopId]);
+
+  React.useEffect(() => {
+    if (!locationServiceCatalog.length) return;
+    setServices((prev) => {
+      if (!prev.length) return prev;
+      let changed = false;
+      const next = prev.map((service) => {
+        const catalogId =
+          service.catalogServiceId ||
+          extractUuidFromSyntheticId(service.id) ||
+          service.id;
+        const catalog =
+          locationServiceCatalog.find((item) => item.id === catalogId) ||
+          locationServiceCatalog.find((item) => item.id === service.id) ||
+          locationServiceCatalog.find((item) => item.name === service.name);
+        if (!catalog) return service;
+        if (
+          catalog.price === service.price &&
+          catalog.originalPrice === service.originalPrice &&
+          catalog.discountPct === service.discountPct
+        ) {
+          return service;
+        }
+        changed = true;
+        return {
+          ...service,
+          price: catalog.price,
+          originalPrice: catalog.originalPrice,
+          discountPct: catalog.discountPct,
+        };
+      });
+      return changed ? next : prev;
+    });
+  }, [locationServiceCatalog]);
 
   const isPlanningPerson = React.useCallback(
     (p: BookingPerson) =>
       p.participantType === "planning" || p.name === "Planning",
     [],
+  );
+
+  const isNonServicePerson = React.useCallback(
+    (p: BookingPerson) => isPlanningPerson(p) || isNotesPerson(p),
+    [isPlanningPerson],
   );
 
   const selectedPerson = React.useMemo(
@@ -588,6 +631,13 @@ export function useClientBookingCreatePage() {
 
   const isPlanningCardSelected = Boolean(
     selectedPerson && isPlanningPerson(selectedPerson),
+  );
+  const isNotesCardSelected = Boolean(
+    selectedPerson && isNotesPerson(selectedPerson),
+  );
+  const hasNotesPerson = React.useMemo(
+    () => people.some(isNotesPerson),
+    [people],
   );
 
   const filteredTeamMembers = React.useMemo(
@@ -793,9 +843,9 @@ export function useClientBookingCreatePage() {
   const canAddFixedLocationGuest =
     !isDesiredLocation && additionalGuests.length < FIXED_LOCATION_MAX_GUESTS;
   const serviceAssignees = React.useMemo(() => {
-    // Jane / Model / Guest can all receive services; Planning cannot.
-    return people.filter((p) => !isPlanningPerson(p));
-  }, [isPlanningPerson, people]);
+    // Jane / Model / Guest can all receive services; Planning / Notes cannot.
+    return people.filter((p) => !isNonServicePerson(p));
+  }, [isNonServicePerson, people]);
   /** Add-to-list stays available even when the pro has no selectable team members. */
   const canAddService = serviceAssignees.length > 0;
 
@@ -809,11 +859,14 @@ export function useClientBookingCreatePage() {
 
   const personCardSubtitle = React.useCallback(
     (person: BookingPerson) => {
+      if (isNotesPerson(person)) {
+        return clientNote.trim() ? "Added" : "Add a note";
+      }
       const role = getParticipantLabel(person);
       const count = serviceCountLabel(person.id);
       return `${role} · ${count}`;
     },
-    [getParticipantLabel, serviceCountLabel],
+    [clientNote, getParticipantLabel, serviceCountLabel],
   );
 
   const selectedServicesCount = React.useMemo(
@@ -822,11 +875,11 @@ export function useClientBookingCreatePage() {
   );
 
   const requiresPersonAssignment = React.useMemo(() => {
-    const assignees = people.filter((p) => !isPlanningPerson(p));
+    const assignees = people.filter((p) => !isNonServicePerson(p));
     return (
       assignees.length > 1 || assignees.some((p) => !p.isRequester)
     );
-  }, [isPlanningPerson, people]);
+  }, [isNonServicePerson, people]);
 
   /**
    * Multi-person / Model / Guest: every service needs a person.
@@ -863,7 +916,7 @@ export function useClientBookingCreatePage() {
   const isModelOrGuestSelected = Boolean(
     selectedPerson &&
     !selectedPerson.isRequester &&
-    !isPlanningPerson(selectedPerson),
+    !isNonServicePerson(selectedPerson),
   );
 
   React.useEffect(() => {
@@ -988,6 +1041,7 @@ export function useClientBookingCreatePage() {
       const hasPlanning = Boolean(
         planningItem?.activity || planningItem?.duration,
       );
+      if (isNotesPerson(p)) continue;
       if (!items.length && !hasPlanning) continue;
       const roleLabel = getParticipantLabel(p);
       const teamMemberLabel = teamMemberChipLabelForItems(items);
@@ -1156,7 +1210,7 @@ export function useClientBookingCreatePage() {
       setServiceTab(getPreferredServiceTab(profileServices));
       setSelectedServiceIds({});
 
-      if (isDesired && profileSelection.projectEnabled) {
+      if (isDesired && profileSelection.projectEnabled && isCompanyClient) {
         setProjectDescription(profileSelection.projectInstructions);
       }
 
@@ -1179,7 +1233,7 @@ export function useClientBookingCreatePage() {
 
       setProfileHydrated(true);
     },
-    [getPreferredServiceTab],
+    [getPreferredServiceTab, isCompanyClient],
   );
 
   React.useEffect(() => {
@@ -1247,7 +1301,7 @@ export function useClientBookingCreatePage() {
       setServices(draftServices);
       ebrSuggestBaselineRef.current = draftServices.map((s) => ({ ...s }));
 
-      const draftPeople = existing.draft.people?.length
+      const draftPeople: BookingPerson[] = existing.draft.people?.length
         ? existing.draft.people.map((p) => ({
             id: p.id,
             name: p.name,
@@ -1264,6 +1318,9 @@ export function useClientBookingCreatePage() {
               isRequester: true as const,
             },
           ];
+      if (existing.draft.clientNote?.trim() && !draftPeople.some(isNotesPerson)) {
+        draftPeople.push(createNotesPerson());
+      }
       setPeople(draftPeople);
 
       const personWithServices =
@@ -1319,6 +1376,9 @@ export function useClientBookingCreatePage() {
               "",
           })),
         );
+      }
+      if (existing.draft.clientNote) {
+        setClientNote(existing.draft.clientNote);
       }
       // Restore visit address the client already entered (Desired Location).
       const savedVisit = existing.draft.desiredLocation;
@@ -1389,15 +1449,20 @@ export function useClientBookingCreatePage() {
     const catalogServices = getServicesForLocationMode(
       businessProfile,
       mode,
-    ).map((s) => ({
-      id: s.id,
-      catalogServiceId: s.id,
-      name: s.name,
-      durationMins: s.durationMins,
-      price: s.priceValue,
-      guestId: (leaveUnassigned ? null : "p-requester") as string | null,
-      teamMemberId: defaultTeamMemberId,
-    }));
+    ).map((s) => {
+      const priced = pricePublicProfileServiceOnDate(s, toISO(selectedDate));
+      return {
+        id: s.id,
+        catalogServiceId: s.id,
+        name: s.name,
+        durationMins: s.durationMins,
+        price: priced.price,
+        originalPrice: priced.originalPrice,
+        discountPct: priced.discountPct,
+        guestId: (leaveUnassigned ? null : "p-requester") as string | null,
+        teamMemberId: defaultTeamMemberId,
+      };
+    });
 
     setServices(catalogServices.slice(0, 3));
     setShopTeamMembers(apiTeam);
@@ -1530,7 +1595,7 @@ export function useClientBookingCreatePage() {
     setSelectedServiceIds({});
     const person = people.find((p) => p.id === personId);
     const isModelOrGuest = Boolean(
-      person && !person.isRequester && !isPlanningPerson(person),
+      person && !person.isRequester && !isNonServicePerson(person),
     );
     if (isModelOrGuest) {
       const hasPending = services.some((s) => !s.guestId);
@@ -1549,6 +1614,23 @@ export function useClientBookingCreatePage() {
     const isPlanning = cardName === "Planning";
     const isModel = cardName === "Model";
     const isGuest = cardName === "Guest";
+    const isNotes = cardName === "Notes";
+
+    if (isModel && !isCompanyClient) return;
+    if (isPlanning && !isCompanyClient) return;
+
+    if (isNotes) {
+      const existing = people.find(isNotesPerson);
+      setParticipantMenuAnchor(null);
+      if (existing) {
+        setSelectedPersonId(existing.id);
+        return;
+      }
+      const nextPerson = createNotesPerson();
+      setPeople((prev) => [...prev, nextPerson]);
+      setSelectedPersonId(nextPerson.id);
+      return;
+    }
 
     if (
       !isDesiredLocation &&
@@ -1628,6 +1710,7 @@ export function useClientBookingCreatePage() {
   const deleteGuest = (guestId: string) => {
     const person = people.find((p) => p.id === guestId);
     if (!person || person.isRequester) return;
+    if (isNotesPerson(person)) setClientNote("");
     setPeople((prev) => prev.filter((p) => p.id !== guestId));
     // Remove this guest's services from the booking (do not send them to Unassigned).
     setServices((prev) => prev.filter((s) => s.guestId !== guestId));
@@ -1786,30 +1869,6 @@ export function useClientBookingCreatePage() {
     )
       return;
 
-    if (isDesiredLocation && !isDesiredVisitAddressComplete) {
-      showSnackbar({
-        severity: "error",
-        message: "Please enter the full visit address for this Desired Location booking.",
-      });
-      return;
-    }
-
-    if (
-      isDesiredLocation &&
-      !isAddressInOperatingArea(
-        businessProfile?.desiredLocation,
-        desiredVisitAddress.province,
-        desiredVisitAddress.municipality,
-      )
-    ) {
-      showSnackbar({
-        severity: "error",
-        message:
-          "This address is outside the professional’s operating area and cannot be booked.",
-      });
-      return;
-    }
-
     if (isSelectedToday && isSameDayBookingTooSoon(selectedTime)) {
       setTimeValidationError(CLIENT_BOOKING_MIN_LEAD_ERROR);
       showSnackbar({
@@ -1820,7 +1879,7 @@ export function useClientBookingCreatePage() {
     }
     setTimeValidationError(null);
 
-    const peopleForDraft =
+    const peopleForDraft = (
       planningPersonId != null
         ? people.map((p) =>
             p.id === planningPersonId
@@ -1831,7 +1890,8 @@ export function useClientBookingCreatePage() {
                 }
               : p,
           )
-        : people;
+        : people
+    ).filter((p) => !isNotesPerson(p));
 
     const requesterId =
       peopleForDraft.find((p) => p.isRequester)?.id ??
@@ -1859,16 +1919,21 @@ export function useClientBookingCreatePage() {
       services: servicesForDraft,
       teamMembers: shopTeamMembers.map(({ id, name }) => ({ id, name })),
       total,
+      ...(clientNote.trim() ? { clientNote: clientNote.trim() } : {}),
       ...(isDesiredLocation
         ? {
-            projectDetails: {
-              description: projectDescriptionForDraft,
-              uploads: projectUploads.map((u) => ({
-                id: u.id,
-                name: u.name,
-                previewUrl: u.previewUrl,
-              })),
-            },
+            ...(isCompanyClient
+              ? {
+                  projectDetails: {
+                    description: projectDescriptionForDraft,
+                    uploads: projectUploads.map((u) => ({
+                      id: u.id,
+                      name: u.name,
+                      previewUrl: u.previewUrl,
+                    })),
+                  },
+                }
+              : {}),
             desiredLocation: {
               street: desiredVisitAddress.street.trim(),
               number: desiredVisitAddress.number.trim(),
@@ -1980,7 +2045,7 @@ export function useClientBookingCreatePage() {
       const filesToUpload = projectUploads
         .map((u) => u.file)
         .filter((file): file is File => Boolean(file));
-      if (isDesiredLocation && filesToUpload.length > 0) {
+      if (isDesiredLocation && isCompanyClient && filesToUpload.length > 0) {
         const uploaded = await uploadBookingAttachments(filesToUpload).unwrap();
         const attachments = uploaded.data?.attachments ?? [];
         projectDetailsUploads = attachments.map((att) => ({
@@ -2000,12 +2065,17 @@ export function useClientBookingCreatePage() {
         services: servicesForDraft,
         teamMembers: shopTeamMembers.map(({ id, name }) => ({ id, name })),
         total,
+        ...(clientNote.trim() ? { clientNote: clientNote.trim() } : {}),
         ...(isDesiredLocation
           ? {
-              projectDetails: {
-                description: projectDescriptionForDraft,
-                uploads: projectDetailsUploads,
-              },
+              ...(isCompanyClient
+                ? {
+                    projectDetails: {
+                      description: projectDescriptionForDraft,
+                      uploads: projectDetailsUploads,
+                    },
+                  }
+                : {}),
               desiredLocation: {
                 street: desiredVisitAddress.street.trim(),
                 number: desiredVisitAddress.number.trim(),
@@ -2191,9 +2261,6 @@ export function useClientBookingCreatePage() {
     setProjectDescription,
     projectUploads,
     setProjectUploads,
-    desiredVisitAddress,
-    setDesiredVisitAddress,
-    isDesiredVisitAddressComplete,
     desiredVisitAddressLabel,
     participantMenuAnchor,
     setParticipantMenuAnchor,
@@ -2203,14 +2270,21 @@ export function useClientBookingCreatePage() {
     setPlanningActivity,
     planningDuration,
     setPlanningDuration,
+    clientNote,
+    setClientNote,
     projectFileInputRef,
     locationMode,
     isDesiredLocation,
+    isCompanyClient,
+    showProjectDetails,
     getParticipantLabel,
     catalogByTeamMemberId,
     isPlanningPerson,
+    isNotesPerson,
     selectedPerson,
     isPlanningCardSelected,
+    isNotesCardSelected,
+    hasNotesPerson,
     filteredTeamMembers,
     hasAssignableTeamMembers,
     additionalGuests,

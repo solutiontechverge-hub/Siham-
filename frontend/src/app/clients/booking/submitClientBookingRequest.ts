@@ -1,7 +1,7 @@
 import { getApiErrorMessage } from "../../../lib/api-error";
 import type { BusinessSetupListing, CreateBookingRequest } from "../../../store/services/businessApi";
 import { parseTimeLabelToMinutes, buildWallClockDateTimeIso } from "./booking-time";
-import { buildClientBookingApiPayload, extractUuidFromSyntheticId } from "./clientBookingApi.mapper";
+import { buildClientBookingApiPayload, extractUuidFromSyntheticId, hasProjectBookingContent } from "./clientBookingApi.mapper";
 import type { ClientBookingRecord } from "./clientBookingRecords";
 import { createBookingRef } from "./clientBookingSession";
 import { resolveCreateBookingStatus } from "./resolveCreateBookingStatus";
@@ -49,7 +49,14 @@ function buildFallbackCreateBookingPayload(
     end_time: buildWallClockDateTimeIso(bookingDate, endMinutes),
     location_type: locationMode === "desired" ? "desired" : "fixed",
     status,
-    booking_type: locationMode === "desired" ? "project" : asBookingRequest ? "request" : "online",
+    booking_type:
+      locationMode === "desired"
+        ? hasProjectBookingContent(draft)
+          ? "project"
+          : "request"
+        : asBookingRequest
+          ? "request"
+          : "online",
     unique_code: bookingRef,
     total_price: draft.total,
     ...(locationMode === "desired" && draft.desiredLocation
@@ -74,7 +81,9 @@ function buildFallbackCreateBookingPayload(
               ? { desiredLocation: draft.desiredLocation }
               : {}),
           },
-          notes: draft.projectDetails?.description
+          notes: draft.clientNote?.trim()
+            ? draft.clientNote.trim()
+            : draft.projectDetails?.description
             ? `Project: ${draft.projectDetails.description}`
             : null,
           images: (draft.projectDetails?.uploads ?? [])

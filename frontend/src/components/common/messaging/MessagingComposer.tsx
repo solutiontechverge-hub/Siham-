@@ -273,6 +273,7 @@ export default function MessagingComposer({
           multiline
           minRows={1}
           maxRows={4}
+          autoFocus={!disabled}
           placeholder={
             disabled ? "Waiting for client message..." : "Type Message"
           }

@@ -158,6 +158,7 @@ export const lookupMollureClientByEmail = async (req, res) => {
       `SELECT
          u.id,
          u.email,
+         u.user_type,
          COALESCE(
            NULLIF(TRIM(CONCAT(ip.first_name, ' ', ip.last_name)), ''),
            NULLIF(TRIM(ip.display_name), ''),
@@ -195,6 +196,7 @@ export const lookupMollureClientByEmail = async (req, res) => {
         email: row.email,
         phone: row.phone || null,
         country_code: row.country_code || null,
+        user_type: row.user_type || null,
       },
     });
   } catch (error) {

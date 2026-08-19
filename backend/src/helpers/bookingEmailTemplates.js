@@ -1,4 +1,5 @@
 import {
+  dangerButton,
   detailsBox,
   escapeHtml,
   getFrontendBaseUrl,
@@ -27,7 +28,15 @@ const formatStartTime = (startTime) => {
 };
 
 const buildBookingDetailsUrl = (uniqueCode) =>
-  `${getFrontendBaseUrl()}/clients/booking?ref=${encodeURIComponent(String(uniqueCode ?? ""))}`;
+  `${getFrontendBaseUrl()}/clients/booking/checkout?ref=${encodeURIComponent(String(uniqueCode ?? ""))}`;
+
+const buildEbrRespondUrl = (uniqueCode, action) => {
+  const params = new URLSearchParams();
+  params.set("ref", String(uniqueCode ?? ""));
+  params.set("tab", "upcoming");
+  params.set("ebr", action);
+  return `${getFrontendBaseUrl()}/clients/booking/checkout?${params.toString()}`;
+};
 
 const buildPaymentUrl = (uniqueCode) =>
   `${getFrontendBaseUrl()}/clients/booking/checkout?ref=${encodeURIComponent(String(uniqueCode ?? ""))}`;
@@ -96,16 +105,36 @@ export const buildBookingConfirmedEmail = (ctx) =>
     status: ctx.status || "confirmed",
   });
 
-export const buildIncomingErEmail = (ctx) =>
-  bookingCardEmail({
-    title: "Incoming ER",
-    salonName: ctx.salonName,
-    professionalName: ctx.professionalName,
-    startTime: ctx.startTime,
-    uniqueCode: ctx.uniqueCode,
-    iconType: null,
-    status: ctx.status,
-  });
+export const buildIncomingErEmail = (ctx) => {
+  const uniqueCode = ctx.uniqueCode;
+  const acceptUrl = buildEbrRespondUrl(uniqueCode, "accept");
+  const rejectUrl = buildEbrRespondUrl(uniqueCode, "reject");
+  const suggestUrl = buildEbrRespondUrl(uniqueCode, "suggest");
+  const rows = [
+    { label: "Professional", value: ctx.professionalName },
+    { label: "Start Time", value: formatStartTime(ctx.startTime) },
+    { label: "Booking ID", value: formatBookingId(uniqueCode) },
+  ];
+  if (ctx.status) {
+    rows.push({ label: "Status", value: formatStatusLabel(ctx.status) });
+  }
+
+  const html = wrapEmail(`
+    <h1 style="margin:0 0 8px;font-size:24px;color:#1a2b42;">Incoming ER</h1>
+    <p style="margin:0 0 4px;font-size:16px;color:#5c6778;font-weight:600;">${escapeHtml(ctx.salonName)}</p>
+    ${detailsBox(rows)}
+    <div style="margin-top:8px;">
+      ${primaryButton("Accept", acceptUrl)}
+    </div>
+    <div style="margin-top:12px;">
+      ${secondaryButton("Suggest", suggestUrl)}
+      ${dangerButton("Reject", rejectUrl)}
+    </div>
+  `);
+
+  const text = `Incoming ER\n${ctx.salonName}\nProfessional: ${ctx.professionalName}\nStart: ${formatStartTime(ctx.startTime)}\nBooking ID: ${formatBookingId(uniqueCode)}${ctx.status ? `\nStatus: ${formatStatusLabel(ctx.status)}` : ""}\nAccept: ${acceptUrl}\nSuggest: ${suggestUrl}\nReject: ${rejectUrl}`;
+  return { html, text };
+};
 
 export const buildBookingCancelledEmail = (ctx) =>
   bookingCardEmail({
@@ -172,6 +201,20 @@ export const buildNewBookingRequestEmail = (ctx) =>
     status: ctx.status || "requested",
     ctaLabel: "View calendar",
     ctaUrl: `${getFrontendBaseUrl()}/professionals/calendar`,
+  });
+
+export const buildBookingRequestSentEmail = (ctx) =>
+  bookingCardEmail({
+    title: "Booking request sent",
+    salonName: ctx.salonName,
+    professionalName: ctx.professionalName,
+    startTime: ctx.startTime,
+    uniqueCode: ctx.uniqueCode,
+    iconType: "info",
+    status: ctx.status || "requested",
+    ctaLabel: "View booking",
+    ctaUrl: buildPaymentUrl(ctx.uniqueCode),
+    message: "Your booking request was sent. You will be notified when the professional responds.",
   });
 
 export const buildPrepaymentReceivedEmail = (ctx) =>

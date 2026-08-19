@@ -17,6 +17,7 @@ import {
 import type { BookingEditSuggestedProduct } from "./bookingEditRequest";
 import type { ClientBookingDraft, ClientBookingSummarySection } from "./types";
 import { resolveMediaUrl } from "../../../lib/resolveMediaUrl";
+import BookingSummaryNote from "./BookingSummaryNote";
 
 export type ClientBookingPrepaymentState = "none" | "required" | "paid";
 
@@ -1041,6 +1042,12 @@ export default function ClientBookingPaymentDetailsCard({
                 </Typography>
               </Stack>
             </Paper>
+          </Box>
+        ) : null}
+
+        {draft?.clientNote?.trim() ? (
+          <Box sx={{ mt: 1.5 }}>
+            <BookingSummaryNote note={draft.clientNote} />
           </Box>
         ) : null}
       </Box>

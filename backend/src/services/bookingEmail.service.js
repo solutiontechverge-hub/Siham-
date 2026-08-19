@@ -5,6 +5,7 @@ import {
   buildBookingCancelledEmail,
   buildBookingConfirmedEmail,
   buildIncomingErEmail,
+  buildBookingRequestSentEmail,
   buildNewBookingRequestEmail,
   buildNotificationCompanionEmail,
   buildPostTreatmentPaymentEmail,
@@ -27,6 +28,7 @@ export const BOOKING_EMAIL_TYPES = {
   PROFESSIONAL_ACTION: "professional_action",
   RESPOND_REQUEST_REMINDER: "respond_request_reminder",
   NEW_BOOKING_REQUEST: "new_booking_request",
+  CLIENT_BR_SENT: "client_br_sent",
   PREPAYMENT_RECEIVED: "prepayment_received",
   /** Generic companion email for any in-app notification. */
   NOTIFICATION_COMPANION: "notification_companion",
@@ -65,6 +67,10 @@ const EMAIL_BUILDERS = {
     subject: "New booking request",
     build: buildNewBookingRequestEmail,
   },
+  [BOOKING_EMAIL_TYPES.CLIENT_BR_SENT]: {
+    subject: "Your booking request was sent",
+    build: buildBookingRequestSentEmail,
+  },
   [BOOKING_EMAIL_TYPES.PREPAYMENT_RECEIVED]: {
     subject: "Prepayment received",
     build: buildPrepaymentReceivedEmail,
@@ -80,11 +86,19 @@ const loadBookingEmailContext = async (bookingId) => {
        b.status,
        u.email AS customer_email,
        COALESCE(NULLIF(bs.salon_name, ''), NULLIF(bs.business_name, ''), 'Your salon') AS salon_name,
-       COALESCE(NULLIF(tm.full_name, ''), 'Your professional') AS professional_name,
+       COALESCE(
+         NULLIF(TRIM(tm.full_name), ''),
+         NULLIF(TRIM(CONCAT(COALESCE(pp.contact_first_name, ''), ' ', COALESCE(pp.contact_last_name, ''))), ''),
+         NULLIF(TRIM(pp.legal_name), ''),
+         NULLIF(TRIM(bs.salon_name), ''),
+         NULLIF(TRIM(bs.business_name), ''),
+         'Professional'
+       ) AS professional_name,
        COALESCE(NULLIF(sc.title, ''), 'Service') AS service_name
      FROM bookings b
      INNER JOIN users u ON u.id = b.customer_id
      INNER JOIN business_setups bs ON bs.id = b.business_setup_id
+     INNER JOIN professional_profiles pp ON pp.id = bs.professional_profile_id
      LEFT JOIN business_team_members tm ON tm.id = b.team_member_id
      LEFT JOIN subcategories sc ON sc.id = b.service_id
      WHERE b.id = $1
@@ -306,6 +320,9 @@ function mapNotificationTypeToEmailType(notificationType, isProfessional) {
   }
 
   // Client-only rich emails
+  if (type === "client.br.sent") {
+    return BOOKING_EMAIL_TYPES.CLIENT_BR_SENT;
+  }
   if (type === "client.booking.confirmed" || type === "client.br.accepted") {
     return BOOKING_EMAIL_TYPES.CONFIRMED;
   }

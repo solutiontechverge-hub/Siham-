@@ -4,7 +4,10 @@ import {
   uploadBusinessMediaFilesToS3,
   uploadTeamMemberPhotoFileToS3,
 } from "../services/s3-upload.service.js";
-import { buildServiceDetailsFromCategories } from "../utils/business-service-categories.js";
+import {
+  buildServiceDetailsFromCategories,
+  normalizeServiceDiscountFields,
+} from "../utils/business-service-categories.js";
 import {
   applyUnpublishedDraftToSetup,
   buildUnpublishedDraftPayload,
@@ -319,6 +322,7 @@ const normalizeServiceCategories = (value) => {
         duration_label: durationLabel,
         parent_service_id: parentServiceId,
         is_visible: item.is_visible === false || item.isVisible === false ? false : true,
+        ...normalizeServiceDiscountFields(item),
       };
     })
     .filter(Boolean);
@@ -1569,15 +1573,23 @@ export const getCalendarOverview = async (req, res) => {
            COALESCE(
              NULLIF(TRIM(ip.display_name), ''),
              NULLIF(TRIM(CONCAT_WS(' ', ip.first_name, ip.last_name)), ''),
+             NULLIF(TRIM(cp.legal_name), ''),
+             NULLIF(TRIM(CONCAT_WS(' ', cp.contact_first_name, cp.contact_last_name)), ''),
              u.email
            ) AS customer_name,
-           u.email AS customer_email
+           u.email AS customer_email,
+           CASE
+             WHEN u.user_type = 'company' THEN 'company'
+             WHEN u.user_type = 'individual' THEN 'individual'
+             ELSE NULL
+           END AS client_kind
          FROM bookings b
          INNER JOIN business_setups bs ON bs.id = b.business_setup_id
          LEFT JOIN subcategories s ON s.id = b.service_id
          LEFT JOIN business_team_members tm ON tm.id = b.team_member_id
          LEFT JOIN users u ON u.id = b.customer_id
          LEFT JOIN individual_profiles ip ON ip.user_id = u.id
+         LEFT JOIN company_profiles cp ON cp.user_id = u.id
          WHERE bs.professional_profile_id = $1
          ${bookingsDateClause}
          ORDER BY COALESCE(b.start_time, b.created_at) DESC`,
@@ -2118,15 +2130,23 @@ export const listBookings = async (req, res) => {
            COALESCE(
              NULLIF(TRIM(ip.display_name), ''),
              NULLIF(TRIM(CONCAT_WS(' ', ip.first_name, ip.last_name)), ''),
+             NULLIF(TRIM(cp.legal_name), ''),
+             NULLIF(TRIM(CONCAT_WS(' ', cp.contact_first_name, cp.contact_last_name)), ''),
              u.email
            ) AS customer_name,
-           u.email AS customer_email
+           u.email AS customer_email,
+           CASE
+             WHEN u.user_type = 'company' THEN 'company'
+             WHEN u.user_type = 'individual' THEN 'individual'
+             ELSE NULL
+           END AS client_kind
          FROM bookings b
          INNER JOIN business_setups bs ON bs.id = b.business_setup_id
          LEFT JOIN subcategories s ON s.id = b.service_id
          LEFT JOIN business_team_members tm ON tm.id = b.team_member_id
          LEFT JOIN users u ON u.id = b.customer_id
          LEFT JOIN individual_profiles ip ON ip.user_id = u.id
+         LEFT JOIN company_profiles cp ON cp.user_id = u.id
          WHERE b.business_setup_id = $1
          ${tabFilterSql}
          ${searchSql}
@@ -2246,11 +2266,34 @@ export const uploadBookingAttachments = async (req, res) => {
 export const createBooking = async (req, res) => {
   try {
     const locationDetails = parseJsonValue(req.body.location_details, {});
+    if (req.user.user_type === "company" || req.user.user_type === "individual") {
+      locationDetails.clientKind = req.user.user_type === "company" ? "company" : "individual";
+    }
 
     const normalizedStatus = normalizeBookingStatus(req.body.status, "requested");
-    const bookingType = req.body.booking_type ?? "online";
+    let bookingType = req.body.booking_type ?? "online";
+    if (bookingType === "project" && req.user.user_type === "individual") {
+      bookingType = req.body.location_type === "desired" ? "request" : "online";
+    }
     const generatedCodePrefix = bookingType === "offline" ? "OF123" : "123";
     const uniqueCode = await ensureUniqueBookingCode(req.body.unique_code, generatedCodePrefix);
+
+    let notes = req.body.notes ?? null;
+    if (
+      (req.user.user_type === "company" || req.user.user_type === "individual") &&
+      typeof notes === "string" &&
+      notes.includes("---mollure-meta---")
+    ) {
+      const marker = "---mollure-meta---";
+      const markerIndex = notes.indexOf(marker);
+      try {
+        const meta = JSON.parse(notes.slice(markerIndex + marker.length).trim());
+        meta.clientKind = req.user.user_type === "company" ? "company" : "individual";
+        notes = `${notes.slice(0, markerIndex)}${marker}\n${JSON.stringify(meta)}`;
+      } catch {
+        // keep original notes
+      }
+    }
 
     const result = await query(
       `INSERT INTO bookings (
@@ -2292,7 +2335,7 @@ export const createBooking = async (req, res) => {
         req.body.end_time ?? null,
         req.body.location_type ?? null,
         JSON.stringify(locationDetails),
-        req.body.notes ?? null,
+        notes,
         req.body.prepayment_status ?? null,
         normalizedStatus,
         bookingType,
@@ -2321,7 +2364,9 @@ export const createBooking = async (req, res) => {
       }
     }
 
-    void dispatchBookingCreatedNotifications(booking);
+    void dispatchBookingCreatedNotifications(booking).catch((error) => {
+      console.error("[booking-notification] create dispatch failed:", error.message || error);
+    });
 
     emitBookingChanged(booking, "created");
 
