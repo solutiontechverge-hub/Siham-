@@ -64,7 +64,9 @@ export function isAdditionalGuest(p: BookingPerson): boolean {
   return !p.isRequester && p.participantType === "guest";
 }
 
-export function isNotesPerson(p: Pick<BookingPerson, "id" | "name" | "participantType">): boolean {
+export function isNotesPerson(
+  p: Pick<BookingPerson, "id" | "name"> & Partial<Pick<BookingPerson, "participantType">>,
+): boolean {
   return (
     p.participantType === "notes" ||
     p.id === NOTES_PERSON_ID ||

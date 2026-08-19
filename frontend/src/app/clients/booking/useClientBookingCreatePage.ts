@@ -1301,7 +1301,7 @@ export function useClientBookingCreatePage() {
       setServices(draftServices);
       ebrSuggestBaselineRef.current = draftServices.map((s) => ({ ...s }));
 
-      const draftPeople = existing.draft.people?.length
+      const draftPeople: BookingPerson[] = existing.draft.people?.length
         ? existing.draft.people.map((p) => ({
             id: p.id,
             name: p.name,

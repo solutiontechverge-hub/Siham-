@@ -700,7 +700,7 @@ export default function ProfessionalFixedLocationCalendar({
         quantity: number;
         unitPrice: number;
       }>;
-      participantType?: "model" | "planning" | "guest" | "buffer";
+      participantType?: "model" | "planning" | "guest" | "buffer" | "notes";
       planningActivity?: string;
       planningDuration?: string;
       bufferTeamMemberId?: string;
@@ -1098,7 +1098,6 @@ export default function ProfessionalFixedLocationCalendar({
         bookingTotalDiscount,
         showKilometerAllowance,
         kilometerAllowanceDraft,
-        clientNote: viewingBookingEvent?.details?.clientNote,
       }),
     };
   }, [
@@ -12238,7 +12237,7 @@ export default function ProfessionalFixedLocationCalendar({
                                   </BodyText>
                                 </ButtonBase>
                               </>
-                            ) : slotLocation !== "DL" ? (
+                            ) : (
                               <ButtonBase
                                 onClick={() => {
                                   if (isViewingExisting || showInlineGuestField)
@@ -12300,7 +12299,7 @@ export default function ProfessionalFixedLocationCalendar({
                                   Guest
                                 </BodyText>
                               </ButtonBase>
-                            ) : null}
+                            )}
                           </Stack>
                         </Box>
                         ) : null}
