@@ -55,6 +55,7 @@ export function buildBookingSummarySections(draft: ClientBookingDraft | null): C
             }
           : undefined;
       const hasPlanning = Boolean(planningItem?.activity || planningItem?.duration);
+      if (p.participantType === "notes" || p.id === "p-notes") continue;
       if (!items.length && !hasPlanning) continue;
 
       const participantType: ClientBookingSummarySection["participantType"] = p.isRequester

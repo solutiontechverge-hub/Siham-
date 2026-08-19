@@ -22,7 +22,7 @@ export type ClientBookingDraftPerson = {
   id: string;
   name: string;
   isRequester?: boolean;
-  participantType?: "model" | "planning" | "guest" | "buffer";
+  participantType?: "model" | "planning" | "guest" | "buffer" | "notes";
   planningActivity?: string;
   planningDuration?: string;
   planningIsLocked?: boolean;
@@ -65,6 +65,8 @@ export type ClientBookingDraft = {
   projectDetails?: ClientBookingDraftProjectDetails;
   /** Client visit address for Desired Location bookings. */
   desiredLocation?: ClientBookingDesiredLocation;
+  /** IC booking note sent to the professional calendar. */
+  clientNote?: string;
 };
 
 export type ClientBookingSelectedShop = {

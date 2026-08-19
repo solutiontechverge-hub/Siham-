@@ -27,6 +27,10 @@ import {
 } from "../../../components/common/calendar/serviceOrder.utils";
 import type { ServiceOrderSettings } from "../../../components/common/calendar/calendar-settings.types";
 import { normalizeServiceDurationLabel } from "../../../utils/serviceDuration";
+import {
+  applyBusinessServiceDiscount,
+  readBusinessServiceDiscountFields,
+} from "../../../data/businessServiceModal.data";
 import type {
   BusinessSetupListing,
   BusinessSetupListingPolicy,
@@ -85,6 +89,30 @@ function parseDurationMins(durationLabel: string) {
 function formatPriceLabel(price: number) {
   if (!Number.isFinite(price) || price <= 0) return "—";
   return `${Math.round(price)} €`;
+}
+
+function pricedServiceFields(
+  basePrice: number,
+  source: Parameters<typeof applyBusinessServiceDiscount>[1],
+) {
+  const priced = applyBusinessServiceDiscount(basePrice, source);
+  const fields = readBusinessServiceDiscountFields(source);
+  return {
+    priceLabel: formatPriceLabel(priced.amount),
+    priceValue: priced.amount,
+    originalPriceValue: priced.active ? basePrice : undefined,
+    originalPriceLabel: priced.active ? formatPriceLabel(basePrice) : undefined,
+    discountPct: priced.percentOff ?? undefined,
+    discountType: fields.discountType,
+    discountAmount: parseEuroOrUndefined(fields.discountAmount),
+    discountStartDate: fields.discountStartDate || undefined,
+    discountEndDate: fields.discountEndDate || undefined,
+  };
+}
+
+function parseEuroOrUndefined(value: string): number | undefined {
+  const n = Number.parseFloat(value);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
 }
 
 function formatTimeBlock(block: BusinessSetupListingTimeBlock | undefined | null) {
@@ -352,7 +380,7 @@ function buildProfileServices(setup: BusinessSetupListing): BusinessPublicProfil
         "";
       const durationMins = parseDurationMins(rawDuration);
       const durationLabel = normalizeServiceDurationLabel(rawDuration, durationMins);
-      const priceValue = Number(detail.price);
+      const basePrice = Number(detail.price);
 
       return {
         id: detail.serviceId != null ? String(detail.serviceId) : detail.id != null ? String(detail.id) : `svc-${index}`,
@@ -360,9 +388,8 @@ function buildProfileServices(setup: BusinessSetupListing): BusinessPublicProfil
         categoryTitle,
         name: detail.serviceTitle as string,
         durationLabel,
-        priceLabel: formatPriceLabel(priceValue),
-        priceValue,
         durationMins,
+        ...pricedServiceFields(Number.isFinite(basePrice) ? basePrice : 0, detail),
       };
     });
 
@@ -401,15 +428,15 @@ function buildProfileServices(setup: BusinessSetupListing): BusinessPublicProfil
         durationByServiceId.get(serviceId) || String(entry.duration_label ?? entry.durationLabel ?? "").trim();
       const durationMins = parseDurationMins(rawDuration);
       const durationLabel = normalizeServiceDurationLabel(rawDuration, durationMins);
+      const basePrice = Number.isFinite(amount) ? amount : 0;
       return {
         id: serviceId || `svc-${index}`,
         categoryId,
         categoryTitle: categoryTitle || undefined,
         name: serviceTitle || "Service",
         durationLabel,
-        priceLabel: formatPriceLabel(Number.isFinite(amount) ? amount : 0),
-        priceValue: Number.isFinite(amount) ? amount : 0,
         durationMins,
+        ...pricedServiceFields(basePrice, entry),
       };
     })
     .filter((service): service is BusinessPublicProfileService => service !== null);
@@ -471,7 +498,9 @@ function resolveComboServicePrice(
   const detail = resolveComboServiceDetail(setup, serviceId, title);
   if (detail?.price != null) {
     const price = Number(detail.price);
-    if (Number.isFinite(price) && price > 0) return price;
+    if (Number.isFinite(price) && price > 0) {
+      return applyBusinessServiceDiscount(price, detail).amount;
+    }
   }
 
   const key = serviceId != null && serviceId !== "" ? String(serviceId) : "";
@@ -482,12 +511,16 @@ function resolveComboServicePrice(
     if (!Number.isFinite(amount) || amount <= 0) continue;
 
     const entryServiceId = String(entry.service_id ?? entry.serviceId ?? "").trim();
-    if (key && entryServiceId === key) return amount;
+    if (key && entryServiceId === key) {
+      return applyBusinessServiceDiscount(amount, entry).amount;
+    }
 
     const entryTitle = String(entry.service_title ?? entry.serviceTitle ?? "")
       .trim()
       .toLowerCase();
-    if (needle && entryTitle === needle) return amount;
+    if (needle && entryTitle === needle) {
+      return applyBusinessServiceDiscount(amount, entry).amount;
+    }
   }
 
   return 0;

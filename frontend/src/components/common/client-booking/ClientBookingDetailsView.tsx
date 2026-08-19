@@ -158,6 +158,7 @@ export default function ClientBookingDetailsView({
   const router = useRouter();
   const searchParams = useSearchParams();
   const listTab: BookingListTab = parseBookingListTab(searchParams?.get("tab"));
+  const ebrRespondParam = searchParams?.get("ebr");
   const m = useTheme().palette.mollure;
   useBookingRealtimeSync();
   const user = useAppSelector((s) => s.auth.user);
@@ -1377,8 +1378,58 @@ export default function ClientBookingDetailsView({
 
   const handleConfirmEbrSuggest = React.useCallback(async () => {
     setEbrAction(null);
-    setEbrSuggestDrawerOpen(true);
-  }, []);
+    setEbrSuggestDrawerOpen(false);
+    if (!bookingRef) return;
+    try {
+      const result = await openMessagingForBooking({ bookingRef }).unwrap();
+      messagingWidget?.openMessaging({
+        threadId: result.threadId,
+        bookingRef: result.bookingRef,
+        businessSetupId: result.businessSetupId,
+        searchPrefill: result.thread?.name || undefined,
+      });
+    } catch (error) {
+      showSnackbar({
+        severity: "error",
+        message: getApiErrorMessage(
+          error,
+          "Unable to open chat for this booking.",
+        ),
+      });
+    }
+  }, [bookingRef, messagingWidget, openMessagingForBooking, showSnackbar]);
+
+  const ebrRespondHandledRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!ebrRespondParam || !bookingRef) return;
+    const key = `${bookingRef}:${ebrRespondParam}`;
+    if (ebrRespondHandledRef.current === key) return;
+    ebrRespondHandledRef.current = key;
+
+    if (ebrRespondParam === "suggest") {
+      void handleConfirmEbrSuggest();
+    } else if (ebrRespondParam === "accept") {
+      setEbrAction("accept");
+    } else if (ebrRespondParam === "reject") {
+      setEbrAction("reject");
+    }
+
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("ebr");
+    const nextQuery = params.toString();
+    router.replace(
+      nextQuery
+        ? `${window.location.pathname}?${nextQuery}`
+        : window.location.pathname,
+      { scroll: false },
+    );
+  }, [
+    bookingRef,
+    ebrRespondParam,
+    handleConfirmEbrSuggest,
+    router,
+    searchParams,
+  ]);
 
   const handleAcknowledgeRejected = React.useCallback(() => {
     returnToBookingDetailsStart("acknowledge_rejected");
@@ -2216,7 +2267,9 @@ export default function ClientBookingDetailsView({
                 : undefined
             }
             onEditProject={
-              bookingStatus === "confirmed" && locationMode === "desired"
+              bookingStatus === "confirmed" &&
+              locationMode === "desired" &&
+              user?.user_type === "company"
                 ? () => openConfirmedEbrEditor("project")
                 : undefined
             }
@@ -2245,6 +2298,17 @@ export default function ClientBookingDetailsView({
               await refreshActiveBooking();
               editRequest.refresh();
             }}
+            apiEditGrantActive={
+              activeBooking?.editRequest?.status === "approved" &&
+              Boolean(
+                activeBooking.editRequest.edit_grant_active ??
+                  (activeBooking.editRequest as { editGrantActive?: boolean })
+                    .editGrantActive,
+              ) &&
+              (activeBooking.editRequest.initiated_by ??
+                (activeBooking.editRequest as { initiatedBy?: string }).initiatedBy) !==
+                "professional"
+            }
             showUpdated={showStatusUpdated}
             showEditScenario={
               bookingStatus === "confirmed" &&
@@ -2369,7 +2433,7 @@ export default function ClientBookingDetailsView({
                 {showRequestResponseActions ? (
                   <ClientEbrResponseActions
                     onAccept={() => setEbrAction("accept")}
-                    onSuggestChange={() => setEbrAction("suggest")}
+                    onSuggestChange={() => void handleConfirmEbrSuggest()}
                     onReject={() => setEbrAction("reject")}
                   />
                 ) : null}

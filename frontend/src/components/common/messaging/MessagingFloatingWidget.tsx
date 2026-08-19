@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import ChatBubbleRoundedIcon from "@mui/icons-material/ChatBubbleRounded";
-import { Badge, Box, Fab, Paper } from "@mui/material";
+import { Badge, Box, Fab, Modal, Paper } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import { usePathname } from "next/navigation";
 import MessagingPageView from "./MessagingPageView";
@@ -49,78 +49,76 @@ export default function MessagingFloatingWidget({
 
   return (
     <>
-      {open ? (
-        <>
+      <Modal
+        open={open}
+        onClose={() => closeMessaging()}
+        disableAutoFocus
+        disableRestoreFocus
+        disableScrollLock
+        slotProps={{
+          backdrop: { sx: { bgcolor: "transparent" } },
+        }}
+        sx={{ zIndex: (theme) => theme.zIndex.modal + 2 }}
+      >
+        <Paper
+          elevation={12}
+          tabIndex={-1}
+          sx={{
+            position: "fixed",
+            right: 0,
+            bottom: 0,
+            outline: "none",
+            width: {
+              xs: "100vw",
+              sm: "85vw",
+              md: "72vw",
+              lg: "60vw",
+            },
+            maxWidth: { md: 960, lg: 1100 },
+            height: {
+              xs: "min(92dvh, 100%)",
+              sm: "80vh",
+              md: "75vh",
+              lg: "70vh",
+            },
+            maxHeight: { xs: "100dvh", sm: "85vh", lg: "80vh" },
+            borderRadius: { xs: "16px 16px 0 0", sm: "14px 0 0 0" },
+            border: `1px solid ${alpha(m.navy, 0.1)}`,
+            borderRight: { sm: "none" },
+            borderBottom: "none",
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+            bgcolor: "#fff",
+            boxShadow: "0 -8px 40px rgba(16, 35, 63, 0.14)",
+            pb: "env(safe-area-inset-bottom, 0px)",
+            isolation: "isolate",
+          }}
+        >
           <Box
-            aria-hidden
-            onClick={closeMessaging}
             sx={{
-              position: "fixed",
-              inset: 0,
-              zIndex: 1290,
-              bgcolor: "transparent",
-            }}
-          />
-          <Paper
-            elevation={12}
-            onClick={(e) => e.stopPropagation()}
-            sx={{
-              position: "fixed",
-              right: 0,
-              bottom: 0,
-              width: {
-                xs: "100vw",
-                sm: "85vw",
-                md: "72vw",
-                lg: "60vw",
-              },
-              maxWidth: { md: 960, lg: 1100 },
-              height: {
-                xs: "min(92dvh, 100%)",
-                sm: "80vh",
-                md: "75vh",
-                lg: "70vh",
-              },
-              maxHeight: { xs: "100dvh", sm: "85vh", lg: "80vh" },
-              zIndex: 1300,
-              borderRadius: { xs: "16px 16px 0 0", sm: "14px 0 0 0" },
-              border: `1px solid ${alpha(m.navy, 0.1)}`,
-              borderRight: { sm: "none" },
-              borderBottom: "none",
-              overflow: "hidden",
+              flex: 1,
+              minHeight: 0,
               display: "flex",
               flexDirection: "column",
-              bgcolor: "#fff",
-              boxShadow: "0 -8px 40px rgba(16, 35, 63, 0.14)",
-              pb: "env(safe-area-inset-bottom, 0px)",
-              isolation: "isolate",
             }}
           >
-            <Box
-              sx={{
-                flex: 1,
-                minHeight: 0,
-                display: "flex",
-                flexDirection: "column",
+            <MessagingPageView
+              audience={audience}
+              currentUserName={userName}
+              currentUserAvatarSrc={avatarUrl}
+              embedded
+              navigation={{
+                bookingRef: params.bookingRef,
+                threadId: params.threadId,
+                businessSetupId: params.businessSetupId,
+                searchPrefill: params.searchPrefill,
               }}
-            >
-              <MessagingPageView
-                audience={audience}
-                currentUserName={userName}
-                currentUserAvatarSrc={avatarUrl}
-                embedded
-                navigation={{
-                  bookingRef: params.bookingRef,
-                  threadId: params.threadId,
-                  businessSetupId: params.businessSetupId,
-                  searchPrefill: params.searchPrefill,
-                }}
-                onClose={closeMessaging}
-              />
-            </Box>
-          </Paper>
-        </>
-      ) : null}
+              onClose={closeMessaging}
+            />
+          </Box>
+        </Paper>
+      </Modal>
 
       {!hideFab && !open ? (
         <Fab

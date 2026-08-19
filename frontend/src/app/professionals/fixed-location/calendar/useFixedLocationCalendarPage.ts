@@ -10,7 +10,7 @@ import {
 import { useSnackbar } from "../../../../components/common/AppSnackbar";
 import { getApiErrorMessage } from "../../../../lib/api-error";
 import { parseCalendarSettings } from "../../../../components/common/calendar/calendar-settings.types";
-import { mergeCalendarOverviewEvents } from "../../../../components/common/calendar/calendar-overview.mappers";
+import { mergeCalendarOverviewEvents, applyProfessionalClientKind } from "../../../../components/common/calendar/calendar-overview.mappers";
 import {
   getCalendarQueryDateRange,
   toIsoLocalDate,
@@ -36,6 +36,7 @@ import {
   type UpsertBusinessSetupRequest,
 } from "../../../../store/services/businessApi";
 import type { BookingCatalogService } from "../../../../data/bookingServiceCatalog.data";
+import { applyBusinessServiceDiscount } from "../../../../data/businessServiceModal.data";
 import { buildPlatformServiceOrderDefaults } from "../../../../data/businessServiceCategorySlider.data";
 import { useBookingRealtimeSync } from "../../../../hooks/useBookingRealtimeSync";
 import {
@@ -71,13 +72,17 @@ const parseServiceDurationMins = (label?: string | null) => {
 const mapSetupServicesToCatalog = (
   services: readonly BusinessServiceDetail[] | undefined,
 ): BookingCatalogService[] =>
-  (services ?? []).map((service) => ({
-    id: String(service.service_id || service.id),
-    name: service.service_title,
-    durationMins: parseServiceDurationMins(service.duration_label),
-    price: Number(service.price) || 0,
-    category: service.category_title || undefined,
-  }));
+  (services ?? []).map((service) => {
+    const base = Number(service.price) || 0;
+    const priced = applyBusinessServiceDiscount(base, service);
+    return {
+      id: String(service.service_id || service.id),
+      name: service.service_title,
+      durationMins: parseServiceDurationMins(service.duration_label),
+      price: priced.amount,
+      category: service.category_title || undefined,
+    };
+  });
 
 function buildUpsertPayloadFromSetup(
   setup: BusinessSetup,
@@ -212,11 +217,12 @@ export function useFixedLocationCalendarPage() {
           : ["FL", "DL"];
 
     const fallbackResourceId = resources[0]?.id ?? "unassigned";
+    const professionalClients = professionalClientsData?.data ?? [];
     const apiEvents: CalendarEvent[] = mergeCalendarOverviewEvents(
       overview?.entries ?? [],
       overview?.bookings ?? [],
       fallbackResourceId,
-    );
+    ).map((event) => applyProfessionalClientKind(event, professionalClients));
 
     const apiBlocks: CalendarBlock[] = (overview?.entries ?? [])
       .filter((entry) => entry.status === "blocked")
@@ -253,7 +259,7 @@ export function useFixedLocationCalendarPage() {
       scheduleAvailability: [],
       scheduleBlocked: [],
     };
-  }, [calendarOverviewData, setupData]);
+  }, [calendarOverviewData, professionalClientsData, setupData]);
 
   const calendarSettings = React.useMemo(
     () =>
@@ -325,6 +331,7 @@ export function useFixedLocationCalendarPage() {
         email: client.email,
         mollureUserId: client.mollure_user_id,
         phone: client.phone ?? "",
+        clientKind: client.client_kind,
       })),
     [professionalClientsData],
   );

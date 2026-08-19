@@ -75,6 +75,7 @@ type StoredBookingNoteMeta = Partial<
   Pick<
     CalendarBookingDetails,
     | "showInternalNote"
+    | "clientNote"
     | "showLateRescheduling"
     | "lateRescheduleFeePercent"
     | "showLateCancellation"
@@ -115,6 +116,7 @@ type StoredBookingNoteMeta = Partial<
     | "waitingForPayment"
     | "invoiceDueDate"
     | "splitBill"
+    | "clientKind"
   >
 > & {
   ebr?: StoredEbrNotePayload;
@@ -147,6 +149,7 @@ export function serializeCalendarEntryNotes(
   const trimmed = internalNote.trim();
   const meta: StoredBookingNoteMeta = {
     showInternalNote: Boolean(trimmed) || Boolean(details?.showInternalNote),
+    ...(details?.clientNote?.trim() ? { clientNote: details.clientNote.trim() } : {}),
     showLateRescheduling: details?.showLateRescheduling,
     lateRescheduleFeePercent: details?.lateRescheduleFeePercent,
     showLateCancellation: details?.showLateCancellation,
@@ -189,6 +192,7 @@ export function serializeCalendarEntryNotes(
     ...(details?.waitingForPayment ? { waitingForPayment: true } : {}),
     ...(details?.invoiceDueDate ? { invoiceDueDate: details.invoiceDueDate } : {}),
     ...(details?.splitBill ? { splitBill: details.splitBill } : {}),
+    ...(details?.clientKind ? { clientKind: details.clientKind } : {}),
     ...(ebr ? { ebr } : {}),
     ...(er ? { er } : {}),
   };
@@ -401,15 +405,21 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
       showInternalNote: Boolean(plainNote),
     };
   }
-  const internalNote = sanitizeInternalNoteText(notes.slice(0, markerIndex));
+  const prefixNote = sanitizeInternalNoteText(notes.slice(0, markerIndex));
   const metaRaw = notes.slice(markerIndex + NOTES_META_PREFIX.length).trim();
   try {
     const meta = JSON.parse(metaRaw) as StoredBookingNoteMeta;
     const ebr = meta.ebr;
     const snapshotServices = mainDrawerServicesFromClientSnapshot(meta.clientSnapshot);
+    const storedClientNote = sanitizeInternalNoteText(meta.clientNote);
+    const incomingClientPrefix =
+      !storedClientNote && meta.requestDirection === "incoming" ? prefixNote : "";
+    const clientNote = storedClientNote || incomingClientPrefix;
+    const internalNote = clientNote && prefixNote === clientNote ? "" : prefixNote;
     return {
       internalNote,
       showInternalNote: Boolean(internalNote),
+      ...(clientNote ? { clientNote } : {}),
       showLateRescheduling: Boolean(meta.showLateRescheduling),
       lateRescheduleFeePercent: meta.lateRescheduleFeePercent ?? "",
       showLateCancellation: Boolean(meta.showLateCancellation),
@@ -482,6 +492,7 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
       ...(meta.waitingForPayment ? { waitingForPayment: true } : {}),
       ...(meta.invoiceDueDate ? { invoiceDueDate: meta.invoiceDueDate } : {}),
       ...(meta.splitBill ? { splitBill: meta.splitBill } : {}),
+      ...(meta.clientKind ? { clientKind: meta.clientKind } : {}),
       ...(ebr?.status !== "rejected" && ebr?.editedServiceIds?.length && !meta.editedServiceIds?.length
         ? { editedServiceIds: ebr.editedServiceIds }
         : {}),
@@ -602,7 +613,11 @@ export function hydrateBookingDrawerFromEvent(ev: CalendarEvent): BookingDrawerH
 }
 
 export function buildBookingDetailsSnapshot(input: {
-  selectedClient: { name: string; email: string } | null;
+  selectedClient: {
+    name: string;
+    email: string;
+    clientKind?: "individual" | "company";
+  } | null;
   selectedServices: BookingDrawerHydration["services"];
   selectedProducts: BookingDrawerHydration["products"];
   bookingGuests: BookingDrawerHydration["guests"];
@@ -625,9 +640,13 @@ export function buildBookingDetailsSnapshot(input: {
   editedServiceIds?: CalendarBookingDetails["editedServiceIds"];
   clientEditedServiceIds?: CalendarBookingDetails["clientEditedServiceIds"];
   lastEditedBy?: CalendarBookingDetails["lastEditedBy"];
+  clientNote?: string;
 }): CalendarBookingDetails {
   return {
     clientEmail: input.selectedClient?.email ?? "",
+    ...(input.selectedClient?.clientKind
+      ? { clientKind: input.selectedClient.clientKind }
+      : {}),
     services: input.selectedServices,
     products: input.selectedProducts,
     guests: input.bookingGuests,
@@ -643,6 +662,7 @@ export function buildBookingDetailsSnapshot(input: {
     lateRescheduleFeePercent: input.lateRescheduleFeePercent,
     showInternalNote: input.showInternalNote || Boolean(input.bookingInternalNote.trim()),
     internalNote: input.bookingInternalNote,
+    ...(input.clientNote?.trim() ? { clientNote: input.clientNote.trim() } : {}),
     totalDiscount: input.bookingTotalDiscount,
     showKilometerAllowance: input.showKilometerAllowance,
     kilometerAllowance: input.kilometerAllowanceDraft,

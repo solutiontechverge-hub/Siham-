@@ -205,7 +205,22 @@ export default function CalendarBookingCard({
           isIncomingEr ? alpha(m.teal, 0.14) : backgroundColor
         }
         pattern={cardPattern}
-        scenarioBadges={scenarioIndicators.map((indicator) => ({
+        scenarioBadges={[
+          ...(event.clientKind === "company" ||
+          event.details?.clientKind === "company"
+            ? [
+                {
+                  label: "CC",
+                  bold: true,
+                  sx: {
+                    border: `1px solid ${alpha(m.teal, 0.45)}`,
+                    bgcolor: alpha(m.teal, 0.16),
+                    color: m.teal,
+                  },
+                },
+              ]
+            : []),
+          ...scenarioIndicators.map((indicator) => ({
           label: scenarioIndicatorDisplayLabel(indicator),
           showRequestSentIcon: indicator === "BR",
           requestDirection:
@@ -244,7 +259,8 @@ export default function CalendarBookingCard({
                     color: m.teal,
                   }
                 : undefined,
-        }))}
+        })),
+        ]}
         prepaymentStatus={prepaymentIconVariant}
         paymentDue={
           paymentDueMeta
@@ -287,6 +303,7 @@ export default function CalendarBookingCard({
             ? "Edit request note"
             : "Note added",
           onClick: onOpenNotes,
+          count: hasNote ? 1 : undefined,
         }}
         profileAction={{
           show: true,

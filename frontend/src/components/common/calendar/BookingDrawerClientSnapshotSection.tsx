@@ -39,6 +39,7 @@ export default function BookingDrawerClientSnapshotSection({
   const hideGuestBlocks = hiddenIds.size > 0;
   const nonRequesterPeople = people.filter((p) => {
     if (p.isRequester) return false;
+    if (p.participantType === "notes") return false;
     if (hiddenIds.has(String(p.id))) return false;
     if (!hideGuestBlocks) return true;
     const isPlanning =

@@ -120,10 +120,13 @@ import {
 } from "../../../data/businessServiceCategorySlider.data";
 import {
   formatBusinessServicePriceLabel,
-  normalizeBusinessServiceDiscountType,
+  isBusinessServiceDiscountActive,
+  applyBusinessServiceDiscount,
   normalizeBusinessServicePriceType,
   parseEuroAmountString,
   parsePriceLabelForModal,
+  readBusinessServiceDiscountFields,
+  toBusinessServiceDiscountPayload,
   businessServiceModalCopy,
   hydrateMainAndSubservicesFromDetails,
   isHydratedMainServiceId,
@@ -176,6 +179,7 @@ const mapServiceItemsToCategories = (
         parent_service_id:
           parentId && !parentId.startsWith("main-") ? parentId : null,
         is_visible: true,
+        ...toBusinessServiceDiscountPayload(item),
       };
     })
     .filter((entry) => entry.amount > 0);
@@ -204,6 +208,7 @@ const mapServiceItemsToCategories = (
         String(entry.parent_service_id ?? entry.parentServiceId ?? "").trim() ||
         null,
       is_visible: false,
+      ...toBusinessServiceDiscountPayload(entry),
     }))
     .filter((entry) => entry.category_id && entry.service_id);
 
@@ -214,16 +219,8 @@ function normalizePriceType(type: string | undefined): "fixed" | "from" {
   return normalizeBusinessServicePriceType(type);
 }
 
-function normalizeDiscountType(t: string | undefined): "fixed" | "percent" {
-  return normalizeBusinessServiceDiscountType(t);
-}
-
 function hasServiceDiscount(it: ServiceDetailUiItem): boolean {
-  const d = parseEuroAmountString(it.discountAmount ?? "");
-  if (d === null || d <= 0) return false;
-  const kind = normalizeDiscountType(it.discountType);
-  if (kind === "percent" && d > 100) return false;
-  return true;
+  return isBusinessServiceDiscountActive(it);
 }
 
 function getServiceBaseAmountNumber(it: ServiceDetailUiItem): number | null {
@@ -237,12 +234,7 @@ function computeDiscountedBaseAmount(
   base: number,
   it: ServiceDetailUiItem,
 ): number {
-  if (!hasServiceDiscount(it)) return base;
-  const kind = normalizeDiscountType(it.discountType);
-  const d = parseEuroAmountString(it.discountAmount ?? "") ?? 0;
-  if (kind === "percent")
-    return Math.max(0, base * (1 - Math.min(100, d) / 100));
-  return Math.max(0, base - d);
+  return applyBusinessServiceDiscount(base, it).amount;
 }
 
 function formatEuroDisplay(n: number): string {
@@ -2573,6 +2565,7 @@ export default function ProfessionalFixedLocationSetup({
           : "";
       const durationLabel =
         categoryDurationByServiceId.get(item.service_id) || "";
+      const discount = readBusinessServiceDiscountFields(item);
       return {
         id: String(item.service_id),
         parentServiceId: item.parent_service_id
@@ -2587,6 +2580,17 @@ export default function ProfessionalFixedLocationSetup({
         categoryTitle: item.category_title || undefined,
         priceLabel: priceStr,
         durationLabel: durationLabel || undefined,
+        priceAmount:
+          rawPrice !== null &&
+          rawPrice !== undefined &&
+          String(rawPrice).trim() !== ""
+            ? String(rawPrice).trim().replace(/\s*€\s*$/i, "").trim()
+            : "",
+        discountType: discount.discountType,
+        discountAmount: discount.discountAmount,
+        discountStartDate: discount.discountStartDate,
+        discountEndDate: discount.discountEndDate,
+        discountDescription: discount.discountDescription,
       };
     };
 
@@ -2605,6 +2609,11 @@ export default function ProfessionalFixedLocationSetup({
             category_id: String(entry.category_id),
             category_title: entry.category_title || "",
             is_visible: entry.is_visible !== false,
+            discount_type: entry.discount_type ?? null,
+            discount_amount: entry.discount_amount ?? null,
+            discount_start_date: entry.discount_start_date ?? null,
+            discount_end_date: entry.discount_end_date ?? null,
+            discount_description: entry.discount_description ?? null,
           }));
 
     const savedServices: BusinessSubserviceUi[] = detailsForHydration
@@ -3549,6 +3558,9 @@ export default function ProfessionalFixedLocationSetup({
         priceAmount: main.priceAmount,
         discountType: main.discountType,
         discountAmount: main.discountAmount,
+        discountStartDate: main.discountStartDate,
+        discountEndDate: main.discountEndDate,
+        discountDescription: main.discountDescription,
       });
 
       return (
