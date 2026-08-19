@@ -41,7 +41,7 @@ export type CalendarBookingGuestItem = {
   name: string;
   services: CalendarBookingServiceItem[];
   products: CalendarBookingProductItem[];
-  participantType?: "model" | "planning" | "guest" | "buffer";
+  participantType?: "model" | "planning" | "guest" | "buffer" | "notes";
   planningActivity?: string;
   planningDuration?: string;
   bufferTeamMemberId?: string;
@@ -53,7 +53,7 @@ export type CalendarBookingClientSnapshot = {
     id: string;
     name: string;
     isRequester?: boolean;
-    participantType?: "model" | "planning" | "guest" | "buffer";
+    participantType?: "model" | "planning" | "guest" | "buffer" | "notes";
     planningActivity?: string;
     planningDuration?: string;
     planningIsLocked?: boolean;
@@ -115,6 +115,8 @@ export type CalendarBookingDetails = {
   showLateRescheduling?: boolean;
   internalNote?: string;
   showInternalNote?: boolean;
+  /** Note written by the client on the original booking request. */
+  clientNote?: string;
   /** Client-provided reason when cancelling; enables Activity detail arrow */
   cancellationReason?: string;
   totalDiscount?: {

@@ -10,7 +10,6 @@ import {
   CircularProgress,
   Container,
   Divider,
-  Grid,
   Paper,
   Stack,
   Typography,
@@ -29,6 +28,7 @@ import {
 } from "../../../app/clients/booking/clientBookingSession";
 import { submitClientBookingRequest } from "../../../app/clients/booking/submitClientBookingRequest";
 import { getApiErrorMessage } from "../../../lib/api-error";
+import { queueSnackbarFlash } from "../../../lib/snackbarFlash";
 import {
   useCreateBookingMutation,
   useGetAllBusinessSetupsQuery,
@@ -50,6 +50,7 @@ import {
   splitContactPhone,
 } from "../../../lib/phone-validation";
 import { buildBookingSummarySections, resolveTeamMemberFirstName } from "./buildBookingSummarySections";
+import BookingSummaryNote from "./BookingSummaryNote";
 import StripePrepaymentDialog from "./StripePrepaymentDialog";
 import { useActiveClientBooking } from "./useActiveClientBooking";
 import { useClientBookingDraft } from "./useClientBookingDraft";
@@ -441,6 +442,10 @@ export default function ClientBookingCreateSummaryView() {
       existing?.bookingRequestSent &&
       existing.apiBookingId
     ) {
+      queueSnackbarFlash({
+        severity: "success",
+        message: "Booking request sent",
+      });
       router.push(
         `/clients/booking/completed?outcome=completed&tab=${encodeURIComponent(listTab)}`,
       );
@@ -474,6 +479,13 @@ export default function ClientBookingCreateSummaryView() {
       setActiveBookingSession(result.record);
       await refreshActiveBooking();
       const outcome = locationMode === "desired" ? "requested" : "completed";
+      queueSnackbarFlash({
+        severity: "success",
+        message:
+          outcome === "requested"
+            ? "Booking request sent"
+            : "Booking completed",
+      });
       router.push(
         `/clients/booking/completed?outcome=${outcome}&tab=${encodeURIComponent(listTab)}`,
       );
@@ -527,6 +539,19 @@ export default function ClientBookingCreateSummaryView() {
   }
 
   let serviceCursor = bookingStartMinutes;
+  const addressFieldLabelSx = {
+    fontSize: 12,
+    fontWeight: 900,
+    color: alpha(m.navy, 0.65),
+    mb: 0.75,
+  } as const;
+  const addressFieldInputSx = {
+    "& .MuiOutlinedInput-root": {
+      height: 40,
+      minHeight: 40,
+      alignItems: "center",
+    },
+  } as const;
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "mollure.pageBg", py: { xs: 2.5, md: 3.5 } }}>
@@ -764,6 +789,11 @@ export default function ClientBookingCreateSummaryView() {
                 );
               })}
             </Stack>
+            {draft?.clientNote?.trim() ? (
+              <Box sx={{ mt: 1.5 }}>
+                <BookingSummaryNote note={draft.clientNote} />
+              </Box>
+            ) : null}
           </Box>
 
           <Box
@@ -918,7 +948,7 @@ export default function ClientBookingCreateSummaryView() {
             {isDesired ? "Contact & Address Details" : "Contact"}
           </Typography>
 
-          <Stack spacing={1.35}>
+          <Stack spacing={1.35} sx={{ width: "100%" }}>
             <AppCountryPhoneFields
               countryCode={countryCode}
               phone={phone}
@@ -933,18 +963,17 @@ export default function ClientBookingCreateSummaryView() {
             />
 
             {isDesired ? (
-              <Grid container spacing={1.25}>
-                <Grid item xs={12} sm={6}>
-                  <Typography
-                    sx={{
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: alpha(m.navy, 0.55),
-                      mb: 0.6,
-                    }}
-                  >
-                    Province
-                  </Typography>
+              <Box
+                sx={{
+                  width: "100%",
+                  display: "grid",
+                  gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+                  columnGap: 1.25,
+                  rowGap: 1.35,
+                }}
+              >
+                <Box>
+                  <Typography sx={addressFieldLabelSx}>Province</Typography>
                   <AppDropdown
                     value={address.province}
                     onChange={(val) =>
@@ -961,19 +990,11 @@ export default function ClientBookingCreateSummaryView() {
                     placeholder="Province"
                     fullWidth
                     size="small"
+                    sx={addressFieldInputSx}
                   />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography
-                    sx={{
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: alpha(m.navy, 0.55),
-                      mb: 0.6,
-                    }}
-                  >
-                    Municipality
-                  </Typography>
+                </Box>
+                <Box>
+                  <Typography sx={addressFieldLabelSx}>Municipality</Typography>
                   <AppDropdown
                     value={address.municipality}
                     onChange={(val) =>
@@ -1003,19 +1024,11 @@ export default function ClientBookingCreateSummaryView() {
                     fullWidth
                     size="small"
                     disabled={!address.province}
+                    sx={addressFieldInputSx}
                   />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography
-                    sx={{
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: alpha(m.navy, 0.55),
-                      mb: 0.6,
-                    }}
-                  >
-                    Street Address
-                  </Typography>
+                </Box>
+                <Box>
+                  <Typography sx={addressFieldLabelSx}>Street Address</Typography>
                   <AppTextField
                     value={address.street}
                     onChange={(e) =>
@@ -1027,19 +1040,11 @@ export default function ClientBookingCreateSummaryView() {
                     placeholder="Churchill-laan"
                     fullWidth
                     size="small"
+                    sx={addressFieldInputSx}
                   />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography
-                    sx={{
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: alpha(m.navy, 0.55),
-                      mb: 0.6,
-                    }}
-                  >
-                    Street Number
-                  </Typography>
+                </Box>
+                <Box>
+                  <Typography sx={addressFieldLabelSx}>Street Number</Typography>
                   <AppTextField
                     value={address.number}
                     onChange={(e) =>
@@ -1051,19 +1056,11 @@ export default function ClientBookingCreateSummaryView() {
                     placeholder="34234"
                     fullWidth
                     size="small"
+                    sx={addressFieldInputSx}
                   />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography
-                    sx={{
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: alpha(m.navy, 0.55),
-                      mb: 0.6,
-                    }}
-                  >
-                    Postal Code
-                  </Typography>
+                </Box>
+                <Box sx={{ gridColumn: { xs: "1", sm: "1 / -1" } }}>
+                  <Typography sx={addressFieldLabelSx}>Postal Code</Typography>
                   <AppTextField
                     value={address.postalCode}
                     onChange={(e) =>
@@ -1075,9 +1072,10 @@ export default function ClientBookingCreateSummaryView() {
                     placeholder="1234 AB"
                     fullWidth
                     size="small"
+                    sx={addressFieldInputSx}
                   />
-                </Grid>
-              </Grid>
+                </Box>
+              </Box>
             ) : null}
           </Stack>
         </Paper>

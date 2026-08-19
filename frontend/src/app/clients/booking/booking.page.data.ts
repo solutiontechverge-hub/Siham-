@@ -11,6 +11,8 @@ export const UUID_RE =
 
 export const FIXED_LOCATION_MAX_GUESTS = 1;
 
+export const NOTES_PERSON_ID = "p-notes";
+
 /** Appended to booking notes when the client leaves team member unselected. */
 export const TEAM_MEMBER_PROVIDED_BY_PRO_NOTE =
   "Team member will be provided by professional";
@@ -60,6 +62,23 @@ export function resolveRequesterDisplayName(
 
 export function isAdditionalGuest(p: BookingPerson): boolean {
   return !p.isRequester && p.participantType === "guest";
+}
+
+export function isNotesPerson(p: Pick<BookingPerson, "id" | "name" | "participantType">): boolean {
+  return (
+    p.participantType === "notes" ||
+    p.id === NOTES_PERSON_ID ||
+    p.name.trim().toLowerCase() === "notes"
+  );
+}
+
+export function createNotesPerson(): BookingPerson {
+  return {
+    id: NOTES_PERSON_ID,
+    name: "Notes",
+    isRequester: false,
+    participantType: "notes",
+  };
 }
 
 export function resolveProfileCatalogService(

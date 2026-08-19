@@ -64,7 +64,9 @@ import {
 import {
   FIXED_LOCATION_MAX_GUESTS,
   UUID_RE,
+  createNotesPerson,
   isAdditionalGuest,
+  isNotesPerson,
   buildAddServiceCatalog,
   resolveProfileCatalogService,
   servicesMissingTeamMember,
@@ -484,6 +486,7 @@ export function useClientBookingCreatePage() {
       if (person.isRequester) return "Client";
       if (person.participantType === "planning" || person.name === "Planning")
         return "Planning";
+      if (isNotesPerson(person)) return "Note";
       if (person.participantType === "model") return "Model";
       if (person.participantType === "guest" || person.name === "Guest")
         return "Guest";
@@ -616,6 +619,11 @@ export function useClientBookingCreatePage() {
     [],
   );
 
+  const isNonServicePerson = React.useCallback(
+    (p: BookingPerson) => isPlanningPerson(p) || isNotesPerson(p),
+    [isPlanningPerson],
+  );
+
   const selectedPerson = React.useMemo(
     () => people.find((p) => p.id === selectedPersonId) ?? null,
     [people, selectedPersonId],
@@ -623,6 +631,13 @@ export function useClientBookingCreatePage() {
 
   const isPlanningCardSelected = Boolean(
     selectedPerson && isPlanningPerson(selectedPerson),
+  );
+  const isNotesCardSelected = Boolean(
+    selectedPerson && isNotesPerson(selectedPerson),
+  );
+  const hasNotesPerson = React.useMemo(
+    () => people.some(isNotesPerson),
+    [people],
   );
 
   const filteredTeamMembers = React.useMemo(
@@ -828,9 +843,9 @@ export function useClientBookingCreatePage() {
   const canAddFixedLocationGuest =
     !isDesiredLocation && additionalGuests.length < FIXED_LOCATION_MAX_GUESTS;
   const serviceAssignees = React.useMemo(() => {
-    // Jane / Model / Guest can all receive services; Planning cannot.
-    return people.filter((p) => !isPlanningPerson(p));
-  }, [isPlanningPerson, people]);
+    // Jane / Model / Guest can all receive services; Planning / Notes cannot.
+    return people.filter((p) => !isNonServicePerson(p));
+  }, [isNonServicePerson, people]);
   /** Add-to-list stays available even when the pro has no selectable team members. */
   const canAddService = serviceAssignees.length > 0;
 
@@ -844,11 +859,14 @@ export function useClientBookingCreatePage() {
 
   const personCardSubtitle = React.useCallback(
     (person: BookingPerson) => {
+      if (isNotesPerson(person)) {
+        return clientNote.trim() ? "Added" : "Add a note";
+      }
       const role = getParticipantLabel(person);
       const count = serviceCountLabel(person.id);
       return `${role} · ${count}`;
     },
-    [getParticipantLabel, serviceCountLabel],
+    [clientNote, getParticipantLabel, serviceCountLabel],
   );
 
   const selectedServicesCount = React.useMemo(
@@ -857,11 +875,11 @@ export function useClientBookingCreatePage() {
   );
 
   const requiresPersonAssignment = React.useMemo(() => {
-    const assignees = people.filter((p) => !isPlanningPerson(p));
+    const assignees = people.filter((p) => !isNonServicePerson(p));
     return (
       assignees.length > 1 || assignees.some((p) => !p.isRequester)
     );
-  }, [isPlanningPerson, people]);
+  }, [isNonServicePerson, people]);
 
   /**
    * Multi-person / Model / Guest: every service needs a person.
@@ -898,7 +916,7 @@ export function useClientBookingCreatePage() {
   const isModelOrGuestSelected = Boolean(
     selectedPerson &&
     !selectedPerson.isRequester &&
-    !isPlanningPerson(selectedPerson),
+    !isNonServicePerson(selectedPerson),
   );
 
   React.useEffect(() => {
@@ -1023,6 +1041,7 @@ export function useClientBookingCreatePage() {
       const hasPlanning = Boolean(
         planningItem?.activity || planningItem?.duration,
       );
+      if (isNotesPerson(p)) continue;
       if (!items.length && !hasPlanning) continue;
       const roleLabel = getParticipantLabel(p);
       const teamMemberLabel = teamMemberChipLabelForItems(items);
@@ -1299,6 +1318,9 @@ export function useClientBookingCreatePage() {
               isRequester: true as const,
             },
           ];
+      if (existing.draft.clientNote?.trim() && !draftPeople.some(isNotesPerson)) {
+        draftPeople.push(createNotesPerson());
+      }
       setPeople(draftPeople);
 
       const personWithServices =
@@ -1573,7 +1595,7 @@ export function useClientBookingCreatePage() {
     setSelectedServiceIds({});
     const person = people.find((p) => p.id === personId);
     const isModelOrGuest = Boolean(
-      person && !person.isRequester && !isPlanningPerson(person),
+      person && !person.isRequester && !isNonServicePerson(person),
     );
     if (isModelOrGuest) {
       const hasPending = services.some((s) => !s.guestId);
@@ -1592,9 +1614,23 @@ export function useClientBookingCreatePage() {
     const isPlanning = cardName === "Planning";
     const isModel = cardName === "Model";
     const isGuest = cardName === "Guest";
+    const isNotes = cardName === "Notes";
 
     if (isModel && !isCompanyClient) return;
     if (isPlanning && !isCompanyClient) return;
+
+    if (isNotes) {
+      const existing = people.find(isNotesPerson);
+      setParticipantMenuAnchor(null);
+      if (existing) {
+        setSelectedPersonId(existing.id);
+        return;
+      }
+      const nextPerson = createNotesPerson();
+      setPeople((prev) => [...prev, nextPerson]);
+      setSelectedPersonId(nextPerson.id);
+      return;
+    }
 
     if (
       !isDesiredLocation &&
@@ -1674,6 +1710,7 @@ export function useClientBookingCreatePage() {
   const deleteGuest = (guestId: string) => {
     const person = people.find((p) => p.id === guestId);
     if (!person || person.isRequester) return;
+    if (isNotesPerson(person)) setClientNote("");
     setPeople((prev) => prev.filter((p) => p.id !== guestId));
     // Remove this guest's services from the booking (do not send them to Unassigned).
     setServices((prev) => prev.filter((s) => s.guestId !== guestId));
@@ -1842,7 +1879,7 @@ export function useClientBookingCreatePage() {
     }
     setTimeValidationError(null);
 
-    const peopleForDraft =
+    const peopleForDraft = (
       planningPersonId != null
         ? people.map((p) =>
             p.id === planningPersonId
@@ -1853,7 +1890,8 @@ export function useClientBookingCreatePage() {
                 }
               : p,
           )
-        : people;
+        : people
+    ).filter((p) => !isNotesPerson(p));
 
     const requesterId =
       peopleForDraft.find((p) => p.isRequester)?.id ??
@@ -2242,8 +2280,11 @@ export function useClientBookingCreatePage() {
     getParticipantLabel,
     catalogByTeamMemberId,
     isPlanningPerson,
+    isNotesPerson,
     selectedPerson,
     isPlanningCardSelected,
+    isNotesCardSelected,
+    hasNotesPerson,
     filteredTeamMembers,
     hasAssignableTeamMembers,
     additionalGuests,

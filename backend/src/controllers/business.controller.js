@@ -2364,7 +2364,9 @@ export const createBooking = async (req, res) => {
       }
     }
 
-    void dispatchBookingCreatedNotifications(booking);
+    void dispatchBookingCreatedNotifications(booking).catch((error) => {
+      console.error("[booking-notification] create dispatch failed:", error.message || error);
+    });
 
     emitBookingChanged(booking, "created");
 

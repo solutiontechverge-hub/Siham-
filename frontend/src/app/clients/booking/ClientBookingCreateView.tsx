@@ -38,9 +38,9 @@ import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
 import ModeEditOutlineRoundedIcon from "@mui/icons-material/ModeEditOutlineRounded";
-import { AppDropdown } from "../../../components/common";
+import { AppDropdown, AppTextField } from "../../../components/common";
 import AppModal from "../../../components/common/AppModal";
-import EditRequestNoteDialog from "../../../components/common/client-booking/EditRequestNoteDialog";
+import BookingSummaryNote from "../../../components/common/client-booking/BookingSummaryNote";
 import { ServiceSummaryMetaLine } from "../../../components/common/ServiceSummaryMetaLine";
 import {
   CLIENT_BOOKING_MIN_LEAD_ERROR,
@@ -50,6 +50,7 @@ import {
 
 import { useClientBookingCreatePage } from "./useClientBookingCreatePage";
 import type { BookingPerson } from "./booking.page.types";
+import { isNotesPerson } from "./booking.page.data";
 import { resolveMediaUrl } from "../../../lib/resolveMediaUrl";
 
 export default function ClientBookingCreateView() {
@@ -167,6 +168,8 @@ export default function ClientBookingCreateView() {
     isPlanningPerson,
     selectedPerson,
     isPlanningCardSelected,
+    isNotesCardSelected,
+    hasNotesPerson,
     filteredTeamMembers,
     hasAssignableTeamMembers,
     additionalGuests,
@@ -223,7 +226,6 @@ export default function ClientBookingCreateView() {
     deleteProjectUpload,
     deleteGuest,
   } = useClientBookingCreatePage();
-  const [noteDialogOpen, setNoteDialogOpen] = React.useState(false);
 
   const planningCardDetails = (person: BookingPerson) => {
     if (!person.planningIsLocked) return { duration: "" };
@@ -361,6 +363,38 @@ export default function ClientBookingCreateView() {
           Save
         </AppButton>
       ) : null}
+    </Box>
+  );
+
+  const renderNotesForm = () => (
+    <Box
+      sx={{
+        mx: 1.5,
+        mb: 1.5,
+        p: 1.5,
+        borderRadius: "10px",
+        bgcolor: "#fff",
+      }}
+    >
+      <Typography
+        sx={{
+          fontSize: 11,
+          fontWeight: 800,
+          color: alpha(m.navy, 0.62),
+          mb: 0.75,
+        }}
+      >
+        Note
+      </Typography>
+      <AppTextField
+        value={clientNote}
+        onChange={(e) => setClientNote(e.target.value)}
+        placeholder="Write a note for the professional…"
+        fullWidth
+        multiline
+        minRows={4}
+        sx={planningFieldSx}
+      />
     </Box>
   );
 
@@ -2085,21 +2119,7 @@ export default function ClientBookingCreateView() {
                             >
                               Model
                             </MenuItem>
-                          ) : (
-                            <MenuItem
-                              onClick={() => {
-                                setParticipantMenuAnchor(null);
-                                setNoteDialogOpen(true);
-                              }}
-                              sx={{
-                                fontSize: 12,
-                                fontWeight: 900,
-                                color: alpha(m.navy, 0.78),
-                              }}
-                            >
-                              Notes
-                            </MenuItem>
-                          )}
+                          ) : null}
                           {isCompanyClient ? (
                             <MenuItem
                               onClick={() => addParticipant("Planning")}
@@ -2110,6 +2130,18 @@ export default function ClientBookingCreateView() {
                               }}
                             >
                               Planning
+                            </MenuItem>
+                          ) : null}
+                          {!hasNotesPerson ? (
+                            <MenuItem
+                              onClick={() => addParticipant("Notes")}
+                              sx={{
+                                fontSize: 12,
+                                fontWeight: 900,
+                                color: alpha(m.navy, 0.78),
+                              }}
+                            >
+                              Notes
                             </MenuItem>
                           ) : null}
                         </Menu>
@@ -2171,6 +2203,8 @@ export default function ClientBookingCreateView() {
                             onClick={() => {
                               if (isPlanningPerson(p)) {
                                 selectPlanningCard(p);
+                              } else if (isNotesPerson(p)) {
+                                setSelectedPersonId(p.id);
                               } else {
                                 selectNonPlanningPerson(p.id);
                               }
@@ -2213,7 +2247,7 @@ export default function ClientBookingCreateView() {
                                 alignItems: "center",
                               }}
                             >
-                              {p.isRequester ? (
+                              {p.isRequester || isNotesPerson(p) ? (
                                 <Typography
                                   sx={{
                                     fontWeight: 900,
@@ -2284,7 +2318,7 @@ export default function ClientBookingCreateView() {
                       })}
                     </Stack>
 
-                    {requiresPersonAssignment ? (
+                    {requiresPersonAssignment && !isNotesCardSelected ? (
                       <Box
                         sx={{
                           mt: 1.25,
@@ -2317,6 +2351,8 @@ export default function ClientBookingCreateView() {
 
                   {isDesiredLocation && isPlanningCardSelected ? (
                     renderPlanningForm()
+                  ) : isNotesCardSelected ? (
+                    renderNotesForm()
                   ) : (
                     <>
                       <Divider />
@@ -2664,6 +2700,8 @@ export default function ClientBookingCreateView() {
                         },
                       )}
 
+                      <BookingSummaryNote note={clientNote} />
+
                       <Stack
                         direction="row"
                         justifyContent="space-between"
@@ -2778,16 +2816,6 @@ export default function ClientBookingCreateView() {
           </Box>
         </Paper>
       </Container>
-      <EditRequestNoteDialog
-        open={noteDialogOpen}
-        onClose={() => setNoteDialogOpen(false)}
-        onConfirm={(note) => setClientNote(note)}
-        title="Notes"
-        description="Write a note for the professional. It will be sent with this booking."
-        placeholder="Add a note…"
-        confirmLabel="Save"
-        initialValue={clientNote}
-      />
     </Box>
   );
 }

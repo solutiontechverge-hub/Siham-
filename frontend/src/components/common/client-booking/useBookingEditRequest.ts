@@ -40,7 +40,7 @@ export function useBookingEditRequest(bookingRef: string) {
     isEditGrantActive:
       record.status === "approved" &&
       Boolean(record.editGrantActive) &&
-      record.initiatedBy === "client",
+      record.initiatedBy !== "professional",
     refresh,
   };
 }

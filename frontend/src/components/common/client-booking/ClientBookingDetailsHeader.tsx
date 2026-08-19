@@ -68,6 +68,8 @@ type Props = {
   onOpenActivity?: () => void;
   /** Persist Confirmed ER note to API (client → professional). */
   onSendConfirmedEditRequest?: (note: string) => void | Promise<void>;
+  /** Backend edit_request grant (source of truth after professional Accept). */
+  apiEditGrantActive?: boolean;
   /** Show Updated next to Confirmed after post-accept edits. */
   showUpdated?: boolean;
   /** Confirmed booking was edited after ER/EBR accept. */
@@ -99,6 +101,7 @@ export default function ClientBookingDetailsHeader({
   onDispatchBookingNotification,
   onOpenActivity,
   onSendConfirmedEditRequest,
+  apiEditGrantActive = false,
   showUpdated = false,
   showEditScenario = false,
   responseOverdue = false,
@@ -228,7 +231,7 @@ export default function ClientBookingDetailsHeader({
   /** Confirmed edits require an accepted ER grant — no direct FL/DL edit. */
   const showConfirmedEditMenu =
     isConfirmed &&
-    editRequest.isEditGrantActive &&
+    (editRequest.isEditGrantActive || apiEditGrantActive) &&
     Boolean(onEditDateTime || onEditBookingDetails || onEditProject);
   const [erNoteOpen, setErNoteOpen] = React.useState(false);
 

@@ -1098,6 +1098,7 @@ export default function ProfessionalFixedLocationCalendar({
         bookingTotalDiscount,
         showKilometerAllowance,
         kilometerAllowanceDraft,
+        clientNote: viewingBookingEvent?.details?.clientNote,
       }),
     };
   }, [
@@ -1238,7 +1239,9 @@ export default function ProfessionalFixedLocationCalendar({
       if (person.isRequester) continue;
       if (
         person.participantType === "planning" ||
-        person.name?.trim() === "Planning"
+        person.participantType === "notes" ||
+        person.name?.trim() === "Planning" ||
+        person.name?.trim().toLowerCase() === "notes"
       )
         continue;
       const trimmed = person.name?.trim() ?? "";
@@ -1266,6 +1269,8 @@ export default function ProfessionalFixedLocationCalendar({
     isViewingBooking &&
     canRespondToConfirmedEr(viewingBookingEvent) &&
     !isEditingExisting;
+  const incomingClientNote =
+    viewingBookingEvent?.details?.clientNote?.trim() || "";
   const incomingErNote = React.useMemo(() => {
     if (!showIncomingErActions || !viewingBookingEvent) return null;
     const detailsNote = viewingBookingEvent.details?.editRequestNote?.trim();
@@ -1399,17 +1404,15 @@ export default function ProfessionalFixedLocationCalendar({
       setEditBaselineSignature((prev) =>
         prev === null ? bookingEditSignature : prev,
       );
-    } else if (!editingEventId) {
-      setEditBaselineSignature(null);
-    } else if (editBaselineSignature === null) {
-      setEditBaselineSignature(bookingEditSignature);
+      return;
     }
-  }, [
-    isEditingExisting,
-    bookingEditSignature,
-    editingEventId,
-    editBaselineSignature,
-  ]);
+    if (!editingEventId) {
+      setEditBaselineSignature(null);
+      return;
+    }
+    // View / accept / live-hydrate must not look like an unsaved edit.
+    setEditBaselineSignature(bookingEditSignature);
+  }, [isEditingExisting, bookingEditSignature, editingEventId]);
   const isBookingDirty =
     Boolean(editingEventId) &&
     editBaselineSignature !== null &&
@@ -1417,6 +1420,10 @@ export default function ProfessionalFixedLocationCalendar({
 
   const lockClientIdentity =
     isViewingBooking && isClientOriginatedBooking(viewingBookingEvent);
+  const isProfessionalManualBooking =
+    !viewingBookingEvent || !isClientOriginatedBooking(viewingBookingEvent);
+  const showManualBookingParticipantActions =
+    isProfessionalManualBooking && !isViewingExisting;
   const showLineItemRemoveButton = !isViewingExisting;
   const showClientRemoveButton =
     showLineItemRemoveButton && !lockClientIdentity;
@@ -3554,7 +3561,12 @@ export default function ProfessionalFixedLocationCalendar({
         ) {
           setBookingGuests(
             snap.people
-              .filter((person) => !person.isRequester)
+              .filter(
+                (person) =>
+                  !person.isRequester &&
+                  person.participantType !== "notes" &&
+                  person.name?.trim().toLowerCase() !== "notes",
+              )
               .map((person) => ({
                 id: person.id,
                 name: person.name,
@@ -4034,6 +4046,7 @@ export default function ProfessionalFixedLocationCalendar({
       );
       setSlotStatus("Confirmed");
       setIncomingRequestEditMode(false);
+      setIsEditingExisting(false);
       showSnackbar({
         severity: "success",
         message: "Booking request accepted.",
@@ -4246,6 +4259,7 @@ export default function ProfessionalFixedLocationCalendar({
       }
       setSlotStatus("Confirmed");
       setIncomingRequestEditMode(false);
+      setIsEditingExisting(false);
       showSnackbar({
         severity: "success",
         message: "Booking request accepted.",
@@ -5171,6 +5185,7 @@ export default function ProfessionalFixedLocationCalendar({
           bookingTotalDiscount,
           showKilometerAllowance,
           kilometerAllowanceDraft,
+          clientNote: existingEvent.details?.clientNote,
           // Persist as outgoing EBR so Discard EBR and client EBR pill stay in sync.
           requestDirection: "outgoing",
           originalServices,
@@ -5264,6 +5279,9 @@ export default function ProfessionalFixedLocationCalendar({
             await onUpdateBookingStatus(parsedBooking.id, "requested", {
               notes: persistedNotes,
               total_price: ebrTotal,
+              booking_date: selectedSlot.date,
+              start_time: `${selectedSlot.date}T${selectedSlot.start}:00`,
+              end_time: `${selectedSlot.date}T${selectedSlot.end}:00`,
             });
           } catch {
             showSnackbar({
@@ -5394,6 +5412,7 @@ export default function ProfessionalFixedLocationCalendar({
           bookingTotalDiscount,
           showKilometerAllowance,
           kilometerAllowanceDraft,
+          clientNote: existingEvent?.details?.clientNote,
           ...(isNewManualBooking
             ? {
                 requestDirection: "outgoing" as const,
@@ -7730,10 +7749,14 @@ export default function ProfessionalFixedLocationCalendar({
                                 ? isViewingExisting || !slotValidation.isValid
                                 : slotBookingScreen === "add-buffer"
                                   ? isViewingExisting || !slotValidation.isValid
-                                  : drawerPrimaryActionLabel === "Update"
-                                    ? !slotValidation.isValid || !isBookingDirty
-                                    : !slotValidation.isValid ||
-                                      isViewingExisting)
+                                  : incomingRequestEditMode
+                                    ? !slotValidation.isValid
+                                    : drawerPrimaryActionLabel === "Update"
+                                      ? !isEditingExisting ||
+                                        !slotValidation.isValid ||
+                                        !isBookingDirty
+                                      : !slotValidation.isValid ||
+                                        isViewingExisting)
                       }
                       onClick={() => {
                         if (isCompletedBooking || isCancelledOrInvalidBooking)
@@ -7743,7 +7766,7 @@ export default function ProfessionalFixedLocationCalendar({
                           drawerPrimaryActionLabel === "Update" &&
                           !isEditingExisting
                         ) {
-                          setIsEditingExisting(true);
+                          return;
                         }
                         if (slotBookingScreen === "edit-service") {
                           if (isViewingExisting) return;
@@ -11301,7 +11324,7 @@ export default function ProfessionalFixedLocationCalendar({
                           phoneError={slotErrors.bookingPhoneNumber}
                           phonePlaceholder="+442xxxxxxxxxx"
                           required={false}
-                          disabled={false}
+                          disabled={isViewingExisting}
                         />
 
                         {isViewingBooking &&
@@ -11929,6 +11952,14 @@ export default function ProfessionalFixedLocationCalendar({
                           </>
                         ) : null}
 
+                        {incomingClientNote &&
+                        incomingClientNote !== (incomingErNote ?? "") ? (
+                          <EditRequestIncomingNote
+                            note={incomingClientNote}
+                            from="client"
+                          />
+                        ) : null}
+
                         {showIncomingErActions && incomingErNote ? (
                           <EditRequestIncomingNote
                             note={incomingErNote}
@@ -12031,7 +12062,7 @@ export default function ProfessionalFixedLocationCalendar({
                           </Box>
                         ) : null}
 
-                        {slotLocation === "DL" && isViewingExisting ? null : (
+                        {showManualBookingParticipantActions ? (
                         <Box
                           sx={{
                             borderRadius: "10px",
@@ -12045,7 +12076,7 @@ export default function ProfessionalFixedLocationCalendar({
                             useFlexGap
                             flexWrap="wrap"
                           >
-                            {slotLocation === "DL" && !isViewingExisting ? (
+                            {slotLocation === "DL" ? (
                               <>
                                 <ButtonBase
                                   onClick={(e) => {
@@ -12272,7 +12303,7 @@ export default function ProfessionalFixedLocationCalendar({
                             ) : null}
                           </Stack>
                         </Box>
-                        )}
+                        ) : null}
 
                         <Box sx={{ flex: 1, minHeight: 40 }} />
                       </>
@@ -12661,14 +12692,8 @@ export default function ProfessionalFixedLocationCalendar({
               void handleAcceptConfirmedEr();
             else if (incomingConfirmAction === "reject")
               void handleRejectConfirmedEr();
-            else if (incomingConfirmAction === "suggest" && viewingBookingEvent) {
-              const bookingRef =
-                viewingBookingEvent.bookingCode ??
-                extractBookingId(viewingBookingEvent.id);
-              professionalSuggestBookingChanges(bookingRef, {
-                professionalNote: "Suggested changes via message",
-              });
-              openBookingMessages(viewingBookingEvent);
+            else if (incomingConfirmAction === "suggest") {
+              handleStartIncomingEdit();
             }
             return;
           }
@@ -12676,8 +12701,8 @@ export default function ProfessionalFixedLocationCalendar({
             void handleAcceptIncomingRequest();
           else if (incomingConfirmAction === "reject")
             void handleRejectIncomingRequest();
-          else if (incomingConfirmAction === "suggest" && viewingBookingEvent)
-            openBookingMessages(viewingBookingEvent);
+          else if (incomingConfirmAction === "suggest")
+            handleStartIncomingEdit();
         }}
       />
       <EditRequestNoteDialog

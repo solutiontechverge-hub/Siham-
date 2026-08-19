@@ -32,6 +32,7 @@ export const NOTIFICATION_TYPES = {
   CLIENT_BR_REJECTED: "client.br.rejected",
   CLIENT_BR_EBR_DISCARDED: "client.br.ebr_discarded",
   CLIENT_BR_INCOMING: "client.br.incoming",
+  CLIENT_BR_SENT: "client.br.sent",
   CLIENT_BOOKING_CONFIRMED: "client.booking.confirmed",
   CLIENT_BOOKING_CANCELLED: "client.booking.cancelled",
   CLIENT_BOOKING_COMPLETED: "client.booking.completed",
@@ -177,6 +178,11 @@ const NOTIFICATION_META = {
   },
   [NOTIFICATION_TYPES.CLIENT_BR_INCOMING]: {
     title: "New Booking Request",
+    statusType: "pending",
+    audience: "client",
+  },
+  [NOTIFICATION_TYPES.CLIENT_BR_SENT]: {
+    title: "Booking Request Sent",
     statusType: "pending",
     audience: "client",
   },
@@ -548,7 +554,10 @@ export async function dispatchBookingEventNotification(bookingId, event, options
 export async function dispatchBookingCreatedNotifications(booking, options = {}) {
   if (!booking?.id) return;
   const ctx = await loadBookingNotificationContext(booking.id);
-  if (!ctx) return;
+  if (!ctx) {
+    console.error("[booking-notification] missing context for booking", booking.id);
+    return;
+  }
 
   if (booking.status === "requested") {
     // Professional → client BR (calendar "Add from Mollure platform")
@@ -561,6 +570,9 @@ export async function dispatchBookingCreatedNotifications(booking, options = {})
     // Client → professional BR
     await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_BR_INCOMING, ctx.client_name, {
       message: `${ctx.client_name} sent you a booking request.`,
+    });
+    await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_BR_SENT, ctx.professional_name, {
+      message: `Your booking request was sent to ${ctx.professional_name}.`,
     });
   }
 

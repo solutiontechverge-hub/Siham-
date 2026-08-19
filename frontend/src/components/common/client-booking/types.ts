@@ -22,7 +22,7 @@ export type ClientBookingDraftPerson = {
   id: string;
   name: string;
   isRequester?: boolean;
-  participantType?: "model" | "planning" | "guest" | "buffer";
+  participantType?: "model" | "planning" | "guest" | "buffer" | "notes";
   planningActivity?: string;
   planningDuration?: string;
   planningIsLocked?: boolean;
