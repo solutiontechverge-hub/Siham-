@@ -63,6 +63,9 @@ declare module "@mui/material/styles" {
     textcolorgrey700: string;
     headingText: string;
     descriptionText: string;
+    /** Assigned / Unassigned segmented control */
+    segmentSelectedBg: string;
+    segmentText: string;
     warmwarning: string;
     requestAccent: string;
     requestAccentSoft: string;

@@ -35,7 +35,6 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
-import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
 import ModeEditOutlineRoundedIcon from "@mui/icons-material/ModeEditOutlineRounded";
 import { AppDropdown } from "../../../components/common";
@@ -147,7 +146,6 @@ export default function ClientBookingCreateView() {
     setProjectDescription,
     projectUploads,
     setProjectUploads,
-    desiredVisitAddressLabel,
     participantMenuAnchor,
     setParticipantMenuAnchor,
     planningPersonId,
@@ -168,6 +166,8 @@ export default function ClientBookingCreateView() {
     selectedPerson,
     isPlanningCardSelected,
     filteredTeamMembers,
+    sharedTeamMemberOptions,
+    getServiceTeamMemberOptions,
     hasAssignableTeamMembers,
     additionalGuests,
     canAddFixedLocationGuest,
@@ -207,8 +207,8 @@ export default function ClientBookingCreateView() {
     summaryGroups,
     teamMemberNameById,
     guestNameById,
-    teamMemberChipLabelForItems,
     teamMemberFirstName,
+    resolveServiceTeamMemberName,
     summarySections,
     applyProfileSelection,
     reorderPeople,
@@ -373,7 +373,11 @@ export default function ClientBookingCreateView() {
         sx={{ mb: 1 }}
       >
         <Typography
-          sx={{ fontSize: 12, fontWeight: 900, color: alpha(m.navy, 0.78) }}
+          sx={{
+            fontSize: 12,
+            fontWeight: theme.typography.fontWeightRegular,
+            color: m.headingText,
+          }}
         >
           Services Details
         </Typography>
@@ -387,9 +391,11 @@ export default function ClientBookingCreateView() {
           sx={{
             minHeight: 28,
             "& .MuiTabs-indicator": { display: "none" },
-            bgcolor: alpha(m.navy, 0.04),
-            borderRadius: "10px",
-            p: 0.35,
+            bgcolor: m.white,
+            border: `1px solid ${m.fxPillBorder}`,
+            borderRadius: "8px",
+            p: 0,
+            minWidth: 0,
           }}
         >
           <Tab
@@ -399,11 +405,15 @@ export default function ClientBookingCreateView() {
               minHeight: 28,
               textTransform: "none",
               fontSize: 11.5,
-              fontWeight: 900,
+              fontWeight: theme.typography.fontWeightRegular,
               borderRadius: "8px",
               px: 1.25,
-              color: alpha(m.navy, 0.62),
-              "&.Mui-selected": { bgcolor: "#fff", color: alpha(m.navy, 0.78) },
+              color: m.segmentText,
+              "&.Mui-selected": {
+                bgcolor: m.segmentSelectedBg,
+                color: m.segmentText,
+                fontWeight: theme.typography.fontWeightBold,
+              },
               "&.Mui-disabled": { opacity: 0.45 },
             }}
           />
@@ -414,11 +424,15 @@ export default function ClientBookingCreateView() {
               minHeight: 28,
               textTransform: "none",
               fontSize: 11.5,
-              fontWeight: 900,
+              fontWeight: theme.typography.fontWeightRegular,
               borderRadius: "8px",
               px: 1.25,
-              color: alpha(m.navy, 0.62),
-              "&.Mui-selected": { bgcolor: "#fff", color: alpha(m.navy, 0.78) },
+              color: m.segmentText,
+              "&.Mui-selected": {
+                bgcolor: m.segmentSelectedBg,
+                color: m.segmentText,
+                fontWeight: theme.typography.fontWeightBold,
+              },
             }}
           />
         </Tabs>
@@ -433,10 +447,7 @@ export default function ClientBookingCreateView() {
             onChange={(val) => applySharedTeamMember(String(val ?? ""))}
             options={[
               { value: "", label: "Any team member" },
-              ...filteredTeamMembers.map((tm) => ({
-                value: tm.id,
-                label: tm.name,
-              })),
+              ...sharedTeamMemberOptions,
             ]}
             placeholder="Any team member"
             size="small"
@@ -503,7 +514,7 @@ export default function ClientBookingCreateView() {
         />
       ) : null}
 
-      {hasUnassigned && serviceTab === "unassigned" ? (
+      {hasUnassigned && serviceTab === "unassigned" && visible.length > 1 ? (
         <Stack
           direction="row"
           alignItems="center"
@@ -594,10 +605,7 @@ export default function ClientBookingCreateView() {
                           onChange={(val) =>
                             updateServiceTeamMember(s.id, String(val ?? ""))
                           }
-                          options={filteredTeamMembers.map((tm) => ({
-                            value: tm.id,
-                            label: tm.name,
-                          }))}
+                          options={getServiceTeamMemberOptions(s)}
                           placeholder="Team member"
                           size="small"
                           fullWidth
@@ -910,13 +918,16 @@ export default function ClientBookingCreateView() {
         disabled={!canAddService}
         sx={{
           mt: 1.25,
-          display: "inline-flex",
+          display: "flex",
+          flexDirection: "row",
           alignItems: "center",
+          justifyContent: "flex-start",
           gap: 0.75,
           borderRadius: "8px",
           py: 0.25,
           opacity: canAddService ? 1 : 0.45,
           cursor: canAddService ? "pointer" : "not-allowed",
+          verticalAlign: "middle",
         }}
       >
         <Box
@@ -924,9 +935,9 @@ export default function ClientBookingCreateView() {
             width: 18,
             height: 18,
             borderRadius: "999px",
-            bgcolor: "primary.light",
-            color: "#fff",
-            display: "inline-flex",
+            bgcolor: m.addSoftBg,
+            color: m.addSoftFg,
+            display: "flex",
             alignItems: "center",
             justifyContent: "center",
             flexShrink: 0,
@@ -940,10 +951,13 @@ export default function ClientBookingCreateView() {
           sx={{
             fontSize: 11,
             fontWeight: 800,
-            lineHeight: 1,
-            color: "primary.light",
-            display: "inline-flex",
+            lineHeight: "18px",
+            height: 18,
+            color: m.addSoftFg,
+            display: "flex",
             alignItems: "center",
+            m: 0,
+            p: 0,
           }}
         >
           Service to assignment list
@@ -951,6 +965,20 @@ export default function ClientBookingCreateView() {
       </ButtonBase>
     </Box>
   );
+
+  const summaryServiceName =
+    [...new Set(services.map((s) => s.name.trim()).filter(Boolean))].join(
+      ", ",
+    ) ||
+    shop?.shopName ||
+    "";
+  const summaryTeamMemberName = [
+    ...new Set(
+      services
+        .map((s) => resolveServiceTeamMemberName(s))
+        .filter((name): name is string => Boolean(name)),
+    ),
+  ].join(", ");
 
   if (fromProfile && !profileHydrated) {
     return (
@@ -1146,7 +1174,7 @@ export default function ClientBookingCreateView() {
             <Typography
               sx={{
                 fontWeight: 700,
-                color: alpha(m.navy, 0.86),
+                color: m.headingText,
                 fontSize: "30px",
               }}
             >
@@ -1475,8 +1503,8 @@ export default function ClientBookingCreateView() {
                                     : blocked
                                       ? alpha(m.blockedTimeFg, 0.45)
                                       : active
-                                        ? alpha(m.teal, 0.6)
-                                        : alpha(m.navy, 0.1)
+                                        ? m.teal
+                                        : m.cardBorder
                                 }`,
                                 bgcolor: past
                                   ? alpha(m.navy, 0.015)
@@ -1484,7 +1512,7 @@ export default function ClientBookingCreateView() {
                                     ? m.blockedTimeBg
                                     : active
                                       ? m.teal
-                                      : "#fff",
+                                      : m.white,
                                 py: 0.9,
                                 display: "flex",
                                 flexDirection: "column",
@@ -1515,8 +1543,8 @@ export default function ClientBookingCreateView() {
                                     : blocked
                                       ? m.blockedTimeFg
                                       : active
-                                        ? "#fff"
-                                        : alpha(m.navy, 0.55),
+                                        ? m.white
+                                        : m.headingText,
                                 }}
                               >
                                 {d.dow}
@@ -1530,8 +1558,8 @@ export default function ClientBookingCreateView() {
                                     : blocked
                                       ? m.blockedTimeFg
                                       : active
-                                        ? "#fff"
-                                        : alpha(m.navy, 0.76),
+                                        ? m.white
+                                        : m.headingText,
                                 }}
                               >
                                 {d.day}
@@ -1647,28 +1675,25 @@ export default function ClientBookingCreateView() {
                                   px: 1.25,
                                   height: 32,
                                   fontSize: 11.5,
+                                  fontWeight: active
+                                    ? theme.typography.fontWeightBold
+                                    : theme.typography.fontWeightRegular,
                                   whiteSpace: "nowrap",
-                                  bgcolor: active
-                                    ? alpha(m.teal, 0.14)
-                                    : "#fff",
-                                  color: active ? m.tealDark : m.teal,
-                                  borderColor: active
-                                    ? m.teal
-                                    : alpha(m.teal, 0.45),
+                                  bgcolor: active ? m.teal : m.white,
+                                  color: active ? m.white : m.headingText,
+                                  borderColor: active ? m.teal : m.cardBorder,
                                   "&:hover": {
-                                    bgcolor: active
-                                      ? alpha(m.teal, 0.2)
-                                      : alpha(m.teal, 0.08),
-                                    color: m.tealDark,
-                                    borderColor: m.teal,
+                                    bgcolor: active ? m.teal : m.white,
+                                    color: active ? m.white : m.headingText,
+                                    borderColor: active ? m.teal : m.cardBorder,
                                   },
                                   ...(unavailable
                                     ? {
-                                        bgcolor: "#fff",
+                                        bgcolor: m.white,
                                         borderColor: alpha(m.navy, 0.08),
                                         color: alpha(m.navy, 0.32),
                                         "&:hover": {
-                                          bgcolor: "#fff",
+                                          bgcolor: m.white,
                                           borderColor: alpha(m.navy, 0.08),
                                           color: alpha(m.navy, 0.32),
                                         },
@@ -1946,22 +1971,51 @@ export default function ClientBookingCreateView() {
                           />
                         </Tooltip>
                         <Chip
-                          icon={<AddRoundedIcon sx={{ fontSize: 16 }} />}
+                          icon={
+                            <Box
+                              component="span"
+                              sx={{
+                                width: 18,
+                                height: 18,
+                                borderRadius: "999px",
+                                bgcolor: m.addSoftBg,
+                                color: m.addSoftFg,
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                flexShrink: 0,
+                                lineHeight: 0,
+                              }}
+                            >
+                              <AddRoundedIcon
+                                sx={{ fontSize: 14, display: "block" }}
+                              />
+                            </Box>
+                          }
                           label="Guest"
                           variant="outlined"
                           clickable
                           onClick={() => addParticipant("Guest")}
                           sx={{
-                            height: 28,
+                            height: 32,
                             borderRadius: "10px",
                             fontSize: 11.5,
-                            fontWeight: 900,
-                            borderColor: alpha(m.navy, 0.12),
-                            color: alpha(m.navy, 0.62),
-                            "& .MuiChip-icon": { color: m.teal, ml: 0.8 },
+                            fontWeight: theme.typography.fontWeightRegular,
+                            bgcolor: m.white,
+                            borderColor: m.cardBorder,
+                            color: m.headingText,
+                            "& .MuiChip-icon": {
+                              color: m.addSoftFg,
+                              ml: 0.85,
+                              mr: 0.25,
+                            },
                             "&:hover": {
-                              bgcolor: alpha(m.teal, 0.06),
-                              borderColor: alpha(m.teal, 0.35),
+                              bgcolor: m.white,
+                              borderColor: m.cardBorder,
+                              "& .MuiChip-icon": {
+                                bgcolor: m.addSoftBgHover,
+                                color: m.addSoftFg,
+                              },
                             },
                           }}
                         />
@@ -2349,86 +2403,26 @@ export default function ClientBookingCreateView() {
                       Service Summary
                     </Typography>
 
-                    <Box sx={{ mt: 0.8 }}>
-                      <Chip
-                        label={
-                          shop?.locationMode === "desired"
-                            ? "Desired Location"
-                            : "Fixed Location"
-                        }
-                        size="small"
-                        sx={{
-                          height: 18,
-                          borderRadius: "2px",
-                          bgcolor: alpha(m.teal, 0.1),
-                          color: m.teal,
-                          fontSize: 9.5,
-                          fontWeight: 900,
-                          "& .MuiChip-label": { px: 0.8 },
-                        }}
-                      />
-                    </Box>
-
                     <Typography
                       sx={{
-                        mt: 0.65,
+                        mt: 0.85,
                         fontWeight: 900,
-                        color: alpha(m.navy, 0.88),
+                        color: m.headingText,
                         fontSize: 15,
                         lineHeight: 1.2,
                       }}
                     >
-                      {shop?.shopName ?? "Beyond Beauty Salon"}
+                      {summaryServiceName}
                     </Typography>
 
-                    <Stack
-                      direction="row"
-                      alignItems="center"
-                      justifyContent="space-between"
-                      sx={{ mt: 0.65, gap: 1.25, minWidth: 0 }}
-                    >
+                    {summaryTeamMemberName ? (
                       <Stack
                         direction="row"
                         alignItems="center"
-                        spacing={0.55}
-                        sx={{ minWidth: 0, flex: 1 }}
+                        spacing={0.5}
+                        sx={{ mt: 0.55 }}
                       >
-                        <AccessTimeRoundedIcon
-                          sx={{ fontSize: 15, color: m.teal, flexShrink: 0 }}
-                        />
-                        <Typography
-                          sx={{
-                            fontWeight: 800,
-                            color: alpha(m.teal, 0.95),
-                            fontSize: 10.25,
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                        >
-                          {selectedDate.toLocaleDateString("en-US", {
-                            weekday: "short",
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          })}{" "}
-                          ({fmtMinutesToTimeLabel(bookingStartMinutes)} –{" "}
-                          {fmtMinutesToTimeLabel(bookingEndMinutes)})
-                        </Typography>
-                      </Stack>
-
-                      <Stack
-                        direction="row"
-                        alignItems="center"
-                        spacing={0.45}
-                        sx={{
-                          minWidth: 0,
-                          maxWidth: "46%",
-                          justifyContent: "flex-end",
-                          flexShrink: 0,
-                        }}
-                      >
-                        <LocationOnOutlinedIcon
+                        <PersonOutlineRoundedIcon
                           sx={{
                             fontSize: 15,
                             color: alpha(m.navy, 0.45),
@@ -2437,24 +2431,63 @@ export default function ClientBookingCreateView() {
                         />
                         <Typography
                           sx={{
-                            fontWeight: 800,
-                            color: alpha(m.navy, 0.55),
-                            fontSize: 10.25,
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            textAlign: "right",
+                            fontSize: 11.5,
+                            fontWeight: 700,
+                            color: alpha(m.navy, 0.62),
+                            lineHeight: 1,
                           }}
                         >
-                          {desiredVisitAddressLabel ||
-                            (shop?.locationMode === "desired"
-                              ? "Service at your location"
-                              : (shop?.addressLabel?.trim() ||
-                                shop?.municipalityLabel?.trim() ||
-                                "Studio location"))}
+                          {summaryTeamMemberName}
                         </Typography>
                       </Stack>
+                    ) : null}
+
+                    <Stack
+                      direction="row"
+                      alignItems="center"
+                      spacing={0.55}
+                      sx={{ mt: 0.65, minWidth: 0 }}
+                    >
+                      <AccessTimeRoundedIcon
+                        sx={{ fontSize: 15, color: m.teal, flexShrink: 0 }}
+                      />
+                      <Typography
+                        sx={{
+                          fontWeight: 800,
+                          color: alpha(m.teal, 0.95),
+                          fontSize: 10.25,
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        {selectedDate.toLocaleDateString("en-US", {
+                          weekday: "short",
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}{" "}
+                        ({fmtMinutesToTimeLabel(bookingStartMinutes)} –{" "}
+                        {fmtMinutesToTimeLabel(bookingEndMinutes)})
+                      </Typography>
                     </Stack>
+
+                    <Chip
+                      label={
+                        isDesiredLocation ? "Desired Location" : "Fixed Location"
+                      }
+                      size="small"
+                      sx={{
+                        mt: 0.7,
+                        height: 18,
+                        borderRadius: "4px",
+                        bgcolor: alpha(m.teal, 0.1),
+                        color: m.teal,
+                        fontSize: 9.5,
+                        fontWeight: 800,
+                        "& .MuiChip-label": { px: 0.85 },
+                      }}
+                    />
                   </Box>
                   <Divider />
 
@@ -2467,30 +2500,12 @@ export default function ClientBookingCreateView() {
                           roleLabel,
                           items,
                           planningItem,
-                          teamMemberLabel,
                         }) => {
-                          const uniqueTeamMemberLabels = [
-                            ...new Set(
-                              items
-                                .map((s) => teamMemberFirstName(s.teamMemberId))
-                                .filter((name): name is string =>
-                                  Boolean(name),
-                                ),
-                            ),
-                          ];
-                          // Prefer section chips for every assigned professional (fixed may have several).
-                          const sectionTeamLabels =
-                            uniqueTeamMemberLabels.length > 0
-                              ? uniqueTeamMemberLabels
-                              : teamMemberLabel
-                                ? [teamMemberLabel]
-                                : [];
-
                           return (
                             <Box key={key}>
                               <Stack
                                 direction="row"
-                                alignItems="baseline"
+                                alignItems="center"
                                 spacing={0.75}
                                 sx={{ mb: 0.75 }}
                               >
@@ -2498,7 +2513,8 @@ export default function ClientBookingCreateView() {
                                   sx={{
                                     fontWeight: 900,
                                     fontSize: 12,
-                                    color: alpha(m.navy, 0.78),
+                                    color: m.headingText,
+                                    lineHeight: 1,
                                   }}
                                 >
                                   {title}
@@ -2510,65 +2526,12 @@ export default function ClientBookingCreateView() {
                                     color: "primary.light",
                                     textTransform: "uppercase",
                                     letterSpacing: 0.3,
+                                    lineHeight: 1,
                                   }}
                                 >
                                   {roleLabel}
                                 </Typography>
                               </Stack>
-                              {sectionTeamLabels.length > 0 ? (
-                                <Stack
-                                  direction="row"
-                                  flexWrap="wrap"
-                                  useFlexGap
-                                  spacing={0.65}
-                                  sx={{ mb: 0.75 }}
-                                >
-                                  {sectionTeamLabels.map((label) => (
-                                    <Box
-                                      key={label}
-                                      sx={{
-                                        display: "inline-flex",
-                                        alignItems: "center",
-                                        gap: 0.65,
-                                        borderRadius: "999px",
-                                        border: `1px solid ${alpha(m.navy, 0.12)}`,
-                                        bgcolor: "#fff",
-                                        px: 1,
-                                        py: 0.45,
-                                      }}
-                                    >
-                                      <Box
-                                        sx={{
-                                          width: 22,
-                                          height: 22,
-                                          borderRadius: "999px",
-                                          border: `1px solid ${alpha(m.navy, 0.14)}`,
-                                          display: "grid",
-                                          placeItems: "center",
-                                          flexShrink: 0,
-                                        }}
-                                      >
-                                        <PersonOutlineRoundedIcon
-                                          sx={{
-                                            fontSize: 14,
-                                            color: alpha(m.navy, 0.45),
-                                          }}
-                                        />
-                                      </Box>
-                                      <Typography
-                                        sx={{
-                                          fontSize: 11.5,
-                                          fontWeight: 800,
-                                          color: alpha(m.navy, 0.62),
-                                          lineHeight: 1,
-                                        }}
-                                      >
-                                        {label}
-                                      </Typography>
-                                    </Box>
-                                  ))}
-                                </Stack>
-                              ) : null}
                               <Stack spacing={0.75}>
                                 {planningItem ? (
                                   <Box
@@ -2610,7 +2573,18 @@ export default function ClientBookingCreateView() {
                                     </Box>
                                   </Box>
                                 ) : null}
-                                {items.map((s) => (
+                                {items.map((s, index) => {
+                                  const startMin = bookServicesAtSameTime
+                                    ? bookingStartMinutes
+                                    : bookingStartMinutes +
+                                      items
+                                        .slice(0, index)
+                                        .reduce(
+                                          (sum, row) => sum + row.durationMins,
+                                          0,
+                                        );
+                                  const staffName = resolveServiceTeamMemberName(s);
+                                  return (
                                   <Box
                                     key={s.id}
                                     sx={{
@@ -2623,40 +2597,68 @@ export default function ClientBookingCreateView() {
                                   >
                                     <Stack
                                       direction="row"
+                                      alignItems="flex-start"
                                       justifyContent="space-between"
                                       spacing={1}
                                     >
-                                      <Box sx={{ minWidth: 0 }}>
+                                      <Box sx={{ minWidth: 0, flex: 1 }}>
                                         <Typography
                                           sx={{
                                             fontSize: 12,
                                             fontWeight: 900,
-                                            color: alpha(m.navy, 0.78),
-                                            lineHeight: 1.1,
+                                            color: m.headingText,
+                                            lineHeight: 1.2,
                                           }}
                                         >
                                           {s.name}
                                         </Typography>
                                         <ServiceSummaryMetaLine
                                           timeRange={serviceTimeRangeLabel(
-                                            bookingStartMinutes,
+                                            startMin,
                                             s.durationMins,
                                           )}
                                           durationLabel={`${s.durationMins} Mins`}
                                         />
+                                        {staffName ? (
+                                          <Stack
+                                            direction="row"
+                                            alignItems="center"
+                                            spacing={0.5}
+                                            sx={{ mt: 0.5 }}
+                                          >
+                                            <PersonOutlineRoundedIcon
+                                              sx={{
+                                                fontSize: 14,
+                                                color: alpha(m.navy, 0.4),
+                                              }}
+                                            />
+                                            <Typography
+                                              sx={{
+                                                fontSize: 11,
+                                                fontWeight: 700,
+                                                color: alpha(m.navy, 0.55),
+                                                lineHeight: 1,
+                                              }}
+                                            >
+                                              {staffName}
+                                            </Typography>
+                                          </Stack>
+                                        ) : null}
                                       </Box>
                                       <Typography
                                         sx={{
                                           fontSize: 12,
                                           fontWeight: 900,
-                                          color: alpha(m.navy, 0.76),
+                                          color: m.headingText,
+                                          flexShrink: 0,
                                         }}
                                       >
                                         {s.price} €
                                       </Typography>
                                     </Stack>
                                   </Box>
-                                ))}
+                                  );
+                                })}
                               </Stack>
                               <Divider sx={{ mt: 1.1 }} />
                             </Box>

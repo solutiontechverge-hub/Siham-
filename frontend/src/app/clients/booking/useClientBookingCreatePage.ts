@@ -58,6 +58,7 @@ import type {
 import {
   autoAssignServicesByAvailability,
   computeUnionBookableSlots,
+  getMemberSlotStatus,
   type SetupAvailabilitySnapshot,
 } from "./clientAvailability.utils";
 
@@ -78,6 +79,7 @@ import type {
   Service,
   ShopState,
   ShopTeamMember,
+  TeamMemberSlotOption,
 } from "./booking.page.types";
 
 export function useClientBookingCreatePage() {
@@ -625,11 +627,13 @@ export function useClientBookingCreatePage() {
     selectedPerson && isPlanningPerson(selectedPerson),
   );
 
-  const filteredTeamMembers = React.useMemo(
-    () =>
-      shopTeamMembers.filter((tm) => tm.locationModes.includes(locationMode)),
-    [locationMode, shopTeamMembers],
-  );
+  const filteredTeamMembers = React.useMemo(() => {
+    const matching = shopTeamMembers.filter(
+      (tm) =>
+        !tm.locationModes?.length || tm.locationModes.includes(locationMode),
+    );
+    return matching.length ? matching : shopTeamMembers;
+  }, [locationMode, shopTeamMembers]);
   /** Client can pick / assign staff only when the pro exposed team members for this mode. */
   const hasAssignableTeamMembers = filteredTeamMembers.length > 0;
 
@@ -768,6 +772,106 @@ export function useClientBookingCreatePage() {
     selectedTime,
     services,
   ]);
+
+  const getServiceStartMin = React.useCallback(
+    (serviceId: string) => {
+      const start = parseTimeLabelToMinutes(selectedTime);
+      if (!start) return 0;
+      if (bookServicesAtSameTime) return start;
+      let cursor = start;
+      for (const service of services) {
+        if (service.id === serviceId) return cursor;
+        cursor += service.durationMins || 0;
+      }
+      return start;
+    },
+    [bookServicesAtSameTime, selectedTime, services],
+  );
+
+  const buildSlotTeamMemberOptions = React.useCallback(
+    (
+      currentId: string,
+      startMin: number,
+      durationMins: number,
+    ): TeamMemberSlotOption[] => {
+      const options: TeamMemberSlotOption[] = [];
+      const slotById = new Map(
+        filteredTeamMembers.map((tm) => [
+          tm.id,
+          availabilitySnapshot && startMin > 0
+            ? getMemberSlotStatus(
+                availabilitySnapshot,
+                tm.id,
+                startMin,
+                durationMins || 30,
+              )
+            : { withinWorking: true, booked: false, available: true },
+        ]),
+      );
+      const anyWorking = [...slotById.values()].some((slot) => slot.withinWorking);
+
+      for (const tm of filteredTeamMembers) {
+        const slot = slotById.get(tm.id) ?? {
+          withinWorking: true,
+          booked: false,
+          available: true,
+        };
+        const isCurrent = tm.id === currentId;
+        if (anyWorking && !slot.withinWorking && !isCurrent) continue;
+        const unavailable = anyWorking && (slot.booked || !slot.withinWorking);
+        options.push({
+          value: tm.id,
+          label: tm.name,
+          disabled: unavailable,
+          tooltip: slot.booked ? "Team member is booked" : undefined,
+        });
+      }
+      const hasOtherAvailable = options.some(
+        (option) => !option.disabled && option.value !== currentId,
+      );
+      if (!hasOtherAvailable) {
+        options.push({
+          value: "__no_other_team_member__",
+          label: "No other team member available",
+          disabled: true,
+        });
+      }
+      return options;
+    },
+    [availabilitySnapshot, filteredTeamMembers],
+  );
+
+  const sharedTeamMemberOptions = React.useMemo(
+    () =>
+      buildSlotTeamMemberOptions(
+        selectedTeamMemberId,
+        parseTimeLabelToMinutes(selectedTime),
+        servicesDurationMins || 30,
+      ),
+    [
+      buildSlotTeamMemberOptions,
+      selectedTeamMemberId,
+      selectedTime,
+      servicesDurationMins,
+    ],
+  );
+
+  const getServiceTeamMemberOptions = React.useCallback(
+    (service: Service): TeamMemberSlotOption[] =>
+      buildSlotTeamMemberOptions(
+        service.teamMemberId ?? "",
+        getServiceStartMin(service.id),
+        bookServicesAtSameTime
+          ? servicesDurationMins || service.durationMins || 30
+          : service.durationMins || 30,
+      ),
+    [
+      bookServicesAtSameTime,
+      buildSlotTeamMemberOptions,
+      getServiceStartMin,
+      servicesDurationMins,
+    ],
+  );
 
   const addServiceTeamMemberId = React.useMemo(() => {
     if (!hasAssignableTeamMembers) return "";
@@ -963,9 +1067,18 @@ export function useClientBookingCreatePage() {
 
   const teamMemberNameById = React.useMemo(() => {
     const map = new Map<string, string>();
-    for (const tm of shopTeamMembers) map.set(tm.id, tm.name);
+    for (const tm of shopTeamMembers) {
+      const id = String(tm.id ?? "").trim();
+      const name = tm.name?.trim();
+      if (id && name) map.set(id, name);
+    }
+    for (const tm of availabilitySnapshot?.teamMembers ?? []) {
+      const id = String(tm.id ?? "").trim();
+      const name = tm.name?.trim();
+      if (id && name && !map.has(id)) map.set(id, name);
+    }
     return map;
-  }, [shopTeamMembers]);
+  }, [availabilitySnapshot?.teamMembers, shopTeamMembers]);
 
   const guestNameById = React.useMemo(() => {
     const map = new Map<string, string>();
@@ -994,12 +1107,35 @@ export function useClientBookingCreatePage() {
 
   const teamMemberFirstName = React.useCallback(
     (teamMemberId: string | null | undefined) => {
-      if (!teamMemberId) return undefined;
-      const fullName = teamMemberNameById.get(teamMemberId);
+      const id = String(teamMemberId ?? "").trim();
+      if (!id) return undefined;
+      const fullName = teamMemberNameById.get(id);
       if (!fullName) return undefined;
-      return fullName.split(/\s+/)[0];
+      return fullName.split(/\s+/)[0] || fullName;
     },
     [teamMemberNameById],
+  );
+
+  const resolveServiceTeamMemberName = React.useCallback(
+    (service: { teamMemberId?: string | null }) => {
+      const id =
+        String(service.teamMemberId ?? "").trim() ||
+        String(selectedTeamMemberId ?? "").trim() ||
+        filteredTeamMembers[0]?.id ||
+        "";
+      if (!id) return undefined;
+      return (
+        teamMemberFirstName(id) ||
+        teamMemberNameById.get(id) ||
+        filteredTeamMembers.find((tm) => tm.id === id)?.name
+      );
+    },
+    [
+      filteredTeamMembers,
+      selectedTeamMemberId,
+      teamMemberFirstName,
+      teamMemberNameById,
+    ],
   );
 
   const summarySections = React.useMemo(() => {
@@ -1461,6 +1597,24 @@ export function useClientBookingCreatePage() {
   ]);
 
   React.useEffect(() => {
+    if (!businessProfile || !profileHydrated) return;
+    const apiTeam = getTeamForLocationMode(businessProfile, locationMode).map(
+      (tm) => ({
+        id: tm.id,
+        name: tm.name,
+        locationModes: tm.locationModes,
+      }),
+    );
+    if (!apiTeam.length) return;
+    setShopTeamMembers((prev) => {
+      if (!prev.length) return apiTeam;
+      const have = new Set(prev.map((tm) => tm.id));
+      const missing = apiTeam.filter((tm) => tm.id && !have.has(tm.id));
+      return missing.length ? [...prev, ...missing] : prev;
+    });
+  }, [businessProfile, locationMode, profileHydrated]);
+
+  React.useEffect(() => {
     if (!people.some((p) => p.id === selectedPersonId)) {
       setSelectedPersonId(people[0]?.id ?? "");
     }
@@ -1800,6 +1954,7 @@ export function useClientBookingCreatePage() {
 
   /** Desired: one team member for the whole booking. Fixed: picker for Unassigned assign only. */
   const applySharedTeamMember = (teamMemberId: string) => {
+    if (teamMemberId.startsWith("__")) return;
     setSelectedTeamMemberId(teamMemberId);
     if (!isDesiredLocation) return;
     setServices((prev) =>
@@ -1808,7 +1963,7 @@ export function useClientBookingCreatePage() {
   };
 
   const updateServiceTeamMember = (serviceId: string, teamMemberId: string) => {
-    if (!teamMemberId) return;
+    if (!teamMemberId || teamMemberId.startsWith("__")) return;
     if (isDesiredLocation) {
       setSelectedTeamMemberId(teamMemberId);
       setServices((prev) => prev.map((s) => ({ ...s, teamMemberId })));
@@ -2245,6 +2400,8 @@ export function useClientBookingCreatePage() {
     selectedPerson,
     isPlanningCardSelected,
     filteredTeamMembers,
+    sharedTeamMemberOptions,
+    getServiceTeamMemberOptions,
     hasAssignableTeamMembers,
     additionalGuests,
     canAddFixedLocationGuest,
@@ -2286,6 +2443,7 @@ export function useClientBookingCreatePage() {
     guestNameById,
     teamMemberChipLabelForItems,
     teamMemberFirstName,
+    resolveServiceTeamMemberName,
     summarySections,
     applyProfileSelection,
     reorderPeople,
