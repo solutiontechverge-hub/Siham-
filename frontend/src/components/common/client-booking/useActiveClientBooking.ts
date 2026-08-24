@@ -17,6 +17,14 @@ import {
 import { useGetMyBookingsQuery } from "../../../store/services/businessApi";
 import type { ClientBookingRecord } from "../../../app/clients/booking/clientBookingRecords";
 
+function normalizeBookingLookup(value: string | null | undefined) {
+  return String(value ?? "")
+    .replace(/^#/, "")
+    .replace(/^BK-/i, "")
+    .trim()
+    .toUpperCase();
+}
+
 function matchActiveBooking(
   bookings: ClientBookingRecord[],
   activeId: string | null,
@@ -28,10 +36,11 @@ function matchActiveBooking(
     if (byId) return byId;
   }
   if (bookingRef) {
-    const normalized = bookingRef.replace(/^#/, "").trim();
-    const byRef = bookings.find(
-      (b) => b.bookingRef === normalized || b.bookingRef === bookingRef || b.id === normalized,
-    );
+    const normalized = normalizeBookingLookup(bookingRef);
+    const byRef = bookings.find((b) => {
+      const refs = [b.bookingRef, b.id, b.apiBookingId].map(normalizeBookingLookup);
+      return refs.includes(normalized);
+    });
     if (byRef) return byRef;
   }
   return null;
@@ -69,6 +78,13 @@ export function useActiveClientBooking() {
 
   const syncSessionKeys = React.useCallback(() => {
     if (typeof window === "undefined") return;
+    const urlRef = new URLSearchParams(window.location.search).get("ref")?.trim();
+    if (urlRef) {
+      window.sessionStorage.setItem(
+        CHECKOUT_REF_KEY,
+        urlRef.replace(/^#/, "").trim(),
+      );
+    }
     setActiveId(window.sessionStorage.getItem(ACTIVE_BOOKING_ID_KEY));
     setBookingRef(window.sessionStorage.getItem(CHECKOUT_REF_KEY));
   }, []);

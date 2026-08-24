@@ -220,11 +220,15 @@ export function mapCalendarBookingToEvent(
       parsedNotes?.requestDirection === "outgoing") &&
     !isIncomingClientEbr;
   const clientNote = sanitizeInternalNoteText(ebrMeta?.clientNote);
-  const noteText =
-    clientNote ||
-    sanitizeInternalNoteText(erMeta?.note) ||
-    sanitizeInternalNoteText(parsedNotes?.internalNote) ||
-    "";
+  const incomingCreateNote =
+    !clientNote &&
+    (parsedNotes?.requestDirection === "incoming" || isRequestBooking)
+      ? sanitizeInternalNoteText(parsedNotes?.clientNote || parsedNotes?.internalNote)
+      : sanitizeInternalNoteText(parsedNotes?.clientNote);
+  const displayClientNote = clientNote || incomingCreateNote;
+  const internalNoteText = sanitizeInternalNoteText(parsedNotes?.internalNote);
+  const professionalInternalNote =
+    internalNoteText && internalNoteText !== displayClientNote ? internalNoteText : "";
   const erRequestDirection: "outgoing" | "incoming" | undefined = isErPending
     ? erMeta?.initiatedBy === "professional"
       ? "outgoing"
@@ -419,9 +423,10 @@ export function mapCalendarBookingToEvent(
       phoneNumber: splitPhone.phone,
       showPrepayment: showPrepaymentFromApi || Boolean(parsedNotes?.showPrepayment),
       ...(mappedPrepayStatus ? { prepaymentStatus: mappedPrepayStatus } : {}),
-      ...(noteText
+      ...(displayClientNote ? { clientNote: displayClientNote } : {}),
+      ...(professionalInternalNote
         ? {
-            internalNote: noteText,
+            internalNote: professionalInternalNote,
             showInternalNote: true,
           }
         : {}),
@@ -437,7 +442,6 @@ export function mapCalendarBookingToEvent(
             lateRescheduleFeePercent: parsedNotes.lateRescheduleFeePercent,
             showLateCancellation: parsedNotes.showLateCancellation,
             lateCancellationFeePercent: parsedNotes.lateCancellationFeePercent,
-            showPrepayment: Boolean(parsedNotes.showPrepayment) || showPrepaymentFromApi,
             prepaymentPercent: parsedNotes.prepaymentPercent,
             ...(mappedPrepayStatus
               ? { prepaymentStatus: mappedPrepayStatus }
@@ -458,7 +462,9 @@ export function mapCalendarBookingToEvent(
                       (person) =>
                         !person.isRequester &&
                         person.participantType !== "planning" &&
-                        person.name?.trim() !== "Planning",
+                        person.participantType !== "notes" &&
+                        person.name?.trim() !== "Planning" &&
+                        person.name?.trim().toLowerCase() !== "notes",
                     )
                     .map((person) => {
                       const personId = String(person.id);

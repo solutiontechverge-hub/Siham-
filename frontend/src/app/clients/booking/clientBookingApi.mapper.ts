@@ -178,7 +178,9 @@ export function buildClientBookingApiPayload(input: {
   const humanNotes = (input.draft.clientNote ?? "").trim();
 
   const clientSnapshot = {
-    people: (input.draft.people ?? []).map((p) => ({
+    people: (input.draft.people ?? [])
+      .filter((p) => p.participantType !== "notes" && p.id !== "p-notes")
+      .map((p) => ({
       id: p.id,
       name: p.name,
       isRequester: Boolean(p.isRequester),
@@ -224,6 +226,7 @@ export function buildClientBookingApiPayload(input: {
 
   const notes = `${humanNotes}${humanNotes ? "\n" : ""}---mollure-meta---\n${JSON.stringify({
     requestDirection: input.asBookingRequest ? "incoming" : undefined,
+    ...(humanNotes ? { clientNote: humanNotes } : {}),
     clientSnapshot,
     ...(showPrepayment
       ? {
@@ -368,22 +371,23 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
   const bookingRef = booking.unique_code || String(booking.id);
   // Backend edit_request is source of truth for Confirmed ER (fallback: notes.er).
   if (String(booking.status ?? "").toLowerCase() === "confirmed") {
-    syncEditRequestFromBookingApi(
-      bookingRef,
-      booking.edit_request ??
-        (() => {
-          const er = parseStoredErFromNotes(booking.notes);
-          if (!er || er.status === "none") return null;
-          return {
-            status: er.status as "pending" | "approved" | "rejected",
-            note: er.note,
-            initiated_by: (er.initiatedBy ?? "client") as "client" | "professional",
-            requested_at: er.requestedAt ?? null,
-            responded_at: er.approvedAt ?? er.rejectedAt ?? null,
-            edit_grant_active: Boolean(er.editGrantActive),
-          };
-        })(),
-    );
+    const notesEr = parseStoredErFromNotes(booking.notes);
+    const notesPayload =
+      notesEr && notesEr.status !== "none"
+        ? {
+            status: notesEr.status as "pending" | "approved" | "rejected",
+            note: notesEr.note,
+            initiated_by: (notesEr.initiatedBy ?? "client") as "client" | "professional",
+            requested_at: notesEr.requestedAt ?? null,
+            responded_at: notesEr.approvedAt ?? notesEr.rejectedAt ?? null,
+            edit_grant_active: Boolean(notesEr.editGrantActive),
+          }
+        : null;
+    if (booking.edit_request) {
+      syncEditRequestFromBookingApi(bookingRef, booking.edit_request);
+    } else if (notesPayload) {
+      syncEditRequestFromBookingApi(bookingRef, notesPayload);
+    }
   }
   const activeEbr =
     !bookingCancelled && ebr && (ebr.status === "suggested" || ebr.status === "pending") ? ebr : null;
@@ -744,9 +748,11 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
         desiredLocation.municipality)
         ? { desiredLocation }
         : {}),
-      ...(notesDetails?.internalNote?.trim()
-        ? { clientNote: notesDetails.internalNote.trim() }
-        : {}),
+      ...(notesDetails?.clientNote?.trim()
+        ? { clientNote: notesDetails.clientNote.trim() }
+        : notesDetails?.internalNote?.trim()
+          ? { clientNote: notesDetails.internalNote.trim() }
+          : {}),
       total: (() => {
         if (activeEbr?.suggestedServices?.length) {
           return (

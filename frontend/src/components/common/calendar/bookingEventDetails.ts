@@ -75,6 +75,7 @@ type StoredBookingNoteMeta = Partial<
   Pick<
     CalendarBookingDetails,
     | "showInternalNote"
+    | "clientNote"
     | "showLateRescheduling"
     | "lateRescheduleFeePercent"
     | "showLateCancellation"
@@ -148,6 +149,7 @@ export function serializeCalendarEntryNotes(
   const trimmed = internalNote.trim();
   const meta: StoredBookingNoteMeta = {
     showInternalNote: Boolean(trimmed) || Boolean(details?.showInternalNote),
+    ...(details?.clientNote?.trim() ? { clientNote: details.clientNote.trim() } : {}),
     showLateRescheduling: details?.showLateRescheduling,
     lateRescheduleFeePercent: details?.lateRescheduleFeePercent,
     showLateCancellation: details?.showLateCancellation,
@@ -403,15 +405,21 @@ export function parseCalendarEntryNotes(notes?: string | null): CalendarBookingD
       showInternalNote: Boolean(plainNote),
     };
   }
-  const internalNote = sanitizeInternalNoteText(notes.slice(0, markerIndex));
+  const prefixNote = sanitizeInternalNoteText(notes.slice(0, markerIndex));
   const metaRaw = notes.slice(markerIndex + NOTES_META_PREFIX.length).trim();
   try {
     const meta = JSON.parse(metaRaw) as StoredBookingNoteMeta;
     const ebr = meta.ebr;
     const snapshotServices = mainDrawerServicesFromClientSnapshot(meta.clientSnapshot);
+    const storedClientNote = sanitizeInternalNoteText(meta.clientNote);
+    const incomingClientPrefix =
+      !storedClientNote && meta.requestDirection === "incoming" ? prefixNote : "";
+    const clientNote = storedClientNote || incomingClientPrefix;
+    const internalNote = clientNote && prefixNote === clientNote ? "" : prefixNote;
     return {
       internalNote,
       showInternalNote: Boolean(internalNote),
+      ...(clientNote ? { clientNote } : {}),
       showLateRescheduling: Boolean(meta.showLateRescheduling),
       lateRescheduleFeePercent: meta.lateRescheduleFeePercent ?? "",
       showLateCancellation: Boolean(meta.showLateCancellation),
@@ -632,6 +640,7 @@ export function buildBookingDetailsSnapshot(input: {
   editedServiceIds?: CalendarBookingDetails["editedServiceIds"];
   clientEditedServiceIds?: CalendarBookingDetails["clientEditedServiceIds"];
   lastEditedBy?: CalendarBookingDetails["lastEditedBy"];
+  clientNote?: string;
 }): CalendarBookingDetails {
   return {
     clientEmail: input.selectedClient?.email ?? "",
@@ -653,6 +662,7 @@ export function buildBookingDetailsSnapshot(input: {
     lateRescheduleFeePercent: input.lateRescheduleFeePercent,
     showInternalNote: input.showInternalNote || Boolean(input.bookingInternalNote.trim()),
     internalNote: input.bookingInternalNote,
+    ...(input.clientNote?.trim() ? { clientNote: input.clientNote.trim() } : {}),
     totalDiscount: input.bookingTotalDiscount,
     showKilometerAllowance: input.showKilometerAllowance,
     kilometerAllowance: input.kilometerAllowanceDraft,

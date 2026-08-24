@@ -7,20 +7,27 @@ export function mapApiEditRequestToRecord(
   editRequest: BookingEditRequestPayload | null | undefined,
 ): BookingEditRequestRecord | null {
   if (!editRequest?.status) return null;
+  const raw = editRequest as BookingEditRequestPayload & {
+    initiatedBy?: "client" | "professional";
+    editGrantActive?: boolean;
+    requestedAt?: string | null;
+    respondedAt?: string | null;
+  };
+  const initiatedBy = raw.initiated_by ?? raw.initiatedBy ?? "client";
   return {
     status: editRequest.status,
     note: editRequest.note,
-    initiatedBy: editRequest.initiated_by,
-    requestedAt: editRequest.requested_at ?? undefined,
+    initiatedBy,
+    requestedAt: raw.requested_at ?? raw.requestedAt ?? undefined,
     approvedAt:
       editRequest.status === "approved"
-        ? (editRequest.responded_at ?? undefined)
+        ? (raw.responded_at ?? raw.respondedAt ?? undefined)
         : undefined,
     rejectedAt:
       editRequest.status === "rejected"
-        ? (editRequest.responded_at ?? undefined)
+        ? (raw.responded_at ?? raw.respondedAt ?? undefined)
         : undefined,
-    editGrantActive: Boolean(editRequest.edit_grant_active),
+    editGrantActive: Boolean(raw.edit_grant_active ?? raw.editGrantActive),
   };
 }
 

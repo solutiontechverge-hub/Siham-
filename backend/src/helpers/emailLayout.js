@@ -56,6 +56,11 @@ export const secondaryButton = (label, href) => `
     ${escapeHtml(label)}
   </a>`;
 
+export const dangerButton = (label, href) => `
+  <a href="${href}" style="display:inline-block;padding:14px 24px;background:#e53935;color:#ffffff;text-decoration:none;border-radius:10px;font-weight:700;font-size:14px;">
+    ${escapeHtml(label)}
+  </a>`;
+
 export const wrapEmail = (innerHtml) => `
 <!DOCTYPE html>
 <html>
