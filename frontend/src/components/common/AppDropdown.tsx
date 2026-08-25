@@ -6,8 +6,10 @@ import {
   Checkbox,
   ListSubheader,
   MenuItem,
+  Tooltip,
   type TextFieldProps,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import AppTextField from "./AppTextField";
 import AppSearchField from "./AppSearchField";
 
@@ -18,6 +20,10 @@ export type AppDropdownOption = {
   icon?: React.ReactNode;
   /** Optional text color for the option (and selected value). */
   color?: string;
+  /** Grey, not selectable (e.g. booked team member). */
+  disabled?: boolean;
+  /** Hover text, including for disabled rows. */
+  tooltip?: string;
 };
 
 type AppDropdownProps = Omit<
@@ -61,15 +67,25 @@ export default function AppDropdown({
   searchPlaceholder = "Search...",
   renderValue,
   placeholder,
+  SelectProps: callerSelectProps,
   ...props
 }: AppDropdownProps) {
+  const m = useTheme().palette.mollure;
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
 
   const handleChange = (
     event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
-    onChange(normalizeSelectValue(event.target.value, multiple), event);
+    const next = normalizeSelectValue(event.target.value, multiple);
+    if (
+      !multiple &&
+      typeof next === "string" &&
+      options.some((option) => option.value === next && option.disabled)
+    ) {
+      return;
+    }
+    onChange(next, event);
     if (closeOnSelect) {
       setMenuOpen(false);
     }
@@ -80,6 +96,9 @@ export default function AppDropdown({
     searchable && query
       ? options.filter((option) => option.label.toLowerCase().includes(query))
       : options;
+
+  const { MenuProps: callerMenuProps, ...restCallerSelectProps } =
+    callerSelectProps ?? {};
 
   return (
     <AppTextField
@@ -120,6 +139,11 @@ export default function AppDropdown({
               </span>
             );
           }),
+        ...restCallerSelectProps,
+        MenuProps: {
+          disablePortal: false,
+          ...callerMenuProps,
+        },
       }}
       {...props}
     >
@@ -145,10 +169,14 @@ export default function AppDropdown({
         const selected = Array.isArray(value)
           ? value.includes(option.value)
           : value === option.value;
-        return (
+        const rowColor = option.disabled
+          ? m.placeholder
+          : option.color;
+        const item = (
           <MenuItem
             key={option.value}
             value={option.value}
+            disabled={option.disabled}
             sx={{
               display: "flex",
               alignItems: "center",
@@ -156,17 +184,30 @@ export default function AppDropdown({
               minHeight: 40,
               py: 1,
               lineHeight: 1.2,
-              color: option.color,
-              fontWeight: option.color ? 700 : undefined,
+              color: rowColor,
+              fontWeight: option.color && !option.disabled ? 700 : undefined,
+              "&.Mui-disabled": {
+                opacity: 1,
+                color: m.placeholder,
+                pointerEvents: "auto",
+                cursor: "not-allowed",
+              },
             }}
           >
             {multiple ? (
               <Checkbox size="small" checked={selected} sx={{ p: 0.5 }} />
             ) : null}
             {option.icon ? option.icon : null}
-            {option.label}
+            {option.tooltip ? (
+              <Tooltip title={option.tooltip} placement="right">
+                <span>{option.label}</span>
+              </Tooltip>
+            ) : (
+              option.label
+            )}
           </MenuItem>
         );
+        return item;
       })}
     </AppTextField>
   );

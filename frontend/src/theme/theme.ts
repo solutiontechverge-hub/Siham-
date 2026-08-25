@@ -108,6 +108,9 @@ const theme = createTheme({
       textcolorgrey700: "#344054",
       headingText: "#333333",
       descriptionText: "#5A5A5A",
+      /** Assigned / Unassigned segmented control */
+      segmentSelectedBg: "#E8EBF3",
+      segmentText: "#58667E",
       warmwarning: "#FFFCF5",
       /** Request-type accents (How it works — Types of Requests icon chips) */
       requestAccent: "#DC6803",
@@ -123,11 +126,11 @@ const theme = createTheme({
       fxSurface: "#FFFFFF",
       fxPillTrack: "#EFFDF199",
       fxPillBorder: "#DCDFE3",
-      // Shared "Add" affordance colors (icon chip / small add buttons)
-      addSoftBg: "#BAE9EB",
-      addSoftBgHover: "#A6E2E5",
-      addSoftFg: "#149CA7",
-      addSoftBorder: "rgba(20,156,167,0.18)",
+      // Shared circular “+” add icons — pale Primary-500 tint + Primary 500 glyph
+      addSoftBg: "#D4F4F4",
+      addSoftBgHover: "#C5EEEE",
+      addSoftFg: "#21B8BF",
+      addSoftBorder: "rgba(33,184,191,0.18)",
       /** Calendar blocked-time slot */
       blockedTimeBg: "#FEE4E2",
       blockedTimeFg: "#F04438",

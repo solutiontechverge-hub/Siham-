@@ -165,3 +165,38 @@ export function buildAddServiceCatalog(
   // Stale assignedServices (e.g. old "Color") with no catalog match → show full shop list.
   return matched.length > 0 ? matched : locationCatalog;
 }
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function durationPartsToMinutes(hours: unknown, minutes: unknown): number {
+  const h = Number.parseInt(String(hours ?? ""), 10);
+  const m = Number.parseInt(String(minutes ?? ""), 10);
+  return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
+}
+
+function formatClockHours(totalMinutes: number): string | null {
+  if (totalMinutes <= 0) return null;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")} Hours`;
+}
+
+/** Client booking notice from professional DL minimum timeslot settings. */
+export function formatMinimumTimeslotNotice(bookingRules: unknown): string | null {
+  if (!isRecord(bookingRules)) return null;
+
+  const nested = isRecord(bookingRules.desired)
+    ? bookingRules.desired.minimumTimeslot
+    : undefined;
+  const nestedMinutes = isRecord(nested)
+    ? durationPartsToMinutes(nested.hours, nested.minutes)
+    : 0;
+  const flatMinutes = durationPartsToMinutes(
+    bookingRules.dlMinTimeslotHours,
+    bookingRules.dlMinTimeslotMinutes,
+  );
+  const clock = formatClockHours(flatMinutes > 0 ? flatMinutes : nestedMinutes);
+  return clock ? `A minimum Time of - ${clock} is Required` : null;
+}

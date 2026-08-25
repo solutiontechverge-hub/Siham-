@@ -6,6 +6,7 @@ import { parseCalendarEntryNotes, parseStoredEbrFromNotes, parseStoredErFromNote
 import { buildResponseDeadline } from "../../../components/common/calendar/bookingResponseDeadline";
 import { syncEditRequestFromBookingApi } from "../../../components/common/client-booking/syncEditRequestFromApi";
 import { resolveMediaUrl } from "../../../lib/resolveMediaUrl";
+import { inferProjectUploadKind, isProjectUploadImage } from "../../../lib/projectUploadMedia";
 import type { BusinessSetupListing, CalendarBooking, CreateBookingRequest } from "../../../store/services/businessApi";
 import { mapApiBookingStatusToClient } from "./clientBookingStatus";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -163,16 +164,12 @@ export function buildClientBookingApiPayload(input: {
         desiredLocation?.municipality?.trim(),
     );
 
-  const isImageUpload = (upload: (typeof projectUploads)[number]) => {
-    if (upload.kind === "image") return true;
-    if (upload.kind === "document") return false;
-    const mime = String(upload.mimeType ?? "").toLowerCase();
-    const name = String(upload.name ?? "").toLowerCase();
-    return mime.startsWith("image/") || /\.(jpe?g|png|webp|gif|heic|heif)$/i.test(name);
-  };
-
-  const imageUrls = projectUploads.filter((u) => u.url && isImageUpload(u)).map((u) => u.url as string);
-  const documentUrls = projectUploads.filter((u) => u.url && !isImageUpload(u)).map((u) => u.url as string);
+  const imageUrls = projectUploads
+    .filter((u) => u.url && isProjectUploadImage(u))
+    .map((u) => u.url as string);
+  const documentUrls = projectUploads
+    .filter((u) => u.url && !isProjectUploadImage(u))
+    .map((u) => u.url as string);
 
   // IC client notes become the professional Internal Note; project/services stay in meta.
   const humanNotes = (input.draft.clientNote ?? "").trim();
@@ -507,7 +504,10 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
             url: upload.url ?? undefined,
             previewUrl: resolved,
             mimeType: upload.mimeType ?? undefined,
-            kind: upload.kind === "document" ? ("document" as const) : ("image" as const),
+            kind: inferProjectUploadKind(
+              upload.name || `File ${index + 1}`,
+              upload.mimeType ?? undefined,
+            ),
           };
         })
       : [...imageUploads, ...documentUploads].map((upload) => ({

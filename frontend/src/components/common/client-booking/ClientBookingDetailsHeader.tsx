@@ -298,7 +298,10 @@ export default function ClientBookingDetailsHeader({
                 fontWeight: 900,
                 fontSize: 20,
                 lineHeight: 1.25,
-                color: alpha(m.navy, 0.88),
+                color:
+                  locationMode === "desired"
+                    ? "#333333"
+                    : alpha(m.navy, 0.88),
               }}
             >
               Booking Details{" "}

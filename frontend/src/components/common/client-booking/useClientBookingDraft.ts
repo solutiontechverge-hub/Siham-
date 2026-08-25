@@ -35,6 +35,9 @@ export function useClientBookingDraft() {
       (d.services ?? []).map((s) => `${s.id}:${s.price}:${s.guestId ?? ""}`).join("|"),
       (d.products ?? []).map((p) => `${p.id}:${p.price}x${p.quantity}`).join("|"),
       d.projectDetails?.description ?? "",
+      (d.projectDetails?.uploads ?? [])
+        .map((u) => `${u.id}:${u.url ?? ""}:${u.previewUrl ?? ""}`)
+        .join("|"),
       (d.people ?? []).map((p) => `${p.id}:${p.name}`).join("|"),
     ].join("::");
   }, [activeBooking]);
