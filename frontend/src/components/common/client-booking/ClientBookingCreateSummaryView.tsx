@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
+import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
 import {
@@ -10,6 +11,7 @@ import {
   CircularProgress,
   Container,
   Divider,
+  IconButton,
   Paper,
   Stack,
   Typography,
@@ -24,6 +26,7 @@ import {
 import { parseBookingListTab } from "../../../app/clients/booking/bookingPillTabs";
 import {
   getActiveBookingSession,
+  getCreateReturnHref,
   setActiveBookingSession,
 } from "../../../app/clients/booking/clientBookingSession";
 import { submitClientBookingRequest } from "../../../app/clients/booking/submitClientBookingRequest";
@@ -50,7 +53,9 @@ import {
   splitContactPhone,
 } from "../../../lib/phone-validation";
 import { buildBookingSummarySections, resolveTeamMemberFirstName } from "./buildBookingSummarySections";
+import { locationModeChipSx } from "./locationModeChipSx";
 import BookingSummaryNote from "./BookingSummaryNote";
+import ClientBookingProjectDetailsCard from "./ClientBookingProjectDetailsCard";
 import StripePrepaymentDialog from "./StripePrepaymentDialog";
 import { useActiveClientBooking } from "./useActiveClientBooking";
 import { useClientBookingDraft } from "./useClientBookingDraft";
@@ -283,6 +288,26 @@ export default function ClientBookingCreateSummaryView() {
     setActiveBookingSession(next);
     return next;
   }, [activeBooking, address, addressLabel, contactPhoneValue, isDesired]);
+
+  const goBackToCreate = React.useCallback(() => {
+    persistDraftEdits();
+    const href = getCreateReturnHref();
+    if (href) {
+      router.push(href);
+      return;
+    }
+    router.back();
+  }, [persistDraftEdits, router]);
+
+  React.useEffect(() => {
+    persistDraftEdits();
+  }, [persistDraftEdits]);
+
+  React.useEffect(() => {
+    const persist = () => persistDraftEdits();
+    window.addEventListener("pagehide", persist);
+    return () => window.removeEventListener("pagehide", persist);
+  }, [persistDraftEdits]);
 
   const ensureBookingCreated = React.useCallback(async () => {
     const record = persistDraftEdits();
@@ -555,18 +580,7 @@ export default function ClientBookingCreateSummaryView() {
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "mollure.pageBg", py: { xs: 2.5, md: 3.5 } }}>
-      <Container maxWidth="md">
-        <Typography
-          sx={{
-            fontSize: "30px",
-            fontWeight: 700,
-            color: alpha(m.navy, 0.86),
-            mb: 2,
-          }}
-        >
-          Booking Details
-        </Typography>
-
+      <Container maxWidth="lg" sx={{ maxWidth: { lg: 1100 } }}>
         <Paper
           elevation={0}
           sx={{
@@ -577,37 +591,60 @@ export default function ClientBookingCreateSummaryView() {
             boxShadow: "0 10px 22px rgba(16, 35, 63, 0.05)",
           }}
         >
+          <Box sx={{ px: { xs: 2.25, md: 3.5 }, pt: 2.25, pb: 1.15 }}>
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <IconButton
+                size="small"
+                onClick={goBackToCreate}
+                aria-label="Back to booking"
+                sx={{
+                  width: 36,
+                  height: 36,
+                  color: alpha(m.navy, 0.7),
+                }}
+              >
+                <ArrowBackRoundedIcon sx={{ fontSize: 22 }} />
+              </IconButton>
+              <Typography
+                sx={{
+                  fontSize: { xs: 26, md: 30 },
+                  fontWeight: 700,
+                  color: isDesired ? "#333333" : alpha(m.navy, 0.86),
+                  lineHeight: 1.15,
+                }}
+              >
+                Booking Details
+              </Typography>
+            </Stack>
+          </Box>
+          <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
+
+          <Box sx={{ px: { xs: 2.25, md: 3.5 }, py: 2 }}>
+            <Box
+              sx={{
+                borderRadius: "12px",
+                border: `1px solid ${alpha(m.navy, 0.18)}`,
+                bgcolor: "#fff",
+                overflow: "hidden",
+              }}
+            >
           <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 2, pb: 1.25 }}>
             <Typography
               sx={{
-                fontWeight: 900,
-                fontSize: 14,
+                fontWeight: 700,
+                fontSize: "30px",
                 color: alpha(m.navy, 0.72),
                 textAlign: "center",
+                lineHeight: 1.2,
               }}
             >
               Service Summary
             </Typography>
-
-            <Box sx={{ mt: 1 }}>
-              <Chip
-                label={isDesired ? "Desired Location" : "Fixed Location"}
-                size="small"
-                sx={{
-                  height: 20,
-                  borderRadius: "4px",
-                  bgcolor: alpha(m.teal, 0.12),
-                  color: m.teal,
-                  fontSize: 11,
-                  fontWeight: 900,
-                  "& .MuiChip-label": { px: 1 },
-                }}
-              />
-            </Box>
-
+          </Box>
+          <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
+          <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 1.35, pb: 1.5 }}>
             <Typography
               sx={{
-                mt: 0.85,
                 fontWeight: 900,
                 fontSize: 18,
                 color: alpha(m.navy, 0.88),
@@ -620,58 +657,87 @@ export default function ClientBookingCreateSummaryView() {
             <Stack
               direction="row"
               alignItems="center"
-              spacing={0.6}
-              sx={{ mt: 0.75, minWidth: 0 }}
+              justifyContent="space-between"
+              spacing={2}
+              sx={{ mt: 0.85 }}
             >
-              <AccessTimeRoundedIcon
-                sx={{ fontSize: 16, color: m.teal, flexShrink: 0 }}
-              />
-              <Typography
-                sx={{
-                  fontWeight: 800,
-                  color: alpha(m.teal, 0.95),
-                  fontSize: 12.5,
-                }}
-              >
-                {dateLabel} ({fmtMinutesToTimeLabel(bookingStartMinutes)}-
-                {fmtMinutesToTimeLabel(bookingEndMinutes)})
-              </Typography>
-            </Stack>
-
-            {!isDesired ? (
               <Stack
                 direction="row"
                 alignItems="center"
-                spacing={0.55}
-                sx={{ mt: 0.55, minWidth: 0 }}
+                spacing={0.6}
+                sx={{ minWidth: 0, flexShrink: 0 }}
               >
-                <LocationOnOutlinedIcon
-                  sx={{ fontSize: 16, color: alpha(m.navy, 0.45), flexShrink: 0 }}
+                <AccessTimeRoundedIcon
+                  sx={{ fontSize: 16, color: m.teal, flexShrink: 0 }}
                 />
                 <Typography
+                  sx={{
+                    fontWeight: 800,
+                    color: alpha(m.teal, 0.95),
+                    fontSize: 12.5,
+                    whiteSpace: { xs: "normal", sm: "nowrap" },
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {dateLabel} ({fmtMinutesToTimeLabel(bookingStartMinutes)}-
+                  {fmtMinutesToTimeLabel(bookingEndMinutes)})
+                </Typography>
+              </Stack>
+
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.5,
+                  ml: "auto",
+                  maxWidth: { xs: "46%", sm: "50%" },
+                  flex: "0 1 auto",
+                  minWidth: 0,
+                }}
+              >
+                <LocationOnOutlinedIcon
+                  sx={{
+                    fontSize: 16,
+                    width: 16,
+                    height: 16,
+                    color: alpha(m.navy, 0.45),
+                    flexShrink: 0,
+                    display: "block",
+                  }}
+                />
+                <Typography
+                  component="span"
                   sx={{
                     fontWeight: 700,
                     color: alpha(m.navy, 0.55),
                     fontSize: 12,
+                    lineHeight: 1.2,
+                    minWidth: 0,
                   }}
                 >
                   {addressLabel}
                 </Typography>
-              </Stack>
-            ) : null}
+              </Box>
+            </Stack>
+
+            <Chip
+              label={isDesired ? "Desired Location" : "Fixed Location"}
+              size="small"
+              sx={{ ...locationModeChipSx, mt: 0.75 }}
+            />
           </Box>
 
-          <Divider />
+          <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
 
           <Box sx={{ px: { xs: 2, md: 2.5 }, py: 1.75 }}>
-            <Stack spacing={1.5}>
+            <Stack spacing={1.5} divider={<Divider sx={{ borderColor: alpha(m.navy, 0.08) }} />}>
               {summarySections.map((section) => {
                 const roleLabel = roleLabelForSection(section);
                 return (
                   <Box key={section.key}>
                     <Stack
                       direction="row"
-                      alignItems="baseline"
+                      alignItems="center"
                       spacing={0.75}
                       sx={{ mb: 0.75 }}
                     >
@@ -680,6 +746,9 @@ export default function ClientBookingCreateSummaryView() {
                           fontWeight: 900,
                           fontSize: 13,
                           color: alpha(m.navy, 0.78),
+                          lineHeight: 1,
+                          display: "flex",
+                          alignItems: "center",
                         }}
                       >
                         {section.title}
@@ -691,6 +760,9 @@ export default function ClientBookingCreateSummaryView() {
                           color: "primary.light",
                           textTransform: "uppercase",
                           letterSpacing: 0.3,
+                          lineHeight: 1,
+                          display: "flex",
+                          alignItems: "center",
                         }}
                       >
                         {roleLabel}
@@ -698,6 +770,51 @@ export default function ClientBookingCreateSummaryView() {
                     </Stack>
 
                     <Stack spacing={0.85}>
+                      {section.planningItem ? (
+                        <Box
+                          sx={{
+                            borderRadius: "10px",
+                            border: `1px solid ${alpha(m.navy, 0.06)}`,
+                            px: 1.25,
+                            py: 1,
+                            bgcolor: alpha(m.navy, 0.015),
+                          }}
+                        >
+                          <Stack
+                            direction="row"
+                            alignItems="center"
+                            justifyContent="space-between"
+                            spacing={1}
+                          >
+                            <Box sx={{ minWidth: 0, flex: 1 }}>
+                              {section.planningItem.activity ? (
+                                <Typography
+                                  sx={{
+                                    fontSize: 13,
+                                    fontWeight: 900,
+                                    color: alpha(m.navy, 0.82),
+                                    lineHeight: 1.2,
+                                  }}
+                                >
+                                  {section.planningItem.activity}
+                                </Typography>
+                              ) : null}
+                              {section.planningItem.duration ? (
+                                <Typography
+                                  sx={{
+                                    mt: section.planningItem.activity ? 0.3 : 0,
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    color: alpha(m.navy, 0.48),
+                                  }}
+                                >
+                                  {section.planningItem.duration}
+                                </Typography>
+                              ) : null}
+                            </Box>
+                          </Stack>
+                        </Box>
+                      ) : null}
                       {section.items.map((item) => {
                         const start = serviceCursor;
                         serviceCursor += item.durationMins;
@@ -746,28 +863,52 @@ export default function ClientBookingCreateSummaryView() {
                                   • {item.durationMins} Mins
                                 </Typography>
                                 {tmName ? (
-                                  <Stack
-                                    direction="row"
-                                    alignItems="center"
-                                    spacing={0.5}
-                                    sx={{ mt: 0.55 }}
+                                  <Box
+                                    sx={{
+                                      mt: 0.55,
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      gap: 0.5,
+                                      height: 24,
+                                      px: 0.9,
+                                      borderRadius: "8px",
+                                      border: `1px solid ${alpha(m.navy, 0.12)}`,
+                                      bgcolor: "#fff",
+                                      lineHeight: 0,
+                                    }}
                                   >
-                                    <PersonOutlineRoundedIcon
+                                    <Box
                                       sx={{
-                                        fontSize: 14,
-                                        color: alpha(m.navy, 0.4),
+                                        width: 13,
+                                        height: 13,
+                                        display: "grid",
+                                        placeItems: "center",
+                                        flexShrink: 0,
+                                        lineHeight: 0,
                                       }}
-                                    />
+                                    >
+                                      <PersonOutlineRoundedIcon
+                                        sx={{
+                                          fontSize: 13,
+                                          color: alpha(m.navy, 0.4),
+                                          display: "block",
+                                        }}
+                                      />
+                                    </Box>
                                     <Typography
                                       sx={{
                                         fontSize: 11,
                                         fontWeight: 700,
                                         color: alpha(m.navy, 0.55),
+                                        lineHeight: 1,
+                                        display: "flex",
+                                        alignItems: "center",
                                       }}
                                     >
                                       {tmName}
                                     </Typography>
-                                  </Stack>
+                                  </Box>
                                 ) : null}
                               </Box>
                               <Typography
@@ -796,147 +937,162 @@ export default function ClientBookingCreateSummaryView() {
             ) : null}
           </Box>
 
-          <Box
-            sx={{
-              px: { xs: 2, md: 2.5 },
-              py: 1.35,
-              bgcolor: alpha(m.navy, 0.035),
-              borderTop: `1px solid ${alpha(m.navy, 0.06)}`,
-            }}
-          >
-            <Stack
-              direction="row"
-              alignItems="center"
-              justifyContent="space-between"
+          <Box sx={{ px: { xs: 2, md: 2.5 }, pb: 1.75 }}>
+            <Box
+              sx={{
+                borderRadius: "10px",
+                bgcolor: alpha(m.navy, 0.035),
+                border: `1px solid ${alpha(m.navy, 0.22)}`,
+                px: { xs: 1.5, md: 2 },
+                py: 1.35,
+              }}
             >
-              <Typography
-                sx={{ fontWeight: 800, fontSize: 13, color: alpha(m.navy, 0.7) }}
-              >
-                Total
-              </Typography>
-              <Typography
-                sx={{ fontWeight: 900, fontSize: 16, color: alpha(m.navy, 0.88) }}
-              >
-                €{total}
-              </Typography>
-            </Stack>
-
-            {showFixedPrepayRow ? (
               <Stack
                 direction="row"
                 alignItems="center"
                 justifyContent="space-between"
-                spacing={1}
-                sx={{ mt: 0.85 }}
+                spacing={1.5}
               >
+                <Typography
+                  sx={{ fontWeight: 600, fontSize: 13, color: alpha(m.navy, 0.48) }}
+                >
+                  Total
+                </Typography>
                 <Typography
                   sx={{
                     fontWeight: 700,
-                    fontSize: 12,
-                    color: alpha(m.navy, 0.58),
-                    flex: 1,
-                    minWidth: 0,
+                    fontSize: 15,
+                    color: alpha(m.navy, 0.55),
+                    flexShrink: 0,
                   }}
                 >
-                  {isPrepaymentPaid
-                    ? `Prepaid (${prepaymentPercent}%)`
-                    : `Prepayment Required (${prepaymentPercent}%)`}
+                  €{total}
                 </Typography>
+              </Stack>
+
+              {showFixedPrepayRow ? (
                 <Stack
                   direction="row"
                   alignItems="center"
-                  spacing={1.25}
-                  sx={{ flexShrink: 0 }}
+                  justifyContent="space-between"
+                  spacing={1.5}
+                  sx={{ mt: 0.85 }}
                 >
-                  {!isPrepaymentPaid ? (
-                    <Typography
-                      component="button"
-                      type="button"
-                      onClick={() => void handlePayNow()}
-                      disabled={isPaying}
-                      sx={{
-                        border: 0,
-                        bgcolor: "transparent",
-                        p: 0,
-                        cursor: isPaying ? "wait" : "pointer",
-                        color: m.teal,
-                        fontWeight: 900,
-                        fontSize: 12.5,
-                        fontFamily: "inherit",
-                        opacity: isPaying ? 0.7 : 1,
-                        "&:hover": { color: m.tealDark },
-                      }}
-                    >
-                      {isPaying ? "Preparing…" : "Pay Now"}
-                    </Typography>
-                  ) : (
-                    <Typography
-                      sx={{
-                        fontWeight: 800,
-                        fontSize: 12,
-                        color: m.teal,
-                      }}
-                    >
-                      Paid
-                    </Typography>
-                  )}
                   <Typography
                     sx={{
-                      fontWeight: 800,
+                      fontWeight: 600,
+                      fontSize: 12,
+                      color: alpha(m.navy, 0.42),
+                      minWidth: 0,
+                    }}
+                  >
+                    {isPrepaymentPaid
+                      ? `Prepaid (${prepaymentPercent}%)`
+                      : `Prepayment Required (${prepaymentPercent}%)`}
+                  </Typography>
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    spacing={1.25}
+                    sx={{ flexShrink: 0 }}
+                  >
+                    {!isPrepaymentPaid ? (
+                      <Typography
+                        component="button"
+                        type="button"
+                        onClick={() => void handlePayNow()}
+                        disabled={isPaying}
+                        sx={{
+                          border: 0,
+                          bgcolor: "transparent",
+                          p: 0,
+                          cursor: isPaying ? "wait" : "pointer",
+                          color: m.teal,
+                          fontWeight: 900,
+                          fontSize: 12.5,
+                          fontFamily: "inherit",
+                          opacity: isPaying ? 0.7 : 1,
+                          "&:hover": { color: m.tealDark },
+                        }}
+                      >
+                        {isPaying ? "Preparing…" : "Pay Now"}
+                      </Typography>
+                    ) : (
+                      <Typography
+                        sx={{
+                          fontWeight: 800,
+                          fontSize: 12,
+                          color: m.teal,
+                        }}
+                      >
+                        Paid
+                      </Typography>
+                    )}
+                    <Typography
+                      sx={{
+                        fontWeight: 600,
+                        fontSize: 13,
+                        color: alpha(m.navy, 0.48),
+                        textAlign: "right",
+                      }}
+                    >
+                      €{prepayAmount}
+                    </Typography>
+                  </Stack>
+                </Stack>
+              ) : null}
+
+              {showDesiredPrepayNote ? (
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  spacing={1.5}
+                  sx={{ mt: 0.75 }}
+                >
+                  <Typography
+                    sx={{
+                      fontWeight: 600,
+                      fontSize: 11.5,
+                      color: alpha(m.navy, 0.42),
+                      minWidth: 0,
+                    }}
+                  >
+                    Prepayment Required ({prepaymentPercent}%) After Acceptance
+                  </Typography>
+                  <Typography
+                    sx={{
+                      fontWeight: 600,
                       fontSize: 13,
-                      color: alpha(m.navy, 0.78),
-                      minWidth: 56,
-                      textAlign: "right",
+                      color: alpha(m.navy, 0.48),
+                      flexShrink: 0,
                     }}
                   >
                     €{prepayAmount}
                   </Typography>
                 </Stack>
-              </Stack>
-            ) : null}
-
-            {showDesiredPrepayNote ? (
-              <Stack
-                direction="row"
-                alignItems="center"
-                justifyContent="space-between"
-                sx={{ mt: 0.75 }}
-              >
-                <Typography
-                  sx={{
-                    fontWeight: 700,
-                    fontSize: 11.5,
-                    color: alpha(m.navy, 0.55),
-                  }}
-                >
-                  Prepayment Required ({prepaymentPercent}%) After Acceptance
-                </Typography>
-                <Typography
-                  sx={{
-                    fontWeight: 800,
-                    fontSize: 13,
-                    color: alpha(m.navy, 0.78),
-                  }}
-                >
-                  €{prepayAmount}
-                </Typography>
-              </Stack>
-            ) : null}
+              ) : null}
+            </Box>
           </Box>
-        </Paper>
+            </Box>
+          </Box>
 
-        <Paper
-          elevation={0}
-          sx={{
-            mt: 2,
-            borderRadius: "12px",
-            border: `1px solid ${alpha(m.navy, 0.08)}`,
-            bgcolor: "#fff",
-            overflow: "hidden",
-            px: { xs: 2, md: 2.5 },
-            py: 2,
-          }}
-        >
+          {draft.projectDetails ? (
+            <Box sx={{ px: { xs: 2.25, md: 3.5 }, pb: 2 }}>
+              <ClientBookingProjectDetailsCard project={draft.projectDetails} />
+            </Box>
+          ) : null}
+
+          <Box sx={{ px: { xs: 2.25, md: 3.5 }, pt: 0.25, pb: 2.25 }}>
+          <Box
+            sx={{
+              borderRadius: "10px",
+              border: `1px solid ${alpha(m.navy, 0.22)}`,
+              bgcolor: "#fff",
+              px: { xs: 1.5, md: 2 },
+              py: 1.75,
+            }}
+          >
           <Typography
             sx={{
               fontWeight: 900,
@@ -1078,40 +1234,42 @@ export default function ClientBookingCreateSummaryView() {
               </Box>
             ) : null}
           </Stack>
-        </Paper>
+          </Box>
 
-        <AppButton
-          tone="primary"
-          fullWidth
-          disabled={isSubmitting || mustPayBeforeBooking}
-          onClick={() => void onSubmit()}
-          sx={{ mt: 2, height: 44 }}
-        >
-          {isSubmitting ? (
-            <>
-              <CircularProgress size={18} sx={{ mr: 1, color: "inherit" }} />
-              {isDesired ? "Sending…" : "Booking…"}
-            </>
-          ) : isDesired ? (
-            "Send Booking Request"
-          ) : (
-            "Book Now"
-          )}
-        </AppButton>
-
-        {mustPayBeforeBooking ? (
-          <Typography
-            sx={{
-              mt: 1,
-              textAlign: "center",
-              fontSize: 12,
-              fontWeight: 700,
-              color: alpha(m.navy, 0.5),
-            }}
+          <AppButton
+            tone="primary"
+            fullWidth
+            disabled={isSubmitting || mustPayBeforeBooking}
+            onClick={() => void onSubmit()}
+            sx={{ mt: 2.25, height: 44 }}
           >
-            Complete prepayment with Pay Now to enable booking.
-          </Typography>
-        ) : null}
+            {isSubmitting ? (
+              <>
+                <CircularProgress size={18} sx={{ mr: 1, color: "inherit" }} />
+                {isDesired ? "Sending…" : "Booking…"}
+              </>
+            ) : isDesired ? (
+              "Send Booking Request"
+            ) : (
+              "Book Now"
+            )}
+          </AppButton>
+
+          {mustPayBeforeBooking ? (
+            <Typography
+              sx={{
+                mt: 1,
+                textAlign: "center",
+                fontSize: 12,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.5),
+              }}
+            >
+              Complete prepayment with Pay Now to enable booking.
+            </Typography>
+          ) : null}
+          </Box>
+        </Paper>
       </Container>
 
       <StripePrepaymentDialog

@@ -2345,6 +2345,9 @@ export default function ClientBookingDetailsView({
                   requesterEmail={user?.email}
                   requesterAvatarUrl={requesterAvatarUrl}
                   prepaymentState="none"
+                  shopName={shop?.shopName ?? professional.name}
+                  locationMode={locationMode}
+                  addressLabel={address}
                   editedServiceIds={clientVisibleEditedServiceIds}
                   products={editRequest.suggestedProducts}
                   editedProductIds={clientVisibleEditedProductIds}
@@ -2378,6 +2381,9 @@ export default function ClientBookingDetailsView({
                   payNowLabel={payNowLabel}
                   showKilometerAllowance={showKilometerAllowance}
                   kilometerAllowanceAmount={kilometerAllowanceAmount}
+                  shopName={shop?.shopName ?? professional.name}
+                  locationMode={locationMode}
+                  addressLabel={address}
                   rejectedChangesNote={rejectedChangesNote}
                   acceptedChangesNote={acceptedChangesNote}
                   editedServiceIds={clientVisibleEditedServiceIds}

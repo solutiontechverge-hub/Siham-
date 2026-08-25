@@ -14,6 +14,13 @@ export type ShopTeamMember = {
   locationModes: Array<"fixed" | "desired">;
 };
 
+export type TeamMemberSlotOption = {
+  value: string;
+  label: string;
+  disabled?: boolean;
+  tooltip?: string;
+};
+
 export type CatalogService = {
   id: string;
   name: string;

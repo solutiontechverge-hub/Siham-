@@ -97,6 +97,42 @@ export function isMemberAvailableAt(
   );
 }
 
+export function isMemberBookedAtSlot(
+  snapshot: SetupAvailabilitySnapshot,
+  memberId: string,
+  startMin: number,
+  durationMins: number,
+) {
+  return getMemberSlotStatus(snapshot, memberId, startMin, durationMins).booked;
+}
+
+export function getMemberSlotStatus(
+  snapshot: SetupAvailabilitySnapshot,
+  memberId: string,
+  startMin: number,
+  durationMins: number,
+) {
+  const working = getMemberWorkingIntervals(
+    memberId,
+    snapshot.date,
+    snapshot.location,
+    snapshot,
+  );
+  const busy = snapshot.busyByMember[memberId] ?? [];
+  const endMin = startMin + durationMins;
+  const withinWorking = working.some(
+    (window) => startMin >= window.startMin && endMin <= window.endMin,
+  );
+  const booked = busy.some((interval) =>
+    intervalsOverlap({ startMin, endMin }, interval),
+  );
+  return {
+    withinWorking,
+    booked,
+    available: withinWorking && !booked,
+  };
+}
+
 export function computeFreeSlotStarts(
   workingIntervals: Interval[],
   busyIntervals: Interval[],

@@ -1,5 +1,6 @@
 import type { ClientBookingDraft } from "../../../components/common/client-booking/types";
 import type { ClientBookingRecord } from "./clientBookingRecords";
+import { liveMediaUrl } from "../../../lib/projectUploadMedia";
 
 const DRAFT_SNAPSHOT_KEY = "mollure:booking_draft_snapshots_v1";
 
@@ -16,84 +17,38 @@ type DraftSnapshot = {
   clientNote?: string;
 };
 
-type SnapshotStore = Record<string, DraftSnapshot>;
-
-function readStore(): SnapshotStore {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = window.localStorage.getItem(DRAFT_SNAPSHOT_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as SnapshotStore;
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-function writeStore(store: SnapshotStore) {
+function clearLegacyLocalDraftCache() {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(DRAFT_SNAPSHOT_KEY, JSON.stringify(store));
+    window.localStorage.removeItem(DRAFT_SNAPSHOT_KEY);
   } catch {
-    // Quota / private mode — ignore.
+    // Ignore quota / private mode.
   }
 }
 
-function keysForRecord(record: Pick<ClientBookingRecord, "id" | "apiBookingId" | "bookingRef">) {
-  return [record.bookingRef, record.apiBookingId, record.id]
-    .map((value) => String(value ?? "").replace(/^#/, "").trim())
-    .filter(Boolean);
-}
-
-function toSnapshot(draft: ClientBookingDraft): DraftSnapshot {
+function sanitizeProjectDetails(
+  project?: ClientBookingDraft["projectDetails"],
+): ClientBookingDraft["projectDetails"] | undefined {
+  if (!project) return undefined;
   return {
-    people: draft.people,
-    services: draft.services,
-    products: draft.products,
-    projectDetails: draft.projectDetails
-      ? {
-          description: draft.projectDetails.description ?? "",
-          // Keep previewUrl when present so same-browser reopen can still show thumbnails.
-          uploads: (draft.projectDetails.uploads ?? []).map((u) => ({
-            id: u.id,
-            name: u.name,
-            previewUrl: u.previewUrl,
-          })),
-        }
-      : undefined,
-    teamMembers: draft.teamMembers,
-    total: draft.total,
-    selectedDateISO: draft.selectedDateISO,
-    selectedTime: draft.selectedTime,
-    combineServices: draft.combineServices,
-    clientNote: draft.clientNote,
+    description: project.description ?? "",
+    uploads: (project.uploads ?? []).map((upload) => {
+      const url = liveMediaUrl(upload.url);
+      const previewUrl = liveMediaUrl(upload.previewUrl) || url;
+      return {
+        ...upload,
+        url,
+        previewUrl,
+      };
+    }),
   };
 }
 
-/** Persist rich Continue-layout draft so list reopen keeps Project / Model / Planning UI. */
-export function cacheClientBookingDraftSnapshot(record: ClientBookingRecord) {
-  if (!record?.draft) return;
-  const keys = keysForRecord(record);
-  if (!keys.length) return;
-  const store = readStore();
-  const previous =
-    keys.map((key) => store[key]).find((snap) => snap && (hasPeople(snap) || hasProject(snap) || servicesHaveGuestIds(snap))) ??
-    keys.map((key) => store[key]).find(Boolean) ??
-    null;
-  // Never let a stripped API draft erase Models/Guests/Project from local storage.
-  const snapshot = toSnapshot(mergeClientBookingDraftRichness(record.draft, previous));
-  for (const key of keys) store[key] = snapshot;
-  writeStore(store);
-}
-
-export function getCachedClientBookingDraftSnapshot(
-  record: Pick<ClientBookingRecord, "id" | "apiBookingId" | "bookingRef">,
-): DraftSnapshot | null {
-  const store = readStore();
-  for (const key of keysForRecord(record)) {
-    if (store[key]) return store[key];
-  }
-  return null;
+function sanitizeDraft(draft: ClientBookingDraft): ClientBookingDraft {
+  return {
+    ...draft,
+    projectDetails: sanitizeProjectDetails(draft.projectDetails),
+  };
 }
 
 function hasPeople(draft?: ClientBookingDraft | DraftSnapshot | null) {
@@ -109,33 +64,96 @@ function servicesHaveGuestIds(draft?: ClientBookingDraft | DraftSnapshot | null)
   return (draft?.services ?? []).some((s) => Boolean(s.guestId));
 }
 
+function mergeProjectUploads(
+  primary?: ClientBookingDraft["projectDetails"],
+  fallback?: ClientBookingDraft["projectDetails"],
+): NonNullable<ClientBookingDraft["projectDetails"]>["uploads"] {
+  type Upload = NonNullable<ClientBookingDraft["projectDetails"]>["uploads"][number];
+  const primaryUploads: Upload[] = sanitizeProjectDetails(primary)?.uploads ?? [];
+  const fallbackUploads: Upload[] = sanitizeProjectDetails(fallback)?.uploads ?? [];
+  if (!primaryUploads.length) return fallbackUploads;
+  if (!fallbackUploads.length) return primaryUploads;
+
+  const fallbackById = new Map(fallbackUploads.map((u) => [u.id, u]));
+  const fallbackByName = new Map(fallbackUploads.map((u) => [u.name, u]));
+  const used = new Set<string>();
+
+  const merged: Upload[] = primaryUploads.map((upload) => {
+    const match = fallbackById.get(upload.id) ?? fallbackByName.get(upload.name);
+    if (match) used.add(match.id);
+    const url = liveMediaUrl(upload.url) || liveMediaUrl(match?.url);
+    const previewUrl =
+      liveMediaUrl(upload.previewUrl) || liveMediaUrl(match?.previewUrl) || url;
+    return {
+      ...upload,
+      ...match,
+      ...upload,
+      url,
+      previewUrl,
+      mimeType: upload.mimeType || match?.mimeType,
+      kind: upload.kind || match?.kind,
+    };
+  });
+
+  for (const upload of fallbackUploads) {
+    if (used.has(upload.id)) continue;
+    if (merged.some((row) => row.id === upload.id || row.name === upload.name)) continue;
+    merged.push(upload);
+  }
+  return merged;
+}
+
+/** Booking drafts stay on the live API — never write them to localStorage. */
+export function cacheClientBookingDraftSnapshot(_record: ClientBookingRecord) {
+  clearLegacyLocalDraftCache();
+}
+
+export function getCachedClientBookingDraftSnapshot(
+  _record: Pick<ClientBookingRecord, "id" | "apiBookingId" | "bookingRef">,
+): DraftSnapshot | null {
+  clearLegacyLocalDraftCache();
+  return null;
+}
+
 /**
- * Prefer API draft, but fill missing Project/people/guest assignments from
- * session/local snapshot so Past/Ongoing/Upcoming reopen matches Continue design.
- * Never replace a newer/longer API services list with a poorer cache snapshot.
+ * Prefer API draft, then fill missing people/guest/project fields from the
+ * in-memory session draft. Project media only keeps live server URLs.
  */
 export function mergeClientBookingDraftRichness(
   primary: ClientBookingDraft,
   fallback?: DraftSnapshot | ClientBookingDraft | null,
 ): ClientBookingDraft {
-  if (!fallback) return primary;
+  const livePrimary = sanitizeDraft(primary);
+  if (!fallback) return livePrimary;
+  const liveFallback = sanitizeDraft(fallback as ClientBookingDraft);
 
-  const people = hasPeople(primary) ? primary.people : fallback.people ?? primary.people;
-  const projectDetails = hasProject(primary)
-    ? primary.projectDetails
-    : fallback.projectDetails ?? primary.projectDetails;
-  const teamMembers = primary.teamMembers?.length
-    ? primary.teamMembers
-    : fallback.teamMembers ?? primary.teamMembers;
+  const people = hasPeople(livePrimary)
+    ? livePrimary.people
+    : liveFallback.people ?? livePrimary.people;
+  const projectDetails =
+    hasProject(livePrimary) || hasProject(liveFallback)
+      ? {
+          description:
+            livePrimary.projectDetails?.description?.trim() ||
+            liveFallback.projectDetails?.description ||
+            "",
+          uploads: mergeProjectUploads(
+            livePrimary.projectDetails,
+            liveFallback.projectDetails,
+          ),
+        }
+      : livePrimary.projectDetails;
+  const teamMembers = livePrimary.teamMembers?.length
+    ? livePrimary.teamMembers
+    : liveFallback.teamMembers ?? livePrimary.teamMembers;
 
-  const primaryServices = primary.services ?? [];
-  const fallbackServices = fallback.services ?? [];
+  const primaryServices = livePrimary.services ?? [];
+  const fallbackServices = liveFallback.services ?? [];
   let services = primaryServices;
 
   if (fallbackServices.length > 0) {
     const byId = new Map(fallbackServices.map((s) => [s.id, s]));
     const byName = new Map(fallbackServices.map((s) => [s.name, s]));
-    // Always keep primary rows (API / notes) — only borrow guest/team assignments.
     services = primaryServices.map((service) => {
       const match = byId.get(service.id) ?? byName.get(service.name);
       return {
@@ -145,8 +163,6 @@ export function mergeClientBookingDraftRichness(
       };
     });
 
-    // If notes stripped guest lines entirely, append cache-only guest rows that
-    // are not already present — but never when primary already has more rows.
     if (
       !servicesHaveGuestIds({ services }) &&
       fallbackServices.some((s) => Boolean(s.guestId)) &&
@@ -172,34 +188,39 @@ export function mergeClientBookingDraftRichness(
     }
   }
 
-  const fallbackProducts = fallback.products;
+  const fallbackProducts = liveFallback.products;
   const products =
-    (primary.products?.length ?? 0) > 0
-      ? primary.products
+    (livePrimary.products?.length ?? 0) > 0
+      ? livePrimary.products
       : fallbackProducts?.length
         ? fallbackProducts
-        : primary.products;
+        : livePrimary.products;
 
   const primaryTotal =
-    typeof primary.total === "number" && primary.total > 0 ? primary.total : null;
+    typeof livePrimary.total === "number" && livePrimary.total > 0
+      ? livePrimary.total
+      : null;
   const fallbackTotal =
-    typeof fallback.total === "number" && fallback.total > 0 ? fallback.total : null;
+    typeof liveFallback.total === "number" && liveFallback.total > 0
+      ? liveFallback.total
+      : null;
 
   return {
-    ...primary,
+    ...livePrimary,
     people,
     projectDetails,
     teamMembers,
     services,
     products,
-    total: primaryTotal ?? fallbackTotal ?? primary.total,
-    clientNote: primary.clientNote?.trim() || fallback.clientNote || primary.clientNote,
+    total: primaryTotal ?? fallbackTotal ?? livePrimary.total,
+    clientNote:
+      livePrimary.clientNote?.trim() ||
+      liveFallback.clientNote ||
+      livePrimary.clientNote,
   };
 }
 
 export function enrichClientBookingRecord(record: ClientBookingRecord): ClientBookingRecord {
   if (!record.draft) return record;
-  const cached = getCachedClientBookingDraftSnapshot(record);
-  const draft = mergeClientBookingDraftRichness(record.draft, cached);
-  return { ...record, draft };
+  return { ...record, draft: sanitizeDraft(record.draft) };
 }

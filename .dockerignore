@@ -1,0 +1,12 @@
+.git
+**/.git
+**/node_modules
+**/.next
+**/.vercel
+**/.env
+**/.env.*
+**/uploads
+**/*.md
+**/vercel.json
+_env_backup
+_merge_preserve

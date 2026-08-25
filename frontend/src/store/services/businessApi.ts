@@ -813,7 +813,10 @@ export const businessApi = baseApi.injectEndpoints({
       providesTags: ["BusinessSetupsListing"],
     }),
     getPublicBusinessHours: builder.query<
-      ApiEnvelope<{ publicBusinessHours: Record<string, unknown>[] }>,
+      ApiEnvelope<{
+        publicBusinessHours: Record<string, unknown>[];
+        bookingRules?: Record<string, unknown>;
+      }>,
       string
     >({
       async queryFn(setupId, _api, _extraOptions, fetchWithBQ) {
@@ -828,6 +831,7 @@ export const businessApi = baseApi.injectEndpoints({
 
         const data = response.data as ApiEnvelope<{
           publicBusinessHours: Record<string, unknown>[];
+          bookingRules?: Record<string, unknown>;
         }>;
         if (!data.success || !data.data) {
           return {
