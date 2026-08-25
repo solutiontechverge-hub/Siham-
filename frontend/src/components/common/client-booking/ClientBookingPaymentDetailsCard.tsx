@@ -17,9 +17,10 @@ import {
   buildBookingSummarySections,
   resolveTeamMemberFirstName,
 } from "./buildBookingSummarySections";
+import { locationModeChipSx } from "./locationModeChipSx";
+import ProjectUploadThumb from "./ProjectUploadThumb";
 import type { BookingEditSuggestedProduct } from "./bookingEditRequest";
 import type { ClientBookingDraft, ClientBookingSummarySection } from "./types";
-import { resolveMediaUrl } from "../../../lib/resolveMediaUrl";
 import BookingSummaryNote from "./BookingSummaryNote";
 
 export type ClientBookingPrepaymentState = "none" | "required" | "paid";
@@ -487,23 +488,9 @@ export default function ClientBookingPaymentDetailsCard({
 
       {shopName || addressLabel ? (
         <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 1.35, pb: 1.5 }}>
-          <Chip
-            label={locationMode === "desired" ? "Desired Location" : "Fixed Location"}
-            size="small"
-            sx={{
-              height: 22,
-              borderRadius: "4px",
-              bgcolor: alpha(m.teal, 0.12),
-              color: m.teal,
-              fontSize: 11,
-              fontWeight: 800,
-              "& .MuiChip-label": { px: 1 },
-            }}
-          />
           {shopName ? (
             <Typography
               sx={{
-                mt: 0.9,
                 fontWeight: 900,
                 fontSize: 18,
                 color: alpha(m.navy, 0.88),
@@ -515,7 +502,7 @@ export default function ClientBookingPaymentDetailsCard({
           ) : null}
           <Stack
             direction="row"
-            alignItems="flex-start"
+            alignItems="center"
             justifyContent="space-between"
             spacing={2}
             sx={{ mt: 0.85 }}
@@ -547,7 +534,7 @@ export default function ClientBookingPaymentDetailsCard({
               <Box
                 sx={{
                   display: "flex",
-                  alignItems: "flex-start",
+                  alignItems: "center",
                   gap: 0.5,
                   ml: "auto",
                   maxWidth: { xs: "46%", sm: "50%" },
@@ -562,7 +549,7 @@ export default function ClientBookingPaymentDetailsCard({
                     height: 16,
                     color: alpha(m.navy, 0.45),
                     flexShrink: 0,
-                    mt: "2px",
+                    display: "block",
                   }}
                 />
                 <Typography
@@ -571,7 +558,7 @@ export default function ClientBookingPaymentDetailsCard({
                     fontWeight: 700,
                     color: alpha(m.navy, 0.55),
                     fontSize: 12,
-                    lineHeight: 1.35,
+                    lineHeight: 1.2,
                     minWidth: 0,
                   }}
                 >
@@ -580,6 +567,11 @@ export default function ClientBookingPaymentDetailsCard({
               </Box>
             ) : null}
           </Stack>
+          <Chip
+            label={locationMode === "desired" ? "Desired Location" : "Fixed Location"}
+            size="small"
+            sx={{ ...locationModeChipSx, mt: 0.75 }}
+          />
         </Box>
       ) : null}
       <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
@@ -646,12 +638,7 @@ export default function ClientBookingPaymentDetailsCard({
                   color: alpha(m.navy, 0.82),
                 }}
               >
-                Project
-              </Typography>
-              <Typography
-                sx={{ fontWeight: 800, fontSize: 11.5, color: m.teal }}
-              >
-                Detail
+                Project Details and Media
               </Typography>
             </Stack>
             {project?.description?.trim() ? (
@@ -687,71 +674,17 @@ export default function ClientBookingPaymentDetailsCard({
                     mb: 1,
                   }}
                 >
-                  Uploaded
+                  Media
                 </Typography>
                 <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                  {project!.uploads.map((upload) => {
-                    const thumb =
-                      resolveMediaUrl(upload.previewUrl) ||
-                      resolveMediaUrl(upload.url);
-                    return (
-                    <Box
+                  {project!.uploads.map((upload) => (
+                    <ProjectUploadThumb
                       key={upload.id}
-                      sx={{
-                        width: 72,
-                        borderRadius: "8px",
-                        overflow: "hidden",
-                        border: `1px solid ${alpha(m.navy, 0.1)}`,
-                        bgcolor: alpha(m.navy, 0.03),
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          width: "100%",
-                          height: 72,
-                          bgcolor: alpha(m.navy, 0.06),
-                          backgroundImage: thumb
-                            ? `url(${thumb})`
-                            : undefined,
-                          backgroundSize: "cover",
-                          backgroundPosition: "center",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        {!thumb ? (
-                          <Typography
-                            sx={{
-                              fontSize: 10,
-                              fontWeight: 800,
-                              color: alpha(m.navy, 0.45),
-                              px: 0.5,
-                              textAlign: "center",
-                            }}
-                          >
-                            IMG
-                          </Typography>
-                        ) : null}
-                      </Box>
-                      <Typography
-                        sx={{
-                          px: 0.5,
-                          py: 0.35,
-                          fontSize: 9.5,
-                          fontWeight: 800,
-                          color: alpha(m.navy, 0.5),
-                          textAlign: "center",
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        }}
-                      >
-                        {upload.name}
-                      </Typography>
-                    </Box>
-                    );
-                  })}
+                      upload={upload}
+                      width={72}
+                      height={72}
+                    />
+                  ))}
                 </Stack>
               </Box>
             ) : null}

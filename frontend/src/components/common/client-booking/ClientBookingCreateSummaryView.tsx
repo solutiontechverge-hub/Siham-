@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
+import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
 import {
@@ -10,6 +11,7 @@ import {
   CircularProgress,
   Container,
   Divider,
+  IconButton,
   Paper,
   Stack,
   Typography,
@@ -24,6 +26,7 @@ import {
 import { parseBookingListTab } from "../../../app/clients/booking/bookingPillTabs";
 import {
   getActiveBookingSession,
+  getCreateReturnHref,
   setActiveBookingSession,
 } from "../../../app/clients/booking/clientBookingSession";
 import { submitClientBookingRequest } from "../../../app/clients/booking/submitClientBookingRequest";
@@ -50,7 +53,9 @@ import {
   splitContactPhone,
 } from "../../../lib/phone-validation";
 import { buildBookingSummarySections, resolveTeamMemberFirstName } from "./buildBookingSummarySections";
+import { locationModeChipSx } from "./locationModeChipSx";
 import BookingSummaryNote from "./BookingSummaryNote";
+import ClientBookingProjectDetailsCard from "./ClientBookingProjectDetailsCard";
 import StripePrepaymentDialog from "./StripePrepaymentDialog";
 import { useActiveClientBooking } from "./useActiveClientBooking";
 import { useClientBookingDraft } from "./useClientBookingDraft";
@@ -283,6 +288,26 @@ export default function ClientBookingCreateSummaryView() {
     setActiveBookingSession(next);
     return next;
   }, [activeBooking, address, addressLabel, contactPhoneValue, isDesired]);
+
+  const goBackToCreate = React.useCallback(() => {
+    persistDraftEdits();
+    const href = getCreateReturnHref();
+    if (href) {
+      router.push(href);
+      return;
+    }
+    router.back();
+  }, [persistDraftEdits, router]);
+
+  React.useEffect(() => {
+    persistDraftEdits();
+  }, [persistDraftEdits]);
+
+  React.useEffect(() => {
+    const persist = () => persistDraftEdits();
+    window.addEventListener("pagehide", persist);
+    return () => window.removeEventListener("pagehide", persist);
+  }, [persistDraftEdits]);
 
   const ensureBookingCreated = React.useCallback(async () => {
     const record = persistDraftEdits();
@@ -567,16 +592,30 @@ export default function ClientBookingCreateSummaryView() {
           }}
         >
           <Box sx={{ px: { xs: 2.25, md: 3.5 }, pt: 2.25, pb: 1.15 }}>
-            <Typography
-              sx={{
-                fontSize: { xs: 26, md: 30 },
-                fontWeight: 700,
-                color: alpha(m.navy, 0.86),
-                lineHeight: 1.15,
-              }}
-            >
-              Booking Details
-            </Typography>
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <IconButton
+                size="small"
+                onClick={goBackToCreate}
+                aria-label="Back to booking"
+                sx={{
+                  width: 36,
+                  height: 36,
+                  color: alpha(m.navy, 0.7),
+                }}
+              >
+                <ArrowBackRoundedIcon sx={{ fontSize: 22 }} />
+              </IconButton>
+              <Typography
+                sx={{
+                  fontSize: { xs: 26, md: 30 },
+                  fontWeight: 700,
+                  color: isDesired ? "#333333" : alpha(m.navy, 0.86),
+                  lineHeight: 1.15,
+                }}
+              >
+                Booking Details
+              </Typography>
+            </Stack>
           </Box>
           <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
 
@@ -604,26 +643,8 @@ export default function ClientBookingCreateSummaryView() {
           </Box>
           <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
           <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 1.35, pb: 1.5 }}>
-
-            <Box sx={{ mt: 1.1 }}>
-              <Chip
-                label={isDesired ? "Desired Location" : "Fixed Location"}
-                size="small"
-                sx={{
-                  height: 22,
-                  borderRadius: "4px",
-                  bgcolor: alpha(m.teal, 0.12),
-                  color: m.teal,
-                  fontSize: 11,
-                  fontWeight: 800,
-                  "& .MuiChip-label": { px: 1 },
-                }}
-              />
-            </Box>
-
             <Typography
               sx={{
-                mt: 0.9,
                 fontWeight: 900,
                 fontSize: 18,
                 color: alpha(m.navy, 0.88),
@@ -635,7 +656,7 @@ export default function ClientBookingCreateSummaryView() {
 
             <Stack
               direction="row"
-              alignItems="flex-start"
+              alignItems="center"
               justifyContent="space-between"
               spacing={2}
               sx={{ mt: 0.85 }}
@@ -655,6 +676,7 @@ export default function ClientBookingCreateSummaryView() {
                     color: alpha(m.teal, 0.95),
                     fontSize: 12.5,
                     whiteSpace: { xs: "normal", sm: "nowrap" },
+                    lineHeight: 1.2,
                   }}
                 >
                   {dateLabel} ({fmtMinutesToTimeLabel(bookingStartMinutes)}-
@@ -665,7 +687,7 @@ export default function ClientBookingCreateSummaryView() {
               <Box
                 sx={{
                   display: "flex",
-                  alignItems: "flex-start",
+                  alignItems: "center",
                   gap: 0.5,
                   ml: "auto",
                   maxWidth: { xs: "46%", sm: "50%" },
@@ -680,7 +702,7 @@ export default function ClientBookingCreateSummaryView() {
                     height: 16,
                     color: alpha(m.navy, 0.45),
                     flexShrink: 0,
-                    mt: "2px",
+                    display: "block",
                   }}
                 />
                 <Typography
@@ -689,7 +711,7 @@ export default function ClientBookingCreateSummaryView() {
                     fontWeight: 700,
                     color: alpha(m.navy, 0.55),
                     fontSize: 12,
-                    lineHeight: 1.35,
+                    lineHeight: 1.2,
                     minWidth: 0,
                   }}
                 >
@@ -697,6 +719,12 @@ export default function ClientBookingCreateSummaryView() {
                 </Typography>
               </Box>
             </Stack>
+
+            <Chip
+              label={isDesired ? "Desired Location" : "Fixed Location"}
+              size="small"
+              sx={{ ...locationModeChipSx, mt: 0.75 }}
+            />
           </Box>
 
           <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
@@ -709,7 +737,7 @@ export default function ClientBookingCreateSummaryView() {
                   <Box key={section.key}>
                     <Stack
                       direction="row"
-                      alignItems="baseline"
+                      alignItems="center"
                       spacing={0.75}
                       sx={{ mb: 0.75 }}
                     >
@@ -718,6 +746,9 @@ export default function ClientBookingCreateSummaryView() {
                           fontWeight: 900,
                           fontSize: 13,
                           color: alpha(m.navy, 0.78),
+                          lineHeight: 1,
+                          display: "flex",
+                          alignItems: "center",
                         }}
                       >
                         {section.title}
@@ -729,6 +760,9 @@ export default function ClientBookingCreateSummaryView() {
                           color: "primary.light",
                           textTransform: "uppercase",
                           letterSpacing: 0.3,
+                          lineHeight: 1,
+                          display: "flex",
+                          alignItems: "center",
                         }}
                       >
                         {roleLabel}
@@ -736,6 +770,51 @@ export default function ClientBookingCreateSummaryView() {
                     </Stack>
 
                     <Stack spacing={0.85}>
+                      {section.planningItem ? (
+                        <Box
+                          sx={{
+                            borderRadius: "10px",
+                            border: `1px solid ${alpha(m.navy, 0.06)}`,
+                            px: 1.25,
+                            py: 1,
+                            bgcolor: alpha(m.navy, 0.015),
+                          }}
+                        >
+                          <Stack
+                            direction="row"
+                            alignItems="center"
+                            justifyContent="space-between"
+                            spacing={1}
+                          >
+                            <Box sx={{ minWidth: 0, flex: 1 }}>
+                              {section.planningItem.activity ? (
+                                <Typography
+                                  sx={{
+                                    fontSize: 13,
+                                    fontWeight: 900,
+                                    color: alpha(m.navy, 0.82),
+                                    lineHeight: 1.2,
+                                  }}
+                                >
+                                  {section.planningItem.activity}
+                                </Typography>
+                              ) : null}
+                              {section.planningItem.duration ? (
+                                <Typography
+                                  sx={{
+                                    mt: section.planningItem.activity ? 0.3 : 0,
+                                    fontSize: 11,
+                                    fontWeight: 700,
+                                    color: alpha(m.navy, 0.48),
+                                  }}
+                                >
+                                  {section.planningItem.duration}
+                                </Typography>
+                              ) : null}
+                            </Box>
+                          </Stack>
+                        </Box>
+                      ) : null}
                       {section.items.map((item) => {
                         const start = serviceCursor;
                         serviceCursor += item.durationMins;
@@ -784,28 +863,52 @@ export default function ClientBookingCreateSummaryView() {
                                   • {item.durationMins} Mins
                                 </Typography>
                                 {tmName ? (
-                                  <Stack
-                                    direction="row"
-                                    alignItems="center"
-                                    spacing={0.5}
-                                    sx={{ mt: 0.55 }}
+                                  <Box
+                                    sx={{
+                                      mt: 0.55,
+                                      display: "inline-flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      gap: 0.5,
+                                      height: 24,
+                                      px: 0.9,
+                                      borderRadius: "8px",
+                                      border: `1px solid ${alpha(m.navy, 0.12)}`,
+                                      bgcolor: "#fff",
+                                      lineHeight: 0,
+                                    }}
                                   >
-                                    <PersonOutlineRoundedIcon
+                                    <Box
                                       sx={{
-                                        fontSize: 14,
-                                        color: alpha(m.navy, 0.4),
+                                        width: 13,
+                                        height: 13,
+                                        display: "grid",
+                                        placeItems: "center",
+                                        flexShrink: 0,
+                                        lineHeight: 0,
                                       }}
-                                    />
+                                    >
+                                      <PersonOutlineRoundedIcon
+                                        sx={{
+                                          fontSize: 13,
+                                          color: alpha(m.navy, 0.4),
+                                          display: "block",
+                                        }}
+                                      />
+                                    </Box>
                                     <Typography
                                       sx={{
                                         fontSize: 11,
                                         fontWeight: 700,
                                         color: alpha(m.navy, 0.55),
+                                        lineHeight: 1,
+                                        display: "flex",
+                                        alignItems: "center",
                                       }}
                                     >
                                       {tmName}
                                     </Typography>
-                                  </Stack>
+                                  </Box>
                                 ) : null}
                               </Box>
                               <Typography
@@ -973,6 +1076,12 @@ export default function ClientBookingCreateSummaryView() {
           </Box>
             </Box>
           </Box>
+
+          {draft.projectDetails ? (
+            <Box sx={{ px: { xs: 2.25, md: 3.5 }, pb: 2 }}>
+              <ClientBookingProjectDetailsCard project={draft.projectDetails} />
+            </Box>
+          ) : null}
 
           <Box sx={{ px: { xs: 2.25, md: 3.5 }, pt: 0.25, pb: 2.25 }}>
           <Box

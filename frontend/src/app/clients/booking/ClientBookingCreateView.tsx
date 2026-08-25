@@ -35,12 +35,12 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
-import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
 import ModeEditOutlineRoundedIcon from "@mui/icons-material/ModeEditOutlineRounded";
 import { AppDropdown, AppTextField } from "../../../components/common";
 import AppModal from "../../../components/common/AppModal";
 import BookingSummaryNote from "../../../components/common/client-booking/BookingSummaryNote";
+import { locationModeChipSx } from "../../../components/common/client-booking/locationModeChipSx";
 import { ServiceSummaryMetaLine } from "../../../components/common/ServiceSummaryMetaLine";
 import {
   CLIENT_BOOKING_MIN_LEAD_ERROR,
@@ -161,7 +161,7 @@ export default function ClientBookingCreateView() {
     projectFileInputRef,
     locationMode,
     isDesiredLocation,
-    desiredVisitAddressLabel,
+    minimumTimeslotNotice,
     isCompanyClient,
     showProjectDetails,
     getParticipantLabel,
@@ -421,6 +421,7 @@ export default function ClientBookingCreateView() {
         <Tabs
           value={serviceTab}
           onChange={(_, v: "assigned" | "unassigned") => {
+            if (v === "unassigned" && unassigned.length === 0) return;
             setServiceTab(v);
             setSelectedServiceIds({});
           }}
@@ -436,7 +437,7 @@ export default function ClientBookingCreateView() {
         >
           <Tab
             value="assigned"
-            label={`Assigned(${assigned.length})`}
+            label={`Assigned (${assigned.length})`}
             sx={{
               minHeight: 28,
               textTransform: "none",
@@ -455,7 +456,8 @@ export default function ClientBookingCreateView() {
           />
           <Tab
             value="unassigned"
-            label={`Unassigned(${unassigned.length})`}
+            label={`Unassigned (${unassigned.length})`}
+            disabled={unassigned.length === 0}
             sx={{
               minHeight: 28,
               textTransform: "none",
@@ -469,6 +471,7 @@ export default function ClientBookingCreateView() {
                 color: m.segmentText,
                 fontWeight: theme.typography.fontWeightBold,
               },
+              "&.Mui-disabled": { opacity: 0.45, cursor: "not-allowed" },
             }}
           />
         </Tabs>
@@ -477,7 +480,7 @@ export default function ClientBookingCreateView() {
       {/* Desired: one shared team member. Fixed: shared picker on Unassigned tab only. */}
       {filteredTeamMembers.length > 0 &&
       (isDesiredLocation || serviceTab === "unassigned") ? (
-        <Box sx={{ mb: 1.25 }} onClick={(e) => e.stopPropagation()}>
+        <Box sx={{ mb: 1.25, maxWidth: 240 }} onClick={(e) => e.stopPropagation()}>
           <AppDropdown
             value={selectedTeamMemberId}
             onChange={(val) => applySharedTeamMember(String(val ?? ""))}
@@ -609,7 +612,8 @@ export default function ClientBookingCreateView() {
                   bgcolor: "#fff",
                 }}
               >
-                <Stack direction="row" alignItems="flex-start" spacing={1.25}>
+                <Stack spacing={1.25}>
+                <Stack direction="row" alignItems="center" spacing={1.25}>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography
                       sx={{
@@ -631,9 +635,77 @@ export default function ClientBookingCreateView() {
                     >
                       {s.durationMins} Mins
                     </Typography>
+                  </Box>
+
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    spacing={0.75}
+                    sx={{ flexShrink: 0 }}
+                  >
+                      <Box sx={{ textAlign: "right" }}>
+                        {typeof s.originalPrice === "number" ? (
+                          <Typography
+                            sx={{
+                              fontSize: 11,
+                              fontWeight: 800,
+                              color: alpha(m.navy, 0.38),
+                              textDecoration: "line-through",
+                              lineHeight: 1.1,
+                            }}
+                          >
+                            {s.originalPrice} €
+                          </Typography>
+                        ) : null}
+                        <Typography
+                          sx={{
+                            fontSize: 14,
+                            fontWeight: 900,
+                            color: alpha(m.navy, 0.88),
+                            lineHeight: 1.15,
+                            mt: typeof s.originalPrice === "number" ? 0.15 : 0,
+                          }}
+                        >
+                          {s.price} €
+                        </Typography>
+                        {typeof s.discountPct === "number" ? (
+                          <Typography
+                            sx={{
+                              fontSize: 10.5,
+                              fontWeight: 800,
+                              color: m.teal,
+                              mt: 0.2,
+                            }}
+                          >
+                            {s.discountPct}% Discount
+                          </Typography>
+                        ) : null}
+                      </Box>
+                      <IconButton
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          unassignService(s.id);
+                        }}
+                        sx={{
+                          width: 22,
+                          height: 22,
+                          p: 0,
+                          color: alpha(m.navy, 0.38),
+                          "&:hover": {
+                            bgcolor: "transparent",
+                            color: alpha(m.navy, 0.62),
+                          },
+                        }}
+                        aria-label={`Remove ${s.name}`}
+                      >
+                        <CloseRoundedIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                  </Stack>
+                </Stack>
                     {!isDesiredLocation ? (
                       <Box
-                        sx={{ mt: 1.25, maxWidth: 200 }}
+                        sx={{ maxWidth: 200 }}
                         onClick={(e) => e.stopPropagation()}
                       >
                         <AppDropdown
@@ -696,83 +768,6 @@ export default function ClientBookingCreateView() {
                         />
                       </Box>
                     ) : null}
-                  </Box>
-
-                  <Stack
-                    alignItems="flex-end"
-                    spacing={0.35}
-                    sx={{ flexShrink: 0, pt: 0.1 }}
-                  >
-                    <Stack
-                      direction="row"
-                      alignItems="flex-start"
-                      spacing={0.75}
-                    >
-                      <Box sx={{ textAlign: "right" }}>
-                        <Stack
-                          direction="row"
-                          alignItems="baseline"
-                          spacing={0.75}
-                          justifyContent="flex-end"
-                        >
-                          {typeof s.originalPrice === "number" ? (
-                            <Typography
-                              sx={{
-                                fontSize: 12,
-                                fontWeight: 800,
-                                color: alpha(m.navy, 0.4),
-                                textDecoration: "line-through",
-                              }}
-                            >
-                              {s.originalPrice} €
-                            </Typography>
-                          ) : null}
-                          <Typography
-                            sx={{
-                              fontSize: 14,
-                              fontWeight: 900,
-                              color: alpha(m.navy, 0.88),
-                              lineHeight: 1.1,
-                            }}
-                          >
-                            {s.price} €
-                          </Typography>
-                        </Stack>
-                        {typeof s.discountPct === "number" ? (
-                          <Typography
-                            sx={{
-                              fontSize: 11,
-                              fontWeight: 800,
-                              color: m.teal,
-                              mt: 0.35,
-                            }}
-                          >
-                            {s.discountPct}% Discount
-                          </Typography>
-                        ) : null}
-                      </Box>
-                      <IconButton
-                        size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          unassignService(s.id);
-                        }}
-                        sx={{
-                          width: 26,
-                          height: 26,
-                          borderRadius: "999px",
-                          color: alpha(m.navy, 0.4),
-                          "&:hover": {
-                            bgcolor: alpha(m.navy, 0.06),
-                            color: alpha(m.navy, 0.65),
-                          },
-                        }}
-                        aria-label={`Remove ${s.name}`}
-                      >
-                        <CloseRoundedIcon sx={{ fontSize: 16 }} />
-                      </IconButton>
-                    </Stack>
-                  </Stack>
                 </Stack>
               </Paper>
             );
@@ -797,7 +792,7 @@ export default function ClientBookingCreateView() {
                 },
               }}
             >
-              <Stack direction="row" alignItems="flex-start" spacing={1.25}>
+              <Stack direction="row" alignItems="center" spacing={1.25}>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Stack
                     direction="row"
@@ -996,18 +991,13 @@ export default function ClientBookingCreateView() {
             p: 0,
           }}
         >
-          Service to assignment list
+          service to assignment list
         </Typography>
       </ButtonBase>
     </Box>
   );
 
-  const summaryServiceName =
-    [...new Set(services.map((s) => s.name.trim()).filter(Boolean))].join(
-      ", ",
-    ) ||
-    shop?.shopName ||
-    "";
+  const summaryShopName = shop?.shopName?.trim() || "Salon";
   const summaryTeamMemberName = [
     ...new Set(
       services
@@ -1015,12 +1005,12 @@ export default function ClientBookingCreateView() {
         .filter((name): name is string => Boolean(name)),
     ),
   ].join(", ");
-  const summaryAddressLabel =
-    (isDesiredLocation
-      ? desiredVisitAddressLabel
-      : shop?.addressLabel?.trim() || shop?.municipalityLabel?.trim()) ||
-    (isDesiredLocation ? "Service at your location" : "Studio location");
-
+  const desiredTeamMemberFullName = isDesiredLocation
+    ? filteredTeamMembers.find((tm) => tm.id === selectedTeamMemberId)?.name
+        ?.trim() ||
+      summaryTeamMemberName.split(",")[0]?.trim() ||
+      ""
+    : "";
   if (fromProfile && !profileHydrated) {
     return (
       <Box
@@ -1215,7 +1205,7 @@ export default function ClientBookingCreateView() {
             <Typography
               sx={{
                 fontWeight: 700,
-                color: m.headingText,
+                color: "#333333",
                 fontSize: "30px",
               }}
             >
@@ -1232,7 +1222,7 @@ export default function ClientBookingCreateView() {
                   elevation={0}
                   sx={{
                     borderRadius: "10px",
-                    border: `1px solid ${alpha(m.navy, 0.08)}`,
+                    border: `1px solid ${alpha(m.navy, 0.16)}`,
                     overflow: "hidden",
                     bgcolor: "#fff",
                   }}
@@ -1635,8 +1625,8 @@ export default function ClientBookingCreateView() {
                       elevation={0}
                       sx={{
                         borderRadius: "10px",
-                        border: `1px solid ${alpha(m.navy, 0.08)}`,
-                        bgcolor: alpha(m.navy, 0.015),
+                        border: `1px solid ${alpha(m.navy, 0.2)}`,
+                        bgcolor: m.fxGrayF2F4F7,
                         px: 1.25,
                         py: 1.1,
                       }}
@@ -1650,12 +1640,11 @@ export default function ClientBookingCreateView() {
                       >
                         Select Time
                       </Typography>
-                      <Box
+                      <Divider
                         sx={{
-                          height: 1,
-                          bgcolor: alpha(m.navy, 0.08),
                           mt: 1,
                           mb: 1.25,
+                          borderColor: alpha(m.navy, 0.12),
                         }}
                       />
 
@@ -1997,20 +1986,17 @@ export default function ClientBookingCreateView() {
                           </Box>
                         ) : null}
                     </Paper>
+                  </Box>
+                </Paper>
 
-                    {!isDesiredLocation && canAddFixedLocationGuest ? (
-                      <Stack
+                  {/* People */}
+                  <Box id="booking-services-section" sx={{ mt: 1.25, p: 0.25 }}>
+                    <Stack
                         direction="row"
                         alignItems="center"
                         justifyContent="flex-end"
-                        spacing={0.5}
-                        sx={{ mt: 1 }}
+                        sx={{ mb: 1 }}
                       >
-                        <Tooltip title="Fixed location bookings include the client plus one guest (max 2 people), starting at the same time.">
-                          <InfoOutlinedIcon
-                            sx={{ fontSize: 16, color: alpha(m.navy, 0.38) }}
-                          />
-                        </Tooltip>
                         <Chip
                           icon={
                             <Box
@@ -2035,8 +2021,15 @@ export default function ClientBookingCreateView() {
                           }
                           label="Guest"
                           variant="outlined"
-                          clickable
-                          onClick={() => addParticipant("Guest")}
+                          clickable={isDesiredLocation || canAddFixedLocationGuest}
+                          onClick={(e) => {
+                            if (isDesiredLocation) {
+                              setParticipantMenuAnchor(e.currentTarget);
+                              return;
+                            }
+                            if (!canAddFixedLocationGuest) return;
+                            addParticipant("Guest");
+                          }}
                           sx={{
                             height: 32,
                             borderRadius: "10px",
@@ -2047,8 +2040,12 @@ export default function ClientBookingCreateView() {
                             color: m.headingText,
                             "& .MuiChip-icon": {
                               color: m.addSoftFg,
-                              ml: 0.85,
-                              mr: 0.25,
+                              ml: 0.6,
+                              mr: 0,
+                            },
+                            "& .MuiChip-label": {
+                              pl: 0.4,
+                              pr: 1,
                             },
                             "&:hover": {
                               bgcolor: m.white,
@@ -2058,87 +2055,12 @@ export default function ClientBookingCreateView() {
                                 color: m.addSoftFg,
                               },
                             },
+                            ...(!isDesiredLocation && !canAddFixedLocationGuest
+                              ? { opacity: 0.45, pointerEvents: "none" }
+                              : null),
                           }}
                         />
-                      </Stack>
-                    ) : null}
-                  </Box>
-
-                  <Divider />
-
-                  {/* People */}
-                  <Box id="booking-services-section" sx={{ p: 1.5 }}>
-                    {isDesiredLocation ? (
-                      <Stack
-                        direction="row"
-                        alignItems="center"
-                        justifyContent="flex-end"
-                        sx={{ mb: 1 }}
-                      >
-                        <AppButton
-                          variant="outlined"
-                          endIcon={
-                            <KeyboardArrowDownRoundedIcon
-                              sx={{ fontSize: 16 }}
-                            />
-                          }
-                          startIcon={
-                            <Box
-                              component="span"
-                              sx={{
-                                width: 18,
-                                height: 18,
-                                borderRadius: "999px",
-                                bgcolor: m.addSoftBg,
-                                color: m.addSoftFg,
-                                border: `1px solid ${m.addSoftBorder}`,
-                                display: "inline-flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                flexShrink: 0,
-                                lineHeight: 0,
-                              }}
-                            >
-                              <AddRoundedIcon
-                                sx={{ fontSize: 14, display: "block" }}
-                              />
-                            </Box>
-                          }
-                          onClick={(e) =>
-                            setParticipantMenuAnchor(e.currentTarget)
-                          }
-                          sx={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            borderRadius: "10px",
-                            textTransform: "none",
-                            fontWeight: 900,
-                            fontSize: 11.5,
-                            lineHeight: 1,
-                            height: 32,
-                            minHeight: 32,
-                            py: 0,
-                            px: 1.25,
-                            borderColor: alpha(m.navy, 0.12),
-                            color: alpha(m.navy, 0.62),
-                            bgcolor: "#fff",
-                            "& .MuiButton-startIcon, & .MuiButton-endIcon": {
-                              display: "inline-flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              marginTop: 0,
-                              marginBottom: 0,
-                            },
-                            "& .MuiButton-startIcon": { mr: 0.75, ml: 0 },
-                            "& .MuiButton-endIcon": { ml: 0.35, mr: 0 },
-                            "& .MuiButton-startIcon > *:nth-of-type(1)": {
-                              fontSize: "inherit",
-                            },
-                          }}
-                        >
-                          Add
-                        </AppButton>
+                        {isDesiredLocation ? (
                         <Menu
                           anchorEl={participantMenuAnchor}
                           open={Boolean(participantMenuAnchor)}
@@ -2206,8 +2128,8 @@ export default function ClientBookingCreateView() {
                             </MenuItem>
                           ) : null}
                         </Menu>
+                        ) : null}
                       </Stack>
-                    ) : null}
 
                     <Stack direction="row" spacing={1} alignItems="center">
                       {people.map((p) => {
@@ -2240,15 +2162,13 @@ export default function ClientBookingCreateView() {
                             sx={{
                               flex: 1,
                               borderRadius: "10px",
-                              border: `1px solid ${active ? alpha(m.teal, 0.7) : alpha(m.navy, 0.1)}`,
+                              border: `1px solid ${active ? alpha(m.navy, 0.28) : alpha(m.navy, 0.1)}`,
                               bgcolor: "#fff",
                               px: 1,
                               pt: 1.05,
                               pb: 0.75,
                               cursor: "pointer",
-                              boxShadow: active
-                                ? `0 0 0 4px ${alpha(m.teal, 0.08)}`
-                                : "none",
+                              boxShadow: "none",
                               position: "relative",
                               minHeight: 72,
                               overflow: "visible",
@@ -2309,15 +2229,35 @@ export default function ClientBookingCreateView() {
                               }}
                             >
                               {p.isRequester || isNotesPerson(p) ? (
-                                <Typography
+                                <Box
                                   sx={{
-                                    fontWeight: 900,
-                                    fontSize: 12.5,
-                                    color: alpha(m.navy, 0.82),
+                                    border: `1px solid ${alpha(m.navy, 0.12)}`,
+                                    borderRadius: "8px",
+                                    px: 1,
+                                    py: 0.2,
+                                    maxWidth: 96,
+                                    minHeight: 22,
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
                                   }}
                                 >
-                                  {p.name}
-                                </Typography>
+                                  <Typography
+                                    sx={{
+                                      fontWeight: 900,
+                                      fontSize: 11,
+                                      color: alpha(m.navy, 0.82),
+                                      textAlign: "center",
+                                      lineHeight: 1.2,
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      whiteSpace: "nowrap",
+                                      maxWidth: 88,
+                                    }}
+                                  >
+                                    {p.name}
+                                  </Typography>
+                                </Box>
                               ) : (
                                 <Box
                                   sx={{
@@ -2379,7 +2319,34 @@ export default function ClientBookingCreateView() {
                       })}
                     </Stack>
 
-                    {requiresPersonAssignment && !isNotesCardSelected ? (
+                    {isDesiredLocation && minimumTimeslotNotice ? (
+                      <Box
+                        sx={{
+                          mt: 1.25,
+                          borderRadius: "10px",
+                          bgcolor: alpha(m.teal, 0.1),
+                          px: 1.25,
+                          py: 0.7,
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 0.75,
+                        }}
+                      >
+                        <InfoOutlinedIcon
+                          sx={{ fontSize: 16, color: m.teal, flexShrink: 0 }}
+                        />
+                        <Typography
+                          sx={{
+                            fontSize: 11.5,
+                            fontWeight: 800,
+                            color: m.teal,
+                            lineHeight: 1.25,
+                          }}
+                        >
+                          {minimumTimeslotNotice}
+                        </Typography>
+                      </Box>
+                    ) : requiresPersonAssignment && !isNotesCardSelected ? (
                       <Box
                         sx={{
                           mt: 1.25,
@@ -2408,7 +2375,6 @@ export default function ClientBookingCreateView() {
                         </Typography>
                       </Box>
                     ) : null}
-                  </Box>
 
                   {isDesiredLocation && isPlanningCardSelected ? (
                     renderPlanningForm()
@@ -2420,7 +2386,7 @@ export default function ClientBookingCreateView() {
                       {renderServicesDetails()}
                     </>
                   )}
-                </Paper>
+                  </Box>
               </Grid>
 
               {/* RIGHT */}
@@ -2448,145 +2414,129 @@ export default function ClientBookingCreateView() {
                   </Box>
                   <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
                   <Box sx={{ px: 1.8, pt: 1.15, pb: 1.05 }}>
+                    <Typography
+                      sx={{
+                        fontWeight: 900,
+                        color: m.headingText,
+                        fontSize: 17,
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      {summaryShopName}
+                    </Typography>
+
+                    <Stack
+                      direction="row"
+                      alignItems="center"
+                      spacing={0.55}
+                      sx={{ mt: 0.65, minWidth: 0 }}
+                    >
+                      <AccessTimeRoundedIcon
+                        sx={{ fontSize: 15, color: m.teal, flexShrink: 0 }}
+                      />
+                      <Typography
+                        sx={{
+                          fontWeight: 800,
+                          color: alpha(m.teal, 0.95),
+                          fontSize: 10.25,
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                        }}
+                      >
+                        {selectedDate.toLocaleDateString("en-US", {
+                          weekday: "short",
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}{" "}
+                        ({fmtMinutesToTimeLabel(bookingStartMinutes)} –{" "}
+                        {fmtMinutesToTimeLabel(bookingEndMinutes)})
+                      </Typography>
+                    </Stack>
+
                     <Chip
                       label={
                         isDesiredLocation ? "Desired Location" : "Fixed Location"
                       }
                       size="small"
-                      sx={{
-                        height: 18,
-                        borderRadius: "4px",
-                        bgcolor: alpha(m.teal, 0.1),
-                        color: m.teal,
-                        fontSize: 9.5,
-                        fontWeight: 800,
-                        "& .MuiChip-label": { px: 0.85 },
-                      }}
+                      sx={{ ...locationModeChipSx, mt: 0.75 }}
                     />
-
-                    <Typography
-                      sx={{
-                        mt: 0.85,
-                        fontWeight: 900,
-                        color: m.headingText,
-                        fontSize: 15,
-                        lineHeight: 1.2,
-                      }}
-                    >
-                      {summaryServiceName}
-                    </Typography>
-
-                    {summaryTeamMemberName ? (
-                      <Stack
-                        direction="row"
-                        alignItems="center"
-                        spacing={0.5}
-                        sx={{ mt: 0.55 }}
-                      >
-                        <PersonOutlineRoundedIcon
-                          sx={{
-                            fontSize: 15,
-                            color: alpha(m.navy, 0.45),
-                            flexShrink: 0,
-                          }}
-                        />
-                        <Typography
-                          sx={{
-                            fontSize: 11.5,
-                            fontWeight: 700,
-                            color: alpha(m.navy, 0.62),
-                            lineHeight: 1,
-                          }}
-                        >
-                          {summaryTeamMemberName}
-                        </Typography>
-                      </Stack>
-                    ) : null}
-
-                    <Stack
-                      direction="row"
-                      alignItems="flex-start"
-                      justifyContent="space-between"
-                      spacing={1}
-                      sx={{ mt: 0.65 }}
-                    >
-                      <Stack
-                        direction="row"
-                        alignItems="center"
-                        spacing={0.55}
-                        sx={{ minWidth: 0, flexShrink: 1 }}
-                      >
-                        <AccessTimeRoundedIcon
-                          sx={{ fontSize: 15, color: m.teal, flexShrink: 0 }}
-                        />
-                        <Typography
-                          sx={{
-                            fontWeight: 800,
-                            color: alpha(m.teal, 0.95),
-                            fontSize: 10.25,
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                        >
-                          {selectedDate.toLocaleDateString("en-US", {
-                            weekday: "short",
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          })}{" "}
-                          ({fmtMinutesToTimeLabel(bookingStartMinutes)} –{" "}
-                          {fmtMinutesToTimeLabel(bookingEndMinutes)})
-                        </Typography>
-                      </Stack>
-                      <Box
-                        sx={{
-                          display: "flex",
-                          alignItems: "flex-start",
-                          gap: 0.5,
-                          ml: "auto",
-                          maxWidth: "46%",
-                          flex: "0 1 auto",
-                          minWidth: 0,
-                        }}
-                      >
-                        <LocationOnOutlinedIcon
-                          sx={{
-                            fontSize: 14,
-                            width: 14,
-                            height: 14,
-                            color: alpha(m.navy, 0.45),
-                            flexShrink: 0,
-                            mt: "1px",
-                          }}
-                        />
-                        <Typography
-                          component="span"
-                          sx={{
-                            fontWeight: 700,
-                            color: alpha(m.navy, 0.55),
-                            fontSize: 10,
-                            lineHeight: 1.3,
-                            minWidth: 0,
-                          }}
-                        >
-                          {summaryAddressLabel}
-                        </Typography>
-                      </Box>
-                    </Stack>
                   </Box>
                   <Divider />
 
                   <Box sx={{ p: 1.6 }}>
                     <Stack spacing={1.25}>
+                      {isDesiredLocation && desiredTeamMemberFullName ? (
+                        <Box
+                          sx={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            alignSelf: "flex-start",
+                            gap: 0.6,
+                            height: 26,
+                            borderRadius: "10px",
+                            border: `1px solid ${alpha(m.navy, 0.12)}`,
+                            bgcolor: "#fff",
+                            px: 1,
+                            py: 0,
+                            lineHeight: 0,
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              width: 14,
+                              height: 14,
+                              display: "grid",
+                              placeItems: "center",
+                              flexShrink: 0,
+                              lineHeight: 0,
+                            }}
+                          >
+                            <PersonOutlineRoundedIcon
+                              sx={{
+                                fontSize: 14,
+                                color: alpha(m.navy, 0.45),
+                                display: "block",
+                              }}
+                            />
+                          </Box>
+                          <Typography
+                            sx={{
+                              fontSize: 11.5,
+                              fontWeight: 700,
+                              color: alpha(m.navy, 0.72),
+                              lineHeight: 1,
+                              display: "flex",
+                              alignItems: "center",
+                            }}
+                          >
+                            {desiredTeamMemberFullName}
+                          </Typography>
+                        </Box>
+                      ) : null}
                       {summarySections.map(
-                        ({
-                          key,
-                          title,
-                          roleLabel,
-                          items,
-                          planningItem,
-                        }) => {
+                        (
+                          {
+                            key,
+                            title,
+                            roleLabel,
+                            isRequester,
+                            items,
+                            planningItem,
+                          },
+                          sectionIndex,
+                        ) => {
+                          const heading =
+                            isRequester
+                              ? title
+                              : roleLabel === "Guest" &&
+                                  !title.toLowerCase().startsWith("guest")
+                                ? `Guest ${title}`
+                                : title;
+                          const useGuestCardStyle =
+                            !isRequester || isDesiredLocation;
                           return (
                             <Box key={key}>
                               <Stack
@@ -2598,35 +2548,45 @@ export default function ClientBookingCreateView() {
                                 <Typography
                                   sx={{
                                     fontWeight: 900,
-                                    fontSize: 12,
+                                    fontSize: isRequester ? 12 : 13,
                                     color: m.headingText,
                                     lineHeight: 1,
+                                    display: "flex",
+                                    alignItems: "center",
                                   }}
                                 >
-                                  {title}
+                                  {heading}
                                 </Typography>
-                                <Typography
-                                  sx={{
-                                    fontWeight: 800,
-                                    fontSize: 10.5,
-                                    color: "primary.light",
-                                    textTransform: "uppercase",
-                                    letterSpacing: 0.3,
-                                    lineHeight: 1,
-                                  }}
-                                >
-                                  {roleLabel}
-                                </Typography>
+                                {isRequester ? (
+                                  <Typography
+                                    sx={{
+                                      fontWeight: 800,
+                                      fontSize: 10.5,
+                                      color: "primary.light",
+                                      textTransform: "uppercase",
+                                      letterSpacing: 0.3,
+                                      lineHeight: 1,
+                                      display: "flex",
+                                      alignItems: "center",
+                                    }}
+                                  >
+                                    CLIENT
+                                  </Typography>
+                                ) : null}
                               </Stack>
                               <Stack spacing={0.75}>
                                 {planningItem ? (
                                   <Box
                                     sx={{
                                       borderRadius: "10px",
-                                      border: `1px solid ${alpha(m.navy, 0.06)}`,
+                                      border: useGuestCardStyle
+                                        ? "none"
+                                        : `1px solid ${alpha(m.navy, 0.08)}`,
                                       px: 1.2,
                                       py: 0.9,
-                                      bgcolor: alpha(m.navy, 0.02),
+                                      bgcolor: useGuestCardStyle
+                                        ? m.fxGrayF2F4F7
+                                        : "#fff",
                                     }}
                                   >
                                     <Box sx={{ minWidth: 0 }}>
@@ -2669,21 +2629,28 @@ export default function ClientBookingCreateView() {
                                           (sum, row) => sum + row.durationMins,
                                           0,
                                         );
-                                  const staffName = resolveServiceTeamMemberName(s);
+                                  const staffName =
+                                    !isDesiredLocation && isRequester
+                                      ? resolveServiceTeamMemberName(s)
+                                      : undefined;
                                   return (
                                   <Box
                                     key={s.id}
                                     sx={{
                                       borderRadius: "10px",
-                                      border: `1px solid ${alpha(m.navy, 0.06)}`,
+                                      border: useGuestCardStyle
+                                        ? "none"
+                                        : `1px solid ${alpha(m.navy, 0.08)}`,
                                       px: 1.2,
                                       py: 0.9,
-                                      bgcolor: alpha(m.navy, 0.02),
+                                      bgcolor: useGuestCardStyle
+                                        ? m.fxGrayF2F4F7
+                                        : "#fff",
                                     }}
                                   >
                                     <Stack
                                       direction="row"
-                                      alignItems="flex-start"
+                                      alignItems="center"
                                       justifyContent="space-between"
                                       spacing={1}
                                     >
@@ -2746,7 +2713,9 @@ export default function ClientBookingCreateView() {
                                   );
                                 })}
                               </Stack>
-                              <Divider sx={{ mt: 1.1 }} />
+                              {sectionIndex < summarySections.length - 1 ? (
+                                <Divider sx={{ mt: 1.1 }} />
+                              ) : null}
                             </Box>
                           );
                         },

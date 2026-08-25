@@ -4,6 +4,7 @@ import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import PhoneOutlinedIcon from "@mui/icons-material/PhoneOutlined";
 import { Box, Chip, Grid, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
+import { locationModeChipSx } from "./locationModeChipSx";
 
 type Props = {
   professionalName: string;
@@ -91,20 +92,13 @@ export default function ClientBookingInfoBar({
             <Chip
               label={locationBadge}
               size="small"
-              sx={{
-                height: 20,
-                fontSize: 9,
-                fontWeight: 900,
-                bgcolor: alpha(m.teal, 0.1),
-                color: m.teal,
-                "& .MuiChip-label": { px: 0.75 },
-              }}
+              sx={locationModeChipSx}
             />
           </Stack>
           <Box
             sx={{
               display: "flex",
-              alignItems: "flex-start",
+              alignItems: "center",
               gap: 0.5,
               minWidth: 0,
             }}
@@ -116,7 +110,7 @@ export default function ClientBookingInfoBar({
                 height: 16,
                 color: alpha(m.navy, 0.45),
                 flexShrink: 0,
-                mt: 0.15,
+                display: "block",
               }}
             />
             <Typography
@@ -125,7 +119,7 @@ export default function ClientBookingInfoBar({
                 fontWeight: 700,
                 fontSize: 11.5,
                 color: alpha(m.navy, 0.62),
-                lineHeight: 1.4,
+                lineHeight: 1.2,
                 minWidth: 0,
               }}
             >

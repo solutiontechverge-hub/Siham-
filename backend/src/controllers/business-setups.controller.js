@@ -251,7 +251,10 @@ export const getPublicBusinessHoursForSetup = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Public business hours fetched successfully.",
-      data: { publicBusinessHours },
+      data: {
+        publicBusinessHours,
+        bookingRules: availability?.bookingRules ?? {},
+      },
     });
   } catch (error) {
     return res.status(500).json({
