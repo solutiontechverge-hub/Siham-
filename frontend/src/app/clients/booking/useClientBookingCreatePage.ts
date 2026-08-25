@@ -1323,9 +1323,6 @@ export function useClientBookingCreatePage() {
         tm.locationModes.includes(profileSelection.locationMode),
       );
       const noSelectableTeam = !firstMember;
-      // Desired: always start in Unassigned — client assigns from that tab.
-      // Fixed with no staff: Unassigned (pro will provide). Fixed with staff: Assigned.
-      const leaveUnassigned = isDesired || noSelectableTeam;
       const defaultTeamMemberId = firstMember?.id ?? null;
 
       const profileServices = profileSelection.services.map((row) => ({
@@ -1335,8 +1332,9 @@ export function useClientBookingCreatePage() {
         name: row.name,
         durationMins: row.durationMins,
         price: row.price,
-        guestId: leaveUnassigned ? null : "p-requester",
-        // Desired keeps backend/default TM even while Unassigned so assign stamps it.
+        // New Book Now: always Unassigned for every professional. Edit/EBR keeps draft guestId.
+        guestId: null,
+        // Keep default TM on the picker while Unassigned so assign can stamp it.
         teamMemberId: noSelectableTeam
           ? null
           : (row.teamMemberId || defaultTeamMemberId),
@@ -1578,10 +1576,7 @@ export function useClientBookingCreatePage() {
       : [];
 
     const mode = shop.locationMode ?? "fixed";
-    const isDesired = mode === "desired";
     const defaultTeamMemberId = apiTeam[0]?.id ?? null;
-    // Desired: Unassigned until client assigns. Fixed: Unassigned only when no staff.
-    const leaveUnassigned = isDesired || !defaultTeamMemberId;
     const catalogServices = getServicesForLocationMode(
       businessProfile,
       mode,
@@ -1595,7 +1590,7 @@ export function useClientBookingCreatePage() {
         price: priced.price,
         originalPrice: priced.originalPrice,
         discountPct: priced.discountPct,
-        guestId: (leaveUnassigned ? null : "p-requester") as string | null,
+        guestId: null as string | null,
         teamMemberId: defaultTeamMemberId,
       };
     });
@@ -1652,16 +1647,14 @@ export function useClientBookingCreatePage() {
       return;
     }
     setSelectedTeamMemberId(fallbackId);
-    if (isDesiredLocation) {
-      setServices((prev) =>
-        prev.map((s) => ({
-          ...s,
-          // Stamp TM without moving Unassigned → Assigned.
-          teamMemberId: s.teamMemberId || fallbackId,
-        })),
-      );
-    }
-  }, [filteredTeamMembers, isDesiredLocation, selectedTeamMemberId]);
+    setServices((prev) =>
+      prev.map((s) => ({
+        ...s,
+        // Stamp TM without moving Unassigned → Assigned.
+        teamMemberId: s.teamMemberId || fallbackId,
+      })),
+    );
+  }, [filteredTeamMembers, selectedTeamMemberId]);
 
   const reorderPeople = React.useCallback((fromId: string, toId: string) => {
     if (fromId === toId) return;

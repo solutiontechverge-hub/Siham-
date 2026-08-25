@@ -35,6 +35,7 @@ import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
+import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import FileUploadOutlinedIcon from "@mui/icons-material/FileUploadOutlined";
 import ModeEditOutlineRoundedIcon from "@mui/icons-material/ModeEditOutlineRounded";
 import { AppDropdown, AppTextField } from "../../../components/common";
@@ -160,6 +161,7 @@ export default function ClientBookingCreateView() {
     projectFileInputRef,
     locationMode,
     isDesiredLocation,
+    desiredVisitAddressLabel,
     isCompanyClient,
     showProjectDetails,
     getParticipantLabel,
@@ -1013,6 +1015,11 @@ export default function ClientBookingCreateView() {
         .filter((name): name is string => Boolean(name)),
     ),
   ].join(", ");
+  const summaryAddressLabel =
+    (isDesiredLocation
+      ? desiredVisitAddressLabel
+      : shop?.addressLabel?.trim() || shop?.municipalityLabel?.trim()) ||
+    (isDesiredLocation ? "Service at your location" : "Studio location");
 
   if (fromProfile && !profileHydrated) {
     return (
@@ -2438,6 +2445,24 @@ export default function ClientBookingCreateView() {
                     >
                       Service Summary
                     </Typography>
+                  </Box>
+                  <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
+                  <Box sx={{ px: 1.8, pt: 1.15, pb: 1.05 }}>
+                    <Chip
+                      label={
+                        isDesiredLocation ? "Desired Location" : "Fixed Location"
+                      }
+                      size="small"
+                      sx={{
+                        height: 18,
+                        borderRadius: "4px",
+                        bgcolor: alpha(m.teal, 0.1),
+                        color: m.teal,
+                        fontSize: 9.5,
+                        fontWeight: 800,
+                        "& .MuiChip-label": { px: 0.85 },
+                      }}
+                    />
 
                     <Typography
                       sx={{
@@ -2480,50 +2505,75 @@ export default function ClientBookingCreateView() {
 
                     <Stack
                       direction="row"
-                      alignItems="center"
-                      spacing={0.55}
-                      sx={{ mt: 0.65, minWidth: 0 }}
+                      alignItems="flex-start"
+                      justifyContent="space-between"
+                      spacing={1}
+                      sx={{ mt: 0.65 }}
                     >
-                      <AccessTimeRoundedIcon
-                        sx={{ fontSize: 15, color: m.teal, flexShrink: 0 }}
-                      />
-                      <Typography
+                      <Stack
+                        direction="row"
+                        alignItems="center"
+                        spacing={0.55}
+                        sx={{ minWidth: 0, flexShrink: 1 }}
+                      >
+                        <AccessTimeRoundedIcon
+                          sx={{ fontSize: 15, color: m.teal, flexShrink: 0 }}
+                        />
+                        <Typography
+                          sx={{
+                            fontWeight: 800,
+                            color: alpha(m.teal, 0.95),
+                            fontSize: 10.25,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          {selectedDate.toLocaleDateString("en-US", {
+                            weekday: "short",
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })}{" "}
+                          ({fmtMinutesToTimeLabel(bookingStartMinutes)} –{" "}
+                          {fmtMinutesToTimeLabel(bookingEndMinutes)})
+                        </Typography>
+                      </Stack>
+                      <Box
                         sx={{
-                          fontWeight: 800,
-                          color: alpha(m.teal, 0.95),
-                          fontSize: 10.25,
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: 0.5,
+                          ml: "auto",
+                          maxWidth: "46%",
+                          flex: "0 1 auto",
+                          minWidth: 0,
                         }}
                       >
-                        {selectedDate.toLocaleDateString("en-US", {
-                          weekday: "short",
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}{" "}
-                        ({fmtMinutesToTimeLabel(bookingStartMinutes)} –{" "}
-                        {fmtMinutesToTimeLabel(bookingEndMinutes)})
-                      </Typography>
+                        <LocationOnOutlinedIcon
+                          sx={{
+                            fontSize: 14,
+                            width: 14,
+                            height: 14,
+                            color: alpha(m.navy, 0.45),
+                            flexShrink: 0,
+                            mt: "1px",
+                          }}
+                        />
+                        <Typography
+                          component="span"
+                          sx={{
+                            fontWeight: 700,
+                            color: alpha(m.navy, 0.55),
+                            fontSize: 10,
+                            lineHeight: 1.3,
+                            minWidth: 0,
+                          }}
+                        >
+                          {summaryAddressLabel}
+                        </Typography>
+                      </Box>
                     </Stack>
-
-                    <Chip
-                      label={
-                        isDesiredLocation ? "Desired Location" : "Fixed Location"
-                      }
-                      size="small"
-                      sx={{
-                        mt: 0.7,
-                        height: 18,
-                        borderRadius: "4px",
-                        bgcolor: alpha(m.teal, 0.1),
-                        color: m.teal,
-                        fontSize: 9.5,
-                        fontWeight: 800,
-                        "& .MuiChip-label": { px: 0.85 },
-                      }}
-                    />
                   </Box>
                   <Divider />
 
@@ -2704,31 +2754,41 @@ export default function ClientBookingCreateView() {
 
                       <BookingSummaryNote note={clientNote} />
 
-                      <Stack
-                        direction="row"
-                        justifyContent="space-between"
-                        alignItems="center"
+                      <Box
+                        sx={{
+                          borderRadius: "10px",
+                          bgcolor: alpha(m.navy, 0.035),
+                          border: `1px solid ${alpha(m.navy, 0.22)}`,
+                          px: 1.25,
+                          py: 1,
+                        }}
                       >
-                        <Typography
-                          sx={{
-                            fontSize: 12,
-                            fontWeight: 900,
-                            color: alpha(m.navy, 0.78),
-                          }}
+                        <Stack
+                          direction="row"
+                          justifyContent="space-between"
+                          alignItems="center"
                         >
-                          Total
-                        </Typography>
-                        <Typography
-                          sx={{
-                            fontSize: 12.5,
-                            fontWeight: 900,
-                            color: alpha(m.navy, 0.78),
-                            lineHeight: 1.1,
-                          }}
-                        >
-                          {total} €
-                        </Typography>
-                      </Stack>
+                          <Typography
+                            sx={{
+                              fontSize: 12,
+                              fontWeight: 600,
+                              color: alpha(m.navy, 0.48),
+                            }}
+                          >
+                            Total
+                          </Typography>
+                          <Typography
+                            sx={{
+                              fontSize: 12.5,
+                              fontWeight: 700,
+                              color: alpha(m.navy, 0.55),
+                              lineHeight: 1.1,
+                            }}
+                          >
+                            €{total}
+                          </Typography>
+                        </Stack>
+                      </Box>
 
                       {!allServicesAssigned && services.length > 0 ? (
                         <Typography

@@ -101,21 +101,32 @@ export default function ClientBookingInfoBar({
               }}
             />
           </Stack>
-          <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.6 }}>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 0.5,
+              minWidth: 0,
+            }}
+          >
             <LocationOnOutlinedIcon
               sx={{
                 fontSize: 16,
+                width: 16,
+                height: 16,
                 color: alpha(m.navy, 0.45),
-                mt: 0.15,
                 flexShrink: 0,
+                mt: 0.15,
               }}
             />
             <Typography
+              component="span"
               sx={{
                 fontWeight: 700,
                 fontSize: 11.5,
                 color: alpha(m.navy, 0.62),
                 lineHeight: 1.4,
+                minWidth: 0,
               }}
             >
               {address?.trim() ||

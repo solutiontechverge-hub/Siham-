@@ -555,18 +555,7 @@ export default function ClientBookingCreateSummaryView() {
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "mollure.pageBg", py: { xs: 2.5, md: 3.5 } }}>
-      <Container maxWidth="md">
-        <Typography
-          sx={{
-            fontSize: "30px",
-            fontWeight: 700,
-            color: alpha(m.navy, 0.86),
-            mb: 2,
-          }}
-        >
-          Booking Details
-        </Typography>
-
+      <Container maxWidth="lg" sx={{ maxWidth: { lg: 1100 } }}>
         <Paper
           elevation={0}
           sx={{
@@ -577,29 +566,56 @@ export default function ClientBookingCreateSummaryView() {
             boxShadow: "0 10px 22px rgba(16, 35, 63, 0.05)",
           }}
         >
+          <Box sx={{ px: { xs: 2.25, md: 3.5 }, pt: 2.25, pb: 1.15 }}>
+            <Typography
+              sx={{
+                fontSize: { xs: 26, md: 30 },
+                fontWeight: 700,
+                color: alpha(m.navy, 0.86),
+                lineHeight: 1.15,
+              }}
+            >
+              Booking Details
+            </Typography>
+          </Box>
+          <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
+
+          <Box sx={{ px: { xs: 2.25, md: 3.5 }, py: 2 }}>
+            <Box
+              sx={{
+                borderRadius: "12px",
+                border: `1px solid ${alpha(m.navy, 0.18)}`,
+                bgcolor: "#fff",
+                overflow: "hidden",
+              }}
+            >
           <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 2, pb: 1.25 }}>
             <Typography
               sx={{
-                fontWeight: 900,
-                fontSize: 14,
+                fontWeight: 700,
+                fontSize: "30px",
                 color: alpha(m.navy, 0.72),
                 textAlign: "center",
+                lineHeight: 1.2,
               }}
             >
               Service Summary
             </Typography>
+          </Box>
+          <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
+          <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 1.35, pb: 1.5 }}>
 
-            <Box sx={{ mt: 1 }}>
+            <Box sx={{ mt: 1.1 }}>
               <Chip
                 label={isDesired ? "Desired Location" : "Fixed Location"}
                 size="small"
                 sx={{
-                  height: 20,
+                  height: 22,
                   borderRadius: "4px",
                   bgcolor: alpha(m.teal, 0.12),
                   color: m.teal,
                   fontSize: 11,
-                  fontWeight: 900,
+                  fontWeight: 800,
                   "& .MuiChip-label": { px: 1 },
                 }}
               />
@@ -607,7 +623,7 @@ export default function ClientBookingCreateSummaryView() {
 
             <Typography
               sx={{
-                mt: 0.85,
+                mt: 0.9,
                 fontWeight: 900,
                 fontSize: 18,
                 color: alpha(m.navy, 0.88),
@@ -619,52 +635,74 @@ export default function ClientBookingCreateSummaryView() {
 
             <Stack
               direction="row"
-              alignItems="center"
-              spacing={0.6}
-              sx={{ mt: 0.75, minWidth: 0 }}
+              alignItems="flex-start"
+              justifyContent="space-between"
+              spacing={2}
+              sx={{ mt: 0.85 }}
             >
-              <AccessTimeRoundedIcon
-                sx={{ fontSize: 16, color: m.teal, flexShrink: 0 }}
-              />
-              <Typography
-                sx={{
-                  fontWeight: 800,
-                  color: alpha(m.teal, 0.95),
-                  fontSize: 12.5,
-                }}
-              >
-                {dateLabel} ({fmtMinutesToTimeLabel(bookingStartMinutes)}-
-                {fmtMinutesToTimeLabel(bookingEndMinutes)})
-              </Typography>
-            </Stack>
-
-            {!isDesired ? (
               <Stack
                 direction="row"
                 alignItems="center"
-                spacing={0.55}
-                sx={{ mt: 0.55, minWidth: 0 }}
+                spacing={0.6}
+                sx={{ minWidth: 0, flexShrink: 0 }}
               >
-                <LocationOnOutlinedIcon
-                  sx={{ fontSize: 16, color: alpha(m.navy, 0.45), flexShrink: 0 }}
+                <AccessTimeRoundedIcon
+                  sx={{ fontSize: 16, color: m.teal, flexShrink: 0 }}
                 />
                 <Typography
+                  sx={{
+                    fontWeight: 800,
+                    color: alpha(m.teal, 0.95),
+                    fontSize: 12.5,
+                    whiteSpace: { xs: "normal", sm: "nowrap" },
+                  }}
+                >
+                  {dateLabel} ({fmtMinutesToTimeLabel(bookingStartMinutes)}-
+                  {fmtMinutesToTimeLabel(bookingEndMinutes)})
+                </Typography>
+              </Stack>
+
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 0.5,
+                  ml: "auto",
+                  maxWidth: { xs: "46%", sm: "50%" },
+                  flex: "0 1 auto",
+                  minWidth: 0,
+                }}
+              >
+                <LocationOnOutlinedIcon
+                  sx={{
+                    fontSize: 16,
+                    width: 16,
+                    height: 16,
+                    color: alpha(m.navy, 0.45),
+                    flexShrink: 0,
+                    mt: "2px",
+                  }}
+                />
+                <Typography
+                  component="span"
                   sx={{
                     fontWeight: 700,
                     color: alpha(m.navy, 0.55),
                     fontSize: 12,
+                    lineHeight: 1.35,
+                    minWidth: 0,
                   }}
                 >
                   {addressLabel}
                 </Typography>
-              </Stack>
-            ) : null}
+              </Box>
+            </Stack>
           </Box>
 
-          <Divider />
+          <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
 
           <Box sx={{ px: { xs: 2, md: 2.5 }, py: 1.75 }}>
-            <Stack spacing={1.5}>
+            <Stack spacing={1.5} divider={<Divider sx={{ borderColor: alpha(m.navy, 0.08) }} />}>
               {summarySections.map((section) => {
                 const roleLabel = roleLabelForSection(section);
                 return (
@@ -796,147 +834,156 @@ export default function ClientBookingCreateSummaryView() {
             ) : null}
           </Box>
 
-          <Box
-            sx={{
-              px: { xs: 2, md: 2.5 },
-              py: 1.35,
-              bgcolor: alpha(m.navy, 0.035),
-              borderTop: `1px solid ${alpha(m.navy, 0.06)}`,
-            }}
-          >
-            <Stack
-              direction="row"
-              alignItems="center"
-              justifyContent="space-between"
+          <Box sx={{ px: { xs: 2, md: 2.5 }, pb: 1.75 }}>
+            <Box
+              sx={{
+                borderRadius: "10px",
+                bgcolor: alpha(m.navy, 0.035),
+                border: `1px solid ${alpha(m.navy, 0.22)}`,
+                px: { xs: 1.5, md: 2 },
+                py: 1.35,
+              }}
             >
-              <Typography
-                sx={{ fontWeight: 800, fontSize: 13, color: alpha(m.navy, 0.7) }}
-              >
-                Total
-              </Typography>
-              <Typography
-                sx={{ fontWeight: 900, fontSize: 16, color: alpha(m.navy, 0.88) }}
-              >
-                €{total}
-              </Typography>
-            </Stack>
-
-            {showFixedPrepayRow ? (
               <Stack
                 direction="row"
                 alignItems="center"
                 justifyContent="space-between"
-                spacing={1}
-                sx={{ mt: 0.85 }}
+                spacing={1.5}
               >
+                <Typography
+                  sx={{ fontWeight: 600, fontSize: 13, color: alpha(m.navy, 0.48) }}
+                >
+                  Total
+                </Typography>
                 <Typography
                   sx={{
                     fontWeight: 700,
-                    fontSize: 12,
-                    color: alpha(m.navy, 0.58),
-                    flex: 1,
-                    minWidth: 0,
+                    fontSize: 15,
+                    color: alpha(m.navy, 0.55),
+                    flexShrink: 0,
                   }}
                 >
-                  {isPrepaymentPaid
-                    ? `Prepaid (${prepaymentPercent}%)`
-                    : `Prepayment Required (${prepaymentPercent}%)`}
+                  €{total}
                 </Typography>
+              </Stack>
+
+              {showFixedPrepayRow ? (
                 <Stack
                   direction="row"
                   alignItems="center"
-                  spacing={1.25}
-                  sx={{ flexShrink: 0 }}
+                  justifyContent="space-between"
+                  spacing={1.5}
+                  sx={{ mt: 0.85 }}
                 >
-                  {!isPrepaymentPaid ? (
-                    <Typography
-                      component="button"
-                      type="button"
-                      onClick={() => void handlePayNow()}
-                      disabled={isPaying}
-                      sx={{
-                        border: 0,
-                        bgcolor: "transparent",
-                        p: 0,
-                        cursor: isPaying ? "wait" : "pointer",
-                        color: m.teal,
-                        fontWeight: 900,
-                        fontSize: 12.5,
-                        fontFamily: "inherit",
-                        opacity: isPaying ? 0.7 : 1,
-                        "&:hover": { color: m.tealDark },
-                      }}
-                    >
-                      {isPaying ? "Preparing…" : "Pay Now"}
-                    </Typography>
-                  ) : (
-                    <Typography
-                      sx={{
-                        fontWeight: 800,
-                        fontSize: 12,
-                        color: m.teal,
-                      }}
-                    >
-                      Paid
-                    </Typography>
-                  )}
                   <Typography
                     sx={{
-                      fontWeight: 800,
+                      fontWeight: 600,
+                      fontSize: 12,
+                      color: alpha(m.navy, 0.42),
+                      minWidth: 0,
+                    }}
+                  >
+                    {isPrepaymentPaid
+                      ? `Prepaid (${prepaymentPercent}%)`
+                      : `Prepayment Required (${prepaymentPercent}%)`}
+                  </Typography>
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    spacing={1.25}
+                    sx={{ flexShrink: 0 }}
+                  >
+                    {!isPrepaymentPaid ? (
+                      <Typography
+                        component="button"
+                        type="button"
+                        onClick={() => void handlePayNow()}
+                        disabled={isPaying}
+                        sx={{
+                          border: 0,
+                          bgcolor: "transparent",
+                          p: 0,
+                          cursor: isPaying ? "wait" : "pointer",
+                          color: m.teal,
+                          fontWeight: 900,
+                          fontSize: 12.5,
+                          fontFamily: "inherit",
+                          opacity: isPaying ? 0.7 : 1,
+                          "&:hover": { color: m.tealDark },
+                        }}
+                      >
+                        {isPaying ? "Preparing…" : "Pay Now"}
+                      </Typography>
+                    ) : (
+                      <Typography
+                        sx={{
+                          fontWeight: 800,
+                          fontSize: 12,
+                          color: m.teal,
+                        }}
+                      >
+                        Paid
+                      </Typography>
+                    )}
+                    <Typography
+                      sx={{
+                        fontWeight: 600,
+                        fontSize: 13,
+                        color: alpha(m.navy, 0.48),
+                        textAlign: "right",
+                      }}
+                    >
+                      €{prepayAmount}
+                    </Typography>
+                  </Stack>
+                </Stack>
+              ) : null}
+
+              {showDesiredPrepayNote ? (
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  spacing={1.5}
+                  sx={{ mt: 0.75 }}
+                >
+                  <Typography
+                    sx={{
+                      fontWeight: 600,
+                      fontSize: 11.5,
+                      color: alpha(m.navy, 0.42),
+                      minWidth: 0,
+                    }}
+                  >
+                    Prepayment Required ({prepaymentPercent}%) After Acceptance
+                  </Typography>
+                  <Typography
+                    sx={{
+                      fontWeight: 600,
                       fontSize: 13,
-                      color: alpha(m.navy, 0.78),
-                      minWidth: 56,
-                      textAlign: "right",
+                      color: alpha(m.navy, 0.48),
+                      flexShrink: 0,
                     }}
                   >
                     €{prepayAmount}
                   </Typography>
                 </Stack>
-              </Stack>
-            ) : null}
-
-            {showDesiredPrepayNote ? (
-              <Stack
-                direction="row"
-                alignItems="center"
-                justifyContent="space-between"
-                sx={{ mt: 0.75 }}
-              >
-                <Typography
-                  sx={{
-                    fontWeight: 700,
-                    fontSize: 11.5,
-                    color: alpha(m.navy, 0.55),
-                  }}
-                >
-                  Prepayment Required ({prepaymentPercent}%) After Acceptance
-                </Typography>
-                <Typography
-                  sx={{
-                    fontWeight: 800,
-                    fontSize: 13,
-                    color: alpha(m.navy, 0.78),
-                  }}
-                >
-                  €{prepayAmount}
-                </Typography>
-              </Stack>
-            ) : null}
+              ) : null}
+            </Box>
           </Box>
-        </Paper>
+            </Box>
+          </Box>
 
-        <Paper
-          elevation={0}
-          sx={{
-            mt: 2,
-            borderRadius: "12px",
-            border: `1px solid ${alpha(m.navy, 0.08)}`,
-            bgcolor: "#fff",
-            overflow: "hidden",
-            px: { xs: 2, md: 2.5 },
-            py: 2,
-          }}
-        >
+          <Box sx={{ px: { xs: 2.25, md: 3.5 }, pt: 0.25, pb: 2.25 }}>
+          <Box
+            sx={{
+              borderRadius: "10px",
+              border: `1px solid ${alpha(m.navy, 0.22)}`,
+              bgcolor: "#fff",
+              px: { xs: 1.5, md: 2 },
+              py: 1.75,
+            }}
+          >
           <Typography
             sx={{
               fontWeight: 900,
@@ -1078,40 +1125,42 @@ export default function ClientBookingCreateSummaryView() {
               </Box>
             ) : null}
           </Stack>
-        </Paper>
+          </Box>
 
-        <AppButton
-          tone="primary"
-          fullWidth
-          disabled={isSubmitting || mustPayBeforeBooking}
-          onClick={() => void onSubmit()}
-          sx={{ mt: 2, height: 44 }}
-        >
-          {isSubmitting ? (
-            <>
-              <CircularProgress size={18} sx={{ mr: 1, color: "inherit" }} />
-              {isDesired ? "Sending…" : "Booking…"}
-            </>
-          ) : isDesired ? (
-            "Send Booking Request"
-          ) : (
-            "Book Now"
-          )}
-        </AppButton>
-
-        {mustPayBeforeBooking ? (
-          <Typography
-            sx={{
-              mt: 1,
-              textAlign: "center",
-              fontSize: 12,
-              fontWeight: 700,
-              color: alpha(m.navy, 0.5),
-            }}
+          <AppButton
+            tone="primary"
+            fullWidth
+            disabled={isSubmitting || mustPayBeforeBooking}
+            onClick={() => void onSubmit()}
+            sx={{ mt: 2.25, height: 44 }}
           >
-            Complete prepayment with Pay Now to enable booking.
-          </Typography>
-        ) : null}
+            {isSubmitting ? (
+              <>
+                <CircularProgress size={18} sx={{ mr: 1, color: "inherit" }} />
+                {isDesired ? "Sending…" : "Booking…"}
+              </>
+            ) : isDesired ? (
+              "Send Booking Request"
+            ) : (
+              "Book Now"
+            )}
+          </AppButton>
+
+          {mustPayBeforeBooking ? (
+            <Typography
+              sx={{
+                mt: 1,
+                textAlign: "center",
+                fontSize: 12,
+                fontWeight: 700,
+                color: alpha(m.navy, 0.5),
+              }}
+            >
+              Complete prepayment with Pay Now to enable booking.
+            </Typography>
+          ) : null}
+          </Box>
+        </Paper>
       </Container>
 
       <StripePrepaymentDialog
