@@ -112,6 +112,7 @@ type StoredBookingNoteMeta = Partial<
     | "addedServiceIds"
     | "cancelledServiceIds"
     | "silentUpdated"
+    | "scheduleEdited"
     | "refunded"
     | "waitingForPayment"
     | "invoiceDueDate"
@@ -188,6 +189,7 @@ export function serializeCalendarEntryNotes(
       ? { cancelledServiceIds: details.cancelledServiceIds }
       : {}),
     ...(details?.silentUpdated ? { silentUpdated: true } : {}),
+    ...(details?.scheduleEdited ? { scheduleEdited: true } : {}),
     ...(details?.refunded ? { refunded: true } : {}),
     ...(details?.waitingForPayment ? { waitingForPayment: true } : {}),
     ...(details?.invoiceDueDate ? { invoiceDueDate: details.invoiceDueDate } : {}),

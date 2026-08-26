@@ -22,6 +22,11 @@ import ProjectUploadThumb from "./ProjectUploadThumb";
 import type { BookingEditSuggestedProduct } from "./bookingEditRequest";
 import type { ClientBookingDraft, ClientBookingSummarySection } from "./types";
 import BookingSummaryNote from "./BookingSummaryNote";
+import BookingLineAmount from "../calendar/BookingLineAmount";
+import {
+  clientLineDiscountLabel,
+  formatBookingEur,
+} from "../../../data/bookingLinePricing";
 
 export type ClientBookingPrepaymentState = "none" | "required" | "paid";
 
@@ -275,11 +280,43 @@ export default function ClientBookingPaymentDetailsCard({
   );
 
   const total = draft?.total ?? 0;
+  const actualAmount = React.useMemo(() => {
+    const serviceActual = (draft?.services ?? []).reduce(
+      (sum, service) =>
+        sum + (Number(service.originalPrice ?? service.price) || 0),
+      0,
+    );
+    const productActual = products.reduce((sum, product) => {
+      const original = product.originalPrice ?? product.price;
+      return sum + (Number(original) || 0);
+    }, 0);
+    const km =
+      showKilometerAllowance && kilometerAllowanceAmount > 0
+        ? kilometerAllowanceAmount
+        : 0;
+    const summed = serviceActual + productActual + km;
+    return summed > 0 ? summed : total;
+  }, [
+    draft?.services,
+    kilometerAllowanceAmount,
+    products,
+    showKilometerAllowance,
+    total,
+  ]);
   const prepaidAmount =
     Math.round(((total * prepaymentPercent) / 100 + Number.EPSILON) * 100) /
     100;
   const remaining =
     Math.round((total - prepaidAmount + Number.EPSILON) * 100) / 100;
+  const showPrepaidRow =
+    prepaymentState === "required" ||
+    prepaymentState === "paid" ||
+    (locationMode === "desired" && prepaymentPercent > 0);
+  const prepaidDeducted =
+    (prepaymentState === "required" || prepaymentState === "paid") &&
+    prepaidAmount > 0;
+  const displayTotal = prepaidDeducted ? remaining : total;
+  const showStrike = actualAmount > displayTotal;
 
   const requesterSections = sections.filter(
     (s) => s.isRequester || s.participantType === "requester",
@@ -389,16 +426,11 @@ export default function ClientBookingPaymentDetailsCard({
               </Stack>
             ) : null}
           </Box>
-          <Typography
-            sx={{
-              fontSize: 13,
-              fontWeight: 900,
-              color: alpha(m.navy, 0.82),
-              flexShrink: 0,
-            }}
-          >
-            €{service.price}
-          </Typography>
+          <BookingLineAmount
+            amount={service.price}
+            originalAmount={service.originalPrice}
+            discountLabel={clientLineDiscountLabel(service)}
+          />
         </Stack>
       </Box>
     );
@@ -763,16 +795,11 @@ export default function ClientBookingPaymentDetailsCard({
                           <BookingEditedTag variant="edited" />
                         ) : null}
                       </Stack>
-                      <Typography
-                        sx={{
-                          fontSize: 13,
-                          fontWeight: 900,
-                          color: alpha(m.navy, 0.82),
-                          flexShrink: 0,
-                        }}
-                      >
-                        €{product.price}
-                      </Typography>
+                      <BookingLineAmount
+                        amount={product.price}
+                        originalAmount={product.originalPrice}
+                        discountLabel={clientLineDiscountLabel(product)}
+                      />
                     </Stack>
                   </Box>
                 ))}
@@ -842,13 +869,40 @@ export default function ClientBookingPaymentDetailsCard({
               justifyContent="space-between"
               spacing={1.5}
             >
-              <Typography sx={totalsLabelSx}>Total</Typography>
-              <Typography sx={totalsValueSx}>€{total}</Typography>
+              <Typography sx={totalsLabelSx}>Total Price</Typography>
+              <Stack alignItems="flex-end" spacing={0.2}>
+                {showStrike ? (
+                  <Typography
+                    sx={{
+                      fontWeight: 700,
+                      fontSize: 13,
+                      color: alpha(m.navy, 0.38),
+                      textDecoration: "line-through",
+                      lineHeight: 1.15,
+                    }}
+                  >
+                    €{formatBookingEur(actualAmount)}
+                  </Typography>
+                ) : null}
+                <Typography sx={totalsValueSx}>
+                  €{formatBookingEur(displayTotal)}
+                </Typography>
+                {prepaidDeducted ? (
+                  <Typography
+                    sx={{
+                      fontWeight: 800,
+                      fontSize: 11,
+                      color: m.teal,
+                      lineHeight: 1.15,
+                    }}
+                  >
+                    −€{formatBookingEur(prepaidAmount)} Prepaid
+                  </Typography>
+                ) : null}
+              </Stack>
             </Stack>
 
-            {prepaymentState === "required" ||
-            prepaymentState === "paid" ||
-            (locationMode === "desired" && prepaymentPercent > 0) ? (
+            {showPrepaidRow ? (
               <Stack
                 direction="row"
                 alignItems="center"

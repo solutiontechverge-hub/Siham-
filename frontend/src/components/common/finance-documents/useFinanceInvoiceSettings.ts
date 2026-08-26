@@ -13,6 +13,9 @@ export type FinanceInvoiceProduct = {
   name: string;
   price: string;
   vat: string;
+  unit?: number;
+  discountType?: "fixed" | "percentage";
+  discountAmount?: string;
 };
 
 export type FinanceInvoiceService = {
@@ -50,6 +53,7 @@ export type FinanceInvoiceSettings = {
   logoDataUrl: string | null;
   defaultInvoiceType: FinanceInvoiceTemplateType;
   products: FinanceInvoiceProduct[];
+  uniqueItems: FinanceInvoiceProduct[];
   services: FinanceInvoiceService[];
   paymentTerms: FinanceInvoicePaymentTerms;
   reminders: FinanceInvoiceReminders;
@@ -59,6 +63,7 @@ export const defaultFinanceInvoiceSettings: FinanceInvoiceSettings = {
   logoDataUrl: null,
   defaultInvoiceType: "individual",
   products: [],
+  uniqueItems: [],
   services: [],
   paymentTerms: {
     originalDueValue: "2",
@@ -93,15 +98,53 @@ export function useFinanceInvoiceSettings() {
   const [updateInvoiceSettings] = useUpdateFinanceInvoiceSettingsMutation();
   const [localDraft, setLocalDraft] = React.useState<FinanceInvoiceSettings | null>(null);
 
-  const settings = localDraft ?? settingsResponse?.data?.invoiceSettings ?? defaultFinanceInvoiceSettings;
+  const rawSettings =
+    localDraft ?? settingsResponse?.data?.invoiceSettings ?? defaultFinanceInvoiceSettings;
+  const settings: FinanceInvoiceSettings = {
+    ...defaultFinanceInvoiceSettings,
+    ...rawSettings,
+    products: rawSettings.products ?? [],
+    uniqueItems: rawSettings.uniqueItems ?? [],
+    services: rawSettings.services ?? [],
+    paymentTerms: {
+      ...defaultFinanceInvoiceSettings.paymentTerms,
+      ...rawSettings.paymentTerms,
+    },
+    reminders: {
+      ...defaultFinanceInvoiceSettings.reminders,
+      ...rawSettings.reminders,
+    },
+  };
 
   const setSettings = React.useCallback(
     (updater: FinanceInvoiceSettings | ((prev: FinanceInvoiceSettings) => FinanceInvoiceSettings)) => {
       setLocalDraft((prev) => {
-        const base = prev ?? settingsResponse?.data?.invoiceSettings ?? defaultFinanceInvoiceSettings;
+        const raw = prev ?? settingsResponse?.data?.invoiceSettings ?? defaultFinanceInvoiceSettings;
+        const base: FinanceInvoiceSettings = {
+          ...defaultFinanceInvoiceSettings,
+          ...raw,
+          products: raw.products ?? [],
+          uniqueItems: raw.uniqueItems ?? [],
+          services: raw.services ?? [],
+          paymentTerms: {
+            ...defaultFinanceInvoiceSettings.paymentTerms,
+            ...raw.paymentTerms,
+          },
+          reminders: {
+            ...defaultFinanceInvoiceSettings.reminders,
+            ...raw.reminders,
+          },
+        };
         const next = typeof updater === "function" ? updater(base) : updater;
-        void updateInvoiceSettings({ invoiceSettings: next });
-        return next;
+        const normalized: FinanceInvoiceSettings = {
+          ...defaultFinanceInvoiceSettings,
+          ...next,
+          products: next.products ?? [],
+          uniqueItems: next.uniqueItems ?? [],
+          services: next.services ?? [],
+        };
+        void updateInvoiceSettings({ invoiceSettings: normalized });
+        return normalized;
       });
     },
     [settingsResponse?.data?.invoiceSettings, updateInvoiceSettings],

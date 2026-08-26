@@ -55,6 +55,11 @@ import {
 import { buildBookingSummarySections, resolveTeamMemberFirstName } from "./buildBookingSummarySections";
 import { locationModeChipSx } from "./locationModeChipSx";
 import BookingSummaryNote from "./BookingSummaryNote";
+import BookingLineAmount from "../calendar/BookingLineAmount";
+import {
+  clientLineDiscountLabel,
+  formatBookingEur,
+} from "../../../data/bookingLinePricing";
 import ClientBookingProjectDetailsCard from "./ClientBookingProjectDetailsCard";
 import StripePrepaymentDialog from "./StripePrepaymentDialog";
 import { useActiveClientBooking } from "./useActiveClientBooking";
@@ -88,7 +93,8 @@ export default function ClientBookingCreateSummaryView() {
   } = useClientBookingDraft();
   const { record: activeBooking, refresh: refreshActiveBooking } =
     useActiveClientBooking();
-  const { requesterCountryCode, requesterPhone } = useClientRequesterProfile();
+  const { requesterCountryCode, requesterPhone, isProfileLoading } =
+    useClientRequesterProfile();
   const { data: businessSetupsData } = useGetAllBusinessSetupsQuery();
   const [createBooking] = useCreateBookingMutation();
   const [updateMyBooking] = useUpdateMyBookingMutation();
@@ -112,8 +118,34 @@ export default function ClientBookingCreateSummaryView() {
     return splitContactPhone(fromProfile, preferredCode);
   }, [requesterCountryCode, requesterPhone]);
 
-  const countryCode = profilePhone.countryCode;
-  const phone = profilePhone.phone;
+  const hasProfilePhone = Boolean(profilePhone.phone.trim());
+  const [countryCode, setCountryCode] = React.useState("");
+  const [phone, setPhone] = React.useState("");
+
+  React.useEffect(() => {
+    if (isProfileLoading) return;
+    if (hasProfilePhone) {
+      setCountryCode(profilePhone.countryCode);
+      setPhone(profilePhone.phone);
+      return;
+    }
+    const fromSession = String(activeBooking?.contactPhone ?? "").trim();
+    if (fromSession) {
+      const split = splitContactPhone(fromSession, profilePhone.countryCode);
+      setCountryCode((prev) => prev || split.countryCode);
+      setPhone((prev) => prev || split.phone);
+      return;
+    }
+    if (profilePhone.countryCode) {
+      setCountryCode((prev) => prev || profilePhone.countryCode);
+    }
+  }, [
+    activeBooking?.contactPhone,
+    hasProfilePhone,
+    isProfileLoading,
+    profilePhone.countryCode,
+    profilePhone.phone,
+  ]);
 
   const [address, setAddress] = React.useState<ClientBookingDesiredLocation>({
     street: "",
@@ -183,6 +215,15 @@ export default function ClientBookingCreateSummaryView() {
   }, [address, isDesired, shop?.addressLabel, shop?.municipalityLabel]);
 
   const total = draft?.total ?? 0;
+  const actualAmount = React.useMemo(
+    () =>
+      (draft?.services ?? []).reduce(
+        (sum, service) =>
+          sum + (Number(service.originalPrice ?? service.price) || 0),
+        0,
+      ) || total,
+    [draft?.services, total],
+  );
   const prepaymentPercent =
     Number(activeBooking?.prepaymentPercent) > 0
       ? Number(activeBooking?.prepaymentPercent)
@@ -196,6 +237,13 @@ export default function ClientBookingCreateSummaryView() {
   const prepayAmount =
     Math.round(((total * prepaymentPercent) / 100 + Number.EPSILON) * 100) /
     100;
+  const remainingAfterPrepay = Math.max(
+    0,
+    Math.round((total - prepayAmount + Number.EPSILON) * 100) / 100,
+  );
+  const deductPrepayment =
+    (showFixedPrepayRow || showDesiredPrepayNote) && prepayAmount > 0;
+  const displayTotal = deductPrepayment ? remainingAfterPrepay : total;
   const contactPhoneValue = formatContactPhone(countryCode, phone);
   const bookingRef = activeBooking?.bookingRef ?? "";
 
@@ -911,16 +959,11 @@ export default function ClientBookingCreateSummaryView() {
                                   </Box>
                                 ) : null}
                               </Box>
-                              <Typography
-                                sx={{
-                                  fontSize: 13,
-                                  fontWeight: 900,
-                                  color: alpha(m.navy, 0.82),
-                                  flexShrink: 0,
-                                }}
-                              >
-                                €{item.price}
-                              </Typography>
+                              <BookingLineAmount
+                                amount={item.price}
+                                originalAmount={item.originalPrice}
+                                discountLabel={clientLineDiscountLabel(item)}
+                              />
                             </Stack>
                           </Box>
                         );
@@ -937,143 +980,6 @@ export default function ClientBookingCreateSummaryView() {
             ) : null}
           </Box>
 
-          <Box sx={{ px: { xs: 2, md: 2.5 }, pb: 1.75 }}>
-            <Box
-              sx={{
-                borderRadius: "10px",
-                bgcolor: alpha(m.navy, 0.035),
-                border: `1px solid ${alpha(m.navy, 0.22)}`,
-                px: { xs: 1.5, md: 2 },
-                py: 1.35,
-              }}
-            >
-              <Stack
-                direction="row"
-                alignItems="center"
-                justifyContent="space-between"
-                spacing={1.5}
-              >
-                <Typography
-                  sx={{ fontWeight: 600, fontSize: 13, color: alpha(m.navy, 0.48) }}
-                >
-                  Total
-                </Typography>
-                <Typography
-                  sx={{
-                    fontWeight: 700,
-                    fontSize: 15,
-                    color: alpha(m.navy, 0.55),
-                    flexShrink: 0,
-                  }}
-                >
-                  €{total}
-                </Typography>
-              </Stack>
-
-              {showFixedPrepayRow ? (
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  justifyContent="space-between"
-                  spacing={1.5}
-                  sx={{ mt: 0.85 }}
-                >
-                  <Typography
-                    sx={{
-                      fontWeight: 600,
-                      fontSize: 12,
-                      color: alpha(m.navy, 0.42),
-                      minWidth: 0,
-                    }}
-                  >
-                    {isPrepaymentPaid
-                      ? `Prepaid (${prepaymentPercent}%)`
-                      : `Prepayment Required (${prepaymentPercent}%)`}
-                  </Typography>
-                  <Stack
-                    direction="row"
-                    alignItems="center"
-                    spacing={1.25}
-                    sx={{ flexShrink: 0 }}
-                  >
-                    {!isPrepaymentPaid ? (
-                      <Typography
-                        component="button"
-                        type="button"
-                        onClick={() => void handlePayNow()}
-                        disabled={isPaying}
-                        sx={{
-                          border: 0,
-                          bgcolor: "transparent",
-                          p: 0,
-                          cursor: isPaying ? "wait" : "pointer",
-                          color: m.teal,
-                          fontWeight: 900,
-                          fontSize: 12.5,
-                          fontFamily: "inherit",
-                          opacity: isPaying ? 0.7 : 1,
-                          "&:hover": { color: m.tealDark },
-                        }}
-                      >
-                        {isPaying ? "Preparing…" : "Pay Now"}
-                      </Typography>
-                    ) : (
-                      <Typography
-                        sx={{
-                          fontWeight: 800,
-                          fontSize: 12,
-                          color: m.teal,
-                        }}
-                      >
-                        Paid
-                      </Typography>
-                    )}
-                    <Typography
-                      sx={{
-                        fontWeight: 600,
-                        fontSize: 13,
-                        color: alpha(m.navy, 0.48),
-                        textAlign: "right",
-                      }}
-                    >
-                      €{prepayAmount}
-                    </Typography>
-                  </Stack>
-                </Stack>
-              ) : null}
-
-              {showDesiredPrepayNote ? (
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  justifyContent="space-between"
-                  spacing={1.5}
-                  sx={{ mt: 0.75 }}
-                >
-                  <Typography
-                    sx={{
-                      fontWeight: 600,
-                      fontSize: 11.5,
-                      color: alpha(m.navy, 0.42),
-                      minWidth: 0,
-                    }}
-                  >
-                    Prepayment Required ({prepaymentPercent}%) After Acceptance
-                  </Typography>
-                  <Typography
-                    sx={{
-                      fontWeight: 600,
-                      fontSize: 13,
-                      color: alpha(m.navy, 0.48),
-                      flexShrink: 0,
-                    }}
-                  >
-                    €{prepayAmount}
-                  </Typography>
-                </Stack>
-              ) : null}
-            </Box>
-          </Box>
             </Box>
           </Box>
 
@@ -1108,13 +1014,15 @@ export default function ClientBookingCreateSummaryView() {
             <AppCountryPhoneFields
               countryCode={countryCode}
               phone={phone}
-              onCountryCodeChange={() => {}}
-              onPhoneChange={() => {}}
+              onCountryCodeChange={setCountryCode}
+              onPhoneChange={setPhone}
               label="Contact Number"
-              phonePlaceholder="Add phone in profile"
+              phonePlaceholder={
+                hasProfilePhone ? "Phone number" : "Enter your phone number"
+              }
               required
-              disabled
-              validateOnBlur={false}
+              disabled={hasProfilePhone}
+              validateOnBlur={!hasProfilePhone}
               countryCodeWidth={140}
             />
 
@@ -1234,6 +1142,171 @@ export default function ClientBookingCreateSummaryView() {
               </Box>
             ) : null}
           </Stack>
+          </Box>
+
+          <Box sx={{ px: 0, pt: 1.75 }}>
+            <Box
+              sx={{
+                borderRadius: "10px",
+                bgcolor: alpha(m.navy, 0.035),
+                border: `1px solid ${alpha(m.navy, 0.22)}`,
+                px: { xs: 1.5, md: 2 },
+                py: 1.35,
+              }}
+            >
+              <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                spacing={1.5}
+              >
+                <Typography
+                  sx={{ fontWeight: 600, fontSize: 13, color: alpha(m.navy, 0.48) }}
+                >
+                  Total Price
+                </Typography>
+                <Stack alignItems="flex-end" spacing={0.2}>
+                  {actualAmount > displayTotal ? (
+                    <Typography
+                      sx={{
+                        fontWeight: 700,
+                        fontSize: 13,
+                        color: alpha(m.navy, 0.38),
+                        textDecoration: "line-through",
+                        lineHeight: 1.15,
+                      }}
+                    >
+                      €{formatBookingEur(actualAmount)}
+                    </Typography>
+                  ) : null}
+                  <Typography
+                    sx={{
+                      fontWeight: 700,
+                      fontSize: 15,
+                      color: alpha(m.navy, 0.55),
+                      flexShrink: 0,
+                    }}
+                  >
+                    €{formatBookingEur(displayTotal)}
+                  </Typography>
+                  {deductPrepayment ? (
+                    <Typography
+                      sx={{
+                        fontWeight: 800,
+                        fontSize: 11,
+                        color: m.teal,
+                        lineHeight: 1.15,
+                      }}
+                    >
+                      −€{formatBookingEur(prepayAmount)} Prepaid
+                    </Typography>
+                  ) : null}
+                </Stack>
+              </Stack>
+
+              {showFixedPrepayRow ? (
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  spacing={1.5}
+                  sx={{ mt: 0.85 }}
+                >
+                  <Typography
+                    sx={{
+                      fontWeight: 600,
+                      fontSize: 12,
+                      color: alpha(m.navy, 0.42),
+                      minWidth: 0,
+                    }}
+                  >
+                    {isPrepaymentPaid
+                      ? `Prepaid (${prepaymentPercent}%)`
+                      : `Prepayment Required (${prepaymentPercent}%)`}
+                  </Typography>
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    spacing={1.25}
+                    sx={{ flexShrink: 0 }}
+                  >
+                    {!isPrepaymentPaid ? (
+                      <Typography
+                        component="button"
+                        type="button"
+                        onClick={() => void handlePayNow()}
+                        disabled={isPaying}
+                        sx={{
+                          border: 0,
+                          bgcolor: "transparent",
+                          p: 0,
+                          cursor: isPaying ? "wait" : "pointer",
+                          color: m.teal,
+                          fontWeight: 900,
+                          fontSize: 12.5,
+                          fontFamily: "inherit",
+                          opacity: isPaying ? 0.7 : 1,
+                          "&:hover": { color: m.tealDark },
+                        }}
+                      >
+                        {isPaying ? "Preparing…" : "Pay Now"}
+                      </Typography>
+                    ) : (
+                      <Typography
+                        sx={{
+                          fontWeight: 800,
+                          fontSize: 12,
+                          color: m.teal,
+                        }}
+                      >
+                        Paid
+                      </Typography>
+                    )}
+                    <Typography
+                      sx={{
+                        fontWeight: 600,
+                        fontSize: 13,
+                        color: alpha(m.navy, 0.48),
+                        textAlign: "right",
+                      }}
+                    >
+                      €{prepayAmount}
+                    </Typography>
+                  </Stack>
+                </Stack>
+              ) : null}
+
+              {showDesiredPrepayNote ? (
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  spacing={1.5}
+                  sx={{ mt: 0.75 }}
+                >
+                  <Typography
+                    sx={{
+                      fontWeight: 600,
+                      fontSize: 11.5,
+                      color: alpha(m.navy, 0.42),
+                      minWidth: 0,
+                    }}
+                  >
+                    Prepayment Required ({prepaymentPercent}%) After Acceptance
+                  </Typography>
+                  <Typography
+                    sx={{
+                      fontWeight: 600,
+                      fontSize: 13,
+                      color: alpha(m.navy, 0.48),
+                      flexShrink: 0,
+                    }}
+                  >
+                    €{prepayAmount}
+                  </Typography>
+                </Stack>
+              ) : null}
+            </Box>
           </Box>
 
           <AppButton

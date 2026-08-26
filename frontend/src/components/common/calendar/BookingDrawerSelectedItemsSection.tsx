@@ -9,7 +9,12 @@ import {
   getEffectiveServicePrice,
   type BookingServiceLineItem,
 } from "../../../data/bookingServiceEdit.data";
+import {
+  formatLineDiscountLabel,
+  type BookingLineDiscount,
+} from "../../../data/bookingLinePricing";
 import BookingEditedTag from "./BookingEditedTag";
+import BookingLineAmount from "./BookingLineAmount";
 import type { BookingEditTagVariant } from "./bookingRequestNegotiation";
 
 type SelectedProductItem = {
@@ -18,6 +23,8 @@ type SelectedProductItem = {
   price: number;
   quantity: number;
   unitPrice: number;
+  originalPrice?: number;
+  discount?: BookingLineDiscount | null;
 };
 
 type BookingDrawerSelectedItemsSectionProps = {
@@ -89,7 +96,7 @@ export default function BookingDrawerSelectedItemsSection({
                 <Stack
                   direction="row"
                   justifyContent="space-between"
-                  alignItems="flex-start"
+                  alignItems="center"
                   spacing={1.25}
                 >
                   <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -122,19 +129,17 @@ export default function BookingDrawerSelectedItemsSection({
                   </Box>
                   <Stack
                     direction="row"
-                    alignItems="flex-start"
+                    alignItems="center"
                     spacing={0.35}
                     sx={{ flexShrink: 0 }}
                   >
-                    <BodyText
-                      sx={{
-                        fontSize: 13,
-                        fontWeight: 900,
-                        color: alpha(m.navy, 0.82),
-                      }}
-                    >
-                      €{getEffectiveServicePrice(service)}
-                    </BodyText>
+                    <BookingLineAmount
+                      amount={getEffectiveServicePrice(service)}
+                      originalAmount={
+                        service.discount?.amount ? service.price : undefined
+                      }
+                      discountLabel={formatLineDiscountLabel(service.discount)}
+                    />
                     {showRemoveButtons ? (
                       <IconButton
                         size="small"
@@ -142,7 +147,7 @@ export default function BookingDrawerSelectedItemsSection({
                           event.stopPropagation();
                           onRemoveService?.(service.id);
                         }}
-                        sx={{ color: alpha(m.navy, 0.35), mt: -0.35 }}
+                        sx={{ color: alpha(m.navy, 0.35) }}
                         aria-label={`Remove ${service.name}`}
                       >
                         <CloseRoundedIcon sx={{ fontSize: 17 }} />
@@ -170,7 +175,7 @@ export default function BookingDrawerSelectedItemsSection({
               <Stack
                 direction="row"
                 justifyContent="space-between"
-                alignItems="flex-start"
+                alignItems="center"
                 spacing={1.25}
               >
                 <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -203,24 +208,20 @@ export default function BookingDrawerSelectedItemsSection({
                 </Box>
                 <Stack
                   direction="row"
-                  alignItems="flex-start"
+                  alignItems="center"
                   spacing={0.35}
                   sx={{ flexShrink: 0 }}
                 >
-                  <BodyText
-                    sx={{
-                      fontSize: 13,
-                      fontWeight: 900,
-                      color: alpha(m.navy, 0.82),
-                    }}
-                  >
-                    €{product.price.toFixed(2)}
-                  </BodyText>
+                  <BookingLineAmount
+                    amount={product.price}
+                    originalAmount={product.originalPrice}
+                    discountLabel={formatLineDiscountLabel(product.discount)}
+                  />
                   {showRemoveButtons ? (
                     <IconButton
                       size="small"
                       onClick={() => onRemoveProduct?.(product.id)}
-                      sx={{ color: alpha(m.navy, 0.35), mt: -0.35 }}
+                      sx={{ color: alpha(m.navy, 0.35) }}
                       aria-label={`Remove ${product.name}`}
                     >
                       <CloseRoundedIcon sx={{ fontSize: 17 }} />
@@ -248,7 +249,7 @@ export default function BookingDrawerSelectedItemsSection({
               <Stack
                 direction="row"
                 justifyContent="space-between"
-                alignItems="flex-start"
+                alignItems="center"
                 spacing={1.25}
               >
                 <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -280,24 +281,20 @@ export default function BookingDrawerSelectedItemsSection({
                 </Box>
                 <Stack
                   direction="row"
-                  alignItems="flex-start"
+                  alignItems="center"
                   spacing={0.35}
                   sx={{ flexShrink: 0 }}
                 >
-                  <BodyText
-                    sx={{
-                      fontSize: 13,
-                      fontWeight: 900,
-                      color: alpha(m.navy, 0.82),
-                    }}
-                  >
-                    €{item.price.toFixed(2)}
-                  </BodyText>
+                  <BookingLineAmount
+                    amount={item.price}
+                    originalAmount={item.originalPrice}
+                    discountLabel={formatLineDiscountLabel(item.discount)}
+                  />
                   {showRemoveButtons ? (
                     <IconButton
                       size="small"
                       onClick={() => onRemoveUniqueItem?.(item.id)}
-                      sx={{ color: alpha(m.navy, 0.35), mt: -0.35 }}
+                      sx={{ color: alpha(m.navy, 0.35) }}
                       aria-label={`Remove ${item.name}`}
                     >
                       <CloseRoundedIcon sx={{ fontSize: 17 }} />

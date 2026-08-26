@@ -133,10 +133,19 @@ export function buildBookingServiceLineItem(
 export function getEffectiveServicePrice(service: BookingServiceLineItem) {
   const base = service.price;
   if (!service.discount?.amount || base <= 0) return base;
-  if (service.discount.type === "percentage") {
-    return Math.max(0, base - (base * service.discount.amount) / 100);
-  }
-  return Math.max(0, base - service.discount.amount);
+  const discounted =
+    service.discount.type === "percentage"
+      ? Math.max(0, base - (base * service.discount.amount) / 100)
+      : Math.max(0, base - service.discount.amount);
+  return Math.round((discounted + Number.EPSILON) * 100) / 100;
+}
+
+export function getServiceDiscountAmount(service: BookingServiceLineItem) {
+  return Math.round(
+    (Math.max(0, service.price - getEffectiveServicePrice(service)) +
+      Number.EPSILON) *
+      100,
+  ) / 100;
 }
 
 /** Fill missing per-service start/end so each line has its own window (sequential from booking start). */

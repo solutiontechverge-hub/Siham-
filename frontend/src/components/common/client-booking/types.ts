@@ -8,6 +8,10 @@ export type ClientBookingDraftService = {
   assignedTo?: string | null;
   /** Services purchased after checkout appear under Add Ons in payment summary. */
   isAddOn?: boolean;
+  originalPrice?: number;
+  discountPct?: number;
+  discountType?: "fixed" | "percentage";
+  discountAmount?: number;
 };
 
 export type ClientBookingDraftProduct = {
@@ -16,6 +20,9 @@ export type ClientBookingDraftProduct = {
   price: number;
   quantity: number;
   unitPrice?: number;
+  originalPrice?: number;
+  discountType?: "fixed" | "percentage";
+  discountAmount?: number;
 };
 
 export type ClientBookingDraftPerson = {
