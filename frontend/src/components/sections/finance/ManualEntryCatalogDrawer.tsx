@@ -3,6 +3,7 @@
 import AppButton from "../../common/AppButton";
 import * as React from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import RemoveRoundedIcon from "@mui/icons-material/RemoveRounded";
 import {
@@ -19,6 +20,7 @@ import { FinanceDrawerActionsFooter } from "../../common/FinanceDrawerFooter";
 import AppSearchField from "../../common/AppSearchField";
 import BookingAddUniqueItemScreen from "../../common/calendar/BookingAddUniqueItemScreen";
 import BookingEditCatalogItemScreen from "../../common/calendar/BookingEditCatalogItemScreen";
+import CatalogItemDeleteDialog from "../../common/calendar/CatalogItemDeleteDialog";
 import { BodyText } from "../../ui/typography";
 import {
   buildUniqueItemLine,
@@ -128,6 +130,12 @@ type ManualEntryCatalogDrawerProps = {
   editScreenTitle?: string;
   /** Persist catalog edits (finance settings / parent state). */
   onUpdateOption?: (option: ManualEntryCatalogOption) => void;
+  /** Persist newly created catalog options so they survive reload. */
+  onAddOption?: (option: ManualEntryCatalogOption) => void;
+  /** Permanently remove a catalog option after confirmation. */
+  onDeleteOption?: (option: ManualEntryCatalogOption) => void;
+  /** When set, only these options show a delete icon. Defaults to all if onDeleteOption is provided. */
+  isDeletable?: (option: ManualEntryCatalogOption) => boolean;
   onSave: (selected: ManualEntryCatalogSelection[]) => void;
 };
 
@@ -144,6 +152,9 @@ export default function ManualEntryCatalogDrawer({
   addScreenTitle,
   editScreenTitle,
   onUpdateOption,
+  onAddOption,
+  onDeleteOption,
+  isDeletable,
   onSave,
 }: ManualEntryCatalogDrawerProps) {
   const m = useTheme().palette.mollure;
@@ -164,6 +175,8 @@ export default function ManualEntryCatalogDrawer({
   const [uniqueItemDraft, setUniqueItemDraft] =
     React.useState<BookingUniqueItemDraft>(emptyBookingUniqueItemDraft());
   const [uniqueItemAttempted, setUniqueItemAttempted] = React.useState(false);
+  const [pendingDelete, setPendingDelete] =
+    React.useState<ManualEntryCatalogOption | null>(null);
 
   React.useEffect(() => {
     if (!open) return;
@@ -175,16 +188,20 @@ export default function ManualEntryCatalogDrawer({
     setEditingOptionId(null);
     setUniqueItemDraft(emptyBookingUniqueItemDraft());
     setUniqueItemAttempted(false);
+    setPendingDelete(null);
   }, [open]);
 
   const allOptions = React.useMemo(() => {
-    const base = options.map(
-      (option) => optionOverrides[option.id] ?? option,
-    );
-    const customs = customOptions.map(
-      (option) => optionOverrides[option.id] ?? option,
-    );
-    return [...base, ...customs];
+    const byId = new Map<string, ManualEntryCatalogOption>();
+    for (const option of options) {
+      byId.set(option.id, optionOverrides[option.id] ?? option);
+    }
+    for (const option of customOptions) {
+      if (!byId.has(option.id)) {
+        byId.set(option.id, optionOverrides[option.id] ?? option);
+      }
+    }
+    return Array.from(byId.values());
   }, [customOptions, optionOverrides, options]);
 
   const filteredOptions = React.useMemo(() => {
@@ -275,6 +292,7 @@ export default function ManualEntryCatalogDrawer({
     };
 
     setCustomOptions((prev) => [...prev, customOption]);
+    onAddOption?.(customOption);
     setDraft((prev) => ({
       ...prev,
       [line.id]: { selected: true, quantity: line.quantity },
@@ -297,6 +315,7 @@ export default function ManualEntryCatalogDrawer({
           option.id === editingOptionId ? nextOption : option,
         ),
       );
+      onAddOption?.(nextOption);
     } else {
       setOptionOverrides((prev) => ({
         ...prev,
@@ -348,7 +367,22 @@ export default function ManualEntryCatalogDrawer({
     ? "Search items..."
     : "Search products...";
 
+  const confirmDeleteOption = () => {
+    if (!pendingDelete) return;
+    setCustomOptions((prev) =>
+      prev.filter((option) => option.id !== pendingDelete.id),
+    );
+    setDraft((prev) => {
+      const next = { ...prev };
+      delete next[pendingDelete.id];
+      return next;
+    });
+    onDeleteOption?.(pendingDelete);
+    setPendingDelete(null);
+  };
+
   return (
+    <>
     <AppDrawer
       open={open}
       onClose={onClose}
@@ -387,6 +421,7 @@ export default function ManualEntryCatalogDrawer({
             draft={uniqueItemDraft}
             errors={uniqueItemErrors}
             heading={formHeading}
+            namePlaceholder={isItemMode ? "Unique Name" : "Product Name"}
             onChange={(patch) =>
               setUniqueItemDraft((prev) => ({ ...prev, ...patch }))
             }
@@ -501,6 +536,27 @@ export default function ManualEntryCatalogDrawer({
                         }}
                       >
                         <EditRoundedIcon sx={{ fontSize: 17 }} />
+                      </IconButton>
+                    ) : null}
+
+                    {onDeleteOption &&
+                    (isDeletable ? isDeletable(option) : true) ? (
+                      <IconButton
+                        size="small"
+                        aria-label={`Delete ${option.label}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPendingDelete(option);
+                        }}
+                        sx={{
+                          color: alpha(m.navy, 0.42),
+                          "&:hover": {
+                            color: "#E85D5D",
+                            bgcolor: alpha("#E85D5D", 0.08),
+                          },
+                        }}
+                      >
+                        <DeleteOutlineRoundedIcon sx={{ fontSize: 18 }} />
                       </IconButton>
                     ) : null}
 
@@ -623,5 +679,12 @@ export default function ManualEntryCatalogDrawer({
         </Stack>
       )}
     </AppDrawer>
+    <CatalogItemDeleteDialog
+      open={Boolean(pendingDelete)}
+      itemName={pendingDelete?.label}
+      onClose={() => setPendingDelete(null)}
+      onConfirm={confirmDeleteOption}
+    />
+    </>
   );
 }

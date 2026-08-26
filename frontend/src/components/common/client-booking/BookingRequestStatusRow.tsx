@@ -123,7 +123,11 @@ export default function BookingRequestStatusRow({
     : bookingStatus;
 
   const chipColors = bookingStatusChipColors(chipStatus);
-  const chipLabel = isEbrRejected ? "Invalid" : bookingStatusLabel(chipStatus);
+  const chipLabel = isEbrRejected
+    ? "Invalid"
+    : bookingStatusLabel(chipStatus, {
+        edited: showEditScenario && chipStatus === "confirmed",
+      });
   const isConfirmedChip = !isEbrRejected && chipStatus === "confirmed";
 
   // BR only while still pending (draft sent / requested) — hide after accept or reject.
@@ -149,21 +153,22 @@ export default function BookingRequestStatusRow({
           isConfirmedChip ? (
             <CheckCircleRoundedIcon
               sx={{
-                fontSize: "15px !important",
+                fontSize: "12px !important",
                 color: `${chipColors.color} !important`,
               }}
             />
           ) : undefined
         }
         sx={{
-          height: 24,
-          fontWeight: 900,
-          fontSize: 11,
-          borderRadius: "8px",
+          height: 18,
+          fontWeight: 800,
+          fontSize: 9,
+          borderRadius: "6px",
           bgcolor: chipColors.bgcolor,
           color: chipColors.color,
           border: chipColors.border,
-          "& .MuiChip-icon": { ml: 0.75, mr: -0.25 },
+          "& .MuiChip-label": { px: 0.7, py: 0, lineHeight: 1.2 },
+          "& .MuiChip-icon": { ml: 0.5, mr: -0.35 },
         }}
       />
 
@@ -172,13 +177,14 @@ export default function BookingRequestStatusRow({
           label="Updated"
           size="small"
           sx={{
-            height: 24,
-            fontWeight: 900,
-            fontSize: 11,
-            borderRadius: "8px",
+            height: 18,
+            fontWeight: 800,
+            fontSize: 9,
+            borderRadius: "6px",
             bgcolor: alpha(m.teal, 0.12),
             color: m.teal,
             border: `1px solid ${alpha(m.teal, 0.4)}`,
+            "& .MuiChip-label": { px: 0.7, py: 0, lineHeight: 1.2 },
           }}
         />
       ) : null}
@@ -187,7 +193,8 @@ export default function BookingRequestStatusRow({
       !isEbrIncoming &&
       !showErPill &&
       !isTerminal &&
-      !isCompleted ? (
+      !isCompleted &&
+      chipStatus !== "confirmed" ? (
         <ScenarioPill label="Edit" />
       ) : null}
 

@@ -7,6 +7,7 @@ import AppModal, {
   MessagingModalCancelButton,
   MessagingModalPrimaryButton,
 } from "../AppModal";
+import { useSnackbar } from "../AppSnackbar";
 
 export type ClientEbrActionKind = "accept" | "suggest" | "reject";
 export type ClientRequestActionContext = "ebr" | "br" | "er";
@@ -22,12 +23,13 @@ type Props = {
 
 const EBR_COPY: Record<
   ClientEbrActionKind,
-  { title: string; body: string; confirmLabel: string; showWarning?: boolean }
+  { title: string; body: string; confirmLabel: string; snackbarMessage?: string; showWarning?: boolean }
 > = {
   accept: {
     title: "Accept EBR",
     body: "Confirm to accept these changes. They will be applied to your booking.",
     confirmLabel: "Accept",
+    snackbarMessage: "Changes accepted. Your booking is confirmed.",
   },
   suggest: {
     title: "Suggest change EBR",
@@ -38,18 +40,20 @@ const EBR_COPY: Record<
     title: "Reject EBR",
     body: "Confirm to reject these changes. They will not be applied to your booking.",
     confirmLabel: "Reject",
+    snackbarMessage: "Edited booking request rejected.",
     showWarning: true,
   },
 };
 
 const BR_COPY: Record<
   ClientEbrActionKind,
-  { title: string; body: string; confirmLabel: string; showWarning?: boolean }
+  { title: string; body: string; confirmLabel: string; snackbarMessage?: string; showWarning?: boolean }
 > = {
   accept: {
     title: "Accept request",
     body: "Confirm to accept this booking request. Your booking will be confirmed.",
     confirmLabel: "Accept",
+    snackbarMessage: "Booking request accepted.",
   },
   suggest: {
     title: "Suggest changes",
@@ -60,18 +64,20 @@ const BR_COPY: Record<
     title: "Reject request",
     body: "Confirm to reject this booking request. The booking will be marked Invalid.",
     confirmLabel: "Reject",
+    snackbarMessage: "Booking request rejected.",
     showWarning: true,
   },
 };
 
 const ER_COPY: Record<
   ClientEbrActionKind,
-  { title: string; body: string; confirmLabel: string; showWarning?: boolean }
+  { title: string; body: string; confirmLabel: string; snackbarMessage?: string; showWarning?: boolean }
 > = {
   accept: {
     title: "Accept edit request",
     body: "Confirm to accept this edit request. The professional can update the booking once.",
     confirmLabel: "Accept",
+    snackbarMessage: "Edit request accepted.",
   },
   suggest: {
     title: "Suggest change",
@@ -82,6 +88,7 @@ const ER_COPY: Record<
     title: "Reject edit request",
     body: "Confirm to reject this edit request. Your booking stays confirmed.",
     confirmLabel: "Reject",
+    snackbarMessage: "Edit request rejected. Booking stays confirmed.",
     showWarning: true,
   },
 };
@@ -94,6 +101,7 @@ export default function ClientEbrActionDialog({
   onConfirm,
 }: Props) {
   const m = useTheme().palette.mollure;
+  const { showSnackbar } = useSnackbar();
   if (!action) return null;
 
   const copy = (
@@ -116,6 +124,12 @@ export default function ClientEbrActionDialog({
             label={copy.confirmLabel}
             onClick={() => {
               onConfirm();
+              if (copy.snackbarMessage) {
+                showSnackbar({
+                  severity: "success",
+                  message: copy.snackbarMessage,
+                });
+              }
               onClose();
             }}
           />

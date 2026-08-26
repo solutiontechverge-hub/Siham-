@@ -50,6 +50,20 @@ export function scenarioIndicatorDisplayLabel(
   return indicator;
 }
 
+/** Confirmed booking that was edited after ER/EBR accept (date/time or lines). */
+export function isConfirmedEditedEvent(
+  event: Pick<CalendarEvent, "bookingType" | "status" | "bookingScenario" | "details">,
+): boolean {
+  return event.status === "Confirmed" && resolveBookingScenario(event) === "E";
+}
+
+export function calendarBookingStatusLabel(
+  event: Pick<CalendarEvent, "bookingType" | "status" | "bookingScenario" | "details">,
+): string {
+  if (isConfirmedEditedEvent(event)) return "Confirmed Edited";
+  return event.status;
+}
+
 type StatusTheme = {
   accent: string;
   cardBg: string;

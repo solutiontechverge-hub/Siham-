@@ -261,7 +261,17 @@ export default function ClientBookingListView({ listTab }: Props) {
                     displayStatus !== "no_show" &&
                     Boolean(b.requiresPrepayment) &&
                     !b.prepaid);
-                const chipLabel = statusChipLabel(displayStatus);
+                const isConfirmedEdited =
+                  displayStatus === "confirmed" &&
+                  !pendingEr &&
+                  Boolean(
+                    b.lastEditedBy ||
+                      b.editedServiceIds?.length ||
+                      b.incomingEditRequest?.status === "accepted",
+                  );
+                const chipLabel = statusChipLabel(displayStatus, {
+                  edited: isConfirmedEdited,
+                });
                 const chipColors = bookingStatusChipColors(displayStatus);
                 const showUpdated =
                   !pendingEr &&
@@ -397,11 +407,17 @@ export default function ClientBookingListView({ listTab }: Props) {
                               label={chipLabel}
                               size="small"
                               sx={{
-                                height: 22,
-                                fontWeight: 900,
+                                height: 18,
+                                fontSize: 9,
+                                fontWeight: 800,
                                 bgcolor: chipColors.bgcolor,
                                 color: chipColors.color,
                                 border: chipColors.border,
+                                "& .MuiChip-label": {
+                                  px: 0.7,
+                                  py: 0,
+                                  lineHeight: 1.2,
+                                },
                               }}
                             />
                             {showUpdated ? (
@@ -409,28 +425,17 @@ export default function ClientBookingListView({ listTab }: Props) {
                                 label="Updated"
                                 size="small"
                                 sx={{
-                                  height: 22,
-                                  fontWeight: 900,
+                                  height: 18,
+                                  fontSize: 9,
+                                  fontWeight: 800,
                                   bgcolor: alpha(m.teal, 0.12),
                                   color: m.teal,
                                   border: `1px solid ${alpha(m.teal, 0.4)}`,
-                                }}
-                              />
-                            ) : null}
-                            {displayStatus === "confirmed" &&
-                            !pendingEr &&
-                            (b.lastEditedBy ||
-                              Boolean(b.editedServiceIds?.length) ||
-                              b.incomingEditRequest?.status === "accepted") ? (
-                              <Chip
-                                label="Edit"
-                                size="small"
-                                sx={{
-                                  height: 22,
-                                  fontWeight: 900,
-                                  bgcolor: alpha(m.teal, 0.12),
-                                  color: m.teal,
-                                  border: `1px solid ${alpha(m.teal, 0.4)}`,
+                                  "& .MuiChip-label": {
+                                    px: 0.7,
+                                    py: 0,
+                                    lineHeight: 1.2,
+                                  },
                                 }}
                               />
                             ) : null}

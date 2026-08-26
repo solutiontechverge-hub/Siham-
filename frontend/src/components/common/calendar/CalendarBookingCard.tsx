@@ -10,6 +10,7 @@ import type { CalendarEvent } from "../../../app/professionals/fixed-location/ca
 import { extractBookingId } from "./calendar.utils";
 import {
   getBookingScenarioIndicators,
+  calendarBookingStatusLabel,
   scenarioIndicatorDisplayLabel,
   statusCardAccent,
   statusChipSxWithOverride,
@@ -193,7 +194,7 @@ export default function CalendarBookingCard({
         }
         showUpdated={showUpdated}
         status={{
-          label: event.status,
+          label: calendarBookingStatusLabel(event),
           sx: {
             ...statusChipSxWithOverride(event.status, statusColor),
             ...(emphasizeRequest ? { fontWeight: 900 } : null),
@@ -220,7 +221,9 @@ export default function CalendarBookingCard({
                 },
               ]
             : []),
-          ...scenarioIndicators.map((indicator) => ({
+          ...scenarioIndicators
+            .filter((indicator) => indicator !== "E")
+            .map((indicator) => ({
           label: scenarioIndicatorDisplayLabel(indicator),
           showRequestSentIcon: indicator === "BR",
           requestDirection:

@@ -1,3 +1,9 @@
+import {
+  applyLineDiscount,
+  parseDiscountFields,
+  type BookingLineDiscount,
+} from "./bookingLinePricing";
+
 export type BookingCatalogProduct = {
   id: string;
   name: string;
@@ -7,6 +13,16 @@ export type BookingCatalogProduct = {
   unit?: number;
   discountType?: "fixed" | "percentage";
   discountAmount?: string;
+};
+
+export type BookingProductLineItem = {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  unitPrice: number;
+  originalPrice?: number;
+  discount?: BookingLineDiscount | null;
 };
 
 /** Empty — professionals load their own products from finance settings. */
@@ -61,4 +77,39 @@ export function getProductBaseName(name: string, quantity: number) {
   return quantity > 1 && name.endsWith(suffix)
     ? name.slice(0, -suffix.length)
     : name;
+}
+
+export function buildBookingProductLine(
+  product: BookingCatalogProduct,
+  quantity: number,
+): BookingProductLineItem {
+  const qty = Math.max(1, quantity);
+  const unitPrice = product.price;
+  const original = unitPrice * qty;
+  const discount = parseDiscountFields(
+    product.discountType,
+    product.discountAmount,
+  );
+  const priced = applyLineDiscount(original, discount);
+  return {
+    id: product.id,
+    name: formatProductLineName(product.name, qty),
+    unitPrice,
+    quantity: qty,
+    price: priced.price,
+    originalPrice: priced.discountAmount > 0 ? priced.original : undefined,
+    discount: priced.discountAmount > 0 ? discount : null,
+  };
+}
+
+export function productLineOriginalAmount(product: {
+  originalPrice?: number;
+  unitPrice?: number;
+  quantity?: number;
+  price: number;
+}): number {
+  if (typeof product.originalPrice === "number") return product.originalPrice;
+  const qty = Math.max(1, product.quantity ?? 1);
+  const unit = product.unitPrice ?? product.price;
+  return unit * qty;
 }
