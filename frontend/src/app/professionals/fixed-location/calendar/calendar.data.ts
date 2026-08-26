@@ -16,6 +16,11 @@ export type CalendarBookingType = "Online" | "Offline" | "Project" | "Requests";
 
 export type CalendarBookingScenario = "BR" | "EBR" | "ER" | "E";
 
+export type CalendarLineDiscount = {
+  type: "fixed" | "percentage";
+  amount: number;
+};
+
 export type CalendarBookingServiceItem = {
   id: string;
   name: string;
@@ -26,6 +31,10 @@ export type CalendarBookingServiceItem = {
   staffResourceId?: string;
   guestId?: string | null;
   teamMemberId?: string | null;
+  priceType?: "fixed" | "starting_from";
+  discount?: CalendarLineDiscount | null;
+  originalPrice?: number;
+  discountPct?: number;
 };
 
 export type CalendarBookingProductItem = {
@@ -34,6 +43,8 @@ export type CalendarBookingProductItem = {
   price: number;
   quantity: number;
   unitPrice: number;
+  originalPrice?: number;
+  discount?: CalendarLineDiscount | null;
 };
 
 export type CalendarBookingGuestItem = {
@@ -67,6 +78,9 @@ export type CalendarBookingClientSnapshot = {
     durationMins: number;
     guestId?: string | null;
     teamMemberId?: string | null;
+    originalPrice?: number;
+    discountPct?: number;
+    discount?: CalendarLineDiscount | null;
   }>;
   projectDetails?: {
     description: string;
@@ -157,6 +171,8 @@ export type CalendarBookingDetails = {
   cancelledServiceIds?: string[];
   /** Guest name / contact-only change — tag Updated, do not start ER. */
   silentUpdated?: boolean;
+  /** Date/time changed on a Confirmed booking after ER/EBR accept. */
+  scheduleEdited?: boolean;
   refunded?: boolean;
   waitingForPayment?: boolean;
   invoiceDueDate?: string;

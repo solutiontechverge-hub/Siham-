@@ -511,12 +511,12 @@ export default function BookingTimelineCard({
               label={status.label}
               sx={[
                 {
-                  height: 18,
-                  borderRadius: "5px",
-                  fontSize: 8.5,
-                  fontWeight: 500,
+                  height: 16,
+                  borderRadius: "4px",
+                  fontSize: 7.5,
+                  fontWeight: 600,
                   border: "1px solid",
-                  "& .MuiChip-label": { px: 0.85 },
+                  "& .MuiChip-label": { px: 0.55, py: 0, lineHeight: 1.15 },
                 },
                 ...(Array.isArray(status.sx) ? status.sx : [status.sx]),
               ]}

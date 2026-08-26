@@ -25,6 +25,9 @@ export type BookingEditSuggestedProduct = {
   name: string;
   price: number;
   quantity: number;
+  originalPrice?: number;
+  discountType?: "fixed" | "percentage";
+  discountAmount?: number;
 };
 
 export type BookingEditSuggestionPayload = {

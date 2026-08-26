@@ -331,14 +331,9 @@ export function mapCalendarBookingToEvent(
           : status === "Confirmed" &&
               !isErPending &&
               !parsedNotes?.silentUpdated &&
-              (parsedNotes?.lastEditedBy === "client" ||
+              (parsedNotes?.scheduleEdited ||
+                parsedNotes?.lastEditedBy === "client" ||
                 parsedNotes?.lastEditedBy === "professional" ||
-                ebrMeta?.status === "accepted") &&
-              (parsedNotes?.lastEditedBy === "client" ||
-                Boolean(parsedNotes?.editedServiceIds?.length) ||
-                Boolean(parsedNotes?.addedServiceIds?.length) ||
-                Boolean(parsedNotes?.cancelledServiceIds?.length) ||
-                Boolean(parsedNotes?.editedProductIds?.length) ||
                 ebrMeta?.status === "accepted")
             ? "E"
             : undefined,
@@ -414,6 +409,7 @@ export function mapCalendarBookingToEvent(
         ? { cancelledServiceIds: parsedNotes.cancelledServiceIds }
         : {}),
       ...(parsedNotes?.silentUpdated ? { silentUpdated: true } : {}),
+      ...(parsedNotes?.scheduleEdited ? { scheduleEdited: true } : {}),
       ...(parsedNotes?.refunded ? { refunded: true } : {}),
       ...(parsedNotes?.waitingForPayment ? { waitingForPayment: true } : {}),
       ...(parsedNotes?.invoiceDueDate

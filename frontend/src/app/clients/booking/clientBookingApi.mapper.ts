@@ -9,10 +9,31 @@ import { resolveMediaUrl } from "../../../lib/resolveMediaUrl";
 import { inferProjectUploadKind, isProjectUploadImage } from "../../../lib/projectUploadMedia";
 import type { BusinessSetupListing, CalendarBooking, CreateBookingRequest } from "../../../store/services/businessApi";
 import { mapApiBookingStatusToClient } from "./clientBookingStatus";
+import { effectiveServiceAmount } from "../../../data/bookingLinePricing";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function isUuid(value: string | null | undefined): value is string {
   return Boolean(value && UUID_RE.test(value));
+}
+
+function withClientDiscountFields(service: {
+  price: number;
+  originalPrice?: number;
+  discountPct?: number;
+  discount?: { type: "fixed" | "percentage"; amount: number } | null;
+}) {
+  const net = effectiveServiceAmount(service);
+  const original = Number(service.originalPrice ?? service.price) || net;
+  return {
+    price: net,
+    originalPrice: original > net ? original : undefined,
+    discountPct:
+      service.discount?.type === "percentage"
+        ? service.discount.amount
+        : service.discountPct,
+    discountType: service.discount?.type,
+    discountAmount: service.discount?.amount,
+  };
 }
 
 /** Pull a UUID out of synthetic cart ids like `profile-svc-<uuid>-0`. */
@@ -193,6 +214,16 @@ export function buildClientBookingApiPayload(input: {
       durationMins: s.durationMins,
       guestId: s.guestId ?? null,
       teamMemberId: s.teamMemberId ?? null,
+      originalPrice: s.originalPrice,
+      discountPct: s.discountPct,
+      ...(s.discountType && s.discountAmount
+        ? {
+            discount: {
+              type: s.discountType,
+              amount: s.discountAmount,
+            },
+          }
+        : {}),
     })),
     projectDetails: input.draft.projectDetails
       ? {
@@ -432,11 +463,23 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
         ? serviceNames
         : [title];
   const total = activeEbr?.suggestedServices?.length
-    ? activeEbr.suggestedServices.reduce((sum, s) => sum + (s.price || 0), 0) +
-      (activeEbr.suggestedProducts ?? []).reduce((sum, p) => sum + p.price * (p.quantity || 1), 0)
+    ? activeEbr.suggestedServices.reduce(
+        (sum, s) => sum + effectiveServiceAmount(s),
+        0,
+      ) +
+      (activeEbr.suggestedProducts ?? []).reduce(
+        (sum, p) => sum + (Number(p.price) || 0),
+        0,
+      )
     : notesDetails?.services?.length
-      ? notesDetails.services.reduce((sum, s) => sum + (s.price || 0), 0) +
-        (notesDetails.products ?? []).reduce((sum, p) => sum + p.price * (p.quantity || 1), 0)
+      ? notesDetails.services.reduce(
+          (sum, s) => sum + effectiveServiceAmount(s),
+          0,
+        ) +
+        (notesDetails.products ?? []).reduce(
+          (sum, p) => sum + (Number(p.price) || 0),
+          0,
+        )
       : Number(booking.total_price) || 0;
   const durationMins = (() => {
     if (activeEbr?.suggestedServices?.length) {
@@ -582,7 +625,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
             id: service.id,
             name: service.name,
             durationMins: service.durationMins,
-            price: service.price,
+            ...withClientDiscountFields(service),
             guestId: guest.id,
             teamMemberId: service.staffResourceId ?? service.teamMemberId ?? null,
           })),
@@ -604,7 +647,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
             id: service.id,
             name: service.name,
             durationMins: service.durationMins,
-            price: service.price,
+            ...withClientDiscountFields(service),
             guestId: resolveGuestId(service.id, service.name, null),
             teamMemberId: service.staffResourceId ?? booking.team_member_id,
           }));
@@ -619,6 +662,10 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
           price: number;
           guestId: string | null;
           teamMemberId: string | null | undefined;
+          originalPrice?: number;
+          discountPct?: number;
+          discountType?: "fixed" | "percentage";
+          discountAmount?: number;
         }> = [];
         const pushUnique = (row: {
           id: string;
@@ -627,6 +674,11 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
           price: number;
           guestId?: string | null;
           teamMemberId?: string | null;
+          originalPrice?: number;
+          discountPct?: number;
+          discountType?: "fixed" | "percentage";
+          discountAmount?: number;
+          discount?: { type: "fixed" | "percentage"; amount: number } | null;
         }) => {
           const guestId = row.guestId ?? null;
           const exists = merged.some(
@@ -637,7 +689,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
             id: row.id,
             name: row.name,
             durationMins: row.durationMins,
-            price: row.price,
+            ...withClientDiscountFields(row),
             guestId,
             teamMemberId: row.teamMemberId ?? booking.team_member_id,
           });
@@ -652,6 +704,9 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
               price: service.price,
               guestId: resolveGuestId(service.id, service.name, service.guestId ?? null),
               teamMemberId: service.staffResourceId ?? service.teamMemberId ?? null,
+              originalPrice: service.originalPrice,
+              discount: service.discount,
+              discountPct: service.discountPct,
             });
           }
           for (const service of guestNestedServices) {
@@ -666,6 +721,9 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
               price: service.price,
               guestId: service.guestId ?? null,
               teamMemberId: service.teamMemberId ?? null,
+              originalPrice: service.originalPrice,
+              discount: service.discount,
+              discountPct: service.discountPct,
             });
           }
           for (const service of guestNestedServices) {
@@ -692,6 +750,9 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
             price: product.price,
             quantity: product.quantity || 1,
             unitPrice: product.unitPrice ?? product.price,
+            originalPrice: product.originalPrice,
+            discountType: product.discount?.type,
+            discountAmount: product.discount?.amount,
           }));
         }
         const noteProducts = notesDetails?.products ?? [];
@@ -717,6 +778,9 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
             price: product.price,
             quantity: product.quantity || 1,
             unitPrice: product.unitPrice ?? product.price,
+            originalPrice: product.originalPrice,
+            discountType: product.discount?.type,
+            discountAmount: product.discount?.amount,
           }));
         }
         return [];

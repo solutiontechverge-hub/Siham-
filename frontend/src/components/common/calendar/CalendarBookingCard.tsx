@@ -10,6 +10,7 @@ import type { CalendarEvent } from "../../../app/professionals/fixed-location/ca
 import { extractBookingId } from "./calendar.utils";
 import {
   getBookingScenarioIndicators,
+  calendarBookingStatusLabel,
   scenarioIndicatorDisplayLabel,
   statusCardAccent,
   statusChipSxWithOverride,
@@ -193,7 +194,7 @@ export default function CalendarBookingCard({
         }
         showUpdated={showUpdated}
         status={{
-          label: event.status,
+          label: calendarBookingStatusLabel(event),
           sx: {
             ...statusChipSxWithOverride(event.status, statusColor),
             ...(emphasizeRequest ? { fontWeight: 900 } : null),
@@ -220,7 +221,9 @@ export default function CalendarBookingCard({
                 },
               ]
             : []),
-          ...scenarioIndicators.map((indicator) => ({
+          ...scenarioIndicators
+            .filter((indicator) => indicator !== "E")
+            .map((indicator) => ({
           label: scenarioIndicatorDisplayLabel(indicator),
           showRequestSentIcon: indicator === "BR",
           requestDirection:
@@ -243,8 +246,7 @@ export default function CalendarBookingCard({
           bold:
             indicator === "EBR" ||
             indicator === "BR" ||
-            indicator === "ER" ||
-            indicator === "E",
+            indicator === "ER",
           sx:
             indicator === "ER" && isIncomingEr
               ? {
@@ -252,13 +254,7 @@ export default function CalendarBookingCard({
                   bgcolor: alpha(m.teal, 0.12),
                   color: m.teal,
                 }
-              : indicator === "E"
-                ? {
-                    border: `1px solid ${alpha(m.teal, 0.45)}`,
-                    bgcolor: alpha(m.teal, 0.12),
-                    color: m.teal,
-                  }
-                : undefined,
+              : undefined,
         })),
         ]}
         prepaymentStatus={prepaymentIconVariant}

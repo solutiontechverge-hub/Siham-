@@ -2,6 +2,11 @@ import {
   formatProductLineName,
   type BookingCatalogProduct,
 } from "./bookingProductCatalog.data";
+import {
+  applyLineDiscount,
+  parseDiscountFields,
+  type BookingLineDiscount,
+} from "./bookingLinePricing";
 
 export type BookingUniqueItemDiscountType = "fixed" | "percentage";
 
@@ -66,6 +71,8 @@ export type BookingUniqueItemLine = {
   price: number;
   quantity: number;
   unitPrice: number;
+  originalPrice?: number;
+  discount?: BookingLineDiscount | null;
 };
 
 export function buildUniqueItemLine(draft: BookingUniqueItemDraft): BookingUniqueItemLine | null {
@@ -75,18 +82,17 @@ export function buildUniqueItemLine(draft: BookingUniqueItemDraft): BookingUniqu
   const unitPrice = Math.max(0, Number.parseFloat(draft.price.replace(",", ".")) || 0);
   const quantity = Math.max(1, draft.unit);
   const subtotal = unitPrice * quantity;
-  const discountValue = Math.max(0, Number.parseFloat(draft.discountAmount.replace(",", ".")) || 0);
-  const discount =
-    draft.discountType === "percentage"
-      ? Math.round((subtotal * discountValue) / 100)
-      : Math.min(subtotal, discountValue);
+  const discount = parseDiscountFields(draft.discountType, draft.discountAmount);
+  const priced = applyLineDiscount(subtotal, discount);
 
   return {
     id: `unique-${Date.now()}`,
     name: formatProductLineName(productName, quantity),
     unitPrice,
     quantity,
-    price: Math.max(0, subtotal - discount),
+    price: priced.price,
+    originalPrice: priced.discountAmount > 0 ? priced.original : undefined,
+    discount: priced.discountAmount > 0 ? discount : null,
   };
 }
 

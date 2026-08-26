@@ -18,6 +18,7 @@ type BookingAddUniqueItemScreenProps = {
   disabled?: boolean;
   /** Drawer/section heading — depends on Add Product / Service / Unique Item entry. */
   heading?: string;
+  namePlaceholder?: string;
 };
 
 const priceTypeOptions = [
@@ -36,9 +37,13 @@ export default function BookingAddUniqueItemScreen({
   onChange,
   disabled = false,
   heading = "Add Unique Item",
+  namePlaceholder,
 }: BookingAddUniqueItemScreenProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
+  const nameLabel =
+    namePlaceholder ??
+    (heading.toLowerCase().includes("unique") ? "Unique Name" : "Product Name");
   const [priceType, setPriceType] = React.useState<"fixed" | "starting_from">(
     "fixed",
   );
@@ -52,8 +57,8 @@ export default function BookingAddUniqueItemScreen({
       </BodyText>
 
       <AppTextField
-        label="Product Name"
-        placeholder="Enter product name"
+        label={nameLabel}
+        placeholder={`Enter ${nameLabel.toLowerCase()}`}
         value={draft.productName}
         onChange={(e) => onChange({ productName: e.target.value })}
         fullWidth
