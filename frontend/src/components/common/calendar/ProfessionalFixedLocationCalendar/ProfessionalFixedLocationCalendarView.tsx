@@ -9417,7 +9417,7 @@ export default function ProfessionalFixedLocationCalendar({
                                 const badgeResponses =
                                   indicator === "EBR"
                                     ? responseIndicators
-                                    : indicator === "ER" || indicator === "E"
+                                    : indicator === "ER"
                                       ? responseIndicators.filter(
                                           (item) => item === "overdue_response",
                                         )
@@ -9504,19 +9504,9 @@ export default function ProfessionalFixedLocationCalendar({
                                         height: 24,
                                         fontSize: 11,
                                         fontWeight: 800,
-                                        bgcolor:
-                                          indicator === "E"
-                                            ? alpha(m.teal, 0.12)
-                                            : alpha(m.navy, 0.06),
-                                        color:
-                                          indicator === "E"
-                                            ? m.teal
-                                            : alpha(m.navy, 0.62),
-                                        border: `1px solid ${
-                                          indicator === "E"
-                                            ? alpha(m.teal, 0.45)
-                                            : alpha(m.navy, 0.14)
-                                        }`,
+                                        bgcolor: alpha(m.navy, 0.06),
+                                        color: alpha(m.navy, 0.62),
+                                        border: `1px solid ${alpha(m.navy, 0.14)}`,
                                         "& .MuiChip-label": { px: 0.85 },
                                       }}
                                     />

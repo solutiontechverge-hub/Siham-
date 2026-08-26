@@ -246,8 +246,7 @@ export default function CalendarBookingCard({
           bold:
             indicator === "EBR" ||
             indicator === "BR" ||
-            indicator === "ER" ||
-            indicator === "E",
+            indicator === "ER",
           sx:
             indicator === "ER" && isIncomingEr
               ? {
@@ -255,13 +254,7 @@ export default function CalendarBookingCard({
                   bgcolor: alpha(m.teal, 0.12),
                   color: m.teal,
                 }
-              : indicator === "E"
-                ? {
-                    border: `1px solid ${alpha(m.teal, 0.45)}`,
-                    bgcolor: alpha(m.teal, 0.12),
-                    color: m.teal,
-                  }
-                : undefined,
+              : undefined,
         })),
         ]}
         prepaymentStatus={prepaymentIconVariant}
