@@ -594,11 +594,15 @@ export default function SalesAddOnCheckout({
             sx={{ mb: 1 }}
           >
             <Typography
-              sx={{ fontSize: 14, fontWeight: 900, color: alpha(m.navy, 0.82) }}
+              sx={{
+                fontWeight: 900,
+                fontSize: 16,
+                color: m.headingText,
+              }}
             >
               Total Price
             </Typography>
-            <Typography sx={{ fontSize: 22, fontWeight: 900, color: m.teal }}>
+            <Typography sx={{ fontSize: 22, fontWeight: 900, color: m.headingText }}>
               €{totalPrice % 1 === 0 ? totalPrice : totalPrice.toFixed(2)}
             </Typography>
           </Stack>

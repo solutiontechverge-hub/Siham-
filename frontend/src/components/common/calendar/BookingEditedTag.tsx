@@ -6,9 +6,9 @@ import type { BookingEditTagVariant } from "./bookingRequestNegotiation";
 
 const TAG_LABELS: Record<BookingEditTagVariant, string> = {
   edited: "Edited",
-  client_edited: "Client edited",
-  added: "Added",
-  cancelled: "Cancelled",
+  client_edited: "Edited",
+  added: "Edited Added",
+  cancelled: "Service Cancelled",
   updated: "Updated",
 };
 
@@ -18,24 +18,25 @@ type BookingEditedTagProps = {
 
 export default function BookingEditedTag({ variant }: BookingEditedTagProps) {
   const m = useTheme().palette.mollure;
+  const isCancelled = variant === "cancelled";
 
   return (
     <Box
       sx={{
         display: "inline-flex",
         alignItems: "center",
-        px: 0.75,
-        py: 0.2,
+        px: 1,
+        py: 0.3,
         borderRadius: "999px",
-        bgcolor: alpha(m.teal, 0.12),
-        color: m.teal,
+        bgcolor: isCancelled ? m.statusRedBg : alpha(m.teal, 0.14),
+        color: isCancelled ? m.statusRedFg : m.teal,
         flexShrink: 0,
       }}
     >
       <Typography
         sx={{
-          fontSize: 10,
-          fontWeight: 800,
+          fontSize: 10.5,
+          fontWeight: 700,
           lineHeight: 1.2,
           color: "inherit",
         }}

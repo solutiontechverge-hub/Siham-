@@ -51,6 +51,12 @@ import {
 } from "../../../lib/phone-validation";
 import { buildBookingSummarySections, resolveTeamMemberFirstName } from "./buildBookingSummarySections";
 import BookingSummaryNote from "./BookingSummaryNote";
+import BookingTotalPriceCard from "../calendar/BookingTotalPriceCard";
+import { summarizeClientBookingPrice } from "../calendar/bookingTotal";
+import {
+  parseCalendarEntryNotes,
+  resolveKilometerAllowanceAmount,
+} from "../calendar/bookingEventDetails";
 import StripePrepaymentDialog from "./StripePrepaymentDialog";
 import { useActiveClientBooking } from "./useActiveClientBooking";
 import { useClientBookingDraft } from "./useClientBookingDraft";
@@ -107,8 +113,29 @@ export default function ClientBookingCreateSummaryView() {
     return splitContactPhone(fromProfile, preferredCode);
   }, [requesterCountryCode, requesterPhone]);
 
-  const countryCode = profilePhone.countryCode;
-  const phone = profilePhone.phone;
+  const [countryCode, setCountryCode] = React.useState("");
+  const [phone, setPhone] = React.useState("");
+  const phoneHydratedRef = React.useRef(false);
+
+  React.useEffect(() => {
+    if (phoneHydratedRef.current) return;
+    if (countryCode || phone) {
+      phoneHydratedRef.current = true;
+      return;
+    }
+    const sessionPhone = (
+      getActiveBookingSession() ?? activeBooking
+    )?.contactPhone?.trim();
+    const fromSession = sessionPhone
+      ? splitContactPhone(sessionPhone, requesterCountryCode.trim() || undefined)
+      : null;
+    const nextCode = fromSession?.countryCode || profilePhone.countryCode;
+    const nextPhone = fromSession?.phone || profilePhone.phone;
+    if (!nextCode && !nextPhone) return;
+    setCountryCode(nextCode);
+    setPhone(nextPhone);
+    phoneHydratedRef.current = true;
+  }, [activeBooking, countryCode, phone, profilePhone, requesterCountryCode]);
 
   const [address, setAddress] = React.useState<ClientBookingDesiredLocation>({
     street: "",
@@ -178,6 +205,23 @@ export default function ClientBookingCreateSummaryView() {
   }, [address, isDesired, shop?.addressLabel, shop?.municipalityLabel]);
 
   const total = draft?.total ?? 0;
+  const bookingNotesMeta = React.useMemo(
+    () => parseCalendarEntryNotes(activeBooking?.notes),
+    [activeBooking?.notes],
+  );
+  const kilometerAllowanceAmount = React.useMemo(
+    () =>
+      isDesired
+        ? resolveKilometerAllowanceAmount(bookingNotesMeta?.kilometerAllowance)
+        : 0,
+    [bookingNotesMeta?.kilometerAllowance, isDesired],
+  );
+  const extrasAmount =
+    isDesired &&
+    Boolean(bookingNotesMeta?.showKilometerAllowance) &&
+    kilometerAllowanceAmount > 0
+      ? kilometerAllowanceAmount
+      : 0;
   const prepaymentPercent =
     Number(activeBooking?.prepaymentPercent) > 0
       ? Number(activeBooking?.prepaymentPercent)
@@ -185,12 +229,29 @@ export default function ClientBookingCreateSummaryView() {
   const isPrepaymentPaid = Boolean(activeBooking?.prepaid);
   const mustPayBeforeBooking = requiresPrepayment && !isPrepaymentPaid;
   const showFixedPrepayRow =
-    !isDesired && requiresPrepayment && prepaymentPercent > 0 && total > 0;
+    !isDesired && requiresPrepayment && prepaymentPercent > 0;
   const showDesiredPrepayNote =
-    isDesired && prepaymentPercent > 0 && total > 0;
-  const prepayAmount =
-    Math.round(((total * prepaymentPercent) / 100 + Number.EPSILON) * 100) /
-    100;
+    isDesired && prepaymentPercent > 0;
+  const checkoutPrice = summarizeClientBookingPrice({
+    services: draft?.services,
+    people: draft?.people,
+    products: draft?.products,
+    extrasAmount,
+    discount: bookingNotesMeta?.totalDiscount ?? null,
+    showLateCancellation: Boolean(bookingNotesMeta?.showLateCancellation),
+    lateCancellationFeePercent: bookingNotesMeta?.lateCancellationFeePercent,
+    showLateRescheduling: Boolean(bookingNotesMeta?.showLateRescheduling),
+    lateRescheduleFeePercent: bookingNotesMeta?.lateRescheduleFeePercent,
+    showPrepayment:
+      (showFixedPrepayRow || showDesiredPrepayNote) && prepaymentPercent > 0,
+    prepaymentPercent,
+    prepaymentPaid: isPrepaymentPaid,
+  });
+  const checkoutTotal =
+    checkoutPrice.breakdown.bookingTotal > 0
+      ? checkoutPrice.breakdown.bookingTotal
+      : total;
+  const prepayAmount = checkoutPrice.breakdown.prepaymentAmount;
   const contactPhoneValue = formatContactPhone(countryCode, phone);
   const bookingRef = activeBooking?.bookingRef ?? "";
 
@@ -204,7 +265,7 @@ export default function ClientBookingCreateSummaryView() {
         message:
           phoneErrors.phone ??
           phoneErrors.countryCode ??
-          "Please add a contact number in your profile.",
+          "Please enter a valid contact number.",
       });
       return false;
     }
@@ -301,6 +362,9 @@ export default function ClientBookingCreateSummaryView() {
       record: {
         ...record,
         contactPhone: contactPhoneValue,
+        draft: record.draft
+          ? { ...record.draft, total: checkoutTotal }
+          : record.draft,
       },
       locationMode,
       setup: bookingSetup,
@@ -315,6 +379,7 @@ export default function ClientBookingCreateSummaryView() {
     return result.record;
   }, [
     bookingSetup,
+    checkoutTotal,
     contactPhoneValue,
     createBooking,
     locationMode,
@@ -467,6 +532,9 @@ export default function ClientBookingCreateSummaryView() {
         record: {
           ...record,
           contactPhone: contactPhoneValue,
+        draft: record.draft
+          ? { ...record.draft, total: checkoutTotal }
+          : record.draft,
         },
         locationMode,
         setup: bookingSetup,
@@ -505,6 +573,7 @@ export default function ClientBookingCreateSummaryView() {
   }, [
     activeBooking,
     bookingSetup,
+    checkoutTotal,
     contactPhoneValue,
     createBooking,
     isDesired,
@@ -580,8 +649,8 @@ export default function ClientBookingCreateSummaryView() {
           <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 2, pb: 1.25 }}>
             <Typography
               sx={{
-                fontWeight: 900,
-                fontSize: 14,
+                fontWeight: 700,
+                fontSize: 30,
                 color: alpha(m.navy, 0.72),
                 textAlign: "center",
               }}
@@ -719,7 +788,7 @@ export default function ClientBookingCreateSummaryView() {
                           >
                             <Stack
                               direction="row"
-                              alignItems="flex-start"
+                              alignItems="center"
                               justifyContent="space-between"
                               spacing={1}
                             >
@@ -799,128 +868,76 @@ export default function ClientBookingCreateSummaryView() {
           <Box
             sx={{
               px: { xs: 2, md: 2.5 },
-              py: 1.35,
-              bgcolor: alpha(m.navy, 0.035),
+              py: 1.5,
+              bgcolor: alpha(m.navy, 0.02),
               borderTop: `1px solid ${alpha(m.navy, 0.06)}`,
             }}
           >
-            <Stack
-              direction="row"
-              alignItems="center"
-              justifyContent="space-between"
-            >
-              <Typography
-                sx={{ fontWeight: 800, fontSize: 13, color: alpha(m.navy, 0.7) }}
-              >
-                Total
-              </Typography>
-              <Typography
-                sx={{ fontWeight: 900, fontSize: 16, color: alpha(m.navy, 0.88) }}
-              >
-                €{total}
-              </Typography>
-            </Stack>
-
-            {showFixedPrepayRow ? (
-              <Stack
-                direction="row"
-                alignItems="center"
-                justifyContent="space-between"
-                spacing={1}
-                sx={{ mt: 0.85 }}
-              >
-                <Typography
-                  sx={{
-                    fontWeight: 700,
-                    fontSize: 12,
-                    color: alpha(m.navy, 0.58),
-                    flex: 1,
-                    minWidth: 0,
-                  }}
-                >
-                  {isPrepaymentPaid
-                    ? `Prepaid (${prepaymentPercent}%)`
-                    : `Prepayment Required (${prepaymentPercent}%)`}
-                </Typography>
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  spacing={1.25}
-                  sx={{ flexShrink: 0 }}
-                >
-                  {!isPrepaymentPaid ? (
-                    <Typography
-                      component="button"
-                      type="button"
-                      onClick={() => void handlePayNow()}
-                      disabled={isPaying}
-                      sx={{
-                        border: 0,
-                        bgcolor: "transparent",
-                        p: 0,
-                        cursor: isPaying ? "wait" : "pointer",
-                        color: m.teal,
-                        fontWeight: 900,
-                        fontSize: 12.5,
-                        fontFamily: "inherit",
-                        opacity: isPaying ? 0.7 : 1,
-                        "&:hover": { color: m.tealDark },
-                      }}
-                    >
-                      {isPaying ? "Preparing…" : "Pay Now"}
-                    </Typography>
-                  ) : (
-                    <Typography
-                      sx={{
-                        fontWeight: 800,
-                        fontSize: 12,
-                        color: m.teal,
-                      }}
-                    >
-                      Paid
-                    </Typography>
-                  )}
+            <BookingTotalPriceCard
+              embedded
+              totalPrice={checkoutPrice.displayTotal}
+              originalPrice={checkoutPrice.originalPrice}
+              discountAmount={checkoutPrice.breakdown.discountAmount}
+              lines={checkoutPrice.lines}
+              prepaidPercent={
+                showFixedPrepayRow || showDesiredPrepayNote
+                  ? prepaymentPercent
+                  : undefined
+              }
+              prepaidAmount={
+                showFixedPrepayRow || showDesiredPrepayNote ? prepayAmount : 0
+              }
+              remainingAmount={
+                showFixedPrepayRow || showDesiredPrepayNote
+                  ? checkoutPrice.breakdown.remainingAfterPrepayment
+                  : undefined
+              }
+              prepaidAction={
+                showFixedPrepayRow && !isPrepaymentPaid ? (
+                  <Typography
+                    component="button"
+                    type="button"
+                    onClick={() => void handlePayNow()}
+                    disabled={isPaying}
+                    sx={{
+                      border: 0,
+                      bgcolor: "transparent",
+                      p: 0,
+                      cursor: isPaying ? "wait" : "pointer",
+                      color: m.teal,
+                      fontWeight: 900,
+                      fontSize: 12.5,
+                      fontFamily: "inherit",
+                      opacity: isPaying ? 0.7 : 1,
+                      "&:hover": { color: m.tealDark },
+                    }}
+                  >
+                    {isPaying ? "Preparing…" : "Pay Now"}
+                  </Typography>
+                ) : showFixedPrepayRow && isPrepaymentPaid ? (
                   <Typography
                     sx={{
                       fontWeight: 800,
-                      fontSize: 13,
-                      color: alpha(m.navy, 0.78),
-                      minWidth: 56,
-                      textAlign: "right",
+                      fontSize: 12,
+                      color: m.teal,
                     }}
                   >
-                    €{prepayAmount}
+                    Paid
                   </Typography>
-                </Stack>
-              </Stack>
-            ) : null}
-
+                ) : undefined
+              }
+            />
             {showDesiredPrepayNote ? (
-              <Stack
-                direction="row"
-                alignItems="center"
-                justifyContent="space-between"
-                sx={{ mt: 0.75 }}
+              <Typography
+                sx={{
+                  mt: 0.85,
+                  fontWeight: 700,
+                  fontSize: 11.5,
+                  color: alpha(m.navy, 0.5),
+                }}
               >
-                <Typography
-                  sx={{
-                    fontWeight: 700,
-                    fontSize: 11.5,
-                    color: alpha(m.navy, 0.55),
-                  }}
-                >
-                  Prepayment Required ({prepaymentPercent}%) After Acceptance
-                </Typography>
-                <Typography
-                  sx={{
-                    fontWeight: 800,
-                    fontSize: 13,
-                    color: alpha(m.navy, 0.78),
-                  }}
-                >
-                  €{prepayAmount}
-                </Typography>
-              </Stack>
+                Prepayment is collected after the professional accepts.
+              </Typography>
             ) : null}
           </Box>
         </Paper>
@@ -952,13 +969,12 @@ export default function ClientBookingCreateSummaryView() {
             <AppCountryPhoneFields
               countryCode={countryCode}
               phone={phone}
-              onCountryCodeChange={() => {}}
-              onPhoneChange={() => {}}
+              onCountryCodeChange={setCountryCode}
+              onPhoneChange={setPhone}
               label="Contact Number"
-              phonePlaceholder="Add phone in profile"
+              phonePlaceholder="Enter your phone number"
               required
-              disabled
-              validateOnBlur={false}
+              validateOnBlur
               countryCodeWidth={140}
             />
 

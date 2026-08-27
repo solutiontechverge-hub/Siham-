@@ -10,6 +10,10 @@ import {
 } from "../../../app/clients/booking/booking-time";
 import { ServiceSummaryMetaLine } from "../ServiceSummaryMetaLine";
 import BookingEditedTag from "../calendar/BookingEditedTag";
+import BookingTotalPriceCard from "../calendar/BookingTotalPriceCard";
+import { summarizeClientBookingPrice } from "../calendar/bookingTotal";
+import type { ManualEntryDiscount } from "../../sections/finance/manualEntry.data";
+import type { BookingEditTagVariant } from "../calendar/bookingRequestNegotiation";
 import {
   buildBookingSummarySections,
   resolveTeamMemberFirstName,
@@ -174,7 +178,15 @@ type Props = {
   /** Desired-location bookings only — amount from professional kilometer allowance. */
   showKilometerAllowance?: boolean;
   kilometerAllowanceAmount?: number;
+  discount?: ManualEntryDiscount | null;
+  showLateCancellation?: boolean;
+  lateCancellationFeePercent?: number | string;
+  showLateRescheduling?: boolean;
+  lateRescheduleFeePercent?: number | string;
   editedServiceIds?: readonly string[];
+  addedServiceIds?: readonly string[];
+  cancelledServiceIds?: readonly string[];
+  cancelledServices?: ReadonlyArray<ClientBookingDraft["services"][number]>;
   products?: readonly BookingEditSuggestedProduct[];
   editedProductIds?: readonly string[];
   onPayNow?: () => void;
@@ -194,7 +206,15 @@ export default function ClientBookingPaymentDetailsCard({
   payNowLabel = "Pay Now",
   showKilometerAllowance = false,
   kilometerAllowanceAmount = 0,
+  discount = null,
+  showLateCancellation = false,
+  lateCancellationFeePercent,
+  showLateRescheduling = false,
+  lateRescheduleFeePercent,
   editedServiceIds = [],
+  addedServiceIds = [],
+  cancelledServiceIds = [],
+  cancelledServices = [],
   products = [],
   editedProductIds = [],
   onPayNow,
@@ -215,17 +235,56 @@ export default function ClientBookingPaymentDetailsCard({
     () => new Set(editedServiceIds),
     [editedServiceIds],
   );
+  const addedServiceIdSet = React.useMemo(
+    () => new Set(addedServiceIds),
+    [addedServiceIds],
+  );
+  const cancelledServiceIdSet = React.useMemo(
+    () => new Set(cancelledServiceIds),
+    [cancelledServiceIds],
+  );
   const editedProductIdSet = React.useMemo(
     () => new Set(editedProductIds),
     [editedProductIds],
   );
 
-  const total = draft?.total ?? 0;
-  const prepaidAmount =
-    Math.round(((total * prepaymentPercent) / 100 + Number.EPSILON) * 100) /
-    100;
-  const remaining =
-    Math.round((total - prepaidAmount + Number.EPSILON) * 100) / 100;
+  const serviceChangeTag = React.useCallback(
+    (serviceId: string): BookingEditTagVariant | null => {
+      if (cancelledServiceIdSet.has(serviceId)) return "cancelled";
+      if (addedServiceIdSet.has(serviceId)) return "added";
+      if (editedServiceIdSet.has(serviceId)) return "edited";
+      return null;
+    },
+    [addedServiceIdSet, cancelledServiceIdSet, editedServiceIdSet],
+  );
+
+  const listedProducts = products.length
+    ? products
+    : (draft?.products ?? []);
+  const extrasAmount =
+    showKilometerAllowance && kilometerAllowanceAmount > 0
+      ? kilometerAllowanceAmount
+      : 0;
+  const showPrepayment =
+    prepaymentState !== "none" && prepaymentPercent > 0;
+  const prepaymentPaid = prepaymentState === "paid";
+  const priceSummary = summarizeClientBookingPrice({
+    services: draft?.services,
+    people: draft?.people,
+    products: listedProducts,
+    extrasAmount,
+    discount,
+    showLateCancellation,
+    lateCancellationFeePercent,
+    showLateRescheduling,
+    lateRescheduleFeePercent,
+    showPrepayment,
+    prepaymentPercent,
+    prepaymentPaid,
+  });
+  const prepaidAmount = priceSummary.breakdown.prepaymentAmount;
+  const remaining = priceSummary.breakdown.remainingAfterPrepayment;
+  const priceSummaryLines = priceSummary.lines;
 
   const requesterSections = sections.filter(
     (s) => s.isRequester || s.participantType === "requester",
@@ -255,6 +314,26 @@ export default function ClientBookingPaymentDetailsCard({
     ? requesterSections
     : fallbackRequesterSection;
 
+  const attachCancelled = (
+    section: ClientBookingSummarySection,
+  ): ClientBookingSummarySection => {
+    const extra = cancelledServices.filter((s) => {
+      if (section.isRequester || section.participantType === "requester") {
+        return !s.guestId || s.guestId === section.key;
+      }
+      return s.guestId === section.key;
+    });
+    if (!extra.length) return section;
+    const existing = new Set(section.items.map((item) => item.id));
+    return {
+      ...section,
+      items: [
+        ...section.items,
+        ...extra.filter((item) => !existing.has(item.id)),
+      ],
+    };
+  };
+
   const project = draft?.projectDetails;
   const hasProject =
     Boolean(project?.description?.trim()) ||
@@ -271,7 +350,7 @@ export default function ClientBookingPaymentDetailsCard({
       ? serviceTimeRangeLabel(scheduleOffset, service.durationMins)
       : undefined;
     scheduleOffset += service.durationMins;
-    const isEdited = editedServiceIdSet.has(service.id);
+    const changeTag = serviceChangeTag(service.id);
 
     return (
       <Box
@@ -287,28 +366,20 @@ export default function ClientBookingPaymentDetailsCard({
         <Stack
           direction="row"
           justifyContent="space-between"
-          alignItems="flex-start"
+          alignItems="center"
           spacing={1.5}
         >
           <Box sx={{ minWidth: 0 }}>
-            <Stack
-              direction="row"
-              alignItems="center"
-              spacing={0.75}
-              sx={{ flexWrap: "wrap" }}
+            <Typography
+              sx={{
+                fontSize: 13,
+                fontWeight: 900,
+                color: alpha(m.navy, 0.82),
+                lineHeight: 1.2,
+              }}
             >
-              <Typography
-                sx={{
-                  fontSize: 13,
-                  fontWeight: 900,
-                  color: alpha(m.navy, 0.82),
-                  lineHeight: 1.2,
-                }}
-              >
-                {service.name}
-              </Typography>
-              {isEdited ? <BookingEditedTag variant="edited" /> : null}
-            </Stack>
+              {service.name}
+            </Typography>
             <ServiceSummaryMetaLine
               timeRange={timeRange}
               durationLabel={`${service.durationMins} Mins`}
@@ -334,6 +405,11 @@ export default function ClientBookingPaymentDetailsCard({
                 </Typography>
               </Stack>
             ) : null}
+            {changeTag ? (
+              <Box sx={{ mt: 0.7 }}>
+                <BookingEditedTag variant={changeTag} />
+              </Box>
+            ) : null}
           </Box>
           <Typography
             sx={{
@@ -350,12 +426,50 @@ export default function ClientBookingPaymentDetailsCard({
     );
   };
 
+  const renderPersonHeader = (name: string) => (
+    <Stack
+      direction="row"
+      alignItems="center"
+      spacing={1.25}
+      sx={{ mb: 1.15 }}
+    >
+      <Avatar
+        sx={{
+          width: 40,
+          height: 40,
+          bgcolor: alpha(m.teal, 0.12),
+          color: m.teal,
+          fontWeight: 900,
+          fontSize: 15,
+        }}
+      >
+        {name.charAt(0).toUpperCase()}
+      </Avatar>
+      <Typography
+        sx={{ fontWeight: 900, fontSize: 14, color: m.headingText }}
+      >
+        {name}
+      </Typography>
+    </Stack>
+  );
+
+  const nestedCardSx = {
+    borderRadius: "10px",
+    border: `1px solid ${alpha(m.navy, 0.08)}`,
+    bgcolor: m.white,
+    px: 1.5,
+    py: 1.25,
+  } as const;
+
   const renderSectionBlock = (
     section: ClientBookingSummarySection,
     heading?: string,
+    asPersonCard?: boolean,
   ) => (
-    <Box key={section.key}>
-      {heading ? (
+    <Box key={section.key} sx={asPersonCard ? nestedCardSx : undefined}>
+      {asPersonCard
+        ? renderPersonHeader(heading || section.title)
+        : heading ? (
         <Typography
           sx={{
             fontWeight: 900,
@@ -419,9 +533,14 @@ export default function ClientBookingPaymentDetailsCard({
     >
       <Box sx={{ px: 2, py: 1.35, bgcolor: "#fff" }}>
         <Typography
-          sx={{ fontWeight: 900, color: alpha(m.navy, 0.78), fontSize: 12.5 }}
+          sx={{
+            fontWeight: 900,
+            color: m.headingText,
+            fontSize: 16,
+            textAlign: "center",
+          }}
         >
-          Booking &amp; Payment Details
+          Booking and Payment Details
         </Typography>
       </Box>
       <Divider />
@@ -474,28 +593,22 @@ export default function ClientBookingPaymentDetailsCard({
         </Stack>
 
         {hasProject ? (
-          <Box sx={{ mb: 2.25 }}>
-            <Stack
-              direction="row"
-              alignItems="baseline"
-              spacing={1}
-              sx={{ mb: 1 }}
+          <Box
+            sx={{
+              mb: 2.25,
+              ...nestedCardSx,
+            }}
+          >
+            <Typography
+              sx={{
+                fontWeight: 900,
+                fontSize: 14,
+                color: m.headingText,
+                mb: 1,
+              }}
             >
-              <Typography
-                sx={{
-                  fontWeight: 900,
-                  fontSize: 13,
-                  color: alpha(m.navy, 0.82),
-                }}
-              >
-                Project
-              </Typography>
-              <Typography
-                sx={{ fontWeight: 800, fontSize: 11.5, color: m.teal }}
-              >
-                Detail
-              </Typography>
-            </Stack>
+              Project Details and Media
+            </Typography>
             {project?.description?.trim() ? (
               <Box
                 sx={{
@@ -525,11 +638,11 @@ export default function ClientBookingPaymentDetailsCard({
                   sx={{
                     fontWeight: 900,
                     fontSize: 12,
-                    color: alpha(m.navy, 0.72),
+                    color: m.headingText,
                     mb: 1,
                   }}
                 >
-                  Uploaded
+                  Media
                 </Typography>
                 <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
                   {project!.uploads.map((upload) => {
@@ -601,23 +714,28 @@ export default function ClientBookingPaymentDetailsCard({
         ) : null}
 
         <Stack spacing={2}>
-          {clientServiceSections.map((section) => renderSectionBlock(section))}
-
-          {modelSections.map((section) =>
-            renderSectionBlock(section, section.title),
+          {clientServiceSections.map((section) =>
+            renderSectionBlock(attachCancelled(section)),
           )}
 
-          {guestSections.map((section) =>
+          {modelSections.map((section) =>
             renderSectionBlock(
-              section,
-              section.title.toLowerCase().startsWith("guest")
-                ? section.title
-                : `Guest: ${section.title}`,
+              attachCancelled(section),
+              section.title,
+              true,
             ),
           )}
 
+          {guestSections.map((section) =>
+            renderSectionBlock(attachCancelled(section), section.title, true),
+          )}
+
           {planningSections.map((section) =>
-            renderSectionBlock(section, "Planning Details"),
+            renderSectionBlock(
+              attachCancelled(section),
+              "Planning Details",
+              true,
+            ),
           )}
 
           {products.length > 0 ? (
@@ -647,7 +765,7 @@ export default function ClientBookingPaymentDetailsCard({
                     <Stack
                       direction="row"
                       justifyContent="space-between"
-                      alignItems="flex-start"
+                      alignItems="center"
                       spacing={1.5}
                     >
                       <Stack
@@ -690,360 +808,55 @@ export default function ClientBookingPaymentDetailsCard({
           ) : null}
         </Stack>
 
-        {showKilometerAllowance && kilometerAllowanceAmount > 0 ? (
-          <Box sx={{ mt: 2.25 }}>
-            <Typography
-              sx={{
-                fontWeight: 800,
-                fontSize: 10.5,
-                letterSpacing: "0.06em",
-                textTransform: "uppercase",
-                color: alpha(m.navy, 0.48),
-                mb: 0.85,
-              }}
-            >
-              Kilometer Allowance
-            </Typography>
-            <Box
-              sx={{
-                px: 1.75,
-                py: 1.15,
-                borderRadius: "10px",
-                bgcolor: "#fff",
-                border: `1px solid ${alpha(m.navy, 0.08)}`,
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <Typography
-                sx={{
-                  fontWeight: 800,
-                  fontSize: 13,
-                  color: alpha(m.navy, 0.72),
-                }}
-              >
-                Kilometer Allowance
-              </Typography>
-              <Typography
-                sx={{
-                  fontWeight: 900,
-                  fontSize: 14,
-                  color: alpha(m.navy, 0.88),
-                }}
-              >
-                €{kilometerAllowanceAmount.toFixed(2)}
-              </Typography>
-            </Box>
-          </Box>
-        ) : null}
-
-        {prepaymentState === "none" ? (
-          <Box
-            sx={{
-              mt:
-                showKilometerAllowance && kilometerAllowanceAmount > 0
-                  ? 1.5
-                  : 2,
-            }}
-          >
-            <Box
-              sx={{
-                px: 1.75,
-                py: 1.25,
-                borderRadius: "10px",
-                bgcolor: "#fff",
-                border: `1px solid ${alpha(m.navy, 0.08)}`,
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <Typography
-                sx={{
-                  fontWeight: 900,
-                  fontSize: 13,
-                  color: alpha(m.navy, 0.78),
-                }}
-              >
-                Total Price
-              </Typography>
-              <Typography
-                sx={{
-                  fontWeight: 1000,
-                  fontSize: 15,
-                  color: alpha(m.navy, 0.9),
-                }}
-              >
-                {total.toFixed(0)}€
-              </Typography>
-            </Box>
-            {acceptedChangesNote ? (
-              <OutcomeChangesNoteBlock
-                note={acceptedChangesNote}
-                variant="accepted"
-              />
-            ) : null}
-            {rejectedChangesNote ? (
-              <OutcomeChangesNoteBlock
-                note={rejectedChangesNote}
-                variant="rejected"
-              />
-            ) : null}
-          </Box>
-        ) : null}
-
-        {prepaymentState === "required" ? (
-          <Box
-            sx={{
-              mt:
-                showKilometerAllowance && kilometerAllowanceAmount > 0
-                  ? 1.5
-                  : 2,
-            }}
-          >
-            <Stack
-              direction="row"
-              justifyContent="space-between"
-              alignItems="center"
-              sx={{ mb: 1.1, px: 0.25 }}
-            >
-              <Typography
-                sx={{
-                  fontWeight: 900,
-                  fontSize: 13,
-                  color: alpha(m.navy, 0.78),
-                }}
-              >
-                Total Price
-              </Typography>
-              <Typography
-                sx={{
-                  fontWeight: 1000,
-                  fontSize: 15,
-                  color: alpha(m.navy, 0.9),
-                }}
-              >
-                {total.toFixed(0)}€
-              </Typography>
-            </Stack>
-            {acceptedChangesNote ? (
-              <OutcomeChangesNoteBlock
-                note={acceptedChangesNote}
-                variant="accepted"
-              />
-            ) : null}
-            {rejectedChangesNote ? (
-              <OutcomeChangesNoteBlock
-                note={rejectedChangesNote}
-                variant="rejected"
-              />
-            ) : null}
-            <Paper
-              elevation={0}
-              sx={{
-                borderRadius: "10px",
-                border: `1px solid ${alpha(m.navy, 0.08)}`,
-                bgcolor: alpha(m.navy, 0.03),
-                px: 1.75,
-                py: 1.35,
-                mt: acceptedChangesNote || rejectedChangesNote ? 1.25 : 0,
-              }}
-            >
-              <Stack
-                direction="row"
-                alignItems="center"
-                justifyContent="space-between"
-                spacing={1}
-                sx={{ mb: 1.1 }}
-              >
+        <Box sx={{ mt: 2 }}>
+          <BookingTotalPriceCard
+            totalPrice={priceSummary.displayTotal}
+            originalPrice={priceSummary.originalPrice}
+            discountAmount={priceSummary.breakdown.discountAmount}
+            lines={priceSummaryLines}
+            prepaidPercent={
+              prepaymentState === "none" ? undefined : prepaymentPercent
+            }
+            prepaidAmount={prepaymentState === "none" ? 0 : prepaidAmount}
+            remainingAmount={
+              prepaymentState === "none" ? undefined : remaining
+            }
+            prepaidAction={
+              prepaymentState === "required" && onPayNow ? (
                 <Typography
+                  component="button"
+                  type="button"
+                  onClick={onPayNow}
                   sx={{
-                    fontWeight: 800,
-                    fontSize: 12.5,
-                    color: alpha(m.navy, 0.72),
-                    flex: 1,
-                    minWidth: 0,
-                  }}
-                >
-                  Prepayment Required ({prepaymentPercent}%)
-                </Typography>
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  spacing={1}
-                  sx={{ flexShrink: 0 }}
-                >
-                  {onPayNow ? (
-                    <Typography
-                      component="button"
-                      type="button"
-                      onClick={onPayNow}
-                      sx={{
-                        border: 0,
-                        bgcolor: "transparent",
-                        p: 0,
-                        cursor: "pointer",
-                        color: m.teal,
-                        fontWeight: 900,
-                        fontSize: 12.5,
-                        fontFamily: "inherit",
-                        "&:hover": { color: m.tealDark },
-                      }}
-                    >
-                      {payNowLabel}
-                    </Typography>
-                  ) : null}
-                  <Typography
-                    sx={{
-                      fontWeight: 900,
-                      fontSize: 13,
-                      color: alpha(m.navy, 0.88),
-                      minWidth: 72,
-                      textAlign: "right",
-                    }}
-                  >
-                    €{prepaidAmount.toFixed(2)}
-                  </Typography>
-                </Stack>
-              </Stack>
-              <Stack
-                direction="row"
-                justifyContent="space-between"
-                alignItems="center"
-              >
-                <Typography
-                  sx={{
-                    fontWeight: 800,
-                    fontSize: 12.5,
-                    color: alpha(m.navy, 0.62),
-                  }}
-                >
-                  Remaining After Prepayment
-                </Typography>
-                <Typography
-                  sx={{
+                    border: 0,
+                    bgcolor: "transparent",
+                    p: 0,
+                    cursor: "pointer",
+                    color: m.teal,
                     fontWeight: 900,
-                    fontSize: 13,
-                    color: alpha(m.navy, 0.88),
-                  }}
-                >
-                  €{remaining.toFixed(2)}
-                </Typography>
-              </Stack>
-            </Paper>
-          </Box>
-        ) : null}
-
-        {prepaymentState === "paid" ? (
-          <Box
-            sx={{
-              mt:
-                showKilometerAllowance && kilometerAllowanceAmount > 0
-                  ? 1.5
-                  : 2,
-            }}
-          >
-            <Stack
-              direction="row"
-              justifyContent="space-between"
-              alignItems="center"
-              sx={{ mb: 1.1, px: 0.25 }}
-            >
-              <Typography
-                sx={{
-                  fontWeight: 900,
-                  fontSize: 13,
-                  color: alpha(m.navy, 0.78),
-                }}
-              >
-                Total Price
-              </Typography>
-              <Typography
-                sx={{
-                  fontWeight: 1000,
-                  fontSize: 15,
-                  color: alpha(m.navy, 0.9),
-                }}
-              >
-                {total.toFixed(0)}€
-              </Typography>
-            </Stack>
-            {acceptedChangesNote ? (
-              <OutcomeChangesNoteBlock
-                note={acceptedChangesNote}
-                variant="accepted"
-              />
-            ) : null}
-            {rejectedChangesNote ? (
-              <OutcomeChangesNoteBlock
-                note={rejectedChangesNote}
-                variant="rejected"
-              />
-            ) : null}
-            <Paper
-              elevation={0}
-              sx={{
-                borderRadius: "10px",
-                border: `1px solid ${alpha(m.navy, 0.08)}`,
-                bgcolor: alpha(m.navy, 0.03),
-                px: 1.75,
-                py: 1.35,
-                mt: acceptedChangesNote || rejectedChangesNote ? 1.25 : 0,
-              }}
-            >
-              <Stack
-                direction="row"
-                justifyContent="space-between"
-                alignItems="center"
-                sx={{ mb: 1.1 }}
-              >
-                <Typography
-                  sx={{
-                    fontWeight: 800,
                     fontSize: 12.5,
-                    color: alpha(m.navy, 0.72),
+                    fontFamily: "inherit",
+                    "&:hover": { color: m.tealDark },
                   }}
                 >
-                  Prepaid ({prepaymentPercent}%)
+                  {payNowLabel}
                 </Typography>
-                <Typography
-                  sx={{
-                    fontWeight: 900,
-                    fontSize: 13,
-                    color: alpha(m.navy, 0.88),
-                  }}
-                >
-                  -{prepaidAmount.toFixed(2)}€
-                </Typography>
-              </Stack>
-              <Stack
-                direction="row"
-                justifyContent="space-between"
-                alignItems="center"
-              >
-                <Typography
-                  sx={{
-                    fontWeight: 800,
-                    fontSize: 12.5,
-                    color: alpha(m.navy, 0.62),
-                  }}
-                >
-                  Remaining
-                </Typography>
-                <Typography
-                  sx={{
-                    fontWeight: 900,
-                    fontSize: 13,
-                    color: alpha(m.navy, 0.88),
-                  }}
-                >
-                  €{remaining.toFixed(2)}
-                </Typography>
-              </Stack>
-            </Paper>
-          </Box>
-        ) : null}
+              ) : undefined
+            }
+          />
+          {acceptedChangesNote ? (
+            <OutcomeChangesNoteBlock
+              note={acceptedChangesNote}
+              variant="accepted"
+            />
+          ) : null}
+          {rejectedChangesNote ? (
+            <OutcomeChangesNoteBlock
+              note={rejectedChangesNote}
+              variant="rejected"
+            />
+          ) : null}
+        </Box>
 
         {draft?.clientNote?.trim() ? (
           <Box sx={{ mt: 1.5 }}>

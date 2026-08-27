@@ -1772,6 +1772,7 @@ export function useClientBookingCreatePage() {
 
     if (isModel && !isCompanyClient) return;
     if (isPlanning && !isCompanyClient) return;
+    if (isGuest && isDesiredLocation && isCompanyClient) return;
 
     if (isNotes) {
       const existing = people.find(isNotesPerson);

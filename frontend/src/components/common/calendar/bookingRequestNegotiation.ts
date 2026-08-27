@@ -59,42 +59,52 @@ type EditTagEbrSource = {
   cancelledServiceIds?: string[];
 } | null;
 
+function hasId(ids: readonly string[] | undefined, serviceId: string) {
+  return Boolean(ids?.includes(serviceId));
+}
+
 /**
- * Professional drawer: show Edited/Added/Cancelled for client-originated line edits.
- * (Never show the professional's own edits back to themselves.)
+ * Line-change tags after EBR accept (client or professional).
+ * Cancelled > added > edited.
  */
 export function getServiceEditTag(
   serviceId: string,
   details?: CalendarBookingDetails | null,
   ebr?: EditTagEbrSource,
 ): BookingEditTagVariant | null {
-  const clientOrigin =
-    details?.lastEditedBy === "client" || ebr?.lastEditedBy === "client";
   if (
-    clientOrigin &&
-    (details?.addedServiceIds?.includes(serviceId) || ebr?.addedServiceIds?.includes(serviceId))
+    hasId(details?.cancelledServiceIds, serviceId) ||
+    hasId(ebr?.cancelledServiceIds, serviceId)
+  ) {
+    return "cancelled";
+  }
+  if (
+    hasId(details?.addedServiceIds, serviceId) ||
+    hasId(ebr?.addedServiceIds, serviceId)
   ) {
     return "added";
   }
   if (
-    clientOrigin &&
-    (details?.cancelledServiceIds?.includes(serviceId) ||
-      ebr?.cancelledServiceIds?.includes(serviceId))
-  ) {
-    return "cancelled";
-  }
-  if (details?.clientEditedServiceIds?.includes(serviceId)) return "edited";
-  if (ebr?.clientEditedServiceIds?.includes(serviceId)) return "edited";
-  if (ebr?.lastEditedBy === "client" && ebr.editedServiceIds?.includes(serviceId)) {
-    return "edited";
-  }
-  if (
-    details?.lastEditedBy === "client" &&
-    details.editedServiceIds?.includes(serviceId)
+    hasId(details?.clientEditedServiceIds, serviceId) ||
+    hasId(ebr?.clientEditedServiceIds, serviceId) ||
+    hasId(details?.editedServiceIds, serviceId) ||
+    hasId(ebr?.editedServiceIds, serviceId)
   ) {
     return "edited";
   }
   return null;
+}
+
+export function cancelledOriginalServicesForDisplay(
+  originalServices: readonly CalendarBookingServiceItem[] | undefined,
+  currentIds: ReadonlySet<string>,
+  cancelledIds?: readonly string[],
+): CalendarBookingServiceItem[] {
+  if (!originalServices?.length || !cancelledIds?.length) return [];
+  const cancelled = new Set(cancelledIds);
+  return originalServices.filter(
+    (service) => cancelled.has(service.id) && !currentIds.has(service.id),
+  );
 }
 
 /** Professional drawer: Edited only when the client changed the product/unique line. */

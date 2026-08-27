@@ -60,6 +60,7 @@ import { useCheckoutBookingRef } from "./useCheckoutBookingRef";
 import ClientBookingChangeResponsePanel from "./ClientBookingChangeResponsePanel";
 import ClientEbrResponseActions from "./ClientEbrResponseActions";
 import EditRequestIncomingNote from "./EditRequestIncomingNote";
+import InlineTimedSnackbar from "../InlineTimedSnackbar";
 import ClientEbrActionDialog, {
   type ClientEbrActionKind,
 } from "./ClientEbrActionDialog";
@@ -184,6 +185,10 @@ export default function ClientBookingDetailsView({
   const { record: activeBooking, apiBookings, refresh: refreshActiveBooking } =
     useActiveClientBooking();
   const bookingRef = activeBooking?.bookingRef ?? checkoutBookingRef;
+  React.useEffect(() => {
+    setResponseActionsDismissed(false);
+    setActionFeedback(null);
+  }, [bookingRef]);
   const editRequest = useBookingEditRequest(bookingRef);
   const bookingStatus: ClientBookingStatus = activeBooking?.status ?? "draft";
   const isDraft = bookingStatus === "draft";
@@ -244,11 +249,24 @@ export default function ClientBookingDetailsView({
   const [ebrAction, setEbrAction] = React.useState<ClientEbrActionKind | null>(
     null,
   );
+  const [responseActionsDismissed, setResponseActionsDismissed] =
+    React.useState(false);
+  const [actionFeedback, setActionFeedback] = React.useState<{
+    message: string;
+    severity: "success" | "error";
+  } | null>(null);
   const messagingWidget = useMessagingWidgetOptional();
   const isCancelled = bookingStatus === "cancelled";
   /** Accept / Suggest / Reject when professional sent an EBR (API notes). */
   const isEbrIncoming =
     activeBooking?.incomingEditRequest?.status === "suggested";
+  const apiEditRequest = activeBooking?.editRequest;
+  const apiErInitiatedBy =
+    apiEditRequest?.initiated_by ??
+    (apiEditRequest as { initiatedBy?: "client" | "professional" } | null | undefined)
+      ?.initiatedBy;
+  const hasApiPendingEr =
+    String(apiEditRequest?.status ?? "").toLowerCase() === "pending";
   /** Professional-sent booking request awaiting client response. */
   const isIncomingBr =
     bookingStatus === "requested" &&
@@ -256,10 +274,19 @@ export default function ClientBookingDetailsView({
     !isEbrIncoming;
   const isIncomingConfirmedEr =
     bookingStatus === "confirmed" &&
-    editRequest.isPending &&
-    editRequest.initiatedBy === "professional";
+    hasApiPendingEr &&
+    apiErInitiatedBy === "professional";
+  const incomingProfessionalNote = (
+    isIncomingConfirmedEr
+      ? apiEditRequest?.note || editRequest.note
+      : isEbrIncoming
+        ? activeBooking?.incomingEditRequest?.professionalNote ||
+          editRequest.professionalNote
+        : ""
+  )?.trim();
   const showRequestResponseActions =
-    isEbrIncoming || isIncomingBr || isIncomingConfirmedEr;
+    !responseActionsDismissed &&
+    (isEbrIncoming || isIncomingBr || isIncomingConfirmedEr);
   const canActOnPayment =
     !isCompleted && !isCancelled && prepaymentState === "required";
   const { invoiceSettings: financeSettings, transactionOptions } =
@@ -321,28 +348,13 @@ export default function ClientBookingDetailsView({
     if (requesterPhone && !phone) setPhone(requesterPhone);
   }, [phone, requesterPhone]);
 
-  // Hydrate Confirmed ER from backend edit_request (fallback: notes.er).
+  // Hydrate Confirmed ER from backend edit_request only (ignore stale notes/local cache).
   React.useEffect(() => {
     if (!bookingRef) return;
-    if (activeBooking?.editRequest) {
-      syncEditRequestFromBookingApi(bookingRef, activeBooking.editRequest);
-      editRequest.refresh();
-      return;
-    }
-    if (!activeBooking?.notes) return;
-    const er = parseStoredErFromNotes(activeBooking.notes);
-    if (!er || er.status === "none") return;
-    syncEditRequestFromBookingApi(bookingRef, {
-      status: er.status as "pending" | "approved" | "rejected",
-      note: er.note,
-      initiated_by: (er.initiatedBy ?? "client") as "client" | "professional",
-      requested_at: er.requestedAt ?? null,
-      responded_at: er.approvedAt ?? er.rejectedAt ?? null,
-      edit_grant_active: Boolean(er.editGrantActive),
-    });
+    syncEditRequestFromBookingApi(bookingRef, activeBooking?.editRequest ?? null);
     editRequest.refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeBooking?.editRequest, activeBooking?.notes, bookingRef]);
+  }, [activeBooking?.editRequest, bookingRef]);
 
   // Pin Updated for this visit so it stays visible on the Confirmed status row.
   // Clear from localStorage when leaving the page.
@@ -1271,11 +1283,9 @@ export default function ClientBookingDetailsView({
         syncEditRequestFromBookingApi(bookingRef, result.data?.edit_request);
         await refreshActiveBooking();
         editRequest.refresh();
-        showSnackbar({
-          severity: "success",
-          message: "Edit request accepted.",
-        });
       } catch (error) {
+        setResponseActionsDismissed(false);
+        setActionFeedback(null);
         showSnackbar({
           severity: "error",
           message: getApiErrorMessage(
@@ -1314,11 +1324,9 @@ export default function ClientBookingDetailsView({
         syncEditRequestFromBookingApi(bookingRef, result.data?.edit_request);
         await refreshActiveBooking();
         editRequest.refresh();
-        showSnackbar({
-          severity: "success",
-          message: "Edit request rejected. Booking stays confirmed.",
-        });
       } catch (error) {
+        setResponseActionsDismissed(false);
+        setActionFeedback(null);
         showSnackbar({
           severity: "error",
           message: getApiErrorMessage(
@@ -1343,6 +1351,8 @@ export default function ClientBookingDetailsView({
         }).unwrap();
         await refreshActiveBooking();
       } catch (error) {
+        setResponseActionsDismissed(false);
+        setActionFeedback(null);
         showSnackbar({
           severity: "error",
           message: getApiErrorMessage(
@@ -1357,12 +1367,6 @@ export default function ClientBookingDetailsView({
     }
     clearBookingEditRequest(bookingRef);
     editRequest.refresh();
-    showSnackbar({
-      severity: "success",
-      message: isIncomingBr
-        ? "Booking request rejected."
-        : "Edited booking request rejected.",
-    });
   }, [
     activeBooking?.notes,
     apiBookingId,
@@ -1379,6 +1383,11 @@ export default function ClientBookingDetailsView({
   const handleConfirmEbrSuggest = React.useCallback(async () => {
     setEbrAction(null);
     setEbrSuggestDrawerOpen(false);
+    setResponseActionsDismissed(true);
+    setActionFeedback({
+      severity: "success",
+      message: "You can now suggest a change.",
+    });
     if (!bookingRef) return;
     try {
       const result = await openMessagingForBooking({ bookingRef }).unwrap();
@@ -1389,6 +1398,8 @@ export default function ClientBookingDetailsView({
         searchPrefill: result.thread?.name || undefined,
       });
     } catch (error) {
+      setResponseActionsDismissed(false);
+      setActionFeedback(null);
       showSnackbar({
         severity: "error",
         message: getApiErrorMessage(
@@ -2099,31 +2110,46 @@ export default function ClientBookingDetailsView({
     [activeBooking?.notes],
   );
   /**
-   * Client UI: Edited tags only for professional-originated line changes.
-   * Hide when the client last edited (own pending/returned suggestion).
+   * Line-change tags after EBR accept (client or professional).
    */
   const clientVisibleEditedServiceIds = React.useMemo(() => {
-    if (bookingNotesMeta?.lastEditedBy === "client") return undefined;
-    if (editRequest.isPending) return undefined;
-    if (isEbrIncoming) {
-      return editRequest.editedServiceIds ?? activeBooking?.editedServiceIds;
-    }
-    if (bookingNotesMeta?.lastEditedBy === "professional") {
-      return activeBooking?.editedServiceIds ?? editRequest.editedServiceIds;
-    }
-    // Legacy / confirmed booking pro updates without lastEditedBy
-    if (!editRequest.isRejected && !editRequest.isAccepted) {
-      return activeBooking?.editedServiceIds;
-    }
-    return undefined;
+    return (
+      bookingNotesMeta?.editedServiceIds ??
+      editRequest.editedServiceIds ??
+      activeBooking?.editedServiceIds
+    );
   }, [
     activeBooking?.editedServiceIds,
-    bookingNotesMeta?.lastEditedBy,
+    bookingNotesMeta?.editedServiceIds,
     editRequest.editedServiceIds,
-    editRequest.isAccepted,
-    editRequest.isPending,
-    editRequest.isRejected,
-    isEbrIncoming,
+  ]);
+  const clientVisibleAddedServiceIds = React.useMemo(
+    () => bookingNotesMeta?.addedServiceIds,
+    [bookingNotesMeta?.addedServiceIds],
+  );
+  const clientVisibleCancelledServiceIds = React.useMemo(
+    () => bookingNotesMeta?.cancelledServiceIds,
+    [bookingNotesMeta?.cancelledServiceIds],
+  );
+  const cancelledServicesForDisplay = React.useMemo(() => {
+    const ids = new Set(bookingNotesMeta?.cancelledServiceIds ?? []);
+    const originals = bookingNotesMeta?.originalServices ?? [];
+    const currentIds = new Set((displayDraft?.services ?? []).map((s) => s.id));
+    if (!ids.size) return [];
+    return originals
+      .filter((service) => ids.has(service.id) && !currentIds.has(service.id))
+      .map((service) => ({
+        id: service.id,
+        name: service.name,
+        durationMins: service.durationMins,
+        price: service.price,
+        guestId: service.guestId ?? null,
+        teamMemberId: service.teamMemberId ?? service.staffResourceId ?? null,
+      }));
+  }, [
+    bookingNotesMeta?.cancelledServiceIds,
+    bookingNotesMeta?.originalServices,
+    displayDraft?.services,
   ]);
   const clientVisibleEditedProductIds = React.useMemo(() => {
     if (bookingNotesMeta?.lastEditedBy === "client") return undefined;
@@ -2345,7 +2371,25 @@ export default function ClientBookingDetailsView({
                   requesterEmail={user?.email}
                   requesterAvatarUrl={requesterAvatarUrl}
                   prepaymentState="none"
+                  showKilometerAllowance={showKilometerAllowance}
+                  kilometerAllowanceAmount={kilometerAllowanceAmount}
+                  discount={bookingNotesMeta?.totalDiscount ?? null}
+                  showLateCancellation={Boolean(
+                    bookingNotesMeta?.showLateCancellation,
+                  )}
+                  lateCancellationFeePercent={
+                    bookingNotesMeta?.lateCancellationFeePercent
+                  }
+                  showLateRescheduling={Boolean(
+                    bookingNotesMeta?.showLateRescheduling,
+                  )}
+                  lateRescheduleFeePercent={
+                    bookingNotesMeta?.lateRescheduleFeePercent
+                  }
                   editedServiceIds={clientVisibleEditedServiceIds}
+                  addedServiceIds={clientVisibleAddedServiceIds}
+                  cancelledServiceIds={clientVisibleCancelledServiceIds}
+                  cancelledServices={cancelledServicesForDisplay}
                   products={editRequest.suggestedProducts}
                   editedProductIds={clientVisibleEditedProductIds}
                 />
@@ -2378,9 +2422,25 @@ export default function ClientBookingDetailsView({
                   payNowLabel={payNowLabel}
                   showKilometerAllowance={showKilometerAllowance}
                   kilometerAllowanceAmount={kilometerAllowanceAmount}
+                  discount={bookingNotesMeta?.totalDiscount ?? null}
+                  showLateCancellation={Boolean(
+                    bookingNotesMeta?.showLateCancellation,
+                  )}
+                  lateCancellationFeePercent={
+                    bookingNotesMeta?.lateCancellationFeePercent
+                  }
+                  showLateRescheduling={Boolean(
+                    bookingNotesMeta?.showLateRescheduling,
+                  )}
+                  lateRescheduleFeePercent={
+                    bookingNotesMeta?.lateRescheduleFeePercent
+                  }
                   rejectedChangesNote={rejectedChangesNote}
                   acceptedChangesNote={acceptedChangesNote}
                   editedServiceIds={clientVisibleEditedServiceIds}
+                  addedServiceIds={clientVisibleAddedServiceIds}
+                  cancelledServiceIds={clientVisibleCancelledServiceIds}
+                  cancelledServices={cancelledServicesForDisplay}
                   products={
                     isEbrIncoming || editRequest.isPending
                       ? editRequest.suggestedProducts
@@ -2423,9 +2483,9 @@ export default function ClientBookingDetailsView({
                   />
                 ) : null}
 
-                {isIncomingConfirmedEr && editRequest.note ? (
+                {incomingProfessionalNote ? (
                   <EditRequestIncomingNote
-                    note={editRequest.note}
+                    note={incomingProfessionalNote}
                     from="professional"
                   />
                 ) : null}
@@ -2437,6 +2497,13 @@ export default function ClientBookingDetailsView({
                     onReject={() => setEbrAction("reject")}
                   />
                 ) : null}
+
+                <InlineTimedSnackbar
+                  open={Boolean(actionFeedback)}
+                  message={actionFeedback?.message}
+                  severity={actionFeedback?.severity}
+                  onClose={() => setActionFeedback(null)}
+                />
 
                 {isDraft &&
                 !isPrepaid &&
@@ -2526,6 +2593,25 @@ export default function ClientBookingDetailsView({
         }
         onClose={() => setEbrAction(null)}
         onConfirm={() => {
+          const action = ebrAction;
+          setResponseActionsDismissed(true);
+          setActionFeedback({
+            severity: "success",
+            message:
+              action === "accept"
+                ? isIncomingConfirmedEr
+                  ? "Edit request accepted."
+                  : isIncomingBr
+                    ? "Booking request accepted."
+                    : "Changes accepted."
+                : action === "reject"
+                  ? isIncomingConfirmedEr
+                    ? "Edit request rejected. Booking stays confirmed."
+                    : isIncomingBr
+                      ? "Booking request rejected."
+                      : "Edited booking request rejected."
+                  : "You can now suggest a change.",
+          });
           if (ebrAction === "accept") handleConfirmEbrAccept();
           else if (ebrAction === "reject") void handleConfirmEbrReject();
           else if (ebrAction === "suggest") void handleConfirmEbrSuggest();

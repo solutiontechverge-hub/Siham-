@@ -2152,16 +2152,18 @@ export default function ClientBookingCreateView() {
                             },
                           }}
                         >
-                          <MenuItem
-                            onClick={() => addParticipant("Guest")}
-                            sx={{
-                              fontSize: 12,
-                              fontWeight: 900,
-                              color: alpha(m.navy, 0.78),
-                            }}
-                          >
-                            Guest
-                          </MenuItem>
+                          {!isCompanyClient ? (
+                            <MenuItem
+                              onClick={() => addParticipant("Guest")}
+                              sx={{
+                                fontSize: 12,
+                                fontWeight: 900,
+                                color: alpha(m.navy, 0.78),
+                              }}
+                            >
+                              Guest
+                            </MenuItem>
+                          ) : null}
                           {isCompanyClient ? (
                             <MenuItem
                               onClick={() => addParticipant("Model")}
@@ -2436,7 +2438,7 @@ export default function ClientBookingCreateView() {
                         textAlign: "center",
                       }}
                     >
-                      Service Summary
+                      Booking and Payment Details
                     </Typography>
 
                     <Typography
@@ -2633,7 +2635,7 @@ export default function ClientBookingCreateView() {
                                   >
                                     <Stack
                                       direction="row"
-                                      alignItems="flex-start"
+                                      alignItems="center"
                                       justifyContent="space-between"
                                       spacing={1}
                                     >

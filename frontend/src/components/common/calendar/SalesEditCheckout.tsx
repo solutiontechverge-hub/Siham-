@@ -509,18 +509,18 @@ export default function SalesEditCheckout({
               <Stack direction="row" justifyContent="space-between">
                 <Typography
                   sx={{
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: alpha(m.navy, 0.55),
+                    fontSize: 16,
+                    fontWeight: 900,
+                    color: m.headingText,
                   }}
                 >
                   Total Price:
                 </Typography>
                 <Typography
                   sx={{
-                    fontSize: 14,
+                    fontSize: 18,
                     fontWeight: 900,
-                    color: alpha(m.navy, 0.88),
+                    color: m.headingText,
                   }}
                 >
                   {formatEurAmount(totalPrice)} EUR
