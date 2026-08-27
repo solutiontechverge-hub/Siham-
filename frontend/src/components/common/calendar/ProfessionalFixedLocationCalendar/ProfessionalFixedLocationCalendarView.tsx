@@ -134,6 +134,13 @@ import {
   computeBookingPrice,
   resolveBookingPriceDisplay,
 } from "../bookingTotal";
+import {
+  removeFinanceProduct,
+  removeFinanceUniqueItem,
+  toFinanceCatalogProduct,
+  upsertFinanceProduct,
+  upsertFinanceUniqueItem,
+} from "../../../sections/finance/financeCatalogPersist";
 import { useFinanceInvoiceSettings } from "../../../sections/finance/useFinanceInvoiceSettings";
 import BookingSelectServicesScreen from "../BookingSelectServicesScreen";
 import DiscardBrDialog from "../DiscardBrDialog";
@@ -148,6 +155,7 @@ import BookingActivityOverview from "../BookingActivityOverview";
 import { buildBookingActivityTimeline } from "../buildBookingActivityTimeline";
 import type { BookingActivityItem } from "../bookingActivity.types";
 import SalesOverview from "../SalesOverview";
+import CatalogItemDeleteDialog from "../CatalogItemDeleteDialog";
 import BookingEditServiceScreen from "../BookingEditServiceScreen";
 import BookingSelectProductsScreen from "../BookingSelectProductsScreen";
 import BookingAddUniqueItemScreen from "../BookingAddUniqueItemScreen";
@@ -171,10 +179,13 @@ import {
   type BookingServiceLineItem,
 } from "../../../../data/bookingServiceEdit.data";
 import {
+  buildBookingProductLine,
   createEmptyProductSelectionDraft,
   formatProductLineName,
   getProductBaseName,
+  productLineOriginalAmount,
   type BookingCatalogProduct,
+  type BookingProductLineItem,
   type BookingProductSelectionDraft,
 } from "../../../../data/bookingProductCatalog.data";
 import {
@@ -232,6 +243,7 @@ import {
 } from "../calendar.utils";
 import {
   BOOKING_SCENARIO_LABELS,
+  calendarBookingStatusLabel,
   canDiscardBookingRequest,
   getBookingScenarioIndicators,
   isBookingRequestAccepted,
@@ -245,7 +257,7 @@ import {
 } from "../bookingStatusActions";
 import BookingGuidelineIcon from "../BookingGuidelineIcon";
 import BookingRequestAcceptedPanel from "../BookingRequestAcceptedPanel";
-import BookingTotalPriceCard from "../BookingTotalPriceCard";
+import BookingDrawerTotalPriceCard from "../BookingDrawerTotalPriceCard";
 import PrepaymentStatusIcon from "../PrepaymentStatusIcon";
 import { PREPAYMENT_STATUS_LABELS } from "../PrepaymentStatusIcon";
 import BookingIndicatorIcon, {
@@ -549,9 +561,26 @@ export default function ProfessionalFixedLocationCalendar({
         name: product.name,
         price: parseFinancePrice(product.price),
         vat: product.vat,
+        unit: product.unit,
+        discountType: product.discountType,
+        discountAmount: product.discountAmount,
       })),
     );
   }, [financeSettings.products]);
+
+  const persistedUniqueCatalog = React.useMemo<BookingCatalogProduct[]>(
+    () =>
+      (financeSettings.uniqueItems ?? []).map((item) => ({
+        id: item.id,
+        name: item.name,
+        price: parseFinancePrice(item.price),
+        vat: item.vat,
+        unit: item.unit,
+        discountType: item.discountType,
+        discountAmount: item.discountAmount,
+      })),
+    [financeSettings.uniqueItems],
+  );
 
   const defaultDateIso = React.useMemo(() => toIsoLocalDate(new Date()), []);
   const [activeSubTab, setActiveSubTab] = React.useState<CalendarSubTab>(
@@ -652,13 +681,7 @@ export default function ProfessionalFixedLocationCalendar({
   const [editServiceStaffLocked, setEditServiceStaffLocked] =
     React.useState(false);
   const [selectedProducts, setSelectedProducts] = React.useState<
-    Array<{
-      id: string;
-      name: string;
-      price: number;
-      quantity: number;
-      unitPrice: number;
-    }>
+    BookingProductLineItem[]
   >([]);
   const [productSelectionDraft, setProductSelectionDraft] =
     React.useState<BookingProductSelectionDraft>(() =>
@@ -675,6 +698,14 @@ export default function ProfessionalFixedLocationCalendar({
   const [customBookingProducts, setCustomBookingProducts] = React.useState<
     BookingCatalogProduct[]
   >([]);
+  const [pendingCatalogDelete, setPendingCatalogDelete] =
+    React.useState<BookingCatalogProduct | null>(null);
+  const mergedCustomBookingProducts = React.useMemo(() => {
+    const byId = new Map<string, BookingCatalogProduct>();
+    persistedUniqueCatalog.forEach((product) => byId.set(product.id, product));
+    customBookingProducts.forEach((product) => byId.set(product.id, product));
+    return Array.from(byId.values());
+  }, [customBookingProducts, persistedUniqueCatalog]);
   const [showInlineGuestField, setShowInlineGuestField] = React.useState(false);
   const [inlineGuestDraft, setInlineGuestDraft] = React.useState({
     firstName: "",
@@ -711,13 +742,7 @@ export default function ProfessionalFixedLocationCalendar({
       id: string;
       name: string;
       services: BookingServiceLineItem[];
-      products: Array<{
-        id: string;
-        name: string;
-        price: number;
-        quantity: number;
-        unitPrice: number;
-      }>;
+      products: BookingProductLineItem[];
       participantType?: "model" | "planning" | "guest" | "buffer" | "notes";
       planningActivity?: string;
       planningDuration?: string;
@@ -917,6 +942,36 @@ export default function ProfessionalFixedLocationCalendar({
   );
   const subtotalPrice =
     servicesTotal + productsTotal + uniqueItemsTotal + guestsTotal;
+  const lineActualAmount = React.useMemo(() => {
+    const servicesActual = selectedServices.reduce(
+      (sum, service) => sum + service.price,
+      0,
+    );
+    const productsActual = selectedProducts.reduce(
+      (sum, product) => sum + productLineOriginalAmount(product),
+      0,
+    );
+    const uniqueActual = bookingUniqueItems.reduce(
+      (sum, item) => sum + productLineOriginalAmount(item),
+      0,
+    );
+    const guestsActual = bookingGuests.reduce(
+      (sum, guest) =>
+        sum +
+        guest.services.reduce(
+          (serviceSum, service) => serviceSum + service.price,
+          0,
+        ) +
+        guest.products.reduce(
+          (productSum, product) =>
+            productSum + productLineOriginalAmount(product),
+          0,
+        ),
+      0,
+    );
+    return servicesActual + productsActual + uniqueActual + guestsActual;
+  }, [bookingGuests, bookingUniqueItems, selectedProducts, selectedServices]);
+  const lineDiscountAmount = Math.max(0, lineActualAmount - subtotalPrice);
   const kilometerAllowanceAmount = React.useMemo(
     () =>
       slotLocation === "DL" && showKilometerAllowance
@@ -2416,7 +2471,7 @@ export default function ProfessionalFixedLocationCalendar({
     viewMode,
     visibleDates,
   ]);
-  const todayIso = defaultDateIso;
+  const [todayIso, setTodayIso] = React.useState(defaultDateIso);
   const [nowMin, setNowMin] = React.useState(() => {
     const now = new Date();
     return now.getHours() * 60 + now.getMinutes();
@@ -2425,6 +2480,7 @@ export default function ProfessionalFixedLocationCalendar({
     const tick = () => {
       const now = new Date();
       setNowMin(now.getHours() * 60 + now.getMinutes());
+      setTodayIso(toIsoLocalDate(now));
     };
     tick();
     const id = window.setInterval(tick, 60_000);
@@ -2860,9 +2916,19 @@ export default function ProfessionalFixedLocationCalendar({
     (resourceId: string, iso: string): Interval[] => {
       const busy: Interval[] = [];
       for (const e of events) {
-        if (e.resourceId !== resourceId || e.date !== iso) continue;
+        if (e.date !== iso) continue;
         // Cancelled slots stay visually shown but are free to rebook.
         if (e.status === "Cancelled") continue;
+        const assignedKnown =
+          Boolean(e.resourceId) && knownResourceIds.has(String(e.resourceId));
+        if (assignedKnown) {
+          if (e.resourceId !== resourceId) continue;
+        } else if (
+          resourceId !== activeResource?.id &&
+          resourceId !== "unassigned"
+        ) {
+          continue;
+        }
         busy.push({
           startMin: minutesSinceMidnight(e.start),
           endMin: minutesSinceMidnight(e.end),
@@ -2877,7 +2943,7 @@ export default function ProfessionalFixedLocationCalendar({
       }
       return busy;
     },
-    [blocks, events],
+    [activeResource?.id, blocks, events, knownResourceIds],
   );
 
   const drawerBookingDurationMins = React.useMemo(() => {
@@ -3104,14 +3170,32 @@ export default function ProfessionalFixedLocationCalendar({
 
   const getDailyBookingRatio = React.useCallback(
     (resourceId: string, iso: string) => {
-      const availability = getAvailabilityFor(resourceId, iso);
+      let availability = getAvailabilityFor(resourceId, iso);
+      if (!availability.length) {
+        const publicHours = getPublicWorkingHoursForDate(iso);
+        if (publicHours) availability = [publicHours];
+      }
+      if (!availability.length) {
+        availability = [
+          {
+            startMin: grid.startHour * 60,
+            endMin: grid.endHour * 60,
+          },
+        ];
+      }
       const availableMins = sumIntervalsMins(availability);
       if (availableMins <= 0) return 0;
       const busy = getBusyFor(resourceId, iso);
       const bookedMins = sumIntervalsMins(mergeIntervals(busy));
       return Math.max(0, Math.min(1, bookedMins / availableMins));
     },
-    [getAvailabilityFor, getBusyFor],
+    [
+      getAvailabilityFor,
+      getBusyFor,
+      getPublicWorkingHoursForDate,
+      grid.endHour,
+      grid.startHour,
+    ],
   );
 
   const timeColumnAvailability = React.useMemo(() => {
@@ -3188,14 +3272,10 @@ export default function ProfessionalFixedLocationCalendar({
   const renderTeamMemberHeader = (
     laneResource?: (typeof filteredResources)[number],
   ) => {
-    const headerResources =
-      viewMode === "day" && appliedFilters.teamAll && laneResource
-        ? [laneResource]
-        : filteredResources;
-    const menuResourceId =
-      viewMode === "day" && appliedFilters.teamAll && laneResource
-        ? laneResource.id
-        : activeResource?.id;
+    const headerResources = laneResource
+      ? [laneResource]
+      : filteredResources;
+    const menuResourceId = laneResource?.id ?? activeResource?.id;
 
     return (
       <Box
@@ -3610,6 +3690,8 @@ export default function ProfessionalFixedLocationCalendar({
           price: product.price,
           quantity: product.quantity,
           unitPrice: product.unitPrice,
+          originalPrice: product.originalPrice,
+          discount: product.discount ?? null,
         })),
     );
     setServiceSelectionDraft(hydration.services.map((service) => service.id));
@@ -4144,26 +4226,16 @@ export default function ProfessionalFixedLocationCalendar({
 
       const drawerServiceLines: CalendarBookingServiceItem[] = [
         ...selectedServices.map((service) => ({
-          id: service.id,
-          name: service.name,
-          durationMins: service.durationMins,
-          price: getEffectiveServicePrice(service),
+          ...service,
           staffResourceId: service.staffResourceId,
           teamMemberId: service.staffResourceId,
-          startTime: service.startTime,
-          endTime: service.endTime,
           guestId: null as string | null,
         })),
         ...bookingGuests.flatMap((guest) =>
           guest.services.map((service) => ({
-            id: service.id,
-            name: service.name,
-            durationMins: service.durationMins,
-            price: service.price,
+            ...service,
             staffResourceId: service.staffResourceId,
             teamMemberId: service.staffResourceId,
-            startTime: service.startTime,
-            endTime: service.endTime,
             guestId: guest.id,
           })),
         ),
@@ -4803,26 +4875,14 @@ export default function ProfessionalFixedLocationCalendar({
       .filter((product) => productSelectionDraft[product.id]?.selected)
       .map((product) => {
         const quantity = productSelectionDraft[product.id]?.quantity ?? 1;
-        return {
-          id: product.id,
-          name: formatProductLineName(product.name, quantity),
-          unitPrice: product.price,
-          price: product.price * quantity,
-          quantity,
-        };
+        return buildBookingProductLine(product, quantity);
       });
 
-    const customProducts = customBookingProducts
+    const customProducts = mergedCustomBookingProducts
       .filter((product) => productSelectionDraft[product.id]?.selected)
       .map((product) => {
         const quantity = productSelectionDraft[product.id]?.quantity ?? 1;
-        return {
-          id: product.id,
-          name: formatProductLineName(product.name, quantity),
-          unitPrice: product.price,
-          price: product.price * quantity,
-          quantity,
-        };
+        return buildBookingProductLine(product, quantity);
       });
 
     const nextProducts = [...catalogProducts, ...customProducts];
@@ -4856,7 +4916,7 @@ export default function ProfessionalFixedLocationCalendar({
     setSlotSaveAttempted(false);
   }, [
     bookingGuests,
-    customBookingProducts,
+    mergedCustomBookingProducts,
     productCatalog,
     productSelectionDraft,
     selectedProducts,
@@ -4884,6 +4944,26 @@ export default function ProfessionalFixedLocationCalendar({
     [isViewingExisting],
   );
 
+  const persistBookingCatalogProduct = React.useCallback(
+    (product: BookingCatalogProduct, kind: "product" | "unique") => {
+      const payload = toFinanceCatalogProduct({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        vat: product.vat,
+        unit: product.unit,
+        discountType: product.discountType,
+        discountAmount: product.discountAmount,
+      });
+      setFinanceSettings((prev) =>
+        kind === "unique"
+          ? upsertFinanceUniqueItem(prev, payload)
+          : upsertFinanceProduct(prev, payload),
+      );
+    },
+    [setFinanceSettings],
+  );
+
   const applyUniqueItem = React.useCallback(() => {
     if (editingCatalogProductId) {
       const updated = buildCatalogProductFromUniqueItemDraft(
@@ -4892,6 +4972,14 @@ export default function ProfessionalFixedLocationCalendar({
       );
       if (!updated) return;
 
+      const isPersistedUnique =
+        editingCatalogProductId.startsWith("unique-") ||
+        customBookingProducts.some(
+          (product) => product.id === editingCatalogProductId,
+        ) ||
+        (financeSettings.uniqueItems ?? []).some(
+          (item) => item.id === editingCatalogProductId,
+        );
       const isCustom = customBookingProducts.some(
         (product) => product.id === editingCatalogProductId,
       );
@@ -4901,7 +4989,7 @@ export default function ProfessionalFixedLocationCalendar({
             product.id === editingCatalogProductId ? updated : product,
           ),
         );
-      } else {
+      } else if (!isPersistedUnique) {
         setProductCatalog((prev) =>
           prev.map((product) =>
             product.id === editingCatalogProductId ? updated : product,
@@ -4916,11 +5004,19 @@ export default function ProfessionalFixedLocationCalendar({
                   name: updated.name,
                   price: `${updated.price}EUR`,
                   vat: updated.vat?.trim() || product.vat,
+                  unit: updated.unit,
+                  discountType: updated.discountType,
+                  discountAmount: updated.discountAmount,
                 }
               : product,
           ),
         }));
       }
+
+      persistBookingCatalogProduct(
+        updated,
+        isPersistedUnique ? "unique" : "product",
+      );
 
       const syncSelectedProducts = (
         products: Array<{
@@ -4977,6 +5073,18 @@ export default function ProfessionalFixedLocationCalendar({
         ...prev,
         { ...line, name: uniqueItemDraft.productName.trim() },
       ]);
+      persistBookingCatalogProduct(
+        {
+          id: line.id,
+          name: uniqueItemDraft.productName.trim(),
+          price: line.unitPrice,
+          vat: uniqueItemDraft.vat.trim() || undefined,
+          unit: line.quantity,
+          discountType: uniqueItemDraft.discountType,
+          discountAmount: uniqueItemDraft.discountAmount,
+        },
+        "unique",
+      );
       setUniqueItemDraft(emptyBookingUniqueItemDraft());
       setSlotBookingScreen("new-booking");
       setSlotSaveAttempted(false);
@@ -4986,8 +5094,9 @@ export default function ProfessionalFixedLocationCalendar({
       return;
     }
 
+    const catalogId = `p-${Date.now()}`;
     const customProduct: BookingCatalogProduct = {
-      id: line.id,
+      id: catalogId,
       name: uniqueItemDraft.productName.trim(),
       price: line.unitPrice,
       vat: uniqueItemDraft.vat.trim() || undefined,
@@ -4996,10 +5105,10 @@ export default function ProfessionalFixedLocationCalendar({
       discountAmount: uniqueItemDraft.discountAmount,
     };
 
-    setCustomBookingProducts((prev) => [...prev, customProduct]);
+    persistBookingCatalogProduct(customProduct, "product");
     setProductSelectionDraft((prev) => ({
       ...prev,
-      [line.id]: { selected: true, quantity: line.quantity },
+      [catalogId]: { selected: true, quantity: line.quantity },
     }));
     setUniqueItemDraft(emptyBookingUniqueItemDraft());
     setSlotBookingScreen("select-products");
@@ -5012,9 +5121,40 @@ export default function ProfessionalFixedLocationCalendar({
     dispatchBookingEventIfApi,
     editingCatalogProductId,
     editingEventId,
+    financeSettings.uniqueItems,
+    persistBookingCatalogProduct,
     setFinanceSettings,
     uniqueItemDraft,
     uniqueItemOrigin,
+  ]);
+
+  const confirmDeleteCatalogProduct = React.useCallback(() => {
+    if (!pendingCatalogDelete) return;
+    const id = pendingCatalogDelete.id;
+    const isUnique =
+      id.startsWith("unique-") ||
+      (financeSettings.uniqueItems ?? []).some((item) => item.id === id) ||
+      customBookingProducts.some((product) => product.id === id);
+
+    setFinanceSettings((prev) =>
+      isUnique ? removeFinanceUniqueItem(prev, id) : removeFinanceProduct(prev, id),
+    );
+    setCustomBookingProducts((prev) =>
+      prev.filter((product) => product.id !== id),
+    );
+    setProductCatalog((prev) => prev.filter((product) => product.id !== id));
+    setProductSelectionDraft((prev) => {
+      if (!prev[id]) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setPendingCatalogDelete(null);
+  }, [
+    customBookingProducts,
+    financeSettings.uniqueItems,
+    pendingCatalogDelete,
+    setFinanceSettings,
   ]);
 
   const isBookingDetailsSubScreen =
@@ -5286,14 +5426,9 @@ export default function ProfessionalFixedLocationCalendar({
               snapshotServices.find((row) => row.id === service.id) ??
               snapshotServices.find((row) => row.name === service.name);
             return {
-              id: service.id,
-              name: service.name,
-              durationMins: service.durationMins,
-              price: getEffectiveServicePrice(service),
+              ...service,
               staffResourceId: service.staffResourceId,
               teamMemberId: service.staffResourceId,
-              startTime: service.startTime,
-              endTime: service.endTime,
               guestId: fromSnapshot?.guestId ?? null,
             };
           }),
@@ -5557,7 +5692,6 @@ export default function ProfessionalFixedLocationCalendar({
       details.services = [
         ...selectedServices.map((service) => ({
           ...service,
-          price: getEffectiveServicePrice(service),
           guestId: null as string | null,
         })),
         ...guestServiceLines,
@@ -5705,6 +5839,8 @@ export default function ProfessionalFixedLocationCalendar({
             durationMins: service.durationMins,
             guestId: service.guestId ?? null,
             teamMemberId: service.staffResourceId ?? service.teamMemberId ?? null,
+            originalPrice: service.price,
+            discount: service.discount ?? null,
           })),
           teamMembers: existingClientSnapshot?.teamMembers,
           ...(canUseBookingProject && bookingProjectEnabled
@@ -5783,7 +5919,14 @@ export default function ProfessionalFixedLocationCalendar({
           JSON.stringify(
             (existingEvent.details?.guests ?? []).map((guest) => guest.name),
           ) !== JSON.stringify((details.guests ?? []).map((guest) => guest.name));
-        if (
+        const scheduleChanged =
+          existingEvent.date !== selectedSlot.date ||
+          existingEvent.start !== selectedSlot.start ||
+          existingEvent.end !== selectedSlot.end;
+        if (scheduleChanged) {
+          details.scheduleEdited = true;
+          details.lastEditedBy = "professional";
+        } else if (
           !editedIds.length &&
           !editedProductIds.length &&
           (phoneChanged || guestNamesChanged)
@@ -5836,7 +5979,13 @@ export default function ProfessionalFixedLocationCalendar({
         bookingScenario:
           resolvedStatus === "Requested"
             ? (existingEvent?.bookingScenario ?? "BR")
-            : undefined,
+            : resolvedStatus === "Confirmed" &&
+                (details.scheduleEdited ||
+                  details.lastEditedBy === "professional" ||
+                  details.lastEditedBy === "client") &&
+                !details.silentUpdated
+              ? "E"
+              : undefined,
         showClientName: clientName,
         clientKind: selectedClient?.clientKind,
         details,
@@ -6784,9 +6933,7 @@ export default function ProfessionalFixedLocationCalendar({
                         >
                           {/* Lane header — hidden until at least one team member exists */}
                           {hasTeamMembers
-                            ? renderTeamMemberHeader(
-                                viewMode === "day" ? undefined : res,
-                              )
+                            ? renderTeamMemberHeader(res)
                             : null}
                           {viewMode === "week" ? (
                             <Box
@@ -8104,7 +8251,7 @@ export default function ProfessionalFixedLocationCalendar({
                   <BookingSelectProductsScreen
                     draft={productSelectionDraft}
                     catalog={productCatalog}
-                    customProducts={customBookingProducts}
+                    customProducts={mergedCustomBookingProducts}
                     onToggle={(product) =>
                       toggleProductSelectionDraft(product.id)
                     }
@@ -8116,6 +8263,11 @@ export default function ProfessionalFixedLocationCalendar({
                     }
                     onEdit={
                       isViewingExisting ? undefined : openEditCatalogProduct
+                    }
+                    onDelete={
+                      isViewingExisting
+                        ? undefined
+                        : (product) => setPendingCatalogDelete(product)
                     }
                     disabled={isViewingExisting}
                   />
@@ -8144,6 +8296,11 @@ export default function ProfessionalFixedLocationCalendar({
                         uniqueItemOrigin === "products"
                           ? "Add Product"
                           : "Add Unique Item"
+                      }
+                      namePlaceholder={
+                        uniqueItemOrigin === "products"
+                          ? "Product Name"
+                          : "Unique Name"
                       }
                       onChange={(patch) =>
                         setUniqueItemDraft((prev) => ({ ...prev, ...patch }))
@@ -9340,13 +9497,19 @@ export default function ProfessionalFixedLocationCalendar({
                             >
                               <Chip
                                 size="small"
-                                label={viewingBookingEvent.status}
+                                label={calendarBookingStatusLabel(
+                                  viewingBookingEvent,
+                                )}
                                 sx={{
-                                  height: 24,
-                                  fontSize: 11,
+                                  height: 18,
+                                  fontSize: 9,
                                   fontWeight: 800,
                                   border: "1px solid",
-                                  "& .MuiChip-label": { px: 1 },
+                                  "& .MuiChip-label": {
+                                    px: 0.7,
+                                    py: 0,
+                                    lineHeight: 1.2,
+                                  },
                                   ...statusChipSx(
                                     viewingBookingEvent.status,
                                     m,
@@ -9355,7 +9518,9 @@ export default function ProfessionalFixedLocationCalendar({
                               />
                               {getBookingScenarioIndicators(
                                 viewingBookingEvent,
-                              ).map((indicator) => {
+                              )
+                                .filter((indicator) => indicator !== "E")
+                                .map((indicator) => {
                                 const responseIndicators =
                                   resolveBookingResponseIndicators(
                                     viewingBookingEvent,
@@ -9370,7 +9535,7 @@ export default function ProfessionalFixedLocationCalendar({
                                 const badgeResponses =
                                   indicator === "EBR"
                                     ? responseIndicators
-                                    : indicator === "ER" || indicator === "E"
+                                    : indicator === "ER"
                                       ? responseIndicators.filter(
                                           (item) => item === "overdue_response",
                                         )
@@ -9457,19 +9622,9 @@ export default function ProfessionalFixedLocationCalendar({
                                         height: 24,
                                         fontSize: 11,
                                         fontWeight: 800,
-                                        bgcolor:
-                                          indicator === "E"
-                                            ? alpha(m.teal, 0.12)
-                                            : alpha(m.navy, 0.06),
-                                        color:
-                                          indicator === "E"
-                                            ? m.teal
-                                            : alpha(m.navy, 0.62),
-                                        border: `1px solid ${
-                                          indicator === "E"
-                                            ? alpha(m.teal, 0.45)
-                                            : alpha(m.navy, 0.14)
-                                        }`,
+                                        bgcolor: alpha(m.navy, 0.06),
+                                        color: alpha(m.navy, 0.62),
+                                        border: `1px solid ${alpha(m.navy, 0.14)}`,
                                         "& .MuiChip-label": { px: 0.85 },
                                       }}
                                     />
@@ -11462,45 +11617,6 @@ export default function ProfessionalFixedLocationCalendar({
                         />
 
                         {isViewingBooking &&
-                        (isBookingRequestAccepted(viewingBookingEvent) ||
-                          Boolean(viewingBookingEvent?.details?.needsOk)) ? (
-                          <BookingRequestAcceptedPanel
-                            totalPrice={drawerPriceDisplay.displayTotal}
-                            originalPrice={drawerPriceDisplay.originalPrice}
-                            prepaymentPercent={
-                              Number(prepaymentPercent) || undefined
-                            }
-                            prepaymentAmount={prepaymentAmount}
-                            remainingAmount={remainingAfterPrepayment}
-                            lines={priceSummaryLines}
-                            discountAmount={bookingDiscountAmount}
-                            onOk={handleAcknowledgeAcceptedBr}
-                          />
-                        ) : (
-                          <BookingTotalPriceCard
-                            totalPrice={drawerPriceDisplay.displayTotal}
-                            originalPrice={drawerPriceDisplay.originalPrice}
-                            discountAmount={bookingDiscountAmount}
-                            lines={priceSummaryLines}
-                            prepaidPercent={
-                              showPrepayment || bookingPrice.prepaidApplied > 0
-                                ? Number(prepaymentPercent) || undefined
-                                : undefined
-                            }
-                            prepaidAmount={
-                              showPrepayment
-                                ? prepaymentAmount
-                                : bookingPrice.prepaidApplied
-                            }
-                            remainingAmount={
-                              showPrepayment || bookingPrice.prepaidApplied > 0
-                                ? remainingAfterPrepayment
-                                : undefined
-                            }
-                          />
-                        )}
-
-                        {isViewingBooking &&
                         canDiscardBookingRequest(viewingBookingEvent) ? (
                           <ButtonBase
                             onClick={() => setDiscardBrOpen(true)}
@@ -12343,6 +12459,43 @@ export default function ProfessionalFixedLocationCalendar({
                         </Box>
                         ) : null}
 
+                        {isViewingBooking &&
+                        (isBookingRequestAccepted(viewingBookingEvent) ||
+                          Boolean(viewingBookingEvent?.details?.needsOk)) ? (
+                          <BookingRequestAcceptedPanel
+                            totalPrice={drawerPriceDisplay.displayTotal}
+                            originalPrice={drawerPriceDisplay.originalPrice}
+                            prepaymentPercent={
+                              Number(prepaymentPercent) || undefined
+                            }
+                            prepaymentAmount={prepaymentAmount}
+                            remainingAmount={remainingAfterPrepayment}
+                            lines={priceSummaryLines}
+                            discountAmount={bookingDiscountAmount}
+                            onOk={handleAcknowledgeAcceptedBr}
+                          />
+                        ) : (
+                          <BookingDrawerTotalPriceCard
+                            payableTotal={drawerPriceDisplay.displayTotal}
+                            actualAmount={
+                              drawerPriceDisplay.originalPrice ??
+                              bookingTotalForSave
+                            }
+                            lineDiscountAmount={lineDiscountAmount}
+                            bookingDiscountAmount={bookingDiscountAmount}
+                            bookingTotalDiscount={bookingTotalDiscount}
+                            lateCancellationFeeAmount={
+                              bookingPrice.lateCancellationFeeAmount
+                            }
+                            lateRescheduleFeeAmount={
+                              bookingPrice.lateRescheduleFeeAmount
+                            }
+                            prepaidApplied={
+                              isDrawerPrepaymentPaid ? prepaymentAmount : 0
+                            }
+                          />
+                        )}
+
                         <Box sx={{ flex: 1, minHeight: 40 }} />
                       </>
                     ) : (
@@ -12713,6 +12866,12 @@ export default function ProfessionalFixedLocationCalendar({
         open={discardBrOpen}
         onClose={() => setDiscardBrOpen(false)}
         onConfirm={handleDiscardBr}
+      />
+      <CatalogItemDeleteDialog
+        open={Boolean(pendingCatalogDelete)}
+        itemName={pendingCatalogDelete?.name}
+        onClose={() => setPendingCatalogDelete(null)}
+        onConfirm={confirmDeleteCatalogProduct}
       />
       <DiscardEbrDialog
         open={discardEbrOpen}

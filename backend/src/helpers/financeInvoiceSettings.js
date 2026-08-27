@@ -4,6 +4,7 @@ export const DEFAULT_INVOICE_SETTINGS = {
   logoDataUrl: null,
   defaultInvoiceType: "individual",
   products: [],
+  uniqueItems: [],
   services: [],
   paymentTerms: {
     originalDueValue: "2",
@@ -43,6 +44,9 @@ export const mergeInvoiceSettings = (raw) => {
       ...(raw.reminders ?? {}),
     },
     products: Array.isArray(raw.products) ? raw.products : DEFAULT_INVOICE_SETTINGS.products,
+    uniqueItems: Array.isArray(raw.uniqueItems)
+      ? raw.uniqueItems
+      : DEFAULT_INVOICE_SETTINGS.uniqueItems,
     services: Array.isArray(raw.services) ? raw.services : DEFAULT_INVOICE_SETTINGS.services,
   };
 };

@@ -5,6 +5,7 @@ import { Avatar, Box, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import type { CalendarBookingClientSnapshot } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import { ServiceSummaryMetaLine } from "../ServiceSummaryMetaLine";
+import ProjectUploadThumb from "../client-booking/ProjectUploadThumb";
 
 type Props = {
   snapshot?: CalendarBookingClientSnapshot | null;
@@ -109,34 +110,9 @@ export default function BookingDrawerClientSnapshotSection({
               >
                 Media
               </Typography>
-              <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap">
+              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
                 {project!.uploads.map((upload) => (
-                  <Box
-                    key={upload.id}
-                    sx={{
-                      minWidth: 64,
-                      maxWidth: 88,
-                      borderRadius: "8px",
-                      border: `1px solid ${alpha(m.navy, 0.1)}`,
-                      bgcolor: alpha(m.navy, 0.04),
-                      px: 0.75,
-                      py: 0.6,
-                    }}
-                  >
-                    <Typography
-                      sx={{
-                        fontSize: 10,
-                        fontWeight: 800,
-                        color: alpha(m.navy, 0.55),
-                        textAlign: "center",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {upload.name}
-                    </Typography>
-                  </Box>
+                  <ProjectUploadThumb key={upload.id} upload={upload} />
                 ))}
               </Stack>
             </Box>

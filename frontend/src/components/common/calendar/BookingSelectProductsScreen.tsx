@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import RemoveRoundedIcon from "@mui/icons-material/RemoveRounded";
 import { Box, ButtonBase, Checkbox, IconButton, Stack } from "@mui/material";
@@ -23,6 +24,7 @@ type BookingSelectProductsScreenProps = {
   onQuantityChange: (productId: string, delta: number) => void;
   onAddProduct?: () => void;
   onEdit?: (product: BookingCatalogProduct) => void;
+  onDelete?: (product: BookingCatalogProduct) => void;
   disabled?: boolean;
 };
 
@@ -33,6 +35,7 @@ function ProductRow({
   onToggle,
   onQuantityChange,
   onEdit,
+  onDelete,
 }: {
   product: BookingCatalogProduct;
   draft: BookingProductSelectionDraft;
@@ -40,6 +43,7 @@ function ProductRow({
   onToggle: (product: BookingCatalogProduct) => void;
   onQuantityChange: (productId: string, delta: number) => void;
   onEdit?: (product: BookingCatalogProduct) => void;
+  onDelete?: (product: BookingCatalogProduct) => void;
 }) {
   const theme = useTheme();
   const m = theme.palette.mollure;
@@ -120,6 +124,27 @@ function ProductRow({
         </IconButton>
       ) : null}
 
+      {onDelete ? (
+        <IconButton
+          size="small"
+          onClick={() => {
+            if (disabled) return;
+            onDelete(product);
+          }}
+          disabled={disabled}
+          aria-label={`Delete ${product.name}`}
+          sx={{
+            color: alpha(m.navy, 0.42),
+            "&:hover": {
+              color: "#E85D5D",
+              bgcolor: alpha("#E85D5D", 0.08),
+            },
+          }}
+        >
+          <DeleteOutlineRoundedIcon sx={{ fontSize: 18 }} />
+        </IconButton>
+      ) : null}
+
       <Stack
         direction="row"
         alignItems="center"
@@ -193,6 +218,7 @@ export default function BookingSelectProductsScreen({
   onQuantityChange,
   onAddProduct,
   onEdit,
+  onDelete,
   disabled = false,
 }: BookingSelectProductsScreenProps) {
   const theme = useTheme();
@@ -243,6 +269,7 @@ export default function BookingSelectProductsScreen({
             onToggle={onToggle}
             onQuantityChange={onQuantityChange}
             onEdit={onEdit}
+            onDelete={onDelete}
           />
         ))}
 

@@ -8,6 +8,7 @@ import AppModal, {
   MessagingModalCancelButton,
   MessagingModalPrimaryButton,
 } from "../AppModal";
+import { useSnackbar } from "../AppSnackbar";
 
 export type BookingRequestConfirmAction = "accept" | "suggest" | "reject";
 
@@ -22,7 +23,13 @@ type Props = {
 function copyFor(
   action: BookingRequestConfirmAction,
   scenario?: CalendarBookingScenario | null,
-): { title: string; body: string; confirmLabel: string; showWarning?: boolean } {
+): {
+  title: string;
+  body: string;
+  confirmLabel: string;
+  snackbarMessage?: string;
+  showWarning?: boolean;
+} {
   const isFirstBr = !scenario || scenario === "BR";
   const isEr = scenario === "ER";
   if (action === "accept") {
@@ -34,6 +41,11 @@ function copyFor(
           ? "By accepting, the requested changes will be applied to this confirmed booking."
           : "By accepting, the edited booking request will be applied.",
       confirmLabel: "Accept",
+      snackbarMessage: isEr
+        ? "Edit request accepted."
+        : isFirstBr
+          ? "Booking request accepted."
+          : "Edited booking request accepted.",
     };
   }
   if (action === "suggest") {
@@ -51,6 +63,11 @@ function copyFor(
         ? "By rejecting, the requested changes will not be applied. The booking stays confirmed."
         : "By rejecting, this edited booking request will be marked Invalid.",
     confirmLabel: "Reject",
+    snackbarMessage: isEr
+      ? "Edit request rejected. Booking stays confirmed."
+      : isFirstBr
+        ? "Booking request rejected."
+        : "Edited booking request rejected.",
     showWarning: true,
   };
 }
@@ -63,6 +80,7 @@ export default function BookingRequestConfirmDialog({
   onConfirm,
 }: Props) {
   const m = useTheme().palette.mollure;
+  const { showSnackbar } = useSnackbar();
   if (!action) return null;
 
   const copy = copyFor(action, scenario);
@@ -83,6 +101,12 @@ export default function BookingRequestConfirmDialog({
             label={copy.confirmLabel}
             onClick={() => {
               onConfirm();
+              if (copy.snackbarMessage) {
+                showSnackbar({
+                  severity: "success",
+                  message: copy.snackbarMessage,
+                });
+              }
               onClose();
             }}
           />

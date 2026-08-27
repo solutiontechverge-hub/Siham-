@@ -32,7 +32,7 @@ function resolveNameFromProfileResponse(profile: ProfileResponse | null | undefi
 
 export function useClientRequesterProfile() {
   const user = useAppSelector((s) => s.auth.user);
-  const { data: profileQueryData } = useGetProfileQuery();
+  const { data: profileQueryData, isLoading: isProfileLoading } = useGetProfileQuery();
 
   const requesterName = React.useMemo(() => {
     const fromApi = resolveNameFromProfileResponse(profileQueryData?.data);
@@ -58,9 +58,15 @@ export function useClientRequesterProfile() {
 
   const requesterPhone = React.useMemo(() => {
     const profile = profileQueryData?.data?.profile;
-    if (profile && "phone" in profile && profile.phone) return profile.phone;
+    if (profile && "phone" in profile && profile.phone) return String(profile.phone).trim();
     return "";
   }, [profileQueryData?.data?.profile]);
 
-  return { requesterName, requesterAvatarUrl, requesterCountryCode, requesterPhone };
+  return {
+    requesterName,
+    requesterAvatarUrl,
+    requesterCountryCode,
+    requesterPhone,
+    isProfileLoading,
+  };
 }

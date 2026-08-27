@@ -9,7 +9,12 @@ import {
   getEffectiveServicePrice,
   type BookingServiceLineItem,
 } from "../../../data/bookingServiceEdit.data";
+import {
+  formatLineDiscountLabel,
+  type BookingLineDiscount,
+} from "../../../data/bookingLinePricing";
 import BookingEditedTag from "./BookingEditedTag";
+import BookingLineAmount from "./BookingLineAmount";
 import type { BookingEditTagVariant } from "./bookingRequestNegotiation";
 
 type SelectedProductItem = {
@@ -18,6 +23,8 @@ type SelectedProductItem = {
   price: number;
   quantity: number;
   unitPrice: number;
+  originalPrice?: number;
+  discount?: BookingLineDiscount | null;
 };
 
 type BookingDrawerSelectedItemsSectionProps = {
@@ -130,15 +137,13 @@ export default function BookingDrawerSelectedItemsSection({
                     spacing={0.35}
                     sx={{ flexShrink: 0 }}
                   >
-                    <BodyText
-                      sx={{
-                        fontSize: 13,
-                        fontWeight: 900,
-                        color: alpha(m.navy, 0.82),
-                      }}
-                    >
-                      €{getEffectiveServicePrice(service)}
-                    </BodyText>
+                    <BookingLineAmount
+                      amount={getEffectiveServicePrice(service)}
+                      originalAmount={
+                        service.discount?.amount ? service.price : undefined
+                      }
+                      discountLabel={formatLineDiscountLabel(service.discount)}
+                    />
                     {showRemoveButtons ? (
                       <IconButton
                         size="small"
@@ -260,15 +265,11 @@ export default function BookingDrawerSelectedItemsSection({
                   spacing={0.35}
                   sx={{ flexShrink: 0 }}
                 >
-                  <BodyText
-                    sx={{
-                      fontSize: 13,
-                      fontWeight: 900,
-                      color: alpha(m.navy, 0.82),
-                    }}
-                  >
-                    €{product.price.toFixed(2)}
-                  </BodyText>
+                  <BookingLineAmount
+                    amount={product.price}
+                    originalAmount={product.originalPrice}
+                    discountLabel={formatLineDiscountLabel(product.discount)}
+                  />
                   {showRemoveButtons ? (
                     <IconButton
                       size="small"
@@ -337,15 +338,11 @@ export default function BookingDrawerSelectedItemsSection({
                   spacing={0.35}
                   sx={{ flexShrink: 0 }}
                 >
-                  <BodyText
-                    sx={{
-                      fontSize: 13,
-                      fontWeight: 900,
-                      color: alpha(m.navy, 0.82),
-                    }}
-                  >
-                    €{item.price.toFixed(2)}
-                  </BodyText>
+                  <BookingLineAmount
+                    amount={item.price}
+                    originalAmount={item.originalPrice}
+                    discountLabel={formatLineDiscountLabel(item.discount)}
+                  />
                   {showRemoveButtons ? (
                     <IconButton
                       size="small"

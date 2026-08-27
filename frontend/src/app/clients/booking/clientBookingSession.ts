@@ -1,6 +1,9 @@
 import type { ClientBookingSelectedShop } from "../../../components/common/client-booking/types";
 import type { ClientBookingRecord } from "./clientBookingRecords";
-import { cacheClientBookingDraftSnapshot } from "./clientBookingDraftCache";
+import {
+  cacheClientBookingDraftSnapshot,
+  enrichClientBookingRecord,
+} from "./clientBookingDraftCache";
 
 export const CHECKOUT_REF_KEY = "mollure:checkout_booking_ref";
 export const ACTIVE_BOOKING_ID_KEY = "mollure:active_booking_id";
@@ -8,6 +11,8 @@ export const ACTIVE_BOOKING_RECORD_KEY = "mollure:active_booking_record";
 export const ACTIVE_BOOKING_CHANGED_EVENT = "mollure:active-booking-changed";
 /** Keep the editor draft until EBR/ER grant persist finishes (API must not overwrite it). */
 export const EBR_DRAFT_LOCK_KEY = "mollure:ebr_draft_lock";
+/** Create-page URL to reopen after summary back (keeps `from=profile&t=`). */
+export const CREATE_RETURN_HREF_KEY = "mollure:create_return_href";
 
 export function isEbrDraftLocked() {
   if (typeof window === "undefined") return false;
@@ -49,10 +54,11 @@ export function clearActiveBookingSession() {
 
 export function setActiveBookingSession(record: ClientBookingRecord) {
   if (typeof window === "undefined") return;
-  if (record.bookingRef) window.sessionStorage.setItem(CHECKOUT_REF_KEY, record.bookingRef);
-  window.sessionStorage.setItem(ACTIVE_BOOKING_ID_KEY, record.apiBookingId ?? record.id);
-  window.sessionStorage.setItem(ACTIVE_BOOKING_RECORD_KEY, JSON.stringify(record));
-  cacheClientBookingDraftSnapshot(record);
+  const liveRecord = enrichClientBookingRecord(record);
+  if (liveRecord.bookingRef) window.sessionStorage.setItem(CHECKOUT_REF_KEY, liveRecord.bookingRef);
+  window.sessionStorage.setItem(ACTIVE_BOOKING_ID_KEY, liveRecord.apiBookingId ?? liveRecord.id);
+  window.sessionStorage.setItem(ACTIVE_BOOKING_RECORD_KEY, JSON.stringify(liveRecord));
+  cacheClientBookingDraftSnapshot(liveRecord);
   const shop = record.shop;
   if (shop?.shopId && shop.shopName) {
     const payload: ClientBookingSelectedShop = {
@@ -75,4 +81,46 @@ export function getCheckoutPath(record: ClientBookingRecord, listTab?: string) {
   const base = record.requiresPrepayment ? "/clients/booking/checkout/prepaid" : "/clients/booking/checkout";
   if (!listTab) return base;
   return `${base}?tab=${encodeURIComponent(listTab)}`;
+}
+
+export function rememberCreateReturnHref() {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(
+    CREATE_RETURN_HREF_KEY,
+    `${window.location.pathname}${window.location.search}`,
+  );
+}
+
+export function getCreateReturnHref(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.sessionStorage.getItem(CREATE_RETURN_HREF_KEY);
+}
+
+/** True when the user is returning from Service Summary to the create form. */
+export function isReturningToCreateDraft(args: {
+  fromProfile: boolean;
+  hydrationToken: string;
+  shopId?: string | null;
+}): boolean {
+  const session = getActiveBookingSession();
+  if (!session?.draft?.services?.length) return false;
+  if (session.bookingRequestSent) return false;
+  if (session.status !== "draft") return false;
+  if (
+    args.shopId &&
+    session.shop?.shopId &&
+    session.shop.shopId !== args.shopId
+  ) {
+    return false;
+  }
+  const returnHref = getCreateReturnHref();
+  if (!returnHref) return false;
+  if (!args.fromProfile) return true;
+  try {
+    const url = new URL(returnHref, window.location.origin);
+    const savedToken = url.searchParams.get("t") ?? "";
+    return savedToken === args.hydrationToken;
+  } catch {
+    return false;
+  }
 }

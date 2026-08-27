@@ -1968,6 +1968,11 @@ export default function ClientBookingDetailsView({
         : priorNotes?.clientSnapshot?.projectDetails,
       teamMembers: sessionDraft.teamMembers ?? [],
     };
+    const scheduleEdited =
+      (sessionDraft.selectedDateISO ?? "") !==
+        (activeBooking?.draft?.selectedDateISO ?? "") ||
+      (sessionDraft.selectedTime ?? "") !==
+        (activeBooking?.draft?.selectedTime ?? "");
     const nextNotes = serializeCalendarEntryNotes(
       priorNotes?.internalNote ?? "",
       {
@@ -1976,6 +1981,7 @@ export default function ClientBookingDetailsView({
         services: serviceLines,
         products: productLines,
         lastEditedBy: "client",
+        ...(scheduleEdited ? { scheduleEdited: true } : {}),
         originalServices: originalServices.length
           ? originalServices
           : serviceLines,
@@ -2023,6 +2029,7 @@ export default function ClientBookingDetailsView({
       message: "Booking updated.",
     });
   }, [
+    activeBooking?.draft,
     activeBooking?.notes,
     apiBookingId,
     bookingRef,
@@ -2386,6 +2393,9 @@ export default function ClientBookingDetailsView({
                   lateRescheduleFeePercent={
                     bookingNotesMeta?.lateRescheduleFeePercent
                   }
+                  shopName={shop?.shopName ?? professional.name}
+                  locationMode={locationMode}
+                  addressLabel={address}
                   editedServiceIds={clientVisibleEditedServiceIds}
                   addedServiceIds={clientVisibleAddedServiceIds}
                   cancelledServiceIds={clientVisibleCancelledServiceIds}
@@ -2435,6 +2445,9 @@ export default function ClientBookingDetailsView({
                   lateRescheduleFeePercent={
                     bookingNotesMeta?.lateRescheduleFeePercent
                   }
+                  shopName={shop?.shopName ?? professional.name}
+                  locationMode={locationMode}
+                  addressLabel={address}
                   rejectedChangesNote={rejectedChangesNote}
                   acceptedChangesNote={acceptedChangesNote}
                   editedServiceIds={clientVisibleEditedServiceIds}
@@ -2450,6 +2463,9 @@ export default function ClientBookingDetailsView({
                             name: product.name,
                             price: product.price,
                             quantity: product.quantity || 1,
+                            originalPrice: product.originalPrice,
+                            discountType: product.discountType,
+                            discountAmount: product.discountAmount,
                           }),
                         )
                   }

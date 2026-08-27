@@ -13,14 +13,17 @@ const CLIENT_TO_CALENDAR: Record<Exclude<ClientBookingStatus, "draft">, Calendar
 };
 
 /** Canonical status chip labels — never use payment/response as status text. */
-export function bookingStatusLabel(status: ClientBookingStatus): string {
+export function bookingStatusLabel(
+  status: ClientBookingStatus,
+  options?: { edited?: boolean },
+): string {
   switch (status) {
     case "draft":
       return "Draft";
     case "requested":
       return "Requested";
     case "confirmed":
-      return "Confirmed";
+      return options?.edited ? "Confirmed Edited" : "Confirmed";
     case "in_progress":
       return "In Progress";
     case "completed":

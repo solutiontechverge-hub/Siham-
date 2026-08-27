@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Box, Portal, useTheme } from "@mui/material";
+import { Box, Portal } from "@mui/material";
 import { usePathname } from "next/navigation";
 import MollureSnackbarAlert from "./MollureSnackbarAlert";
 import type { MollureSnackbarSeverity } from "../../theme/mollureSnackbar";
@@ -21,7 +21,6 @@ export default function MollureSnackbar({
   onClose,
   autoHideDuration = 4000,
 }: MollureSnackbarProps) {
-  const theme = useTheme();
   const pathname = usePathname();
   const isClientApp = Boolean(pathname?.startsWith("/clients"));
 
@@ -39,7 +38,7 @@ export default function MollureSnackbar({
         role="presentation"
         sx={{
           position: "fixed",
-          zIndex: theme.zIndex.snackbar + 10,
+          zIndex: (theme) => theme.zIndex.modal + 20,
           left: 0,
           right: 0,
           ...(isClientApp

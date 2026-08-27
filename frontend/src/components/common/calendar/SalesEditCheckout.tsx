@@ -35,6 +35,14 @@ import {
   type ManualEntryLineKind,
 } from "../../sections/finance/manualEntry.data";
 import { useFinanceInvoiceSettings } from "../../sections/finance/useFinanceInvoiceSettings";
+import {
+  financeProductFromCatalogOption,
+  removeFinanceProduct,
+  removeFinanceUniqueItem,
+  toFinanceCatalogProduct,
+  upsertFinanceProduct,
+  upsertFinanceUniqueItem,
+} from "../../sections/finance/financeCatalogPersist";
 import { AppCalendarPanel } from "../AppDatePicker";
 import type {
   SalesCheckoutPaymentMethod,
@@ -174,14 +182,71 @@ export default function SalesEditCheckout({
     }));
   }, [businessSetup?.service_details, settings.services]);
 
+  const uniqueItemOptions = React.useMemo<ManualEntryCatalogOption[]>(
+    () =>
+      (settings.uniqueItems ?? []).map((item) => ({
+        id: item.id,
+        label: item.name,
+        unitPrice: parseFinancePrice(item.price),
+        vat: item.vat,
+        unit: item.unit,
+        discountType: item.discountType,
+        discountAmount: item.discountAmount,
+      })),
+    [settings.uniqueItems],
+  );
+
   const [itemCatalogOverrides, setItemCatalogOverrides] = React.useState<
     Record<string, ManualEntryCatalogOption>
   >({});
 
-  const resolvedItemOptions = React.useMemo(
-    () =>
-      itemOptions.map((option) => itemCatalogOverrides[option.id] ?? option),
-    [itemCatalogOverrides, itemOptions],
+  const resolvedItemOptions = React.useMemo(() => {
+    const base = itemOptions.map(
+      (option) => itemCatalogOverrides[option.id] ?? option,
+    );
+    const extras = uniqueItemOptions.filter(
+      (option) => !base.some((item) => item.id === option.id),
+    );
+    return [...base, ...extras];
+  }, [itemCatalogOverrides, itemOptions, uniqueItemOptions]);
+
+  const handleAddProductOption = React.useCallback(
+    (option: ManualEntryCatalogOption) => {
+      setSettings((prev) =>
+        upsertFinanceProduct(prev, financeProductFromCatalogOption(option)),
+      );
+    },
+    [setSettings],
+  );
+
+  const handleDeleteProductOption = React.useCallback(
+    (option: ManualEntryCatalogOption) => {
+      setSettings((prev) => removeFinanceProduct(prev, option.id));
+    },
+    [setSettings],
+  );
+
+  const handleAddItemOption = React.useCallback(
+    (option: ManualEntryCatalogOption) => {
+      setSettings((prev) =>
+        upsertFinanceUniqueItem(prev, financeProductFromCatalogOption(option)),
+      );
+    },
+    [setSettings],
+  );
+
+  const handleDeleteItemOption = React.useCallback(
+    (option: ManualEntryCatalogOption) => {
+      setSettings((prev) => removeFinanceUniqueItem(prev, option.id));
+    },
+    [setSettings],
+  );
+
+  const isDeletableItemOption = React.useCallback(
+    (option: ManualEntryCatalogOption) =>
+      option.id.startsWith("unique-") ||
+      (settings.uniqueItems ?? []).some((item) => item.id === option.id),
+    [settings.uniqueItems],
   );
 
   const handleUpdateProductOption = React.useCallback(
@@ -872,6 +937,8 @@ export default function SalesEditCheckout({
         addScreenTitle="Add Product"
         editScreenTitle="Edit Product"
         onUpdateOption={handleUpdateProductOption}
+        onAddOption={handleAddProductOption}
+        onDeleteOption={handleDeleteProductOption}
         onClose={() => setProductDrawerOpen(false)}
         onSave={(selected) => {
           addLinesFromCatalog("product", selected);
@@ -888,6 +955,9 @@ export default function SalesEditCheckout({
         addScreenTitle="Add Service"
         editScreenTitle="Edit Item"
         onUpdateOption={handleUpdateItemOption}
+        onAddOption={handleAddItemOption}
+        onDeleteOption={handleDeleteItemOption}
+        isDeletable={isDeletableItemOption}
         onClose={() => setItemDrawerOpen(false)}
         onSave={(selected) => {
           addLinesFromCatalog("item", selected);
@@ -900,6 +970,16 @@ export default function SalesEditCheckout({
         onSave={(line) => {
           setLines((prev) => [...prev, line]);
           setUniqueItemOpen(false);
+          setSettings((prev) =>
+            upsertFinanceUniqueItem(
+              prev,
+              toFinanceCatalogProduct({
+                id: line.id,
+                name: line.name,
+                price: line.unitPrice,
+              }),
+            ),
+          );
         }}
       />
     </Box>

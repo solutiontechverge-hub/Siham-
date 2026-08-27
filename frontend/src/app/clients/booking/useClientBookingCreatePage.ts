@@ -18,12 +18,18 @@ import {
   CHECKOUT_REF_KEY,
   createBookingRef,
   getActiveBookingSession,
+  isReturningToCreateDraft,
   lockEbrDraft,
+  rememberCreateReturnHref,
   setActiveBookingSession,
 } from "./clientBookingSession";
 import { resolveCreateCheckoutPath } from "./resolveCreateBookingStatus";
 import { useSnackbar } from "../../../components/common/AppSnackbar";
 import { getApiErrorMessage } from "../../../lib/api-error";
+import {
+  fileFromProjectUpload,
+  inferProjectUploadKind,
+} from "../../../lib/projectUploadMedia";
 import { resolveMediaUrl } from "../../../lib/resolveMediaUrl";
 import {
   getServicesForLocationMode,
@@ -73,6 +79,7 @@ import {
   servicesMissingTeamMember,
   withTeamMemberProvidedByProNote,
   resolveRequesterDisplayName,
+  formatMinimumTimeslotNotice,
 } from "./booking.page.data";
 import type {
   BookingPerson,
@@ -124,6 +131,10 @@ export function useClientBookingCreatePage() {
     if (!Array.isArray(raw)) return [];
     return raw as PublicBusinessHoursLike[];
   }, [publicHoursResponse?.data?.publicBusinessHours]);
+  const minimumTimeslotNotice = React.useMemo(
+    () => formatMinimumTimeslotNotice(publicHoursResponse?.data?.bookingRules),
+    [publicHoursResponse?.data?.bookingRules],
+  );
   const bookingLocationCode = React.useMemo(
     () => ((shop?.locationMode ?? "fixed") === "desired" ? "DL" : "FL"),
     [shop?.locationMode],
@@ -966,11 +977,9 @@ export function useClientBookingCreatePage() {
       if (isNotesPerson(person)) {
         return clientNote.trim() ? "Added" : "Add a note";
       }
-      const role = getParticipantLabel(person);
-      const count = serviceCountLabel(person.id);
-      return `${role} · ${count}`;
+      return serviceCountLabel(person.id);
     },
-    [clientNote, getParticipantLabel, serviceCountLabel],
+    [clientNote, serviceCountLabel],
   );
 
   const selectedServicesCount = React.useMemo(
@@ -1161,6 +1170,7 @@ export function useClientBookingCreatePage() {
       key: string;
       title: string;
       roleLabel: string;
+      isRequester: boolean;
       items: Service[];
       planningItem?: { activity: string; duration: string };
       teamMemberLabel?: string;
@@ -1185,6 +1195,7 @@ export function useClientBookingCreatePage() {
         key: p.id,
         title: p.name,
         roleLabel,
+        isRequester: Boolean(p.isRequester),
         items,
         ...(hasPlanning ? { planningItem } : {}),
         ...(teamMemberLabel ? { teamMemberLabel } : {}),
@@ -1209,6 +1220,7 @@ export function useClientBookingCreatePage() {
   }, [selectedTimeTooSoon]);
 
   React.useEffect(() => {
+    if (!profileHydrated) return;
     // Jump once to the next day that actually has bookable slots.
     // Avoids briefly selecting closed/empty days (red flash / glitch).
     if (isDayUnselectable(selectedDate)) {
@@ -1238,6 +1250,7 @@ export function useClientBookingCreatePage() {
     selectedDate,
     selectedTime,
     today0,
+    profileHydrated,
   ]);
 
   React.useEffect(() => {
@@ -1323,9 +1336,6 @@ export function useClientBookingCreatePage() {
         tm.locationModes.includes(profileSelection.locationMode),
       );
       const noSelectableTeam = !firstMember;
-      // Desired: always start in Unassigned — client assigns from that tab.
-      // Fixed with no staff: Unassigned (pro will provide). Fixed with staff: Assigned.
-      const leaveUnassigned = isDesired || noSelectableTeam;
       const defaultTeamMemberId = firstMember?.id ?? null;
 
       const profileServices = profileSelection.services.map((row) => ({
@@ -1335,8 +1345,9 @@ export function useClientBookingCreatePage() {
         name: row.name,
         durationMins: row.durationMins,
         price: row.price,
-        guestId: leaveUnassigned ? null : "p-requester",
-        // Desired keeps backend/default TM even while Unassigned so assign stamps it.
+        // New Book Now: always Unassigned for every professional. Edit/EBR keeps draft guestId.
+        guestId: null,
+        // Keep default TM on the picker while Unassigned so assign can stamp it.
         teamMemberId: noSelectableTeam
           ? null
           : (row.teamMemberId || defaultTeamMemberId),
@@ -1388,56 +1399,55 @@ export function useClientBookingCreatePage() {
       applyProfileSelection(selection);
     };
 
-    // Confirmed Edit / EBR must win over leftover profile-selection cache.
-    // Desired bookings often still have mollure:profile_booking_selection from create,
-    // which used to wipe Models/Guests/Planning before we restored the draft.
-    if (isEbrSuggest) {
-      if (!shop?.shopId) return;
-      const existingRaw = getActiveBookingSession();
-      const existing = existingRaw
-        ? enrichClientBookingRecord(existingRaw)
-        : null;
-      if (!existing?.draft?.services?.length) {
-        // Session not ready yet — never fall through to blank catalog.
-        return;
-      }
-      if (existing.shop?.shopId && existing.shop.shopId !== shop.shopId) {
-        return;
-      }
-
+    const hydrateFromActiveDraft = (
+      existing: NonNullable<ReturnType<typeof enrichClientBookingRecord>>,
+      options: { signaturePrefix: string; forceRequesterGuestId: boolean },
+    ) => {
       const locationMode =
-        existing.shop?.locationMode ?? shop.locationMode ?? "fixed";
-      const signature = `ebrSuggest:${existing.bookingRef}:${existing.draft.people
+        existing.shop?.locationMode ?? shop?.locationMode ?? "fixed";
+      const signature = `${options.signaturePrefix}:${existing.bookingRef}:${existing.draft?.people
         ?.map((p) => `${p.id}:${p.participantType ?? ""}`)
-        .join(",")}:${existing.draft.services
+        .join(",")}:${(existing.draft?.services ?? [])
         .map(
           (row) => `${row.id}:${row.guestId ?? ""}:${row.teamMemberId ?? ""}`,
         )
-        .join("|")}:${existing.draft.projectDetails?.description ?? ""}:${[
-          existing.draft.desiredLocation?.street,
-          existing.draft.desiredLocation?.number,
-          existing.draft.desiredLocation?.postalCode,
-          existing.draft.desiredLocation?.province,
-          existing.draft.desiredLocation?.municipality,
-        ].join("|")}`;
+        .join("|")}:${existing.draft?.projectDetails?.description ?? ""}:${
+        existing.draft?.combineServices === false ? "0" : "1"
+      }:${[
+        existing.draft?.desiredLocation?.street,
+        existing.draft?.desiredLocation?.number,
+        existing.draft?.desiredLocation?.postalCode,
+        existing.draft?.desiredLocation?.province,
+        existing.draft?.desiredLocation?.municipality,
+      ].join("|")}`;
       if (hydrationSignatureRef.current === signature) return;
       hydrationSignatureRef.current = signature;
 
-      const draftServices: Service[] = existing.draft.services.map((row) => ({
-        id: row.id,
-        catalogServiceId: extractUuidFromSyntheticId(row.id) ?? row.id,
-        name: row.name,
-        durationMins: row.durationMins,
-        price: row.price,
-        guestId:
-          row.guestId != null && row.guestId !== "" ? row.guestId : "p-requester",
-        teamMemberId: row.teamMemberId ?? null,
-      }));
+      const draftServices: Service[] = (existing.draft?.services ?? []).map(
+        (row) => ({
+          id: row.id,
+          catalogServiceId:
+            (row as Service).catalogServiceId ??
+            extractUuidFromSyntheticId(row.id) ??
+            row.id,
+          name: row.name,
+          durationMins: row.durationMins,
+          price: row.price,
+          guestId: options.forceRequesterGuestId
+            ? row.guestId != null && row.guestId !== ""
+              ? row.guestId
+              : "p-requester"
+            : (row.guestId ?? null),
+          teamMemberId: row.teamMemberId ?? null,
+        }),
+      );
 
       setServices(draftServices);
-      ebrSuggestBaselineRef.current = draftServices.map((s) => ({ ...s }));
+      if (options.signaturePrefix === "ebrSuggest") {
+        ebrSuggestBaselineRef.current = draftServices.map((s) => ({ ...s }));
+      }
 
-      const draftPeople: BookingPerson[] = existing.draft.people?.length
+      const draftPeople: BookingPerson[] = existing.draft?.people?.length
         ? existing.draft.people.map((p) => ({
             id: p.id,
             name: p.name,
@@ -1454,7 +1464,10 @@ export function useClientBookingCreatePage() {
               isRequester: true as const,
             },
           ];
-      if (existing.draft.clientNote?.trim() && !draftPeople.some(isNotesPerson)) {
+      if (
+        existing.draft?.clientNote?.trim() &&
+        !draftPeople.some(isNotesPerson)
+      ) {
         draftPeople.push(createNotesPerson());
       }
       setPeople(draftPeople);
@@ -1467,7 +1480,7 @@ export function useClientBookingCreatePage() {
         draftPeople[0];
       if (personWithServices?.id) setSelectedPersonId(personWithServices.id);
 
-      const draftTeamMembers = existing.draft.teamMembers;
+      const draftTeamMembers = existing.draft?.teamMembers;
       if (draftTeamMembers?.length) {
         setShopTeamMembers((prev) => {
           const fromDraft = draftTeamMembers.map((tm) => ({
@@ -1491,15 +1504,19 @@ export function useClientBookingCreatePage() {
         if (apiTeam.length) setShopTeamMembers(apiTeam);
       }
 
-      if (existing.draft.selectedDateISO) {
+      if (existing.draft?.selectedDateISO) {
         const parsed = new Date(`${existing.draft.selectedDateISO}T00:00:00`);
         if (!Number.isNaN(parsed.getTime())) {
           setSelectedDate(clampToBookableDay(parsed));
         }
       }
-      if (existing.draft.selectedTime)
+      if (existing.draft?.selectedTime) {
         setSelectedTime(existing.draft.selectedTime);
-      if (existing.draft.projectDetails) {
+      }
+      if (typeof existing.draft?.combineServices === "boolean") {
+        setCombineServices(existing.draft.combineServices);
+      }
+      if (existing.draft?.projectDetails) {
         setProjectDescription(existing.draft.projectDetails.description ?? "");
         setProjectUploads(
           (existing.draft.projectDetails.uploads ?? []).map((u) => ({
@@ -1513,11 +1530,10 @@ export function useClientBookingCreatePage() {
           })),
         );
       }
-      if (existing.draft.clientNote) {
+      if (existing.draft?.clientNote) {
         setClientNote(existing.draft.clientNote);
       }
-      // Restore visit address the client already entered (Desired Location).
-      const savedVisit = existing.draft.desiredLocation;
+      const savedVisit = existing.draft?.desiredLocation;
       if (
         savedVisit &&
         (savedVisit.street?.trim() ||
@@ -1534,13 +1550,56 @@ export function useClientBookingCreatePage() {
           municipality: savedVisit.municipality ?? "",
         });
       }
-      // Only pre-select a TM the draft already assigned — never force roster[0].
       const firstTm =
         draftServices.find((s) => s.teamMemberId)?.teamMemberId ?? "";
       setSelectedTeamMemberId(firstTm);
       setServiceTab(getPreferredServiceTab(draftServices));
       setProfileHydrated(true);
+    };
+
+    // Confirmed Edit / EBR must win over leftover profile-selection cache.
+    // Desired bookings often still have mollure:profile_booking_selection from create,
+    // which used to wipe Models/Guests/Planning before we restored the draft.
+    if (isEbrSuggest) {
+      if (!shop?.shopId) return;
+      const existingRaw = getActiveBookingSession();
+      const existing = existingRaw
+        ? enrichClientBookingRecord(existingRaw)
+        : null;
+      if (!existing?.draft?.services?.length) {
+        // Session not ready yet — never fall through to blank catalog.
+        return;
+      }
+      if (existing.shop?.shopId && existing.shop.shopId !== shop.shopId) {
+        return;
+      }
+      hydrateFromActiveDraft(existing, {
+        signaturePrefix: "ebrSuggest",
+        forceRequesterGuestId: true,
+      });
       return;
+    }
+
+    // Summary back (browser or arrow): restore guests/models/planning/date/time
+    // instead of re-applying Book Now profile selection.
+    if (
+      isReturningToCreateDraft({
+        fromProfile,
+        hydrationToken: profileHydrationToken,
+        shopId: shop?.shopId,
+      })
+    ) {
+      const existingRaw = getActiveBookingSession();
+      const existing = existingRaw
+        ? enrichClientBookingRecord(existingRaw)
+        : null;
+      if (existing?.draft?.services?.length) {
+        hydrateFromActiveDraft(existing, {
+          signaturePrefix: "createReturn",
+          forceRequesterGuestId: false,
+        });
+        return;
+      }
     }
 
     if (fromProfile && profileSelection?.services.length) {
@@ -1578,10 +1637,7 @@ export function useClientBookingCreatePage() {
       : [];
 
     const mode = shop.locationMode ?? "fixed";
-    const isDesired = mode === "desired";
     const defaultTeamMemberId = apiTeam[0]?.id ?? null;
-    // Desired: Unassigned until client assigns. Fixed: Unassigned only when no staff.
-    const leaveUnassigned = isDesired || !defaultTeamMemberId;
     const catalogServices = getServicesForLocationMode(
       businessProfile,
       mode,
@@ -1595,7 +1651,7 @@ export function useClientBookingCreatePage() {
         price: priced.price,
         originalPrice: priced.originalPrice,
         discountPct: priced.discountPct,
-        guestId: (leaveUnassigned ? null : "p-requester") as string | null,
+        guestId: null as string | null,
         teamMemberId: defaultTeamMemberId,
       };
     });
@@ -1652,16 +1708,14 @@ export function useClientBookingCreatePage() {
       return;
     }
     setSelectedTeamMemberId(fallbackId);
-    if (isDesiredLocation) {
-      setServices((prev) =>
-        prev.map((s) => ({
-          ...s,
-          // Stamp TM without moving Unassigned → Assigned.
-          teamMemberId: s.teamMemberId || fallbackId,
-        })),
-      );
-    }
-  }, [filteredTeamMembers, isDesiredLocation, selectedTeamMemberId]);
+    setServices((prev) =>
+      prev.map((s) => ({
+        ...s,
+        // Stamp TM without moving Unassigned → Assigned.
+        teamMemberId: s.teamMemberId || fallbackId,
+      })),
+    );
+  }, [filteredTeamMembers, selectedTeamMemberId]);
 
   const reorderPeople = React.useCallback((fromId: string, toId: string) => {
     if (fromId === toId) return;
@@ -2086,6 +2140,8 @@ export function useClientBookingCreatePage() {
                       id: u.id,
                       name: u.name,
                       previewUrl: u.previewUrl,
+                      mimeType: u.file?.type,
+                      kind: inferProjectUploadKind(u.name, u.file?.type),
                     })),
                   },
                 }
@@ -2175,6 +2231,7 @@ export function useClientBookingCreatePage() {
             existing.requiresPrepayment ?? requiresPrepayment,
           ),
         });
+        rememberCreateReturnHref();
         router.push(`${checkoutPath}?tab=${listTab}`);
       } finally {
         setIsContinuing(false);
@@ -2191,26 +2248,53 @@ export function useClientBookingCreatePage() {
         window.sessionStorage.removeItem(CHECKOUT_REF_KEY);
       }
 
-      let projectDetailsUploads: Array<{
+      const localUploads: Array<{
         id: string;
         name: string;
         url?: string;
+        previewUrl?: string;
         mimeType?: string;
         kind?: "image" | "document";
-      }> = projectUploads.map((u) => ({ id: u.id, name: u.name }));
-      const filesToUpload = projectUploads
-        .map((u) => u.file)
-        .filter((file): file is File => Boolean(file));
-      if (isDesiredLocation && isCompanyClient && filesToUpload.length > 0) {
-        const uploaded = await uploadBookingAttachments(filesToUpload).unwrap();
-        const attachments = uploaded.data?.attachments ?? [];
-        projectDetailsUploads = attachments.map((att) => ({
-          id: att.id,
-          name: att.name,
-          url: att.url,
-          mimeType: att.mimeType,
-          kind: att.kind,
-        }));
+      }> = projectUploads.map((u) => ({
+        id: u.id,
+        name: u.name,
+        previewUrl: u.previewUrl,
+        mimeType: u.file?.type,
+        kind: inferProjectUploadKind(u.name, u.file?.type),
+      }));
+      let projectDetailsUploads = localUploads;
+      if (isDesiredLocation && isCompanyClient && projectUploads.length > 0) {
+        const filesToUpload = (
+          await Promise.all(projectUploads.map((u) => fileFromProjectUpload(u)))
+        ).filter((file): file is File => Boolean(file));
+        if (filesToUpload.length > 0) {
+          const uploaded = await uploadBookingAttachments(filesToUpload).unwrap();
+          const attachments = uploaded.data?.attachments ?? [];
+          const durableByName = new Map(
+            attachments.map((att) => [att.name, att]),
+          );
+          projectDetailsUploads = projectUploads.map((upload, index) => {
+            const matched =
+              (upload.file && durableByName.get(upload.file.name)) ||
+              durableByName.get(upload.name) ||
+              attachments[index];
+            if (!matched) return localUploads[index];
+            const durable = resolveMediaUrl(matched.url) ?? matched.url;
+            return {
+              id: matched.id || upload.id,
+              name: upload.name || matched.name,
+              url: matched.url,
+              previewUrl: durable,
+              mimeType: matched.mimeType || upload.file?.type,
+              kind:
+                matched.kind ||
+                inferProjectUploadKind(
+                  upload.name || matched.name,
+                  matched.mimeType || upload.file?.type,
+                ),
+            };
+          });
+        }
       }
 
       const payload = {
@@ -2283,6 +2367,7 @@ export function useClientBookingCreatePage() {
         locationMode,
         requiresPrepayment,
       });
+      rememberCreateReturnHref();
       router.push(`${checkoutPath}?tab=${listTab}`);
     } catch (error) {
       showSnackbar({
@@ -2431,6 +2516,7 @@ export function useClientBookingCreatePage() {
     projectFileInputRef,
     locationMode,
     isDesiredLocation,
+    minimumTimeslotNotice,
     isCompanyClient,
     showProjectDetails,
     getParticipantLabel,

@@ -1,10 +1,13 @@
 "use client";
 
 import * as React from "react";
+import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
+import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
-import { Avatar, Box, Divider, Paper, Stack, Typography } from "@mui/material";
+import { Avatar, Box, Chip, Divider, Paper, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import {
+  fmtMinutesToTimeLabel,
   parseTimeLabelToMinutes,
   serviceTimeRangeLabel,
 } from "../../../app/clients/booking/booking-time";
@@ -18,10 +21,13 @@ import {
   buildBookingSummarySections,
   resolveTeamMemberFirstName,
 } from "./buildBookingSummarySections";
+import { locationModeChipSx } from "./locationModeChipSx";
+import ProjectUploadThumb from "./ProjectUploadThumb";
 import type { BookingEditSuggestedProduct } from "./bookingEditRequest";
 import type { ClientBookingDraft, ClientBookingSummarySection } from "./types";
-import { resolveMediaUrl } from "../../../lib/resolveMediaUrl";
 import BookingSummaryNote from "./BookingSummaryNote";
+import BookingLineAmount from "../calendar/BookingLineAmount";
+import { clientLineDiscountLabel } from "../../../data/bookingLinePricing";
 
 export type ClientBookingPrepaymentState = "none" | "required" | "paid";
 
@@ -190,6 +196,9 @@ type Props = {
   products?: readonly BookingEditSuggestedProduct[];
   editedProductIds?: readonly string[];
   onPayNow?: () => void;
+  shopName?: string;
+  locationMode?: "fixed" | "desired";
+  addressLabel?: string;
   /** Shown under Total Price when professional accepted the client's post-confirm EBR. */
   acceptedChangesNote?: OutcomeChangesNote | null;
   /** Shown under Total Price when professional rejected the client's post-confirm EBR. */
@@ -218,6 +227,9 @@ export default function ClientBookingPaymentDetailsCard({
   products = [],
   editedProductIds = [],
   onPayNow,
+  shopName,
+  locationMode = "fixed",
+  addressLabel,
   acceptedChangesNote = null,
   rejectedChangesNote = null,
 }: Props) {
@@ -231,6 +243,20 @@ export default function ClientBookingPaymentDetailsCard({
       draft?.selectedTime ? parseTimeLabelToMinutes(draft.selectedTime) : 0,
     [draft?.selectedTime],
   );
+  const bookingEndMinutes =
+    bookingStartMinutes +
+    (draft?.services ?? []).reduce((sum, s) => sum + s.durationMins, 0);
+  const dateLabel = React.useMemo(() => {
+    if (!draft?.selectedDateISO) return "";
+    const dt = new Date(`${draft.selectedDateISO}T00:00:00`);
+    if (Number.isNaN(dt.getTime())) return draft.selectedDateISO;
+    return dt.toLocaleDateString("en-US", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  }, [draft?.selectedDateISO]);
   const editedServiceIdSet = React.useMemo(
     () => new Set(editedServiceIds),
     [editedServiceIds],
@@ -411,16 +437,11 @@ export default function ClientBookingPaymentDetailsCard({
               </Box>
             ) : null}
           </Box>
-          <Typography
-            sx={{
-              fontSize: 13,
-              fontWeight: 900,
-              color: alpha(m.navy, 0.82),
-              flexShrink: 0,
-            }}
-          >
-            €{service.price}
-          </Typography>
+          <BookingLineAmount
+            amount={service.price}
+            originalAmount={service.originalPrice}
+            discountLabel={clientLineDiscountLabel(service)}
+          />
         </Stack>
       </Box>
     );
@@ -525,25 +546,116 @@ export default function ClientBookingPaymentDetailsCard({
     <Paper
       elevation={0}
       sx={{
-        borderRadius: "10px",
-        border: `1px solid ${alpha(m.navy, 0.08)}`,
-        bgcolor: alpha(m.navy, 0.015),
+        borderRadius: "12px",
+        border: `1px solid ${alpha(m.navy, 0.18)}`,
+        bgcolor: "#fff",
         overflow: "hidden",
       }}
     >
-      <Box sx={{ px: 2, py: 1.35, bgcolor: "#fff" }}>
+      <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 2, pb: 1.25 }}>
         <Typography
           sx={{
-            fontWeight: 900,
-            color: m.headingText,
-            fontSize: 16,
+            fontWeight: 700,
+            fontSize: "30px",
+            color: alpha(m.navy, 0.72),
             textAlign: "center",
+            lineHeight: 1.2,
           }}
         >
-          Booking and Payment Details
+          Service Summary
         </Typography>
       </Box>
-      <Divider />
+      <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
+
+      {shopName || addressLabel ? (
+        <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 1.35, pb: 1.5 }}>
+          {shopName ? (
+            <Typography
+              sx={{
+                fontWeight: 900,
+                fontSize: 18,
+                color: alpha(m.navy, 0.88),
+                lineHeight: 1.2,
+              }}
+            >
+              {shopName}
+            </Typography>
+          ) : null}
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+            spacing={2}
+            sx={{ mt: 0.85 }}
+          >
+            {dateLabel ? (
+              <Stack
+                direction="row"
+                alignItems="center"
+                spacing={0.6}
+                sx={{ minWidth: 0, flexShrink: 0 }}
+              >
+                <AccessTimeRoundedIcon
+                  sx={{ fontSize: 16, color: m.teal, flexShrink: 0 }}
+                />
+                <Typography
+                  sx={{
+                    fontWeight: 800,
+                    color: alpha(m.teal, 0.95),
+                    fontSize: 12.5,
+                    whiteSpace: { xs: "normal", sm: "nowrap" },
+                  }}
+                >
+                  {dateLabel} ({fmtMinutesToTimeLabel(bookingStartMinutes)}-
+                  {fmtMinutesToTimeLabel(bookingEndMinutes)})
+                </Typography>
+              </Stack>
+            ) : null}
+            {addressLabel ? (
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.5,
+                  ml: "auto",
+                  maxWidth: { xs: "46%", sm: "50%" },
+                  flex: "0 1 auto",
+                  minWidth: 0,
+                }}
+              >
+                <LocationOnOutlinedIcon
+                  sx={{
+                    fontSize: 16,
+                    width: 16,
+                    height: 16,
+                    color: alpha(m.navy, 0.45),
+                    flexShrink: 0,
+                    display: "block",
+                  }}
+                />
+                <Typography
+                  component="span"
+                  sx={{
+                    fontWeight: 700,
+                    color: alpha(m.navy, 0.55),
+                    fontSize: 12,
+                    lineHeight: 1.2,
+                    minWidth: 0,
+                  }}
+                >
+                  {addressLabel}
+                </Typography>
+              </Box>
+            ) : null}
+          </Stack>
+          <Chip
+            label={locationMode === "desired" ? "Desired Location" : "Fixed Location"}
+            size="small"
+            sx={{ ...locationModeChipSx, mt: 0.75 }}
+          />
+        </Box>
+      ) : null}
+      <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
 
       <Box sx={{ p: 2, bgcolor: "#fff" }}>
         <Stack
@@ -645,68 +757,14 @@ export default function ClientBookingPaymentDetailsCard({
                   Media
                 </Typography>
                 <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                  {project!.uploads.map((upload) => {
-                    const thumb =
-                      resolveMediaUrl(upload.previewUrl) ||
-                      resolveMediaUrl(upload.url);
-                    return (
-                    <Box
+                  {project!.uploads.map((upload) => (
+                    <ProjectUploadThumb
                       key={upload.id}
-                      sx={{
-                        width: 72,
-                        borderRadius: "8px",
-                        overflow: "hidden",
-                        border: `1px solid ${alpha(m.navy, 0.1)}`,
-                        bgcolor: alpha(m.navy, 0.03),
-                      }}
-                    >
-                      <Box
-                        sx={{
-                          width: "100%",
-                          height: 72,
-                          bgcolor: alpha(m.navy, 0.06),
-                          backgroundImage: thumb
-                            ? `url(${thumb})`
-                            : undefined,
-                          backgroundSize: "cover",
-                          backgroundPosition: "center",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        {!thumb ? (
-                          <Typography
-                            sx={{
-                              fontSize: 10,
-                              fontWeight: 800,
-                              color: alpha(m.navy, 0.45),
-                              px: 0.5,
-                              textAlign: "center",
-                            }}
-                          >
-                            IMG
-                          </Typography>
-                        ) : null}
-                      </Box>
-                      <Typography
-                        sx={{
-                          px: 0.5,
-                          py: 0.35,
-                          fontSize: 9.5,
-                          fontWeight: 800,
-                          color: alpha(m.navy, 0.5),
-                          textAlign: "center",
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        }}
-                      >
-                        {upload.name}
-                      </Typography>
-                    </Box>
-                    );
-                  })}
+                      upload={upload}
+                      width={72}
+                      height={72}
+                    />
+                  ))}
                 </Stack>
               </Box>
             ) : null}
@@ -790,16 +848,11 @@ export default function ClientBookingPaymentDetailsCard({
                           <BookingEditedTag variant="edited" />
                         ) : null}
                       </Stack>
-                      <Typography
-                        sx={{
-                          fontSize: 13,
-                          fontWeight: 900,
-                          color: alpha(m.navy, 0.82),
-                          flexShrink: 0,
-                        }}
-                      >
-                        €{product.price}
-                      </Typography>
+                      <BookingLineAmount
+                        amount={product.price}
+                        originalAmount={product.originalPrice}
+                        discountLabel={clientLineDiscountLabel(product)}
+                      />
                     </Stack>
                   </Box>
                 ))}
