@@ -149,6 +149,11 @@ export type BusinessPublicProfileDesiredLocation = {
 export type BusinessPublicProfileData = {
   shopId: string;
   shopName: string;
+  /** Professional contact number from their profile, when set. */
+  phone?: string;
+  vatNumber?: string;
+  cocNumber?: string;
+  legalName?: string;
   heroImage: unknown;
   heroImages: unknown[];
   rating: number;
@@ -485,8 +490,152 @@ const ALL_NL_PROVINCES = [
   "Zuid-Holland",
 ] as const;
 
+const PROVINCE_MUNICIPALITIES: Record<string, readonly string[]> = {
+  Drenthe: ["Assen", "Emmen", "Hoogeveen", "Meppel", "Coevorden"],
+  "Zuid-Holland": ["Rotterdam", "Den Haag"],
+  Groningen: [
+    "Groningen",
+    "Veendam",
+    "Stadskanaal",
+    "Delfzijl",
+    "Winschoten",
+    "Haren",
+    "Leek",
+    "Appingedam",
+  ],
+  "Noord-Holland": ["Amsterdam", "Haarlem"],
+  Utrecht: ["Utrecht"],
+  "Noord-Brabant": ["Eindhoven"],
+};
+
+function splitDesiredAreaCsv(value: string | null | undefined): string[] {
+  return String(value ?? "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+}
+
+function municipalityBelongsToProvince(municipality: string, province: string): boolean {
+  const normalizedMunicipality = municipality.trim().toLowerCase();
+  const normalizedProvince = province.trim().toLowerCase();
+  if (!normalizedMunicipality || !normalizedProvince) return false;
+  if (normalizedMunicipality === normalizedProvince) return true;
+  if (normalizedProvince.includes(normalizedMunicipality)) return true;
+  if (normalizedMunicipality.includes(normalizedProvince)) return true;
+  return (
+    PROVINCE_MUNICIPALITIES[province]?.some(
+      (entry) => entry.toLowerCase() === normalizedMunicipality,
+    ) ?? false
+  );
+}
+
 /**
- * Province / municipality options for client Desired Location visit address,
+ * Maps stored `desired_location_area` / `desired_location_province` CSV fields
+ * into the structured desired-location areas the professional allowed.
+ */
+export function buildDesiredLocationFromSetupFields(
+  area: string | null | undefined,
+  province: string | null | undefined,
+): BusinessPublicProfileDesiredLocation {
+  const areaText = String(area ?? "").trim();
+  const provinceText = String(province ?? "").trim();
+
+  if (areaText === "All Netherlands" || provinceText === "All Netherlands") {
+    return { areaMode: "All Netherlands", areas: [] };
+  }
+
+  const municipalities = splitDesiredAreaCsv(areaText);
+  const provinces = splitDesiredAreaCsv(provinceText);
+
+  if (!municipalities.length && !provinces.length) {
+    return { areaMode: "Specific areas only", areas: [] };
+  }
+
+  if (provinces.length === 1) {
+    return {
+      areaMode: "Specific areas only",
+      areas: [
+        {
+          province: provinces[0],
+          municipalities,
+          allMunicipalities: municipalities.length === 0,
+        },
+      ],
+    };
+  }
+
+  if (provinces.length > 1) {
+    if (!municipalities.length) {
+      return {
+        areaMode: "Specific areas only",
+        areas: provinces.map((entry) => ({
+          province: entry,
+          municipalities: [],
+          allMunicipalities: true,
+        })),
+      };
+    }
+
+    const areas = provinces.map((entry) => ({
+      province: entry,
+      municipalities: [] as string[],
+      allMunicipalities: false,
+    }));
+    const unassigned: string[] = [];
+
+    for (const municipality of municipalities) {
+      const matchedArea = areas.find((entry) =>
+        municipalityBelongsToProvince(municipality, entry.province),
+      );
+      if (matchedArea) matchedArea.municipalities.push(municipality);
+      else unassigned.push(municipality);
+    }
+
+    if (unassigned.length > 0) {
+      const customProvinces = provinces.filter(
+        (entry) => !PROVINCE_MUNICIPALITIES[entry],
+      );
+      const fallbackProvince =
+        customProvinces[0] ?? areas[areas.length - 1]?.province;
+
+      for (const municipality of unassigned) {
+        const namedArea = areas.find(
+          (entry) =>
+            municipalityBelongsToProvince(municipality, entry.province) ||
+            municipality.toLowerCase().includes(entry.province.toLowerCase()) ||
+            entry.province.toLowerCase().includes(municipality.toLowerCase()),
+        );
+        if (namedArea) {
+          namedArea.municipalities.push(municipality);
+          continue;
+        }
+
+        const fallbackArea = areas.find(
+          (entry) => entry.province === fallbackProvince,
+        );
+        fallbackArea?.municipalities.push(municipality);
+      }
+    }
+
+    return {
+      areaMode: "Specific areas only",
+      areas,
+    };
+  }
+
+  return {
+    areaMode: "Specific areas only",
+    areas: [
+      {
+        province: "Service areas",
+        municipalities,
+      },
+    ],
+  };
+}
+
+/**
+ * Province / municipality options for Desired Location visit address,
  * scoped to what the professional offers.
  */
 export function resolveDesiredVisitAddressOptions(
@@ -531,9 +680,6 @@ export function resolveDesiredVisitAddressOptions(
           ),
         );
       }
-      if (!municipalityOptions.length) {
-        municipalityOptions = fallbackMunicipalities;
-      }
     }
   }
 
@@ -572,6 +718,7 @@ export function mapListingCardToPublicProfile(card: ListingCardData): BusinessPu
   return {
     shopId: card.id,
     shopName,
+    phone: undefined,
     heroImage: card.image,
     heroImages: [card.image, card.image, card.image, card.image],
     rating: card.rating,

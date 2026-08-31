@@ -6,22 +6,30 @@ import FileDownloadOutlinedIcon from "@mui/icons-material/FileDownloadOutlined";
 import { Box, Divider, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import type { TransactionRow } from "../../../app/professionals/fixed-location/finance/data/transactions";
+import type { ProfessionalProfile, ProfileResponse } from "../../../store/services/profileApi";
 import { useSnackbar } from "../AppSnackbar";
 import { BodyText, SubHeading } from "../../ui/typography";
 import {
-  formatDocumentDate,
+  formatDocumentDateTime,
   formatPaymentMethod,
   parseCurrencyValue,
+  professionalBusinessInfoLines,
   receiptItemsTitleForStatus,
   receiptNumberLabelForStatus,
   receiptTitleForStatus,
+  resolveProfessionalBusinessDisplay,
   type PreviewLineItem,
 } from "./financeDocumentUtils";
+import type { FinanceProfessionalBusinessOverride } from "./financeDocumentTypes";
+import type { FinanceInvoiceTemplateType } from "./useFinanceInvoiceSettings";
 
 type Props = {
   row: TransactionRow | null;
   lineItems: PreviewLineItem[];
   totalPriceLabel: string;
+  invoiceType?: FinanceInvoiceTemplateType;
+  profileData?: ProfileResponse | null;
+  professionalBusinessOverride?: FinanceProfessionalBusinessOverride | null;
   onDownload?: () => void;
 };
 
@@ -57,10 +65,25 @@ export default function FinanceReceiptPreview({
   row,
   lineItems,
   totalPriceLabel,
+  invoiceType = "individual",
+  profileData = null,
+  professionalBusinessOverride = null,
   onDownload,
 }: Props) {
   const m = useTheme().palette.mollure;
   const { showSnackbar } = useSnackbar();
+  const professionalProfile =
+    profileData?.user_type === "professional"
+      ? (profileData.profile as ProfessionalProfile | null)
+      : null;
+  const professionalDisplay = resolveProfessionalBusinessDisplay(
+    professionalBusinessOverride,
+    professionalProfile,
+  );
+  const professionalLines = professionalBusinessInfoLines(
+    professionalDisplay,
+    invoiceType,
+  );
 
   const receiptTitle = receiptTitleForStatus(row?.status);
   const itemsTitle = receiptItemsTitleForStatus(row?.status);
@@ -73,13 +96,18 @@ export default function FinanceReceiptPreview({
     row?.id ||
     "—";
   const date =
-    formatDocumentDate(
-      row?.document?.refundedAt || row?.document?.invoiceDate || row?.date,
-    ) || formatDocumentDate(new Date().toISOString().slice(0, 10));
+    formatDocumentDateTime(
+      row?.document?.refundedAt ||
+        row?.document?.serviceDate ||
+        row?.document?.invoiceDate ||
+        row?.date,
+      row?.document?.serviceTime,
+    ) || formatDocumentDateTime(new Date().toISOString().slice(0, 10));
   const paymentMethod = formatPaymentMethod(row);
   const paymentStatus = row?.status ?? "Paid";
   const refundAmount = row?.document?.refundAmount;
   const isRefund = row?.status === "Refunded";
+  const prepaidAmountLabel = row?.document?.prepaymentAmount;
 
   const downloadReceiptPdf = React.useCallback(async () => {
     if (onDownload) {
@@ -104,7 +132,7 @@ export default function FinanceReceiptPreview({
       const metaRows = [
         ["Invoice Number", invoiceNumber],
         [receiptNumberLabel, receiptNumber],
-        ["Date", date],
+        ["Date and time", date],
         ...(isRefund && refundAmount
           ? [["Refund Amount", refundAmount] as const]
           : []),
@@ -118,6 +146,17 @@ export default function FinanceReceiptPreview({
         y += 20;
       });
 
+      y += 10;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(11);
+      doc.text("Professional's Business Info", left, y);
+      y += 16;
+      doc.setFont("helvetica", "normal");
+      professionalLines.forEach((line) => {
+        doc.text(line, left, y);
+        y += 16;
+      });
+
       y += 12;
       doc.setFont("helvetica", "bold");
       doc.text(itemsTitle, left, y);
@@ -128,6 +167,14 @@ export default function FinanceReceiptPreview({
         doc.text(item.totalPrice, left + usableWidth, y, { align: "right" });
         y += 18;
       });
+      if (
+        prepaidAmountLabel &&
+        !lineItems.some((item) => item.description.toLowerCase() === "prepayment")
+      ) {
+        doc.text("Prepayment", left, y);
+        doc.text(prepaidAmountLabel, left + usableWidth, y, { align: "right" });
+        y += 18;
+      }
 
       y += 8;
       doc.setDrawColor(220);
@@ -157,6 +204,8 @@ export default function FinanceReceiptPreview({
     onDownload,
     paymentMethod,
     paymentStatus,
+    prepaidAmountLabel,
+    professionalLines,
     receiptNumber,
     receiptNumberLabel,
     receiptTitle,
@@ -188,13 +237,37 @@ export default function FinanceReceiptPreview({
       <Stack spacing={1.15}>
         <ReceiptMetaRow label="Invoice Number" value={invoiceNumber} />
         <ReceiptMetaRow label={receiptNumberLabel} value={receiptNumber} />
-        <ReceiptMetaRow label="Date" value={date} />
+        <ReceiptMetaRow label="Date and time" value={date} />
         {isRefund && refundAmount ? (
           <ReceiptMetaRow label="Refund Amount" value={refundAmount} />
         ) : null}
         <ReceiptMetaRow label="Payment Method" value={paymentMethod} />
         <ReceiptMetaRow label="Payment Status" value={paymentStatus} />
       </Stack>
+
+      <Box
+        sx={{
+          mt: 2,
+          p: 1.75,
+          borderRadius: "10px",
+          bgcolor: alpha(m.navy, 0.015),
+          border: `1px solid ${alpha(m.navy, 0.08)}`,
+        }}
+      >
+        <BodyText sx={{ fontWeight: 900, color: alpha(m.navy, 0.78) }}>
+          Professional's Business Info
+        </BodyText>
+        <Stack spacing={0.5} sx={{ mt: 1.1 }}>
+          {professionalLines.map((line) => (
+            <BodyText
+              key={line}
+              sx={{ fontSize: 12.5, color: alpha(m.navy, 0.62) }}
+            >
+              {line}
+            </BodyText>
+          ))}
+        </Stack>
+      </Box>
 
       <BodyText
         sx={{
@@ -228,6 +301,27 @@ export default function FinanceReceiptPreview({
             </BodyText>
           </Stack>
         ))}
+        {prepaidAmountLabel &&
+        !lineItems.some(
+          (item) => item.description.toLowerCase() === "prepayment",
+        ) ? (
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="center"
+          >
+            <BodyText
+              sx={{ fontSize: 13, fontWeight: 700, color: alpha(m.navy, 0.72) }}
+            >
+              Prepayment
+            </BodyText>
+            <BodyText
+              sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.82) }}
+            >
+              {prepaidAmountLabel}
+            </BodyText>
+          </Stack>
+        ) : null}
       </Stack>
 
       <Divider sx={{ my: 1.75, borderColor: alpha(m.navy, 0.1) }} />

@@ -794,42 +794,23 @@ export default function ClientBookingCreateView() {
             >
               <Stack direction="row" alignItems="center" spacing={1.25}>
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Stack
-                    direction="row"
-                    alignItems="center"
-                    justifyContent="space-between"
-                    spacing={1}
+                  <Typography
+                    sx={{
+                      fontSize: 12.5,
+                      fontWeight: 900,
+                      color: alpha(m.navy, 0.82),
+                      lineHeight: 1.2,
+                    }}
                   >
-                    <Typography
-                      sx={{
-                        fontSize: 12.5,
-                        fontWeight: 900,
-                        color: alpha(m.navy, 0.82),
-                        lineHeight: 1.1,
-                        flex: 1,
-                        minWidth: 0,
-                      }}
-                    >
-                      {s.name}
-                    </Typography>
-                    <Typography
-                      sx={{
-                        fontSize: 12.5,
-                        fontWeight: 900,
-                        color: alpha(m.navy, 0.82),
-                        lineHeight: 1.1,
-                        flexShrink: 0,
-                      }}
-                    >
-                      {s.price} €
-                    </Typography>
-                  </Stack>
+                    {s.name}
+                  </Typography>
                   <Typography
                     sx={{
                       fontSize: 10.5,
                       fontWeight: 700,
                       color: alpha(m.navy, 0.45),
                       mt: 0.25,
+                      lineHeight: 1.2,
                     }}
                   >
                     {s.durationMins} Mins
@@ -869,7 +850,19 @@ export default function ClientBookingCreateView() {
                   ) : null}
                 </Box>
 
-                <Stack direction="row" alignItems="center" spacing={0.25}>
+                <Typography
+                  sx={{
+                    fontSize: 12.5,
+                    fontWeight: 900,
+                    color: alpha(m.navy, 0.82),
+                    lineHeight: 1.2,
+                    flexShrink: 0,
+                  }}
+                >
+                  {s.price} €
+                </Typography>
+
+                <Stack direction="row" alignItems="center" spacing={0.25} sx={{ flexShrink: 0 }}>
                   {serviceTab === "unassigned" ? (
                     <Checkbox
                       size="small"
@@ -879,6 +872,7 @@ export default function ClientBookingCreateView() {
                         toggleServiceSelection(s.id, e.target.checked)
                       }
                       sx={{
+                        p: 0.25,
                         "&.Mui-checked": { color: m.teal },
                         color: alpha(m.navy, 0.35),
                       }}
@@ -1997,6 +1991,7 @@ export default function ClientBookingCreateView() {
                         justifyContent="flex-end"
                         sx={{ mb: 1 }}
                       >
+                        {isDesiredLocation || canAddFixedLocationGuest ? (
                         <Chip
                           icon={
                             <Box
@@ -2019,7 +2014,7 @@ export default function ClientBookingCreateView() {
                               />
                             </Box>
                           }
-                          label="Guest"
+                          label={isCompanyClient ? "Add" : "Guest"}
                           variant="outlined"
                           clickable={isDesiredLocation || canAddFixedLocationGuest}
                           onClick={(e) => {
@@ -2055,11 +2050,9 @@ export default function ClientBookingCreateView() {
                                 color: m.addSoftFg,
                               },
                             },
-                            ...(!isDesiredLocation && !canAddFixedLocationGuest
-                              ? { opacity: 0.45, pointerEvents: "none" }
-                              : null),
                           }}
                         />
+                        ) : null}
                         {isDesiredLocation ? (
                         <Menu
                           anchorEl={participantMenuAnchor}
@@ -2406,9 +2399,10 @@ export default function ClientBookingCreateView() {
                     <Typography
                       sx={{
                         fontWeight: 900,
-                        color: alpha(m.navy, 0.72),
-                        fontSize: 13,
+                        color: m.headingText,
+                        fontSize: 16,
                         textAlign: "center",
+                        lineHeight: 1.2,
                       }}
                     >
                       Booking and Payment Details
@@ -2725,15 +2719,15 @@ export default function ClientBookingCreateView() {
 
                       <BookingSummaryNote note={clientNote} />
 
-                      <Box
-                        sx={{
-                          borderRadius: "10px",
-                          bgcolor: alpha(m.navy, 0.035),
-                          border: `1px solid ${alpha(m.navy, 0.22)}`,
-                          px: 1.25,
-                          py: 1,
-                        }}
-                      >
+                          <Box
+                            sx={{
+                              borderRadius: "10px",
+                              bgcolor: alpha(m.navy, 0.04),
+                              border: `1px solid ${alpha(m.navy, 0.18)}`,
+                              px: 1.5,
+                              py: 1.2,
+                            }}
+                          >
                         <Stack
                           direction="row"
                           justifyContent="space-between"
@@ -2741,19 +2735,20 @@ export default function ClientBookingCreateView() {
                         >
                           <Typography
                             sx={{
-                              fontSize: 12,
-                              fontWeight: 600,
-                              color: alpha(m.navy, 0.48),
+                              fontSize: 16,
+                              fontWeight: 900,
+                              color: m.headingText,
+                              lineHeight: 1.2,
                             }}
                           >
                             Total
                           </Typography>
                           <Typography
                             sx={{
-                              fontSize: 12.5,
-                              fontWeight: 700,
-                              color: alpha(m.navy, 0.55),
-                              lineHeight: 1.1,
+                              fontSize: 18,
+                              fontWeight: 900,
+                              color: m.headingText,
+                              lineHeight: 1.2,
                             }}
                           >
                             €{total}

@@ -344,7 +344,54 @@ function weekdaySortIndex(day: string | undefined): number {
   return idx >= 0 ? idx : WEEKDAY_ORDER.length;
 }
 
-function formatHoursLabel(entry: PublicBusinessHoursEntry): string {
+type IndexedHoursEntry = {
+  entry: PublicBusinessHoursEntry;
+  index: number;
+};
+
+type HoursDropdownOption = {
+  label: string;
+  value: string;
+  color?: string;
+  sourceIds: string[];
+};
+
+function hoursOptionId(entry: PublicBusinessHoursEntry, index: number): string {
+  return `${entry.location}-${entry.day}-${entry.dateFrom}-${entry.dateTo}-${entry.startTime}-${entry.endTime}-${index}`;
+}
+
+function hoursEntriesKey(entries: PublicBusinessHoursEntry[]): string {
+  return entries.map((entry, index) => hoursOptionId(entry, index)).join("|");
+}
+
+function formatWeekdaySpan(days: readonly string[]): string {
+  const ordered = WEEKDAY_ORDER.filter((day) => days.includes(day));
+  if (!ordered.length || ordered.length === WEEKDAY_ORDER.length) return "";
+
+  const spans: string[] = [];
+  let start = 0;
+  for (let i = 1; i <= ordered.length; i += 1) {
+    const prev = WEEKDAY_ORDER.indexOf(ordered[i - 1]);
+    const current =
+      i < ordered.length ? WEEKDAY_ORDER.indexOf(ordered[i]) : Number.NaN;
+    if (current !== prev + 1) {
+      spans.push(
+        start === i - 1
+          ? ordered[start]
+          : `${ordered[start]} – ${ordered[i - 1]}`,
+      );
+      start = i;
+    }
+  }
+  return spans.join(", ");
+}
+
+function formatHoursTimeSpan(entry: PublicBusinessHoursEntry): {
+  start: string;
+  end: string;
+  dateSpan: string;
+  fromLabel: string;
+} {
   const start = entry.startTime || "--:--";
   const end = entry.endTime || "--:--";
   const fromLabel = formatDisplayDate(entry.dateFrom);
@@ -353,8 +400,12 @@ function formatHoursLabel(entry: PublicBusinessHoursEntry): string {
     fromLabel && toLabel && fromLabel !== toLabel
       ? `${fromLabel} – ${toLabel}`
       : fromLabel;
+  return { start, end, dateSpan, fromLabel };
+}
 
-  // Off / not available — show specific date when present (pinned to top separately).
+function formatHoursLabel(entry: PublicBusinessHoursEntry): string {
+  const { start, end, dateSpan, fromLabel } = formatHoursTimeSpan(entry);
+
   if (entry.notAvailable) {
     if (dateSpan) {
       const dayPrefix = entry.day ? `${entry.day} ` : "";
@@ -363,109 +414,239 @@ function formatHoursLabel(entry: PublicBusinessHoursEntry): string {
     return `${entry.day || "Day"} (Not available)`;
   }
 
-  // Specific day override inside a range — show that date + changed time.
   if (isSingleDateEntry(entry)) {
     const dayPrefix = entry.day ? `${entry.day} ` : "";
     return `${dayPrefix}${fromLabel} (${start} - ${end})`;
   }
 
-  // Date range schedule — weekday + start/end dates + time.
   if (isRangeEntry(entry)) {
     const day = entry.day || "Every day";
     return `${day} ${dateSpan} (${start} - ${end})`;
   }
 
-  // Legacy weekday-only rows.
   return `${entry.day || "Today"} (${start} - ${end})`;
 }
 
-function hoursOptionId(entry: PublicBusinessHoursEntry, index: number): string {
-  return `${entry.location}-${entry.day}-${entry.dateFrom}-${entry.dateTo}-${entry.startTime}-${entry.endTime}-${index}`;
+function formatGroupedHoursLabel(
+  days: readonly string[],
+  entry: PublicBusinessHoursEntry,
+): string {
+  const { start, end, dateSpan } = formatHoursTimeSpan(entry);
+  const daySpan = formatWeekdaySpan(days);
+  const prefix = daySpan ? `${daySpan} ` : "";
+
+  if (isRangeEntry(entry) && dateSpan) {
+    return `${prefix}${dateSpan} (${start} - ${end})`.trim();
+  }
+
+  if (dateSpan) {
+    return `${prefix}${dateSpan} (${start} - ${end})`.trim();
+  }
+
+  return `${daySpan || entry.day || "Today"} (${start} - ${end})`;
+}
+
+function latestByKey(items: IndexedHoursEntry[]): IndexedHoursEntry[] {
+  const latest = new Map<string, IndexedHoursEntry>();
+  for (const item of items) {
+    const key = item.entry.dateFrom
+      ? `${item.entry.dateFrom}|${item.entry.dateTo || item.entry.dateFrom}`
+      : `${item.entry.day}|${item.index}`;
+    latest.set(key, item);
+  }
+  return [...latest.values()].sort((a, b) =>
+    String(b.entry.dateFrom || "").localeCompare(String(a.entry.dateFrom || "")),
+  );
+}
+
+function groupIdenticalWeekRows(
+  weekRows: IndexedHoursEntry[],
+): Array<{ days: string[]; item: IndexedHoursEntry; sourceIds: string[] }> {
+  const groups: Array<{
+    days: string[];
+    item: IndexedHoursEntry;
+    sourceIds: string[];
+  }> = [];
+  const groupIndex = new Map<string, number>();
+
+  for (const item of weekRows) {
+    const day = item.entry.day || "";
+    const key = [
+      item.entry.dateFrom,
+      item.entry.dateTo,
+      item.entry.startTime,
+      item.entry.endTime,
+    ].join("|");
+    const existing = groupIndex.get(key);
+    const sourceId = hoursOptionId(item.entry, item.index);
+    if (existing != null) {
+      if (day && !groups[existing].days.includes(day)) {
+        groups[existing].days.push(day);
+      }
+      groups[existing].sourceIds.push(sourceId);
+      continue;
+    }
+    groupIndex.set(key, groups.length);
+    groups.push({
+      days: day ? [day] : [],
+      item,
+      sourceIds: [sourceId],
+    });
+  }
+
+  return groups;
 }
 
 function buildHoursDropdownOptions(
   entries: PublicBusinessHoursEntry[],
   colors: { override: string; notAvailable: string },
-) {
+): HoursDropdownOption[] {
   if (!entries.length) {
-    return [{ label: "No hours set yet", value: "empty" }];
+    return [{ label: "No hours set yet", value: "empty", sourceIds: [] }];
   }
 
   const indexed = entries.map((entry, index) => ({ entry, index }));
-  const notAvailable = indexed.filter((item) => item.entry.notAvailable);
-  const singleDayOverrides = indexed.filter(
-    (item) => !item.entry.notAvailable && isSingleDateEntry(item.entry),
+  const notAvailable = latestByKey(
+    indexed.filter((item) => item.entry.notAvailable),
+  );
+  const singleDayOverrides = latestByKey(
+    indexed.filter(
+      (item) => !item.entry.notAvailable && isSingleDateEntry(item.entry),
+    ),
   );
   const rangeOrWeek = indexed.filter(
     (item) => !item.entry.notAvailable && !isSingleDateEntry(item.entry),
   );
 
-  // Days already shown prominently at the top should not repeat in the week list.
   const prominentDays = new Set<string>();
   for (const item of [...notAvailable, ...singleDayOverrides]) {
     if (item.entry.day) prominentDays.add(item.entry.day);
   }
 
-  // One clean week row per weekday (latest wins). Prefer dated ranges over legacy.
-  const uniqueWeek = new Map<string, (typeof indexed)[number]>();
+  const uniqueWeek = new Map<string, IndexedHoursEntry>();
   for (const item of rangeOrWeek) {
     const day = item.entry.day || "all";
     if (day !== "all" && prominentDays.has(day)) continue;
+    const spanKey = `${day}|${item.entry.dateFrom}|${item.entry.dateTo}`;
 
-    const existing = uniqueWeek.get(day);
+    const existing = uniqueWeek.get(spanKey);
     if (!existing) {
-      uniqueWeek.set(day, item);
+      uniqueWeek.set(spanKey, item);
       continue;
     }
-    // Prefer a real date-range row over a legacy day-only row.
     const existingIsRange = isRangeEntry(existing.entry);
     const nextIsRange = isRangeEntry(item.entry);
     if (nextIsRange || !existingIsRange) {
-      uniqueWeek.set(day, item);
+      uniqueWeek.set(spanKey, item);
     }
   }
 
-  const weekRows = [...uniqueWeek.values()].sort(
-    (a, b) =>
-      weekdaySortIndex(a.entry.day) - weekdaySortIndex(b.entry.day),
+  const datedDays = new Set<string>();
+  for (const item of uniqueWeek.values()) {
+    if (isRangeEntry(item.entry) && item.entry.day) {
+      datedDays.add(item.entry.day);
+    }
+  }
+
+  const weekRows = [...uniqueWeek.values()]
+    .filter((item) => {
+      if (isRangeEntry(item.entry) || !item.entry.day) return true;
+      return !datedDays.has(item.entry.day);
+    })
+    .sort((a, b) => {
+      const dateCmp = String(b.entry.dateFrom || "").localeCompare(
+        String(a.entry.dateFrom || ""),
+      );
+      if (dateCmp !== 0) return dateCmp;
+      return weekdaySortIndex(a.entry.day) - weekdaySortIndex(b.entry.day);
+    });
+  const weekGroups = groupIdenticalWeekRows(weekRows);
+  for (const group of weekGroups) {
+    const key = [
+      group.item.entry.dateFrom,
+      group.item.entry.dateTo,
+      group.item.entry.startTime,
+      group.item.entry.endTime,
+    ].join("|");
+    for (const item of rangeOrWeek) {
+      const itemKey = [
+        item.entry.dateFrom,
+        item.entry.dateTo,
+        item.entry.startTime,
+        item.entry.endTime,
+      ].join("|");
+      if (itemKey !== key) continue;
+      const id = hoursOptionId(item.entry, item.index);
+      if (!group.sourceIds.includes(id)) group.sourceIds.push(id);
+    }
+  }
+
+  const options: HoursDropdownOption[] = [
+    ...notAvailable.map((item) => ({
+      label: formatHoursLabel(item.entry),
+      value: hoursOptionId(item.entry, item.index),
+      color: colors.notAvailable,
+      sourceIds: [hoursOptionId(item.entry, item.index)],
+    })),
+    ...singleDayOverrides.map((item) => ({
+      label: formatHoursLabel(item.entry),
+      value: hoursOptionId(item.entry, item.index),
+      color: colors.override,
+      sourceIds: [hoursOptionId(item.entry, item.index)],
+    })),
+    ...weekGroups.map((group) => ({
+      label: formatGroupedHoursLabel(group.days, group.item.entry),
+      value: `group-${group.sourceIds[0]}`,
+      sourceIds: group.sourceIds,
+    })),
+  ];
+
+  return options;
+}
+
+function pickLatestHoursOption(
+  entries: PublicBusinessHoursEntry[],
+  options: HoursDropdownOption[],
+): string {
+  if (!entries.length || !options.length) return options[0]?.value ?? "empty";
+  const last = entries[entries.length - 1];
+  const lastId = hoursOptionId(last, entries.length - 1);
+  return (
+    options.find((option) => option.sourceIds.includes(lastId))?.value ??
+    options[0].value
   );
-
-  // Image-2 layout: changed/off days first (prominent), then the rest of the week.
-  const ordered = [...notAvailable, ...singleDayOverrides, ...weekRows];
-
-  return ordered.map(({ entry, index }) => ({
-    label: formatHoursLabel(entry),
-    value: hoursOptionId(entry, index),
-    color: entry.notAvailable
-      ? colors.notAvailable
-      : isSingleDateEntry(entry)
-        ? colors.override
-        : undefined,
-  }));
 }
 
 function LocationHoursBlock({
   title,
   scheduleLabel,
   entries,
-  selectedId,
-  onSelectedIdChange,
   showInfo,
 }: {
   title: string;
   scheduleLabel: string;
   entries: PublicBusinessHoursEntry[];
-  selectedId: string;
-  onSelectedIdChange: (id: string) => void;
   showInfo?: boolean;
 }) {
   const m = useTheme().palette.mollure;
   const options = buildHoursDropdownOptions(entries, {
-    // Requested / changed-day accent (orange).
     override: m.requestAccent,
-    // Delete / blocked accent (red).
     notAvailable: m.blockedTimeFg,
   });
+  const entriesKey = hoursEntriesKey(entries);
+  const [selectedId, setSelectedId] = React.useState(() =>
+    pickLatestHoursOption(entries, options),
+  );
+
+  React.useEffect(() => {
+    setSelectedId(pickLatestHoursOption(entries, options));
+    // Re-select whenever the professional saves new hours, not on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entriesKey]);
+
+  const dropdownValue = options.some((option) => option.value === selectedId)
+    ? selectedId
+    : options[0]?.value || "empty";
 
   return (
     <Box
@@ -509,8 +690,8 @@ function LocationHoursBlock({
         </Stack>
         <Box sx={{ flex: 1, minWidth: 220 }}>
           <AppDropdown
-            value={selectedId || options[0]?.value || "empty"}
-            onChange={(val) => onSelectedIdChange(String(val))}
+            value={dropdownValue}
+            onChange={(val) => setSelectedId(String(val))}
             options={options}
             fullWidth
             size="small"
@@ -592,8 +773,6 @@ export default function CalendarHoursRulesPanel({
   const [selectedCategory, setSelectedCategory] = React.useState<string | null>(
     null,
   );
-  const [flHoursId, setFlHoursId] = React.useState("");
-  const [dlHoursId, setDlHoursId] = React.useState("");
 
   const hoursEntries = React.useMemo(
     () => (Array.isArray(publicBusinessHours) ? publicBusinessHours : []),
@@ -607,22 +786,6 @@ export default function CalendarHoursRulesPanel({
     () => hoursEntries.filter((entry) => entry.location === "DL"),
     [hoursEntries],
   );
-
-  React.useEffect(() => {
-    if (flEntries.length && !flHoursId) {
-      setFlHoursId(
-        hoursOptionId(flEntries[flEntries.length - 1], flEntries.length - 1),
-      );
-    }
-  }, [flEntries, flHoursId]);
-
-  React.useEffect(() => {
-    if (dlEntries.length && !dlHoursId) {
-      setDlHoursId(
-        hoursOptionId(dlEntries[dlEntries.length - 1], dlEntries.length - 1),
-      );
-    }
-  }, [dlEntries, dlHoursId]);
 
   const categories = React.useMemo(
     () => dedupeServiceOrderSettings(serviceOrder).categories,
@@ -758,8 +921,6 @@ export default function CalendarHoursRulesPanel({
                 title="Fixed Location"
                 scheduleLabel="Fixed Schedule"
                 entries={flEntries}
-                selectedId={flHoursId}
-                onSelectedIdChange={setFlHoursId}
               />
             ) : null}
             {showDl ? (
@@ -767,8 +928,6 @@ export default function CalendarHoursRulesPanel({
                 title="Desired Location"
                 scheduleLabel="Variable Schedule"
                 entries={dlEntries}
-                selectedId={dlHoursId}
-                onSelectedIdChange={setDlHoursId}
                 showInfo
               />
             ) : null}

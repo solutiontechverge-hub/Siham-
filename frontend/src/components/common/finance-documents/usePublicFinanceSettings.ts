@@ -10,7 +10,6 @@ import {
   type FinanceInvoiceSettings,
 } from "./useFinanceInvoiceSettings";
 import {
-  defaultFinanceTransactionOptions,
   type FinanceTransactionOptions,
 } from "./useFinanceTransactionOptions";
 
@@ -26,7 +25,13 @@ export function usePublicFinanceSettings(businessSetupId: string | undefined) {
   );
 
   const transactionOptions = React.useMemo<FinanceTransactionOptions>(
-    () => txResponse?.data ?? defaultFinanceTransactionOptions,
+    () =>
+      txResponse?.data ?? {
+        onlineImmediate: false,
+        onlineInvoiceDueDate: false,
+        offlineImmediate: false,
+        offlineInvoiceDueDate: false,
+      },
     [txResponse?.data],
   );
 

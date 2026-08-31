@@ -131,15 +131,23 @@ const loadProfessionalEmailContext = async (bookingId) => {
        b.status,
        pu.email AS professional_email,
        COALESCE(
-         NULLIF(TRIM(COALESCE(ip.display_name, ip.first_name || ' ' || ip.last_name)), ''),
-         pu.email
+         CASE
+           WHEN cu.user_type = 'company' THEN NULLIF(TRIM(cp.legal_name), '')
+           ELSE NULLIF(TRIM(CONCAT_WS(' ', cu_ip.first_name, cu_ip.last_name)), '')
+         END,
+         NULLIF(TRIM(cu_ip.display_name), ''),
+         NULLIF(TRIM(cp.legal_name), ''),
+         NULLIF(TRIM(CONCAT_WS(' ', cp.contact_first_name, cp.contact_last_name)), ''),
+         cu.email,
+         'Client'
        ) AS client_name
      FROM bookings b
      INNER JOIN business_setups bs ON bs.id = b.business_setup_id
      INNER JOIN professional_profiles pp ON pp.id = bs.professional_profile_id
      INNER JOIN users pu ON pu.id = pp.user_id
      LEFT JOIN users cu ON cu.id = b.customer_id
-     LEFT JOIN individual_profiles ip ON ip.user_id = cu.id
+     LEFT JOIN individual_profiles cu_ip ON cu_ip.user_id = cu.id
+     LEFT JOIN company_profiles cp ON cp.user_id = cu.id
      WHERE b.id = $1
      LIMIT 1`,
     [bookingId],

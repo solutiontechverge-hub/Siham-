@@ -16,6 +16,8 @@ export type BookingPriceInput = {
   prepaymentPercent?: number | string;
   /** When true, prepaid amount is deducted from the payable total. */
   prepaymentPaid?: boolean;
+  /** Offline prepayment is collected at the visit — do not deduct it from remaining. */
+  prepaymentOffline?: boolean;
 };
 
 export type BookingPriceBreakdown = {
@@ -68,8 +70,35 @@ export type BookingPriceProduct = {
   quantity?: number;
 };
 
-function isUniqueItemId(id?: string | null): boolean {
+export function isUniqueItemId(id?: string | null): boolean {
   return Boolean(id && String(id).startsWith("unique-"));
+}
+
+export function partitionBookingProducts<T extends { id?: string | null }>(
+  items: readonly T[] | null | undefined,
+): { products: T[]; uniqueItems: T[] } {
+  const products: T[] = [];
+  const uniqueItems: T[] = [];
+  for (const item of items ?? []) {
+    if (isUniqueItemId(item.id)) uniqueItems.push(item);
+    else products.push(item);
+  }
+  return { products, uniqueItems };
+}
+
+const ITEMIZED_SUMMARY_LABELS = new Set([
+  "Services",
+  "Guests / Models",
+  "Add-ons",
+  "Products",
+  "Unique items",
+]);
+
+/** Keep extras/fees/discount after services, products, and unique items are listed as cards. */
+export function withoutItemizedBookingSummaryLines(
+  lines: readonly BookingPriceSummaryLine[],
+): BookingPriceSummaryLine[] {
+  return lines.filter((line) => !ITEMIZED_SUMMARY_LABELS.has(line.label));
 }
 
 function isRequesterPerson(person: BookingPricePerson): boolean {
@@ -248,6 +277,7 @@ export function summarizeClientBookingPrice(input: ClientBookingPriceInput) {
     showPrepayment: input.showPrepayment,
     prepaymentPercent: input.prepaymentPercent,
     prepaymentPaid: input.prepaymentPaid,
+    prepaymentOffline: input.prepaymentOffline,
   });
   const lines = buildBookingPriceSummaryLines({
     ...split,
@@ -313,11 +343,15 @@ export function computeBookingPrice(
     ? percentOf(afterDiscount, input.prepaymentPercent)
     : 0;
   const prepaidApplied =
-    input.prepaymentPaid && prepaymentAmount > 0 ? prepaymentAmount : 0;
+    input.prepaymentPaid && !input.prepaymentOffline && prepaymentAmount > 0
+      ? prepaymentAmount
+      : 0;
 
   const payableTotal = roundMoney(Math.max(0, bookingTotal - prepaidApplied));
   const remainingAfterPrepayment = roundMoney(
-    Math.max(0, bookingTotal - prepaymentAmount),
+    input.prepaymentOffline
+      ? bookingTotal
+      : Math.max(0, bookingTotal - prepaymentAmount),
   );
 
   return {

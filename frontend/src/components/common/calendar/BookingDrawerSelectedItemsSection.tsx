@@ -293,7 +293,7 @@ export default function BookingDrawerSelectedItemsSection({
           <BodyText
             sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.72) }}
           >
-            Unique Item
+            Unique item
           </BodyText>
           {uniqueItems.map((item) => {
             const editTag = resolveProductEditTag?.(item.id) ?? null;

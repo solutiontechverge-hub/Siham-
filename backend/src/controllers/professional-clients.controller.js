@@ -1,6 +1,10 @@
 import { query } from "../db/index.js";
 import { parseUuid } from "../utils/uuid.js";
 import {
+  refreshProfessionalClientSalesStats,
+  syncProfessionalClientsFromConfirmedBookings,
+} from "../services/professional-clients.service.js";
+import {
   listResponse,
   paginateItems,
   parseListPagination,
@@ -19,7 +23,12 @@ const getProfessionalProfile = async (userId) => {
 const formatEuro = (value) => {
   const n = Number(value);
   if (!Number.isFinite(n)) return "€0";
-  return `€${n.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+  const rounded = Math.round(n * 100) / 100;
+  const hasCents = Math.abs(rounded - Math.round(rounded)) >= 0.005;
+  return `€${rounded.toLocaleString("en-US", {
+    minimumFractionDigits: hasCents ? 2 : 0,
+    maximumFractionDigits: 2,
+  })}`;
 };
 
 const formatDmy = (value) => {
@@ -91,6 +100,18 @@ export const listProfessionalClients = async (req, res) => {
     const profile = await getProfessionalProfile(req.user.id);
     if (!profile) {
       return res.status(404).json({ success: false, message: "Professional profile not found.", data: null });
+    }
+
+    try {
+      await syncProfessionalClientsFromConfirmedBookings(profile.id);
+    } catch {
+      // list should still return existing rows if backfill fails
+    }
+
+    try {
+      await refreshProfessionalClientSalesStats(profile.id);
+    } catch {
+      // stored totals may be stale; list still returns client rows
     }
 
     const pagination = parseListPagination(req.query);

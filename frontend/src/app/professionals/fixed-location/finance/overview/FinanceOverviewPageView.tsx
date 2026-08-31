@@ -9,6 +9,7 @@ import RefundSalesDrawer from "../../../../../components/sections/finance/Refund
 import TransactionNoteModal from "../../../../../components/sections/finance/TransactionNoteModal";
 import FinanceFiltersDrawerView from "../../../../../components/sections/finance/FinanceFiltersDrawerView";
 import FinanceDocumentPreviewDrawer from "../../../../../components/sections/finance/FinanceDocumentPreviewDrawer";
+import { useProfessionalBusinessOverride } from "../../../../../components/common/finance-documents";
 import TransactionsHeader from "../../../../../components/sections/finance/TransactionsHeader";
 import TransactionsTable from "../../../../../components/sections/finance/TransactionsTable";
 import TransactionsToolbar from "../../../../../components/sections/finance/TransactionsToolbar";
@@ -81,6 +82,7 @@ export default function FinanceOverviewPageView() {
     openActionExportMenu,
     openManualEntryDrawer,
   } = useFinanceOverviewPage();
+  const professionalBusinessOverride = useProfessionalBusinessOverride();
 
   return (
     <Paper
@@ -281,6 +283,7 @@ export default function FinanceOverviewPageView() {
         settings={settings}
         row={activeDocument?.row ?? null}
         profileData={profileResponse?.data ?? null}
+        professionalBusinessOverride={professionalBusinessOverride}
       />
 
       <CancelPendingPaymentModal

@@ -8,6 +8,7 @@ import StoreProvider from "../store/provider";
 import MessagingWidgetHost from "../components/common/messaging/MessagingWidgetHost";
 import MessagingRealtimeBridge from "../components/common/messaging/MessagingRealtimeBridge";
 import NotificationsRealtimeBridge from "../components/common/NotificationsRealtimeBridge";
+import BusinessRealtimeBridge from "../components/common/BusinessRealtimeBridge";
 import { MessagingWidgetProvider } from "../components/common/messaging/MessagingWidgetContext";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
@@ -18,6 +19,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
           {children}
           <MessagingRealtimeBridge />
           <NotificationsRealtimeBridge />
+          <BusinessRealtimeBridge />
           <MessagingWidgetHost />
         </MessagingWidgetProvider>
       </ThemeRegistry>

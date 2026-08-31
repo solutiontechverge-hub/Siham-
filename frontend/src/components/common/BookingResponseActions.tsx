@@ -10,6 +10,8 @@ type Props = {
   onAccept: () => void;
   onSuggestChange: () => void;
   onReject: () => void;
+  /** Hide Accept until online prepayment is completed. */
+  showAccept?: boolean;
 };
 
 const ACTION_SX = {
@@ -25,6 +27,7 @@ export default function BookingResponseActions({
   onAccept,
   onSuggestChange,
   onReject,
+  showAccept = true,
 }: Props) {
   const m = useTheme().palette.mollure;
 
@@ -51,6 +54,7 @@ export default function BookingResponseActions({
         </Typography>
       </Box>
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1.15}>
+        {showAccept ? (
         <AppButton
           fullWidth
           variant="contained"
@@ -66,6 +70,7 @@ export default function BookingResponseActions({
         >
           Accept
         </AppButton>
+        ) : null}
         <AppButton
           tone="secondary"
           fullWidth

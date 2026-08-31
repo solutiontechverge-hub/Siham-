@@ -56,12 +56,22 @@ import { buildBookingSummarySections, resolveTeamMemberFirstName } from "./build
 import { locationModeChipSx } from "./locationModeChipSx";
 import BookingSummaryNote from "./BookingSummaryNote";
 import BookingTotalPriceCard from "../calendar/BookingTotalPriceCard";
-import { summarizeClientBookingPrice } from "../calendar/bookingTotal";
+import {
+  partitionBookingProducts,
+  summarizeClientBookingPrice,
+  withoutItemizedBookingSummaryLines,
+} from "../calendar/bookingTotal";
 import {
   parseCalendarEntryNotes,
   resolveKilometerAllowanceAmount,
 } from "../calendar/bookingEventDetails";
 import BookingLineAmount from "../calendar/BookingLineAmount";
+import { usePublicFinanceSettings } from "../finance-documents/usePublicFinanceSettings";
+import {
+  checkoutPaymentMethodSupportsPayNow,
+  isOfflinePaymentMethod,
+  resolveCheckoutPaymentOptions,
+} from "./checkoutPaymentOptions";
 import {
   clientLineDiscountLabel,
 } from "../../../data/bookingLinePricing";
@@ -108,6 +118,20 @@ export default function ClientBookingCreateSummaryView() {
 
   const locationMode = shop?.locationMode ?? "fixed";
   const isDesired = locationMode === "desired";
+  const { transactionOptions } = usePublicFinanceSettings(shop?.shopId);
+  const checkoutPaymentOptions = React.useMemo(
+    () =>
+      resolveCheckoutPaymentOptions(
+        transactionOptions,
+        locationMode,
+        parseCalendarEntryNotes(activeBooking?.notes)?.paymentMethod,
+      ),
+    [activeBooking?.notes, locationMode, transactionOptions],
+  );
+  const checkoutMethodId = checkoutPaymentOptions[0]?.id ?? "onlineDirect";
+  const isOfflinePay =
+    checkoutPaymentOptions.length > 0 &&
+    checkoutPaymentOptions.every((option) => isOfflinePaymentMethod(option.id));
   const bookingSetup = React.useMemo(
     () =>
       businessSetupsData?.data?.find((row) => row.id === shop?.shopId) ?? null,
@@ -215,9 +239,16 @@ export default function ClientBookingCreateSummaryView() {
     return (
       shop?.addressLabel?.trim() ||
       shop?.municipalityLabel?.trim() ||
+      businessProfile?.fixedLocation?.formattedAddress?.trim() ||
       "Studio location"
     );
-  }, [address, isDesired, shop?.addressLabel, shop?.municipalityLabel]);
+  }, [
+    address,
+    businessProfile?.fixedLocation?.formattedAddress,
+    isDesired,
+    shop?.addressLabel,
+    shop?.municipalityLabel,
+  ]);
 
   const total = draft?.total ?? 0;
   const bookingNotesMeta = React.useMemo(
@@ -242,7 +273,12 @@ export default function ClientBookingCreateSummaryView() {
       ? Number(activeBooking?.prepaymentPercent)
       : profilePrepaymentPercent;
   const isPrepaymentPaid = Boolean(activeBooking?.prepaid);
-  const mustPayBeforeBooking = requiresPrepayment && !isPrepaymentPaid;
+  const mustPayBeforeBooking =
+    !isDesired &&
+    requiresPrepayment &&
+    !isPrepaymentPaid &&
+    !isOfflinePay &&
+    checkoutPaymentMethodSupportsPayNow(checkoutMethodId);
   const showFixedPrepayRow =
     !isDesired && requiresPrepayment && prepaymentPercent > 0;
   const showDesiredPrepayNote =
@@ -261,7 +297,17 @@ export default function ClientBookingCreateSummaryView() {
       (showFixedPrepayRow || showDesiredPrepayNote) && prepaymentPercent > 0,
     prepaymentPercent,
     prepaymentPaid: isPrepaymentPaid,
+    prepaymentOffline: isOfflinePay,
   });
+  const checkoutLines = withoutItemizedBookingSummaryLines(checkoutPrice.lines);
+  const { products: catalogProducts, uniqueItems: catalogUniqueItems } =
+    partitionBookingProducts(draft?.products);
+  const catalogHeadingSx = {
+    fontWeight: 800,
+    fontSize: 12,
+    color: alpha(m.navy, 0.55),
+    mb: 1,
+  } as const;
   const checkoutTotal =
     checkoutPrice.breakdown.bookingTotal > 0
       ? checkoutPrice.breakdown.bookingTotal
@@ -496,14 +542,12 @@ export default function ClientBookingCreateSummaryView() {
 
     setIsPaying(true);
     try {
-      const record = await ensureBookingCreated();
-      if (!record) return;
-      setStripeDialogOpen(true);
+      await completePrepayment();
     } finally {
       setIsPaying(false);
     }
   }, [
-    ensureBookingCreated,
+    completePrepayment,
     isPaying,
     isPrepaymentPaid,
     prepayAmount,
@@ -809,6 +853,9 @@ export default function ClientBookingCreateSummaryView() {
           <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
 
           <Box sx={{ px: { xs: 2, md: 2.5 }, py: 1.75 }}>
+            {summarySections.length > 0 ? (
+              <Typography sx={catalogHeadingSx}>Service</Typography>
+            ) : null}
             <Stack spacing={1.5} divider={<Divider sx={{ borderColor: alpha(m.navy, 0.08) }} />}>
               {summarySections.map((section) => {
                 const roleLabel = roleLabelForSection(section);
@@ -1004,6 +1051,96 @@ export default function ClientBookingCreateSummaryView() {
                 );
               })}
             </Stack>
+            {catalogProducts.length > 0 ? (
+              <Box sx={{ mt: 2 }}>
+                <Typography sx={catalogHeadingSx}>Product</Typography>
+                <Stack spacing={1}>
+                  {catalogProducts.map((product) => (
+                    <Box
+                      key={product.id}
+                      sx={{
+                        borderRadius: "10px",
+                        border: `1px solid ${alpha(m.navy, 0.06)}`,
+                        px: 1.25,
+                        py: 1,
+                        bgcolor: alpha(m.navy, 0.015),
+                      }}
+                    >
+                      <Stack
+                        direction="row"
+                        alignItems="center"
+                        justifyContent="space-between"
+                        spacing={1}
+                      >
+                        <Typography
+                          sx={{
+                            fontSize: 13,
+                            fontWeight: 900,
+                            color: alpha(m.navy, 0.82),
+                            lineHeight: 1.2,
+                            minWidth: 0,
+                          }}
+                        >
+                          {product.quantity > 1
+                            ? `${product.name} ×${product.quantity}`
+                            : product.name}
+                        </Typography>
+                        <BookingLineAmount
+                          amount={product.price}
+                          originalAmount={product.originalPrice}
+                          discountLabel={clientLineDiscountLabel(product)}
+                        />
+                      </Stack>
+                    </Box>
+                  ))}
+                </Stack>
+              </Box>
+            ) : null}
+            {catalogUniqueItems.length > 0 ? (
+              <Box sx={{ mt: 2 }}>
+                <Typography sx={catalogHeadingSx}>Unique item</Typography>
+                <Stack spacing={1}>
+                  {catalogUniqueItems.map((item) => (
+                    <Box
+                      key={item.id}
+                      sx={{
+                        borderRadius: "10px",
+                        border: `1px solid ${alpha(m.navy, 0.06)}`,
+                        px: 1.25,
+                        py: 1,
+                        bgcolor: alpha(m.navy, 0.015),
+                      }}
+                    >
+                      <Stack
+                        direction="row"
+                        alignItems="center"
+                        justifyContent="space-between"
+                        spacing={1}
+                      >
+                        <Typography
+                          sx={{
+                            fontSize: 13,
+                            fontWeight: 900,
+                            color: alpha(m.navy, 0.82),
+                            lineHeight: 1.2,
+                            minWidth: 0,
+                          }}
+                        >
+                          {item.quantity > 1
+                            ? `${item.name} ×${item.quantity}`
+                            : item.name}
+                        </Typography>
+                        <BookingLineAmount
+                          amount={item.price}
+                          originalAmount={item.originalPrice}
+                          discountLabel={clientLineDiscountLabel(item)}
+                        />
+                      </Stack>
+                    </Box>
+                  ))}
+                </Stack>
+              </Box>
+            ) : null}
             {draft?.clientNote?.trim() ? (
               <Box sx={{ mt: 1.5 }}>
                 <BookingSummaryNote note={draft.clientNote} />
@@ -1180,7 +1317,7 @@ export default function ClientBookingCreateSummaryView() {
               totalPrice={checkoutPrice.displayTotal}
               originalPrice={checkoutPrice.originalPrice}
               discountAmount={checkoutPrice.breakdown.discountAmount}
-              lines={checkoutPrice.lines}
+              lines={checkoutLines}
               prepaidPercent={
                 showFixedPrepayRow || showDesiredPrepayNote
                   ? prepaymentPercent
@@ -1195,7 +1332,7 @@ export default function ClientBookingCreateSummaryView() {
                   : undefined
               }
               prepaidAction={
-                showFixedPrepayRow && !isPrepaymentPaid ? (
+                showFixedPrepayRow && !isPrepaymentPaid && !isOfflinePay ? (
                   <Typography
                     component="button"
                     type="button"

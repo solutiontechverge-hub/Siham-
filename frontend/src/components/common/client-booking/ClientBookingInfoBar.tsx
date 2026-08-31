@@ -16,7 +16,7 @@ type Props = {
 
 export default function ClientBookingInfoBar({
   professionalName,
-  professionalRole = "Professional",
+  professionalRole,
   address,
   locationMode,
   phone,
@@ -27,30 +27,22 @@ export default function ClientBookingInfoBar({
 
   const colSx = {
     px: { xs: 0, md: 2.5 },
-    py: { xs: 1.5, md: 0 },
+    py: { xs: 1.35, md: 1.5 },
     borderRight: { xs: "none", md: `1px solid ${alpha(m.navy, 0.1)}` },
-    "&:last-of-type": { borderRight: "none" },
+    borderBottom: { xs: `1px solid ${alpha(m.navy, 0.08)}`, md: "none" },
+    "&:last-of-type": { borderRight: "none", borderBottom: "none" },
   };
 
   return (
-    <Box
-      sx={{
-        borderRadius: "10px",
-        border: `1px solid ${alpha(m.navy, 0.08)}`,
-        bgcolor: "#fff",
-        py: { xs: 1.5, md: 2 },
-        px: { xs: 2, md: 2.5 },
-        mb: 2,
-      }}
-    >
+    <Box sx={{ mb: 2 }}>
       <Grid container spacing={0}>
         <Grid item xs={12} md={4} sx={colSx}>
           <Typography
             sx={{
-              fontSize: 14,
+              fontSize: 13,
               fontWeight: 800,
-              color: alpha(m.navy, 0.5),
-              mb: 0.75,
+              color: alpha(m.navy, 0.48),
+              mb: 0.65,
             }}
           >
             Professional
@@ -58,23 +50,25 @@ export default function ClientBookingInfoBar({
           <Typography
             sx={{
               fontWeight: 900,
-              fontSize: 13,
-              color: alpha(m.navy, 0.85),
-              lineHeight: 1.2,
+              fontSize: 14,
+              color: alpha(m.navy, 0.88),
+              lineHeight: 1.25,
             }}
           >
             {professionalName}
           </Typography>
-          <Typography
-            sx={{
-              fontSize: 11.5,
-              fontWeight: 600,
-              color: alpha(m.navy, 0.48),
-              mt: 0.2,
-            }}
-          >
-            {professionalRole}
-          </Typography>
+          {professionalRole ? (
+            <Typography
+              sx={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: alpha(m.navy, 0.48),
+                mt: 0.2,
+              }}
+            >
+              {professionalRole}
+            </Typography>
+          ) : null}
         </Grid>
 
         <Grid item xs={12} md={4} sx={colSx}>
@@ -82,18 +76,14 @@ export default function ClientBookingInfoBar({
             direction="row"
             alignItems="center"
             spacing={0.75}
-            sx={{ mb: 0.75 }}
+            sx={{ mb: 0.65 }}
           >
             <Typography
-              sx={{ fontSize: 14, fontWeight: 800, color: alpha(m.navy, 0.5) }}
+              sx={{ fontSize: 13, fontWeight: 800, color: alpha(m.navy, 0.48) }}
             >
               Location
             </Typography>
-            <Chip
-              label={locationBadge}
-              size="small"
-              sx={locationModeChipSx}
-            />
+            <Chip label={locationBadge} size="small" sx={locationModeChipSx} />
           </Stack>
           <Box
             sx={{
@@ -117,16 +107,13 @@ export default function ClientBookingInfoBar({
               component="span"
               sx={{
                 fontWeight: 700,
-                fontSize: 11.5,
+                fontSize: 12,
                 color: alpha(m.navy, 0.62),
-                lineHeight: 1.2,
+                lineHeight: 1.25,
                 minWidth: 0,
               }}
             >
-              {address?.trim() ||
-                (locationMode === "desired"
-                  ? "Service at your location"
-                  : "Studio location")}
+              {address?.trim() || "—"}
             </Typography>
           </Box>
         </Grid>
@@ -134,10 +121,10 @@ export default function ClientBookingInfoBar({
         <Grid item xs={12} md={4} sx={colSx}>
           <Typography
             sx={{
-              fontSize: 14,
+              fontSize: 13,
               fontWeight: 800,
-              color: alpha(m.navy, 0.5),
-              mb: 0.75,
+              color: alpha(m.navy, 0.48),
+              mb: 0.65,
             }}
           >
             Contact number
@@ -153,7 +140,7 @@ export default function ClientBookingInfoBar({
                 color: alpha(m.navy, 0.62),
               }}
             >
-              {phone || "—"}
+              {phone?.trim() || "—"}
             </Typography>
           </Box>
         </Grid>

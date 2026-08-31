@@ -1,27 +1,26 @@
 "use client";
 
 import * as React from "react";
-import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
-import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
-import { Avatar, Box, Chip, Divider, Paper, Stack, Typography } from "@mui/material";
+import { Avatar, Box, Paper, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import {
-  fmtMinutesToTimeLabel,
   parseTimeLabelToMinutes,
   serviceTimeRangeLabel,
 } from "../../../app/clients/booking/booking-time";
 import { ServiceSummaryMetaLine } from "../ServiceSummaryMetaLine";
 import BookingEditedTag from "../calendar/BookingEditedTag";
-import BookingTotalPriceCard from "../calendar/BookingTotalPriceCard";
-import { summarizeClientBookingPrice } from "../calendar/bookingTotal";
+import BookingPriceBreakdown from "../booking-finance/BookingPriceBreakdown";
+import {
+  partitionBookingProducts,
+  summarizeClientBookingPrice,
+} from "../calendar/bookingTotal";
 import type { ManualEntryDiscount } from "../../sections/finance/manualEntry.data";
 import type { BookingEditTagVariant } from "../calendar/bookingRequestNegotiation";
 import {
   buildBookingSummarySections,
   resolveTeamMemberFirstName,
 } from "./buildBookingSummarySections";
-import { locationModeChipSx } from "./locationModeChipSx";
 import ProjectUploadThumb from "./ProjectUploadThumb";
 import type { BookingEditSuggestedProduct } from "./bookingEditRequest";
 import type { ClientBookingDraft, ClientBookingSummarySection } from "./types";
@@ -196,13 +195,14 @@ type Props = {
   products?: readonly BookingEditSuggestedProduct[];
   editedProductIds?: readonly string[];
   onPayNow?: () => void;
-  shopName?: string;
-  locationMode?: "fixed" | "desired";
-  addressLabel?: string;
+  /** Extra block under Total Price (payment summary, notes). */
+  footer?: React.ReactNode;
   /** Shown under Total Price when professional accepted the client's post-confirm EBR. */
   acceptedChangesNote?: OutcomeChangesNote | null;
   /** Shown under Total Price when professional rejected the client's post-confirm EBR. */
   rejectedChangesNote?: OutcomeChangesNote | null;
+  /** Offline prepayment is due at the visit — keep the total undeducted. */
+  prepaymentOffline?: boolean;
 };
 
 export default function ClientBookingPaymentDetailsCard({
@@ -227,11 +227,10 @@ export default function ClientBookingPaymentDetailsCard({
   products = [],
   editedProductIds = [],
   onPayNow,
-  shopName,
-  locationMode = "fixed",
-  addressLabel,
+  footer,
   acceptedChangesNote = null,
   rejectedChangesNote = null,
+  prepaymentOffline = false,
 }: Props) {
   const m = useTheme().palette.mollure;
   const sections = React.useMemo(
@@ -243,20 +242,6 @@ export default function ClientBookingPaymentDetailsCard({
       draft?.selectedTime ? parseTimeLabelToMinutes(draft.selectedTime) : 0,
     [draft?.selectedTime],
   );
-  const bookingEndMinutes =
-    bookingStartMinutes +
-    (draft?.services ?? []).reduce((sum, s) => sum + s.durationMins, 0);
-  const dateLabel = React.useMemo(() => {
-    if (!draft?.selectedDateISO) return "";
-    const dt = new Date(`${draft.selectedDateISO}T00:00:00`);
-    if (Number.isNaN(dt.getTime())) return draft.selectedDateISO;
-    return dt.toLocaleDateString("en-US", {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  }, [draft?.selectedDateISO]);
   const editedServiceIdSet = React.useMemo(
     () => new Set(editedServiceIds),
     [editedServiceIds],
@@ -287,6 +272,8 @@ export default function ClientBookingPaymentDetailsCard({
   const listedProducts = products.length
     ? products
     : (draft?.products ?? []);
+  const { products: catalogProducts, uniqueItems: catalogUniqueItems } =
+    partitionBookingProducts(listedProducts);
   const extrasAmount =
     showKilometerAllowance && kilometerAllowanceAmount > 0
       ? kilometerAllowanceAmount
@@ -307,10 +294,16 @@ export default function ClientBookingPaymentDetailsCard({
     showPrepayment,
     prepaymentPercent,
     prepaymentPaid,
+    prepaymentOffline,
   });
   const prepaidAmount = priceSummary.breakdown.prepaymentAmount;
   const remaining = priceSummary.breakdown.remainingAfterPrepayment;
-  const priceSummaryLines = priceSummary.lines;
+  const catalogHeadingSx = {
+    fontWeight: 800,
+    fontSize: 12,
+    color: alpha(m.navy, 0.55),
+    mb: 1,
+  } as const;
 
   const requesterSections = sections.filter(
     (s) => s.isRequester || s.participantType === "requester",
@@ -447,6 +440,65 @@ export default function ClientBookingPaymentDetailsCard({
     );
   };
 
+  const renderCatalogItem = (
+    item: {
+      id: string;
+      name: string;
+      price: number;
+      quantity?: number;
+      originalPrice?: number;
+      discountType?: "fixed" | "percentage";
+      discountAmount?: number;
+      discountPct?: number;
+    },
+  ) => (
+    <Box
+      key={item.id}
+      sx={{
+        borderRadius: "10px",
+        border: `1px solid ${alpha(m.navy, 0.08)}`,
+        px: 1.5,
+        py: 1.15,
+        bgcolor: "#fff",
+      }}
+    >
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="center"
+        spacing={1.5}
+      >
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={0.75}
+          sx={{ minWidth: 0, flexWrap: "wrap" }}
+        >
+          <Typography
+            sx={{
+              fontSize: 13,
+              fontWeight: 900,
+              color: alpha(m.navy, 0.82),
+              lineHeight: 1.2,
+            }}
+          >
+            {item.quantity && item.quantity > 1
+              ? `${item.name} ×${item.quantity}`
+              : item.name}
+          </Typography>
+          {editedProductIdSet.has(item.id) ? (
+            <BookingEditedTag variant="edited" />
+          ) : null}
+        </Stack>
+        <BookingLineAmount
+          amount={item.price}
+          originalAmount={item.originalPrice}
+          discountLabel={clientLineDiscountLabel(item)}
+        />
+      </Stack>
+    </Box>
+  );
+
   const renderPersonHeader = (name: string) => (
     <Stack
       direction="row"
@@ -482,11 +534,57 @@ export default function ClientBookingPaymentDetailsCard({
     py: 1.25,
   } as const;
 
+  const requesterSectionKey = clientServiceSections[0]?.key ?? "";
+
+  const catalogItemsForSection = (
+    items: typeof catalogProducts,
+    section: ClientBookingSummarySection,
+  ) => {
+    const isRequester = Boolean(
+      section.isRequester || section.participantType === "requester",
+    );
+    return items.filter((item) => {
+      const assigned = String(
+        (item as { guestId?: string | null }).guestId ?? "",
+      ).trim();
+      if (!assigned) return isRequester || section.key === requesterSectionKey;
+      return assigned === section.key;
+    });
+  };
+
+  const renderCatalogGroup = (
+    heading: string,
+    items: Array<{
+      id: string;
+      name: string;
+      price: number;
+      quantity?: number;
+      originalPrice?: number;
+      discountType?: "fixed" | "percentage";
+      discountAmount?: number;
+      discountPct?: number;
+    }>,
+  ) => {
+    if (!items.length) return null;
+    return (
+      <Box>
+        <Typography sx={catalogHeadingSx}>{heading}</Typography>
+        <Stack spacing={1}>
+          {items.map((item) => renderCatalogItem(item))}
+        </Stack>
+      </Box>
+    );
+  };
+
   const renderSectionBlock = (
     section: ClientBookingSummarySection,
     heading?: string,
     asPersonCard?: boolean,
-  ) => (
+  ) => {
+    const services = section.items;
+    const products = catalogItemsForSection(catalogProducts, section);
+    const uniqueItems = catalogItemsForSection(catalogUniqueItems, section);
+    return (
     <Box key={section.key} sx={asPersonCard ? nestedCardSx : undefined}>
       {asPersonCard
         ? renderPersonHeader(heading || section.title)
@@ -502,6 +600,7 @@ export default function ClientBookingPaymentDetailsCard({
           {heading}
         </Typography>
       ) : null}
+      <Stack spacing={1.5}>
       {section.planningItem ? (
         <Box
           sx={{
@@ -510,7 +609,6 @@ export default function ClientBookingPaymentDetailsCard({
             px: 1.5,
             py: 1.15,
             bgcolor: "#fff",
-            mb: section.items.length ? 1 : 0,
           }}
         >
           {section.planningItem.activity ? (
@@ -534,130 +632,43 @@ export default function ClientBookingPaymentDetailsCard({
           ) : null}
         </Box>
       ) : null}
-      {section.items.length ? (
-        <Stack spacing={1}>
-          {section.items.map((service) => renderService(service))}
-        </Stack>
+      {services.length ? (
+        <Box>
+          <Typography sx={catalogHeadingSx}>Service</Typography>
+          <Stack spacing={1}>
+            {services.map((service) => renderService(service))}
+          </Stack>
+        </Box>
       ) : null}
+      {renderCatalogGroup("Product", products)}
+      {renderCatalogGroup("Unique item", uniqueItems)}
+      </Stack>
     </Box>
-  );
+    );
+  };
 
   return (
     <Paper
       elevation={0}
       sx={{
         borderRadius: "12px",
-        border: `1px solid ${alpha(m.navy, 0.18)}`,
+        border: `1px solid ${alpha(m.navy, 0.1)}`,
         bgcolor: "#fff",
         overflow: "hidden",
       }}
     >
-      <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 2, pb: 1.25 }}>
+      <Box sx={{ p: 2, bgcolor: "#fff" }}>
         <Typography
           sx={{
             fontWeight: 700,
-            fontSize: "30px",
-            color: alpha(m.navy, 0.72),
-            textAlign: "center",
-            lineHeight: 1.2,
+            fontSize: 16,
+            color: alpha(m.navy, 0.82),
+            letterSpacing: "-0.01em",
+            mb: 1.35,
           }}
         >
-          Service Summary
+          Booking & Payment Details
         </Typography>
-      </Box>
-      <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
-
-      {shopName || addressLabel ? (
-        <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 1.35, pb: 1.5 }}>
-          {shopName ? (
-            <Typography
-              sx={{
-                fontWeight: 900,
-                fontSize: 18,
-                color: alpha(m.navy, 0.88),
-                lineHeight: 1.2,
-              }}
-            >
-              {shopName}
-            </Typography>
-          ) : null}
-          <Stack
-            direction="row"
-            alignItems="center"
-            justifyContent="space-between"
-            spacing={2}
-            sx={{ mt: 0.85 }}
-          >
-            {dateLabel ? (
-              <Stack
-                direction="row"
-                alignItems="center"
-                spacing={0.6}
-                sx={{ minWidth: 0, flexShrink: 0 }}
-              >
-                <AccessTimeRoundedIcon
-                  sx={{ fontSize: 16, color: m.teal, flexShrink: 0 }}
-                />
-                <Typography
-                  sx={{
-                    fontWeight: 800,
-                    color: alpha(m.teal, 0.95),
-                    fontSize: 12.5,
-                    whiteSpace: { xs: "normal", sm: "nowrap" },
-                  }}
-                >
-                  {dateLabel} ({fmtMinutesToTimeLabel(bookingStartMinutes)}-
-                  {fmtMinutesToTimeLabel(bookingEndMinutes)})
-                </Typography>
-              </Stack>
-            ) : null}
-            {addressLabel ? (
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 0.5,
-                  ml: "auto",
-                  maxWidth: { xs: "46%", sm: "50%" },
-                  flex: "0 1 auto",
-                  minWidth: 0,
-                }}
-              >
-                <LocationOnOutlinedIcon
-                  sx={{
-                    fontSize: 16,
-                    width: 16,
-                    height: 16,
-                    color: alpha(m.navy, 0.45),
-                    flexShrink: 0,
-                    display: "block",
-                  }}
-                />
-                <Typography
-                  component="span"
-                  sx={{
-                    fontWeight: 700,
-                    color: alpha(m.navy, 0.55),
-                    fontSize: 12,
-                    lineHeight: 1.2,
-                    minWidth: 0,
-                  }}
-                >
-                  {addressLabel}
-                </Typography>
-              </Box>
-            ) : null}
-          </Stack>
-          <Chip
-            label={locationMode === "desired" ? "Desired Location" : "Fixed Location"}
-            size="small"
-            sx={{ ...locationModeChipSx, mt: 0.75 }}
-          />
-        </Box>
-      ) : null}
-      <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
-
-      <Box sx={{ p: 2, bgcolor: "#fff" }}>
         <Stack
           direction="row"
           alignItems="center"
@@ -668,7 +679,7 @@ export default function ClientBookingPaymentDetailsCard({
             py: 1.1,
             borderRadius: "10px",
             border: `1px solid ${alpha(m.navy, 0.08)}`,
-            bgcolor: alpha(m.navy, 0.015),
+            bgcolor: "#fff",
           }}
         >
           <Avatar
@@ -784,9 +795,18 @@ export default function ClientBookingPaymentDetailsCard({
             ),
           )}
 
-          {guestSections.map((section) =>
-            renderSectionBlock(attachCancelled(section), section.title, true),
-          )}
+          {guestSections.map((section) => {
+            const guestTitle = section.title.trim();
+            const heading =
+              guestTitle.toLowerCase().startsWith("guest")
+                ? guestTitle
+                : `Guest: ${guestTitle}`;
+            return renderSectionBlock(
+              attachCancelled(section),
+              heading,
+              true,
+            );
+          })}
 
           {planningSections.map((section) =>
             renderSectionBlock(
@@ -796,84 +816,35 @@ export default function ClientBookingPaymentDetailsCard({
             ),
           )}
 
-          {products.length > 0 ? (
-            <Box>
-              <Typography
-                sx={{
-                  fontWeight: 800,
-                  fontSize: 12,
-                  color: alpha(m.navy, 0.55),
-                  mb: 1,
-                }}
-              >
-                Product
-              </Typography>
-              <Stack spacing={1}>
-                {products.map((product) => (
-                  <Box
-                    key={product.id}
-                    sx={{
-                      borderRadius: "10px",
-                      border: `1px solid ${alpha(m.navy, 0.08)}`,
-                      px: 1.5,
-                      py: 1.15,
-                      bgcolor: "#fff",
-                    }}
-                  >
-                    <Stack
-                      direction="row"
-                      justifyContent="space-between"
-                      alignItems="center"
-                      spacing={1.5}
-                    >
-                      <Stack
-                        direction="row"
-                        alignItems="center"
-                        spacing={0.75}
-                        sx={{ minWidth: 0, flexWrap: "wrap" }}
-                      >
-                        <Typography
-                          sx={{
-                            fontSize: 13,
-                            fontWeight: 900,
-                            color: alpha(m.navy, 0.82),
-                            lineHeight: 1.2,
-                          }}
-                        >
-                          {product.quantity > 1
-                            ? `${product.name} ×${product.quantity}`
-                            : product.name}
-                        </Typography>
-                        {editedProductIdSet.has(product.id) ? (
-                          <BookingEditedTag variant="edited" />
-                        ) : null}
-                      </Stack>
-                      <BookingLineAmount
-                        amount={product.price}
-                        originalAmount={product.originalPrice}
-                        discountLabel={clientLineDiscountLabel(product)}
-                      />
-                    </Stack>
-                  </Box>
-                ))}
-              </Stack>
-            </Box>
+          {clientServiceSections.length === 0 ? (
+            <>
+              {renderCatalogGroup("Product", catalogProducts)}
+              {renderCatalogGroup("Unique item", catalogUniqueItems)}
+            </>
           ) : null}
         </Stack>
 
         <Box sx={{ mt: 2 }}>
-          <BookingTotalPriceCard
-            totalPrice={priceSummary.displayTotal}
+          <BookingPriceBreakdown
+            totalPrice={priceSummary.breakdown.bookingTotal}
             originalPrice={priceSummary.originalPrice}
-            discountAmount={priceSummary.breakdown.discountAmount}
-            lines={priceSummaryLines}
+            lineDiscountAmount={0}
+            bookingDiscountAmount={priceSummary.breakdown.discountAmount}
+            bookingTotalDiscount={discount}
+            lateCancellationFeeAmount={
+              priceSummary.breakdown.lateCancellationFeeAmount
+            }
+            lateRescheduleFeeAmount={
+              priceSummary.breakdown.lateRescheduleFeeAmount
+            }
             prepaidPercent={
-              prepaymentState === "none" ? undefined : prepaymentPercent
+              prepaymentState === "none" ? 0 : prepaymentPercent
             }
             prepaidAmount={prepaymentState === "none" ? 0 : prepaidAmount}
             remainingAmount={
               prepaymentState === "none" ? undefined : remaining
             }
+            variant="plain"
             prepaidAction={
               prepaymentState === "required" && onPayNow ? (
                 <Typography
@@ -916,6 +887,8 @@ export default function ClientBookingPaymentDetailsCard({
             <BookingSummaryNote note={draft.clientNote} />
           </Box>
         ) : null}
+
+        {footer ? <Box sx={{ mt: 1.75 }}>{footer}</Box> : null}
       </Box>
     </Paper>
   );

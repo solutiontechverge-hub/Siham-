@@ -28,6 +28,7 @@ export type BookingTotalPriceCardProps = {
   prepaidAction?: React.ReactNode;
   /** Drop outer card chrome when nested inside another paper. */
   embedded?: boolean;
+  showRemaining?: boolean;
 };
 
 function SummaryRow({
@@ -91,6 +92,7 @@ export default function BookingTotalPriceCard({
   remainingAmount,
   prepaidAction,
   embedded = false,
+  showRemaining = true,
 }: BookingTotalPriceCardProps) {
   const m = useTheme().palette.mollure;
   const showPrepay = prepaidAmount > 0 || (prepaidPercent ?? 0) > 0;
@@ -101,6 +103,10 @@ export default function BookingTotalPriceCard({
   const remaining =
     remainingAmount ??
     Math.round((totalPrice - prepaidAmount + Number.EPSILON) * 100) / 100;
+  const remainingDiffersFromTotal =
+    Math.round((remaining + Number.EPSILON) * 100) / 100 !==
+    Math.round((totalPrice + Number.EPSILON) * 100) / 100;
+  const renderRemaining = showRemaining && remainingDiffersFromTotal;
   const showStrike = originalPrice != null && originalPrice > totalPrice;
   const visibleLines = lines.filter((line) => line.amount > 0);
   const hasBreakdown = visibleLines.length > 0 || showPrepay;
@@ -140,11 +146,13 @@ export default function BookingTotalPriceCard({
             action={prepaidAction}
             muted
           />
-          <SummaryRow
-            label="Remaining"
-            value={formatEuro(remaining)}
-            muted
-          />
+          {renderRemaining ? (
+            <SummaryRow
+              label="Remaining"
+              value={formatEuro(remaining)}
+              muted
+            />
+          ) : null}
         </Stack>
       ) : null}
 

@@ -52,31 +52,78 @@ const OFFLINE_OPTIONS: Array<{
   },
 ];
 
+export function checkoutPaymentMethodApiValue(method: CheckoutPaymentMethodId) {
+  if (method === "onlineInvoiceDueDate") return "onlineInvoice";
+  if (method === "offlineInvoiceDueDate") return "offlineInvoice";
+  if (method === "offlineDirect") return "offlineDirect";
+  return "onlineDirect";
+}
+
+function toOption(
+  item: (typeof ONLINE_OPTIONS)[number] | (typeof OFFLINE_OPTIONS)[number],
+): CheckoutPaymentOption {
+  return { id: item.id, label: item.label, description: item.description };
+}
+
+/** Map the method the professional saved on this booking to a single checkout option. */
+export function optionFromStoredPaymentMethod(
+  method?: string | null,
+): CheckoutPaymentOption | null {
+  const value = String(method ?? "").toLowerCase().replace(/[\s_-]/g, "");
+  if (!value) return null;
+  if (value === "offline" || value === "offlinedirect") {
+    return toOption(OFFLINE_OPTIONS[0]);
+  }
+  if (value === "offlineinvoice" || value === "offlinenondirect") {
+    return toOption(OFFLINE_OPTIONS[1]);
+  }
+  if (value === "onlineinvoice" || value === "onlinenondirect") {
+    return toOption(ONLINE_OPTIONS[1]);
+  }
+  if (value === "online" || value === "onlinedirect") {
+    return toOption(ONLINE_OPTIONS[0]);
+  }
+  return null;
+}
+
 export function resolveCheckoutPaymentOptions(
   txOptions: FinanceTransactionOptions,
   locationMode: "fixed" | "desired",
+  chosenMethod?: string | null,
 ): CheckoutPaymentOption[] {
-  const pool = locationMode === "desired" ? ONLINE_OPTIONS : [...ONLINE_OPTIONS, ...OFFLINE_OPTIONS];
-  const enabled = pool.filter((item) => txOptions[item.key]);
-  if (enabled.length) {
-    return enabled.map(({ id, label, description }) => ({ id, label, description }));
+  const chosen = optionFromStoredPaymentMethod(chosenMethod);
+  if (chosen) {
+    if (locationMode === "desired" && chosen.id.startsWith("offline")) {
+      return [toOption(ONLINE_OPTIONS[0])];
+    }
+    return [chosen];
   }
-  return [
-    {
-      id: "onlineDirect",
-      label: "Online – pay now (15 min window)",
-      description: "Pay securely online with iDeal or card.",
-    },
-  ];
+  const pool =
+    locationMode === "desired" ? ONLINE_OPTIONS : [...ONLINE_OPTIONS, ...OFFLINE_OPTIONS];
+  return pool.filter((item) => txOptions[item.key]).map(toOption);
 }
 
 export function checkoutPaymentMethodSupportsPayNow(method: CheckoutPaymentMethodId) {
   return method === "onlineDirect";
 }
 
-export function checkoutPaymentMethodApiValue(method: CheckoutPaymentMethodId) {
-  if (method === "onlineInvoiceDueDate") return "onlineInvoice";
-  if (method === "offlineInvoiceDueDate") return "offlineInvoice";
-  if (method === "offlineDirect") return "offlineDirect";
-  return "onlineDirect";
+export function isOfflinePaymentMethod(method?: string | null): boolean {
+  const value = String(method ?? "")
+    .toLowerCase()
+    .replace(/[\s_-]/g, "");
+  return value.startsWith("offline");
+}
+
+export function checkoutPaymentMethodTitle(method?: string | null): string {
+  const value = String(method ?? "")
+    .toLowerCase()
+    .replace(/[\s_-]/g, "");
+  if (value.includes("invoice") || value.includes("nondirect")) {
+    return isOfflinePaymentMethod(method) ? "Offline - Invoice" : "Online - Invoice";
+  }
+  return isOfflinePaymentMethod(method) ? "Offline - Direct" : "Online - Direct";
+}
+
+export function checkoutPaymentMethodDetail(method?: string | null): string {
+  return isOfflinePaymentMethod(method) ? "Cash" : "Card";
 }

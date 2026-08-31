@@ -6,7 +6,7 @@ import type { BusinessPublicProfileData } from "../data/businessPublicProfile.da
 import { useGetAllBusinessSetupsQuery } from "../store/services/businessApi";
 
 export function useBusinessPublicProfile(shopId: string | undefined) {
-  const { data, isLoading, isFetching, isError, error, refetch } = useGetAllBusinessSetupsQuery();
+  const { data, isLoading, isError, error, refetch } = useGetAllBusinessSetupsQuery();
 
   const profile = React.useMemo<BusinessPublicProfileData | null>(() => {
     if (!shopId) return null;
@@ -16,7 +16,7 @@ export function useBusinessPublicProfile(shopId: string | undefined) {
   return {
     profile,
     setups: data?.data ?? [],
-    isLoading: isLoading || isFetching,
+    isLoading,
     isError,
     error,
     refetch,

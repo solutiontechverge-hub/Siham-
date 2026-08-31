@@ -6,7 +6,7 @@ import type { ListingCardData } from "./listing.data";
 import { mapBusinessSetupsToListingCards } from "./listing.mappers";
 
 export function useListingCards() {
-  const { data, isLoading, isFetching, isError, error, refetch } = useGetAllBusinessSetupsQuery();
+  const { data, isLoading, isError, error, refetch } = useGetAllBusinessSetupsQuery();
 
   const cards = React.useMemo<ListingCardData[]>(() => {
     if (!data?.data?.length) {
@@ -17,7 +17,7 @@ export function useListingCards() {
 
   return {
     cards,
-    isLoading: isLoading || isFetching,
+    isLoading,
     isError,
     error,
     refetch,

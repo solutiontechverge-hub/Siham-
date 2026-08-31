@@ -7,18 +7,19 @@ import {
   ListingImage6,
 } from "../../../../images";
 import type { ListingCardData } from "./listing.data";
-import type {
-  BusinessPublicProfileBookCombo,
-  BusinessPublicProfileCategory,
-  BusinessPublicProfileData,
-  BusinessPublicProfileDesiredLocation,
-  BusinessPublicProfileFixedLocation,
-  BusinessPublicProfilePolicySection,
-  BusinessPublicProfileScheduleDay,
-  BusinessPublicProfileScheduleOption,
-  BusinessPublicProfileService,
-  BusinessPublicProfileServiceForItem,
-  BusinessPublicProfileTeamMember,
+import {
+  buildDesiredLocationFromSetupFields,
+  type BusinessPublicProfileBookCombo,
+  type BusinessPublicProfileCategory,
+  type BusinessPublicProfileData,
+  type BusinessPublicProfileDesiredLocation,
+  type BusinessPublicProfileFixedLocation,
+  type BusinessPublicProfilePolicySection,
+  type BusinessPublicProfileScheduleDay,
+  type BusinessPublicProfileScheduleOption,
+  type BusinessPublicProfileService,
+  type BusinessPublicProfileServiceForItem,
+  type BusinessPublicProfileTeamMember,
 } from "../../../data/businessPublicProfile.data";
 import { buildDynamicServiceCategoryTabs } from "../../../data/businessServiceCategorySlider.data";
 import {
@@ -170,24 +171,32 @@ function buildDurationByServiceId(setup: BusinessSetupListing) {
   return map;
 }
 
+function joinAddressParts(parts: Array<string | null | undefined>) {
+  return parts
+    .map((part) => String(part ?? "").trim())
+    .filter(Boolean)
+    .join(", ");
+}
+
 function buildFormattedAddress(setup: BusinessSetupListing) {
-  const { fixedLocation, desiredLocation, locationMode } = setup;
-  const fixedParts = [
+  const { fixedLocation, desiredLocation, profileAddress } = setup;
+  const fixedParts = joinAddressParts([
     fixedLocation.streetNumber,
     fixedLocation.address,
     fixedLocation.postalCode,
     fixedLocation.municipality,
     fixedLocation.province,
-  ]
-    .filter(Boolean)
-    .join(", ");
-
-  if (fixedParts && (locationMode === "fixed" || locationMode === "both")) {
-    return fixedParts;
-  }
-
-  const desiredParts = [desiredLocation.area, desiredLocation.province].filter(Boolean).join(", ");
-  return desiredParts || fixedParts || "Location not specified";
+  ]);
+  const profileParts = joinAddressParts([
+    profileAddress?.streetNumber,
+    profileAddress?.street,
+    profileAddress?.postalCode,
+    profileAddress?.municipality,
+    profileAddress?.province,
+  ]);
+  if (fixedParts) return fixedParts;
+  if (profileParts) return profileParts;
+  return joinAddressParts([desiredLocation.area, desiredLocation.province]);
 }
 
 function buildFixedLocation(setup: BusinessSetupListing, shopName: string): BusinessPublicProfileFixedLocation {
@@ -203,135 +212,11 @@ function buildFixedLocation(setup: BusinessSetupListing, shopName: string): Busi
   };
 }
 
-function splitCsv(value: string | null | undefined): string[] {
-  return String(value ?? "")
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean);
-}
-
-const PROVINCE_MUNICIPALITIES: Record<string, readonly string[]> = {
-  Drenthe: ["Assen", "Emmen", "Hoogeveen", "Meppel", "Coevorden"],
-  "Zuid-Holland": ["Rotterdam", "Den Haag"],
-  Groningen: ["Groningen", "Veendam", "Stadskanaal", "Delfzijl", "Winschoten", "Haren", "Leek", "Appingedam"],
-  "Noord-Holland": ["Amsterdam", "Haarlem"],
-  Utrecht: ["Utrecht"],
-  "Noord-Brabant": ["Eindhoven"],
-};
-
-function municipalityBelongsToProvince(municipality: string, province: string): boolean {
-  const normalizedMunicipality = municipality.trim().toLowerCase();
-  const normalizedProvince = province.trim().toLowerCase();
-  if (!normalizedMunicipality || !normalizedProvince) return false;
-  if (normalizedMunicipality === normalizedProvince) return true;
-  if (normalizedProvince.includes(normalizedMunicipality)) return true;
-  if (normalizedMunicipality.includes(normalizedProvince)) return true;
-  return (
-    PROVINCE_MUNICIPALITIES[province]?.some(
-      (entry) => entry.toLowerCase() === normalizedMunicipality,
-    ) ?? false
-  );
-}
-
 function buildDesiredLocation(setup: BusinessSetupListing): BusinessPublicProfileDesiredLocation {
-  const { desiredLocation } = setup;
-  const area = desiredLocation.area?.trim() ?? "";
-  const province = desiredLocation.province?.trim() ?? "";
-
-  if (area === "All Netherlands" || province === "All Netherlands") {
-    return { areaMode: "All Netherlands", areas: [] };
-  }
-
-  // `desired_location_area` stores municipalities (comma-separated).
-  // Do not use `services` — that field is service titles, not places.
-  const municipalities = splitCsv(area);
-  const provinces = splitCsv(province);
-
-  if (!municipalities.length && !provinces.length) {
-    return { areaMode: "Specific areas only", areas: [] };
-  }
-
-  if (provinces.length === 1) {
-    return {
-      areaMode: "Specific areas only",
-      areas: [
-        {
-          province: provinces[0],
-          municipalities,
-          allMunicipalities: municipalities.length === 0,
-        },
-      ],
-    };
-  }
-
-  if (provinces.length > 1) {
-    if (!municipalities.length) {
-      return {
-        areaMode: "Specific areas only",
-        areas: provinces.map((entry) => ({
-          province: entry,
-          municipalities: [],
-          allMunicipalities: true,
-        })),
-      };
-    }
-
-    const areas = provinces.map((entry) => ({
-      province: entry,
-      municipalities: [] as string[],
-      allMunicipalities: false,
-    }));
-    const unassigned: string[] = [];
-
-    for (const municipality of municipalities) {
-      const matchedArea = areas.find((area) =>
-        municipalityBelongsToProvince(municipality, area.province),
-      );
-      if (matchedArea) matchedArea.municipalities.push(municipality);
-      else unassigned.push(municipality);
-    }
-
-    if (unassigned.length > 0) {
-      const customProvinces = provinces.filter(
-        (entry) => !PROVINCE_MUNICIPALITIES[entry],
-      );
-      const fallbackProvince =
-        customProvinces[0] ?? areas[areas.length - 1]?.province;
-
-      for (const municipality of unassigned) {
-        const namedArea = areas.find(
-          (area) =>
-            municipalityBelongsToProvince(municipality, area.province) ||
-            municipality.toLowerCase().includes(area.province.toLowerCase()) ||
-            area.province.toLowerCase().includes(municipality.toLowerCase()),
-        );
-        if (namedArea) {
-          namedArea.municipalities.push(municipality);
-          continue;
-        }
-
-        const fallbackArea = areas.find(
-          (area) => area.province === fallbackProvince,
-        );
-        fallbackArea?.municipalities.push(municipality);
-      }
-    }
-
-    return {
-      areaMode: "Specific areas only",
-      areas,
-    };
-  }
-
-  return {
-    areaMode: "Specific areas only",
-    areas: [
-      {
-        province: "Service areas",
-        municipalities,
-      },
-    ],
-  };
+  return buildDesiredLocationFromSetupFields(
+    setup.desiredLocation.area,
+    setup.desiredLocation.province,
+  );
 }
 
 function getSetupServiceOrder(
@@ -752,6 +637,7 @@ export function mapBusinessSetupToPublicProfile(setup: BusinessSetupListing): Bu
   };
 
   const shopName = (setup.businessName || setup.salonName || "Business").trim();
+  const phone = String(setup.phone ?? "").trim();
   const services = buildProfileServices(setup);
   const heroImages = resolveHeroImages(setup);
   const portfolioImages = heroImages;
@@ -762,6 +648,10 @@ export function mapBusinessSetupToPublicProfile(setup: BusinessSetupListing): Bu
   return {
     shopId: String(setup.id),
     shopName,
+    phone: phone || undefined,
+    vatNumber: setup.vatNumber?.trim() || undefined,
+    cocNumber: setup.cocNumber?.trim() || undefined,
+    legalName: setup.legalName?.trim() || undefined,
     heroImage: heroImages[0],
     heroImages,
     rating: setup.rating,

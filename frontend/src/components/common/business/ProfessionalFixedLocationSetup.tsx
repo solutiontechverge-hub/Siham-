@@ -1569,15 +1569,6 @@ export default function ProfessionalFixedLocationSetup({
   const fixedLocationForm = (
     <Grid container spacing={1.6}>
       <Grid item xs={12}>
-        <MollureFormField
-          label="Salon Name"
-          placeholder="Makelush"
-          value={fixedBiz.salonName}
-          onChange={(e) => setFixedBizField("salonName", e.target.value)}
-          disabled={locationDisabled}
-        />
-      </Grid>
-      <Grid item xs={12}>
         <Typography
           sx={{
             fontWeight: 700,
@@ -2120,7 +2111,7 @@ export default function ProfessionalFixedLocationSetup({
         business_media: mediaSlides
           .filter(isPersistedMediaUrl)
           .slice(0, BUSINESS_MEDIA_MAX_COUNT),
-        salon_name: fixedBiz.salonName,
+        salon_name: sourceBiz.profileName,
         fixed_location_address: addressSource.streetAddress,
         fixed_location_street_number: addressSource.streetNumber,
         fixed_location_postal_code: addressSource.postalCode,
@@ -5478,7 +5469,22 @@ export default function ProfessionalFixedLocationSetup({
       </SectionShell>
 
       <SectionShell
-        title={isBothOffering ? activeBusinessTemplate : locationSectionTitle}
+        title={
+          <Typography
+            sx={{
+              fontWeight: 700,
+              color: alpha(m.navy, 0.9),
+              fontSize: 30,
+              lineHeight: 1.2,
+              minWidth: 0,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {isBothOffering ? activeBusinessTemplate : locationSectionTitle}
+          </Typography>
+        }
         action={renderSectionEditAction("location")}
       >
         {showFixedLocationSection ? fixedLocationForm : null}

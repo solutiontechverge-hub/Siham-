@@ -38,6 +38,7 @@ import {
 import type { BookingCatalogService } from "../../../../data/bookingServiceCatalog.data";
 import { applyBusinessServiceDiscount } from "../../../../data/businessServiceModal.data";
 import { buildPlatformServiceOrderDefaults } from "../../../../data/businessServiceCategorySlider.data";
+import { buildDesiredLocationFromSetupFields } from "../../../../data/businessPublicProfile.data";
 import { useBookingRealtimeSync } from "../../../../hooks/useBookingRealtimeSync";
 import {
   applyServiceOrderToServiceCategories,
@@ -346,6 +347,23 @@ export function useFixedLocationCalendarPage() {
       ? String(setupData.data.late_reschedule_fee_percentage)
       : undefined;
 
+  const prepaymentPercentDefault =
+    setupData?.data?.prepayment_percentage != null
+      ? String(setupData.data.prepayment_percentage)
+      : undefined;
+
+  const desiredLocationSetup = React.useMemo(
+    () =>
+      buildDesiredLocationFromSetupFields(
+        setupData?.data?.desired_location_area,
+        setupData?.data?.desired_location_province,
+      ),
+    [
+      setupData?.data?.desired_location_area,
+      setupData?.data?.desired_location_province,
+    ],
+  );
+
   const isSaving =
     isCreatingCalendarEntry ||
     isUpdatingCalendarEntry ||
@@ -497,8 +515,10 @@ export function useFixedLocationCalendarPage() {
     clientOptions,
     fixedLocationAddress,
     lateRescheduleFeePercentDefault,
+    prepaymentPercentDefault,
     cancellationBeforeHours: setupData?.data?.cancellation_before_hours ?? null,
     cancellationBeforeMinutes: setupData?.data?.cancellation_before_minutes ?? null,
+    desiredLocationSetup,
     isSaving,
     onCreateCalendarEntry,
     onUpdateCalendarEntry,
