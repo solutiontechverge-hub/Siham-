@@ -215,9 +215,14 @@ export function resolveTeamCategoryRecord(
     categoryTabs,
   ).map((service) => service.serviceId);
 
+  const subServiceIds =
+    setupServiceIds.length > 0
+      ? setupServiceIds
+      : base.subServiceIds;
+
   return {
     ...base,
-    subServiceIds: Array.from(new Set([...base.subServiceIds, ...setupServiceIds])),
+    subServiceIds: Array.from(new Set(subServiceIds)),
   };
 }
 
@@ -241,6 +246,20 @@ export function buildTeamServiceOptionsForCategory(
     options.push({ value, label });
   };
 
+  const categoryServices = getTeamServicesForCategory(
+    categoryId,
+    businessCategories,
+    businessServices,
+    categoryTabs,
+  );
+
+  if (categoryServices.length > 0) {
+    for (const service of categoryServices) {
+      pushOption(service.serviceId, service.label);
+    }
+    return options;
+  }
+
   const apiCategory = businessCategories.find((item) => String(item.id) === category.id) as
     | BusinessCategoryWithSubs
     | undefined;
@@ -248,15 +267,6 @@ export function buildTeamServiceOptionsForCategory(
     for (const sub of apiCategory.subcategories) {
       pushOption(String(sub.id), sub.title);
     }
-  }
-
-  for (const service of getTeamServicesForCategory(
-    categoryId,
-    businessCategories,
-    businessServices,
-    categoryTabs,
-  )) {
-    pushOption(service.serviceId, service.label);
   }
 
   return options;

@@ -2,8 +2,11 @@ import type { CalendarBookingLocation } from "../../../app/professionals/fixed-l
 import type { Interval } from "./calendar.utils";
 import {
   addDaysIso,
+  intersectIntervals,
+  mergeIntervals,
   minutesSinceMidnight,
   parseIsoDate,
+  subtractIntervals,
 } from "./calendar.utils";
 import type { BlockTimeDraft } from "./calendar.utils";
 import type { ScheduleAvailabilityRow, ScheduleDateOverride } from "./calendar-settings.types";
@@ -82,6 +85,76 @@ export function getLocationAvailabilityIntervals(
     }
   }
   return intervals;
+}
+
+export type LocationAvailabilityKind = "fixed" | "desired" | "both";
+
+export type LocationAvailabilityBand = {
+  kind: LocationAvailabilityKind;
+  interval: Interval;
+};
+
+export function locationAvailabilityTooltip(kind: LocationAvailabilityKind) {
+  if (kind === "fixed") return "Available for Fixed Location";
+  if (kind === "desired") return "Available for Desired Location";
+  return "Available for Both";
+}
+
+export function locationAvailabilityKindAtMinute(
+  bands: readonly LocationAvailabilityBand[],
+  minute: number,
+): LocationAvailabilityKind | null {
+  const band = bands.find(
+    (item) => minute >= item.interval.startMin && minute < item.interval.endMin,
+  );
+  return band?.kind ?? null;
+}
+
+/** FL / DL / overlap bands from the team member's Schedule (not Public Hours). */
+export function getLocationAvailabilityBands(
+  resourceId: string,
+  iso: string,
+  offeredLocations: readonly CalendarBookingLocation[],
+  rows: readonly ScheduleAvailabilityRow[],
+  overrides: readonly ScheduleDateOverride[],
+  combinedFallback: readonly Interval[] = [],
+): LocationAvailabilityBand[] {
+  const offersFixed = offeredLocations.includes("FL");
+  const offersDesired = offeredLocations.includes("DL");
+  const fixed = offersFixed
+    ? mergeIntervals(
+        getLocationAvailabilityIntervals(resourceId, iso, "FL", rows, overrides),
+      )
+    : [];
+  const desired = offersDesired
+    ? mergeIntervals(
+        getLocationAvailabilityIntervals(resourceId, iso, "DL", rows, overrides),
+      )
+    : [];
+  const combined = mergeIntervals(combinedFallback);
+
+  const toBands = (
+    kind: LocationAvailabilityKind,
+    intervals: readonly Interval[],
+  ): LocationAvailabilityBand[] =>
+    intervals.map((interval) => ({ kind, interval }));
+
+  if (offersFixed && !offersDesired) {
+    return toBands("fixed", fixed.length ? fixed : combined);
+  }
+  if (offersDesired && !offersFixed) {
+    return toBands("desired", desired.length ? desired : combined);
+  }
+
+  if (!fixed.length && !desired.length) {
+    return toBands("both", combined);
+  }
+
+  return [
+    ...toBands("fixed", subtractIntervals(fixed, desired)),
+    ...toBands("desired", subtractIntervals(desired, fixed)),
+    ...toBands("both", intersectIntervals(fixed, desired)),
+  ];
 }
 
 export function getCombinedAvailabilityIntervals(

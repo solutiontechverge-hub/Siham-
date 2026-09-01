@@ -20,13 +20,18 @@ import {
   pickSectionDraft,
 } from "../utils/business-setup-draft.js";
 import { syncBookingToFinanceTransaction } from "../services/finance-sync.service.js";
+import { safeEnsureProfessionalClientFromBooking } from "../services/professional-clients.service.js";
 import {
   BOOKING_NOTIFICATION_EVENTS,
   dispatchBookingCreatedNotifications,
   dispatchBookingEventNotification,
   dispatchBookingUpdatedNotifications,
 } from "../services/bookingNotification.service.js";
-import { emitBookingChanged } from "../messaging/messagingSocket.js";
+import {
+  emitBookingChanged,
+  emitBusinessChanged,
+  emitBusinessChangedForProfile,
+} from "../messaging/messagingSocket.js";
 import { normalizeEntityId } from "../utils/business-setup-parsers.js";
 import { saveBookingAttachments } from "../services/booking-upload.service.js";
 import {
@@ -439,8 +444,19 @@ const getBusinessSetupDetailById = async (
   options = {},
 ) => {
   const setupResult = await client.query(
-    `SELECT bs.*
+    `SELECT
+       bs.*,
+       pp.phone AS professional_phone,
+       pp.legal_name AS professional_legal_name,
+       pp.vat_number AS professional_vat_number,
+       pp.ccc_number AS professional_coc_number,
+       pp.street AS professional_street,
+       pp.street_number AS professional_street_number,
+       pp.postal_code AS professional_postal_code,
+       pp.municipality AS professional_municipality,
+       pp.province AS professional_province
      FROM business_setups bs
+     LEFT JOIN professional_profiles pp ON pp.id = bs.professional_profile_id
      WHERE bs.id = $1`,
     [setupId],
   );
@@ -700,6 +716,11 @@ export const updateBusinessSetupActive = async (req, res) => {
       );
 
       const savedBusinessSetup = await getBusinessSetupDetailById(insertResult.rows[0].id);
+      emitBusinessChanged({
+        business_setup_id: savedBusinessSetup?.id,
+        action: isActive ? "activated" : "deactivated",
+        scope: "listing",
+      });
 
       return res.status(200).json({
         success: true,
@@ -717,6 +738,11 @@ export const updateBusinessSetupActive = async (req, res) => {
     );
 
     const savedBusinessSetup = await getBusinessSetupDetailById(existingSetup.id);
+    emitBusinessChanged({
+      business_setup_id: savedBusinessSetup?.id ?? existingSetup.id,
+      action: isActive ? "activated" : "deactivated",
+      scope: "listing",
+    });
 
     return res.status(200).json({
       success: true,
@@ -860,6 +886,12 @@ export const uploadBusinessMedia = async (req, res) => {
         data: null,
       });
     }
+
+    emitBusinessChanged({
+      business_setup_id: businessSetupId,
+      action: "updated",
+      scope: "listing",
+    });
 
     return res.status(200).json({
       success: true,
@@ -1141,6 +1173,11 @@ export const upsertBusinessSetup = async (req, res) => {
         await client.query("COMMIT");
 
         const savedBusinessSetup = await getBusinessSetupDetailById(setupId);
+        emitBusinessChanged({
+          business_setup_id: setupId,
+          action: "published",
+          scope: "listing",
+        });
 
         return res.status(200).json({
           success: true,
@@ -1312,6 +1349,12 @@ export const upsertBusinessSetup = async (req, res) => {
       );
 
       await client.query("COMMIT");
+
+      emitBusinessChanged({
+        business_setup_id: businessSetup.id,
+        action: isPublishSetupRequest(req.body) ? "published" : "updated",
+        scope: "listing",
+      });
 
       return res.status(200).json({
         success: true,
@@ -1494,6 +1537,11 @@ export const createCalendarEntry = async (req, res) => {
         // Client list mirror is best-effort; calendar entry still succeeds.
       }
     }
+
+    emitBusinessChangedForProfile(professionalProfile.id, {
+      action: "updated",
+      scope: "calendar",
+    });
 
     return res.status(201).json({
       success: true,
@@ -1691,6 +1739,11 @@ export const upsertCalendarSettings = async (req, res) => {
        RETURNING *`,
       [professionalProfile.id, JSON.stringify(availability), JSON.stringify(design)],
     );
+
+    emitBusinessChangedForProfile(professionalProfile.id, {
+      action: "updated",
+      scope: "calendar",
+    });
 
     return res.status(200).json({
       success: true,
@@ -2362,6 +2415,7 @@ export const createBooking = async (req, res) => {
       } catch {
         // finance sync is best-effort
       }
+      await safeEnsureProfessionalClientFromBooking(booking.id);
     }
 
     void dispatchBookingCreatedNotifications(booking).catch((error) => {
@@ -2440,6 +2494,11 @@ export const updateCalendarEntryStatus = async (req, res) => {
         data: null,
       });
     }
+
+    emitBusinessChangedForProfile(professionalProfile.id, {
+      action: "updated",
+      scope: "calendar",
+    });
 
     return res.status(200).json({
       success: true,
@@ -2559,6 +2618,11 @@ export const updateCalendarEntry = async (req, res) => {
       }
     }
 
+    emitBusinessChangedForProfile(professionalProfile.id, {
+      action: "updated",
+      scope: "calendar",
+    });
+
     return res.status(200).json({
       success: true,
       message: "Calendar entry updated successfully.",
@@ -2618,6 +2682,11 @@ export const deleteCalendarEntry = async (req, res) => {
         data: null,
       });
     }
+
+    emitBusinessChangedForProfile(professionalProfile.id, {
+      action: "updated",
+      scope: "calendar",
+    });
 
     return res.status(200).json({
       success: true,
@@ -2842,6 +2911,7 @@ export const updateMyBooking = async (req, res) => {
       } catch {
         // best-effort
       }
+      await safeEnsureProfessionalClientFromBooking(booking.id);
     }
 
     if (previousStatus !== booking.status || existing.prepayment_status !== booking.prepayment_status) {
@@ -3076,6 +3146,7 @@ export const updateBookingStatus = async (req, res) => {
       } catch {
         // best-effort
       }
+      await safeEnsureProfessionalClientFromBooking(booking.id);
     }
 
     // Flag the client record when they booked but did not show up.

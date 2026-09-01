@@ -14,8 +14,10 @@ export default function FixedLocationCalendarPageView() {
     clientOptions,
     fixedLocationAddress,
     lateRescheduleFeePercentDefault,
+    prepaymentPercentDefault,
     cancellationBeforeHours,
     cancellationBeforeMinutes,
+    desiredLocationSetup,
     isSaving,
     onCreateCalendarEntry,
     onUpdateCalendarEntry,
@@ -38,8 +40,10 @@ export default function FixedLocationCalendarPageView() {
       clientOptions={clientOptions}
       fixedLocationAddress={fixedLocationAddress}
       lateRescheduleFeePercentDefault={lateRescheduleFeePercentDefault}
+      prepaymentPercentDefault={prepaymentPercentDefault}
       cancellationBeforeHours={cancellationBeforeHours}
       cancellationBeforeMinutes={cancellationBeforeMinutes}
+      desiredLocationSetup={desiredLocationSetup}
       isSaving={isSaving}
       onCreateCalendarEntry={onCreateCalendarEntry}
       onUpdateCalendarEntry={onUpdateCalendarEntry}

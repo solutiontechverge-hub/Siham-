@@ -190,10 +190,12 @@ const financeApi = baseApi.injectEndpoints({
       string
     >({
       query: (businessSetupId) => `/api/finance/transaction-options/${businessSetupId}`,
+      providesTags: ["FinanceSettings"],
     }),
 
     getPublicInvoiceSettings: builder.query<ApiEnvelope<FinanceInvoiceSettings>, string>({
       query: (businessSetupId) => `/api/finance/invoice-settings/${businessSetupId}`,
+      providesTags: ["FinanceSettings"],
     }),
 
     processFinanceInvoiceReissues: builder.mutation<ApiEnvelope<{ created: number }>, void>({

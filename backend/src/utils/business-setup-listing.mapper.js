@@ -131,6 +131,17 @@ export const transformBusinessSetupForListing = (
     media: parseTextArray(row.business_media),
     locationMode: row.location_mode ?? null,
     salonName: toNullableString(row.salon_name),
+    phone: toNullableString(row.professional_phone ?? row.phone),
+    legalName: toNullableString(row.professional_legal_name),
+    vatNumber: toNullableString(row.professional_vat_number),
+    cocNumber: toNullableString(row.professional_coc_number),
+    profileAddress: {
+      street: toNullableString(row.professional_street),
+      streetNumber: toNullableString(row.professional_street_number),
+      postalCode: toNullableString(row.professional_postal_code),
+      municipality: toNullableString(row.professional_municipality),
+      province: toNullableString(row.professional_province),
+    },
     fixedLocation: {
       address: toNullableString(row.fixed_location_address),
       streetNumber: toNullableString(row.fixed_location_street_number),

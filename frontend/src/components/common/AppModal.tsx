@@ -82,7 +82,7 @@ export default function AppModal({
       alignItems={subtitle ? "flex-start" : "center"}
       justifyContent="space-between"
       sx={{
-        px: 2.5,
+        px: { xs: 2, sm: 2.5 },
         py: 1.75,
         flexShrink: 0,
         bgcolor: headerBg,
@@ -150,6 +150,7 @@ export default function AppModal({
               display: "flex",
               justifyContent: "center",
               alignItems: "center",
+              flexWrap: "wrap",
               gap: 1.5,
             }
           : null),
@@ -198,6 +199,7 @@ export default function AppModal({
             overflow: "hidden",
             margin: 2,
             width: "100%",
+            maxWidth: "calc(100vw - 32px)",
             maxHeight: "calc(100vh - 48px)",
           },
           ...(Array.isArray(paperSx) ? paperSx : paperSx ? [paperSx] : []),

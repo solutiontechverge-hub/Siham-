@@ -31,6 +31,8 @@ type BookingDrawerSelectedItemsSectionProps = {
   services: readonly BookingServiceLineItem[];
   products: readonly SelectedProductItem[];
   uniqueItems?: readonly SelectedProductItem[];
+  /** Display-only cancelled lines (after EBR accept). */
+  cancelledServices?: readonly BookingServiceLineItem[];
   /** Nest inside a parent card (tighter spacing, white item rows). */
   nested?: boolean;
   showRemoveButtons?: boolean;
@@ -47,6 +49,7 @@ export default function BookingDrawerSelectedItemsSection({
   services,
   products,
   uniqueItems = [],
+  cancelledServices = [],
   nested = false,
   showRemoveButtons = false,
   resolveStaffName,
@@ -61,7 +64,8 @@ export default function BookingDrawerSelectedItemsSection({
   const m = theme.palette.mollure;
   const primaryLight = theme.palette.secondary.main;
 
-  if (!services.length && !products.length && !uniqueItems.length) return null;
+  if (!services.length && !products.length && !uniqueItems.length && !cancelledServices.length)
+    return null;
 
   const cardSx = {
     borderRadius: "10px",
@@ -73,7 +77,7 @@ export default function BookingDrawerSelectedItemsSection({
 
   return (
     <Stack spacing={nested ? 1 : 1.5}>
-      {services.length > 0 ? (
+      {services.length > 0 || cancelledServices.length > 0 ? (
         <Stack spacing={0.75}>
           <BodyText
             sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.72) }}
@@ -154,6 +158,55 @@ export default function BookingDrawerSelectedItemsSection({
                       </IconButton>
                     ) : null}
                   </Stack>
+                </Stack>
+              </Box>
+            );
+          })}
+          {cancelledServices.map((service) => {
+            const staffName = resolveStaffName?.(service.staffResourceId);
+            return (
+              <Box key={`cancelled-${service.id}`} sx={cardSx}>
+                <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  spacing={1.25}
+                >
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <BodyText
+                      sx={{
+                        fontSize: 13,
+                        fontWeight: 900,
+                        color: alpha(m.navy, 0.86),
+                        lineHeight: 1.25,
+                      }}
+                    >
+                      {service.name}
+                    </BodyText>
+                    <ServiceSummaryMetaLine
+                      timeRange={
+                        service.startTime
+                          ? service.endTime
+                            ? `${service.startTime}–${service.endTime}`
+                            : service.startTime
+                          : undefined
+                      }
+                      durationLabel={`${service.durationMins} Mins`}
+                      staffName={staffName}
+                    />
+                    <Box sx={{ mt: 0.55 }}>
+                      <BookingEditedTag variant="cancelled" />
+                    </Box>
+                  </Box>
+                  <BodyText
+                    sx={{
+                      fontSize: 13,
+                      fontWeight: 900,
+                      color: alpha(m.navy, 0.82),
+                    }}
+                  >
+                    €{getEffectiveServicePrice(service)}
+                  </BodyText>
                 </Stack>
               </Box>
             );
@@ -240,7 +293,7 @@ export default function BookingDrawerSelectedItemsSection({
           <BodyText
             sx={{ fontSize: 12.5, fontWeight: 800, color: alpha(m.navy, 0.72) }}
           >
-            Unique Item
+            Unique item
           </BodyText>
           {uniqueItems.map((item) => {
             const editTag = resolveProductEditTag?.(item.id) ?? null;

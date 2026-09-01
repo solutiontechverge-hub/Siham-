@@ -97,7 +97,7 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({
         sx={{
           borderRadius: "10px",
           border: `1px solid ${alpha(m.navy, 0.1)}`,
-          overflow: "hidden",
+          overflowX: "auto",
           boxShadow: "none",
           bgcolor: "#fff",
         }}
@@ -205,7 +205,7 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({
         sx={{
           borderRadius: "10px",
           border: `1px solid ${alpha(m.navy, 0.1)}`,
-          overflow: "hidden",
+          overflowX: "auto",
           boxShadow: "none",
         }}
       >
@@ -360,7 +360,7 @@ export default function ProfessionalFixedLocationRatingReviewAnalytics({
         sx={{
           borderRadius: "10px",
           border: `1px solid ${alpha(m.navy, 0.1)}`,
-          overflow: "hidden",
+          overflowX: "auto",
           boxShadow: "none",
         }}
       >

@@ -3,7 +3,9 @@ import type {
   TransactionDocumentLineItem,
   TransactionRow,
 } from "../../../app/professionals/fixed-location/finance/data/transactions";
-import type { FinanceInvoiceSettings } from "./useFinanceInvoiceSettings";
+import type { ProfessionalProfile } from "../../../store/services/profileApi";
+import type { FinanceProfessionalBusinessOverride } from "./financeDocumentTypes";
+import type { FinanceInvoiceSettings, FinanceInvoiceTemplateType } from "./useFinanceInvoiceSettings";
 
 export type PreviewLineItem = {
   description: string;
@@ -15,9 +17,75 @@ export type PreviewLineItem = {
 
 export function formatDocumentDate(value?: string | null) {
   if (!value) return "";
-  const parts = value.split("-");
-  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  const isoDate = value.includes("T") ? value.slice(0, 10) : value;
+  const parts = isoDate.split("-");
+  if (parts.length === 3 && parts[0].length === 4) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
   return value;
+}
+
+export function formatDocumentTime(value?: string | null) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  if (/^\d{1,2}:\d{2}/.test(raw) || /am|pm/i.test(raw)) return raw;
+  if (raw.includes("T")) {
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleTimeString("en-GB", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
+  }
+  return raw;
+}
+
+export function formatDocumentDateTime(date?: string | null, time?: string | null) {
+  const datePart = formatDocumentDate(date);
+  const timePart = formatDocumentTime(time) || (date && date.includes("T") ? formatDocumentTime(date) : "");
+  if (!datePart) return timePart;
+  if (!timePart) return datePart;
+  return `${datePart}, ${timePart}`;
+}
+
+export function resolveProfessionalBusinessDisplay(
+  override?: FinanceProfessionalBusinessOverride | null,
+  profile?: ProfessionalProfile | null,
+) {
+  const profileAddress = [
+    profile?.street,
+    profile?.street_number,
+    profile?.municipality,
+    profile?.province,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  const shopName =
+    override?.shopName?.trim() ||
+    override?.legalName?.trim() ||
+    profile?.legal_name?.trim() ||
+    "—";
+  const phone = override?.phone?.trim() || profile?.phone?.trim() || "—";
+  const location = override?.address?.trim() || profileAddress || "—";
+  const vat = override?.vatNumber?.trim() || profile?.vat_number?.trim() || "—";
+  const coc = override?.cocNumber?.trim() || profile?.ccc_number?.trim() || "—";
+  return { shopName, phone, location, vat, coc };
+}
+
+export function professionalBusinessInfoLines(
+  display: ReturnType<typeof resolveProfessionalBusinessDisplay>,
+  invoiceType: FinanceInvoiceTemplateType,
+) {
+  const lines = [
+    `Shop Name: ${display.shopName}`,
+    `Contact number: ${display.phone}`,
+    `Location: ${display.location}`,
+  ];
+  if (invoiceType === "company") {
+    lines.push(`Professional VAT No: ${display.vat}`, `Professional COC No: ${display.coc}`);
+  }
+  return lines;
 }
 
 export function parseCurrencyValue(input?: string | null) {

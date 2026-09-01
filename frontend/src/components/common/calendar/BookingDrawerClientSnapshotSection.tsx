@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Box, Stack, Typography } from "@mui/material";
+import { Avatar, Box, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import type { CalendarBookingClientSnapshot } from "../../../app/professionals/fixed-location/calendar/calendar.data";
 import { ServiceSummaryMetaLine } from "../ServiceSummaryMetaLine";
@@ -56,23 +56,25 @@ export default function BookingDrawerClientSnapshotSection({
   return (
     <Stack spacing={1.75} sx={{ mt: 1.5 }}>
       {hasProject ? (
-        <Box>
-          <Stack
-            direction="row"
-            alignItems="baseline"
-            spacing={1}
-            sx={{ mb: 1 }}
+        <Box
+          sx={{
+            borderRadius: "10px",
+            border: `1px solid ${alpha(m.navy, 0.1)}`,
+            bgcolor: "#fff",
+            px: 1.5,
+            py: 1.25,
+          }}
+        >
+          <Typography
+            sx={{
+              fontWeight: 900,
+              fontSize: 13,
+              color: m.headingText,
+              mb: 1,
+            }}
           >
-            <Typography
-              sx={{
-                fontWeight: 900,
-                fontSize: 12.5,
-                color: alpha(m.navy, 0.78),
-              }}
-            >
-              Project Details and Media
-            </Typography>
-          </Stack>
+            Project Details and Media
+          </Typography>
           {project?.description?.trim() ? (
             <Box
               sx={{
@@ -101,8 +103,8 @@ export default function BookingDrawerClientSnapshotSection({
               <Typography
                 sx={{
                   fontWeight: 900,
-                  fontSize: 11.5,
-                  color: alpha(m.navy, 0.68),
+                  fontSize: 12,
+                  color: m.headingText,
                   mb: 0.75,
                 }}
               >
@@ -148,17 +150,44 @@ export default function BookingDrawerClientSnapshotSection({
         if (!personServices.length && !hasPlanning) return null;
 
         return (
-          <Box key={person.id}>
-            <Typography
-              sx={{
-                fontWeight: 900,
-                fontSize: 12.5,
-                color: alpha(m.navy, 0.72),
-                mb: 0.85,
-              }}
+          <Box
+            key={person.id}
+            sx={{
+              borderRadius: "10px",
+              border: `1px solid ${alpha(m.navy, 0.1)}`,
+              bgcolor: "#fff",
+              px: 1.5,
+              py: 1.25,
+            }}
+          >
+            <Stack
+              direction="row"
+              alignItems="center"
+              spacing={1.15}
+              sx={{ mb: 1 }}
             >
-              {title}
-            </Typography>
+              <Avatar
+                sx={{
+                  width: 34,
+                  height: 34,
+                  bgcolor: alpha(m.teal, 0.12),
+                  color: m.teal,
+                  fontWeight: 900,
+                  fontSize: 14,
+                }}
+              >
+                {title.charAt(0).toUpperCase()}
+              </Avatar>
+              <Typography
+                sx={{
+                  fontWeight: 900,
+                  fontSize: 13,
+                  color: m.headingText,
+                }}
+              >
+                {title}
+              </Typography>
+            </Stack>
             {hasPlanning ? (
               <Box
                 sx={{
@@ -214,6 +243,7 @@ export default function BookingDrawerClientSnapshotSection({
                     <Stack
                       direction="row"
                       justifyContent="space-between"
+                      alignItems="center"
                       spacing={1}
                     >
                       <Box sx={{ minWidth: 0 }}>

@@ -29,6 +29,7 @@ export type BookingEditServiceStaffOption = {
   id: string;
   name: string;
   avatarText?: string;
+  photoSrc?: string;
   /** 0–100, shown as “N% availability”. */
   availabilityPercent?: number;
 };
@@ -434,6 +435,8 @@ export default function BookingEditServiceScreen({
                     }}
                   >
                     <Avatar
+                      src={staff.photoSrc || undefined}
+                      alt=""
                       sx={{
                         width: 34,
                         height: 34,

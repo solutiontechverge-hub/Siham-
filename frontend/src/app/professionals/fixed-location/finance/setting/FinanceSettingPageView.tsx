@@ -37,6 +37,7 @@ import AppCard from "../../../../../components/common/AppCard";
 import MollureFormField from "../../../../../components/common/MollureFormField";
 import AppModal from "../../../../../components/common/AppModal";
 import FinanceDocumentPreviewDrawer from "../../../../../components/sections/finance/FinanceDocumentPreviewDrawer";
+import { useProfessionalBusinessOverride } from "../../../../../components/common/finance-documents";
 import {
   EXPECT_ITEMS,
   MANAGING_BULLETS,
@@ -547,6 +548,7 @@ function InvoiceSettings() {
     selectIndividualInvoice,
     selectCompanyInvoice,
   } = useInvoiceSettingsSection();
+  const professionalBusinessOverride = useProfessionalBusinessOverride();
 
   const sectionCardSx = {
     borderRadius: "10px",
@@ -1719,6 +1721,7 @@ function InvoiceSettings() {
         invoiceType={settings.defaultInvoiceType}
         settings={settings}
         profileData={profileResponse?.data ?? null}
+        professionalBusinessOverride={professionalBusinessOverride}
       />
     </Stack>
   );

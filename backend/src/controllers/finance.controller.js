@@ -1,4 +1,5 @@
 import { query } from "../db/index.js";
+import { emitBusinessChangedForProfile } from "../messaging/messagingSocket.js";
 import {
   dispatchInvoiceReissuedNotification,
   dispatchPaymentDueSetNotification,
@@ -250,6 +251,11 @@ export const updateFinanceInvoiceSettings = async (req, res) => {
       [profile.id, JSON.stringify(invoiceSettings)],
     );
 
+    emitBusinessChangedForProfile(profile.id, {
+      action: "updated",
+      scope: "finance",
+    });
+
     return res.status(200).json({
       success: true,
       message: "Invoice settings updated.",
@@ -275,6 +281,11 @@ export const updateFinanceTransactionOptions = async (req, res) => {
        RETURNING *`,
       [profile.id, JSON.stringify(options)],
     );
+
+    emitBusinessChangedForProfile(profile.id, {
+      action: "updated",
+      scope: "finance",
+    });
 
     return res.status(200).json({
       success: true,
@@ -320,6 +331,11 @@ export const updateFinanceStripeStatus = async (req, res) => {
        RETURNING *`,
       [profile.id, nextSubscription ?? null, nextConnect ?? null],
     );
+
+    emitBusinessChangedForProfile(profile.id, {
+      action: "updated",
+      scope: "finance",
+    });
 
     return res.status(200).json({
       success: true,

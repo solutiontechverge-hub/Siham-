@@ -9,6 +9,8 @@
 html {
   /* Reserve scrollbar width so open menus/modals don't shift the layout */
   scrollbar-gutter: stable;
+  overflow-x: clip;
+  max-width: 100%;
 }
 
 html,
@@ -19,6 +21,7 @@ body {
     sans-serif;
   font-size: 16px;
   line-height: 1.5;
+  max-width: 100%;
 }
 
 /*

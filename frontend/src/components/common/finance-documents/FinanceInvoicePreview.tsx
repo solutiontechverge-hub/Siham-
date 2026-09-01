@@ -27,8 +27,11 @@ import {
   addDuration,
   buildPreviewLineItems,
   formatDocumentDate,
+  formatDocumentDateTime,
   formatCurrencyValue,
   parseCurrencyValue,
+  professionalBusinessInfoLines,
+  resolveProfessionalBusinessDisplay,
 } from "./financeDocumentUtils";
 import type {
   FinanceInvoiceSettings,
@@ -69,9 +72,14 @@ export default function FinanceInvoicePreview({
     [settings, row],
   );
   const serviceDate =
-    formatDocumentDate(row?.document?.serviceDate || row?.date) || "12/04/2023";
+    formatDocumentDateTime(
+      row?.document?.serviceDate || row?.date,
+      row?.document?.serviceTime,
+    ) || "12/04/2023";
   const invoiceDate =
-    formatDocumentDate(row?.document?.invoiceDate || row?.date) || serviceDate;
+    formatDocumentDate(row?.document?.invoiceDate || row?.date) ||
+    formatDocumentDate(row?.document?.serviceDate || row?.date) ||
+    serviceDate;
   const dueDate =
     formatDocumentDate(row?.document?.dueDate) ||
     addDuration(
@@ -99,29 +107,22 @@ export default function FinanceInvoicePreview({
       ? `Late payment fee: ${settings.paymentTerms.originalPenaltyValue} ${settings.paymentTerms.originalPenaltyUnit} applies after the due date.`
       : "Late payment fee applies after the due date.");
 
-  const professionalAddress =
-    professionalBusinessOverride?.address ||
-    [
-      professionalProfile?.street,
-      professionalProfile?.street_number,
-      professionalProfile?.municipality,
-      professionalProfile?.province,
-    ]
-      .filter(Boolean)
-      .join(", ");
-
-  const professionalName =
-    professionalBusinessOverride?.legalName ||
-    professionalProfile?.legal_name ||
-    "Craig Martha";
-  const professionalVat =
-    professionalBusinessOverride?.vatNumber ||
-    professionalProfile?.vat_number ||
-    "-";
-  const professionalCoc =
-    professionalBusinessOverride?.cocNumber ||
-    professionalProfile?.ccc_number ||
-    "-";
+  const professionalDisplay = resolveProfessionalBusinessDisplay(
+    professionalBusinessOverride,
+    professionalProfile,
+  );
+  const professionalLines = professionalBusinessInfoLines(
+    professionalDisplay,
+    invoiceType,
+  );
+  const prepaidAmountLabel = row?.document?.prepaymentAmount;
+  const prepaidAmountValue = parseCurrencyValue(prepaidAmountLabel);
+  const remainingAfterPrepayment =
+    prepaidAmountValue > 0
+      ? formatCurrencyValue(
+          Math.max(0, parseCurrencyValue(totalPriceLabel) - prepaidAmountValue),
+        )
+      : null;
   const clientParty = clientPartyOverride ?? row?.document?.client;
 
   const clientLines = React.useMemo(
@@ -204,16 +205,7 @@ export default function FinanceInvoicePreview({
         y += blockHeight + 10;
       };
 
-      drawBlock("Professional's Business Info", [
-        `Legal Name: ${professionalName}`,
-        `Professional Address: ${professionalAddress || "-"}`,
-        ...(invoiceType === "company"
-          ? [
-              `Professional VAT No: ${professionalVat}`,
-              `Professional COC No: ${professionalCoc}`,
-            ]
-          : []),
-      ]);
+      drawBlock("Professional's Business Info", professionalLines);
       drawBlock(clientInfoTitle, [
         ...clientLines,
         ...(invoiceType === "company"
@@ -264,17 +256,27 @@ export default function FinanceInvoicePreview({
         });
       });
       doc.setFont("helvetica", "bold");
-      doc.text(
-        "Total (incl. VAT)",
-        left,
-        tableTop + 26 + lineItems.length * 18 + 22,
-      );
-      doc.text(
-        totalPriceLabel,
-        left + usableWidth - 20,
-        tableTop + 26 + lineItems.length * 18 + 22,
-        { align: "right" },
-      );
+      let totalsY = tableTop + 26 + lineItems.length * 18 + 22;
+      doc.text("Total (incl. VAT)", left, totalsY);
+      doc.text(totalPriceLabel, left + usableWidth - 20, totalsY, {
+        align: "right",
+      });
+      if (prepaidAmountLabel && prepaidAmountValue > 0) {
+        totalsY += 18;
+        doc.setFont("helvetica", "normal");
+        doc.text("Prepayment", left, totalsY);
+        doc.text(prepaidAmountLabel, left + usableWidth - 20, totalsY, {
+          align: "right",
+        });
+        if (remainingAfterPrepayment) {
+          totalsY += 18;
+          doc.setFont("helvetica", "bold");
+          doc.text("Remaining", left, totalsY);
+          doc.text(remainingAfterPrepayment, left + usableWidth - 20, totalsY, {
+            align: "right",
+          });
+        }
+      }
 
       doc.save(`invoice-${documentNumber}.pdf`);
       showSnackbar({
@@ -298,10 +300,10 @@ export default function FinanceInvoicePreview({
     invoiceType,
     lineItems,
     penaltySummary,
-    professionalAddress,
-    professionalCoc,
-    professionalName,
-    professionalVat,
+    prepaidAmountLabel,
+    prepaidAmountValue,
+    professionalLines,
+    remainingAfterPrepayment,
     serviceDate,
     settings.logoDataUrl,
     showSnackbar,
@@ -320,7 +322,7 @@ export default function FinanceInvoicePreview({
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: "1fr auto 1fr",
+          gridTemplateColumns: { xs: "1fr", sm: "1fr auto 1fr" },
           alignItems: "start",
           columnGap: 2,
         }}
@@ -364,7 +366,7 @@ export default function FinanceInvoicePreview({
             </Box>
           ) : null}
         </Box>
-        <Box sx={{ textAlign: "right" }}>
+        <Box sx={{ textAlign: { xs: "left", sm: "right" }, mt: { xs: 1.5, sm: 0 } }}>
           <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.62) }}>
             Invoice Date: {invoiceDate}
           </BodyText>
@@ -382,22 +384,14 @@ export default function FinanceInvoicePreview({
 
       <Stack spacing={1.25} sx={{ mt: 2 }}>
         <InfoBlock title="Professional's Business Info">
-          <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.62) }}>
-            Legal Name: {professionalName}
-          </BodyText>
-          <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.62) }}>
-            Professional Address: {professionalAddress || "-"}
-          </BodyText>
-          {invoiceType === "company" ? (
-            <>
-              <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.62) }}>
-                Professional VAT No: {professionalVat}
-              </BodyText>
-              <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.62) }}>
-                Professional COC No: {professionalCoc}
-              </BodyText>
-            </>
-          ) : null}
+          {professionalLines.map((line) => (
+            <BodyText
+              key={line}
+              sx={{ fontSize: 12.5, color: alpha(m.navy, 0.62) }}
+            >
+              {line}
+            </BodyText>
+          ))}
         </InfoBlock>
         <InfoBlock title={clientInfoTitle}>
           {clientLines.map((line) => (
@@ -468,15 +462,55 @@ export default function FinanceInvoicePreview({
             ))}
           </TableBody>
         </Table>
-        <Stack direction="row" justifyContent="space-between" sx={{ mt: 1.5 }}>
-          <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.65) }}>
-            Total (incl. VAT)
-          </BodyText>
-          <BodyText
-            sx={{ fontSize: 12.5, fontWeight: 900, color: alpha(m.navy, 0.78) }}
-          >
-            {totalPriceLabel}
-          </BodyText>
+        <Stack spacing={0.75} sx={{ mt: 1.5 }}>
+          <Stack direction="row" justifyContent="space-between">
+            <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.65) }}>
+              Total (incl. VAT)
+            </BodyText>
+            <BodyText
+              sx={{
+                fontSize: 12.5,
+                fontWeight: 900,
+                color: alpha(m.navy, 0.78),
+              }}
+            >
+              {totalPriceLabel}
+            </BodyText>
+          </Stack>
+          {prepaidAmountLabel && prepaidAmountValue > 0 ? (
+            <>
+              <Stack direction="row" justifyContent="space-between">
+                <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.65) }}>
+                  Prepayment
+                </BodyText>
+                <BodyText
+                  sx={{
+                    fontSize: 12.5,
+                    fontWeight: 900,
+                    color: alpha(m.navy, 0.78),
+                  }}
+                >
+                  {prepaidAmountLabel}
+                </BodyText>
+              </Stack>
+              {remainingAfterPrepayment ? (
+                <Stack direction="row" justifyContent="space-between">
+                  <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.65) }}>
+                    Remaining
+                  </BodyText>
+                  <BodyText
+                    sx={{
+                      fontSize: 12.5,
+                      fontWeight: 900,
+                      color: alpha(m.navy, 0.78),
+                    }}
+                  >
+                    {remainingAfterPrepayment}
+                  </BodyText>
+                </Stack>
+              ) : null}
+            </>
+          ) : null}
         </Stack>
       </Box>
 

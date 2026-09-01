@@ -76,13 +76,12 @@ export function validateBusinessSetupForPublish(
     if (condition) missing.push(label);
   };
 
-  requireField(isBlank(input.profileName), "Name");
+  requireField(isBlank(input.profileName), "Salon name");
   requireField(isBlank(input.about), "About");
   requireField(input.keywords.length === 0, "Keywords");
   requireField(input.mediaCount === 0, "Profile media");
 
   if (input.offering === "Fixed Location" || input.offering === "Both") {
-    requireField(isBlank(input.fixedLocation.salonName), "Salon name");
     requireField(isBlank(input.fixedLocation.streetAddress), "Street address");
     requireField(isBlank(input.fixedLocation.streetNumber), "Street number");
     requireField(isBlank(input.fixedLocation.postalCode), "Postal code");

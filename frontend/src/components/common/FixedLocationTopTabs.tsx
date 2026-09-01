@@ -68,7 +68,7 @@ export default function FixedLocationTopTabs({
         direction="row"
         spacing={0}
         sx={{
-          overflowX: "hidden",
+          overflowX: "auto",
           position: "relative",
           bgcolor: "transparent",
           backgroundColor: "transparent",
@@ -76,15 +76,15 @@ export default function FixedLocationTopTabs({
           width: "100%",
           justifyContent: "space-between",
 
-          // ✅ Hide scrollbar (Chrome, Safari, Edge)
+          // Hide scrollbar (Chrome, Safari, Edge)
           "&::-webkit-scrollbar": {
             display: "none",
           },
 
-          // ✅ Hide scrollbar (Firefox)
+          // Hide scrollbar (Firefox)
           scrollbarWidth: "none",
 
-          // ✅ Hide scrollbar (IE/Edge legacy)
+          // Hide scrollbar (IE/Edge legacy)
           msOverflowStyle: "none",
 
           "&:after": {
@@ -115,6 +115,7 @@ export default function FixedLocationTopTabs({
                 textDecoration: "none",
                 whiteSpace: "nowrap",
                 flex: "1 1 0",
+                minWidth: { xs: 72, md: 0 },
                 textAlign: "center",
                 letterSpacing: "-0.01em",
                 bgcolor: "#fff",
@@ -122,9 +123,9 @@ export default function FixedLocationTopTabs({
                 color: active
                   ? theme.palette.text.primary
                   : alpha(theme.palette.text.secondary, 0.75),
-                fontSize: 16,
-                pt: 1.6,
-                pb: 1.55,
+                fontSize: { xs: 13, sm: 14, md: 16 },
+                pt: { xs: 1.25, md: 1.6 },
+                pb: { xs: 1.2, md: 1.55 },
                 fontWeight: active ? 700 : 500,
                 position: "relative",
                 zIndex: 1,

@@ -114,7 +114,7 @@ function ConfigurableSectionBlock({
         {SYNC_SECTION_LABELS[sectionId]}
       </Typography>
       <RadioGroup
-        value={mode}
+        value={mode === "sync" ? "sync" : "independent"}
         onChange={(e) => onChange(e.target.value as TemplateSyncMode)}
       >
         {TEMPLATE_SYNC_MODE_OPTIONS.map((option) => (

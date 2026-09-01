@@ -143,11 +143,17 @@ export function useActiveClientBooking() {
       return enrichClientBookingRecord({
         ...fromApi,
         draft,
+        prepaid: Boolean(fromApi.prepaid || sessionRecord.prepaid),
         incomingEditRequest: fromApi.incomingEditRequest ?? sessionRecord.incomingEditRequest,
       });
     }
 
-    if (fromApi) return enrichClientBookingRecord(fromApi);
+    if (fromApi) {
+      if (sessionRecord && sameBooking(fromApi, sessionRecord) && sessionRecord.prepaid && !fromApi.prepaid) {
+        return enrichClientBookingRecord({ ...fromApi, prepaid: true });
+      }
+      return enrichClientBookingRecord(fromApi);
+    }
 
     if (!sessionRecord) return null;
 

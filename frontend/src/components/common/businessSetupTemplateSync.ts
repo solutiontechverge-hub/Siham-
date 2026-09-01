@@ -1,4 +1,4 @@
-export type TemplateSyncMode = "sync" | "syncAndEdit" | "independent";
+export type TemplateSyncMode = "sync" | "independent";
 
 /** Sections that appear in the sync settings UI. */
 export type TemplateSyncSectionId =
@@ -20,12 +20,14 @@ export const TEMPLATE_SYNC_MODE_OPTIONS: ReadonlyArray<{
   {
     value: "sync",
     label: "Sync",
-    description: "Always match — edit in either template updates both in real-time",
+    description:
+      "Always match — editing in either FL or DL updates both in real-time. DEFAULT option.",
   },
   {
-    value: "syncAndEdit",
-    label: "Sync and edit",
-    description: "Copy once from Fixed (fields filled), then edit Desired independently (default)",
+    value: "independent",
+    label: "Independent",
+    description:
+      "Breaks the sync. Current content in both templates is kept as-is. From that moment, each template's version of the section is edited separately and no longer affects the other.",
   },
 ] as const;
 
@@ -49,7 +51,7 @@ export const SYNC_SECTION_LABELS: Record<TemplateSyncSectionId, string> = {
   portfolio: "Portfolios",
 };
 
-/** Field keys mirrored when a section is in live `sync` (or copied for syncAndEdit). */
+/** Field keys mirrored when a section is in live `sync`. */
 export const SECTION_SYNC_FIELDS = {
   profile: ["profileName", "about", "keywordDraft", "keywords"] as const,
   serviceFor: ["serviceFor", "amenities"] as const,
@@ -71,16 +73,16 @@ export function createDefaultTemplateSyncSettings(): TemplateSyncSettings {
   return {
     profile: "sync",
     location: "independent",
-    serviceFor: "syncAndEdit",
-    servicesDetails: "syncAndEdit",
-    manageTeam: "syncAndEdit",
-    infoAndPolicy: "syncAndEdit",
-    portfolio: "syncAndEdit",
+    serviceFor: "sync",
+    servicesDetails: "sync",
+    manageTeam: "sync",
+    infoAndPolicy: "sync",
+    portfolio: "sync",
   };
 }
 
 export function isTemplateSyncMode(value: unknown): value is TemplateSyncMode {
-  return value === "sync" || value === "syncAndEdit" || value === "independent";
+  return value === "sync" || value === "independent";
 }
 
 export function normalizeTemplateSyncSettings(raw: unknown): TemplateSyncSettings {
@@ -98,9 +100,12 @@ export function normalizeTemplateSyncSettings(raw: unknown): TemplateSyncSetting
 
   for (const sectionId of CONFIGURABLE_SYNC_SECTION_IDS) {
     const value = source[sectionId];
-    if (isTemplateSyncMode(value)) {
-      // Legacy "independent" is no longer offered; treat as syncAndEdit.
-      next[sectionId] = value === "independent" ? "syncAndEdit" : value;
+    if (value === "sync") {
+      next[sectionId] = "sync";
+    } else if (value === "independent" || value === "syncAndEdit") {
+      // Independent keeps current content in each template.
+      // Legacy "syncAndEdit" was one-time copy then independent editing.
+      next[sectionId] = "independent";
     }
   }
 
@@ -114,24 +119,6 @@ export function pickSectionFields<T extends Record<string, unknown>>(
   const fields = SECTION_SYNC_FIELDS[sectionId];
   if (!fields.length) return {};
   return Object.fromEntries(fields.map((key) => [key, state[key as keyof T]])) as Partial<T>;
-}
-
-export function blankSectionFields<T extends Record<string, unknown>>(
-  state: T,
-  sectionId: keyof typeof SECTION_SYNC_FIELDS,
-): Partial<T> {
-  const fields = SECTION_SYNC_FIELDS[sectionId];
-  const blank: Record<string, unknown> = {};
-  for (const key of fields) {
-    const current = state[key as keyof T];
-    if (typeof current === "string") blank[key] = "";
-    else if (Array.isArray(current)) blank[key] = [];
-    else if (current && typeof current === "object" && "men" in (current as object)) {
-      blank[key] = { men: false, women: false, kids: false };
-    } else if (typeof current === "boolean") blank[key] = false;
-    else blank[key] = current;
-  }
-  return blank as Partial<T>;
 }
 
 export function getSectionIdForField(key: string): TemplateSyncSectionId | null {

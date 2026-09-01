@@ -92,6 +92,42 @@ export function emitNotificationChanged(userId) {
   messagingIo.to(`user:${userId}`).emit("notifications:changed", { userId });
 }
 
+export function emitBusinessChanged(payload = {}) {
+  if (!messagingIo) return;
+  const businessSetupId = payload.business_setup_id
+    ? String(payload.business_setup_id)
+    : "";
+  const eventPayload = {
+    action: payload.action || "updated",
+    scope: payload.scope || "listing",
+    business_setup_id: businessSetupId || null,
+  };
+  messagingIo.to("listing:public").emit("business:changed", eventPayload);
+  if (businessSetupId) {
+    messagingIo.to(`business:${businessSetupId}`).emit("business:changed", eventPayload);
+  }
+}
+
+export function emitBusinessChangedForProfile(professionalProfileId, payload = {}) {
+  if (!professionalProfileId) {
+    emitBusinessChanged(payload);
+    return;
+  }
+  void query(
+    `SELECT id FROM business_setups WHERE professional_profile_id = $1 LIMIT 1`,
+    [professionalProfileId],
+  )
+    .then((result) => {
+      emitBusinessChanged({
+        ...payload,
+        business_setup_id: result.rows[0]?.id ?? null,
+      });
+    })
+    .catch(() => {
+      emitBusinessChanged(payload);
+    });
+}
+
 export function attachMessagingSocket(httpServer) {
   const io = new Server(httpServer, {
     cors: {
@@ -116,6 +152,10 @@ export function attachMessagingSocket(httpServer) {
 
     socket.on("bookings:join-business", ({ businessSetupId } = {}) => {
       if (businessSetupId) socket.join(`business:${businessSetupId}`);
+    });
+
+    socket.on("listing:join", () => {
+      socket.join("listing:public");
     });
 
     socket.on("messaging:history", async ({ threadId }, callback) => {

@@ -128,7 +128,7 @@ export default function AppDrawer({
           alignItems={subtitle ? "flex-start" : "center"}
           justifyContent="space-between"
           sx={{
-            px: 2.5,
+            px: { xs: 2, sm: 2.5 },
             py: 1.75,
             flexShrink: 0,
             bgcolor: headerBg,

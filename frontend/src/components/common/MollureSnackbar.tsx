@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Box, Portal } from "@mui/material";
+import { usePathname } from "next/navigation";
 import MollureSnackbarAlert from "./MollureSnackbarAlert";
 import type { MollureSnackbarSeverity } from "../../theme/mollureSnackbar";
 
@@ -20,6 +21,9 @@ export default function MollureSnackbar({
   onClose,
   autoHideDuration = 4000,
 }: MollureSnackbarProps) {
+  const pathname = usePathname();
+  const isClientApp = Boolean(pathname?.startsWith("/clients"));
+
   React.useEffect(() => {
     if (!open || autoHideDuration == null) return;
     const timer = window.setTimeout(() => onClose(), autoHideDuration);
@@ -37,10 +41,12 @@ export default function MollureSnackbar({
           zIndex: (theme) => theme.zIndex.modal + 20,
           left: 0,
           right: 0,
-          top: { xs: 16, sm: 24 },
+          ...(isClientApp
+            ? { bottom: { xs: 16, sm: 24 } }
+            : { top: { xs: 16, sm: 24 } }),
           display: "flex",
           justifyContent: "center",
-          px: 2,
+          px: { xs: 2, sm: 3 },
           pointerEvents: "none",
           "& > *": { pointerEvents: "auto" },
         }}

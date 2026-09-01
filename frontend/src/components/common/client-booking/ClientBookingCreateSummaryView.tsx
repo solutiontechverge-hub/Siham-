@@ -55,10 +55,25 @@ import {
 import { buildBookingSummarySections, resolveTeamMemberFirstName } from "./buildBookingSummarySections";
 import { locationModeChipSx } from "./locationModeChipSx";
 import BookingSummaryNote from "./BookingSummaryNote";
+import BookingTotalPriceCard from "../calendar/BookingTotalPriceCard";
+import {
+  partitionBookingProducts,
+  summarizeClientBookingPrice,
+  withoutItemizedBookingSummaryLines,
+} from "../calendar/bookingTotal";
+import {
+  parseCalendarEntryNotes,
+  resolveKilometerAllowanceAmount,
+} from "../calendar/bookingEventDetails";
 import BookingLineAmount from "../calendar/BookingLineAmount";
+import { usePublicFinanceSettings } from "../finance-documents/usePublicFinanceSettings";
+import {
+  checkoutPaymentMethodSupportsPayNow,
+  isOfflinePaymentMethod,
+  resolveCheckoutPaymentOptions,
+} from "./checkoutPaymentOptions";
 import {
   clientLineDiscountLabel,
-  formatBookingEur,
 } from "../../../data/bookingLinePricing";
 import ClientBookingProjectDetailsCard from "./ClientBookingProjectDetailsCard";
 import StripePrepaymentDialog from "./StripePrepaymentDialog";
@@ -103,6 +118,20 @@ export default function ClientBookingCreateSummaryView() {
 
   const locationMode = shop?.locationMode ?? "fixed";
   const isDesired = locationMode === "desired";
+  const { transactionOptions } = usePublicFinanceSettings(shop?.shopId);
+  const checkoutPaymentOptions = React.useMemo(
+    () =>
+      resolveCheckoutPaymentOptions(
+        transactionOptions,
+        locationMode,
+        parseCalendarEntryNotes(activeBooking?.notes)?.paymentMethod,
+      ),
+    [activeBooking?.notes, locationMode, transactionOptions],
+  );
+  const checkoutMethodId = checkoutPaymentOptions[0]?.id ?? "onlineDirect";
+  const isOfflinePay =
+    checkoutPaymentOptions.length > 0 &&
+    checkoutPaymentOptions.every((option) => isOfflinePaymentMethod(option.id));
   const bookingSetup = React.useMemo(
     () =>
       businessSetupsData?.data?.find((row) => row.id === shop?.shopId) ?? null,
@@ -210,40 +239,80 @@ export default function ClientBookingCreateSummaryView() {
     return (
       shop?.addressLabel?.trim() ||
       shop?.municipalityLabel?.trim() ||
+      businessProfile?.fixedLocation?.formattedAddress?.trim() ||
       "Studio location"
     );
-  }, [address, isDesired, shop?.addressLabel, shop?.municipalityLabel]);
+  }, [
+    address,
+    businessProfile?.fixedLocation?.formattedAddress,
+    isDesired,
+    shop?.addressLabel,
+    shop?.municipalityLabel,
+  ]);
 
   const total = draft?.total ?? 0;
-  const actualAmount = React.useMemo(
-    () =>
-      (draft?.services ?? []).reduce(
-        (sum, service) =>
-          sum + (Number(service.originalPrice ?? service.price) || 0),
-        0,
-      ) || total,
-    [draft?.services, total],
+  const bookingNotesMeta = React.useMemo(
+    () => parseCalendarEntryNotes(activeBooking?.notes),
+    [activeBooking?.notes],
   );
+  const kilometerAllowanceAmount = React.useMemo(
+    () =>
+      isDesired
+        ? resolveKilometerAllowanceAmount(bookingNotesMeta?.kilometerAllowance)
+        : 0,
+    [bookingNotesMeta?.kilometerAllowance, isDesired],
+  );
+  const extrasAmount =
+    isDesired &&
+    Boolean(bookingNotesMeta?.showKilometerAllowance) &&
+    kilometerAllowanceAmount > 0
+      ? kilometerAllowanceAmount
+      : 0;
   const prepaymentPercent =
     Number(activeBooking?.prepaymentPercent) > 0
       ? Number(activeBooking?.prepaymentPercent)
       : profilePrepaymentPercent;
   const isPrepaymentPaid = Boolean(activeBooking?.prepaid);
-  const mustPayBeforeBooking = requiresPrepayment && !isPrepaymentPaid;
+  const mustPayBeforeBooking =
+    !isDesired &&
+    requiresPrepayment &&
+    !isPrepaymentPaid &&
+    !isOfflinePay &&
+    checkoutPaymentMethodSupportsPayNow(checkoutMethodId);
   const showFixedPrepayRow =
-    !isDesired && requiresPrepayment && prepaymentPercent > 0 && total > 0;
+    !isDesired && requiresPrepayment && prepaymentPercent > 0;
   const showDesiredPrepayNote =
-    isDesired && prepaymentPercent > 0 && total > 0;
-  const prepayAmount =
-    Math.round(((total * prepaymentPercent) / 100 + Number.EPSILON) * 100) /
-    100;
-  const remainingAfterPrepay = Math.max(
-    0,
-    Math.round((total - prepayAmount + Number.EPSILON) * 100) / 100,
-  );
-  const deductPrepayment =
-    (showFixedPrepayRow || showDesiredPrepayNote) && prepayAmount > 0;
-  const displayTotal = deductPrepayment ? remainingAfterPrepay : total;
+    isDesired && prepaymentPercent > 0;
+  const checkoutPrice = summarizeClientBookingPrice({
+    services: draft?.services,
+    people: draft?.people,
+    products: draft?.products,
+    extrasAmount,
+    discount: bookingNotesMeta?.totalDiscount ?? null,
+    showLateCancellation: Boolean(bookingNotesMeta?.showLateCancellation),
+    lateCancellationFeePercent: bookingNotesMeta?.lateCancellationFeePercent,
+    showLateRescheduling: Boolean(bookingNotesMeta?.showLateRescheduling),
+    lateRescheduleFeePercent: bookingNotesMeta?.lateRescheduleFeePercent,
+    showPrepayment:
+      (showFixedPrepayRow || showDesiredPrepayNote) && prepaymentPercent > 0,
+    prepaymentPercent,
+    prepaymentPaid: isPrepaymentPaid,
+    prepaymentOffline: isOfflinePay,
+  });
+  const checkoutLines = withoutItemizedBookingSummaryLines(checkoutPrice.lines);
+  const { products: catalogProducts, uniqueItems: catalogUniqueItems } =
+    partitionBookingProducts(draft?.products);
+  const catalogHeadingSx = {
+    fontWeight: 800,
+    fontSize: 12,
+    color: alpha(m.navy, 0.55),
+    mb: 1,
+  } as const;
+  const checkoutTotal =
+    checkoutPrice.breakdown.bookingTotal > 0
+      ? checkoutPrice.breakdown.bookingTotal
+      : total;
+  const prepayAmount = checkoutPrice.breakdown.prepaymentAmount;
   const contactPhoneValue = formatContactPhone(countryCode, phone);
   const bookingRef = activeBooking?.bookingRef ?? "";
 
@@ -257,7 +326,7 @@ export default function ClientBookingCreateSummaryView() {
         message:
           phoneErrors.phone ??
           phoneErrors.countryCode ??
-          "Please add a contact number in your profile.",
+          "Please enter a valid contact number.",
       });
       return false;
     }
@@ -374,6 +443,9 @@ export default function ClientBookingCreateSummaryView() {
       record: {
         ...record,
         contactPhone: contactPhoneValue,
+        draft: record.draft
+          ? { ...record.draft, total: checkoutTotal }
+          : record.draft,
       },
       locationMode,
       setup: bookingSetup,
@@ -388,6 +460,7 @@ export default function ClientBookingCreateSummaryView() {
     return result.record;
   }, [
     bookingSetup,
+    checkoutTotal,
     contactPhoneValue,
     createBooking,
     locationMode,
@@ -469,14 +542,12 @@ export default function ClientBookingCreateSummaryView() {
 
     setIsPaying(true);
     try {
-      const record = await ensureBookingCreated();
-      if (!record) return;
-      setStripeDialogOpen(true);
+      await completePrepayment();
     } finally {
       setIsPaying(false);
     }
   }, [
-    ensureBookingCreated,
+    completePrepayment,
     isPaying,
     isPrepaymentPaid,
     prepayAmount,
@@ -540,6 +611,9 @@ export default function ClientBookingCreateSummaryView() {
         record: {
           ...record,
           contactPhone: contactPhoneValue,
+        draft: record.draft
+          ? { ...record.draft, total: checkoutTotal }
+          : record.draft,
         },
         locationMode,
         setup: bookingSetup,
@@ -578,6 +652,7 @@ export default function ClientBookingCreateSummaryView() {
   }, [
     activeBooking,
     bookingSetup,
+    checkoutTotal,
     contactPhoneValue,
     createBooking,
     isDesired,
@@ -778,6 +853,9 @@ export default function ClientBookingCreateSummaryView() {
           <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
 
           <Box sx={{ px: { xs: 2, md: 2.5 }, py: 1.75 }}>
+            {summarySections.length > 0 ? (
+              <Typography sx={catalogHeadingSx}>Service</Typography>
+            ) : null}
             <Stack spacing={1.5} divider={<Divider sx={{ borderColor: alpha(m.navy, 0.08) }} />}>
               {summarySections.map((section) => {
                 const roleLabel = roleLabelForSection(section);
@@ -884,7 +962,7 @@ export default function ClientBookingCreateSummaryView() {
                           >
                             <Stack
                               direction="row"
-                              alignItems="flex-start"
+                              alignItems="center"
                               justifyContent="space-between"
                               spacing={1}
                             >
@@ -973,6 +1051,96 @@ export default function ClientBookingCreateSummaryView() {
                 );
               })}
             </Stack>
+            {catalogProducts.length > 0 ? (
+              <Box sx={{ mt: 2 }}>
+                <Typography sx={catalogHeadingSx}>Product</Typography>
+                <Stack spacing={1}>
+                  {catalogProducts.map((product) => (
+                    <Box
+                      key={product.id}
+                      sx={{
+                        borderRadius: "10px",
+                        border: `1px solid ${alpha(m.navy, 0.06)}`,
+                        px: 1.25,
+                        py: 1,
+                        bgcolor: alpha(m.navy, 0.015),
+                      }}
+                    >
+                      <Stack
+                        direction="row"
+                        alignItems="center"
+                        justifyContent="space-between"
+                        spacing={1}
+                      >
+                        <Typography
+                          sx={{
+                            fontSize: 13,
+                            fontWeight: 900,
+                            color: alpha(m.navy, 0.82),
+                            lineHeight: 1.2,
+                            minWidth: 0,
+                          }}
+                        >
+                          {product.quantity > 1
+                            ? `${product.name} ×${product.quantity}`
+                            : product.name}
+                        </Typography>
+                        <BookingLineAmount
+                          amount={product.price}
+                          originalAmount={product.originalPrice}
+                          discountLabel={clientLineDiscountLabel(product)}
+                        />
+                      </Stack>
+                    </Box>
+                  ))}
+                </Stack>
+              </Box>
+            ) : null}
+            {catalogUniqueItems.length > 0 ? (
+              <Box sx={{ mt: 2 }}>
+                <Typography sx={catalogHeadingSx}>Unique item</Typography>
+                <Stack spacing={1}>
+                  {catalogUniqueItems.map((item) => (
+                    <Box
+                      key={item.id}
+                      sx={{
+                        borderRadius: "10px",
+                        border: `1px solid ${alpha(m.navy, 0.06)}`,
+                        px: 1.25,
+                        py: 1,
+                        bgcolor: alpha(m.navy, 0.015),
+                      }}
+                    >
+                      <Stack
+                        direction="row"
+                        alignItems="center"
+                        justifyContent="space-between"
+                        spacing={1}
+                      >
+                        <Typography
+                          sx={{
+                            fontSize: 13,
+                            fontWeight: 900,
+                            color: alpha(m.navy, 0.82),
+                            lineHeight: 1.2,
+                            minWidth: 0,
+                          }}
+                        >
+                          {item.quantity > 1
+                            ? `${item.name} ×${item.quantity}`
+                            : item.name}
+                        </Typography>
+                        <BookingLineAmount
+                          amount={item.price}
+                          originalAmount={item.originalPrice}
+                          discountLabel={clientLineDiscountLabel(item)}
+                        />
+                      </Stack>
+                    </Box>
+                  ))}
+                </Stack>
+              </Box>
+            ) : null}
             {draft?.clientNote?.trim() ? (
               <Box sx={{ mt: 1.5 }}>
                 <BookingSummaryNote note={draft.clientNote} />
@@ -1145,168 +1313,71 @@ export default function ClientBookingCreateSummaryView() {
           </Box>
 
           <Box sx={{ px: 0, pt: 1.75 }}>
-            <Box
-              sx={{
-                borderRadius: "10px",
-                bgcolor: alpha(m.navy, 0.035),
-                border: `1px solid ${alpha(m.navy, 0.22)}`,
-                px: { xs: 1.5, md: 2 },
-                py: 1.35,
-              }}
-            >
-              <Stack
-                direction="row"
-                alignItems="center"
-                justifyContent="space-between"
-                spacing={1.5}
-              >
-                <Typography
-                  sx={{ fontWeight: 600, fontSize: 13, color: alpha(m.navy, 0.48) }}
-                >
-                  Total Price
-                </Typography>
-                <Stack alignItems="flex-end" spacing={0.2}>
-                  {actualAmount > displayTotal ? (
-                    <Typography
-                      sx={{
-                        fontWeight: 700,
-                        fontSize: 13,
-                        color: alpha(m.navy, 0.38),
-                        textDecoration: "line-through",
-                        lineHeight: 1.15,
-                      }}
-                    >
-                      €{formatBookingEur(actualAmount)}
-                    </Typography>
-                  ) : null}
+            <BookingTotalPriceCard
+              totalPrice={checkoutPrice.displayTotal}
+              originalPrice={checkoutPrice.originalPrice}
+              discountAmount={checkoutPrice.breakdown.discountAmount}
+              lines={checkoutLines}
+              prepaidPercent={
+                showFixedPrepayRow || showDesiredPrepayNote
+                  ? prepaymentPercent
+                  : undefined
+              }
+              prepaidAmount={
+                showFixedPrepayRow || showDesiredPrepayNote ? prepayAmount : 0
+              }
+              remainingAmount={
+                showFixedPrepayRow || showDesiredPrepayNote
+                  ? checkoutPrice.breakdown.remainingAfterPrepayment
+                  : undefined
+              }
+              prepaidAction={
+                showFixedPrepayRow && !isPrepaymentPaid && !isOfflinePay ? (
                   <Typography
+                    component="button"
+                    type="button"
+                    onClick={() => void handlePayNow()}
+                    disabled={isPaying}
                     sx={{
-                      fontWeight: 700,
-                      fontSize: 15,
-                      color: alpha(m.navy, 0.55),
-                      flexShrink: 0,
+                      border: 0,
+                      bgcolor: "transparent",
+                      p: 0,
+                      cursor: isPaying ? "wait" : "pointer",
+                      color: m.teal,
+                      fontWeight: 900,
+                      fontSize: 12.5,
+                      fontFamily: "inherit",
+                      opacity: isPaying ? 0.7 : 1,
+                      "&:hover": { color: m.tealDark },
                     }}
                   >
-                    €{formatBookingEur(displayTotal)}
+                    {isPaying ? "Preparing…" : "Pay Now"}
                   </Typography>
-                  {deductPrepayment ? (
-                    <Typography
-                      sx={{
-                        fontWeight: 800,
-                        fontSize: 11,
-                        color: m.teal,
-                        lineHeight: 1.15,
-                      }}
-                    >
-                      −€{formatBookingEur(prepayAmount)} Prepaid
-                    </Typography>
-                  ) : null}
-                </Stack>
-              </Stack>
-
-              {showFixedPrepayRow ? (
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  justifyContent="space-between"
-                  spacing={1.5}
-                  sx={{ mt: 0.85 }}
-                >
+                ) : showFixedPrepayRow && isPrepaymentPaid ? (
                   <Typography
                     sx={{
-                      fontWeight: 600,
+                      fontWeight: 800,
                       fontSize: 12,
-                      color: alpha(m.navy, 0.42),
-                      minWidth: 0,
+                      color: m.teal,
                     }}
                   >
-                    {isPrepaymentPaid
-                      ? `Prepaid (${prepaymentPercent}%)`
-                      : `Prepayment Required (${prepaymentPercent}%)`}
+                    Paid
                   </Typography>
-                  <Stack
-                    direction="row"
-                    alignItems="center"
-                    spacing={1.25}
-                    sx={{ flexShrink: 0 }}
-                  >
-                    {!isPrepaymentPaid ? (
-                      <Typography
-                        component="button"
-                        type="button"
-                        onClick={() => void handlePayNow()}
-                        disabled={isPaying}
-                        sx={{
-                          border: 0,
-                          bgcolor: "transparent",
-                          p: 0,
-                          cursor: isPaying ? "wait" : "pointer",
-                          color: m.teal,
-                          fontWeight: 900,
-                          fontSize: 12.5,
-                          fontFamily: "inherit",
-                          opacity: isPaying ? 0.7 : 1,
-                          "&:hover": { color: m.tealDark },
-                        }}
-                      >
-                        {isPaying ? "Preparing…" : "Pay Now"}
-                      </Typography>
-                    ) : (
-                      <Typography
-                        sx={{
-                          fontWeight: 800,
-                          fontSize: 12,
-                          color: m.teal,
-                        }}
-                      >
-                        Paid
-                      </Typography>
-                    )}
-                    <Typography
-                      sx={{
-                        fontWeight: 600,
-                        fontSize: 13,
-                        color: alpha(m.navy, 0.48),
-                        textAlign: "right",
-                      }}
-                    >
-                      €{prepayAmount}
-                    </Typography>
-                  </Stack>
-                </Stack>
-              ) : null}
-
-              {showDesiredPrepayNote ? (
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  justifyContent="space-between"
-                  spacing={1.5}
-                  sx={{ mt: 0.75 }}
-                >
-                  <Typography
-                    sx={{
-                      fontWeight: 600,
-                      fontSize: 11.5,
-                      color: alpha(m.navy, 0.42),
-                      minWidth: 0,
-                    }}
-                  >
-                    Prepayment Required ({prepaymentPercent}%) After Acceptance
-                  </Typography>
-                  <Typography
-                    sx={{
-                      fontWeight: 600,
-                      fontSize: 13,
-                      color: alpha(m.navy, 0.48),
-                      flexShrink: 0,
-                    }}
-                  >
-                    €{prepayAmount}
-                  </Typography>
-                </Stack>
-              ) : null}
-            </Box>
+                ) : undefined
+              }
+            />
+            {showDesiredPrepayNote ? (
+              <Typography
+                sx={{
+                  mt: 0.85,
+                  fontWeight: 700,
+                  fontSize: 11.5,
+                  color: alpha(m.navy, 0.5),
+                }}
+              >
+                Prepayment is collected after the professional accepts.
+              </Typography>
+            ) : null}
           </Box>
 
           <AppButton

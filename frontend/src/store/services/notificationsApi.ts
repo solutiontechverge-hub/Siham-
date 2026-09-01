@@ -30,6 +30,15 @@ export type NotificationsQueryArg = ListPaginationParams & {
   audience?: NotificationAudience;
 };
 
+const PREPAYMENT_NOTIFICATION_TITLES: Record<string, string> = {
+  "client.payment.prepayment_received": "Prepayment Made Successfully",
+  "pro.payment.prepayment_received": "Prepayment Received",
+};
+
+export function displayNotificationTitle(item: Pick<AppNotificationItem, "notificationType" | "title">) {
+  return PREPAYMENT_NOTIFICATION_TITLES[item.notificationType] ?? item.title;
+}
+
 type ApiEnvelope<T> = {
   success: boolean;
   message: string;
