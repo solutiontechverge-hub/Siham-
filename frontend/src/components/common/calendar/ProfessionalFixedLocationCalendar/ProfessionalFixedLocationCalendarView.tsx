@@ -208,8 +208,12 @@ import {
 } from "../../../../data/bookingUniqueItem.data";
 import {
   getCombinedAvailabilityIntervals,
+  getLocationAvailabilityBands,
   getLocationAvailabilityIntervals,
+  locationAvailabilityKindAtMinute,
+  locationAvailabilityTooltip,
   makeScheduleRowId,
+  type LocationAvailabilityKind,
 } from "../calendar-schedule.utils";
 import {
   defaultBookingRules,
@@ -237,9 +241,6 @@ import {
   blockTitleFromDraft,
   buildBlocksFromDraft,
   getCalendarQueryDateRange,
-  getPublicBusinessHoursInterval,
-  getPublicBusinessHoursNotAvailableNote,
-  isPublicBusinessHoursNotAvailable,
   type CalendarQueryDateRange,
   type BlockTimeDraft,
   type Interval,
@@ -424,6 +425,24 @@ const locationToApi = (location: CalendarBookingLocation) =>
   location === "DL" ? "desired" : "fixed";
 const isMinuteInAvailability = (minute: number, windows: readonly Interval[]) =>
   windows.some((w) => minute >= w.startMin && minute < w.endMin);
+const AVAILABILITY_PATTERN_LINE = "#D0D5DD";
+const locationAvailabilityPatternSx = (kind: LocationAvailabilityKind) => {
+  if (kind === "desired") {
+    return {
+      backgroundImage: `repeating-linear-gradient(90deg, transparent 0px, transparent 5px, ${AVAILABILITY_PATTERN_LINE} 5px, ${AVAILABILITY_PATTERN_LINE} 6px)`,
+    };
+  }
+  if (kind === "both") {
+    return {
+      backgroundImage: `repeating-linear-gradient(90deg, ${AVAILABILITY_PATTERN_LINE} 0px, ${AVAILABILITY_PATTERN_LINE} 1px, transparent 1px, transparent 6px)`,
+      maskImage:
+        "repeating-linear-gradient(180deg, #000 0px, #000 3px, transparent 3px, transparent 7px)",
+      WebkitMaskImage:
+        "repeating-linear-gradient(180deg, #000 0px, #000 3px, transparent 3px, transparent 7px)",
+    };
+  }
+  return {};
+};
 const formatWeekDayName = (iso: string) =>
   parseIsoDate(iso).toLocaleDateString("en-US", {
     weekday: "short",
@@ -436,6 +455,8 @@ const formatWeekDayDate = (iso: string) =>
     timeZone: "UTC",
   });
 const WEEK_DAY_MIN_PX = 110;
+const TEAM_NAV_VISIBLE_SLOTS = 3;
+const TEAM_NAV_SCROLLBAR_PX = 10;
 
 export default function ProfessionalFixedLocationCalendar({
   data,
@@ -2444,46 +2465,63 @@ export default function ProfessionalFixedLocationCalendar({
     return [activeDateIso];
   }, [activeDateIso, viewMode]);
 
-  /** Public business hours window for a date (union across FL/DL). */
-  const getPublicWorkingHoursForDate = React.useCallback(
-    (isoDate: string): Interval | null => {
-      const entries = calendarSettings?.availability.publicBusinessHours;
-      const locations = data.supportedLocations.length
-        ? data.supportedLocations
-        : (["FL", "DL"] as const);
-      let start = Number.POSITIVE_INFINITY;
-      let end = Number.NEGATIVE_INFINITY;
-      for (const loc of locations) {
-        const interval = getPublicBusinessHoursInterval(entries, isoDate, loc);
-        if (!interval) continue;
-        start = Math.min(start, interval.startMin);
-        end = Math.max(end, interval.endMin);
-      }
-      if (
-        !Number.isFinite(start) ||
-        !Number.isFinite(end) ||
-        end <= start
-      ) {
-        return null;
-      }
-      return { startMin: start, endMin: end };
+  const getAvailabilityFor = React.useCallback(
+    (resourceId: string, iso: string): Interval[] => {
+      const fromSchedule = getCombinedAvailabilityIntervals(
+        resourceId,
+        iso,
+        scheduleRows,
+        dateOverrides ?? [],
+      );
+      if (fromSchedule.length) return mergeIntervals(fromSchedule);
+
+      const av = data.availability.find((a) => a.resourceId === resourceId);
+      if (!av) return [];
+      const dow = parseIsoDate(iso).getUTCDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+      const windows = av.weekly[dow] ?? [];
+      return mergeIntervals(
+        windows.map((w) => ({
+          startMin: minutesSinceMidnight(w.start),
+          endMin: minutesSinceMidnight(w.end),
+        })),
+      );
     },
-    [
-      calendarSettings?.availability.publicBusinessHours,
-      data.supportedLocations,
-    ],
+    [data.availability, dateOverrides, scheduleRows],
   );
 
-  /** Grid height follows public hours for visible days (no full-day scroller). */
+  const getLocationAvailability = React.useCallback(
+    (
+      resourceId: string,
+      iso: string,
+      location: CalendarBookingLocation,
+    ): Interval[] =>
+      mergeIntervals(
+        getLocationAvailabilityIntervals(
+          resourceId,
+          iso,
+          location,
+          scheduleRows,
+          dateOverrides ?? [],
+        ),
+      ),
+    [dateOverrides, scheduleRows],
+  );
+
+  /** Grid height follows each team member's Schedule for visible days. */
   const { startMin, endMin } = React.useMemo(() => {
     const step = grid.stepMinutes;
     let start = Number.POSITIVE_INFINITY;
     let end = Number.NEGATIVE_INFINITY;
+    const resourceIds = (
+      filteredResources.length ? filteredResources : data.resources
+    ).map((resource) => resource.id);
     for (const iso of visibleDates) {
-      const hours = getPublicWorkingHoursForDate(iso);
-      if (!hours) continue;
-      start = Math.min(start, hours.startMin);
-      end = Math.max(end, hours.endMin);
+      for (const resourceId of resourceIds) {
+        for (const hours of getAvailabilityFor(resourceId, iso)) {
+          start = Math.min(start, hours.startMin);
+          end = Math.max(end, hours.endMin);
+        }
+      }
     }
     if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
       return {
@@ -2496,7 +2534,9 @@ export default function ProfessionalFixedLocationCalendar({
       endMin: Math.ceil(end / step) * step,
     };
   }, [
-    getPublicWorkingHoursForDate,
+    data.resources,
+    filteredResources,
+    getAvailabilityFor,
     grid.endHour,
     grid.startHour,
     grid.stepMinutes,
@@ -2554,7 +2594,11 @@ export default function ProfessionalFixedLocationCalendar({
   // Week always needs the date header row; day only needs a header when staff exist.
   const timelineHeaderRows =
     viewMode === "week" ? (hasTeamMembers ? 2 : 1) : hasTeamMembers ? 1 : 0;
-  const timelineHeaderPx = laneHeaderPx * timelineHeaderRows;
+  const timelineHeaderPx =
+    laneHeaderPx * timelineHeaderRows +
+    (filteredResources.length > TEAM_NAV_VISIBLE_SLOTS
+      ? TEAM_NAV_SCROLLBAR_PX
+      : 0);
 
   const slotLines = React.useMemo(() => {
     const out: number[] = [];
@@ -2815,6 +2859,8 @@ export default function ProfessionalFixedLocationCalendar({
     absoluteTop: number;
     timeMin: number;
   } | null>(null);
+  const [availabilityHoverTitle, setAvailabilityHoverTitle] =
+    React.useState("");
   const handleTimelineHoverMove = React.useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
       const gridEl = timelineGridRef.current;
@@ -2837,6 +2883,7 @@ export default function ProfessionalFixedLocationCalendar({
   );
   const clearTimelineHover = React.useCallback(() => {
     setTimelineHover(null);
+    setAvailabilityHoverTitle("");
   }, []);
   React.useEffect(() => {
     setTimelineHover(null);
@@ -3245,47 +3292,6 @@ export default function ProfessionalFixedLocationCalendar({
     else setActiveDateIso(addDaysIso(activeDateIso, 1));
   };
 
-  const getAvailabilityFor = React.useCallback(
-    (resourceId: string, iso: string): Interval[] => {
-      const fromSchedule = getCombinedAvailabilityIntervals(
-        resourceId,
-        iso,
-        scheduleRows,
-        dateOverrides ?? [],
-      );
-      if (fromSchedule.length) return fromSchedule;
-
-      const av = data.availability.find((a) => a.resourceId === resourceId);
-      if (!av) return [];
-      const dow = parseIsoDate(iso).getUTCDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6;
-      const windows = av.weekly[dow] ?? [];
-      return windows.map((w) => ({
-        startMin: minutesSinceMidnight(w.start),
-        endMin: minutesSinceMidnight(w.end),
-      }));
-    },
-    [data.availability, dateOverrides, scheduleRows],
-  );
-
-  const getLocationAvailability = React.useCallback(
-    (
-      resourceId: string,
-      iso: string,
-      location: CalendarBookingLocation,
-    ): Interval[] => {
-      const fromSchedule = getLocationAvailabilityIntervals(
-        resourceId,
-        iso,
-        location,
-        scheduleRows,
-        dateOverrides ?? [],
-      );
-      if (fromSchedule.length) return fromSchedule;
-      return getAvailabilityFor(resourceId, iso);
-    },
-    [dateOverrides, getAvailabilityFor, scheduleRows],
-  );
-
   const getBusyFor = React.useCallback(
     (resourceId: string, iso: string): Interval[] => {
       const busy: Interval[] = [];
@@ -3328,24 +3334,13 @@ export default function ProfessionalFixedLocationCalendar({
     return fromServices > 0 ? fromServices : grid.stepMinutes;
   }, [grid.stepMinutes, selectedServices]);
 
-  const isPublicDayNotAvailable = React.useCallback(
-    (isoDate: string) =>
-      isPublicBusinessHoursNotAvailable(
-        calendarSettings?.availability.publicBusinessHours,
-        isoDate,
-        slotLocation,
-      ),
-    [calendarSettings?.availability.publicBusinessHours, slotLocation],
-  );
-
-  const getPublicDayNotAvailableNote = React.useCallback(
-    (isoDate: string) =>
-      getPublicBusinessHoursNotAvailableNote(
-        calendarSettings?.availability.publicBusinessHours,
-        isoDate,
-        slotLocation,
-      ),
-    [calendarSettings?.availability.publicBusinessHours, slotLocation],
+  const hasScheduleAvailabilityOnDate = React.useCallback(
+    (isoDate: string, resourceId?: string) => {
+      const id = resourceId || activeResource?.id || data.resources[0]?.id;
+      if (!id) return false;
+      return getAvailabilityFor(id, isoDate).length > 0;
+    },
+    [activeResource?.id, data.resources, getAvailabilityFor],
   );
 
   const drawerAvailableTimeSlots = React.useMemo(() => {
@@ -3353,33 +3348,16 @@ export default function ProfessionalFixedLocationCalendar({
       return [] as Array<{ time: string; disabled: boolean }>;
     }
 
-    const entries = calendarSettings?.availability.publicBusinessHours;
     const date = selectedSlot.date;
-
-    // Prefer public business hours for the active FL/DL location.
-    let hourWindows: Interval[] = [];
-    const primary = getPublicBusinessHoursInterval(entries, date, slotLocation);
-    if (primary) {
-      hourWindows = [primary];
-    } else {
-      // If hours are saved under the other location, still show those slots.
-      for (const loc of data.supportedLocations) {
-        if (loc === slotLocation) continue;
-        const alt = getPublicBusinessHoursInterval(entries, date, loc);
-        if (alt) {
-          hourWindows = [alt];
-          break;
-        }
-      }
-    }
-
-    // Fall back to the team member's schedule availability for this date.
-    if (!hourWindows.length) {
-      hourWindows = getAvailabilityFor(selectedSlot.resourceId, date);
-    }
+    const hourWindows = slotLocation
+      ? getLocationAvailability(selectedSlot.resourceId, date, slotLocation)
+      : [];
+    const resolvedWindows = hourWindows.length
+      ? hourWindows
+      : getAvailabilityFor(selectedSlot.resourceId, date);
 
     // Professional has not set hours/availability for this date.
-    if (!hourWindows.length) {
+    if (!resolvedWindows.length) {
       return [] as Array<{ time: string; disabled: boolean }>;
     }
 
@@ -3397,7 +3375,7 @@ export default function ProfessionalFixedLocationCalendar({
     const isPastDate = date < todayIso;
 
     const slots: Array<{ time: string; disabled: boolean }> = [];
-    for (const hours of hourWindows) {
+    for (const hours of resolvedWindows) {
       for (
         let min = hours.startMin;
         min < hours.endMin;
@@ -3414,12 +3392,11 @@ export default function ProfessionalFixedLocationCalendar({
     }
     return slots;
   }, [
-    calendarSettings?.availability.publicBusinessHours,
-    data.supportedLocations,
     drawerBookingDurationMins,
     editingEventId,
     getAvailabilityFor,
     getBusyFor,
+    getLocationAvailability,
     grid.stepMinutes,
     selectedSlot?.date,
     selectedSlot?.end,
@@ -3441,26 +3418,13 @@ export default function ProfessionalFixedLocationCalendar({
       return [] as Array<{ time: string; status: "available" | "occupied" }>;
     }
 
-    const entries = calendarSettings?.availability.publicBusinessHours;
     const date = selectedSlot.date;
-
-    let hourWindows: Interval[] = [];
-    const primary = getPublicBusinessHoursInterval(entries, date, slotLocation);
-    if (primary) {
-      hourWindows = [primary];
-    } else {
-      for (const loc of data.supportedLocations) {
-        if (loc === slotLocation) continue;
-        const alt = getPublicBusinessHoursInterval(entries, date, loc);
-        if (alt) {
-          hourWindows = [alt];
-          break;
-        }
-      }
-    }
-    if (!hourWindows.length) {
-      hourWindows = getAvailabilityFor(resourceId, date);
-    }
+    const locationWindows = slotLocation
+      ? getLocationAvailability(resourceId, date, slotLocation)
+      : [];
+    const hourWindows = locationWindows.length
+      ? locationWindows
+      : getAvailabilityFor(resourceId, date);
     if (!hourWindows.length) {
       return [] as Array<{ time: string; status: "available" | "occupied" }>;
     }
@@ -3500,12 +3464,11 @@ export default function ProfessionalFixedLocationCalendar({
     }
     return slots;
   }, [
-    calendarSettings?.availability.publicBusinessHours,
-    data.supportedLocations,
     drawerBookingDurationMins,
     editingEventId,
     getAvailabilityFor,
     getBusyFor,
+    getLocationAvailability,
     grid.stepMinutes,
     selectedSlot?.date,
     selectedSlot?.end,
@@ -3538,32 +3501,14 @@ export default function ProfessionalFixedLocationCalendar({
 
   const getDailyBookingRatio = React.useCallback(
     (resourceId: string, iso: string) => {
-      let availability = getAvailabilityFor(resourceId, iso);
-      if (!availability.length) {
-        const publicHours = getPublicWorkingHoursForDate(iso);
-        if (publicHours) availability = [publicHours];
-      }
-      if (!availability.length) {
-        availability = [
-          {
-            startMin: grid.startHour * 60,
-            endMin: grid.endHour * 60,
-          },
-        ];
-      }
+      const availability = getAvailabilityFor(resourceId, iso);
       const availableMins = sumIntervalsMins(availability);
       if (availableMins <= 0) return 0;
       const busy = getBusyFor(resourceId, iso);
       const bookedMins = sumIntervalsMins(mergeIntervals(busy));
       return Math.max(0, Math.min(1, bookedMins / availableMins));
     },
-    [
-      getAvailabilityFor,
-      getBusyFor,
-      getPublicWorkingHoursForDate,
-      grid.endHour,
-      grid.startHour,
-    ],
+    [getAvailabilityFor, getBusyFor],
   );
 
   const alphabeticalResources = React.useMemo(
@@ -3610,25 +3555,38 @@ export default function ProfessionalFixedLocationCalendar({
     });
   }, [defaultSelectedResourceId, filteredResources, viewMode]);
 
-  const teamNavVisibleSlots = 3;
   const teamNavMemberCount = teamNavResources.length;
-  const teamNavNeedsScroll = teamNavMemberCount > teamNavVisibleSlots;
+  const teamNavNeedsScroll = teamNavMemberCount > TEAM_NAV_VISIBLE_SLOTS;
   const teamNavScrollContentWidth = teamNavNeedsScroll
-    ? `calc(100cqw * ${teamNavMemberCount} / ${teamNavVisibleSlots})`
+    ? `calc(100% * ${teamNavMemberCount} / ${TEAM_NAV_VISIBLE_SLOTS})`
     : "100%";
   const teamNavGridTemplateColumns =
     teamNavMemberCount > 0
-      ? teamNavNeedsScroll
-        ? `repeat(${teamNavMemberCount}, calc(100cqw / ${teamNavVisibleSlots}))`
-        : `repeat(${teamNavMemberCount}, minmax(0, 1fr))`
+      ? `repeat(${teamNavMemberCount}, minmax(0, 1fr))`
       : "1fr";
   const teamNavScrollOverflowSx = {
     overflowX: teamNavNeedsScroll ? ("auto" as const) : ("hidden" as const),
     overflowY: "hidden" as const,
     WebkitOverflowScrolling: "touch" as const,
-    scrollbarWidth: "none" as const,
-    msOverflowStyle: "none" as const,
-    "&::-webkit-scrollbar": { display: "none" },
+    ...(teamNavNeedsScroll
+      ? {
+          scrollbarWidth: "thin" as const,
+          "&::-webkit-scrollbar": {
+            height: 8,
+            display: "block",
+          },
+          "&::-webkit-scrollbar-track": {
+            backgroundColor: alpha(m.navy, 0.06),
+          },
+          "&::-webkit-scrollbar-thumb": {
+            backgroundColor: alpha(m.navy, 0.32),
+            borderRadius: "999px",
+          },
+        }
+      : {
+          scrollbarWidth: "none" as const,
+          "&::-webkit-scrollbar": { display: "none" },
+        }),
   };
 
   const dayViewMemberColumns = dayViewMemberColumnSource;
@@ -3679,7 +3637,7 @@ export default function ProfessionalFixedLocationCalendar({
   const scrollTeamNav = React.useCallback(
     (el: HTMLDivElement | null, direction: -1 | 1) => {
       if (!el) return;
-      const step = el.clientWidth / teamNavVisibleSlots;
+      const step = el.clientWidth / TEAM_NAV_VISIBLE_SLOTS;
       el.scrollBy({ left: direction * step, behavior: "smooth" });
     },
     [],
@@ -3854,9 +3812,23 @@ export default function ProfessionalFixedLocationCalendar({
 
   const timeColumnAvailability = React.useMemo(() => {
     if (viewMode !== "day") return [];
-    const publicHours = getPublicWorkingHoursForDate(activeDateIso);
-    return publicHours ? [publicHours] : [];
-  }, [activeDateIso, getPublicWorkingHoursForDate, viewMode]);
+    const members = dayViewMemberColumnSource.length
+      ? dayViewMemberColumnSource
+      : activeResource
+        ? [activeResource]
+        : [];
+    const intervals: Interval[] = [];
+    for (const member of members) {
+      intervals.push(...getAvailabilityFor(member.id, activeDateIso));
+    }
+    return mergeIntervals(intervals);
+  }, [
+    activeDateIso,
+    activeResource,
+    dayViewMemberColumnSource,
+    getAvailabilityFor,
+    viewMode,
+  ]);
 
   const addMenuBookingResourceId = React.useMemo(
     () =>
@@ -3867,8 +3839,11 @@ export default function ProfessionalFixedLocationCalendar({
     [activeResource?.id, data.resources, selectedResourceId],
   );
 
-  /** Add → Booking disabled only on Not Availability days. */
-  const isAddMenuBookingDisabled = isPublicDayNotAvailable(activeDateIso);
+  /** Add → Booking disabled when the selected team member has no Schedule that day. */
+  const isAddMenuBookingDisabled = !hasScheduleAvailabilityOnDate(
+    activeDateIso,
+    addMenuBookingResourceId,
+  );
 
   const lateCancelNoticeLabel = React.useMemo(() => {
     const hours = Number(cancellationBeforeHours) || 0;
@@ -3908,7 +3883,6 @@ export default function ProfessionalFixedLocationCalendar({
           flex: 1,
           minWidth: 0,
           height: "100%",
-          containerType: "inline-size",
         }}
       >
         <Box
@@ -3979,8 +3953,8 @@ export default function ProfessionalFixedLocationCalendar({
       <Box
         sx={{
           position: "relative",
-          minHeight: laneHeaderPx,
-          height: laneHeaderPx,
+          minHeight: laneHeaderPx + (teamNavNeedsScroll ? TEAM_NAV_SCROLLBAR_PX : 0),
+          height: laneHeaderPx + (teamNavNeedsScroll ? TEAM_NAV_SCROLLBAR_PX : 0),
           bgcolor: "#fff",
           borderBottom: `1px solid ${alpha(m.navy, 0.07)}`,
           width: "100%",
@@ -5870,25 +5844,16 @@ export default function ProfessionalFixedLocationCalendar({
         });
         return;
       }
-      if (isPublicDayNotAvailable(iso)) {
+      const availability = getAvailabilityFor(resourceId, iso);
+      if (!availability.length) {
         showSnackbar({
           severity: "info",
-          message:
-            getPublicDayNotAvailableNote(iso) ||
-            "This day is marked as not available.",
-        });
-        return;
-      }
-      const workingHours = getPublicWorkingHoursForDate(iso);
-      if (!workingHours) {
-        showSnackbar({
-          severity: "info",
-          message: "No public business hours set for this day.",
+          message: "No schedule availability for this team member on this day.",
         });
         return;
       }
       const busy = getBusyFor(resourceId, iso);
-      const free = subtractIntervals([workingHours], busy);
+      const free = subtractIntervals(availability, busy);
       const segment = free.find(
         (f) => minutes >= f.startMin && minutes < f.endMin,
       );
@@ -5921,11 +5886,9 @@ export default function ProfessionalFixedLocationCalendar({
       openBookingDrawer(payload, { allowTimeSelection: false });
     },
     [
+      getAvailabilityFor,
       getBusyFor,
-      getPublicDayNotAvailableNote,
-      getPublicWorkingHoursForDate,
       grid.stepMinutes,
-      isPublicDayNotAvailable,
       openBookingDrawer,
       showSnackbar,
       todayIso,
@@ -7040,16 +7003,10 @@ export default function ProfessionalFixedLocationCalendar({
                     resourceId,
                     bookingDate,
                   );
-                  const publicHours = getPublicBusinessHoursInterval(
-                    calendarSettings?.availability.publicBusinessHours,
-                    bookingDate,
-                    slotLocation,
-                  );
-                  const segment = availability[0] ??
-                    publicHours ?? {
-                      startMin,
-                      endMin: Math.min(endMin, startMin + grid.stepMinutes),
-                    };
+                  const segment = availability[0] ?? {
+                    startMin,
+                    endMin: Math.min(endMin, startMin + grid.stepMinutes),
+                  };
                   let start = Number.isFinite(segment.startMin)
                     ? segment.startMin
                     : startMin;
@@ -7156,9 +7113,10 @@ export default function ProfessionalFixedLocationCalendar({
                   {monthCells.map((cell, idx) => {
                     const hasBookings = cell.dayEvents.length > 0;
                     const showClosed =
-                      isPublicDayNotAvailable(cell.iso) && !cell.isPast;
+                      !cell.isPast &&
+                      !hasScheduleAvailabilityOnDate(cell.iso);
                     const closedNote = showClosed
-                      ? getPublicDayNotAvailableNote(cell.iso)
+                      ? "No schedule availability"
                       : null;
 
                     return (
@@ -7466,7 +7424,7 @@ export default function ProfessionalFixedLocationCalendar({
                             pt: idx === 0 ? 1.15 : 1,
                             bgcolor: isAvailable
                               ? timelineGridSlotBg(t, timelineGridSlotColors)
-                              : m.fxGrayF2F4F7,
+                              : m.timelineGridHourSlotBg,
                           }}
                         >
                           <BodyText
@@ -7583,9 +7541,10 @@ export default function ProfessionalFixedLocationCalendar({
                                 const isActiveDay = date === activeDateIso;
                                 const isPastDay = date < todayIso;
                                 const showClosed =
-                                  isPublicDayNotAvailable(date) && !isPastDay;
+                                  !isPastDay &&
+                                  getAvailabilityFor(res.id, date).length === 0;
                                 const closedNote = showClosed
-                                  ? getPublicDayNotAvailableNote(date)
+                                  ? "No schedule availability"
                                   : null;
                                 const ratio = Math.round(
                                   getDailyBookingRatio(res.id, date) * 100,
@@ -7812,32 +7771,34 @@ export default function ProfessionalFixedLocationCalendar({
                                   },
                                 );
 
-                                // Unavailable overlay (everything outside public working hours)
-                                const workingHours =
-                                  getPublicWorkingHoursForDate(date);
-                                const availability = workingHours
-                                  ? [workingHours]
-                                  : [];
+                                // Availability comes from the team member's Schedule.
+                                const availability = getAvailabilityFor(
+                                  resource.id,
+                                  date,
+                                );
+                                const locationBands =
+                                  getLocationAvailabilityBands(
+                                    resource.id,
+                                    date,
+                                    data.supportedLocations,
+                                    scheduleRows,
+                                    dateOverrides ?? [],
+                                    availability,
+                                  );
+                                const unavailableIntervals = subtractIntervals(
+                                  [{ startMin, endMin }],
+                                  availability,
+                                );
+                                const offersBothLocations =
+                                  data.supportedLocations.includes("FL") &&
+                                  data.supportedLocations.includes("DL");
                                 const isPastDay = date < todayIso;
-                                const showClosed =
-                                  isPublicDayNotAvailable(date) && !isPastDay;
-                                const closedNote = showClosed
-                                  ? getPublicDayNotAvailableNote(date)
-                                  : null;
                                 const bookingAddDisabled =
-                                  showClosed ||
-                                  isPastDay ||
-                                  availability.length === 0;
+                                  isPastDay || availability.length === 0;
 
                                 return (
-                                  <Tooltip
-                                    key={key}
-                                    title={closedNote || ""}
-                                    disableHoverListener={!closedNote}
-                                    arrow
-                                    placement="top"
-                                  >
                                   <Box
+                                    key={key}
                                     onMouseMoveCapture={handleTimelineHoverMove}
                                     onMouseLeave={clearTimelineHover}
                                     sx={{
@@ -7847,9 +7808,7 @@ export default function ProfessionalFixedLocationCalendar({
                                           ? `1px solid ${alpha(m.navy, 0.07)}`
                                           : undefined,
                                       height: rows * rowPx,
-                                      bgcolor: showClosed
-                                        ? m.blockedTimeBg
-                                        : "transparent",
+                                      bgcolor: "transparent",
                                       overflow: "visible",
                                       ...(isPastDay
                                         ? { opacity: 0.72 }
@@ -7857,6 +7816,15 @@ export default function ProfessionalFixedLocationCalendar({
                                     }}
                                   >
                                     {/* Click layer — below booking cards */}
+                                    <Tooltip
+                                      title={availabilityHoverTitle}
+                                      followCursor
+                                      disableHoverListener={
+                                        !availabilityHoverTitle
+                                      }
+                                      arrow
+                                      placement="top"
+                                    >
                                     <Box
                                       onClick={(e) => {
                                         if (bookingAddDisabled) return;
@@ -7874,32 +7842,38 @@ export default function ProfessionalFixedLocationCalendar({
                                           minutes,
                                         );
                                       }}
+                                      onMouseMove={(e) => {
+                                        const rect = (
+                                          e.currentTarget as HTMLDivElement
+                                        ).getBoundingClientRect();
+                                        const y = e.clientY - rect.top;
+                                        const minutes =
+                                          startMin +
+                                          (y / rowPx) * grid.stepMinutes;
+                                        const kind =
+                                          locationAvailabilityKindAtMinute(
+                                            locationBands,
+                                            minutes,
+                                          );
+                                        setAvailabilityHoverTitle(
+                                          kind
+                                            ? locationAvailabilityTooltip(kind)
+                                            : "",
+                                        );
+                                      }}
                                       sx={{
                                         position: "absolute",
                                         inset: 0,
                                         cursor: bookingAddDisabled
                                           ? "default"
                                           : "pointer",
-                                        zIndex: 1,
+                                        zIndex: 2,
                                       }}
                                     />
-
-                                    {/* Public hours: whole day not available */}
-                                    {showClosed ? (
-                                      <Box
-                                        sx={{
-                                          position: "absolute",
-                                          inset: 0,
-                                          bgcolor: m.blockedTimeBg,
-                                          pointerEvents: "none",
-                                          zIndex: 0,
-                                        }}
-                                      />
-                                    ) : null}
+                                    </Tooltip>
 
                                     {/* Per-slot row backgrounds (:00 dark, :30 light, :15/:45 normal, blocked → red) */}
-                                    {!showClosed
-                                      ? slotLines.map((t) => {
+                                    {slotLines.map((t) => {
                                           const isBlocked = slotOverlapsBlock(
                                             t,
                                             grid.stepMinutes,
@@ -7930,118 +7904,68 @@ export default function ProfessionalFixedLocationCalendar({
                                               }}
                                             />
                                           );
-                                        })
-                                      : null}
+                                        })}
 
-                                    {/* Outside availability tint */}
-                                    {!showClosed && availability.length ? (
-                                      <>
-                                        {/* Top unavailable */}
-                                        {Math.min(
-                                          ...availability.map(
-                                            (a) => a.startMin,
-                                          ),
-                                        ) > startMin ? (
-                                          <Box
-                                            sx={{
-                                              position: "absolute",
-                                              left: 0,
-                                              right: 0,
-                                              top: 0,
-                                              height:
-                                                ((Math.min(
-                                                  ...availability.map(
-                                                    (a) => a.startMin,
-                                                  ),
-                                                ) -
-                                                  startMin) /
-                                                  grid.stepMinutes) *
-                                                rowPx,
-                                              bgcolor: m.timelineGridNormalSlotBg,
-                                              pointerEvents: "none",
-                                            }}
-                                          />
-                                        ) : null}
-                                        {/* Bottom unavailable */}
-                                        {Math.max(
-                                          ...availability.map((a) => a.endMin),
-                                        ) < endMin ? (
-                                          <Box
-                                            sx={{
-                                              position: "absolute",
-                                              left: 0,
-                                              right: 0,
-                                              top:
-                                                ((Math.max(
-                                                  ...availability.map(
-                                                    (a) => a.endMin,
-                                                  ),
-                                                ) -
-                                                  startMin) /
-                                                  grid.stepMinutes) *
-                                                rowPx,
-                                              height:
-                                                ((endMin -
-                                                  Math.max(
-                                                    ...availability.map(
-                                                      (a) => a.endMin,
-                                                    ),
-                                                  )) /
-                                                  grid.stepMinutes) *
-                                                rowPx,
-                                              bgcolor: m.timelineGridNormalSlotBg,
-                                              pointerEvents: "none",
-                                            }}
-                                          />
-                                        ) : null}
-                                      </>
-                                    ) : null}
+                                    {/* Unavailable = dark gray (outside this member's Schedule) */}
+                                    {unavailableIntervals.map((interval, idx) => {
+                                      const top =
+                                        ((interval.startMin - startMin) /
+                                          grid.stepMinutes) *
+                                        rowPx;
+                                      const height =
+                                        ((interval.endMin - interval.startMin) /
+                                          grid.stepMinutes) *
+                                        rowPx;
+                                      if (height <= 0) return null;
+                                      return (
+                                        <Box
+                                          key={`unavail-${resource.id}-${date}-${idx}`}
+                                          sx={{
+                                            position: "absolute",
+                                            left: 0,
+                                            right: 0,
+                                            top,
+                                            height,
+                                            bgcolor: m.timelineGridHourSlotBg,
+                                            pointerEvents: "none",
+                                            zIndex: 1,
+                                          }}
+                                        />
+                                      );
+                                    })}
 
-                                    {data.supportedLocations.map((location) => {
-                                      const locationIntervals =
-                                        getLocationAvailability(
-                                          resource.id,
-                                          date,
-                                          location,
-                                        );
-                                      return locationIntervals.map(
-                                        (interval, intervalIdx) => {
-                                          const top =
-                                            ((interval.startMin - startMin) /
-                                              grid.stepMinutes) *
-                                            rowPx;
-                                          const height =
-                                            ((interval.endMin -
-                                              interval.startMin) /
-                                              grid.stepMinutes) *
-                                            rowPx;
-                                          const flOnly = location === "FL";
-                                          const dlOnly = location === "DL";
-                                          const tooltipTitle = flOnly
-                                            ? "FL Availability: Available for booking at a fixed location."
-                                            : "DL Availability: Available for booking at a desired location.";
-
-                                          return (
-                                            <Tooltip
-                                              key={`${location}-${intervalIdx}`}
-                                              title={tooltipTitle}
-                                              placement="top"
-                                            >
-                                              <Box
-                                                sx={{
-                                                  position: "absolute",
-                                                  left: 0,
-                                                  right: 0,
-                                                  top,
-                                                  height,
-                                                  pointerEvents: "none",
-                                                  zIndex: 1,
-                                                  bgcolor: "transparent",
-                                                }}
-                                              />
-                                            </Tooltip>
-                                          );
-                                        },
+                                    {locationBands.map((band, bandIdx) => {
+                                      const top =
+                                        ((band.interval.startMin - startMin) /
+                                          grid.stepMinutes) *
+                                        rowPx;
+                                      const height =
+                                        ((band.interval.endMin -
+                                          band.interval.startMin) /
+                                          grid.stepMinutes) *
+                                        rowPx;
+                                      if (height <= 0) return null;
+                                      const patternSx =
+                                        offersBothLocations &&
+                                        band.kind !== "fixed"
+                                          ? locationAvailabilityPatternSx(
+                                              band.kind,
+                                            )
+                                          : {};
+                                      return (
+                                        <Box
+                                          key={`avail-${band.kind}-${bandIdx}`}
+                                          sx={{
+                                            position: "absolute",
+                                            left: 0,
+                                            right: 0,
+                                            top,
+                                            height,
+                                            pointerEvents: "none",
+                                            zIndex: 1,
+                                            ...patternSx,
+                                          }}
+                                        />
                                       );
                                     })}
 
@@ -8217,7 +8141,6 @@ export default function ProfessionalFixedLocationCalendar({
                                       },
                                     )}
                                   </Box>
-                                  </Tooltip>
                                 );
                               },
                             )}

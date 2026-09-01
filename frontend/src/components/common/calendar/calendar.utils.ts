@@ -385,6 +385,25 @@ export function mergeIntervals(intervals: readonly Interval[]) {
   return out;
 }
 
+export function intersectIntervals(
+  left: readonly Interval[],
+  right: readonly Interval[],
+) {
+  const a = mergeIntervals(left);
+  const b = mergeIntervals(right);
+  const out: Interval[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < a.length && j < b.length) {
+    const startMin = Math.max(a[i].startMin, b[j].startMin);
+    const endMin = Math.min(a[i].endMin, b[j].endMin);
+    if (startMin < endMin) out.push({ startMin, endMin });
+    if (a[i].endMin < b[j].endMin) i += 1;
+    else j += 1;
+  }
+  return out;
+}
+
 export function subtractIntervals(base: readonly Interval[], busy: readonly Interval[]) {
   const mergedBusy = mergeIntervals(busy);
   const out: Interval[] = [];
