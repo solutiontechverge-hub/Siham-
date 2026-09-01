@@ -12,13 +12,14 @@ export type MollureSnackbarAlertProps = {
   message: React.ReactNode;
   severity?: MollureSnackbarSeverity;
   onClose?: () => void;
+  fullWidth?: boolean;
 };
 
 const MollureSnackbarAlert = React.forwardRef<
   HTMLDivElement,
   MollureSnackbarAlertProps
 >(function MollureSnackbarAlert(
-  { message, severity = "success", onClose },
+  { message, severity = "success", onClose, fullWidth = false },
   ref,
 ) {
   const colors = getMollureSnackbarColors(severity);
@@ -32,7 +33,8 @@ const MollureSnackbarAlert = React.forwardRef<
         alignItems: "center",
         justifyContent: "space-between",
         gap: 2,
-        minWidth: { xs: "min(100%, 320px)", sm: 360 },
+        minWidth: fullWidth ? 0 : { xs: "min(100%, 320px)", sm: 360 },
+        width: fullWidth ? "100%" : undefined,
         maxWidth: "100%",
         px: 2,
         py: 1.35,

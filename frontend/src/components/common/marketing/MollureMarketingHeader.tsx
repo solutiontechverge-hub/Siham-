@@ -29,6 +29,7 @@ import {
   useGetUnreadNotificationCountQuery,
   useMarkAllNotificationsReadMutation,
   useMarkNotificationReadMutation,
+  displayNotificationTitle,
   type AppNotificationItem,
 } from "../../../store/services/notificationsApi";
 import type { ClientNotificationItem } from "../../../data/clientNotifications.data";
@@ -109,7 +110,7 @@ function mapNotificationToDrawerItem(
     id: item.id,
     professionalName: item.actorName ?? "—",
     actorName: item.actorName ?? "—",
-    statusLabel: item.title,
+    statusLabel: displayNotificationTitle(item),
     statusType: item.statusType,
     bookingIdLabel: item.bookingIdLabel ?? "Booking",
     timeLabel: item.timeLabel,

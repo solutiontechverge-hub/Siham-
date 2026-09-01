@@ -51,6 +51,7 @@ import {
   useGetSetupAvailabilityQuery,
   useUploadBookingAttachmentsMutation,
 } from "../../../store/services/businessApi";
+import { joinBookingBusinessRoom } from "../../../lib/bookingSocketClient";
 import {
   isPublicBusinessHoursNotAvailable,
   getPublicBusinessHoursNotAvailableNote,
@@ -126,6 +127,11 @@ export function useClientBookingCreatePage() {
     setupIdForHours,
     { skip: !setupIdForHours },
   );
+
+  React.useEffect(() => {
+    if (setupIdForHours) joinBookingBusinessRoom(setupIdForHours);
+  }, [setupIdForHours]);
+
   const publicBusinessHours = React.useMemo((): PublicBusinessHoursLike[] => {
     const raw = publicHoursResponse?.data?.publicBusinessHours;
     if (!Array.isArray(raw)) return [];
@@ -956,7 +962,9 @@ export function useClientBookingCreatePage() {
     [people],
   );
   const canAddFixedLocationGuest =
-    !isDesiredLocation && additionalGuests.length < FIXED_LOCATION_MAX_GUESTS;
+    !isCompanyClient &&
+    !isDesiredLocation &&
+    additionalGuests.length < FIXED_LOCATION_MAX_GUESTS;
   const serviceAssignees = React.useMemo(() => {
     // Jane / Model / Guest can all receive services; Planning / Notes cannot.
     return people.filter((p) => !isNonServicePerson(p));
@@ -1826,6 +1834,7 @@ export function useClientBookingCreatePage() {
 
     if (isModel && !isCompanyClient) return;
     if (isPlanning && !isCompanyClient) return;
+    if (isGuest && isCompanyClient) return;
 
     if (isNotes) {
       const existing = people.find(isNotesPerson);

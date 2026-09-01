@@ -1,32 +1,32 @@
 "use client";
 
 import * as React from "react";
-import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
-import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
 import PersonOutlineRoundedIcon from "@mui/icons-material/PersonOutlineRounded";
-import { Avatar, Box, Chip, Divider, Paper, Stack, Typography } from "@mui/material";
+import { Avatar, Box, Paper, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import {
-  fmtMinutesToTimeLabel,
   parseTimeLabelToMinutes,
   serviceTimeRangeLabel,
 } from "../../../app/clients/booking/booking-time";
 import { ServiceSummaryMetaLine } from "../ServiceSummaryMetaLine";
 import BookingEditedTag from "../calendar/BookingEditedTag";
+import BookingPriceBreakdown from "../booking-finance/BookingPriceBreakdown";
+import {
+  partitionBookingProducts,
+  summarizeClientBookingPrice,
+} from "../calendar/bookingTotal";
+import type { ManualEntryDiscount } from "../../sections/finance/manualEntry.data";
+import type { BookingEditTagVariant } from "../calendar/bookingRequestNegotiation";
 import {
   buildBookingSummarySections,
   resolveTeamMemberFirstName,
 } from "./buildBookingSummarySections";
-import { locationModeChipSx } from "./locationModeChipSx";
 import ProjectUploadThumb from "./ProjectUploadThumb";
 import type { BookingEditSuggestedProduct } from "./bookingEditRequest";
 import type { ClientBookingDraft, ClientBookingSummarySection } from "./types";
 import BookingSummaryNote from "./BookingSummaryNote";
 import BookingLineAmount from "../calendar/BookingLineAmount";
-import {
-  clientLineDiscountLabel,
-  formatBookingEur,
-} from "../../../data/bookingLinePricing";
+import { clientLineDiscountLabel } from "../../../data/bookingLinePricing";
 
 export type ClientBookingPrepaymentState = "none" | "required" | "paid";
 
@@ -183,17 +183,26 @@ type Props = {
   /** Desired-location bookings only — amount from professional kilometer allowance. */
   showKilometerAllowance?: boolean;
   kilometerAllowanceAmount?: number;
+  discount?: ManualEntryDiscount | null;
+  showLateCancellation?: boolean;
+  lateCancellationFeePercent?: number | string;
+  showLateRescheduling?: boolean;
+  lateRescheduleFeePercent?: number | string;
   editedServiceIds?: readonly string[];
+  addedServiceIds?: readonly string[];
+  cancelledServiceIds?: readonly string[];
+  cancelledServices?: ReadonlyArray<ClientBookingDraft["services"][number]>;
   products?: readonly BookingEditSuggestedProduct[];
   editedProductIds?: readonly string[];
   onPayNow?: () => void;
-  shopName?: string;
-  locationMode?: "fixed" | "desired";
-  addressLabel?: string;
+  /** Extra block under Total Price (payment summary, notes). */
+  footer?: React.ReactNode;
   /** Shown under Total Price when professional accepted the client's post-confirm EBR. */
   acceptedChangesNote?: OutcomeChangesNote | null;
   /** Shown under Total Price when professional rejected the client's post-confirm EBR. */
   rejectedChangesNote?: OutcomeChangesNote | null;
+  /** Offline prepayment is due at the visit — keep the total undeducted. */
+  prepaymentOffline?: boolean;
 };
 
 export default function ClientBookingPaymentDetailsCard({
@@ -206,15 +215,22 @@ export default function ClientBookingPaymentDetailsCard({
   payNowLabel = "Pay Now",
   showKilometerAllowance = false,
   kilometerAllowanceAmount = 0,
+  discount = null,
+  showLateCancellation = false,
+  lateCancellationFeePercent,
+  showLateRescheduling = false,
+  lateRescheduleFeePercent,
   editedServiceIds = [],
+  addedServiceIds = [],
+  cancelledServiceIds = [],
+  cancelledServices = [],
   products = [],
   editedProductIds = [],
   onPayNow,
-  shopName,
-  locationMode = "fixed",
-  addressLabel,
+  footer,
   acceptedChangesNote = null,
   rejectedChangesNote = null,
+  prepaymentOffline = false,
 }: Props) {
   const m = useTheme().palette.mollure;
   const sections = React.useMemo(
@@ -226,97 +242,68 @@ export default function ClientBookingPaymentDetailsCard({
       draft?.selectedTime ? parseTimeLabelToMinutes(draft.selectedTime) : 0,
     [draft?.selectedTime],
   );
-  const bookingEndMinutes =
-    bookingStartMinutes +
-    (draft?.services ?? []).reduce((sum, s) => sum + s.durationMins, 0);
-  const dateLabel = React.useMemo(() => {
-    if (!draft?.selectedDateISO) return "";
-    const dt = new Date(`${draft.selectedDateISO}T00:00:00`);
-    if (Number.isNaN(dt.getTime())) return draft.selectedDateISO;
-    return dt.toLocaleDateString("en-US", {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    });
-  }, [draft?.selectedDateISO]);
-  const totalsBoxSx = {
-    borderRadius: "10px",
-    bgcolor: alpha(m.navy, 0.035),
-    border: `1px solid ${alpha(m.navy, 0.22)}`,
-    px: { xs: 1.5, md: 2 },
-    py: 1.35,
-  } as const;
-  const totalsLabelSx = {
-    fontWeight: 600,
-    fontSize: 13,
-    color: alpha(m.navy, 0.48),
-  } as const;
-  const totalsValueSx = {
-    fontWeight: 700,
-    fontSize: 15,
-    color: alpha(m.navy, 0.55),
-    flexShrink: 0,
-  } as const;
-  const totalsSubLabelSx = {
-    fontWeight: 600,
-    fontSize: 12,
-    color: alpha(m.navy, 0.42),
-    minWidth: 0,
-  } as const;
-  const totalsSubValueSx = {
-    fontWeight: 600,
-    fontSize: 13,
-    color: alpha(m.navy, 0.48),
-    textAlign: "right" as const,
-  } as const;
   const editedServiceIdSet = React.useMemo(
     () => new Set(editedServiceIds),
     [editedServiceIds],
+  );
+  const addedServiceIdSet = React.useMemo(
+    () => new Set(addedServiceIds),
+    [addedServiceIds],
+  );
+  const cancelledServiceIdSet = React.useMemo(
+    () => new Set(cancelledServiceIds),
+    [cancelledServiceIds],
   );
   const editedProductIdSet = React.useMemo(
     () => new Set(editedProductIds),
     [editedProductIds],
   );
 
-  const total = draft?.total ?? 0;
-  const actualAmount = React.useMemo(() => {
-    const serviceActual = (draft?.services ?? []).reduce(
-      (sum, service) =>
-        sum + (Number(service.originalPrice ?? service.price) || 0),
-      0,
-    );
-    const productActual = products.reduce((sum, product) => {
-      const original = product.originalPrice ?? product.price;
-      return sum + (Number(original) || 0);
-    }, 0);
-    const km =
-      showKilometerAllowance && kilometerAllowanceAmount > 0
-        ? kilometerAllowanceAmount
-        : 0;
-    const summed = serviceActual + productActual + km;
-    return summed > 0 ? summed : total;
-  }, [
-    draft?.services,
-    kilometerAllowanceAmount,
-    products,
-    showKilometerAllowance,
-    total,
-  ]);
-  const prepaidAmount =
-    Math.round(((total * prepaymentPercent) / 100 + Number.EPSILON) * 100) /
-    100;
-  const remaining =
-    Math.round((total - prepaidAmount + Number.EPSILON) * 100) / 100;
-  const showPrepaidRow =
-    prepaymentState === "required" ||
-    prepaymentState === "paid" ||
-    (locationMode === "desired" && prepaymentPercent > 0);
-  const prepaidDeducted =
-    (prepaymentState === "required" || prepaymentState === "paid") &&
-    prepaidAmount > 0;
-  const displayTotal = prepaidDeducted ? remaining : total;
-  const showStrike = actualAmount > displayTotal;
+  const serviceChangeTag = React.useCallback(
+    (serviceId: string): BookingEditTagVariant | null => {
+      if (cancelledServiceIdSet.has(serviceId)) return "cancelled";
+      if (addedServiceIdSet.has(serviceId)) return "added";
+      if (editedServiceIdSet.has(serviceId)) return "edited";
+      return null;
+    },
+    [addedServiceIdSet, cancelledServiceIdSet, editedServiceIdSet],
+  );
+
+  const listedProducts = products.length
+    ? products
+    : (draft?.products ?? []);
+  const { products: catalogProducts, uniqueItems: catalogUniqueItems } =
+    partitionBookingProducts(listedProducts);
+  const extrasAmount =
+    showKilometerAllowance && kilometerAllowanceAmount > 0
+      ? kilometerAllowanceAmount
+      : 0;
+  const showPrepayment =
+    prepaymentState !== "none" && prepaymentPercent > 0;
+  const prepaymentPaid = prepaymentState === "paid";
+  const priceSummary = summarizeClientBookingPrice({
+    services: draft?.services,
+    people: draft?.people,
+    products: listedProducts,
+    extrasAmount,
+    discount,
+    showLateCancellation,
+    lateCancellationFeePercent,
+    showLateRescheduling,
+    lateRescheduleFeePercent,
+    showPrepayment,
+    prepaymentPercent,
+    prepaymentPaid,
+    prepaymentOffline,
+  });
+  const prepaidAmount = priceSummary.breakdown.prepaymentAmount;
+  const remaining = priceSummary.breakdown.remainingAfterPrepayment;
+  const catalogHeadingSx = {
+    fontWeight: 800,
+    fontSize: 12,
+    color: alpha(m.navy, 0.55),
+    mb: 1,
+  } as const;
 
   const requesterSections = sections.filter(
     (s) => s.isRequester || s.participantType === "requester",
@@ -346,6 +333,26 @@ export default function ClientBookingPaymentDetailsCard({
     ? requesterSections
     : fallbackRequesterSection;
 
+  const attachCancelled = (
+    section: ClientBookingSummarySection,
+  ): ClientBookingSummarySection => {
+    const extra = cancelledServices.filter((s) => {
+      if (section.isRequester || section.participantType === "requester") {
+        return !s.guestId || s.guestId === section.key;
+      }
+      return s.guestId === section.key;
+    });
+    if (!extra.length) return section;
+    const existing = new Set(section.items.map((item) => item.id));
+    return {
+      ...section,
+      items: [
+        ...section.items,
+        ...extra.filter((item) => !existing.has(item.id)),
+      ],
+    };
+  };
+
   const project = draft?.projectDetails;
   const hasProject =
     Boolean(project?.description?.trim()) ||
@@ -362,7 +369,7 @@ export default function ClientBookingPaymentDetailsCard({
       ? serviceTimeRangeLabel(scheduleOffset, service.durationMins)
       : undefined;
     scheduleOffset += service.durationMins;
-    const isEdited = editedServiceIdSet.has(service.id);
+    const changeTag = serviceChangeTag(service.id);
 
     return (
       <Box
@@ -378,28 +385,20 @@ export default function ClientBookingPaymentDetailsCard({
         <Stack
           direction="row"
           justifyContent="space-between"
-          alignItems="flex-start"
+          alignItems="center"
           spacing={1.5}
         >
           <Box sx={{ minWidth: 0 }}>
-            <Stack
-              direction="row"
-              alignItems="center"
-              spacing={0.75}
-              sx={{ flexWrap: "wrap" }}
+            <Typography
+              sx={{
+                fontSize: 13,
+                fontWeight: 900,
+                color: alpha(m.navy, 0.82),
+                lineHeight: 1.2,
+              }}
             >
-              <Typography
-                sx={{
-                  fontSize: 13,
-                  fontWeight: 900,
-                  color: alpha(m.navy, 0.82),
-                  lineHeight: 1.2,
-                }}
-              >
-                {service.name}
-              </Typography>
-              {isEdited ? <BookingEditedTag variant="edited" /> : null}
-            </Stack>
+              {service.name}
+            </Typography>
             <ServiceSummaryMetaLine
               timeRange={timeRange}
               durationLabel={`${service.durationMins} Mins`}
@@ -425,6 +424,11 @@ export default function ClientBookingPaymentDetailsCard({
                 </Typography>
               </Stack>
             ) : null}
+            {changeTag ? (
+              <Box sx={{ mt: 0.7 }}>
+                <BookingEditedTag variant={changeTag} />
+              </Box>
+            ) : null}
           </Box>
           <BookingLineAmount
             amount={service.price}
@@ -436,12 +440,155 @@ export default function ClientBookingPaymentDetailsCard({
     );
   };
 
+  const renderCatalogItem = (
+    item: {
+      id: string;
+      name: string;
+      price: number;
+      quantity?: number;
+      originalPrice?: number;
+      discountType?: "fixed" | "percentage";
+      discountAmount?: number;
+      discountPct?: number;
+    },
+  ) => (
+    <Box
+      key={item.id}
+      sx={{
+        borderRadius: "10px",
+        border: `1px solid ${alpha(m.navy, 0.08)}`,
+        px: 1.5,
+        py: 1.15,
+        bgcolor: "#fff",
+      }}
+    >
+      <Stack
+        direction="row"
+        justifyContent="space-between"
+        alignItems="center"
+        spacing={1.5}
+      >
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={0.75}
+          sx={{ minWidth: 0, flexWrap: "wrap" }}
+        >
+          <Typography
+            sx={{
+              fontSize: 13,
+              fontWeight: 900,
+              color: alpha(m.navy, 0.82),
+              lineHeight: 1.2,
+            }}
+          >
+            {item.quantity && item.quantity > 1
+              ? `${item.name} ×${item.quantity}`
+              : item.name}
+          </Typography>
+          {editedProductIdSet.has(item.id) ? (
+            <BookingEditedTag variant="edited" />
+          ) : null}
+        </Stack>
+        <BookingLineAmount
+          amount={item.price}
+          originalAmount={item.originalPrice}
+          discountLabel={clientLineDiscountLabel(item)}
+        />
+      </Stack>
+    </Box>
+  );
+
+  const renderPersonHeader = (name: string) => (
+    <Stack
+      direction="row"
+      alignItems="center"
+      spacing={1.25}
+      sx={{ mb: 1.15 }}
+    >
+      <Avatar
+        sx={{
+          width: 40,
+          height: 40,
+          bgcolor: alpha(m.teal, 0.12),
+          color: m.teal,
+          fontWeight: 900,
+          fontSize: 15,
+        }}
+      >
+        {name.charAt(0).toUpperCase()}
+      </Avatar>
+      <Typography
+        sx={{ fontWeight: 900, fontSize: 14, color: m.headingText }}
+      >
+        {name}
+      </Typography>
+    </Stack>
+  );
+
+  const nestedCardSx = {
+    borderRadius: "10px",
+    border: `1px solid ${alpha(m.navy, 0.08)}`,
+    bgcolor: m.white,
+    px: 1.5,
+    py: 1.25,
+  } as const;
+
+  const requesterSectionKey = clientServiceSections[0]?.key ?? "";
+
+  const catalogItemsForSection = (
+    items: typeof catalogProducts,
+    section: ClientBookingSummarySection,
+  ) => {
+    const isRequester = Boolean(
+      section.isRequester || section.participantType === "requester",
+    );
+    return items.filter((item) => {
+      const assigned = String(
+        (item as { guestId?: string | null }).guestId ?? "",
+      ).trim();
+      if (!assigned) return isRequester || section.key === requesterSectionKey;
+      return assigned === section.key;
+    });
+  };
+
+  const renderCatalogGroup = (
+    heading: string,
+    items: Array<{
+      id: string;
+      name: string;
+      price: number;
+      quantity?: number;
+      originalPrice?: number;
+      discountType?: "fixed" | "percentage";
+      discountAmount?: number;
+      discountPct?: number;
+    }>,
+  ) => {
+    if (!items.length) return null;
+    return (
+      <Box>
+        <Typography sx={catalogHeadingSx}>{heading}</Typography>
+        <Stack spacing={1}>
+          {items.map((item) => renderCatalogItem(item))}
+        </Stack>
+      </Box>
+    );
+  };
+
   const renderSectionBlock = (
     section: ClientBookingSummarySection,
     heading?: string,
-  ) => (
-    <Box key={section.key}>
-      {heading ? (
+    asPersonCard?: boolean,
+  ) => {
+    const services = section.items;
+    const products = catalogItemsForSection(catalogProducts, section);
+    const uniqueItems = catalogItemsForSection(catalogUniqueItems, section);
+    return (
+    <Box key={section.key} sx={asPersonCard ? nestedCardSx : undefined}>
+      {asPersonCard
+        ? renderPersonHeader(heading || section.title)
+        : heading ? (
         <Typography
           sx={{
             fontWeight: 900,
@@ -453,6 +600,7 @@ export default function ClientBookingPaymentDetailsCard({
           {heading}
         </Typography>
       ) : null}
+      <Stack spacing={1.5}>
       {section.planningItem ? (
         <Box
           sx={{
@@ -461,7 +609,6 @@ export default function ClientBookingPaymentDetailsCard({
             px: 1.5,
             py: 1.15,
             bgcolor: "#fff",
-            mb: section.items.length ? 1 : 0,
           }}
         >
           {section.planningItem.activity ? (
@@ -485,130 +632,43 @@ export default function ClientBookingPaymentDetailsCard({
           ) : null}
         </Box>
       ) : null}
-      {section.items.length ? (
-        <Stack spacing={1}>
-          {section.items.map((service) => renderService(service))}
-        </Stack>
+      {services.length ? (
+        <Box>
+          <Typography sx={catalogHeadingSx}>Service</Typography>
+          <Stack spacing={1}>
+            {services.map((service) => renderService(service))}
+          </Stack>
+        </Box>
       ) : null}
+      {renderCatalogGroup("Product", products)}
+      {renderCatalogGroup("Unique item", uniqueItems)}
+      </Stack>
     </Box>
-  );
+    );
+  };
 
   return (
     <Paper
       elevation={0}
       sx={{
         borderRadius: "12px",
-        border: `1px solid ${alpha(m.navy, 0.18)}`,
+        border: `1px solid ${alpha(m.navy, 0.1)}`,
         bgcolor: "#fff",
         overflow: "hidden",
       }}
     >
-      <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 2, pb: 1.25 }}>
+      <Box sx={{ p: 2, bgcolor: "#fff" }}>
         <Typography
           sx={{
             fontWeight: 700,
-            fontSize: "30px",
-            color: alpha(m.navy, 0.72),
-            textAlign: "center",
-            lineHeight: 1.2,
+            fontSize: 16,
+            color: alpha(m.navy, 0.82),
+            letterSpacing: "-0.01em",
+            mb: 1.35,
           }}
         >
-          Service Summary
+          Booking & Payment Details
         </Typography>
-      </Box>
-      <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
-
-      {shopName || addressLabel ? (
-        <Box sx={{ px: { xs: 2, md: 2.5 }, pt: 1.35, pb: 1.5 }}>
-          {shopName ? (
-            <Typography
-              sx={{
-                fontWeight: 900,
-                fontSize: 18,
-                color: alpha(m.navy, 0.88),
-                lineHeight: 1.2,
-              }}
-            >
-              {shopName}
-            </Typography>
-          ) : null}
-          <Stack
-            direction="row"
-            alignItems="center"
-            justifyContent="space-between"
-            spacing={2}
-            sx={{ mt: 0.85 }}
-          >
-            {dateLabel ? (
-              <Stack
-                direction="row"
-                alignItems="center"
-                spacing={0.6}
-                sx={{ minWidth: 0, flexShrink: 0 }}
-              >
-                <AccessTimeRoundedIcon
-                  sx={{ fontSize: 16, color: m.teal, flexShrink: 0 }}
-                />
-                <Typography
-                  sx={{
-                    fontWeight: 800,
-                    color: alpha(m.teal, 0.95),
-                    fontSize: 12.5,
-                    whiteSpace: { xs: "normal", sm: "nowrap" },
-                  }}
-                >
-                  {dateLabel} ({fmtMinutesToTimeLabel(bookingStartMinutes)}-
-                  {fmtMinutesToTimeLabel(bookingEndMinutes)})
-                </Typography>
-              </Stack>
-            ) : null}
-            {addressLabel ? (
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 0.5,
-                  ml: "auto",
-                  maxWidth: { xs: "46%", sm: "50%" },
-                  flex: "0 1 auto",
-                  minWidth: 0,
-                }}
-              >
-                <LocationOnOutlinedIcon
-                  sx={{
-                    fontSize: 16,
-                    width: 16,
-                    height: 16,
-                    color: alpha(m.navy, 0.45),
-                    flexShrink: 0,
-                    display: "block",
-                  }}
-                />
-                <Typography
-                  component="span"
-                  sx={{
-                    fontWeight: 700,
-                    color: alpha(m.navy, 0.55),
-                    fontSize: 12,
-                    lineHeight: 1.2,
-                    minWidth: 0,
-                  }}
-                >
-                  {addressLabel}
-                </Typography>
-              </Box>
-            ) : null}
-          </Stack>
-          <Chip
-            label={locationMode === "desired" ? "Desired Location" : "Fixed Location"}
-            size="small"
-            sx={{ ...locationModeChipSx, mt: 0.75 }}
-          />
-        </Box>
-      ) : null}
-      <Divider sx={{ borderColor: alpha(m.navy, 0.1) }} />
-
-      <Box sx={{ p: 2, bgcolor: "#fff" }}>
         <Stack
           direction="row"
           alignItems="center"
@@ -619,7 +679,7 @@ export default function ClientBookingPaymentDetailsCard({
             py: 1.1,
             borderRadius: "10px",
             border: `1px solid ${alpha(m.navy, 0.08)}`,
-            bgcolor: alpha(m.navy, 0.015),
+            bgcolor: "#fff",
           }}
         >
           <Avatar
@@ -656,23 +716,22 @@ export default function ClientBookingPaymentDetailsCard({
         </Stack>
 
         {hasProject ? (
-          <Box sx={{ mb: 2.25 }}>
-            <Stack
-              direction="row"
-              alignItems="baseline"
-              spacing={1}
-              sx={{ mb: 1 }}
+          <Box
+            sx={{
+              mb: 2.25,
+              ...nestedCardSx,
+            }}
+          >
+            <Typography
+              sx={{
+                fontWeight: 900,
+                fontSize: 14,
+                color: m.headingText,
+                mb: 1,
+              }}
             >
-              <Typography
-                sx={{
-                  fontWeight: 900,
-                  fontSize: 13,
-                  color: alpha(m.navy, 0.82),
-                }}
-              >
-                Project Details and Media
-              </Typography>
-            </Stack>
+              Project Details and Media
+            </Typography>
             {project?.description?.trim() ? (
               <Box
                 sx={{
@@ -702,7 +761,7 @@ export default function ClientBookingPaymentDetailsCard({
                   sx={{
                     fontWeight: 900,
                     fontSize: 12,
-                    color: alpha(m.navy, 0.72),
+                    color: m.headingText,
                     mb: 1,
                   }}
                 >
@@ -724,248 +783,91 @@ export default function ClientBookingPaymentDetailsCard({
         ) : null}
 
         <Stack spacing={2}>
-          {clientServiceSections.map((section) => renderSectionBlock(section))}
-
-          {modelSections.map((section) =>
-            renderSectionBlock(section, section.title),
+          {clientServiceSections.map((section) =>
+            renderSectionBlock(attachCancelled(section)),
           )}
 
-          {guestSections.map((section) =>
+          {modelSections.map((section) =>
             renderSectionBlock(
-              section,
-              section.title.toLowerCase().startsWith("guest")
-                ? section.title
-                : `Guest: ${section.title}`,
+              attachCancelled(section),
+              section.title,
+              true,
             ),
           )}
 
+          {guestSections.map((section) => {
+            const guestTitle = section.title.trim();
+            const heading =
+              guestTitle.toLowerCase().startsWith("guest")
+                ? guestTitle
+                : `Guest: ${guestTitle}`;
+            return renderSectionBlock(
+              attachCancelled(section),
+              heading,
+              true,
+            );
+          })}
+
           {planningSections.map((section) =>
-            renderSectionBlock(section, "Planning Details"),
+            renderSectionBlock(
+              attachCancelled(section),
+              "Planning Details",
+              true,
+            ),
           )}
 
-          {products.length > 0 ? (
-            <Box>
-              <Typography
-                sx={{
-                  fontWeight: 800,
-                  fontSize: 12,
-                  color: alpha(m.navy, 0.55),
-                  mb: 1,
-                }}
-              >
-                Product
-              </Typography>
-              <Stack spacing={1}>
-                {products.map((product) => (
-                  <Box
-                    key={product.id}
-                    sx={{
-                      borderRadius: "10px",
-                      border: `1px solid ${alpha(m.navy, 0.08)}`,
-                      px: 1.5,
-                      py: 1.15,
-                      bgcolor: "#fff",
-                    }}
-                  >
-                    <Stack
-                      direction="row"
-                      justifyContent="space-between"
-                      alignItems="flex-start"
-                      spacing={1.5}
-                    >
-                      <Stack
-                        direction="row"
-                        alignItems="center"
-                        spacing={0.75}
-                        sx={{ minWidth: 0, flexWrap: "wrap" }}
-                      >
-                        <Typography
-                          sx={{
-                            fontSize: 13,
-                            fontWeight: 900,
-                            color: alpha(m.navy, 0.82),
-                            lineHeight: 1.2,
-                          }}
-                        >
-                          {product.quantity > 1
-                            ? `${product.name} ×${product.quantity}`
-                            : product.name}
-                        </Typography>
-                        {editedProductIdSet.has(product.id) ? (
-                          <BookingEditedTag variant="edited" />
-                        ) : null}
-                      </Stack>
-                      <BookingLineAmount
-                        amount={product.price}
-                        originalAmount={product.originalPrice}
-                        discountLabel={clientLineDiscountLabel(product)}
-                      />
-                    </Stack>
-                  </Box>
-                ))}
-              </Stack>
-            </Box>
+          {clientServiceSections.length === 0 ? (
+            <>
+              {renderCatalogGroup("Product", catalogProducts)}
+              {renderCatalogGroup("Unique item", catalogUniqueItems)}
+            </>
           ) : null}
         </Stack>
 
-        {showKilometerAllowance && kilometerAllowanceAmount > 0 ? (
-          <Box sx={{ mt: 2.25 }}>
-            <Typography
-              sx={{
-                fontWeight: 800,
-                fontSize: 10.5,
-                letterSpacing: "0.06em",
-                textTransform: "uppercase",
-                color: alpha(m.navy, 0.48),
-                mb: 0.85,
-              }}
-            >
-              Kilometer Allowance
-            </Typography>
-            <Box
-              sx={{
-                px: 1.75,
-                py: 1.15,
-                borderRadius: "10px",
-                bgcolor: "#fff",
-                border: `1px solid ${alpha(m.navy, 0.08)}`,
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <Typography
-                sx={{
-                  fontWeight: 800,
-                  fontSize: 13,
-                  color: alpha(m.navy, 0.72),
-                }}
-              >
-                Kilometer Allowance
-              </Typography>
-              <Typography
-                sx={{
-                  fontWeight: 900,
-                  fontSize: 14,
-                  color: alpha(m.navy, 0.88),
-                }}
-              >
-                €{kilometerAllowanceAmount.toFixed(2)}
-              </Typography>
-            </Box>
-          </Box>
-        ) : null}
-
-        <Box
-          sx={{
-            mt:
-              showKilometerAllowance && kilometerAllowanceAmount > 0 ? 1.5 : 2,
-          }}
-        >
-          <Box sx={totalsBoxSx}>
-            <Stack
-              direction="row"
-              alignItems="center"
-              justifyContent="space-between"
-              spacing={1.5}
-            >
-              <Typography sx={totalsLabelSx}>Total Price</Typography>
-              <Stack alignItems="flex-end" spacing={0.2}>
-                {showStrike ? (
-                  <Typography
-                    sx={{
-                      fontWeight: 700,
-                      fontSize: 13,
-                      color: alpha(m.navy, 0.38),
-                      textDecoration: "line-through",
-                      lineHeight: 1.15,
-                    }}
-                  >
-                    €{formatBookingEur(actualAmount)}
-                  </Typography>
-                ) : null}
-                <Typography sx={totalsValueSx}>
-                  €{formatBookingEur(displayTotal)}
-                </Typography>
-                {prepaidDeducted ? (
-                  <Typography
-                    sx={{
-                      fontWeight: 800,
-                      fontSize: 11,
-                      color: m.teal,
-                      lineHeight: 1.15,
-                    }}
-                  >
-                    −€{formatBookingEur(prepaidAmount)} Prepaid
-                  </Typography>
-                ) : null}
-              </Stack>
-            </Stack>
-
-            {showPrepaidRow ? (
-              <Stack
-                direction="row"
-                alignItems="center"
-                justifyContent="space-between"
-                spacing={1.5}
-                sx={{ mt: 0.85 }}
-              >
-                <Typography sx={totalsSubLabelSx}>
-                  {prepaymentState === "paid"
-                    ? `Prepaid (${prepaymentPercent}%)`
-                    : locationMode === "desired" &&
-                        prepaymentState !== "required"
-                      ? `Prepayment Required (${prepaymentPercent}%) After Acceptance`
-                      : `Prepayment Required (${prepaymentPercent}%)`}
-                </Typography>
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  spacing={1.25}
-                  sx={{ flexShrink: 0 }}
+        <Box sx={{ mt: 2 }}>
+          <BookingPriceBreakdown
+            totalPrice={priceSummary.breakdown.bookingTotal}
+            originalPrice={priceSummary.originalPrice}
+            lineDiscountAmount={0}
+            bookingDiscountAmount={priceSummary.breakdown.discountAmount}
+            bookingTotalDiscount={discount}
+            lateCancellationFeeAmount={
+              priceSummary.breakdown.lateCancellationFeeAmount
+            }
+            lateRescheduleFeeAmount={
+              priceSummary.breakdown.lateRescheduleFeeAmount
+            }
+            prepaidPercent={
+              prepaymentState === "none" ? 0 : prepaymentPercent
+            }
+            prepaidAmount={prepaymentState === "none" ? 0 : prepaidAmount}
+            remainingAmount={
+              prepaymentState === "none" ? undefined : remaining
+            }
+            variant="plain"
+            prepaidAction={
+              prepaymentState === "required" && onPayNow ? (
+                <Typography
+                  component="button"
+                  type="button"
+                  onClick={onPayNow}
+                  sx={{
+                    border: 0,
+                    bgcolor: "transparent",
+                    p: 0,
+                    cursor: "pointer",
+                    color: m.teal,
+                    fontWeight: 900,
+                    fontSize: 12.5,
+                    fontFamily: "inherit",
+                    "&:hover": { color: m.tealDark },
+                  }}
                 >
-                  {prepaymentState === "required" && onPayNow ? (
-                    <Typography
-                      component="button"
-                      type="button"
-                      onClick={onPayNow}
-                      sx={{
-                        border: 0,
-                        bgcolor: "transparent",
-                        p: 0,
-                        cursor: "pointer",
-                        color: m.teal,
-                        fontWeight: 900,
-                        fontSize: 12.5,
-                        fontFamily: "inherit",
-                        "&:hover": { color: m.tealDark },
-                      }}
-                    >
-                      {payNowLabel}
-                    </Typography>
-                  ) : null}
-                  <Typography sx={totalsSubValueSx}>€{prepaidAmount}</Typography>
-                </Stack>
-              </Stack>
-            ) : null}
-
-            {prepaymentState === "required" || prepaymentState === "paid" ? (
-              <Stack
-                direction="row"
-                alignItems="center"
-                justifyContent="space-between"
-                spacing={1.5}
-                sx={{ mt: 0.75 }}
-              >
-                <Typography sx={totalsSubLabelSx}>
-                  {prepaymentState === "paid"
-                    ? "Remaining"
-                    : "Remaining After Prepayment"}
+                  {payNowLabel}
                 </Typography>
-                <Typography sx={totalsSubValueSx}>€{remaining}</Typography>
-              </Stack>
-            ) : null}
-          </Box>
+              ) : undefined
+            }
+          />
           {acceptedChangesNote ? (
             <OutcomeChangesNoteBlock
               note={acceptedChangesNote}
@@ -985,6 +887,8 @@ export default function ClientBookingPaymentDetailsCard({
             <BookingSummaryNote note={draft.clientNote} />
           </Box>
         ) : null}
+
+        {footer ? <Box sx={{ mt: 1.75 }}>{footer}</Box> : null}
       </Box>
     </Paper>
   );

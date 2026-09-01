@@ -412,7 +412,9 @@ export default function ClientPageView() {
                   textAlign: "center",
                 }}
               >
-                No clients match your search or filters.
+                {clients.length === 0
+                  ? "No clients yet. Confirmed bookings will appear here."
+                  : "No clients match your search or filters."}
               </Typography>
             ) : (
               <TableContainer

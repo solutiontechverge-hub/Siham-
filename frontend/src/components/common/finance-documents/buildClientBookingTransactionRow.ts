@@ -1,6 +1,7 @@
 import type {
   TransactionClientType,
   TransactionDocument,
+  TransactionDocumentParty,
   TransactionRow,
 } from "../../../app/professionals/fixed-location/finance/data/transactions";
 import type { ClientBookingDraft } from "../client-booking/types";
@@ -39,9 +40,14 @@ export type BuildClientBookingTransactionRowInput = {
   financeSettings: FinanceInvoiceSettings;
   /** When set (e.g. prepayment receipt), document total uses this amount. */
   documentAmount?: number;
+  /** Prepayment amount shown on invoice/receipt as "Prepayment". */
+  prepaymentAmount?: number;
+  /** Receipt for a prepayment: line item is labeled Prepayment. */
+  asPrepaymentReceipt?: boolean;
   clientType?: TransactionClientType;
   methodTitle?: string;
   methodDetail?: string;
+  clientParty?: Partial<TransactionDocumentParty>;
 };
 
 export function buildClientBookingTransactionRow({
@@ -51,18 +57,29 @@ export function buildClientBookingTransactionRow({
   requesterEmail,
   financeSettings,
   documentAmount,
+  prepaymentAmount,
+  asPrepaymentReceipt = false,
   clientType = "mollure",
   methodTitle = "Online - Direct",
   methodDetail = "Stripe",
+  clientParty,
 }: BuildClientBookingTransactionRowInput): TransactionRow {
   const serviceDate = draft.selectedDateISO || new Date().toISOString().slice(0, 10);
+  const serviceTime = draft.selectedTime?.trim() || undefined;
   const invoiceDate = new Date().toISOString().slice(0, 10);
   const dueValue = Number(financeSettings.paymentTerms.originalDueValue) || 2;
   const dueUnit = financeSettings.paymentTerms.originalDueUnit.toLowerCase();
   const dueDays = dueUnit.startsWith("month") ? dueValue * 30 : dueUnit.startsWith("day") ? dueValue : dueValue * 7;
   const dueDate = addDaysIso(invoiceDate, dueDays);
 
-  const lineItems = draft.services.map((service) => ({
+  const prepaidValue =
+    prepaymentAmount != null && prepaymentAmount > 0
+      ? prepaymentAmount
+      : asPrepaymentReceipt && documentAmount != null && documentAmount > 0
+        ? documentAmount
+        : 0;
+
+  const serviceLineItems = draft.services.map((service) => ({
     description: service.name,
     quantity: "1",
     vat: resolveVatForService(service.name, financeSettings),
@@ -70,10 +87,27 @@ export function buildClientBookingTransactionRow({
     totalPrice: formatCurrencyEur(service.price),
   }));
 
-  const bookingItems = draft.services.map((service) => ({
-    label: service.name,
-    value: formatCurrencyEur(service.price),
-  }));
+  const prepaidLabel = formatCurrencyEur(prepaidValue);
+  const lineItems =
+    asPrepaymentReceipt && prepaidValue > 0
+      ? [
+          {
+            description: "Prepayment",
+            quantity: "1",
+            vat: "0%",
+            pricePerUnit: prepaidLabel,
+            totalPrice: prepaidLabel,
+          },
+        ]
+      : serviceLineItems;
+
+  const bookingItems = (asPrepaymentReceipt && prepaidValue > 0
+    ? [{ label: "Prepayment", value: prepaidLabel }]
+    : draft.services.map((service) => ({
+        label: service.name,
+        value: formatCurrencyEur(service.price),
+      }))
+  );
 
   const totalFromServices = draft.services.reduce((sum, s) => sum + s.price, 0);
   const totalAmount = documentAmount ?? draft.total ?? totalFromServices;
@@ -84,27 +118,32 @@ export function buildClientBookingTransactionRow({
     documentNumber: bookingRef,
     receiptNumber,
     serviceDate,
+    serviceTime,
     invoiceDate,
     dueDate,
     lateFeeNotice: financeSettings.paymentTerms.originalPenaltyValue
       ? `Late payment fee: ${financeSettings.paymentTerms.originalPenaltyValue} ${financeSettings.paymentTerms.originalPenaltyUnit} applies after the due date.`
       : undefined,
     client: {
-      legalName: requesterName,
-      email: requesterEmail,
+      legalName: clientParty?.legalName || requesterName,
+      email: clientParty?.email || requesterEmail,
+      address: clientParty?.address,
+      vatNumber: clientParty?.vatNumber,
+      cocNumber: clientParty?.cocNumber,
     },
     bookingItems,
     lineItems,
     totalPrice: totalPriceLabel,
+    ...(prepaidValue > 0 ? { prepaymentAmount: prepaidLabel } : {}),
   };
 
   return {
     id: `booking-${bookingRef}`,
-    entryType: "onlineBooking",
+    entryType: methodTitle.toLowerCase().includes("offline") ? "offlineBooking" : "onlineBooking",
     entryId: bookingRef,
     date: invoiceDate,
     bookingId: bookingRef,
-    entryLabel: "Booking",
+    entryLabel: asPrepaymentReceipt ? "Prepayment" : "Booking",
     clientName: requesterName,
     clientEmail: requesterEmail ?? "",
     clientType,

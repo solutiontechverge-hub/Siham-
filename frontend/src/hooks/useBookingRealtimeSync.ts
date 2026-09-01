@@ -47,7 +47,7 @@ export function useBookingRealtimeSync(options?: Options) {
     if (!isAuthed) return;
 
     const handleBookingChanged = (payload: BookingChangedPayload) => {
-      dispatch(businessApi.util.invalidateTags(["Calendar", "Bookings"]));
+      dispatch(businessApi.util.invalidateTags(["Calendar", "Bookings", "ProfessionalClients"]));
       void dispatch(
         businessApi.endpoints.getMyBookings.initiate(undefined, {
           forceRefetch: true,

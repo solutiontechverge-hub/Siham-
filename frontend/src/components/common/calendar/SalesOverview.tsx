@@ -21,7 +21,12 @@ import { useSnackbar } from "../AppSnackbar";
 import {
   FinanceDocumentPreviewDrawer,
   buildClientBookingTransactionRow,
+  useProfessionalBusinessOverride,
 } from "../finance-documents";
+import {
+  checkoutPaymentMethodDetail,
+  checkoutPaymentMethodTitle,
+} from "../client-booking/checkoutPaymentOptions";
 import { useFinanceInvoiceSettings } from "../../sections/finance/useFinanceInvoiceSettings";
 import TransactionNoteModal from "../../sections/finance/TransactionNoteModal";
 import type { ClientBookingDraft } from "../client-booking/types";
@@ -61,6 +66,19 @@ type SalesOverviewProps = {
   onBookingCompleted?: (bookingId: string) => void;
 };
 
+function timeFromOccurredAt(iso: string): string {
+  if (!iso) return "";
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) {
+    const match = iso.match(/T(\d{2}:\d{2})/);
+    return match?.[1] ?? "";
+  }
+  return parsed.toLocaleTimeString("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function cardToDraft(card: SalesOverviewCardData): ClientBookingDraft {
   const sourceLines = card.highlightedLineIds?.length
     ? card.lines.filter(
@@ -71,7 +89,7 @@ function cardToDraft(card: SalesOverviewCardData): ClientBookingDraft {
 
   return {
     selectedDateISO: card.occurredAt.slice(0, 10),
-    selectedTime: "",
+    selectedTime: timeFromOccurredAt(card.occurredAt),
     combineServices: false,
     services: (sourceLines.length
       ? sourceLines
@@ -101,6 +119,7 @@ export default function SalesOverview({
   const m = useTheme().palette.mollure;
   const { showSnackbar } = useSnackbar();
   const { settings: financeSettings } = useFinanceInvoiceSettings();
+  const professionalBusinessOverride = useProfessionalBusinessOverride();
   const { data: clientsResponse } = useGetProfessionalClientsQuery();
   const [updateBookingStatus, { isLoading: cancelling }] =
     useUpdateBookingStatusMutation();
@@ -261,6 +280,14 @@ export default function SalesOverview({
         });
         return;
       }
+      const matchedClient = (clientsResponse?.data ?? []).find(
+        (row) =>
+          String(row.email || "")
+            .trim()
+            .toLowerCase() === String(card.clientEmail || "").trim().toLowerCase(),
+      );
+      const methodKey = card.paymentMethod || card.paymentMethodLabel;
+      const isPrepayCard = card.kind === "prepayment";
       const row = buildClientBookingTransactionRow({
         bookingRef: `${card.bookingCode}-${card.kind}${card.payerKey ? `-${card.payerKey}` : ""}`,
         draft,
@@ -271,18 +298,23 @@ export default function SalesOverview({
         requesterEmail: card.clientEmail,
         financeSettings,
         documentAmount: card.documentAmount,
-        methodTitle: card.paymentMethodLabel?.includes("Offline")
-          ? "Offline - Direct"
-          : "Online - Direct",
-        methodDetail: card.paymentMethodLabel?.includes("Offline")
-          ? "Cash"
-          : "Card",
+        prepaymentAmount: isPrepayCard ? card.documentAmount : undefined,
+        asPrepaymentReceipt: type === "receipt" && isPrepayCard,
+        methodTitle: checkoutPaymentMethodTitle(methodKey),
+        methodDetail: checkoutPaymentMethodDetail(methodKey),
+        clientParty: {
+          legalName: matchedClient?.legal_name || card.clientName,
+          email: card.clientEmail,
+          address: matchedClient?.business_address || undefined,
+          vatNumber: matchedClient?.vat || undefined,
+          cocNumber: matchedClient?.coc || undefined,
+        },
       });
       setDocRow(row);
       setDocType(type);
       setDocOpen(true);
     },
-    [financeSettings, showSnackbar],
+    [clientsResponse?.data, financeSettings, showSnackbar],
   );
 
   const bump = () => setRevision((n) => n + 1);
@@ -642,9 +674,10 @@ export default function SalesOverview({
         open={docOpen}
         onClose={() => setDocOpen(false)}
         documentType={docType}
-        invoiceType={financeSettings.defaultInvoiceType}
+        invoiceType={clientKind === "company" ? "company" : "individual"}
         settings={financeSettings}
         row={docRow}
+        professionalBusinessOverride={professionalBusinessOverride}
       />
 
       <TransactionNoteModal

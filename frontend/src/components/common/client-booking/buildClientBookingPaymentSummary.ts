@@ -1,5 +1,12 @@
 import { buildBookingSummarySections } from "./buildBookingSummarySections";
 import type { ClientBookingDraft, ClientBookingDraftService } from "./types";
+import {
+  formatFinanceDateTime,
+  formatFinanceMethodLabel,
+  formatOfflinePrepaymentVisitNote,
+} from "../booking-finance/formatBookingFinance";
+import type { BookingPaymentSummarySection } from "../booking-finance/bookingFinance.types";
+import { isOfflinePaymentMethod } from "./checkoutPaymentOptions";
 
 export type PaymentSummaryLine = {
   id: string;
@@ -7,12 +14,10 @@ export type PaymentSummaryLine = {
   amount: number;
   showInvoice?: boolean;
   showReceipt?: boolean;
+  note?: string;
 };
 
-export type PaymentSummarySection = {
-  title: string;
-  lines: PaymentSummaryLine[];
-};
+export type PaymentSummarySection = BookingPaymentSummarySection;
 
 type BuildInput = {
   draft: ClientBookingDraft | null;
@@ -23,13 +28,14 @@ type BuildInput = {
   prepaymentPercent?: number;
   paymentDue?: boolean;
   hasEditPrepayment?: boolean;
+  paymentDateIso?: string | null;
+  paymentTime?: string | null;
+  paymentMethod?: string | null;
+  prepaidAmountOverride?: number;
+  /** Offline prepayment still appears as "Prepayment" before online capture. */
+  showUnpaidPrepayment?: boolean;
+  shopName?: string | null;
 };
-
-function formatPaymentDate(iso?: string): string {
-  const d = iso ? new Date(`${iso}T00:00:00`) : new Date();
-  if (Number.isNaN(d.getTime())) return new Date().toLocaleDateString("en-GB");
-  return d.toLocaleDateString("en-GB");
-}
 
 function sumServices(services: ClientBookingDraftService[]): number {
   return Math.round((services.reduce((sum, s) => sum + s.price, 0) + Number.EPSILON) * 100) / 100;
@@ -61,39 +67,63 @@ export function buildClientBookingPaymentSummary(input: BuildInput): PaymentSumm
     prepaymentPercent = 0,
     paymentDue = false,
     hasEditPrepayment = false,
+    paymentDateIso,
+    paymentTime,
+    paymentMethod,
+    prepaidAmountOverride,
+    showUnpaidPrepayment = false,
+    shopName,
   } = input;
 
   if (!draft?.services?.length) return [];
 
-  const treatmentDate = formatPaymentDate(draft.selectedDateISO);
-  const prepaymentDate = formatPaymentDate(draft.selectedDateISO);
+  const bookingDate = formatFinanceDateTime(
+    paymentDateIso || draft.selectedDateISO,
+    paymentTime || draft.selectedTime,
+  );
+  const methodLabel = formatFinanceMethodLabel(paymentMethod);
+  const offline = isOfflinePaymentMethod(paymentMethod);
+  const visitNote = formatOfflinePrepaymentVisitNote(shopName, bookingDate);
   const total = draft.total ?? sumServices(draft.services);
-  const prepaidAmount =
+  const computedPrepaid =
     Math.round(((total * prepaymentPercent) / 100 + Number.EPSILON) * 100) / 100;
+  const prepaidAmount =
+    prepaidAmountOverride != null && prepaidAmountOverride > 0
+      ? prepaidAmountOverride
+      : computedPrepaid;
   const sections: PaymentSummarySection[] = [];
 
-  if (requiresPrepayment || prepaid) {
+  if (requiresPrepayment || prepaid || showUnpaidPrepayment) {
     const prepaymentLines: PaymentSummaryLine[] = [];
-    if (prepaid && prepaidAmount > 0) {
+    const includePrepayment =
+      (prepaid || showUnpaidPrepayment) && prepaidAmount > 0;
+    if (includePrepayment) {
       prepaymentLines.push({
         id: "prepaid-main",
-        label: `Prepaid ${prepaymentPercent}% - Online (Direct)`,
+        label: `Prepayment - ${bookingDate} - ${methodLabel}`,
         amount: prepaidAmount,
-        showInvoice: true,
-        showReceipt: true,
+        showInvoice: !offline,
+        showReceipt: !offline,
+        note: offline ? visitNote : undefined,
       });
     }
-    if (hasEditPrepayment && prepaid) {
+    if (hasEditPrepayment && includePrepayment) {
       prepaymentLines.push({
         id: "prepaid-er",
-        label: `Additional Prepayment ER - ${prepaymentDate} - Online Direct`,
+        label: `Prepayment ER - ${bookingDate} - ${methodLabel}`,
         amount: prepaidAmount,
-        showInvoice: true,
-        showReceipt: true,
+        showInvoice: !offline,
+        showReceipt: !offline,
+        note: offline ? visitNote : undefined,
       });
     }
     if (prepaymentLines.length) {
-      sections.push({ title: "Prepayment", lines: prepaymentLines });
+      sections.push({
+        id: "prepayment",
+        title: "Prepayment",
+        amount: prepaymentLines.reduce((sum, line) => sum + line.amount, 0),
+        lines: prepaymentLines,
+      });
     }
   }
 
@@ -108,11 +138,11 @@ export function buildClientBookingPaymentSummary(input: BuildInput): PaymentSumm
     const isRequester = section.isRequester ?? section.title === requesterName;
     const labelName = isRequester ? "Main Client" : personLabel(section.title, false);
     const status = paymentDue ? "Payment Due" : paid ? "Paid" : "Pending";
-    const method = isRequester ? "Online Direct" : "Offline Direct";
+    const method = isRequester ? methodLabel : "Offline Direct";
 
     afterTreatmentLines.push({
       id: `after-treatment-${section.key}`,
-      label: `${labelName} - ${status} - ${treatmentDate} - ${method}`,
+      label: `${labelName} - ${status} - ${bookingDate} - ${method}`,
       amount,
       showInvoice: isRequester && paid && !paymentDue,
       showReceipt: isRequester && paid && !paymentDue,
@@ -126,7 +156,7 @@ export function buildClientBookingPaymentSummary(input: BuildInput): PaymentSumm
       const status = paymentDue ? "Payment Due" : paid ? "Paid" : "Pending";
       afterTreatmentLines.push({
         id: "after-treatment-main",
-        label: `Main Client - ${status} - ${treatmentDate} - Online Direct`,
+        label: `Main Client - ${status} - ${bookingDate} - ${methodLabel}`,
         amount,
         showInvoice: paid && !paymentDue,
         showReceipt: paid && !paymentDue,
@@ -135,7 +165,12 @@ export function buildClientBookingPaymentSummary(input: BuildInput): PaymentSumm
   }
 
   if (afterTreatmentLines.length) {
-    sections.push({ title: "After Treatment Payment", lines: afterTreatmentLines });
+    sections.push({
+      id: "after-treatment",
+      title: "After Treatment Payment",
+      amount: afterTreatmentLines.reduce((sum, line) => sum + line.amount, 0),
+      lines: afterTreatmentLines,
+    });
   }
 
   const addOnLines: PaymentSummaryLine[] = [];
@@ -150,7 +185,7 @@ export function buildClientBookingPaymentSummary(input: BuildInput): PaymentSumm
 
     addOnLines.push({
       id: `addon-${section.key}`,
-      label: `${labelName} - ${status} - ${treatmentDate} - Offline Direct`,
+      label: `${labelName} - ${status} - ${bookingDate} - Offline Direct`,
       amount,
     });
   }
@@ -162,14 +197,19 @@ export function buildClientBookingPaymentSummary(input: BuildInput): PaymentSumm
       const status = paymentDue ? "Payment Due" : paid ? "Paid" : "Pending";
       addOnLines.push({
         id: "addon-main",
-        label: `Main Client - ${status} - ${treatmentDate} - Offline Direct`,
+        label: `Main Client - ${status} - ${bookingDate} - Offline Direct`,
         amount,
       });
     }
   }
 
   if (addOnLines.length) {
-    sections.push({ title: "Add Ons - After Checkout", lines: addOnLines });
+    sections.push({
+      id: "addons",
+      title: "Add Ons - After Checkout",
+      amount: addOnLines.reduce((sum, line) => sum + line.amount, 0),
+      lines: addOnLines,
+    });
   }
 
   return sections;

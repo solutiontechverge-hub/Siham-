@@ -2,7 +2,8 @@ import type { ClientBookingDraft } from "../../../components/common/client-booki
 import type { ClientBookingRecord, ClientBookingStatus } from "./clientBookingRecords";
 import { fmtMinutesToTimeLabel, parseTimeLabelToMinutes, buildWallClockDateTimeIso } from "./booking-time";
 import { wallClockDateFromDateTime, wallClockTimeFromDateTime } from "../../../components/common/calendar/calendar.utils";
-import { parseCalendarEntryNotes, parseStoredEbrFromNotes, parseStoredErFromNotes } from "../../../components/common/calendar/bookingEventDetails";
+import { parseCalendarEntryNotes, parseStoredEbrFromNotes, resolveKilometerAllowanceAmount } from "../../../components/common/calendar/bookingEventDetails";
+import { summarizeClientBookingPrice } from "../../../components/common/calendar/bookingTotal";
 import { buildResponseDeadline } from "../../../components/common/calendar/bookingResponseDeadline";
 import { syncEditRequestFromBookingApi } from "../../../components/common/client-booking/syncEditRequestFromApi";
 import { resolveMediaUrl } from "../../../lib/resolveMediaUrl";
@@ -397,25 +398,9 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
   const clientSnapshot = notesDetails?.clientSnapshot;
   const bookingCancelled = String(booking.status ?? "").toLowerCase() === "cancelled";
   const bookingRef = booking.unique_code || String(booking.id);
-  // Backend edit_request is source of truth for Confirmed ER (fallback: notes.er).
+  // Backend edit_request column is the only source of truth for Confirmed ER.
   if (String(booking.status ?? "").toLowerCase() === "confirmed") {
-    const notesEr = parseStoredErFromNotes(booking.notes);
-    const notesPayload =
-      notesEr && notesEr.status !== "none"
-        ? {
-            status: notesEr.status as "pending" | "approved" | "rejected",
-            note: notesEr.note,
-            initiated_by: (notesEr.initiatedBy ?? "client") as "client" | "professional",
-            requested_at: notesEr.requestedAt ?? null,
-            responded_at: notesEr.approvedAt ?? notesEr.rejectedAt ?? null,
-            edit_grant_active: Boolean(notesEr.editGrantActive),
-          }
-        : null;
-    if (booking.edit_request) {
-      syncEditRequestFromBookingApi(bookingRef, booking.edit_request);
-    } else if (notesPayload) {
-      syncEditRequestFromBookingApi(bookingRef, notesPayload);
-    }
+    syncEditRequestFromBookingApi(bookingRef, booking.edit_request ?? null);
   }
   const activeEbr =
     !bookingCancelled && ebr && (ebr.status === "suggested" || ebr.status === "pending") ? ebr : null;
@@ -586,6 +571,221 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
     : null;
   const desiredLocation = desiredLocationFromColumns ?? desiredLocationFromDetails;
 
+  const snapshotServices = clientSnapshot?.services ?? [];
+  const snapshotById = new Map(snapshotServices.map((s) => [s.id, s]));
+  const snapshotByName = new Map(snapshotServices.map((s) => [s.name, s]));
+  const resolveGuestId = (
+    id: string,
+    name: string,
+    fallback: string | null | undefined,
+  ) =>
+    fallback ??
+    snapshotById.get(id)?.guestId ??
+    snapshotByName.get(name)?.guestId ??
+    null;
+
+  const guestNestedServices = (notesDetails?.guests ?? []).flatMap((guest) =>
+    (guest.services ?? []).map((service) => ({
+      id: service.id,
+      name: service.name,
+      durationMins: service.durationMins,
+      ...withClientDiscountFields(service),
+      guestId: guest.id,
+      teamMemberId: service.staffResourceId ?? service.teamMemberId ?? null,
+    })),
+  );
+
+  const draftServices = ((): ClientBookingDraft["services"] => {
+    const noteServices = notesDetails?.services ?? [];
+
+    if (activeEbr?.suggestedServices?.length) {
+      return activeEbr.suggestedServices.map((service) => ({
+        id: service.id,
+        name: service.name,
+        durationMins: service.durationMins,
+        ...withClientDiscountFields(service),
+        guestId: resolveGuestId(service.id, service.name, service.guestId ?? null),
+        teamMemberId: service.staffResourceId ?? booking.team_member_id,
+      }));
+    }
+
+    const merged: ClientBookingDraft["services"] = [];
+    const pushUnique = (row: {
+      id: string;
+      name: string;
+      durationMins: number;
+      price: number;
+      guestId?: string | null;
+      teamMemberId?: string | null;
+      originalPrice?: number;
+      discountPct?: number;
+      discountType?: "fixed" | "percentage";
+      discountAmount?: number;
+      discount?: { type: "fixed" | "percentage"; amount: number } | null;
+    }) => {
+      const guestId = row.guestId ?? null;
+      const exists = merged.some(
+        (item) => item.id === row.id && String(item.guestId ?? "") === String(guestId ?? ""),
+      );
+      if (exists) return;
+      merged.push({
+        id: row.id,
+        name: row.name,
+        durationMins: row.durationMins,
+        ...withClientDiscountFields(row),
+        guestId,
+        teamMemberId: row.teamMemberId ?? booking.team_member_id,
+      });
+    };
+
+    if (noteServices.length) {
+      for (const service of noteServices) {
+        pushUnique({
+          id: service.id,
+          name: service.name,
+          durationMins: service.durationMins,
+          price: service.price,
+          guestId: resolveGuestId(service.id, service.name, service.guestId ?? null),
+          teamMemberId: service.staffResourceId ?? service.teamMemberId ?? null,
+          originalPrice: service.originalPrice,
+          discount: service.discount,
+          discountPct: service.discountPct,
+        });
+      }
+      const nonRequesterIds = new Set(
+        (clientSnapshot?.people ?? [])
+          .filter((person) => !person.isRequester)
+          .map((person) => String(person.id)),
+      );
+      const noteHasGuestLine = merged.some(
+        (service) =>
+          Boolean(service.guestId) && nonRequesterIds.has(String(service.guestId)),
+      );
+      if (!noteHasGuestLine) {
+        for (const service of snapshotServices) {
+          const guestId = service.guestId ?? null;
+          if (!guestId || !nonRequesterIds.has(String(guestId))) continue;
+          pushUnique({
+            id: service.id,
+            name: service.name,
+            durationMins: service.durationMins,
+            price: service.price,
+            guestId,
+            teamMemberId: service.teamMemberId ?? null,
+            originalPrice: service.originalPrice,
+            discount: service.discount,
+            discountPct: service.discountPct,
+          });
+        }
+      }
+      for (const service of guestNestedServices) {
+        pushUnique(service);
+      }
+    } else {
+      for (const service of snapshotServices) {
+        pushUnique({
+          id: service.id,
+          name: service.name,
+          durationMins: service.durationMins,
+          price: service.price,
+          guestId: service.guestId ?? null,
+          teamMemberId: service.teamMemberId ?? null,
+          originalPrice: service.originalPrice,
+          discount: service.discount,
+          discountPct: service.discountPct,
+        });
+      }
+      for (const service of guestNestedServices) {
+        pushUnique(service);
+      }
+    }
+
+    if (merged.length) return merged;
+
+    return names.map((name, index) => ({
+      id: `${booking.service_id ?? booking.id}-${index}`,
+      name,
+      durationMins: names.length === 1 ? durationMins : Math.round(durationMins / names.length),
+      price: priceEach,
+      guestId: null as string | null,
+      teamMemberId: booking.team_member_id,
+    }));
+  })();
+
+  const draftProducts: ClientBookingDraft["products"] = (() => {
+    if (activeEbr?.suggestedProducts?.length) {
+      return activeEbr.suggestedProducts.map((product) => ({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        quantity: product.quantity || 1,
+        unitPrice: product.unitPrice ?? product.price,
+        originalPrice: product.originalPrice,
+        discountType: product.discount?.type,
+        discountAmount: product.discount?.amount,
+      }));
+    }
+    const noteProducts = notesDetails?.products ?? [];
+    const guestProducts = (notesDetails?.guests ?? []).flatMap((guest) =>
+      (guest.products ?? []).map((product) => ({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        quantity: product.quantity || 1,
+        unitPrice: product.unitPrice ?? product.price,
+      })),
+    );
+    const mergedProducts = [...noteProducts];
+    for (const product of guestProducts) {
+      if (!mergedProducts.some((p) => p.id === product.id)) {
+        mergedProducts.push(product);
+      }
+    }
+    if (mergedProducts.length) {
+      return mergedProducts.map((product) => ({
+        id: product.id,
+        name: product.name,
+        price: product.price,
+        quantity: product.quantity || 1,
+        unitPrice: product.unitPrice ?? product.price,
+        originalPrice: product.originalPrice,
+        discountType: product.discount?.type,
+        discountAmount: product.discount?.amount,
+      }));
+    }
+    return [];
+  })();
+
+  const kilometerAllowanceAmount =
+    booking.location_type === "desired"
+      ? resolveKilometerAllowanceAmount(notesDetails?.kilometerAllowance)
+      : 0;
+  const extrasAmount =
+    booking.location_type === "desired" &&
+    Boolean(notesDetails?.showKilometerAllowance) &&
+    kilometerAllowanceAmount > 0
+      ? kilometerAllowanceAmount
+      : 0;
+  const mappedPrepaymentPercent = Number(notesDetails?.prepaymentPercent) || 0;
+  const draftPrice = summarizeClientBookingPrice({
+    services: draftServices,
+    people: clientSnapshot?.people,
+    products: draftProducts,
+    extrasAmount,
+    discount: notesDetails?.totalDiscount ?? null,
+    showLateCancellation: Boolean(notesDetails?.showLateCancellation),
+    lateCancellationFeePercent: notesDetails?.lateCancellationFeePercent,
+    showLateRescheduling: Boolean(notesDetails?.showLateRescheduling),
+    lateRescheduleFeePercent: notesDetails?.lateRescheduleFeePercent,
+    showPrepayment:
+      Boolean(notesDetails?.showPrepayment) && mappedPrepaymentPercent > 0,
+    prepaymentPercent: mappedPrepaymentPercent,
+  });
+  const draftTotal =
+    draftPrice.breakdown.bookingTotal > 0
+      ? draftPrice.breakdown.bookingTotal
+      : Number(booking.total_price) || 0;
+
   return {
     id: booking.id,
     apiBookingId: booking.id,
@@ -617,174 +817,8 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
         planningDuration: p.planningDuration,
         planningIsLocked: p.planningIsLocked,
       })),
-      services: (() => {
-        const snapshotServices = clientSnapshot?.services ?? [];
-        const noteServices = notesDetails?.services ?? [];
-        const guestNestedServices = (notesDetails?.guests ?? []).flatMap((guest) =>
-          (guest.services ?? []).map((service) => ({
-            id: service.id,
-            name: service.name,
-            durationMins: service.durationMins,
-            ...withClientDiscountFields(service),
-            guestId: guest.id,
-            teamMemberId: service.staffResourceId ?? service.teamMemberId ?? null,
-          })),
-        );
-        const snapshotById = new Map(snapshotServices.map((s) => [s.id, s]));
-        const snapshotByName = new Map(snapshotServices.map((s) => [s.name, s]));
-        const resolveGuestId = (
-          id: string,
-          name: string,
-          fallback: string | null | undefined,
-        ) =>
-          fallback ??
-          snapshotById.get(id)?.guestId ??
-          snapshotByName.get(name)?.guestId ??
-          null;
-
-        if (activeEbr?.suggestedServices?.length) {
-          return activeEbr.suggestedServices.map((service) => ({
-            id: service.id,
-            name: service.name,
-            durationMins: service.durationMins,
-            ...withClientDiscountFields(service),
-            guestId: resolveGuestId(service.id, service.name, null),
-            teamMemberId: service.staffResourceId ?? booking.team_member_id,
-          }));
-        }
-
-        // Notes.services is canonical after ER/EBR accept + save. Do not re-append
-        // stale snapshot lines — that hid price/duration edits and resurrected removed items.
-        const merged: Array<{
-          id: string;
-          name: string;
-          durationMins: number;
-          price: number;
-          guestId: string | null;
-          teamMemberId: string | null | undefined;
-          originalPrice?: number;
-          discountPct?: number;
-          discountType?: "fixed" | "percentage";
-          discountAmount?: number;
-        }> = [];
-        const pushUnique = (row: {
-          id: string;
-          name: string;
-          durationMins: number;
-          price: number;
-          guestId?: string | null;
-          teamMemberId?: string | null;
-          originalPrice?: number;
-          discountPct?: number;
-          discountType?: "fixed" | "percentage";
-          discountAmount?: number;
-          discount?: { type: "fixed" | "percentage"; amount: number } | null;
-        }) => {
-          const guestId = row.guestId ?? null;
-          const exists = merged.some(
-            (item) => item.id === row.id && String(item.guestId ?? "") === String(guestId ?? ""),
-          );
-          if (exists) return;
-          merged.push({
-            id: row.id,
-            name: row.name,
-            durationMins: row.durationMins,
-            ...withClientDiscountFields(row),
-            guestId,
-            teamMemberId: row.teamMemberId ?? booking.team_member_id,
-          });
-        };
-
-        if (noteServices.length) {
-          for (const service of noteServices) {
-            pushUnique({
-              id: service.id,
-              name: service.name,
-              durationMins: service.durationMins,
-              price: service.price,
-              guestId: resolveGuestId(service.id, service.name, service.guestId ?? null),
-              teamMemberId: service.staffResourceId ?? service.teamMemberId ?? null,
-              originalPrice: service.originalPrice,
-              discount: service.discount,
-              discountPct: service.discountPct,
-            });
-          }
-          for (const service of guestNestedServices) {
-            pushUnique(service);
-          }
-        } else {
-          for (const service of snapshotServices) {
-            pushUnique({
-              id: service.id,
-              name: service.name,
-              durationMins: service.durationMins,
-              price: service.price,
-              guestId: service.guestId ?? null,
-              teamMemberId: service.teamMemberId ?? null,
-              originalPrice: service.originalPrice,
-              discount: service.discount,
-              discountPct: service.discountPct,
-            });
-          }
-          for (const service of guestNestedServices) {
-            pushUnique(service);
-          }
-        }
-
-        if (merged.length) return merged;
-
-        return names.map((name, index) => ({
-          id: `${booking.service_id ?? booking.id}-${index}`,
-          name,
-          durationMins: names.length === 1 ? durationMins : Math.round(durationMins / names.length),
-          price: priceEach,
-          guestId: null as string | null,
-          teamMemberId: booking.team_member_id,
-        }));
-      })(),
-      products: (() => {
-        if (activeEbr?.suggestedProducts?.length) {
-          return activeEbr.suggestedProducts.map((product) => ({
-            id: product.id,
-            name: product.name,
-            price: product.price,
-            quantity: product.quantity || 1,
-            unitPrice: product.unitPrice ?? product.price,
-            originalPrice: product.originalPrice,
-            discountType: product.discount?.type,
-            discountAmount: product.discount?.amount,
-          }));
-        }
-        const noteProducts = notesDetails?.products ?? [];
-        const guestProducts = (notesDetails?.guests ?? []).flatMap((guest) =>
-          (guest.products ?? []).map((product) => ({
-            id: product.id,
-            name: product.name,
-            price: product.price,
-            quantity: product.quantity || 1,
-            unitPrice: product.unitPrice ?? product.price,
-          })),
-        );
-        const mergedProducts = [...noteProducts];
-        for (const product of guestProducts) {
-          if (!mergedProducts.some((p) => p.id === product.id)) {
-            mergedProducts.push(product);
-          }
-        }
-        if (mergedProducts.length) {
-          return mergedProducts.map((product) => ({
-            id: product.id,
-            name: product.name,
-            price: product.price,
-            quantity: product.quantity || 1,
-            unitPrice: product.unitPrice ?? product.price,
-            originalPrice: product.originalPrice,
-            discountType: product.discount?.type,
-            discountAmount: product.discount?.amount,
-          }));
-        }
-        return [];
-      })(),
+      services: draftServices,
+      products: draftProducts,
       teamMembers: clientSnapshot?.teamMembers?.length
         ? clientSnapshot.teamMembers
         : booking.team_member_id
@@ -817,38 +851,7 @@ export function mapApiBookingToClientRecord(booking: CalendarBooking): ClientBoo
         : notesDetails?.internalNote?.trim()
           ? { clientNote: notesDetails.internalNote.trim() }
           : {}),
-      total: (() => {
-        if (activeEbr?.suggestedServices?.length) {
-          return (
-            activeEbr.suggestedServices.reduce((sum, s) => sum + (s.price || 0), 0) +
-            (activeEbr.suggestedProducts ?? []).reduce(
-              (sum, p) => sum + p.price * (p.quantity || 1),
-              0,
-            )
-          );
-        }
-        const noteServices = notesDetails?.services ?? [];
-        const noteProducts = [
-          ...(notesDetails?.products ?? []),
-          ...(notesDetails?.guests ?? []).flatMap((guest) => guest.products ?? []),
-        ];
-        const snapshotServices = clientSnapshot?.services ?? [];
-        if (noteServices.length || noteProducts.length || snapshotServices.length) {
-          const serviceSum = (noteServices.length ? noteServices : snapshotServices).reduce(
-            (sum, s) => sum + (s.price || 0),
-            0,
-          );
-          // Deduplicate guest product ids already in notes.products
-          const seen = new Set<string>();
-          const productSum = noteProducts.reduce((sum, p) => {
-            if (seen.has(p.id)) return sum;
-            seen.add(p.id);
-            return sum + p.price * (p.quantity || 1);
-          }, 0);
-          return serviceSum + productSum;
-        }
-        return total;
-      })(),
+      total: draftTotal,
     },
     createdAt: booking.created_at ?? undefined,
     prepaid,

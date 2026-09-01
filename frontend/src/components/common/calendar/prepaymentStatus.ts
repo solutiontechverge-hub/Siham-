@@ -3,6 +3,13 @@ import type { PrepaymentStatusIconVariant } from "./PrepaymentStatusIcon";
 
 export type CalendarPrepaymentStatus = "pending" | "confirmed" | "canceled" | "invalid";
 
+function isOfflinePaymentMethod(method?: string | null) {
+  return String(method ?? "")
+    .toLowerCase()
+    .replace(/[\s_-]/g, "")
+    .startsWith("offline");
+}
+
 export function toPrepaymentIconVariant(
   status: CalendarPrepaymentStatus,
 ): PrepaymentStatusIconVariant {
@@ -30,13 +37,26 @@ export function resolveCalendarPrepaymentStatus(
   const details = event.details;
   if (!details?.showPrepayment) return undefined;
 
-  // Prefer explicit detail status (synced from API / notes).
-  if (details.prepaymentStatus) return details.prepaymentStatus;
+  const finished =
+    event.status === "Completed" ||
+    event.status === "No Show" ||
+    event.status === "Cancelled" ||
+    event.status === "Invalid";
+
+  // Offline prepayment is collected at the visit — waiting icon until done.
+  if (isOfflinePaymentMethod(details.paymentMethod)) {
+    if (finished) return undefined;
+    return "pending";
+  }
+
+  if (details.prepaymentStatus) {
+    if (finished && details.prepaymentStatus === "pending") return undefined;
+    return details.prepaymentStatus;
+  }
 
   if (event.status === "Cancelled") return "canceled";
   if (event.status === "Invalid") return "invalid";
 
-  // When prepayment is required but not marked paid, show due (pending) icon.
   return "pending";
 }
 

@@ -130,7 +130,7 @@ export const desiredLocationPageData = {
   profile: {
     title: "Profile",
     saveLabel: "Save",
-    nameLabel: "Name",
+    nameLabel: "Salon Name",
     aboutLabel: "About",
     keywordsLabel: "Add keywords(You can add up to 5 keywords)",
     keywordPlaceholder: "e.g Hair Specialist",

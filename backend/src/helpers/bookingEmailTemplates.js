@@ -228,6 +228,9 @@ export const buildPrepaymentReceivedEmail = (ctx) =>
     status: ctx.status || "confirmed",
     ctaLabel: "View calendar",
     ctaUrl: `${getFrontendBaseUrl()}/professionals/calendar`,
+    message: ctx.clientName
+      ? `Prepayment received from ${ctx.clientName}.`
+      : "Prepayment received from the client.",
   });
 
 export const buildPostTreatmentPaymentEmail = (ctx) => {

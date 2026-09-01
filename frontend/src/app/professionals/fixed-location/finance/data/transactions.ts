@@ -261,6 +261,8 @@ export type TransactionDocument = {
   refundAmount?: string;
   refundedAt?: string;
   serviceDate: string;
+  /** Appointment clock time, e.g. "14:00" or "2:00 PM". */
+  serviceTime?: string;
   invoiceDate: string;
   dueDate: string;
   lateFeeNotice?: string;
@@ -269,6 +271,8 @@ export type TransactionDocument = {
   bookingItems?: TransactionDocumentBookingItem[];
   lineItems?: TransactionDocumentLineItem[];
   totalPrice?: string;
+  /** Formatted prepayment amount shown on invoice/receipt as "Prepayment". */
+  prepaymentAmount?: string;
 };
 
 export type TransactionRow = {

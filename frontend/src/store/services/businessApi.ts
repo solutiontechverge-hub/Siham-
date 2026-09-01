@@ -91,7 +91,8 @@ export type BusinessSetupListingTimeBlock = {
 };
 
 export type BusinessSetupListingLocation = {
-  address: string | null;
+  address?: string | null;
+  street?: string | null;
   streetNumber: string | null;
   postalCode: string | null;
   province: string | null;
@@ -161,6 +162,12 @@ export type BusinessSetupListing = {
   media: string[];
   locationMode: "fixed" | "desired" | "both" | null;
   salonName: string | null;
+  /** Professional profile contact number, when the professional has set one. */
+  phone?: string | null;
+  legalName?: string | null;
+  vatNumber?: string | null;
+  cocNumber?: string | null;
+  profileAddress?: BusinessSetupListingLocation | null;
   fixedLocation: BusinessSetupListingLocation;
   desiredLocation: BusinessSetupListingDesiredLocation;
   serviceCategories: Array<{
@@ -236,6 +243,15 @@ export type BusinessSetup = {
   business_keywords: string[];
   business_media: string[];
   salon_name: string | null;
+  professional_phone?: string | null;
+  professional_legal_name?: string | null;
+  professional_vat_number?: string | null;
+  professional_coc_number?: string | null;
+  professional_street?: string | null;
+  professional_street_number?: string | null;
+  professional_postal_code?: string | null;
+  professional_municipality?: string | null;
+  professional_province?: string | null;
   fixed_location_address: string | null;
   fixed_location_street_number: string | null;
   fixed_location_postal_code: string | null;
@@ -985,7 +1001,7 @@ export const businessApi = baseApi.injectEndpoints({
 
         return { data };
       },
-      invalidatesTags: ["Calendar", "Bookings"],
+      invalidatesTags: ["Calendar", "Bookings", "ProfessionalClients"],
     }),
     upsertCalendarSettings: builder.mutation<ApiEnvelope<CalendarSettings>, UpsertCalendarSettingsRequest>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
@@ -1006,7 +1022,7 @@ export const businessApi = baseApi.injectEndpoints({
 
         return { data };
       },
-      invalidatesTags: ["Calendar"],
+      invalidatesTags: ["Calendar", "BusinessSetupsListing"],
     }),
     updateCalendarEntryStatus: builder.mutation<ApiEnvelope<CalendarEntry>, UpdateCalendarEntryStatusRequest>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
@@ -1049,7 +1065,7 @@ export const businessApi = baseApi.injectEndpoints({
 
         return { data };
       },
-      invalidatesTags: ["Calendar", "Bookings"],
+      invalidatesTags: ["Calendar", "Bookings", "ProfessionalClients"],
     }),
     deleteCalendarEntry: builder.mutation<ApiEnvelope<{ id: string }>, string>({
       async queryFn(id, _api, _extraOptions, fetchWithBQ) {
@@ -1125,7 +1141,7 @@ export const businessApi = baseApi.injectEndpoints({
 
         return { data };
       },
-      invalidatesTags: ["Calendar", "Bookings"],
+      invalidatesTags: ["Calendar", "Bookings", "ProfessionalClients"],
     }),
     updateBookingStatus: builder.mutation<ApiEnvelope<CalendarBooking>, UpdateBookingStatusRequest>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
@@ -1158,7 +1174,7 @@ export const businessApi = baseApi.injectEndpoints({
 
         return { data };
       },
-      invalidatesTags: ["Calendar", "Bookings"],
+      invalidatesTags: ["Calendar", "Bookings", "ProfessionalClients"],
     }),
     updateMyBooking: builder.mutation<ApiEnvelope<CalendarBooking>, UpdateMyBookingRequest>({
       async queryFn(payload, _api, _extraOptions, fetchWithBQ) {
@@ -1192,7 +1208,7 @@ export const businessApi = baseApi.injectEndpoints({
 
         return { data };
       },
-      invalidatesTags: ["Calendar", "Bookings"],
+      invalidatesTags: ["Calendar", "Bookings", "ProfessionalClients"],
     }),
     manageBookingEditRequest: builder.mutation<
       ApiEnvelope<CalendarBooking>,
@@ -1219,7 +1235,7 @@ export const businessApi = baseApi.injectEndpoints({
 
         return { data };
       },
-      invalidatesTags: ["Calendar", "Bookings"],
+      invalidatesTags: ["Calendar", "Bookings", "ProfessionalClients"],
     }),
     dispatchBookingNotification: builder.mutation<
       ApiEnvelope<{ bookingId: string; event: string }>,

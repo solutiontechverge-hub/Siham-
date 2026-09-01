@@ -62,11 +62,42 @@ export function useClientRequesterProfile() {
     return "";
   }, [profileQueryData?.data?.profile]);
 
+  const requesterUserType = profileQueryData?.data?.user_type ?? user?.user_type ?? "individual";
+
+  const requesterVat = React.useMemo(() => {
+    if (profileQueryData?.data?.user_type !== "company") return "";
+    const p = profileQueryData.data.profile as CompanyProfile | null;
+    return p?.vat_number?.trim() || "";
+  }, [profileQueryData?.data]);
+
+  const requesterCoc = React.useMemo(() => {
+    if (profileQueryData?.data?.user_type !== "company") return "";
+    const p = profileQueryData.data.profile as CompanyProfile | null;
+    return p?.ccc_number?.trim() || "";
+  }, [profileQueryData?.data]);
+
+  const requesterAddress = React.useMemo(() => {
+    const profile = profileQueryData?.data?.profile;
+    if (!profile) return "";
+    if (profileQueryData?.data?.user_type === "company") {
+      const p = profile as CompanyProfile;
+      return [p.street, p.street_number, p.postal_code, p.municipality, p.province]
+        .map((part) => String(part ?? "").trim())
+        .filter(Boolean)
+        .join(", ");
+    }
+    return "";
+  }, [profileQueryData?.data]);
+
   return {
     requesterName,
     requesterAvatarUrl,
     requesterCountryCode,
     requesterPhone,
+    requesterUserType,
+    requesterVat,
+    requesterCoc,
+    requesterAddress,
     isProfileLoading,
   };
 }

@@ -277,7 +277,7 @@ const NOTIFICATION_META = {
     audience: "client",
   },
   [NOTIFICATION_TYPES.CLIENT_PREPAYMENT_RECEIVED]: {
-    title: "Prepayment Received",
+    title: "Prepayment Made Successfully",
     statusType: "accepted",
     audience: "client",
   },
@@ -319,7 +319,13 @@ const loadBookingNotificationContext = async (bookingId) => {
        ) AS professional_name,
        COALESCE(NULLIF(tm.full_name, ''), NULL) AS team_member_name,
        COALESCE(
-         NULLIF(TRIM(COALESCE(ip.display_name, ip.first_name || ' ' || ip.last_name)), ''),
+         CASE
+           WHEN cu.user_type = 'company' THEN NULLIF(TRIM(cp.legal_name), '')
+           ELSE NULLIF(TRIM(CONCAT_WS(' ', ip.first_name, ip.last_name)), '')
+         END,
+         NULLIF(TRIM(ip.display_name), ''),
+         NULLIF(TRIM(cp.legal_name), ''),
+         NULLIF(TRIM(CONCAT_WS(' ', cp.contact_first_name, cp.contact_last_name)), ''),
          cu.email,
          'Client'
        ) AS client_name
@@ -329,6 +335,7 @@ const loadBookingNotificationContext = async (bookingId) => {
      LEFT JOIN business_team_members tm ON tm.id = b.team_member_id
      LEFT JOIN users cu ON cu.id = b.customer_id
      LEFT JOIN individual_profiles ip ON ip.user_id = cu.id
+     LEFT JOIN company_profiles cp ON cp.user_id = cu.id
      WHERE b.id = $1
      LIMIT 1`,
     [bookingId],
@@ -597,8 +604,12 @@ export async function dispatchBookingUpdatedNotifications(booking, previousStatu
     prepaymentChanged && String(booking.prepayment_status ?? "").toLowerCase() === "paid";
 
   if (prepaymentPaid) {
-    await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_PREPAYMENT_RECEIVED, ctx.professional_name);
-    await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_PREPAYMENT_RECEIVED, ctx.client_name);
+    await notifyClientInApp(ctx, NOTIFICATION_TYPES.CLIENT_PREPAYMENT_RECEIVED, ctx.professional_name, {
+      message: "Prepayment made successfully.",
+    });
+    await notifyProfessionalInApp(ctx, NOTIFICATION_TYPES.PRO_PREPAYMENT_RECEIVED, ctx.client_name, {
+      message: `Prepayment received from ${ctx.client_name}.`,
+    });
   }
 
   if (statusChanged) {
@@ -1164,11 +1175,22 @@ export const markAllNotificationsRead = async (userId, { audience = null } = {})
   emitNotificationChanged(userId);
 };
 
+const resolveStoredNotificationTitle = (row) => {
+  const type = String(row?.notification_type ?? "");
+  if (type === NOTIFICATION_TYPES.CLIENT_PREPAYMENT_RECEIVED) {
+    return "Prepayment Made Successfully";
+  }
+  if (type === NOTIFICATION_TYPES.PRO_PREPAYMENT_RECEIVED) {
+    return "Prepayment Received";
+  }
+  return row?.title ?? "";
+};
+
 export const mapNotificationRow = (row) => ({
   id: row.id,
   audience: row.audience,
   notificationType: row.notification_type,
-  title: row.title,
+  title: resolveStoredNotificationTitle(row),
   message: row.message,
   statusType: row.status_type,
   bookingId: row.booking_id,

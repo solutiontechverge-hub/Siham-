@@ -11,7 +11,7 @@ export const PREPAYMENT_STATUS_LABELS: Record<
   PrepaymentStatusIconVariant,
   string
 > = {
-  pending: "Waiting for prepayment",
+  pending: "Prepayment required",
   confirmed: "Prepayment confirmed",
   canceled_or_invalid: "Prepayment canceled or invalid",
 };
@@ -27,7 +27,7 @@ export default function PrepaymentStatusIcon({
   size = 16,
 }: PrepaymentStatusIconProps) {
   if (variant === "pending") {
-    return <BookingGuidelineIcon variant="response_time_active" size={size} />;
+    return <BookingGuidelineIcon variant="waiting_for_prepayment" size={size} />;
   }
   if (variant === "confirmed") {
     return <BookingGuidelineIcon variant="prepaid" size={size} />;

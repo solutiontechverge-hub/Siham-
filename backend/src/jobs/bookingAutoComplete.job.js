@@ -1,5 +1,6 @@
 import { query } from "../db/index.js";
 import { syncBookingToFinanceTransaction } from "../services/finance-sync.service.js";
+import { safeEnsureProfessionalClientFromBooking } from "../services/professional-clients.service.js";
 import { emitBookingChanged } from "../messaging/messagingSocket.js";
 import { dispatchBookingUpdatedNotifications } from "../services/bookingNotification.service.js";
 
@@ -51,6 +52,7 @@ const runAutoCompleteCycle = async () => {
       } catch {
         // best-effort finance sync
       }
+      await safeEnsureProfessionalClientFromBooking(booking.id);
       // In-app + companion emails (client post-treatment / review; pro completed).
       void dispatchBookingUpdatedNotifications(booking, booking.prev_status, booking.prepayment_status);
       emitBookingChanged(booking, "updated");

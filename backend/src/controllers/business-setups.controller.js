@@ -293,8 +293,19 @@ export const listAllBusinessSetups = async (req, res) => {
     }
 
     const setupsResult = await query(
-      `SELECT bs.*
+      `SELECT
+         bs.*,
+         pp.phone AS professional_phone,
+         pp.legal_name AS professional_legal_name,
+         pp.vat_number AS professional_vat_number,
+         pp.ccc_number AS professional_coc_number,
+         pp.street AS professional_street,
+         pp.street_number AS professional_street_number,
+         pp.postal_code AS professional_postal_code,
+         pp.municipality AS professional_municipality,
+         pp.province AS professional_province
        FROM business_setups bs
+       LEFT JOIN professional_profiles pp ON pp.id = bs.professional_profile_id
        WHERE bs.id = ANY($1::uuid[])`,
       [setupIds],
     );

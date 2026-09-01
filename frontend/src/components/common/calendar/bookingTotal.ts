@@ -16,6 +16,8 @@ export type BookingPriceInput = {
   prepaymentPercent?: number | string;
   /** When true, prepaid amount is deducted from the payable total. */
   prepaymentPaid?: boolean;
+  /** Offline prepayment is collected at the visit — do not deduct it from remaining. */
+  prepaymentOffline?: boolean;
 };
 
 export type BookingPriceBreakdown = {
@@ -36,8 +38,260 @@ export type BookingPriceBreakdown = {
   remainingAfterPrepayment: number;
 };
 
-function roundMoney(value: number): number {
+export function roundBookingMoney(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function roundMoney(value: number): number {
+  return roundBookingMoney(value);
+}
+
+export type BookingPriceSummaryLine = {
+  label: string;
+  amount: number;
+  kind?: "add" | "subtract";
+};
+
+export type BookingPricePerson = {
+  id: string;
+  isRequester?: boolean;
+  participantType?: string | null;
+};
+
+export type BookingPriceService = {
+  price: number;
+  guestId?: string | null;
+  isAddOn?: boolean;
+};
+
+export type BookingPriceProduct = {
+  id?: string;
+  price: number;
+  quantity?: number;
+};
+
+export function isUniqueItemId(id?: string | null): boolean {
+  return Boolean(id && String(id).startsWith("unique-"));
+}
+
+export function partitionBookingProducts<T extends { id?: string | null }>(
+  items: readonly T[] | null | undefined,
+): { products: T[]; uniqueItems: T[] } {
+  const products: T[] = [];
+  const uniqueItems: T[] = [];
+  for (const item of items ?? []) {
+    if (isUniqueItemId(item.id)) uniqueItems.push(item);
+    else products.push(item);
+  }
+  return { products, uniqueItems };
+}
+
+const ITEMIZED_SUMMARY_LABELS = new Set([
+  "Services",
+  "Guests / Models",
+  "Add-ons",
+  "Products",
+  "Unique items",
+]);
+
+/** Keep extras/fees/discount after services, products, and unique items are listed as cards. */
+export function withoutItemizedBookingSummaryLines(
+  lines: readonly BookingPriceSummaryLine[],
+): BookingPriceSummaryLine[] {
+  return lines.filter((line) => !ITEMIZED_SUMMARY_LABELS.has(line.label));
+}
+
+function isRequesterPerson(person: BookingPricePerson): boolean {
+  return Boolean(person.isRequester) || person.participantType === "requester";
+}
+
+function isGuestOrModelPerson(person: BookingPricePerson): boolean {
+  if (isRequesterPerson(person)) return false;
+  if (person.participantType === "planning" || person.participantType === "notes") {
+    return false;
+  }
+  return true;
+}
+
+/** Split requester vs guest/model vs product buckets. Amounts stay dynamic. */
+export function splitBookingLineTotals(input: {
+  services?: readonly BookingPriceService[] | null;
+  people?: readonly BookingPricePerson[] | null;
+  products?: readonly BookingPriceProduct[] | null;
+  uniqueItemsTotal?: number;
+}): {
+  servicesTotal: number;
+  guestsTotal: number;
+  addOnsTotal: number;
+  productsTotal: number;
+  uniqueItemsTotal: number;
+} {
+  const people = input.people ?? [];
+  const guestIds = new Set(
+    people.filter(isGuestOrModelPerson).map((person) => String(person.id)),
+  );
+
+  let servicesTotal = 0;
+  let guestsTotal = 0;
+  let addOnsTotal = 0;
+  for (const service of input.services ?? []) {
+    const price = Number(service.price) || 0;
+    if (service.isAddOn) {
+      addOnsTotal += price;
+      continue;
+    }
+    const guestId =
+      service.guestId != null && String(service.guestId).trim() !== ""
+        ? String(service.guestId)
+        : "";
+    if (guestId && guestIds.has(guestId)) guestsTotal += price;
+    else servicesTotal += price;
+  }
+
+  let productsTotal = 0;
+  let uniqueFromProducts = 0;
+  for (const product of input.products ?? []) {
+    const amount = Number(product.price) || 0;
+    if (isUniqueItemId(product.id)) uniqueFromProducts += amount;
+    else productsTotal += amount;
+  }
+
+  return {
+    servicesTotal: roundMoney(servicesTotal),
+    guestsTotal: roundMoney(guestsTotal),
+    addOnsTotal: roundMoney(addOnsTotal),
+    productsTotal: roundMoney(productsTotal),
+    uniqueItemsTotal: roundMoney(
+      (Number(input.uniqueItemsTotal) || 0) + uniqueFromProducts,
+    ),
+  };
+}
+
+export function buildBookingPriceSummaryLines(input: {
+  servicesTotal?: number;
+  guestsTotal?: number;
+  addOnsTotal?: number;
+  productsTotal?: number;
+  uniqueItemsTotal?: number;
+  extrasAmount?: number;
+  extrasLabel?: string;
+  discountAmount?: number;
+  lateCancellationFeeAmount?: number;
+  lateRescheduleFeeAmount?: number;
+}): BookingPriceSummaryLine[] {
+  const servicesTotal = input.servicesTotal ?? 0;
+  const guestsTotal = input.guestsTotal ?? 0;
+  const addOnsTotal = input.addOnsTotal ?? 0;
+  const productsTotal = input.productsTotal ?? 0;
+  const uniqueItemsTotal = input.uniqueItemsTotal ?? 0;
+  const extrasAmount = input.extrasAmount ?? 0;
+  const discountAmount = input.discountAmount ?? 0;
+  const lateCancellationFeeAmount = input.lateCancellationFeeAmount ?? 0;
+  const lateRescheduleFeeAmount = input.lateRescheduleFeeAmount ?? 0;
+  const hasBreakdown =
+    guestsTotal > 0 ||
+    addOnsTotal > 0 ||
+    productsTotal > 0 ||
+    uniqueItemsTotal > 0 ||
+    extrasAmount > 0 ||
+    discountAmount > 0 ||
+    lateCancellationFeeAmount > 0 ||
+    lateRescheduleFeeAmount > 0;
+  if (!hasBreakdown) return [];
+  const lines: BookingPriceSummaryLine[] = [];
+  if (servicesTotal > 0) lines.push({ label: "Services", amount: servicesTotal });
+  if (guestsTotal > 0) lines.push({ label: "Guests / Models", amount: guestsTotal });
+  if (addOnsTotal > 0) lines.push({ label: "Add-ons", amount: addOnsTotal });
+  if (productsTotal > 0) lines.push({ label: "Products", amount: productsTotal });
+  if (uniqueItemsTotal > 0) {
+    lines.push({ label: "Unique items", amount: uniqueItemsTotal });
+  }
+  if (extrasAmount > 0) {
+    lines.push({
+      label: input.extrasLabel ?? "Kilometer Allowance",
+      amount: extrasAmount,
+    });
+  }
+  if (discountAmount > 0) {
+    lines.push({ label: "Discount", amount: discountAmount, kind: "subtract" });
+  }
+  if (lateCancellationFeeAmount > 0) {
+    lines.push({ label: "Cancellation fee", amount: lateCancellationFeeAmount });
+  }
+  if (lateRescheduleFeeAmount > 0) {
+    lines.push({
+      label: "Late reschedule fee",
+      amount: lateRescheduleFeeAmount,
+    });
+  }
+  return lines;
+}
+
+export function resolveBookingPriceDisplay(input: {
+  breakdown: BookingPriceBreakdown;
+  prepaymentPaid?: boolean;
+}): { displayTotal: number; originalPrice: number | null } {
+  const { breakdown, prepaymentPaid } = input;
+  const preDiscount = roundMoney(breakdown.lineSubtotal + breakdown.extrasAmount);
+  if (prepaymentPaid && breakdown.prepaymentAmount > 0) {
+    return {
+      displayTotal: breakdown.payableTotal,
+      originalPrice:
+        breakdown.discountAmount > 0 ? preDiscount : breakdown.bookingTotal,
+    };
+  }
+  if (breakdown.discountAmount > 0) {
+    return {
+      displayTotal: breakdown.bookingTotal,
+      originalPrice: preDiscount,
+    };
+  }
+  return { displayTotal: breakdown.bookingTotal, originalPrice: null };
+}
+
+export type ClientBookingPriceInput = Omit<BookingPriceInput, "lineSubtotal"> & {
+  services?: readonly BookingPriceService[] | null;
+  people?: readonly BookingPricePerson[] | null;
+  products?: readonly BookingPriceProduct[] | null;
+  uniqueItemsTotal?: number;
+  extrasLabel?: string;
+};
+
+export function summarizeClientBookingPrice(input: ClientBookingPriceInput) {
+  const split = splitBookingLineTotals(input);
+  const lineSubtotal = roundMoney(
+    split.servicesTotal +
+      split.guestsTotal +
+      split.addOnsTotal +
+      split.productsTotal +
+      split.uniqueItemsTotal,
+  );
+  const breakdown = computeBookingPrice({
+    lineSubtotal,
+    extrasAmount: input.extrasAmount,
+    discount: input.discount,
+    showLateCancellation: input.showLateCancellation,
+    lateCancellationFeePercent: input.lateCancellationFeePercent,
+    showLateRescheduling: input.showLateRescheduling,
+    lateRescheduleFeePercent: input.lateRescheduleFeePercent,
+    showPrepayment: input.showPrepayment,
+    prepaymentPercent: input.prepaymentPercent,
+    prepaymentPaid: input.prepaymentPaid,
+    prepaymentOffline: input.prepaymentOffline,
+  });
+  const lines = buildBookingPriceSummaryLines({
+    ...split,
+    extrasAmount: breakdown.extrasAmount,
+    extrasLabel: input.extrasLabel,
+    discountAmount: breakdown.discountAmount,
+    lateCancellationFeeAmount: breakdown.lateCancellationFeeAmount,
+    lateRescheduleFeeAmount: breakdown.lateRescheduleFeeAmount,
+  });
+  const display = resolveBookingPriceDisplay({
+    breakdown,
+    prepaymentPaid: input.prepaymentPaid,
+  });
+  return { split, breakdown, lines, ...display };
 }
 
 function parsePercent(value: number | string | undefined): number {
@@ -89,11 +343,15 @@ export function computeBookingPrice(
     ? percentOf(afterDiscount, input.prepaymentPercent)
     : 0;
   const prepaidApplied =
-    input.prepaymentPaid && prepaymentAmount > 0 ? prepaymentAmount : 0;
+    input.prepaymentPaid && !input.prepaymentOffline && prepaymentAmount > 0
+      ? prepaymentAmount
+      : 0;
 
   const payableTotal = roundMoney(Math.max(0, bookingTotal - prepaidApplied));
   const remainingAfterPrepayment = roundMoney(
-    Math.max(0, bookingTotal - prepaymentAmount),
+    input.prepaymentOffline
+      ? bookingTotal
+      : Math.max(0, bookingTotal - prepaymentAmount),
   );
 
   return {
