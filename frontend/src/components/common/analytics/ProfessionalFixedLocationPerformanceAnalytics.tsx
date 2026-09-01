@@ -69,7 +69,7 @@ export default function ProfessionalFixedLocationPerformanceAnalytics({
         sx={{
           borderRadius: "10px",
           border: `1px solid ${alpha(m.navy, 0.1)}`,
-          overflow: "hidden",
+          overflowX: "auto",
           boxShadow: "none",
         }}
       >

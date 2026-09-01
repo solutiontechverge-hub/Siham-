@@ -86,8 +86,8 @@ function AnalyticsSubTabs({
             onClick={() => onChange(t)}
             sx={{
               flex: "1 1 0",
-              minWidth: 0,
-              width: 0,
+              minWidth: "max-content",
+              width: "auto",
               display: "block",
               position: "relative",
               zIndex: 1,
@@ -153,7 +153,7 @@ function BookingOriginAndTypeTable({
       sx={{
         borderRadius: "10px",
         border: `1px solid ${alpha(m.navy, 0.1)}`,
-        overflow: "hidden",
+        overflowX: "auto",
       }}
     >
       <Table size="small">
@@ -258,7 +258,7 @@ function BookingStatusSummaryTable({
       sx={{
         borderRadius: "10px",
         border: `1px solid ${alpha(m.navy, 0.1)}`,
-        overflow: "hidden",
+        overflowX: "auto",
       }}
     >
       <Table size="small">
@@ -348,7 +348,7 @@ function AttendanceNoShowAnalyticsTable({
       sx={{
         borderRadius: "10px",
         border: `1px solid ${alpha(m.navy, 0.1)}`,
-        overflow: "hidden",
+        overflowX: "auto",
       }}
     >
       <Table size="small">
@@ -439,7 +439,7 @@ function TransactionSummaryTable({
       sx={{
         borderRadius: "10px",
         border: `1px solid ${alpha(m.navy, 0.1)}`,
-        overflow: "hidden",
+        overflowX: "auto",
       }}
     >
       <Table size="small">
@@ -657,7 +657,7 @@ export default function ProfessionalFixedLocationAnalytics({
         border: `1px solid ${alpha(m.navy, 0.08)}`,
         boxShadow: "0 10px 22px rgba(16, 35, 63, 0.05)",
         bgcolor: theme.palette.background.paper,
-        overflow: "hidden",
+        overflowX: "auto",
       }}
     >
       <MollureCardHeader

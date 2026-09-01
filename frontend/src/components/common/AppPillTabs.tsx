@@ -40,6 +40,10 @@ export default function AppPillTabs({
         p: 0.4,
         display: "inline-flex",
         gap: 0.5,
+        overflowX: "auto",
+        WebkitOverflowScrolling: "touch",
+        "&::-webkit-scrollbar": { display: "none" },
+        scrollbarWidth: "none",
       }}
     >
       {tabs.map((t, index) => {
@@ -51,7 +55,7 @@ export default function AppPillTabs({
         const tabSx = {
           textTransform: "none" as const,
           fontWeight: 800,
-          fontSize: 13,
+          fontSize: { xs: 12, sm: 13 },
           borderRadius: isActive
             ? "8px"
             : isFirst
@@ -59,10 +63,10 @@ export default function AppPillTabs({
               : isLast
                 ? "4px 8px 8px 4px"
                 : "6px",
-          px: 2.75,
+          px: { xs: 1.5, sm: 2.75 },
           py: 0.95,
           minHeight: 38,
-          minWidth: 96,
+          minWidth: { xs: 72, sm: 96 },
           flex: alignStart ? "0 0 auto" : "1 1 0",
           bgcolor: isActive ? m.teal : "#fff",
           color: isActive ? "#fff" : alpha(m.navy, 0.62),

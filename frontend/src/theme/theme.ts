@@ -134,6 +134,18 @@ const theme = createTheme({
       /** Calendar blocked-time slot */
       blockedTimeBg: "#FEE4E2",
       blockedTimeFg: "#F04438",
+      /** Calendar day/week timeline — solid line at each full hour (dark grey) */
+      timelineGridHourLine: "#71819A",
+      /** Calendar day/week timeline — dotted line at each half hour (light grey) */
+      timelineGridHalfHourLine: "#DCDFE3",
+      /** Quarter-hour marks — no line (matches default lane background) */
+      timelineGridQuarterLine: "transparent",
+      /** Slot row at :00 — dark grey */
+      timelineGridHourSlotBg: "#DCDFE3",
+      /** Slot row at :30 — light grey */
+      timelineGridHalfHourSlotBg: "#F2F4F7",
+      /** Slot row at :15 / :45 — default white */
+      timelineGridNormalSlotBg: "#FFFFFF",
       /** Soft status chips (finance / payment labels) */
       statusOrangeBg: "#FFFAEB",
       statusOrangeFg: "#F79009",
@@ -211,10 +223,13 @@ const theme = createTheme({
       styleOverrides: {
         html: {
           scrollbarGutter: "stable",
+          overflowX: "clip",
+          maxWidth: "100%",
         },
         body: {
           // Keep in sync with globals.css — blocks MUI scroll-lock layout jump
           paddingRight: "0 !important",
+          maxWidth: "100%",
         },
         ".mui-fixed": {
           paddingRight: "0 !important",
@@ -226,10 +241,32 @@ const theme = createTheme({
         // Dropdowns / profile menus don't need body scroll lock
         disableScrollLock: true,
       },
+      styleOverrides: {
+        paper: {
+          maxWidth: "calc(100vw - 16px)",
+        },
+      },
     },
     MuiMenu: {
       defaultProps: {
         disableScrollLock: true,
+      },
+      styleOverrides: {
+        paper: {
+          maxWidth: "calc(100vw - 16px)",
+        },
+      },
+    },
+    MuiDialog: {
+      styleOverrides: {
+        paper: ({ theme: t }) => ({
+          margin: 16,
+          [t.breakpoints.down("sm")]: {
+            margin: 12,
+            width: "calc(100% - 24px)",
+            maxWidth: "calc(100% - 24px)",
+          },
+        }),
       },
     },
     MuiSelect: {

@@ -700,7 +700,7 @@ export default function CalendarSettingsPanel({
                   key={service.key}
                   sx={{
                     display: "grid",
-                    gridTemplateColumns: "auto 1fr auto auto",
+                    gridTemplateColumns: "auto minmax(0, 1fr) auto auto",
                     alignItems: "center",
                     gap: 1.25,
                     borderRadius: "8px",
@@ -724,6 +724,9 @@ export default function CalendarSettingsPanel({
                       fontSize: 13,
                       fontWeight: 700,
                       color: alpha(m.navy, 0.72),
+                      minWidth: 0,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
                     }}
                   >
                     {service.label} colour {service.color}

@@ -117,7 +117,7 @@ export function AppTimePanel({
         <Box
           sx={{
             display: "grid",
-            gridTemplateColumns: "repeat(6, 1fr)",
+            gridTemplateColumns: { xs: "repeat(4, 1fr)", sm: "repeat(6, 1fr)" },
             gap: 0.5,
             mb: 1.25,
             maxHeight: 168,

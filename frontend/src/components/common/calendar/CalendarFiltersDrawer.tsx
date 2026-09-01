@@ -169,25 +169,38 @@ export default function CalendarFiltersDrawer({
                   setDraftFilters((p) => ({
                     ...p,
                     teamAll: checked,
-                    teamIds: Object.fromEntries(
-                      Object.keys(p.teamIds).map((id) => [id, false]),
-                    ),
+                    teamIds: checked
+                      ? Object.fromEntries(
+                          Object.keys(p.teamIds).map((id) => [id, false]),
+                        )
+                      : p.teamIds,
                   }))
                 }
               />
-              {resources.map((r, i) => (
+              {resources.map((r) => (
                 <FilterRow
                   key={r.id}
-                  label={`TM ${String.fromCharCode(65 + i)}`}
+                  label={r.name}
                   checked={
                     !draftFilters.teamAll && Boolean(draftFilters.teamIds[r.id])
                   }
                   onChange={(checked) =>
-                    setDraftFilters((p) => ({
-                      ...p,
-                      teamAll: false,
-                      teamIds: { ...p.teamIds, [r.id]: checked },
-                    }))
+                    setDraftFilters((p) => {
+                      const teamIds = { ...p.teamIds, [r.id]: checked };
+                      const selectedCount = resources.filter(
+                        (member) => teamIds[member.id],
+                      ).length;
+                      if (selectedCount === resources.length) {
+                        return {
+                          ...p,
+                          teamAll: true,
+                          teamIds: Object.fromEntries(
+                            resources.map((member) => [member.id, false]),
+                          ),
+                        };
+                      }
+                      return { ...p, teamAll: false, teamIds };
+                    })
                   }
                 />
               ))}
@@ -206,7 +219,9 @@ export default function CalendarFiltersDrawer({
                     setDraftFilters((p) => ({
                       ...p,
                       locationAll: checked,
-                      locations: { FL: false, DL: false },
+                      locations: checked
+                        ? { FL: false, DL: false }
+                        : p.locations,
                     }))
                   }
                 />
@@ -219,11 +234,20 @@ export default function CalendarFiltersDrawer({
                       Boolean(draftFilters.locations[loc])
                     }
                     onChange={(checked) =>
-                      setDraftFilters((p) => ({
-                        ...p,
-                        locationAll: false,
-                        locations: { ...p.locations, [loc]: checked },
-                      }))
+                      setDraftFilters((p) => {
+                        const nextLocations = { ...p.locations, [loc]: checked };
+                        const selectedCount = locations.filter(
+                          (location) => nextLocations[location],
+                        ).length;
+                        if (selectedCount === locations.length) {
+                          return {
+                            ...p,
+                            locationAll: true,
+                            locations: { FL: false, DL: false },
+                          };
+                        }
+                        return { ...p, locationAll: false, locations: nextLocations };
+                      })
                     }
                   />
                 ))}
@@ -242,12 +266,14 @@ export default function CalendarFiltersDrawer({
                   setDraftFilters((p) => ({
                     ...p,
                     bookingAll: checked,
-                    booking: {
-                      Online: false,
-                      Offline: false,
-                      Project: false,
-                      Requests: false,
-                    },
+                    booking: checked
+                      ? {
+                          Online: false,
+                          Offline: false,
+                          Project: false,
+                          Requests: false,
+                        }
+                      : p.booking,
                     statusAll: checked ? true : p.statusAll,
                     statuses: checked
                       ? {
@@ -271,11 +297,25 @@ export default function CalendarFiltersDrawer({
                     !draftFilters.bookingAll && Boolean(draftFilters.booking[bt])
                   }
                   onChange={(checked) =>
-                    setDraftFilters((p) => ({
-                      ...p,
-                      bookingAll: false,
-                      booking: { ...p.booking, [bt]: checked },
-                    }))
+                    setDraftFilters((p) => {
+                      const booking = { ...p.booking, [bt]: checked };
+                      const selectedCount = bookingTypes.filter(
+                        (type) => booking[type],
+                      ).length;
+                      if (selectedCount === bookingTypes.length) {
+                        return {
+                          ...p,
+                          bookingAll: true,
+                          booking: {
+                            Online: false,
+                            Offline: false,
+                            Project: false,
+                            Requests: false,
+                          },
+                        };
+                      }
+                      return { ...p, bookingAll: false, booking };
+                    })
                   }
                 />
               ))}
@@ -292,15 +332,17 @@ export default function CalendarFiltersDrawer({
                   setDraftFilters((p) => ({
                     ...p,
                     statusAll: checked,
-                    statuses: {
-                      Confirmed: false,
-                      Completed: false,
-                      Cancelled: false,
-                      Invalid: false,
-                      "No Show": false,
-                      Requested: false,
-                      "In Progress": false,
-                    },
+                    statuses: checked
+                      ? {
+                          Confirmed: false,
+                          Completed: false,
+                          Cancelled: false,
+                          Invalid: false,
+                          "No Show": false,
+                          Requested: false,
+                          "In Progress": false,
+                        }
+                      : p.statuses,
                   }))
                 }
               />
@@ -313,11 +355,28 @@ export default function CalendarFiltersDrawer({
                     Boolean(draftFilters.statuses?.[st])
                   }
                   onChange={(checked) =>
-                    setDraftFilters((p) => ({
-                      ...p,
-                      statusAll: false,
-                      statuses: { ...p.statuses, [st]: checked },
-                    }))
+                    setDraftFilters((p) => {
+                      const statuses = { ...p.statuses, [st]: checked };
+                      const selectedCount = bookingStatuses.filter(
+                        (status) => statuses[status],
+                      ).length;
+                      if (selectedCount === bookingStatuses.length) {
+                        return {
+                          ...p,
+                          statusAll: true,
+                          statuses: {
+                            Confirmed: false,
+                            Completed: false,
+                            Cancelled: false,
+                            Invalid: false,
+                            "No Show": false,
+                            Requested: false,
+                            "In Progress": false,
+                          },
+                        };
+                      }
+                      return { ...p, statusAll: false, statuses };
+                    })
                   }
                 />
               ))}

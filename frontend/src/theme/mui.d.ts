@@ -87,6 +87,18 @@ declare module "@mui/material/styles" {
     blockedTimeBg: string;
     /** Calendar blocked-time label / accent */
     blockedTimeFg: string;
+    /** Calendar day/week timeline — solid line at each full hour (dark grey) */
+    timelineGridHourLine: string;
+    /** Calendar day/week timeline — dotted line at each half hour (light grey) */
+    timelineGridHalfHourLine: string;
+    /** Quarter-hour marks — transparent (no visible line) */
+    timelineGridQuarterLine: string;
+    /** Slot row background at :00 */
+    timelineGridHourSlotBg: string;
+    /** Slot row background at :30 */
+    timelineGridHalfHourSlotBg: string;
+    /** Slot row background at :15 / :45 */
+    timelineGridNormalSlotBg: string;
     /** Soft status chip — overdue / pending / due */
     statusOrangeBg: string;
     statusOrangeFg: string;

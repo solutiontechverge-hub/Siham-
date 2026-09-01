@@ -183,6 +183,8 @@ export default function ClientListingPageView() {
           alignItems="center"
           justifyContent="flex-end"
           spacing={1.25}
+          useFlexGap
+          flexWrap="wrap"
           sx={{ mb: 2 }}
         >
           {/*

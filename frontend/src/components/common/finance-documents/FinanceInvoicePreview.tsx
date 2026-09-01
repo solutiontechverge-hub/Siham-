@@ -322,7 +322,7 @@ export default function FinanceInvoicePreview({
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: "1fr auto 1fr",
+          gridTemplateColumns: { xs: "1fr", sm: "1fr auto 1fr" },
           alignItems: "start",
           columnGap: 2,
         }}
@@ -366,7 +366,7 @@ export default function FinanceInvoicePreview({
             </Box>
           ) : null}
         </Box>
-        <Box sx={{ textAlign: "right" }}>
+        <Box sx={{ textAlign: { xs: "left", sm: "right" }, mt: { xs: 1.5, sm: 0 } }}>
           <BodyText sx={{ fontSize: 12.5, color: alpha(m.navy, 0.62) }}>
             Invoice Date: {invoiceDate}
           </BodyText>

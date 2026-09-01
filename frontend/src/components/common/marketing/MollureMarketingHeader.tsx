@@ -5,8 +5,10 @@ import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import LanguageRoundedIcon from "@mui/icons-material/LanguageRounded";
+import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneRounded";
 import {
   Avatar,
@@ -14,6 +16,7 @@ import {
   Box,
   Container,
   Divider,
+  Drawer,
   IconButton,
   Stack,
   Typography,
@@ -202,8 +205,10 @@ export default function MollureMarketingHeader({
   const openProfileMenu = (anchor: HTMLElement) => setProfileAnchor(anchor);
   const closeProfileMenu = () => setProfileAnchor(null);
   const [notificationsOpen, setNotificationsOpen] = React.useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
   const [selectedNotification, setSelectedNotification] =
     React.useState<ClientNotificationItem | null>(null);
+  const closeMobileNav = () => setMobileNavOpen(false);
   const openNotifications = () => setNotificationsOpen(true);
   const closeNotifications = () => setNotificationsOpen(false);
   const closeNotificationSummary = () => setSelectedNotification(null);
@@ -268,7 +273,7 @@ export default function MollureMarketingHeader({
           maxWidth={maxWidth}
           sx={{
             py: 1.5,
-            px: { xs: 3, sm: 4, md: 5, lg: 6, xl: 8 },
+            px: { xs: 2, sm: 3, md: 5, lg: 6, xl: 8 },
           }}
         >
           {/* md+: true center nav between logo and actions; xs: compact row */}
@@ -279,8 +284,9 @@ export default function MollureMarketingHeader({
               alignItems: "center",
               justifyContent: { xs: "space-between", md: "stretch" },
               gridTemplateColumns: { md: "auto minmax(0, 1fr) auto" },
-              columnGap: { md: 2 },
+              columnGap: { xs: 1, md: 2 },
               rowGap: 1,
+              minWidth: 0,
             }}
           >
             <Box
@@ -290,16 +296,33 @@ export default function MollureMarketingHeader({
                 justifyContent: "flex-start",
                 pl: { md: 2, lg: 3, xl: 4 },
                 minWidth: 0,
+                gap: 0.5,
               }}
             >
+              {navItems.length ? (
+                <IconButton
+                  aria-label="Open menu"
+                  onClick={() => setMobileNavOpen(true)}
+                  sx={{
+                    display: { xs: "inline-flex", md: "none" },
+                    color: alpha(m.navy, 0.82),
+                    width: { xs: 34, md: 36 },
+                    height: { xs: 34, md: 36 },
+                    flexShrink: 0,
+                  }}
+                >
+                  <MenuRoundedIcon />
+                </IconButton>
+              ) : null}
               <Box
                 component={Link}
                 href={resolvedHomeHref}
                 sx={{
                   display: "inline-flex",
                   alignItems: "center",
-                  flexShrink: 0,
+                  flexShrink: 1,
                   minWidth: 0,
+                  width: { xs: 100, sm: 140, md: 160 },
                 }}
               >
                 <Image
@@ -308,6 +331,7 @@ export default function MollureMarketingHeader({
                   width={160}
                   height={38}
                   priority
+                  style={{ width: "100%", height: "auto" }}
                 />
               </Box>
             </Box>
@@ -367,13 +391,13 @@ export default function MollureMarketingHeader({
               <Stack
                 direction="row"
                 alignItems="center"
-                spacing={{ xs: 1.1, sm: 1.4, md: 1.6 }}
+        spacing={{ xs: 0.75, sm: 1.4, md: 1.6 }}
                 sx={{
                   flexShrink: 0,
                   justifyContent: "flex-end",
                   justifySelf: "end",
                   alignItems: "center",
-                  flexWrap: { xs: "wrap", sm: "nowrap" },
+                  flexWrap: "nowrap",
                   rowGap: 1,
                   pr: { md: 2, lg: 3, xl: 4 },
                   pl: { xs: 0.5, md: 0 },
@@ -395,11 +419,14 @@ export default function MollureMarketingHeader({
                   }
                   sx={{
                     ...pillOutlineSx,
-                    minWidth: { xs: 84, sm: 84, md: 92 },
+                    minWidth: { xs: 56, sm: 84, md: 92 },
                     justifyContent: "space-between",
-                    gap: 1.1,
+                    gap: { xs: 0.4, sm: 1.1 },
                     "& .MuiButton-startIcon": { mr: 0 },
-                    "& .MuiButton-endIcon": { ml: 0 },
+                    "& .MuiButton-endIcon": {
+                      ml: 0,
+                      display: { xs: "none", sm: "inline-flex" },
+                    },
                   }}
                 >
                   {localeLabel}
@@ -469,7 +496,7 @@ export default function MollureMarketingHeader({
                       </Avatar>
                       <Typography
                         sx={{
-                          display: { xs: "none", sm: "block" },
+                          display: { xs: "none", md: "block" },
                           fontWeight: 700,
                           fontSize: 18,
                           lineHeight: 1.2,
@@ -496,7 +523,7 @@ export default function MollureMarketingHeader({
                       ...pillBaseSx,
                       fontWeight: 500,
                       boxShadow: "none",
-                      minWidth: { xs: 92, sm: 100, md: 108 },
+                      minWidth: { xs: 80, sm: 100, md: 108 },
                     }}
                   >
                     {resolvedLoginLabel}
@@ -511,7 +538,10 @@ export default function MollureMarketingHeader({
                       tone="secondary"
                       sx={{
                         ...audienceSwitchSx,
-                        display: "inline-flex",
+                        display: {
+                          xs: navItems.length ? "none" : "inline-flex",
+                          md: "inline-flex",
+                        },
                         alignItems: "center",
                         justifyContent: "center",
                         minWidth: { xs: 112, sm: 120, md: 128 },
@@ -537,6 +567,102 @@ export default function MollureMarketingHeader({
         </Container>
       </Box>
       {withDivider ? <Divider /> : null}
+
+      {navItems.length ? (
+        <Drawer
+          anchor="right"
+          open={mobileNavOpen}
+          onClose={closeMobileNav}
+          PaperProps={{
+            sx: {
+              width: "min(320px, 100vw)",
+              maxWidth: "100vw",
+              bgcolor: "#fff",
+            },
+          }}
+        >
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+            sx={{
+              px: 2,
+              py: 1.5,
+              borderBottom: `1px solid ${alpha(m.teal, 0.45)}`,
+            }}
+          >
+            <Box
+              sx={{
+                width: 118,
+                display: "inline-flex",
+                alignItems: "center",
+              }}
+            >
+              <Image
+                src={Logo}
+                alt="Mollure"
+                width={160}
+                height={38}
+                style={{ width: "100%", height: "auto" }}
+              />
+            </Box>
+            <IconButton
+              aria-label="Close menu"
+              onClick={closeMobileNav}
+              sx={{ color: alpha(m.navy, 0.82), width: 34, height: 34 }}
+            >
+              <CloseRoundedIcon />
+            </IconButton>
+          </Stack>
+          <Stack spacing={0.5} sx={{ px: 1.5, py: 2 }}>
+            {navItems.map((item) => {
+              const active = isNavActive(pathForActive, item);
+              return (
+                <HeaderNavText
+                  key={item.href + item.label}
+                  component={Link}
+                  href={item.href}
+                  onClick={closeMobileNav}
+                  sx={{
+                    display: "block",
+                    py: 1.1,
+                    px: 1.25,
+                    borderRadius: "10px",
+                    lineHeight: 1.25,
+                    fontWeight: active ? 600 : 500,
+                    color: active ? alpha(m.navy, 0.92) : alpha(m.navy, 0.58),
+                    textDecoration: "none",
+                    bgcolor: active ? alpha(m.teal, 0.1) : "transparent",
+                    "&:hover": {
+                      color: m.navy,
+                      bgcolor: alpha(m.navy, 0.04),
+                    },
+                  }}
+                >
+                  {item.label}
+                </HeaderNavText>
+              );
+            })}
+            {!isAuthed && professionalLinkLabel && professionalHref ? (
+              <AppButton
+                component={Link}
+                href={professionalHref}
+                tone="secondary"
+                onClick={closeMobileNav}
+                sx={{
+                  ...audienceSwitchSx,
+                  mt: 1,
+                  alignSelf: "stretch",
+                  maxWidth: "100%",
+                  display: { xs: "inline-flex", md: "none" },
+                }}
+              >
+                {professionalLinkLabel}
+              </AppButton>
+            ) : null}
+          </Stack>
+        </Drawer>
+      ) : null}
 
       {isAuthed ? (
         isProfessionalContext ? (

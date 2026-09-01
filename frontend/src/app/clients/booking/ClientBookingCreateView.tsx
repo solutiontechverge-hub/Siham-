@@ -1200,7 +1200,7 @@ export default function ClientBookingCreateView() {
               sx={{
                 fontWeight: 700,
                 color: "#333333",
-                fontSize: "30px",
+                fontSize: { xs: 22, sm: 26, md: 30 },
               }}
             >
               Booking Details

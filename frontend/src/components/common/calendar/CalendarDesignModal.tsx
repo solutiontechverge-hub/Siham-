@@ -220,7 +220,7 @@ export default function CalendarDesignModal({
                   key={key}
                   sx={{
                     display: "grid",
-                    gridTemplateColumns: "1fr auto auto",
+                    gridTemplateColumns: "minmax(0, 1fr) auto auto",
                     alignItems: "center",
                     gap: 1,
                     px: 1.75,

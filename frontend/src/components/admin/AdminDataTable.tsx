@@ -45,7 +45,11 @@ export default function AdminDataTable<T>({
 
   return (
     <TableContainer
-      sx={{ borderRadius: 2, border: `1px solid ${tokens.cardBorder}` }}
+      sx={{
+        borderRadius: 2,
+        border: `1px solid ${tokens.cardBorder}`,
+        overflowX: "auto",
+      }}
     >
       <Table size={dense ? "small" : "medium"}>
         <TableHead>
@@ -149,7 +153,7 @@ export function AdminSummaryGrid({
     <Box
       sx={{
         display: "grid",
-        gridTemplateColumns: { xs: "1fr 1fr", md: "repeat(4, 1fr)" },
+        gridTemplateColumns: { xs: "1fr 1fr", sm: "1fr 1fr", md: "repeat(4, 1fr)" },
         gap: 2,
         mt: embedded ? 0 : 3,
       }}

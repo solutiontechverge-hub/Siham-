@@ -1346,7 +1346,7 @@ export default function CalendarHoursRulesPanel({
                   key={item.key}
                   sx={{
                     display: "grid",
-                    gridTemplateColumns: "auto 1fr auto auto",
+                    gridTemplateColumns: "auto minmax(0, 1fr) auto auto",
                     alignItems: "center",
                     gap: 1.25,
                     borderRadius: "8px",
