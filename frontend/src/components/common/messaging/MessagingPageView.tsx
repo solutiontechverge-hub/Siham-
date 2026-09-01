@@ -49,8 +49,7 @@ export default function MessagingPageView({
 }: MessagingPageViewProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
-  const isCompactEmbedded =
-    embedded && useMediaQuery(theme.breakpoints.down("md"));
+  const isCompactLayout = useMediaQuery(theme.breakpoints.down("md"));
   const { showSnackbar } = useSnackbar();
   const inbox = useMessagingInbox(audience, navigation, currentUserName);
   const [mobileChatOpen, setMobileChatOpen] = React.useState(false);
@@ -86,11 +85,11 @@ export default function MessagingPageView({
   );
 
   React.useEffect(() => {
-    if (!isCompactEmbedded) setMobileChatOpen(false);
-  }, [isCompactEmbedded]);
+    if (!isCompactLayout) setMobileChatOpen(false);
+  }, [isCompactLayout]);
 
   React.useEffect(() => {
-    if (!isCompactEmbedded) return;
+    if (!isCompactLayout) return;
     if (
       (navigation?.bookingRef || navigation?.threadId) &&
       inbox.activeThread
@@ -99,7 +98,7 @@ export default function MessagingPageView({
     }
   }, [
     inbox.activeThread,
-    isCompactEmbedded,
+    isCompactLayout,
     navigation?.bookingRef,
     navigation?.threadId,
   ]);
@@ -107,21 +106,21 @@ export default function MessagingPageView({
   const handleSelectThread = React.useCallback(
     (threadId: string) => {
       inbox.setActiveThreadId(threadId);
-      if (isCompactEmbedded) setMobileChatOpen(true);
+      if (isCompactLayout) setMobileChatOpen(true);
     },
-    [inbox, isCompactEmbedded],
+    [inbox, isCompactLayout],
   );
 
   const handleMobileBack = React.useCallback(() => {
     setMobileChatOpen(false);
   }, []);
 
-  const showSidebar = !isCompactEmbedded || !mobileChatOpen;
+  const showSidebar = !isCompactLayout || !mobileChatOpen;
   // When the inbox is empty, always show the chat pane empty-state (even on compact),
   // otherwise the message disappears behind the list-only mobile layout.
   const inboxIsEmpty = inbox.visibleThreads.length === 0;
   const showChatPanel =
-    !isCompactEmbedded || mobileChatOpen || inboxIsEmpty;
+    !isCompactLayout || mobileChatOpen || inboxIsEmpty;
 
   const handleChatAction = (action: MessagingChatAction) => {
     if (!inbox.activeThread) return;
@@ -235,7 +234,7 @@ export default function MessagingPageView({
             }}
             onClose={embedded ? onClose : undefined}
             onBack={
-              isCompactEmbedded && mobileChatOpen ? handleMobileBack : undefined
+              isCompactLayout && mobileChatOpen ? handleMobileBack : undefined
             }
             composerDisabled={audience === "professional" && !inbox.canReply}
             composerDisabledHint={

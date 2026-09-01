@@ -86,7 +86,6 @@ import {
   validateBusinessSetupForPublish,
 } from "../businessSetupPublishValidation";
 import {
-  blankSectionFields,
   createDefaultTemplateSyncSettings,
   normalizeTemplateSyncSettings,
   pickSectionFields,
@@ -2980,26 +2979,15 @@ export default function ProfessionalFixedLocationSetup({
         };
 
         const applySection = (sectionId: "serviceFor" | "infoAndPolicy") => {
-          const mode = normalized[sectionId];
-          if (mode === "sync" || mode === "syncAndEdit") {
-            // Sync / Sync and edit: Desired fields are filled from Fixed.
-            next = {
-              ...next,
-              ...pickSectionFields(
-                source as Record<string, unknown>,
-                sectionId,
-              ),
-            };
-          } else {
-            // Independent: Desired fields start blank.
-            next = {
-              ...next,
-              ...blankSectionFields(
-                source as Record<string, unknown>,
-                sectionId,
-              ),
-            };
-          }
+          // Independent keeps current content in both templates as-is.
+          if (normalized[sectionId] !== "sync") return;
+          next = {
+            ...next,
+            ...pickSectionFields(
+              source as Record<string, unknown>,
+              sectionId,
+            ),
+          };
         };
 
         applySection("serviceFor");
@@ -3007,42 +2995,24 @@ export default function ProfessionalFixedLocationSetup({
         return next;
       });
 
-      if (
-        normalized.servicesDetails === "sync" ||
-        normalized.servicesDetails === "syncAndEdit"
-      ) {
-        // Filled from Fixed, then editable if syncAndEdit.
+      if (normalized.servicesDetails === "sync") {
         setServicesDesired(servicesFixed.map((item) => ({ ...item })));
         setMainServicesDesired(mainServicesFixed.map((item) => ({ ...item })));
-      } else {
-        // Independent: start blank on Desired.
-        setServicesDesired([]);
-        setMainServicesDesired([]);
       }
 
-      if (
-        normalized.manageTeam === "sync" ||
-        normalized.manageTeam === "syncAndEdit"
-      ) {
+      if (normalized.manageTeam === "sync") {
         setTeamMembersDesired(
           teamMembersFixed.map((member) => ({
             ...member,
             pendingPhotoFile: null,
           })),
         );
-      } else {
-        setTeamMembersDesired([]);
       }
 
-      if (
-        normalized.portfolio === "sync" ||
-        normalized.portfolio === "syncAndEdit"
-      ) {
+      if (normalized.portfolio === "sync") {
         setPortfolioItemsDesired(
           portfolioItemsFixed.map((item) => ({ ...item })),
         );
-      } else {
-        setPortfolioItemsDesired([]);
       }
 
       setTemplateSyncSettings(normalized);
@@ -4725,7 +4695,7 @@ export default function ProfessionalFixedLocationSetup({
             {isBothOffering ? (
               <IconButton
                 size="small"
-                aria-label="Template sync settings"
+                aria-label="Template Sync Settings"
                 disabled={businessFormDisabled}
                 onClick={() => {
                   setTemplateSyncDraft(
@@ -5135,8 +5105,8 @@ export default function ProfessionalFixedLocationSetup({
         anchor="right"
         open={templateSyncDrawerOpen}
         onClose={() => setTemplateSyncDrawerOpen(false)}
-        title="Template sync settings"
-        subtitle="Control how Fixed and Desired templates share section data."
+        title="Template Sync Settings"
+        subtitle="Control how each section is shared between your Fixed Location and Desired Location templates."
         contentSx={{ px: 2.5, py: 2 }}
         footer={
           <Stack

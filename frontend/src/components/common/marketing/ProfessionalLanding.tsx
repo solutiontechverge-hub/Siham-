@@ -177,7 +177,7 @@ export default function ProfessionalLanding({
                 />
                 <MarketingHeroTitle
                   sx={{
-                    fontSize: "40px",
+                    fontSize: { xs: 28, sm: 34, md: 40 },
                     fontWeight: 700,
                     lineHeight: 1.2,
                     letterSpacing: "-0.02em",

@@ -26,7 +26,7 @@ export default function FixedLocationPageScaffold({
   return (
     <Box sx={{ ...stickyFooterGrowSx, bgcolor: "mollure.pageBg" }}>
       <Box sx={{ flex: 1 }}>
-        <Container maxWidth="lg" sx={{ py: 2.5 }}>
+        <Container maxWidth="lg" sx={{ py: { xs: 2, md: 2.5 }, px: { xs: 2, sm: 3 } }}>
           <Stack spacing={2}>
             <FixedLocationTopTabs tabs={topTabs} activeLabel={activeTopTab} />
             {children}

@@ -1,4 +1,3 @@
-import { alpha } from "@mui/material/styles";
 import type {
   CalendarBlock,
   CalendarBookingLocation,
@@ -203,6 +202,77 @@ export function fmtTimeLabel(minutes: number) {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
   return `${pad2(h)}:${pad2(m)}`;
+}
+
+export type TimelineGridLineKind = "hour" | "halfHour" | "quarter";
+
+export type TimelineGridSlotColors = {
+  hour: string;
+  halfHour: string;
+  normal: string;
+};
+
+export function getDefaultCalendarResourceId(
+  rankedResources: readonly { id: string }[],
+): string {
+  return rankedResources[0]?.id ?? "";
+}
+
+/** Classify a minute-of-day mark for timeline grid styling. */
+export function timelineGridLineKind(minutes: number): TimelineGridLineKind {
+  const m = minutes % 60;
+  if (m === 0) return "hour";
+  if (m === 30) return "halfHour";
+  return "quarter";
+}
+
+/** Background color for a 15-minute timeline slot row. */
+export function timelineGridSlotBg(
+  minutes: number,
+  colors: TimelineGridSlotColors,
+  options?: { blocked?: boolean; blockedBg?: string },
+): string {
+  if (options?.blocked && options.blockedBg) return options.blockedBg;
+  const kind = timelineGridLineKind(minutes);
+  if (kind === "hour") return colors.hour;
+  if (kind === "halfHour") return colors.halfHour;
+  return colors.normal;
+}
+
+/** Whether a slot row overlaps a blocked-time interval. */
+export function slotOverlapsBlock(
+  slotStartMin: number,
+  slotStepMinutes: number,
+  blocks: readonly { start: string; end: string }[],
+): boolean {
+  const slotEnd = slotStartMin + slotStepMinutes;
+  return blocks.some((block) => {
+    const blockStart = minutesSinceMidnight(block.start);
+    const blockEnd = minutesSinceMidnight(block.end);
+    return blockStart < slotEnd && blockEnd > slotStartMin;
+  });
+}
+
+/** Map pointer Y within a timeline lane body to a clamped line position and minute. */
+export function timelineHoverFromPointerY(
+  yPx: number,
+  {
+    rowPx,
+    startMin,
+    endMin,
+    stepMinutes,
+  }: {
+    rowPx: number;
+    startMin: number;
+    endMin: number;
+    stepMinutes: number;
+  },
+): { topPx: number; timeMin: number } {
+  const maxYPx = Math.max(0, ((endMin - startMin) / stepMinutes) * rowPx);
+  const topPx = Math.max(0, Math.min(maxYPx, yPx));
+  const rawMin = startMin + (topPx / rowPx) * stepMinutes;
+  const timeMin = Math.max(startMin, Math.min(endMin, Math.round(rawMin)));
+  return { topPx, timeMin };
 }
 
 export function parseIsoDate(iso: string) {

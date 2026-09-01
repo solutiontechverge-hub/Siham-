@@ -9,6 +9,7 @@ import {
 } from "./calendar.data";
 import { useSnackbar } from "../../../../components/common/AppSnackbar";
 import { getApiErrorMessage } from "../../../../lib/api-error";
+import { resolveMediaUrl } from "../../../../lib/resolveMediaUrl";
 import { parseCalendarSettings } from "../../../../components/common/calendar/calendar-settings.types";
 import { mergeCalendarOverviewEvents, applyProfessionalClientKind } from "../../../../components/common/calendar/calendar-overview.mappers";
 import {
@@ -208,6 +209,7 @@ export function useFixedLocationCalendarPage() {
         id: String(member.id ?? `team-${index + 1}`),
         name: member.full_name?.trim() || `Team Member ${index + 1}`,
         avatarText: member.full_name?.trim()?.[0]?.toUpperCase() || "T",
+        photoSrc: resolveMediaUrl(member.profile_photo),
       })) ?? [];
 
     const supportedLocations: CalendarBookingLocation[] =

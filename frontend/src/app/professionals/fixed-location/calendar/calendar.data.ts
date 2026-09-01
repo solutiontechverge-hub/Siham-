@@ -183,6 +183,7 @@ export type CalendarResource = {
   id: string;
   name: string;
   avatarText: string;
+  photoSrc?: string;
 };
 
 export type CalendarEvent = {

@@ -962,7 +962,8 @@ function ProfileLocationChoiceCards({
           borderRadius: "8px",
           bgcolor: alpha(m.teal, 0.1),
           border: `1px solid ${alpha(m.teal, 0.25)}`,
-          minWidth: 180,
+          minWidth: { xs: 0, sm: 180 },
+          width: { xs: "100%", sm: "auto" },
         }}
       >
         <Image src={icon} alt="" width={16} height={16} />
@@ -980,7 +981,7 @@ function ProfileLocationChoiceCards({
         alignItems: "stretch",
         minHeight: 38,
         width: { xs: "100%", sm: "auto" },
-        minWidth: { sm: 420 },
+        minWidth: { xs: 0, sm: 420 },
         maxWidth: "100%",
         border: `1px solid ${alpha(m.navy, 0.12)}`,
         borderRadius: "8px",
@@ -1195,8 +1196,8 @@ export default function BusinessPublicProfile({
         }}
       >
         <Stack
-          direction="row"
-          alignItems="center"
+          direction={{ xs: "column", md: "row" }}
+          alignItems={{ xs: "stretch", md: "center" }}
           justifyContent="space-between"
           spacing={2}
           sx={{ px: { xs: 2, md: 2.5 }, py: { xs: 1.5, md: 1.75 } }}
@@ -1207,6 +1208,7 @@ export default function BusinessPublicProfile({
               fontSize: { xs: 17, md: 18 },
               color: alpha(m.navy, 0.88),
               lineHeight: 1.2,
+              minWidth: 0,
             }}
           >
             {pageTitle}

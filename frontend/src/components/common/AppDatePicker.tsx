@@ -650,7 +650,7 @@ export default function AppDatePicker({
           alignItems: "center",
           justifyContent: "space-between",
           width: fullWidth ? "100%" : "auto",
-          minWidth: 160,
+          minWidth: fullWidth ? 0 : 160,
           height: 40,
           minHeight: 40,
           px: 1.5,
