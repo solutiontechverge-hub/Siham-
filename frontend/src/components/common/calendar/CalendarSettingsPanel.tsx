@@ -13,7 +13,7 @@ import AppTextField from "../AppTextField";
 import { BodyText, SubHeading } from "../../ui/typography";
 import { BUSINESS_SERVICE_CATEGORY_CATALOG } from "../../../data/businessServiceCategorySlider.data";
 import type { CalendarDesignDraft } from "./CalendarDesignModal";
-import { getCalendarDesignServiceLabel } from "./CalendarDesignModal";
+import { getCalendarDesignCategoryLabel } from "./CalendarDesignModal";
 import CalendarServiceOrderCard from "./CalendarServiceOrderCard";
 import {
   type BookingRulesDraft,
@@ -432,7 +432,7 @@ export default function CalendarSettingsPanel({
         Boolean(appliedDesign.colorsByCategory[entry.key]),
       ).map((entry) => ({
         key: entry.key,
-        label: getCalendarDesignServiceLabel(entry.key),
+        label: getCalendarDesignCategoryLabel(entry.key),
         color: appliedDesign.colorsByCategory[entry.key],
       })),
     [appliedDesign.colorsByCategory],
@@ -680,7 +680,7 @@ export default function CalendarSettingsPanel({
                         color: alpha(m.navy, 0.72),
                       }}
                     >
-                      {getCalendarDesignServiceLabel(category.key)}
+                      {getCalendarDesignCategoryLabel(category.key)}
                     </BodyText>
                   </Box>
                 ))}

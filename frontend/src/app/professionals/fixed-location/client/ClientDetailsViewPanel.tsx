@@ -437,35 +437,47 @@ export default function ClientDetailsViewPanel({
                 Recent Services
               </Typography>
               <Stack spacing={0.9}>
-                {client.recentServices.map((service) => (
-                  <Stack
-                    key={service.name}
-                    direction="row"
-                    alignItems="center"
-                    justifyContent="space-between"
-                    gap={1}
+                {client.recentServices.length > 0 ? (
+                  client.recentServices.map((service, index) => (
+                    <Stack
+                      key={`${service.name}-${index}`}
+                      direction="row"
+                      alignItems="center"
+                      justifyContent="space-between"
+                      gap={1}
+                    >
+                      <Typography
+                        sx={{
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: alpha(m.navy, 0.55),
+                        }}
+                      >
+                        {service.name}
+                      </Typography>
+                      <Typography
+                        sx={{
+                          fontSize: 12,
+                          fontWeight: 800,
+                          color: alpha(m.navy, 0.88),
+                          flexShrink: 0,
+                        }}
+                      >
+                        {service.price}
+                      </Typography>
+                    </Stack>
+                  ))
+                ) : (
+                  <Typography
+                    sx={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: alpha(m.navy, 0.4),
+                    }}
                   >
-                    <Typography
-                      sx={{
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: alpha(m.navy, 0.55),
-                      }}
-                    >
-                      {service.name}
-                    </Typography>
-                    <Typography
-                      sx={{
-                        fontSize: 12,
-                        fontWeight: 800,
-                        color: alpha(m.navy, 0.88),
-                        flexShrink: 0,
-                      }}
-                    >
-                      {service.price}
-                    </Typography>
-                  </Stack>
-                ))}
+                    No recent services yet
+                  </Typography>
+                )}
               </Stack>
             </Box>
           </Grid>
@@ -490,35 +502,47 @@ export default function ClientDetailsViewPanel({
                 Booking History
               </Typography>
               <Stack spacing={0.9}>
-                {client.bookingHistory.map((entry, index) => (
-                  <Stack
-                    key={`${entry.period}-${index}`}
-                    direction="row"
-                    alignItems="center"
-                    justifyContent="space-between"
-                    gap={1}
+                {client.bookingHistory.length > 0 ? (
+                  client.bookingHistory.map((entry, index) => (
+                    <Stack
+                      key={`${entry.period}-${index}`}
+                      direction="row"
+                      alignItems="center"
+                      justifyContent="space-between"
+                      gap={1}
+                    >
+                      <Typography
+                        sx={{
+                          fontSize: 12,
+                          fontWeight: 600,
+                          color: alpha(m.navy, 0.55),
+                        }}
+                      >
+                        {entry.period}
+                      </Typography>
+                      <Typography
+                        sx={{
+                          fontSize: 12,
+                          fontWeight: 800,
+                          color: alpha(m.navy, 0.88),
+                          flexShrink: 0,
+                        }}
+                      >
+                        {entry.bookings} Booking
+                      </Typography>
+                    </Stack>
+                  ))
+                ) : (
+                  <Typography
+                    sx={{
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: alpha(m.navy, 0.4),
+                    }}
                   >
-                    <Typography
-                      sx={{
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: alpha(m.navy, 0.55),
-                      }}
-                    >
-                      {entry.period}
-                    </Typography>
-                    <Typography
-                      sx={{
-                        fontSize: 12,
-                        fontWeight: 800,
-                        color: alpha(m.navy, 0.88),
-                        flexShrink: 0,
-                      }}
-                    >
-                      {entry.bookings} Booking
-                    </Typography>
-                  </Stack>
-                ))}
+                    No booking history yet
+                  </Typography>
+                )}
               </Stack>
             </Box>
           </Grid>

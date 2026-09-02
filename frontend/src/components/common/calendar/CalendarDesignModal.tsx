@@ -2,21 +2,20 @@
 
 import AppButton from "../AppButton";
 import * as React from "react";
-import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
-import { Box, IconButton, Stack } from "@mui/material";
+import { Box, Stack } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import AppDropdown from "../AppDropdown";
 import AppModal from "../AppModal";
 import { BodyText } from "../../ui/typography";
-import { BUSINESS_SERVICE_CATEGORY_CATALOG } from "../../../data/businessServiceCategorySlider.data";
 import type { CalendarBookingStatus } from "../../../app/professionals/fixed-location/calendar/calendar.data";
-import { BOOKING_STATUS_THEME } from "./bookingStatus";
 
 export type CalendarDesignDraft = {
-  scope: "Categories" | "Services" | "Status" | "Team Members";
+  scope: "Categories" | "Services";
   colorsByCategory: Record<string, string>;
   colorsByService?: Record<string, string>;
+  /** @deprecated Legacy persisted data — not user-configurable. */
   colorsByStatus?: Partial<Record<CalendarBookingStatus, string>>;
+  /** @deprecated Legacy persisted data — not user-configurable. */
   colorsByTeamMember?: Record<string, string>;
 };
 
@@ -28,15 +27,15 @@ type CalendarDesignModalProps = {
   draft: CalendarDesignDraft;
   setDraft: React.Dispatch<React.SetStateAction<CalendarDesignDraft>>;
   serviceOptions?: readonly string[];
-  teamMemberOptions?: readonly { id: string; name: string }[];
+  categoryOptions?: readonly { key: string; label: string }[];
 };
 
-export function getCalendarDesignServiceLabel(key: string): string {
-  const entry = BUSINESS_SERVICE_CATEGORY_CATALOG.find(
-    (item) => item.key === key,
-  );
-  if (!entry) return key;
-  return entry.label;
+export function getCalendarDesignCategoryLabel(
+  key: string,
+  categoryOptions: readonly { key: string; label: string }[] = [],
+): string {
+  const entry = categoryOptions.find((item) => item.key === key);
+  return entry?.label ?? key;
 }
 
 type ColorRow = { key: string; label: string };
@@ -49,60 +48,26 @@ export default function CalendarDesignModal({
   draft,
   setDraft,
   serviceOptions = [],
-  teamMemberOptions = [],
+  categoryOptions = [],
 }: CalendarDesignModalProps) {
   const theme = useTheme();
   const m = theme.palette.mollure;
   const isServices = draft.scope === "Services";
-  const isStatus = draft.scope === "Status";
-  const isTeamMembers = draft.scope === "Team Members";
 
   const colorRows = React.useMemo<ColorRow[]>(() => {
-    if (isTeamMembers) {
-      return teamMemberOptions.map((member) => ({
-        key: member.id,
-        label: member.name,
-      }));
-    }
-    if (isStatus) {
-      return (Object.keys(BOOKING_STATUS_THEME) as CalendarBookingStatus[]).map(
-        (status) => ({
-          key: status,
-          label: status,
-        }),
-      );
-    }
     if (isServices) {
       return serviceOptions.map((label) => ({ key: label, label }));
     }
-    return BUSINESS_SERVICE_CATEGORY_CATALOG.map((entry) => ({
+    return categoryOptions.map((entry) => ({
       key: entry.key,
-      label: getCalendarDesignServiceLabel(entry.key),
+      label: getCalendarDesignCategoryLabel(entry.key, categoryOptions),
     }));
-  }, [isServices, isStatus, isTeamMembers, serviceOptions, teamMemberOptions]);
+  }, [isServices, serviceOptions, categoryOptions]);
 
   const setColor = React.useCallback(
     (key: string, hex: string) => {
       const safe = hex?.startsWith("#") ? hex : `#${hex}`;
       setDraft((p) => {
-        if (isTeamMembers) {
-          return {
-            ...p,
-            colorsByTeamMember: {
-              ...(p.colorsByTeamMember ?? {}),
-              [key]: safe,
-            },
-          };
-        }
-        if (isStatus) {
-          return {
-            ...p,
-            colorsByStatus: {
-              ...(p.colorsByStatus ?? {}),
-              [key as CalendarBookingStatus]: safe,
-            },
-          };
-        }
         if (isServices) {
           return {
             ...p,
@@ -115,33 +80,7 @@ export default function CalendarDesignModal({
         };
       });
     },
-    [isServices, isStatus, isTeamMembers, setDraft],
-  );
-
-  const clearColor = React.useCallback(
-    (key: string) => {
-      setDraft((p) => {
-        if (isTeamMembers) {
-          const next = { ...(p.colorsByTeamMember ?? {}) };
-          delete next[key];
-          return { ...p, colorsByTeamMember: next };
-        }
-        if (isStatus) {
-          const next = { ...(p.colorsByStatus ?? {}) };
-          delete next[key as CalendarBookingStatus];
-          return { ...p, colorsByStatus: next };
-        }
-        if (isServices) {
-          const next = { ...(p.colorsByService ?? {}) };
-          delete next[key];
-          return { ...p, colorsByService: next };
-        }
-        const next = { ...p.colorsByCategory };
-        delete next[key];
-        return { ...p, colorsByCategory: next };
-      });
-    },
-    [isServices, isStatus, isTeamMembers, setDraft],
+    [isServices, setDraft],
   );
 
   return (
@@ -192,8 +131,6 @@ export default function CalendarDesignModal({
             options={[
               { label: "Categories", value: "Categories" },
               { label: "Services", value: "Services" },
-              { label: "Status", value: "Status" },
-              { label: "Team Members", value: "Team Members" },
             ]}
             placeholder="Select scope"
             fullWidth
@@ -208,19 +145,15 @@ export default function CalendarDesignModal({
             }}
           >
             {colorRows.map(({ key, label }) => {
-              const color = isTeamMembers
-                ? draft.colorsByTeamMember?.[key]
-                : isStatus
-                  ? draft.colorsByStatus?.[key as CalendarBookingStatus]
-                  : isServices
-                    ? draft.colorsByService?.[key]
-                    : draft.colorsByCategory[key];
+              const color = isServices
+                ? draft.colorsByService?.[key]
+                : draft.colorsByCategory[key];
               return (
                 <Box
                   key={key}
                   sx={{
                     display: "grid",
-                    gridTemplateColumns: "minmax(0, 1fr) auto auto",
+                    gridTemplateColumns: "minmax(0, 1fr) auto",
                     alignItems: "center",
                     gap: 1,
                     px: 1.75,
@@ -288,22 +221,6 @@ export default function CalendarDesignModal({
                       }}
                     />
                   </AppButton>
-
-                  <IconButton
-                    size="small"
-                    onClick={() => clearColor(key)}
-                    sx={{
-                      width: 30,
-                      height: 30,
-                      borderRadius: "10px",
-                      border: `1px solid ${alpha(m.navy, 0.1)}`,
-                      bgcolor: "#fff",
-                      color: alpha(m.navy, 0.55),
-                      "&:hover": { bgcolor: alpha(m.navy, 0.03) },
-                    }}
-                  >
-                    <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
-                  </IconButton>
                 </Box>
               );
             })}

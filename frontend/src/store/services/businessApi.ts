@@ -72,6 +72,8 @@ export type BusinessTeamMember = {
     title?: string | null;
   }>;
   display_order: number;
+  rating?: number;
+  total_reviews?: number;
   created_at?: string;
   updated_at?: string;
   first_name?: string | null;
@@ -107,6 +109,7 @@ export type UpdateTeamMemberRequest = {
   }>;
   profilePhotoFile?: File | null;
   personalDocumentFile?: File | null;
+  personalDocumentFiles?: File[];
 };
 
 export type BusinessBookServiceCombination = {
@@ -1669,6 +1672,7 @@ export const businessApi = baseApi.injectEndpoints({
           id,
           profilePhotoFile,
           personalDocumentFile,
+          personalDocumentFiles,
           assigned_services,
           personal_documents,
           ...fields
@@ -1677,7 +1681,11 @@ export const businessApi = baseApi.injectEndpoints({
         _extraOptions,
         fetchWithBQ,
       ) {
-        const hasFiles = Boolean(profilePhotoFile || personalDocumentFile);
+        const documentFiles = [
+          ...(personalDocumentFiles ?? []),
+          ...(personalDocumentFile ? [personalDocumentFile] : []),
+        ];
+        const hasFiles = Boolean(profilePhotoFile || documentFiles.length > 0);
         let body: FormData | Record<string, unknown>;
 
         if (hasFiles) {
@@ -1696,8 +1704,8 @@ export const businessApi = baseApi.injectEndpoints({
           if (profilePhotoFile) {
             formData.append("profile_photo", profilePhotoFile);
           }
-          if (personalDocumentFile) {
-            formData.append("personal_document", personalDocumentFile);
+          for (const file of documentFiles) {
+            formData.append("personal_document", file);
           }
           body = formData;
         } else {

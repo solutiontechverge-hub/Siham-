@@ -9,6 +9,7 @@ export default function FixedLocationCalendarPageView() {
     handleOverviewDateRangeChange,
     calendarSettings,
     serviceOptions,
+    categoryOptions,
     serviceCatalog,
     serviceOrderDefaults,
     clientOptions,
@@ -36,6 +37,7 @@ export default function FixedLocationCalendarPageView() {
       onDateRangeChange={handleOverviewDateRangeChange}
       calendarSettings={calendarSettings}
       serviceOptions={serviceOptions}
+      categoryOptions={categoryOptions}
       serviceCatalog={serviceCatalog}
       serviceOrderDefaults={serviceOrderDefaults}
       clientOptions={clientOptions}

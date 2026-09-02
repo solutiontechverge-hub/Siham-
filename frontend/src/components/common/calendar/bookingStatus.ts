@@ -116,12 +116,12 @@ export const BOOKING_STATUS_THEME: Record<CalendarBookingStatus, StatusTheme> = 
     chipBorder: alpha("#E85D5D", 0.45),
   },
   "No Show": {
-    accent: "#667085",
-    cardBg: "#D0D5DD",
-    cardBorder: "#D0D5DD",
-    chipBg: "#D0D5DD",
-    chipColor: "#667085",
-    chipBorder: "#D0D5DD",
+    accent: "#4B5563",
+    cardBg: "#E5E7EB",
+    cardBorder: "#9CA3AF",
+    chipBg: "#D1D5DB",
+    chipColor: "#4B5563",
+    chipBorder: "#9CA3AF",
   },
   Invalid: {
     accent: "#EF4444",
