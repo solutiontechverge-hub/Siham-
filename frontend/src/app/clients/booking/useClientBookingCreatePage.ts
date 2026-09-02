@@ -52,16 +52,11 @@ import {
   useUploadBookingAttachmentsMutation,
 } from "../../../store/services/businessApi";
 import { joinBookingBusinessRoom } from "../../../lib/bookingSocketClient";
-import {
-  isPublicBusinessHoursNotAvailable,
-  getPublicBusinessHoursNotAvailableNote,
-  resolvePublicBusinessHoursDay,
-  type PublicBusinessHoursLike,
-} from "../../../components/common/calendar/calendar.utils";
 import type {
   ScheduleAvailabilityRow,
   ScheduleDateOverride,
 } from "../../../components/common/calendar/calendar-settings.types";
+import type { PublicBusinessHoursLike } from "../../../components/common/calendar/calendar.utils";
 import {
   autoAssignServicesByAvailability,
   computeUnionBookableSlots,
@@ -132,11 +127,6 @@ export function useClientBookingCreatePage() {
     if (setupIdForHours) joinBookingBusinessRoom(setupIdForHours);
   }, [setupIdForHours]);
 
-  const publicBusinessHours = React.useMemo((): PublicBusinessHoursLike[] => {
-    const raw = publicHoursResponse?.data?.publicBusinessHours;
-    if (!Array.isArray(raw)) return [];
-    return raw as PublicBusinessHoursLike[];
-  }, [publicHoursResponse?.data?.publicBusinessHours]);
   const minimumTimeslotNotice = React.useMemo(
     () => formatMinimumTimeslotNotice(publicHoursResponse?.data?.bookingRules),
     [publicHoursResponse?.data?.bookingRules],
@@ -231,25 +221,9 @@ export function useClientBookingCreatePage() {
   };
 
   const allDayTimes = React.useMemo(() => {
-    const iso = toISO(selectedDate);
-    const status = resolvePublicBusinessHoursDay(
-      publicBusinessHours,
-      iso,
-      bookingLocationCode,
-    );
-    // Explicit off day → no bookable times.
-    if (status.kind === "notAvailable") return [] as string[];
-
-    const hours =
-      status.kind === "open"
-        ? status.interval
-        : publicBusinessHours.length
-          ? null
-          : // No public hours configured yet → keep legacy 9–18 fallback.
-            { startMin: 9 * 60, endMin: 18 * 60 + 1 };
-
-    if (!hours) return [] as string[];
-
+    // Public Hours are display-only; slot grid uses a wide day window, then
+    // Schedule availability (availabilityBookableTimes) filters real bookable times.
+    const hours = { startMin: 9 * 60, endMin: 18 * 60 + 1 };
     const slots: string[] = [];
     for (
       let minutes = hours.startMin;
@@ -259,27 +233,11 @@ export function useClientBookingCreatePage() {
       slots.push(fmtMinutesToTimeLabel(minutes));
     }
     return slots;
-  }, [bookingLocationCode, publicBusinessHours, selectedDate]);
+  }, []);
 
-  const isDayNotAvailable = React.useCallback(
-    (d: Date) =>
-      isPublicBusinessHoursNotAvailable(
-        publicBusinessHours,
-        toISO(d),
-        bookingLocationCode,
-      ),
-    [bookingLocationCode, publicBusinessHours],
-  );
+  const isDayNotAvailable = React.useCallback((_d: Date) => false, []);
 
-  const getDayClosedNote = React.useCallback(
-    (d: Date) =>
-      getPublicBusinessHoursNotAvailableNote(
-        publicBusinessHours,
-        toISO(d),
-        bookingLocationCode,
-      ),
-    [bookingLocationCode, publicBusinessHours],
-  );
+  const getDayClosedNote = React.useCallback((_d: Date) => null as string | null, []);
 
   const selectedDayNotAvailable = React.useMemo(
     () => isDayNotAvailable(selectedDate),
@@ -312,20 +270,7 @@ export function useClientBookingCreatePage() {
   const getBookableTimesForDate = React.useCallback(
     (d: Date) => {
       if (isPastDay(d)) return [] as string[];
-      const iso = toISO(d);
-      const status = resolvePublicBusinessHoursDay(
-        publicBusinessHours,
-        iso,
-        bookingLocationCode,
-      );
-      if (status.kind === "notAvailable") return [] as string[];
-      const hours =
-        status.kind === "open"
-          ? status.interval
-          : publicBusinessHours.length
-            ? null
-            : { startMin: 9 * 60, endMin: 18 * 60 + 1 };
-      if (!hours) return [] as string[];
+      const hours = { startMin: 9 * 60, endMin: 18 * 60 + 1 };
       const slots: string[] = [];
       for (
         let minutes = hours.startMin;
@@ -340,23 +285,16 @@ export function useClientBookingCreatePage() {
         (t) => parseTimeLabelToMinutes(t) > minBookableMinutes,
       );
     },
-    [
-      bookingLocationCode,
-      isPastDay,
-      minBookableMinutes,
-      publicBusinessHours,
-      today0,
-    ],
+    [isPastDay, minBookableMinutes, today0],
   );
 
-  /** Day cannot be chosen: past, explicitly closed, or no public hours/slots. */
+  /** Day cannot be chosen: past, or no bookable times in the day window. */
   const isDayUnselectable = React.useCallback(
     (d: Date) => {
       if (isPastDay(d)) return true;
-      if (isDayNotAvailable(d)) return true;
       return getBookableTimesForDate(d).length === 0;
     },
-    [getBookableTimesForDate, isDayNotAvailable, isPastDay],
+    [getBookableTimesForDate, isPastDay],
   );
 
   const times = allDayTimes;

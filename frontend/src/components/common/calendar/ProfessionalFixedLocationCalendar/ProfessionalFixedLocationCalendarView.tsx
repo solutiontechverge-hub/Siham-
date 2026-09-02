@@ -143,7 +143,9 @@ import CalendarDesignModal, {
   type CalendarDesignDraft,
 } from "../CalendarDesignModal";
 import CalendarPublicBusinessHoursModal, {
-  expandPublicBusinessHoursDraft,
+  createEmptyPublicBusinessHoursDraft,
+  draftFromPublicBusinessHoursEntries,
+  replacePublicBusinessHoursForLocations,
   type PublicBusinessHoursDraft,
   type PublicBusinessHoursEntry,
 } from "../CalendarPublicBusinessHoursModal";
@@ -235,6 +237,7 @@ import {
   type BookingUniqueItemLine,
 } from "../../../../data/bookingUniqueItem.data";
 import {
+  archiveFullyPastScheduleRows,
   findBookingsInTimeslot,
   getCombinedAvailabilityIntervals,
   getLocationAvailabilityBands,
@@ -242,6 +245,7 @@ import {
   locationAvailabilityKindAtMinute,
   locationAvailabilityTooltip,
   makeScheduleRowId,
+  resourceHasScheduleOrBlockOnAnyDate,
   type LocationAvailabilityKind,
 } from "../calendar-schedule.utils";
 import {
@@ -1253,7 +1257,7 @@ export default function ProfessionalFixedLocationCalendar({
     bookingTypes,
     bookingStatuses,
     draftFilters,
-    filteredResources,
+    filteredResources: filterDrawerResources,
     initialFilters,
     locations,
     setDraftFilters,
@@ -1264,72 +1268,6 @@ export default function ProfessionalFixedLocationCalendar({
     [data.resources],
   );
   const fallbackTeamMemberId = String(data.resources[0]?.id ?? "");
-  const alphabeticalResources = React.useMemo(
-    () =>
-      [...filteredResources].sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
-      ),
-    [filteredResources],
-  );
-  const dayRankedResources = React.useMemo(
-    () =>
-      rankResourcesForCalendarDay(
-        filteredResources,
-        events,
-        activeDateIso,
-        {
-          fallbackTeamMemberId,
-          knownTeamIds: knownTeamMemberIds,
-        },
-      ),
-    [
-      activeDateIso,
-      events,
-      fallbackTeamMemberId,
-      filteredResources,
-      knownTeamMemberIds,
-    ],
-  );
-  const teamNavResources =
-    viewMode === "day" ? dayRankedResources : alphabeticalResources;
-  const defaultDaySelectedResourceId =
-    getDefaultCalendarResourceId(dayRankedResources);
-  const defaultWeekSelectedResourceId =
-    getDefaultCalendarResourceId(alphabeticalResources);
-
-  React.useLayoutEffect(() => {
-    if (viewMode !== "day") return;
-    userPickedTeamMemberRef.current = false;
-  }, [activeDateIso, viewMode]);
-
-  React.useLayoutEffect(() => {
-    if (filteredResources.length === 0) {
-      setSelectedResourceId("");
-      return;
-    }
-    const defaultResourceId =
-      viewMode === "day"
-        ? defaultDaySelectedResourceId
-        : defaultWeekSelectedResourceId;
-    setSelectedResourceId((current) => {
-      const stillValid =
-        Boolean(current) &&
-        filteredResources.some((resource) => resource.id === current);
-      if (!stillValid) {
-        userPickedTeamMemberRef.current = false;
-        return defaultResourceId;
-      }
-      if (!userPickedTeamMemberRef.current && viewMode === "day") {
-        return defaultDaySelectedResourceId;
-      }
-      return current;
-    });
-  }, [
-    defaultDaySelectedResourceId,
-    defaultWeekSelectedResourceId,
-    filteredResources,
-    viewMode,
-  ]);
 
   React.useEffect(() => {
     if (!data.supportedLocations.includes(slotLocation)) {
@@ -2117,17 +2055,9 @@ export default function ProfessionalFixedLocationCalendar({
   };
 
   const [publicBusinessHoursDraft, setPublicBusinessHoursDraft] =
-    React.useState<PublicBusinessHoursDraft>(() => ({
-      locations: [],
-      schedule: "",
-      day: "",
-      dateFrom: "",
-      dateTo: "",
-      startTime: "08:00",
-      endTime: "18:00",
-      notAvailable: false,
-      note: "",
-    }));
+    React.useState<PublicBusinessHoursDraft>(() =>
+      createEmptyPublicBusinessHoursDraft(),
+    );
 
   const [designDraft, setDesignDraft] = React.useState<CalendarDesignDraft>(
     () => ({
@@ -2153,6 +2083,7 @@ export default function ProfessionalFixedLocationCalendar({
   const [scheduleRows, setScheduleRows] = React.useState<
     ScheduleAvailabilityRow[]
   >([]);
+  const autoArchivePersistedRef = React.useRef<string | null>(null);
   const [dateOverrides, setDateOverrides] = React.useState<
     ParsedCalendarSettings["availability"]["dateOverrides"]
   >([]);
@@ -2193,7 +2124,9 @@ export default function ProfessionalFixedLocationCalendar({
     setBookingRules(
       calendarSettings.availability.bookingRules ?? defaultBookingRules(),
     );
-    setScheduleRows(calendarSettings.availability.scheduleAvailability ?? []);
+    const rawSchedule =
+      calendarSettings.availability.scheduleAvailability ?? [];
+    setScheduleRows(archiveFullyPastScheduleRows(rawSchedule));
     setDateOverrides(calendarSettings.availability.dateOverrides ?? []);
     setAppliedDesign(calendarSettings.design);
     setDesignDraft(calendarSettings.design);
@@ -2247,6 +2180,19 @@ export default function ProfessionalFixedLocationCalendar({
       serviceOrderDraft,
     ],
   );
+
+  React.useEffect(() => {
+    if (!calendarSettings || !onSaveCalendarSettings) return;
+    const raw = calendarSettings.availability.scheduleAvailability ?? [];
+    const next = archiveFullyPastScheduleRows(raw);
+    if (next === raw) return;
+    const fingerprint = next
+      .map((row) => `${row.id}:${row.archived ? 1 : 0}`)
+      .join("|");
+    if (autoArchivePersistedRef.current === fingerprint) return;
+    autoArchivePersistedRef.current = fingerprint;
+    void persistAvailabilitySettings({ scheduleAvailability: next });
+  }, [calendarSettings, onSaveCalendarSettings, persistAvailabilitySettings]);
 
   const resolveEventCategoryKey = React.useCallback((event: CalendarEvent) => {
     const candidates = [
@@ -2758,6 +2704,82 @@ export default function ProfessionalFixedLocationCalendar({
     // month: we still keep a single active date; month grid computed separately in UI.
     return [activeDateIso];
   }, [activeDateIso, viewMode]);
+
+  // Overview calendar: hide members with neither availability nor block on visible dates.
+  const filteredResources = React.useMemo(
+    () =>
+      filterDrawerResources.filter((resource) =>
+        resourceHasScheduleOrBlockOnAnyDate(
+          resource.id,
+          visibleDates,
+          scheduleRows,
+          blocks,
+        ),
+      ),
+    [blocks, filterDrawerResources, scheduleRows, visibleDates],
+  );
+
+  const alphabeticalResources = React.useMemo(
+    () =>
+      [...filteredResources].sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+      ),
+    [filteredResources],
+  );
+  const dayRankedResources = React.useMemo(
+    () =>
+      rankResourcesForCalendarDay(filteredResources, events, activeDateIso, {
+        fallbackTeamMemberId,
+        knownTeamIds: knownTeamMemberIds,
+      }),
+    [
+      activeDateIso,
+      events,
+      fallbackTeamMemberId,
+      filteredResources,
+      knownTeamMemberIds,
+    ],
+  );
+  const teamNavResources =
+    viewMode === "day" ? dayRankedResources : alphabeticalResources;
+  const defaultDaySelectedResourceId =
+    getDefaultCalendarResourceId(dayRankedResources);
+  const defaultWeekSelectedResourceId =
+    getDefaultCalendarResourceId(alphabeticalResources);
+
+  React.useLayoutEffect(() => {
+    if (viewMode !== "day") return;
+    userPickedTeamMemberRef.current = false;
+  }, [activeDateIso, viewMode]);
+
+  React.useLayoutEffect(() => {
+    if (filteredResources.length === 0) {
+      setSelectedResourceId("");
+      return;
+    }
+    const defaultResourceId =
+      viewMode === "day"
+        ? defaultDaySelectedResourceId
+        : defaultWeekSelectedResourceId;
+    setSelectedResourceId((current) => {
+      const stillValid =
+        Boolean(current) &&
+        filteredResources.some((resource) => resource.id === current);
+      if (!stillValid) {
+        userPickedTeamMemberRef.current = false;
+        return defaultResourceId;
+      }
+      if (!userPickedTeamMemberRef.current && viewMode === "day") {
+        return defaultDaySelectedResourceId;
+      }
+      return current;
+    });
+  }, [
+    defaultDaySelectedResourceId,
+    defaultWeekSelectedResourceId,
+    filteredResources,
+    viewMode,
+  ]);
 
   const getAvailabilityFor = React.useCallback(
     (resourceId: string, iso: string): Interval[] => {
@@ -7708,7 +7730,12 @@ export default function ProfessionalFixedLocationCalendar({
                     { allowTimeSelection: true },
                   );
                 }}
-                onPublicBusinessHours={() => setPublicBusinessHoursOpen(true)}
+                onPublicBusinessHours={() => {
+                  setPublicBusinessHoursDraft(
+                    createEmptyPublicBusinessHoursDraft("FL"),
+                  );
+                  setPublicBusinessHoursOpen(true);
+                }}
                 onDesign={() => {
                   setDesignDraft(appliedDesign);
                   setDesignOpen(true);
@@ -8970,12 +8997,17 @@ export default function ProfessionalFixedLocationCalendar({
             setDesignOpen(true);
           }}
           onOpenPublicHours={(location) => {
-            if (location) {
-              setPublicBusinessHoursDraft((prev) => ({
-                ...prev,
-                locations: [location],
-                schedule: location === "FL" ? "fixed" : "variable",
-              }));
+            const existing = Array.isArray(
+              calendarSettings?.availability.publicBusinessHours,
+            )
+              ? calendarSettings.availability.publicBusinessHours
+              : [];
+            if (location === "FL" || location === "DL") {
+              setPublicBusinessHoursDraft(
+                draftFromPublicBusinessHoursEntries(existing, location),
+              );
+            } else {
+              setPublicBusinessHoursDraft(createEmptyPublicBusinessHoursDraft());
             }
             setPublicBusinessHoursOpen(true);
           }}
@@ -14164,58 +14196,45 @@ export default function ProfessionalFixedLocationCalendar({
         onClose={() => setPublicBusinessHoursOpen(false)}
         onApply={async () => {
           try {
-            if (
-              !publicBusinessHoursDraft.locations.length ||
-              !publicBusinessHoursDraft.dateFrom ||
-              !publicBusinessHoursDraft.dateTo ||
-              (publicBusinessHoursDraft.dateFrom ===
-                publicBusinessHoursDraft.dateTo &&
-                !publicBusinessHoursDraft.day)
-            ) {
+            const location =
+              publicBusinessHoursDraft.location ||
+              publicBusinessHoursDraft.locations[0];
+            if (!location || !publicBusinessHoursDraft.schedule) {
               showSnackbar({
                 severity: "error",
-                message:
-                  "Select location and a date (single day or full range) before applying.",
+                message: "Select location and schedule before applying.",
               });
               return;
             }
             if (
-              publicBusinessHoursDraft.notAvailable &&
-              !publicBusinessHoursDraft.note.trim()
+              !publicBusinessHoursDraft.days?.length ||
+              publicBusinessHoursDraft.days.length !== 7
             ) {
               showSnackbar({
                 severity: "error",
-                message:
-                  "Note is required when Not Availability is selected.",
+                message: "Configure hours for each weekday before applying.",
               });
               return;
             }
+            const existing = Array.isArray(
+              calendarSettings?.availability.publicBusinessHours,
+            )
+              ? calendarSettings.availability.publicBusinessHours
+              : [];
             await persistAvailabilitySettings({
-              publicBusinessHours: [
-                ...(Array.isArray(
-                  calendarSettings?.availability.publicBusinessHours,
-                )
-                  ? calendarSettings.availability.publicBusinessHours
-                  : []),
-                ...expandPublicBusinessHoursDraft(publicBusinessHoursDraft),
-              ],
+              publicBusinessHours: replacePublicBusinessHoursForLocations(
+                existing,
+                publicBusinessHoursDraft,
+              ),
             });
             showSnackbar({
               severity: "success",
-              message: "Public business hours added.",
+              message: "Public business hours saved.",
             });
             setPublicBusinessHoursOpen(false);
-            setPublicBusinessHoursDraft({
-              locations: publicBusinessHoursDraft.locations,
-              schedule: publicBusinessHoursDraft.schedule,
-              day: "",
-              dateFrom: "",
-              dateTo: "",
-              startTime: "08:00",
-              endTime: "18:00",
-              notAvailable: false,
-              note: "",
-            });
+            setPublicBusinessHoursDraft(
+              createEmptyPublicBusinessHoursDraft(location),
+            );
           } catch {
             showSnackbar({
               severity: "error",
