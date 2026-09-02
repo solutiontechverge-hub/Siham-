@@ -28,7 +28,7 @@ export const profilePageData = {
     birthDate: { label: "Birth date", placeholder: "MM/DD/YY" },
     gender: { label: "Select Gender (Non Editable)" },
     countryCode: { label: "Country Code" },
-    phone: { label: "Contact Number", placeholder: "+442xxxxxxxxxxx" },
+    phone: { label: "Contact Number", placeholder: "+316xxxxxxxxx" },
     email: { label: "Email (Non Editable)", placeholder: "You@gmail.com" },
     password: { label: "Password*", placeholder: "Enter Password" },
     repeatPassword: { label: "Repeat password*", placeholder: "Confirm Password" },

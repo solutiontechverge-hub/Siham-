@@ -5,6 +5,7 @@ import type {
 } from "./client.types";
 import { isClientBlocked, type ClientRecord } from "./data/clientList";
 import { DEFAULT_CLIENT_LIST_SORT } from "./data/clientListFilters";
+import { DEFAULT_DIAL_CODE } from "../../../../lib/phoneDefaults";
 
 export { DEFAULT_CLIENT_LIST_SORT };
 
@@ -82,5 +83,5 @@ export function splitClientPhone(raw: string): {
       return { countryCode: code, phone: raw.slice(code.length).trim() };
     }
   }
-  return { countryCode: "+44", phone: raw };
+  return { countryCode: DEFAULT_DIAL_CODE, phone: raw };
 }

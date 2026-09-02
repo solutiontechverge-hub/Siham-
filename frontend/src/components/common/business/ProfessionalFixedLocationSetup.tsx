@@ -63,6 +63,7 @@ import {
   useUpdateBusinessSetupActiveMutation,
 } from "../../../store/services/businessApi";
 import { getApiErrorMessage } from "../../../lib/api-error";
+import { teamMemberRatingFromApi } from "../../../lib/teamMemberReviews";
 import { parseCalendarSettings } from "../calendar/calendar-settings.types";
 import {
   isCategoryVisibleInServiceOrder,
@@ -2621,15 +2622,21 @@ export default function ProfessionalFixedLocationSetup({
     servicesDesiredRef.current = hydratedServices.subs;
 
     if (businessSetupData.team_members.length > 0) {
-      const hydratedTeam = businessSetupData.team_members.map((member) => ({
-        id: String(member.id ?? `tm-${member.display_order}`),
-        name: member.full_name,
-        role: member.role,
-        photoSrc: member.profile_photo || "",
-        rating: 4.5,
-        reviewsLabel: "(0 Reviews)",
-        services: defaultServices(member.assigned_services),
-      }));
+      const hydratedTeam = businessSetupData.team_members.map((member) => {
+        const reviewStats = teamMemberRatingFromApi(
+          member.rating,
+          member.total_reviews,
+        );
+        return {
+          id: String(member.id ?? `tm-${member.display_order}`),
+          name: member.full_name,
+          role: member.role,
+          photoSrc: member.profile_photo || "",
+          rating: reviewStats.rating,
+          reviewsLabel: reviewStats.reviewsLabel,
+          services: defaultServices(member.assigned_services),
+        };
+      });
       setTeamMembersFixed(hydratedTeam);
       setTeamMembersDesired(
         hydratedTeam.map((member) => ({ ...member, pendingPhotoFile: null })),
@@ -4526,7 +4533,7 @@ export default function ProfessionalFixedLocationSetup({
       onSubmit={() => void teamMemberModal.saveModal()}
       onChange={teamMemberModal.updateDraft}
       onPickService={teamMemberModal.pickService}
-      onRemoveServiceGroup={teamMemberModal.removeServiceGroup}
+      onRemoveAssignedService={teamMemberModal.removeAssignedService}
       onChoosePhoto={teamMemberModal.choosePhoto}
       onPhotoSelected={teamMemberModal.onPhotoSelected}
     />

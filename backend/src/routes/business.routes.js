@@ -145,7 +145,7 @@ router.patch(
   requireProfessional,
   messagingUpload.fields([
     { name: "profile_photo", maxCount: 1 },
-    { name: "personal_document", maxCount: 1 },
+    { name: "personal_document", maxCount: 5 },
   ]),
   (req, res, next) => {
     if (typeof req.body?.assigned_services === "string" && req.body.assigned_services.trim()) {

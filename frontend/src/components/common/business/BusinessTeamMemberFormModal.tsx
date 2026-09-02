@@ -3,20 +3,18 @@
 import AppButton from "../AppButton";
 import * as React from "react";
 import Image from "next/image";
-import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
-import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
 import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
-import { Box, IconButton, MenuItem, Stack, Typography } from "@mui/material";
+import { Box, MenuItem, Stack, Typography } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import MollureFormField from "../MollureFormField";
 import { MollureLabeledSelect } from "../MollureLabeledFields";
 import AppDrawer from "../AppDrawer";
+import TeamMemberAssignedServicesPanel from "./TeamMemberAssignedServicesPanel";
 import {
   addTeamMemberServiceSelection,
   buildTeamCategoryOptions,
   buildTeamServiceOptionsForCategory,
   businessTeamMemberModalCopy,
-  formatTeamMemberGroupLabel,
   type TeamMemberFormDraft,
   type TeamMemberModalServiceContext,
 } from "../../../data/businessTeamMemberModal.data";
@@ -42,7 +40,7 @@ type BusinessTeamMemberFormModalProps = {
   onSubmit: () => void;
   onChange: (patch: Partial<TeamMemberFormDraft>) => void;
   onPickService: (categoryId: string, serviceId: string) => void;
-  onRemoveServiceGroup: (categoryId: string) => void;
+  onRemoveAssignedService: (serviceId: string) => void;
   onChoosePhoto: () => void;
   onPhotoSelected: (file: File, objectUrl: string) => void;
 };
@@ -61,7 +59,7 @@ export default function BusinessTeamMemberFormModal({
   onSubmit,
   onChange,
   onPickService,
-  onRemoveServiceGroup,
+  onRemoveAssignedService,
   onChoosePhoto,
   onPhotoSelected,
 }: BusinessTeamMemberFormModalProps) {
@@ -373,93 +371,13 @@ export default function BusinessTeamMemberFormModal({
             </Box>
           ) : null}
 
-          <Box
-            sx={{
-              borderRadius: "10px",
-              bgcolor: alpha(m.navy, 0.045),
-              border: `1px solid ${alpha(m.navy, 0.08)}`,
-              p: 2,
-              width: "100%",
-              boxSizing: "border-box",
-            }}
-          >
-            <Typography
-              sx={{
-                fontWeight: 800,
-                fontSize: 14,
-                color: alpha(m.navy, 0.88),
-                mb: 1.5,
-              }}
-            >
-              {businessTeamMemberModalCopy.selectedHeading}
-            </Typography>
-
-            {displaySelectedGroups.length === 0 ? (
-              <Typography sx={{ fontSize: 13, color: alpha(m.navy, 0.5) }}>
-                {businessTeamMemberModalCopy.noSelections}
-              </Typography>
-            ) : (
-              <Box
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: {
-                    xs: "1fr",
-                    sm: "repeat(2, minmax(0, 1fr))",
-                  },
-                  gap: 1.25,
-                }}
-              >
-                {displaySelectedGroups.map((group) => (
-                  <Box
-                    key={group.categoryId}
-                    sx={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 0.75,
-                      minWidth: 0,
-                    }}
-                  >
-                    <MollureFormField
-                      select
-                      value={group.categoryId}
-                      disabled={disabled}
-                      fullWidth
-                      sx={{
-                        flex: 1,
-                        minWidth: 0,
-                        ...fieldInputSx,
-                        "& .MuiSelect-select": {
-                          display: "flex",
-                          alignItems: "center",
-                        },
-                      }}
-                      SelectProps={{
-                        readOnly: true,
-                        IconComponent: KeyboardArrowDownRoundedIcon,
-                      }}
-                    >
-                      <MenuItem value={group.categoryId}>
-                        {formatTeamMemberGroupLabel(
-                          group,
-                          businessCategories,
-                          serviceContext,
-                        )}
-                      </MenuItem>
-                    </MollureFormField>
-                    <IconButton
-                      size="small"
-                      aria-label={`Remove ${group.categoryTitle}`}
-                      onClick={() => onRemoveServiceGroup(group.categoryId)}
-                      disabled={disabled}
-                      sx={{ color: alpha(m.navy, 0.45) }}
-                    >
-                      <DeleteOutlineRoundedIcon sx={{ fontSize: 20 }} />
-                    </IconButton>
-                  </Box>
-                ))}
-              </Box>
-            )}
-          </Box>
+          <TeamMemberAssignedServicesPanel
+            selectedGroups={displaySelectedGroups}
+            businessCategories={businessCategories}
+            serviceContext={serviceContext}
+            disabled={disabled}
+            onRemoveService={onRemoveAssignedService}
+          />
         </Stack>
       </Box>
     </AppDrawer>

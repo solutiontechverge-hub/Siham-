@@ -30,10 +30,19 @@ export const TEAM_SERVICE_SLOT_KEYS: (keyof TeamServiceSlots)[] = [
 
 export const TEAM_MEMBER_ALL_SERVICES_VALUE = "__all__";
 
+export const TEAM_MEMBER_MAX_PERSONAL_DOCUMENTS = 5;
+
 export type TeamMemberServiceGroupSelection = {
   categoryId: string;
   categoryTitle: string;
   subServiceIds: string[];
+};
+
+export type TeamMemberAssignedServiceItem = {
+  serviceId: string;
+  label: string;
+  categoryId: string;
+  categoryTitle: string;
 };
 
 export type TeamMemberFormDraft = {
@@ -52,6 +61,7 @@ export const businessTeamMemberModalCopy = {
   addLabel: "Add",
   updateLabel: "Update",
   profilePictureLabel: "Profile Picture",
+  uploadProfileLabel: "Upload profile",
   nameLabel: "Name",
   namePlaceholder: "Enter team member name",
   selectCategoryLabel: "Select category",
@@ -61,6 +71,7 @@ export const businessTeamMemberModalCopy = {
   selectCategoryPlaceholder: "Select category",
   selectServicePlaceholder: "Select service",
   noSelections: "No services selected yet.",
+  noSelectionsInCategory: "No services selected in this category.",
   noCategories: "No categories available yet. Add services first.",
   noServicesInCategory: "No services in this category yet.",
 } as const;
@@ -148,10 +159,6 @@ export function buildTeamCategoryOptions(
   } else if (businessCategories.length > 0) {
     for (const category of businessCategories) {
       pushOption(String(category.id), category.title);
-    }
-  } else {
-    for (const entry of BUSINESS_SERVICE_CATEGORY_CATALOG) {
-      pushOption(entry.key, entry.label);
     }
   }
 
@@ -344,6 +351,45 @@ export function removeTeamMemberServiceGroup(
   };
 }
 
+export function flattenTeamMemberAssignedServices(
+  groups: readonly TeamMemberServiceGroupSelection[],
+  businessCategories: readonly BusinessCategoryLike[],
+  context: TeamMemberModalServiceContext = {},
+): TeamMemberAssignedServiceItem[] {
+  const items: TeamMemberAssignedServiceItem[] = [];
+
+  for (const group of groups) {
+    const labels = getTeamMemberGroupServiceLabels(group, businessCategories, context);
+    group.subServiceIds.forEach((serviceId, index) => {
+      items.push({
+        serviceId,
+        label: labels[index] ?? serviceId,
+        categoryId: group.categoryId,
+        categoryTitle: group.categoryTitle,
+      });
+    });
+  }
+
+  return items;
+}
+
+export function removeTeamMemberAssignedService(
+  draft: TeamMemberFormDraft,
+  serviceId: string,
+): TeamMemberFormDraft {
+  const normalizedId = String(serviceId ?? "").trim();
+  if (!normalizedId) return draft;
+
+  const selectedGroups = draft.selectedGroups
+    .map((group) => ({
+      ...group,
+      subServiceIds: group.subServiceIds.filter((id) => id !== normalizedId),
+    }))
+    .filter((group) => group.subServiceIds.length > 0);
+
+  return { ...draft, selectedGroups };
+}
+
 export function groupsToTeamService(groups: TeamMemberServiceGroupSelection[]): TeamServiceSlots {
   const ids = groups.flatMap((group) => group.subServiceIds).filter(Boolean);
   const unique = Array.from(new Set(ids)).slice(0, TEAM_SERVICE_SLOT_KEYS.length);
@@ -389,48 +435,91 @@ function appendTeamServiceGroup(
   });
 }
 
+function appendAssignedServiceToGroups(
+  groups: Map<string, TeamMemberServiceGroupSelection>,
+  serviceId: string,
+  businessCategories: readonly BusinessCategoryLike[],
+  context: TeamMemberModalServiceContext,
+): void {
+  const { businessServices = [] } = context;
+  let matched = false;
+
+  for (const category of businessCategories as BusinessCategoryWithSubs[]) {
+    const sub = category.subcategories?.find((item) => String(item.id) === serviceId);
+    if (!sub) continue;
+    appendTeamServiceGroup(groups, String(category.id), category.title, serviceId);
+    matched = true;
+    break;
+  }
+
+  if (!matched) {
+    const setupService = businessServices.find((item) => item.serviceId === serviceId);
+    if (setupService) {
+      const record = resolveTeamCategoryRecord(setupService.categoryId, businessCategories, context);
+      if (record) {
+        appendTeamServiceGroup(groups, record.id, record.title, serviceId);
+        matched = true;
+      }
+    }
+  }
+
+  if (!matched) {
+    for (const entry of BUSINESS_SERVICE_CATEGORY_CATALOG) {
+      const apiCategory = findBusinessCategoryForCatalogEntry(businessCategories, entry) as
+        | BusinessCategoryWithSubs
+        | undefined;
+      if (!apiCategory?.subcategories?.some((item) => String(item.id) === serviceId)) continue;
+      appendTeamServiceGroup(groups, String(apiCategory.id), apiCategory.title, serviceId);
+      break;
+    }
+  }
+}
+
+export function groupsFromAssignedServices(
+  assignedServices: readonly { service_id: string; title?: string | null }[],
+  businessCategories: readonly BusinessCategoryLike[],
+  context: TeamMemberModalServiceContext = {},
+): TeamMemberServiceGroupSelection[] {
+  const groups = new Map<string, TeamMemberServiceGroupSelection>();
+
+  for (const assigned of assignedServices) {
+    const serviceId = String(assigned.service_id ?? "").trim();
+    if (!serviceId) continue;
+    appendAssignedServiceToGroups(groups, serviceId, businessCategories, context);
+  }
+
+  return Array.from(groups.values());
+}
+
+export function getTeamMemberGroupServiceLabels(
+  group: TeamMemberServiceGroupSelection,
+  businessCategories: readonly BusinessCategoryLike[],
+  context: TeamMemberModalServiceContext = {},
+): string[] {
+  const { businessServices = [] } = context;
+
+  return group.subServiceIds.map((serviceId) => {
+    const setupService = businessServices.find((item) => item.serviceId === serviceId);
+    if (setupService?.label) return setupService.label;
+
+    for (const category of businessCategories as BusinessCategoryWithSubs[]) {
+      const sub = category.subcategories?.find((item) => String(item.id) === serviceId);
+      if (sub?.title) return sub.title;
+    }
+
+    return serviceId;
+  });
+}
+
 export function groupsFromTeamService(
   services: TeamServiceSlots,
   businessCategories: readonly BusinessCategoryLike[],
   context: TeamMemberModalServiceContext = {},
 ): TeamMemberServiceGroupSelection[] {
-  const { businessServices = [] } = context;
   const ids = TEAM_SERVICE_SLOT_KEYS.map((key) => String(services[key] ?? "").trim()).filter(Boolean);
-  const groups = new Map<string, TeamMemberServiceGroupSelection>();
-
-  for (const serviceId of ids) {
-    let matched = false;
-
-    for (const category of businessCategories as BusinessCategoryWithSubs[]) {
-      const sub = category.subcategories?.find((item) => String(item.id) === serviceId);
-      if (!sub) continue;
-      appendTeamServiceGroup(groups, String(category.id), category.title, serviceId);
-      matched = true;
-      break;
-    }
-
-    if (!matched) {
-      const setupService = businessServices.find((item) => item.serviceId === serviceId);
-      if (setupService) {
-        const record = resolveTeamCategoryRecord(setupService.categoryId, businessCategories, context);
-        if (record) {
-          appendTeamServiceGroup(groups, record.id, record.title, serviceId);
-          matched = true;
-        }
-      }
-    }
-
-    if (!matched) {
-      for (const entry of BUSINESS_SERVICE_CATEGORY_CATALOG) {
-        const apiCategory = findBusinessCategoryForCatalogEntry(businessCategories, entry) as
-          | BusinessCategoryWithSubs
-          | undefined;
-        if (!apiCategory?.subcategories?.some((item) => String(item.id) === serviceId)) continue;
-        appendTeamServiceGroup(groups, String(apiCategory.id), apiCategory.title, serviceId);
-        break;
-      }
-    }
-  }
-
-  return Array.from(groups.values());
+  return groupsFromAssignedServices(
+    ids.map((service_id) => ({ service_id })),
+    businessCategories,
+    context,
+  );
 }

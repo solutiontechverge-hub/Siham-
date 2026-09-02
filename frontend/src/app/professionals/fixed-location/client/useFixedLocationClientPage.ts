@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { getPhoneValidationErrors } from "../../../../lib/phone-validation";
+import { DEFAULT_DIAL_CODE } from "../../../../lib/phoneDefaults";
 import type { ClientRecord } from "./data/clientList";
 import {
   useCreateProfessionalClientMutation,
@@ -102,7 +103,7 @@ export function useFixedLocationClientPage() {
   const [indLastName, setIndLastName] = React.useState("");
   const [indGender, setIndGender] = React.useState("");
   const [indDob, setIndDob] = React.useState("");
-  const [indCountryCode, setIndCountryCode] = React.useState("+44");
+  const [indCountryCode, setIndCountryCode] = React.useState(DEFAULT_DIAL_CODE);
   const [indPhone, setIndPhone] = React.useState("");
   const [indEmail, setIndEmail] = React.useState("");
   const [indErrors, setIndErrors] = React.useState<Partial<Record<string, string>>>({});
@@ -119,7 +120,7 @@ export function useFixedLocationClientPage() {
   const [coPostal, setCoPostal] = React.useState("");
   const [coProvince, setCoProvince] = React.useState("");
   const [coMunicipality, setCoMunicipality] = React.useState("");
-  const [coCountryCode, setCoCountryCode] = React.useState("+44");
+  const [coCountryCode, setCoCountryCode] = React.useState(DEFAULT_DIAL_CODE);
   const [coPhone, setCoPhone] = React.useState("");
   const [coEmail, setCoEmail] = React.useState("");
   const [compErrors, setCompErrors] = React.useState<Partial<Record<string, string>>>({});
@@ -334,7 +335,7 @@ export function useFixedLocationClientPage() {
     setIndLastName("");
     setIndGender("");
     setIndDob("");
-    setIndCountryCode("+44");
+    setIndCountryCode(DEFAULT_DIAL_CODE);
     setIndPhone("");
     setIndEmail("");
     setIndErrors({});
@@ -350,7 +351,7 @@ export function useFixedLocationClientPage() {
     setCoPostal("");
     setCoProvince("");
     setCoMunicipality("");
-    setCoCountryCode("+44");
+    setCoCountryCode(DEFAULT_DIAL_CODE);
     setCoPhone("");
     setCoEmail("");
     setCompErrors({});
